@@ -136,6 +136,17 @@ struct PythonObject(
         """
         self.py_object = ptr
 
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, none: NoneType._mlir_type):
+        """Initialize a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = Self(none=NoneType(none))
+
     fn __init__(inout self, none: NoneType):
         """Initialize a none value object from a `None` literal.
 

@@ -2540,7 +2540,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 if start:
                     var start_value = start.value()
                     var current_entry = Self(
-                        first_curly=start_value, last_curly=i, field=None
+                        first_curly=start_value, last_curly=i, field=NoneType()
                     )
                     if i - start_value != 1:
                         var field = format_src[start_value + 1 : i]

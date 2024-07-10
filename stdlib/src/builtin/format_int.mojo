@@ -320,7 +320,7 @@ fn _try_write_int[
             len=1,
         )
         fmt.write_str(zero)
-        return
+        return None
 
     # Create a buffer to store the formatted value
 
