@@ -557,13 +557,13 @@ struct List[T: CollectionElement](
         Args:
             new_size: The new size.
         """
-        debug_assert(
-            new_size <= self.size,
-            (
-                "New size must be smaller than or equal to current size when no"
-                " new value is provided."
-            ),
-        )
+        if self.size < new_size:
+            abort(
+                "You are calling List.resize with a new_size bigger than the"
+                " current size. If you want to make the List bigger, provide a"
+                " value to fill the new slots with. If not, make sure the new"
+                " size is smaller than the current size."
+            )
         for i in range(new_size, self.size):
             (self.data + i).destroy_pointee()
         self.size = new_size

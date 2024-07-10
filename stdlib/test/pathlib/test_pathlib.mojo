@@ -114,7 +114,7 @@ def set_home(path: Path):
 
 # More elaborate tests in `os/path/test_expanduser.mojo`
 def test_expand_user():
-    alias user_path = get_user_path()
+    var user_path = get_user_path()
     var original_home = get_current_home()
     set_home(user_path)
 
@@ -129,7 +129,7 @@ def test_expand_user():
 
 
 def test_home():
-    alias user_path = get_user_path()
+    var user_path = get_user_path()
     var original_home = get_current_home()
     set_home(user_path)
 
