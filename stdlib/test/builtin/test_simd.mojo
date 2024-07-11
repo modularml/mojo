@@ -58,18 +58,12 @@ def test_uint_cast():
         assert_equal(n0, Scalar[A](n1))
         assert_equal(n0, n1.cast[A]())
         assert_equal(n0, int(n1.cast[A]()))
-
-        @parameter
-        if T.bitwidth() == A.bitwidth():
-            assert_equal(n0, n1.cast[A]().cast[T]().cast[A]())
+        assert_equal(n0, n1.cast[A]().cast[T]().cast[A]())
 
         var n2 = SIMD[A, width](n0)
         var n3 = SIMD[T, width](n1)
         assert_true((n2 == n3.cast[A]()).reduce_and())
-
-        @parameter
-        if T.bitwidth() == A.bitwidth():
-            assert_true((n2 == n3.cast[A]().cast[T]().cast[A]()).reduce_and())
+        assert_true((n2 == n3.cast[A]().cast[T]().cast[A]()).reduce_and())
 
     alias src = (
         DType.uint64,
