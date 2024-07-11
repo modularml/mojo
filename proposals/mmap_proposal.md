@@ -23,88 +23,88 @@ A `Mmap` object, containing the functionality for construction/destruction and i
 An initial implementation of `Mmap` in a read-only context can be used as follows. Note, the API has been meant to provide similarity with the existing `FileHandle` API.
 
 ```mojo
-var length: Int32 = 24;
-var fd: FileDescriptor = open("./test.txt", "r");
+    var length: Int32 = 24;
+    var fd: FileDescriptor = open("./test.txt", "r");
 
-# Initialize a mmap object for the particular file, with read and shared
-# permissions
-var mmap = Mmap(fd=fd, length=length, offset=0, mode=MmapMode.READ)
+    # Initialize a mmap object for the particular file, with read and shared
+    # permissions
+    var mmap = Mmap(fd=fd, length=length, offset=0, mode=MmapMode.READ)
 
-# Print out the entire file as a String
-print(String(mmap.read_bytes()))
+    # Print out the entire file as a String
+    print(String(mmap.read_bytes()))
 
-# Memory mapped files must be closed once they are finished
-mmap.close()
+    # Memory mapped files must be closed once they are finished
+    mmap.close()
 ```
 
 Whereas an initial implementation of `Mmap` in a read/write context can be used as follows:
 
 ```mojo
-var length: Int32 = 24;
-var fd: FileDescriptor = open("./test.txt", "r+")
+    var length: Int32 = 24;
+    var fd: FileDescriptor = open("./test.txt", "r+")
 
-# Initialize a mmap object for the particular file, with read/write and shared permissions
-var mmap = Mmap(fd=fd, length=length, offset=0, mode=MmapMode.WRITE)
+    # Initialize a mmap object for the particular file, with read/write and shared permissions
+    var mmap = Mmap(fd=fd, length=length, offset=0, mode=MmapMode.WRITE)
 
-# Print out the entire file as a String
-print(String(mmap.read_bytes()))
+    # Print out the entire file as a String
+    print(String(mmap.read_bytes()))
 
-# Write bytes to mmap
-mmap.write("hello world")
+    # Write bytes to mmap
+    mmap.write("hello world")
 
-# Memory mapped files must be closed once they are finished
-mmap.close()
+    # Memory mapped files must be closed once they are finished
+    mmap.close()
 ```
 ### Initial API
 
 An initial API for `MmapMode` and `Mmap` could look like the below. 
 
 ```mojo
-MmapMode:
-	alias READ: String = "READ"
-	alias WRITE: String = "WRITE"
-	alias EXEC: String = "EXEC"
+    struct MmapMode:
+        alias READ: String = "READ"
+        alias WRITE: String = "WRITE"
+        alias EXEC: String = "EXEC"
 
-struct Mmap:
-	var pointer: UnsafePointer[UInt8];
-	var length: Int32;
-	var offset: Int32;
-	var mode: String;
+    struct Mmap:
+        var pointer: UnsafePointer[UInt8];
+        var length: Int32;
+        var offset: Int32;
+        var mode: String;
 
-	@staticmethod
-	fn _get_prot(mode: String) raises -> Int32:
-		"""Helper method to translate between `MmapMode` and OS accepted prot values"""
-		...
+    @staticmethod
+    fn _get_prot(mode: String) raises -> Int32:
+        """Helper method to translate between `MmapMode` and OS accepted prot values"""
+        ...
 
-	@staticmethod
-	fn _get_flags(mode: String) raises -> Int32:
-		"""Helper method to translate between `MmapMode` and OS accepted flags values"""
-		...
+    @staticmethod
+    fn _get_flags(mode: String) raises -> Int32:
+        """Helper method to translate between `MmapMode` and OS accepted flags values"""
+        ...
 
-	fn __init__(inout self, fd: FileDescriptor, length: Int32, offset: Int32, mode: String, address: UnsafePointer[UInt8]) raises:
-		"""Given a FileDescriptor, an expected length and offset, mmap configuration, and an initial address, initialize a `mmap` object"""
-		...
+    fn __init__(inout self, fd: FileDescriptor, length: Int32, offset: Int32, mode: String, address: UnsafePointer[UInt8]) raises:
+        """Given a FileDescriptor, an expected length and offset, mmap configuration, and an initial address, initialize a `mmap` object"""
+        ...
 
-	fn __init__(inout self, length: Int32, offset: Int32, mode: String, address: UnsafePointer[UInt8]) raises:
-		"""Given an expected length and offset, mmap configuration and an initial address, initialize an anonymous `mmap` object"""
+    fn __init__(inout self, length: Int32, offset: Int32, mode: String, address: UnsafePointer[UInt8]) raises:
+        """Given an expected length and offset, mmap configuration and an initial address, initialize an anonymous `mmap` object"""
+        ...
 
-	fn close(inout self):
-		"""Close the existing `mmap` leveraging the OS `munmap` command."""
-		...
+    fn close(inout self):
+        """Close the existing `mmap` leveraging the OS `munmap` command."""
+        ...
 
-	fn read_bytes(inout self, owned size: Int32 = -1) raises -> List[UInt8]:
-		"""Reads data from the mapped file and sets the seek position. 
-		If size is left as default of -1, it will read to the length provided during initialization."""
-		...
+    fn read_bytes(inout self, owned size: Int32 = -1) raises -> List[UInt8]:
+        """Reads data from the mapped file and sets the seek position. 
+        If size is left as default of -1, it will read to the length provided during initialization."""
+        ...
 
-	fn write(inout self, data: String) raises:
-		"""Write data to the memory mapped file. Will error if opened 
-		in a MmapMode.READ configuration."""
-		...
+    fn write(inout self, data: String) raises:
+        """Write data to the memory mapped file. Will error if opened in a MmapMode.READ configuration."""
+        ...
 
-	fn seek(inout self, size: Int32) raises:
-		"""Move the byte cursor forward in the memory mapped file."""
-		...
+    fn seek(inout self, size: Int32) raises:
+        """Move the byte cursor forward in the memory mapped file."""
+        ...
 
 ```
 
@@ -113,94 +113,86 @@ struct Mmap:
 An initial proof of concept, which provides for read-only memory mapped files is provided below:
 
 ```mojo
-alias PROT_READ: Int32 = 1;
-alias MAP_SHARED: Int32 = 0x01;
+    alias PROT_READ: Int32 = 1;
+    alias MAP_SHARED: Int32 = 0x01;
 
-fn page_size() -> Int32:
-	return external_call["getpagesize", Int32]()
+    fn page_size() -> Int32:
+        return external_call["getpagesize", Int32]()
 
-struct MmapMode:
-	alias CLOSEDD: String = "CLOSED"
-	alias READ: String = "READ"
+    struct MmapMode:
+        alias CLOSEDD: String = "CLOSED"
+        alias READ: String = "READ"
 
-struct Mmap:
-	var pointer: UnsafePointer[UInt8]:
-	var length: Int32;
-	var offset: Int32;
-	var mode: String;
+    struct Mmap:
+        var pointer: UnsafePointer[UInt8]:
+        var length: Int32;
+        var offset: Int32;
+        var mode: String;
 
-	@staticmethod
-	fn _get_prot(mode: String) raises -> Int32:
-		if mode == MmapMode.READ:
-			return PROT_READ
-		else:
-			raise "mode provided is not valid: " + mode + ", available options: ('READ')"
+        @staticmethod
+        fn _get_prot(mode: String) raises -> Int32:
+            if mode == MmapMode.READ:
+                return PROT_READ
+            else:
+                raise "mode provided is not valid: " + mode + ", available options: ('READ')"
 
-	@staticmethod
-	fn _get_flags(mode: String) raises -> Int32;
-		if mode == MmapMode.READ:
-			return MAP_SHARED
-		else:
-			raise "mode provided is not valid: " + mode + ", available options: ('READ')"
+        @staticmethod
+        fn _get_flags(mode: String) raises -> Int32;
+            if mode == MmapMode.READ:
+                return MAP_SHARED
+            else:
+                raise "mode provided is not valid: " + mode + ", available options: ('READ')"
 
-	fn __init__(inout self, fd: FileDescriptor, length: Int32, offset: Int32, mode: String, address: UnsafePointer[UInt8] = UnsafePointer[UInt8]()) raises:
+        fn __init__(inout self, fd: FileDescriptor, length: Int32, offset: Int32, mode: String, address: UnsafePointer[UInt8] = UnsafePointer[UInt8]()) raises:
 
-		# Calculate appropriate arguments
-		var alignment = offset % page_size();
-		var aligned_offset = offset - alignment;
-		var aligned_len = length + alignment;
+            # Calculate appropriate arguments
+            var alignment = offset % page_size();
+            var aligned_offset = offset - alignment;
+            var aligned_len = length + alignment;
 
-		var pointer = external_call["mmap",
-									UnsafePointer[UInt8],
-									UnsafePointer[UInt8],
-									Int32,
-									Int32,
-									Int32,
-									Int32,
-									Int32](address,
-										   aligned_len,
-										   self._get_prot(mode),
-										   self._get_flags(mode),
-										   fd.value,
-										   aligned_offset)
+            var pointer = external_call["mmap", UnsafePointer[UInt8], UnsafePointer[UInt8], Int32, Int32, Int32, Int32, Int32](
+                            address,
+                            aligned_len,
+                            self._get_prot(mode),
+                            self._get_flags(mode),
+                            fd.value,
+                            aligned_offset
+                            )
 
-		if pointer < UnsafePointer[UInt8]():
-			raise "unable to mmap file"
+            if pointer < UnsafePointer[UInt8]():
+                raise "unable to mmap file"
 
-		self.pointer = pointer
-		self.length = aligned_len
-		self.offset = offset
-		self.mode = mode
+            self.pointer = pointer
+            self.length = aligned_len
+            self.offset = offset
+            self.mode = mode
 
-	fn close(inout self) raises:
-		var err = external_call["munmap",
-								Int32,
-								UnsafePointer[UInt8],
-								Int32](self.pointer, self.length)
-		if err != 0:
-			raise "unable to close mmap"
-		else:
-			self.mode = MmapMode.CLOSED
+        fn close(inout self) raises:
+            var err = external_call["munmap", Int32, UnsafePointer[UInt8], Int32](self.pointer, self.length)
+            if err != 0:
+                raise "unable to close mmap"
+            else:
+                self.mode = MmapMode.CLOSED
 
-	fn seek(inout self, size: Int32):
-		self.offset += size
+        fn seek(inout self, size: Int32):
+            self.offset += size
 
-	fn read_bytes(inout self, owned size: Int32 = -1) raises -> List[UInt8]:
+        fn read_bytes(inout self, owned size: Int32 = -1) raises -> List[UInt8]:
 
-		if self.mode == "CLOSED":
-			raise "mmap already closed"
+            if self.mode == "CLOSED":
+                raise "mmap already closed"
 
-		var bytes = List[UInt8]()
+            var bytes = List[UInt8]()
 
-		if size == -1:
-			size = self.length
+            if size == -1:
+                size = self.length
 
-		for i in range(self.offset, self.offset + size):
-			bytes.append((self.pointer + i)[])
+            for i in range(self.offset, self.offset + size):
+                bytes.append((self.pointer + i)[])
 
-		self.offset += size
+            self.offset += size
 
-		return bytes
+            return bytes
 ```
 
 ## Background and Alternatives Considered
@@ -217,23 +209,25 @@ Few important pieces to consider:
 Given this information, there are two primary different ways we could initialize a Mmap object. The first way could parameterize a 'mode' which should be shorthand for the `prot` and `flags` fields:
 
 ```mojo
-struct MmapMode:
-	alias READ: String = "READ"
-	alias WRITE: String = "WRITE"
-	alias EXEC: String = "EXEC"
-	alias COW: String = "COW"
+    struct MmapMode:
+        alias READ: String = "READ"
+        alias WRITE: String = "WRITE"
+        alias EXEC: String = "EXEC"
+        alias COW: String = "COW"
 
-struct Mmap:
+    struct Mmap:
 
-	@staticmethod
-	fn _get_prot(mode: String) -> Int32:
-		...
+        @staticmethod
+        fn _get_prot(mode: String) -> Int32:
+            ...
 
-	@staticmethod
-	fn _get_flags(mode: String) -> Int32:
-		...
+        @staticmethod
+        fn _get_flags(mode: String) -> Int32:
+            ...
 
-	fn __init__(self, , length: Int32, offset: Int32, address: UnsafePointer[UInt8](), mode: String = MmapMode.READ) raises -> Self
+        fn __init__(self, fd: FileDescriptor, length: Int32, offset: Int32, address: UnsafePointer[UInt8] = UnsafePointer[UInt8](), mode: String = MmapMode.READ) raises -> Self
+            ...
+
 ```
 
 There are a few pieces to clarify in this first method:
@@ -245,17 +239,17 @@ Additionally, the address in the initialization function provides a hint for the
 An additional way this could be done is similar to other implementations in other languages (namely [memmap2-rs](https://github.com/RazrFalcon/memmap2-rs)). Instead of a enumerated mode, individually named factory functions are provided to configure the memory map. It would look something like this, with an additional constructor provided for each 'mode':
 
 ```mojo
-struct Mmap:
+    struct Mmap:
 
-	@staticmethod
-	fn map(self, fd: FileDescriptor, length: Int32, offset: Int32, address: UnsafePointer[UInt8]()) raises -> Self:
-		...
+        @staticmethod
+        fn map(self, fd: FileDescriptor, length: Int32, offset: Int32, address: UnsafePointer[UInt8]()) raises -> Self:
+            ...
 
-	@staticmethod
-	fn map_mut(self, fd: FileDescriptor, length: Int32, offset: Int32, address: UnsafePointer[UInt8]()) raises -> Self:
-		...
+        @staticmethod
+        fn map_mut(self, fd: FileDescriptor, length: Int32, offset: Int32, address: UnsafePointer[UInt8]()) raises -> Self:
+            ...
 
-	...
+        ...
 
 ```
 
@@ -268,15 +262,15 @@ Secondly, it is simpler in the off chance, we wanted to provide the user with a 
 With the API above, the user is expected to open a FileDescriptor directly, and pass this to the Mmap constructor. Usage would look something like this:
 
 ```mojo
-# This only opens the file handle
-var fd: FileDescriptor = open("./test.txt", "r")
-var mmap = Mmap(fd=fd, length=15, offset=0)
+    # This only opens the file handle
+    var fd: FileDescriptor = open("./test.txt", "r")
+    var mmap = Mmap(fd=fd, length=15, offset=0)
 
-# We no longer need the file descriptor
-# thus we should close it.
+    # We no longer need the file descriptor
+    # thus we should close it.
 
-# We can then continue to use the mmap object as needed...
-print(String(mmap.read_bytes()))
+    # We can then continue to use the mmap object as needed...
+    print(String(mmap.read_bytes()))
 ```
 
 Given this usage pattern, there are two outstanding thoughts, I had:
@@ -288,17 +282,18 @@ Secondly, this puts the responsibility for aligning between file permissions and
 If we were to incorporate this responsibility in the initialization of the `Mmap` object, we could do something like this:
 
 ```mojo
-struct Mmap:
-	fn __init__(inout self, path: String, length: Int32, offset: Int32, mode: String, ...) raises:
+    struct Mmap:
+        fn __init__(inout self, path: String, length: Int32, offset: Int32, mode: String, ...) raises:
 
-		# In this scenario, we would infer the file permissions
-		# from the mode provided above.
-		var fd: FileDescriptor = open(path, "r")
+            # In this scenario, we would infer the file permissions
+            # from the mode provided above.
+            var fd: FileDescriptor = open(path, "r")
 
-		# Initialize mmap object as before...
+            # Initialize mmap object as before...
 
-		# This is not a valid method on FileDescriptor
-		# but suggested in the examples for the method
-		fd.close()
+            # This is not a valid method on FileDescriptor
+            # but suggested in the examples for the method
+            fd.close()
+
 ```
 
