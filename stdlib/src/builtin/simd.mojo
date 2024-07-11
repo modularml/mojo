@@ -1503,7 +1503,12 @@ struct SIMD[type: DType, size: Int](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
         elif (
-            type.is_integral() and target.is_integral() and target.is_unsigned()
+            type.is_integral()
+            and target.is_integral()
+            and target.is_unsigned()
+            # TODO(#933): remove size constraint when llvm instrinsics can be
+            # used at compile time
+            and size == 1
         ):
 
             @parameter

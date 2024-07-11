@@ -82,7 +82,9 @@ def test_uint_cast():
         DType.int8,
     )
     alias dst = (DType.uint64, DType.uint32, DType.uint16, DType.uint8)
-    alias widths = (1, 2, 4, 8, 16, 32, 64, 128, 256)
+    # TODO(#933): remove size constraint when llvm instrinsics can be
+    # used at compile time
+    alias widths: Tuple[Int] = (1)  # , 2, 4, 8, 16, 32, 64, 128, 256)
 
     @parameter
     for i in range(len(src)):
