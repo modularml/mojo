@@ -2177,8 +2177,7 @@ struct SIMD[type: DType, size: Int](
         """
 
         @parameter
-        if self.size > 255:
-            constrained[False, "size > 255"]()
+        constrained[self.size < 256, "size must be less than 256"]()
             # adding 256 occurences of a value would wrap to 0
         return (self == value).cast[DType.uint8]().reduce_add().__int__()
 
