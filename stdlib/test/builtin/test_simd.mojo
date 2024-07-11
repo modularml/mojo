@@ -23,6 +23,7 @@ from testing import (
     assert_true,
 )
 
+from utils import unroll
 from utils.numerics import isfinite, isinf, isnan, nan
 
 

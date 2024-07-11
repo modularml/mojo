@@ -80,7 +80,7 @@ struct Error(
         Returns:
             The constructed Error object.
         """
-        var length = len(src)
+        var length = src.byte_length()
         var dest = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
             dest=dest,
@@ -193,3 +193,9 @@ struct Error(
         if length < 0:
             length = -length
         return String(StringRef(self.data, length))
+
+
+@export("__mojo_debugger_raise_hook")
+fn __mojo_debugger_raise_hook():
+    """This function is used internally by the Mojo Debugger."""
+    pass

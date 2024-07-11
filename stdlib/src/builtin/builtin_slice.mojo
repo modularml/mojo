@@ -15,19 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import OptionalReg
-from sys.intrinsics import _mlirtype_is_eq
+from collections import Optional
 
 
-# TODO: When Slice switches to Optional, just use == instead of this function.
-@always_inline("nodebug")
-fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
-    if x and y:
-        return x.value() == y.value()
-    return not x and not y
-
-
-@register_passable("trivial")
+@value
 struct Slice(
     Stringable,
     EqualityComparable,
@@ -49,9 +40,9 @@ struct Slice(
     ```
     """
 
-    var start: OptionalReg[Int]
+    var start: Optional[Int]
     """The starting index of the slice."""
-    var end: OptionalReg[Int]
+    var end: Optional[Int]
     """The end index of the slice."""
     var step: Int
     """The step increment value of the slice."""
@@ -71,9 +62,9 @@ struct Slice(
     @always_inline("nodebug")
     fn __init__(
         inout self,
-        start: OptionalReg[Int],
-        end: OptionalReg[Int],
-        step: OptionalReg[Int],
+        start: Optional[Int],
+        end: Optional[Int],
+        step: Optional[Int],
     ):
         """Construct slice given the start, end and step values.
 
@@ -84,7 +75,7 @@ struct Slice(
         """
         self.start = start
         self.end = end
-        self.step = step.value() if step else 1
+        self.step = step.or_else(1)
 
     fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the Slice.
@@ -124,7 +115,7 @@ struct Slice(
         """
 
         @parameter
-        fn write_optional(opt: OptionalReg[Int]):
+        fn write_optional(opt: Optional[Int]):
             if opt:
                 writer.write(repr(opt.value()))
             else:
@@ -149,10 +140,9 @@ struct Slice(
             True if start, end, and step values of this slice match the
             corresponding values of the other slice and False otherwise.
         """
-        # TODO: When Slice switches to Optional, just use ==.
         return (
-            _compare_optional(self.start, other.start)
-            and _compare_optional(self.end, other.end)
+            self.start == other.start
+            and self.end == other.end
             and self.step == other.step
         )
 
@@ -168,18 +158,6 @@ struct Slice(
             corresponding values of the other slice and True otherwise.
         """
         return not (self == other)
-
-    @always_inline
-    fn unsafe_indices(self) -> Int:
-        """Return the length of the slice.
-
-        Only use this function if start/end is guaranteed to be not None.
-
-        Returns:
-            The length of the slice.
-        """
-
-        return len(range(self.start.value(), self.end.value(), self.step))
 
     fn indices(self, length: Int) -> (Int, Int, Int):
         """Returns a tuple of 3 integers representing the start, end, and step
@@ -269,7 +247,7 @@ fn slice(start: Int, end: Int) -> Slice:
 
 @always_inline("nodebug")
 fn slice(
-    start: OptionalReg[Int], end: OptionalReg[Int], step: OptionalReg[Int]
+    start: Optional[Int], end: Optional[Int], step: Optional[Int]
 ) -> Slice:
     """Construct a Slice given the start, end and step values.
 

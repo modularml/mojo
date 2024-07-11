@@ -562,6 +562,10 @@ struct CopyCountedStruct(CollectionElement):
     var counter: CopyCounter
     var value: String
 
+    fn __init__(inout self, *, other: Self):
+        self.counter = CopyCounter(other=other.counter)
+        self.value = String(other=other.value)
+
     fn __init__(inout self, value: String):
         self.counter = CopyCounter()
         self.value = value
@@ -816,6 +820,29 @@ def test_list_contains():
     # assert_equal(List(0,1) in y,False)
 
 
+def test_list_eq_ne():
+    var l1 = List[Int](1, 2, 3)
+    var l2 = List[Int](1, 2, 3)
+    assert_true(l1 == l2)
+    assert_false(l1 != l2)
+
+    var l3 = List[Int](1, 2, 3, 4)
+    assert_false(l1 == l3)
+    assert_true(l1 != l3)
+
+    var l4 = List[Int]()
+    var l5 = List[Int]()
+    assert_true(l4 == l5)
+    assert_true(l1 != l4)
+
+    var l6 = List[String]("a", "b", "c")
+    var l7 = List[String]("a", "b", "c")
+    var l8 = List[String]("a", "b")
+    assert_true(l6 == l7)
+    assert_false(l6 != l7)
+    assert_false(l6 == l8)
+
+
 def test_list_init_span():
     var l = List[String]("a", "bb", "cc", "def")
     var sp = Span(l)
@@ -844,6 +871,9 @@ struct DtorCounter(CollectionElement):
 
     fn __init__(inout self):
         self.payload = 0
+
+    fn __init__(inout self, *, other: Self):
+        self.payload = other.payload
 
     fn __copyinit__(inout self, existing: Self, /):
         self.payload = existing.payload

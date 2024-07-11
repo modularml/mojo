@@ -29,6 +29,9 @@ def test_basic():
 struct ObservableDel(CollectionElement):
     var target: UnsafePointer[Bool]
 
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     fn __del__(owned self):
         self.target.init_pointee_move(True)
 

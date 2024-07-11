@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `List[T]` values are now equality comparable with `==` and `!=` when `T` is
+  equality comparable.
+  ([PR 3195#](https://github.com/modularml/mojo/pull/3195) by
+  [@kszucs](https://github.com/kszucs))
+
 - `__setitem__` now works with variadic argument lists such as:
 
   ```mojo
@@ -155,6 +160,12 @@ what we publish.
 - Added `C_char` type alias in `sys.ffi`.
 
 - Added `StringSlice(..)` initializer from a `StringLiteral`.
+
+- Added a `byte_length()` method to `String`, `StringSlice`, and `StringLiteral`
+and deprecated their private `_byte_length()` methods. Added a warning to
+`String.__len__` method that it will return length in Unicode codepoints in the
+future and `StringSlice.__len__` now does return the Unicode codepoints length.
+([PR #2960](https://github.com/modularml/mojo/pull/2960) by [@martinvuyk](https://github.com/martinvuyk))
 
 - Added new `StaticString` type alias. This can be used in place of
   `StringLiteral` for runtime string arguments.
@@ -391,6 +402,12 @@ what we publish.
     print(s.start.value()) # must retrieve the value from the optional
   ```
 
+- `NoneType` is now a normal standard library type, and not an alias for a raw
+  MLIR type.
+
+  Function signatures spelled as `fn(...) -> NoneType` should transition to
+  being written as `fn(...) -> None`.
+
 - Accessing local Python modules with `Python.add_to_path(".")` is no longer
   required, it now behaves the same as Python, you can access modules in the
   same folder as the target file:
@@ -418,6 +435,19 @@ what we publish.
 
 - `memcmp`, `memset` and `memset_zero` no longer take in `LegacyPointer`,
   instead, use `UnsafePointer`.
+
+- A few bit functions have been renamed for clarity:
+- `countl_zero` -> `count_leading_zeros`
+- `countr_zero` -> `count_trailing_zeros`
+
+- `sort` no longer takes `LegacyPointer`. The current API supports:
+  - `sort(list)` just plain list
+  - `sort[type, cmp_fn](list)` list with custom compare function
+  - `sort(ptr, len)` a pointer and length (can change to Span in future)
+  - `sort[type, cmp_fn](ptr, len)` above with custom compare
+
+- `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
+  overload instead.
 
 ### ❌ Removed
 

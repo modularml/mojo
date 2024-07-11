@@ -17,7 +17,7 @@ from random import rand
 
 
 fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:
-    var p = Pointer[SIMD[D, 1]].alloc(size)
+    var p = UnsafePointer[SIMD[D, 1]].alloc(size)
     rand[D](p, size)
     sort[D](p, size)
     for i in range(1, size - 1):

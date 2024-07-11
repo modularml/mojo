@@ -18,8 +18,6 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 from sys import sizeof as _sizeof
 
-from utils import unroll
-
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
 alias _mIsNotInteger = UInt8(~(1 << 7))

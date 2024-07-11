@@ -20,7 +20,7 @@ from sys.intrinsics import _type_is_eq
 
 from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, Variant, unroll
+from utils import StringRef, Variant
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl

@@ -23,8 +23,6 @@ from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
 
-from utils import unroll
-
 # ===----------------------------------------------------------------------===#
 # Utilities
 # ===----------------------------------------------------------------------===#
@@ -150,6 +148,14 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         """
         _static_tuple_construction_checks[size]()
         self.array = _create_array[size, Self.element_type](values)
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided StaticTuple.
+
+        Args:
+            other: The StaticTuple to copy.
+        """
+        self.array = other.array
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -469,7 +475,9 @@ struct InlineArray[
         return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+    fn __contains__[
+        T: EqualityComparableCollectionElement, //
+    ](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo

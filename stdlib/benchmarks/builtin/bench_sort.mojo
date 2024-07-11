@@ -15,7 +15,13 @@
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
 from random import *
-from stdlib.builtin.sort import sort, _small_sort, _insertion_sort, _heap_sort
+from stdlib.builtin.sort import (
+    sort,
+    _small_sort,
+    _insertion_sort,
+    _heap_sort,
+    _SortWrapper,
+)
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Utils
@@ -57,24 +63,24 @@ fn random_scalar_list[
 
 @always_inline
 fn insertion_sort[type: DType](list: List[Scalar[type]]):
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-
     @parameter
-    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
-    _insertion_sort[Scalar[type], _less_than](ptr, 0, len(list))
+    _insertion_sort[Scalar[type], _less_than](list.data, len(list))
 
 
 @always_inline
 fn small_sort[size: Int, type: DType](list: List[Scalar[type]]):
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-
     @parameter
-    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
-    _small_sort[size, Scalar[type], _less_than](ptr)
+    _small_sort[size, Scalar[type], _less_than](list.data)
 
 
 # ===----------------------------------------------------------------------===#
@@ -158,16 +164,14 @@ fn bench_tiny_list_sort(inout m: Bench) raises:
 
 @parameter
 fn bench_small_list_sort(inout m: Bench) raises:
-    alias counts = List(10, 20, 32, 64, 100)
+    var counts = List(10, 20, 32, 64, 100)
 
     @parameter
     for type_index in range(len(dtypes)):
         alias dt = dtypes[type_index]
 
-        @parameter
-        for count_index in range(len(counts)):
-            alias count = counts[count_index]
-            var list = random_scalar_list[dt](count)
+        for count in counts:
+            var list = random_scalar_list[dt](count[])
 
             @parameter
             fn bench_sort_list(inout b: Bencher) raises:
@@ -192,7 +196,7 @@ fn bench_small_list_sort(inout m: Bench) raises:
             m.bench_function[bench_sort_list](
                 BenchId(
                     "bench_std_sort_random_list_"
-                    + str(count)
+                    + str(count[])
                     + "_type_"
                     + str(dt)
                 )
@@ -200,7 +204,7 @@ fn bench_small_list_sort(inout m: Bench) raises:
             m.bench_function[bench_insertion_sort](
                 BenchId(
                     "bench_ins_sort_random_list_"
-                    + str(count)
+                    + str(count[])
                     + "_type_"
                     + str(dt)
                 )
@@ -215,27 +219,25 @@ fn bench_small_list_sort(inout m: Bench) raises:
 
 @always_inline
 fn heap_sort[type: DType](list: List[Scalar[type]]):
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-
     @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
-    _heap_sort[Scalar[type], _less_than_equal](ptr, len(list))
+    _heap_sort[Scalar[type], _less_than](list.data, len(list))
 
 
 @parameter
 fn bench_large_list_sort(inout m: Bench) raises:
-    alias counts = List(1 << 12, 1 << 16)
+    var counts = List(1 << 12, 1 << 16)
 
     @parameter
     for type_index in range(len(dtypes)):
         alias dt = dtypes[type_index]
 
-        @parameter
-        for count_index in range(len(counts)):
-            alias count = counts[count_index]
-            var list = random_scalar_list[dt](count)
+        for count in counts:
+            var list = random_scalar_list[dt](count[])
 
             @parameter
             fn bench_sort_list(inout b: Bencher) raises:
@@ -260,7 +262,7 @@ fn bench_large_list_sort(inout m: Bench) raises:
             m.bench_function[bench_sort_list](
                 BenchId(
                     "bench_std_sort_random_list_"
-                    + str(count)
+                    + str(count[])
                     + "_type_"
                     + str(dt)
                 )
@@ -269,7 +271,7 @@ fn bench_large_list_sort(inout m: Bench) raises:
             m.bench_function[bench_heap_sort](
                 BenchId(
                     "bench_heap_sort_random_list_"
-                    + str(count)
+                    + str(count[])
                     + "_type_"
                     + str(dt)
                 )
@@ -284,17 +286,12 @@ fn bench_large_list_sort(inout m: Bench) raises:
 
 @parameter
 fn bench_low_cardinality_list_sort(inout m: Bench) raises:
-    alias counts = List(1 << 12, 1 << 16)
-    alias deltas = List(0, 2, 5, 20, 100)
+    var counts = List(1 << 12, 1 << 16)
+    var deltas = List(0, 2, 5, 20, 100)
 
-    @parameter
-    for delta_index in range(len(deltas)):
-        var delta = deltas[delta_index]
-
-        @parameter
-        for count_index in range(len(counts)):
-            alias count = counts[count_index]
-            var list = random_scalar_list[DType.uint8](count, delta)
+    for delta in deltas:
+        for count in counts:
+            var list = random_scalar_list[DType.uint8](count[], delta[])
 
             @parameter
             fn bench_sort_list(inout b: Bencher) raises:
@@ -319,18 +316,18 @@ fn bench_low_cardinality_list_sort(inout m: Bench) raises:
             m.bench_function[bench_sort_list](
                 BenchId(
                     "bench_std_sort_low_card_list_"
-                    + str(count)
+                    + str(count[])
                     + "_delta_"
-                    + str(delta)
+                    + str(delta[])
                 )
             )
 
             m.bench_function[bench_heap_sort](
                 BenchId(
                     "bench_heap_sort_low_card_list_"
-                    + str(count)
+                    + str(count[])
                     + "_delta_"
-                    + str(delta)
+                    + str(delta[])
                 )
             )
             _ = list^
