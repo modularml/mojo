@@ -221,8 +221,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        var div: UInt = self._positive_div(rhs)
-        return div
+        return __mlir_op.`index.divu`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: UInt) -> UInt:
@@ -237,7 +236,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        return self._positive_rem(rhs)
+        return __mlir_op.`index.remu`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __divmod__(self, rhs: UInt) -> Tuple[UInt, UInt]:
@@ -251,8 +250,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         """
         if rhs == 0:
             return Tuple[UInt, UInt](0, 0)
-        var div: UInt = self._positive_div(rhs)
-        return div, self._positive_rem(rhs)
+        return self // rhs, self % rhs
 
     @always_inline("nodebug")
     fn __pow__(self, exp: Self) -> Self:
@@ -586,19 +584,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         return value ^ self
 
     @always_inline("nodebug")
-    fn _positive_div(self, rhs: UInt) -> UInt:
-        """Return the division of `self` and `rhs` assuming that the arguments
-        are both positive.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The integer division of `self` and `rhs` .
-        """
-        return __mlir_op.`index.divu`(self.value, rhs.value)
-
-    @always_inline("nodebug")
     fn __gt__(self, rhs: UInt) -> Bool:
         """Return whether this UInt is strictly greater than another.
 
@@ -679,19 +664,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
             False Bool value if the value is equal to 0 and True otherwise.
         """
         return self != 0
-
-    @always_inline("nodebug")
-    fn _positive_rem(self, rhs: UInt) -> UInt:
-        """Return the modulus of `self` and `rhs` assuming that the arguments
-        are both positive.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The integer modulus of `self` and `rhs` .
-        """
-        return __mlir_op.`index.remu`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __index__(self) -> UInt:
