@@ -2161,7 +2161,7 @@ struct SIMD[type: DType, size: Int](
     fn count(self, value: Scalar[type]) -> Int:
         """Counts the number of occurrences of a value in the vector.
 
-        Example:
+        Examples:
 
         ```mojo
         print(SIMD[DType.uint8, 4](1, 1, 1, 0).count(1)) # 3
