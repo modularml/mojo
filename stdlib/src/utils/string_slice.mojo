@@ -530,7 +530,10 @@ struct StringSlice[
         pass
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
-        """Split the string at line boundaries.
+        """Split the string at line boundaries. This corresponds to Python's
+        [universal newlines](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `"\\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
