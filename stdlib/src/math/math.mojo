@@ -898,18 +898,29 @@ fn isclose[
         A boolean vector where a and b are equal within the specified tolerance.
     """
 
+    constrained[
+        a.type is DType.bool or a.type.is_numeric(),
+        "input type must be boolean, integral, or floating-point",
+    ]()
+
     @parameter
-    if type is DType.bool or type.is_integral():
+    if a.type is DType.bool or a.type.is_integral():
         return a == b
+    else:
+        var both_nan = isnan(a) & isnan(b)
+        if equal_nan and all(both_nan):
+            return True
 
-    var atol_vec = SIMD[type, simd_width](atol)
-    var rtol_vec = SIMD[type, simd_width](rtol)
-    var res = abs(a - b) <= (atol_vec.max(rtol_vec * abs(a).max(abs(b))))
+        var res = (a == b) | (
+            isfinite(a)
+            & isfinite(b)
+            & (
+                abs(a - b)
+                <= max(__type_of(a)(atol), rtol * max(abs(a), abs(b)))
+            )
+        )
 
-    if not equal_nan:
-        return res
-
-    return res.select(res, isnan(a) & isnan(b))
+        return res | both_nan if equal_nan else res
 
 
 # ===----------------------------------------------------------------------=== #
