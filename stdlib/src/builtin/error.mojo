@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import alignof, sizeof
 
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcpy
 from memory.memory import _free
 
 # ===----------------------------------------------------------------------===#
@@ -80,7 +80,7 @@ struct Error(
         Returns:
             The constructed Error object.
         """
-        var length = len(src)
+        var length = src.byte_length()
         var dest = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
             dest=dest,
@@ -150,6 +150,7 @@ struct Error(
         """
         return self.data.__bool__()
 
+    @no_inline
     fn __str__(self) -> String:
         """Converts the Error to string representation.
 
@@ -158,6 +159,7 @@ struct Error(
         """
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this error to the provided formatter.
@@ -169,6 +171,7 @@ struct Error(
         # TODO: Avoid this unnecessary intermediate String allocation.
         writer.write(self._message())
 
+    @no_inline
     fn __repr__(self) -> String:
         """Converts the Error to printable representation.
 
@@ -190,3 +193,9 @@ struct Error(
         if length < 0:
             length = -length
         return String(StringRef(self.data, length))
+
+
+@export("__mojo_debugger_raise_hook")
+fn __mojo_debugger_raise_hook():
+    """This function is used internally by the Mojo Debugger."""
+    pass

@@ -562,8 +562,8 @@ def test_contains():
     assert_true(str.__contains__(" "))
     assert_true(str.__contains__("ld"))
 
-    assert_false(str.__contains__("bellow"))
-    assert_true("bellow" not in str)
+    assert_false(str.__contains__("below"))
+    assert_true("below" not in str)
 
 
 def test_find():
@@ -635,7 +635,7 @@ def test_rfind():
     assert_equal(String("").rfind("ab"), -1)
     assert_equal(String("foo").rfind(""), 3)
 
-    # Test that rfind(start) returned pos is absolute, not relative to specifed
+    # Test that rfind(start) returned pos is absolute, not relative to specified
     # start. Also tests positive and negative start offsets.
     assert_equal(String("hello world").rfind("l", 5), 9)
     assert_equal(String("hello world").rfind("l", -5), 9)
@@ -661,8 +661,31 @@ def test_split():
     assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
 
     # Should add all whitespace-like chars as one
-    alias utf8_spaces = String(" \t\n\r\v\f")
-    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    # test all unicode separators
+    # 0 is to build a String with null terminator
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as stringliteral once unicode
+    # escape secuences are accepted
+    var univ_sep_var = (
+        String(" ")
+        + String("\t")
+        + String("\n")
+        + String("\r")
+        + String("\v")
+        + String("\f")
+        + String("\x1c")
+        + String("\x1d")
+        + String("\x1e")
+        + String(next_line)
+        + String(unicode_line_sep)
+        + String(unicode_paragraph_sep)
+    )
+    var s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
     d = s.split()
     assert_true(len(d) == 2)
     assert_true(d[0] == "hello" and d[1] == "world")
@@ -926,7 +949,7 @@ def test_isspace():
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
     # TODO add line and paragraph separator as stringliteral once unicode
-    # escape secuences are accepted
+    # escape sequences are accepted
     var univ_sep_var = List[String](
         String(" "),
         String("\t"),
@@ -1251,7 +1274,7 @@ def test_string_iter():
         var utf8_sequence_len = 0
         var byte_idx = 0
         for v in item:
-            var byte_len = len(v)
+            var byte_len = v.byte_length()
             assert_equal(item[byte_idx : byte_idx + byte_len], v)
             byte_idx += byte_len
             utf8_sequence_len += 1

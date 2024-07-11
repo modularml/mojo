@@ -482,7 +482,7 @@ fn exp[
     """Calculates elementwise exponential of the input vector.
 
     Given an input vector $X$ and an output vector $Y$, sets $Y_i = e^{X_i}$ for
-    each position $i$ in the input vector (where $e$ is the mathmatical constant
+    each position $i$ in the input vector (where $e$ is the mathematical constant
     $e$).
 
     Constraints:
@@ -1900,8 +1900,8 @@ fn gcd(m: Int, n: Int, /) -> Int:
         return max(m, n)
 
     if m > 0 and n > 0:
-        var trailing_zeros_a = countr_zero(m)
-        var trailing_zeros_b = countr_zero(n)
+        var trailing_zeros_a = count_trailing_zeros(m)
+        var trailing_zeros_b = count_trailing_zeros(n)
 
         var u = m >> trailing_zeros_a
         var v = n >> trailing_zeros_b
@@ -1916,7 +1916,7 @@ fn gcd(m: Int, n: Int, /) -> Int:
             v -= u
             if u == 0:
                 break
-            v >>= countr_zero(v)
+            v >>= count_trailing_zeros(v)
         return u << trailing_zeros_common
 
     var u = m

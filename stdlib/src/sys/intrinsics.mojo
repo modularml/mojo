@@ -1195,7 +1195,7 @@ fn prefetch[
     Args:
       addr: The data pointer to prefetch.
     """
-    return llvm_intrinsic["llvm.prefetch", NoneType](
+    llvm_intrinsic["llvm.prefetch", NoneType](
         addr.bitcast[DType.invalid.value](),
         params.rw,
         params.locality,

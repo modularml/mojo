@@ -55,6 +55,7 @@ struct Passwd(Stringable):
         writer.write("', pw_shell='", self.pw_shell)
         writer.write("')")
 
+    @no_inline
     fn __str__(self) -> String:
         """Gets the Passwd struct as a string.
 
@@ -63,6 +64,7 @@ struct Passwd(Stringable):
         """
         return String.format_sequence(self)
 
+    @no_inline
     fn __repr__(self) -> String:
         """Gets the Passwd struct as a string.
 

@@ -21,9 +21,7 @@ from utils import StaticTuple
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, UnsafePointer
-
-from utils import unroll
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -151,6 +149,14 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         _static_tuple_construction_checks[size]()
         self.array = _create_array[size, Self.element_type](values)
 
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided StaticTuple.
+
+        Args:
+            other: The StaticTuple to copy.
+        """
+        self.array = other.array
+
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
@@ -193,50 +199,40 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Self.element_type:
+    fn __getitem__(self, idx: Int) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
 
         Returns:
             The value at the specified position.
         """
-        var offset = int(index)
-        debug_assert(offset < size, "index must be within bounds")
+        debug_assert(idx < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
         var arrayCopy = self.array
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(arrayCopy).address, offset.value
+            UnsafePointer.address_of(arrayCopy).address, idx.value
         )
-        var result = Pointer(ptr)[]
+        var result = UnsafePointer(ptr)[]
         _ = arrayCopy
         return result
 
     @always_inline("nodebug")
-    fn __setitem__[
-        intable: Intable
-    ](inout self, index: intable, val: Self.element_type):
+    fn __setitem__(inout self, idx: Int, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
             val: The value to store.
         """
-        var offset = int(index)
-        debug_assert(offset < size, "index must be within bounds")
+        debug_assert(idx < size, "index must be within bounds")
         var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(tmp.array).address, offset.value
+            UnsafePointer.address_of(tmp.array).address, idx.value
         )
-        Pointer(ptr)[] = val
+        UnsafePointer(ptr)[] = val
         self = tmp
 
 
@@ -394,25 +390,22 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__[
-        IntableType: Intable,
-        index: IntableType,
+        idx: Int,
     ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            IntableType: The inferred type of an intable argument.
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        alias i = int(index)
-        constrained[-size <= i < size, "Index must be within bounds."]()
+        constrained[-size <= idx < size, "Index must be within bounds."]()
 
-        var normalized_idx = i
+        var normalized_idx = idx
 
         @parameter
-        if i < 0:
+        if idx < 0:
             normalized_idx += size
 
         return self._get_reference_unsafe(normalized_idx)[]
@@ -482,7 +475,9 @@ struct InlineArray[
         return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+    fn __contains__[
+        T: EqualityComparableCollectionElement, //
+    ](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo

@@ -33,7 +33,6 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory import memcmp
 from memory.unsafe import DTypePointer
 
 
@@ -257,7 +256,7 @@ fn bench_compare():
     alias type = DType.uint8
     alias width = simdwidthof[type]()
     alias unit = Unit.ns
-    # increasing will reduce the benefit of passing the size as a paramater
+    # increasing will reduce the benefit of passing the size as a parameter
     alias multiplier = 2
     # Add .5 of the elements that fit into a simd register
     alias size: Int = int(multiplier * width + (width * 0.5))

@@ -181,7 +181,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         return _InlineListIter(0, self)
 
     fn __contains__[
-        C: ComparableCollectionElement
+        C: EqualityComparableCollectionElement, //
     ](self: Self, value: C) -> Bool:
         """Verify if a given value is present in the list.
 
@@ -212,7 +212,9 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn count[C: ComparableCollectionElement](self: Self, value: C) -> Int:
+    fn count[
+        C: EqualityComparableCollectionElement, //
+    ](self: Self, value: C) -> Int:
         """Counts the number of occurrences of a value in the list.
 
         ```mojo

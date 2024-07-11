@@ -197,9 +197,67 @@ struct List[T: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
+    @always_inline
+    fn __eq__[
+        U: EqualityComparableCollectionElement, //
+    ](self: List[U], other: List[U]) -> Bool:
+        """Checks if two lists are equal.
+
+        Examples:
+        ```mojo
+        var x = List[Int](1, 2, 3)
+        var y = List[Int](1, 2, 3)
+        if x == y: print("x and y are equal")
+        ```
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+               traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            other: The list to compare with.
+
+        Returns:
+            True if the lists are equal, False otherwise.
+        """
+        if len(self) != len(other):
+            return False
+        var index = 0
+        for element in self:
+            if element[] != other[index]:
+                return False
+            index += 1
+        return True
+
+    @always_inline
+    fn __ne__[
+        U: EqualityComparableCollectionElement, //
+    ](self: List[U], other: List[U]) -> Bool:
+        """Checks if two lists are not equal.
+
+        Examples:
+
+        ```mojo
+        var x = List[Int](1, 2, 3)
+        var y = List[Int](1, 2, 4)
+        if x != y: print("x and y are not equal")
+        ```
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+               traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            other: The list to compare with.
+
+        Returns:
+            True if the lists are not equal, False otherwise.
+        """
+        return not (self == other)
+
     fn __contains__[
-        T2: ComparableCollectionElement
-    ](self: List[T], value: T2) -> Bool:
+        U: EqualityComparableCollectionElement, //
+    ](self: List[U], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -207,7 +265,7 @@ struct List[T: CollectionElement](
         if 3 in x: print("x contains 3")
         ```
         Parameters:
-            T2: The type of the elements in the list. Must implement the
+            U: The type of the elements in the list. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
@@ -216,10 +274,8 @@ struct List[T: CollectionElement](
         Returns:
             True if the value is contained in the list, False otherwise.
         """
-
-        constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if rebind[Reference[T2, __lifetime_of(self)]](i)[] == value:
+            if i[] == value:
                 return True
         return False
 
@@ -306,7 +362,8 @@ struct List[T: CollectionElement](
         """
         return len(self) > 0
 
-    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    @no_inline
+    fn __str__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -334,8 +391,9 @@ struct List[T: CollectionElement](
         self.format_to(writer)
         return output^
 
+    @no_inline
     fn format_to[
-        U: RepresentableCollectionElement
+        U: RepresentableCollectionElement, //
     ](self: List[U], inout writer: Formatter):
         """Write `my_list.__str__()` to a `Formatter`.
 
@@ -352,7 +410,8 @@ struct List[T: CollectionElement](
                 writer.write(", ")
         writer.write("]")
 
-    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    @no_inline
+    fn __repr__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -556,13 +615,13 @@ struct List[T: CollectionElement](
         Args:
             new_size: The new size.
         """
-        debug_assert(
-            new_size <= self.size,
-            (
-                "New size must be smaller than or equal to current size when no"
-                " new value is provided."
-            ),
-        )
+        if self.size < new_size:
+            abort(
+                "You are calling List.resize with a new_size bigger than the"
+                " current size. If you want to make the List bigger, provide a"
+                " value to fill the new slots with. If not, make sure the new"
+                " size is smaller than the current size."
+            )
         for i in range(new_size, self.size):
             (self.data + i).destroy_pointee()
         self.size = new_size
@@ -590,7 +649,7 @@ struct List[T: CollectionElement](
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: ComparableCollectionElement
+        C: EqualityComparableCollectionElement, //
     ](
         ref [_]self: List[C],
         value: C,
@@ -615,7 +674,7 @@ struct List[T: CollectionElement](
 
         Parameters:
             C: The type of the elements in the list. Must implement the
-                `ComparableCollectionElement` trait.
+                `EqualityComparableCollectionElement` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
@@ -756,7 +815,7 @@ struct List[T: CollectionElement](
         return (self.data + idx)[]
 
     @always_inline
-    fn unsafe_set(self, idx: Int, owned value: T):
+    fn unsafe_set(inout self, idx: Int, owned value: T):
         """Write a value to a given location without checking index bounds.
 
         Users should consider using `my_list[idx] = value` instead of this method as it
@@ -782,7 +841,9 @@ struct List[T: CollectionElement](
         (self.data + idx).destroy_pointee()
         (self.data + idx).init_pointee_move(value^)
 
-    fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
+    fn count[
+        T: EqualityComparableCollectionElement, //
+    ](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.

@@ -67,6 +67,7 @@ struct _CTimeSpec(Stringable):
         else:
             return self.tv_sec * _NSEC_PER_SEC + self.tv_subsec * _NSEC_PER_USEC
 
+    @no_inline
     fn __str__(self) -> String:
         return str(self.as_nanoseconds()) + "ns"
 

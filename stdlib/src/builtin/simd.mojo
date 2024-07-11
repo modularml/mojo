@@ -216,6 +216,9 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
         var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
@@ -390,8 +393,11 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
-        # TODO (#36686): This introduces uneeded casts here to work around
+        # TODO (#36686): This introduces unneeded casts here to work around
         # parameter if issues.
         @parameter
         if type is DType.float16:
@@ -1331,7 +1337,7 @@ struct SIMD[type: DType, size: Int](
             rebind[Scalar[type]](self).value
         )
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
 
@@ -1341,7 +1347,7 @@ struct SIMD[type: DType, size: Int](
 
         return String.format_sequence(self)
 
-    @always_inline
+    @no_inline
     fn __repr__(self) -> String:
         """Get the representation of the SIMD value e.g. "SIMD[DType.int8, 2](1, 2)".
 
@@ -1507,6 +1513,7 @@ struct SIMD[type: DType, size: Int](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
+    @always_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.

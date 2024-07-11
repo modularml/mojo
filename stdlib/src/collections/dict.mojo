@@ -636,8 +636,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return len(self).__bool__()
 
+    @no_inline
     fn __str__[
-        T: RepresentableKeyElement, U: RepresentableCollectionElement
+        T: RepresentableKeyElement, U: RepresentableCollectionElement, //
     ](self: Dict[T, U]) -> String:
         """Returns a string representation of a `Dict`.
 
@@ -894,8 +895,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _insert(inout self, owned key: K, owned value: V):
         self._insert(DictEntry[K, V](key^, value^))
 
-    fn _insert(inout self, owned entry: DictEntry[K, V]):
-        self._maybe_resize()
+    fn _insert[
+        safe_context: Bool = False
+    ](inout self, owned entry: DictEntry[K, V]):
+        @parameter
+        if not safe_context:
+            self._maybe_resize()
         var found: Bool
         var slot: Int
         var index: Int
@@ -965,7 +970,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for i in range(len(old_entries)):
             var entry = old_entries.__get_ref(i)
             if entry[]:
-                self._insert(entry[].unsafe_take())
+                self._insert[safe_context=True](entry[].unsafe_take())
 
     fn _compact(inout self):
         self._index = _DictIndex(self._reserved())

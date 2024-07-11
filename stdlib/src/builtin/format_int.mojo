@@ -285,13 +285,13 @@ fn _try_write_int[
     if radix < 2:
         return Error("Unable to format integer to string with radix < 2")
 
-    if radix > len(digit_chars):
+    if radix > digit_chars.byte_length():
         return Error(
             "Unable to format integer to string when provided radix is larger "
             "than length of available digit value characters"
         )
 
-    if not len(digit_chars) >= 2:
+    if not digit_chars.byte_length() >= 2:
         return Error(
             "Unable to format integer to string when provided digit_chars"
             " mapping len is not >= 2"
@@ -315,12 +315,24 @@ fn _try_write_int[
         # SAFETY:
         #   This static lifetime is valid as long as we're using a
         #   `StringLiteral` for `digit_chars`.
+        var zero_char = digit_chars_array[0]
+
+        # Construct a null-terminated buffer of single-byte char.
+        var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
+
         var zero = StringSlice[ImmutableStaticLifetime](
-            unsafe_from_utf8_ptr=digit_chars_array,
+            # TODO(MSTDL-720):
+            #   Support printing non-null-terminated strings on GPU and switch
+            #   back to this code without a workaround.
+            # unsafe_from_utf8_ptr=digit_chars_array,
+            unsafe_from_utf8_ptr=zero_buf.unsafe_ptr(),
             len=1,
         )
         fmt.write_str(zero)
-        return
+
+        _ = zero_buf
+
+        return None
 
     # Create a buffer to store the formatted value
 

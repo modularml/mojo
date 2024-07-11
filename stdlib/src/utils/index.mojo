@@ -313,6 +313,14 @@ struct StaticIntTuple[size: Int](
             _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
         ](elem)
 
+    fn __init__(inout self, *, other: Self):
+        """Copy constructor.
+
+        Args:
+            other: The other tuple to copy from.
+        """
+        self.data = StaticTuple[Int, size](other=other.data)
+
     @always_inline
     fn __init__(inout self, values: VariadicList[Int]):
         """Creates a tuple constant using the specified values.
@@ -629,6 +637,7 @@ struct StaticIntTuple[size: Int](
             _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
         )
 
+    @no_inline
     fn __str__(self) -> String:
         """Get the tuple as a string.
 
@@ -661,6 +670,7 @@ struct StaticIntTuple[size: Int](
         buf.size += 1  # for the null terminator.
         return buf^
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this int tuple to the provided formatter.

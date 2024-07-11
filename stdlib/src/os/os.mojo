@@ -231,7 +231,7 @@ fn listdir[PathLike: os.PathLike](path: PathLike) raises -> List[String]:
 
 
 @no_inline
-fn abort[result: AnyType = NoneType]() -> result:
+fn abort[result: AnyType = NoneType._mlir_type]() -> result:
     """Calls a target dependent trap instruction if available.
 
     Parameters:
@@ -250,7 +250,7 @@ fn abort[result: AnyType = NoneType]() -> result:
 
 @no_inline
 fn abort[
-    result: AnyType = NoneType, *, formattable: Formattable
+    result: AnyType = NoneType._mlir_type, *, formattable: Formattable
 ](message: formattable) -> result:
     """Calls a target dependent trap instruction if available.
 

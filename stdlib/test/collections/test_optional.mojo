@@ -14,7 +14,7 @@
 
 from collections import Optional, OptionalReg
 
-from testing import assert_equal, assert_false, assert_true
+from testing import *
 
 
 def test_basic():
@@ -145,6 +145,18 @@ def test_optional_str_repr():
     assert_equal(Optional[Int](None).__repr__(), "Optional(None)")
 
 
+def test_optional_equality():
+    o = Optional(10)
+    n = Optional[Int]()
+    assert_true(o == 10)
+    assert_true(o != 11)
+    assert_true(o != n)
+    assert_true(o != None)
+    assert_true(n != 11)
+    assert_true(n == n)
+    assert_true(n == None)
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -155,3 +167,4 @@ def main():
     test_optional_take_mutates()
     test_optional_explicit_copy()
     test_optional_str_repr()
+    test_optional_equality()

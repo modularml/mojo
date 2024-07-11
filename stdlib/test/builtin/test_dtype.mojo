@@ -43,8 +43,15 @@ fn test_key_element() raises:
     assert_true(DType.int64 in set)
 
 
+fn test_sizeof() raises:
+    assert_equal(DType.int16.sizeof(), sizeof[DType.int16]())
+    assert_equal(DType.float32.sizeof(), sizeof[DType.float32]())
+    assert_equal(DType.index.sizeof(), sizeof[DType.index]())
+
+
 fn main() raises:
     test_equality()
     test_stringable()
     test_representable()
     test_key_element()
+    test_sizeof()

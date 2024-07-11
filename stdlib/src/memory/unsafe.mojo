@@ -234,6 +234,7 @@ struct LegacyPointer[
         """
         return Self {address: address}
 
+    @no_inline
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 
@@ -331,7 +332,7 @@ struct LegacyPointer[
     @always_inline
     fn free(self):
         """Frees the heap allocated memory."""
-        return _free(self)
+        return _free(self.address)
 
     # ===------------------------------------------------------------------=== #
     # Casting
@@ -611,7 +612,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return LegacyPointer.address_of(arg)
+        return UnsafePointer.address_of(arg)
 
     @staticmethod
     @always_inline
@@ -770,6 +771,7 @@ struct DTypePointer[
         """
         return int(self.address)
 
+    @no_inline
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 

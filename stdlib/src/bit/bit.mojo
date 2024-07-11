@@ -15,7 +15,7 @@
 You can import these APIs from the `bit` package. For example:
 
 ```mojo
-from bit import countl_zero
+from bit import count_leading_zeros
 ```
 """
 
@@ -23,12 +23,12 @@ from sys import llvm_intrinsic
 from sys.info import bitwidthof
 
 # ===----------------------------------------------------------------------===#
-# countl_zero
+# count_leading_zeros
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn countl_zero(val: Int) -> Int:
+fn count_leading_zeros(val: Int) -> Int:
     """Counts the number of leading zeros of an integer.
 
     Args:
@@ -41,7 +41,7 @@ fn countl_zero(val: Int) -> Int:
 
 
 @always_inline("nodebug")
-fn countl_zero[
+fn count_leading_zeros[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the per-element number of leading zeros in a SIMD vector.
@@ -67,12 +67,12 @@ fn countl_zero[
 
 
 # ===----------------------------------------------------------------------===#
-# countr_zero
+# count_trailing_zeros
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn countr_zero(val: Int) -> Int:
+fn count_trailing_zeros(val: Int) -> Int:
     """Counts the number of trailing zeros for an integer.
 
     Args:
@@ -85,7 +85,7 @@ fn countr_zero(val: Int) -> Int:
 
 
 @always_inline("nodebug")
-fn countr_zero[
+fn count_trailing_zeros[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the per-element number of trailing zeros in a SIMD vector.
@@ -267,7 +267,7 @@ fn bit_width(val: Int) -> Int:
     """
     alias bitwidth = bitwidthof[Int]()
 
-    return bitwidth - countl_zero(~val if val < 0 else val)
+    return bitwidth - count_leading_zeros(~val if val < 0 else val)
 
 
 @always_inline
@@ -299,10 +299,10 @@ fn bit_width[
 
     @parameter
     if type.is_unsigned():
-        return bitwidth - countl_zero(val)
+        return bitwidth - count_leading_zeros(val)
     else:
-        var leading_zero_pos = countl_zero(val)
-        var leading_zero_neg = countl_zero(bit_not(val))
+        var leading_zero_pos = count_leading_zeros(val)
+        var leading_zero_neg = count_leading_zeros(bit_not(val))
         var leading_zero = (val < 0).select(leading_zero_neg, leading_zero_pos)
         return bitwidth - leading_zero
 

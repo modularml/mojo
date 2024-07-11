@@ -20,7 +20,7 @@ from sys.intrinsics import _type_is_eq
 
 from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, Variant, unroll
+from utils import StringRef, Variant
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -557,6 +557,7 @@ struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
         else:
             lhs = lhs.convert_bool_to_int()
 
+    @no_inline
     fn __str__(self) -> String:
         """Returns the name (in lowercase) of the specific object type."""
         if self.is_none():
@@ -933,7 +934,7 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
         """
         return self.__bool__()
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Performs conversion to string according to Python
         semantics.

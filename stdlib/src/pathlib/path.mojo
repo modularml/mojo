@@ -146,7 +146,7 @@ struct Path(
         else:
             self.path += DIR_SEPARATOR + suffix
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Returns a string representation of the path.
 
@@ -162,7 +162,7 @@ struct Path(
         Returns:
             True if the path length is greater than zero, and False otherwise.
         """
-        return len(self.path) > 0
+        return self.path.byte_length() > 0
 
     fn format_to(self, inout writer: Formatter):
         """

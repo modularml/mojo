@@ -98,7 +98,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         """
         return self.value
 
-    @always_inline("nodebug")
+    @no_inline
     fn __str__(self) -> String:
         """Convert this UInt to a string.
 
@@ -113,7 +113,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         """
         return String.format_sequence(self)
 
-    @always_inline("nodebug")
+    @no_inline
     fn __repr__(self) -> String:
         """Convert this UInt to a string.
 
