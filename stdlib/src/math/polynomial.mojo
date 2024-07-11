@@ -84,8 +84,9 @@ fn _horner_evaluate[
     alias num_coefficients = len(coefficients)
     alias c_last = coefficients[num_coefficients - 1]
     alias c_second_from_last = coefficients[num_coefficients - 2]
+    print("alias", c_second_from_last, coefficients[num_coefficients - 2])
 
-    var result = x.fma(c_last, c_second_from_last)
+    var result = x.fma(c_last, coefficients[num_coefficients - 2])
 
     @parameter
     for i in reversed(range(num_coefficients - 2)):
