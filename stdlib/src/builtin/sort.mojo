@@ -30,6 +30,9 @@ from memory import UnsafePointer
 struct _SortWrapper[type: CollectionElement](CollectionElement):
     var data: type
 
+    fn __init__(inout self, *, other: Self):
+        self.data = other.data
+
 
 @always_inline
 fn _insertion_sort[

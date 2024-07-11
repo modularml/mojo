@@ -482,8 +482,11 @@ fn test_sort_stress() raises:
 
 
 @value
-struct MyStruct:
+struct MyStruct(CollectionElement):
     var val: Int
+
+    fn __init__(inout self, *, other: Self):
+        self.val = other.val
 
 
 fn test_sort_custom() raises:
@@ -534,6 +537,10 @@ def test_sort_strings():
 struct Person(ComparableCollectionElement):
     var name: String
     var age: Int
+
+    fn __init__(inout self, *, other: Self):
+        self.name = String(other=other.name)
+        self.age = other.age
 
     fn __lt__(self, other: Self) -> Bool:
         if self.age < other.age:

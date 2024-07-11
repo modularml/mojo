@@ -313,18 +313,18 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-    fn __init__(inout self, value: Dict[Self, Self]):
-        """Initialize the object from a dictionary of PythonObjects.
-
-        Args:
-            value: The dictionary value.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyDict_New()
-        for entry in value.items():
-            var result = cpython.PyDict_SetItem(
-                self.py_object, entry[].key.py_object, entry[].value.py_object
-            )
+    # fn __init__(inout self, value: Dict[Self, Self]):
+    #    """Initialize the object from a dictionary of PythonObjects.
+    #
+    #    Args:
+    #        value: The dictionary value.
+    #    """
+    #    var cpython = _get_global_python_itf().cpython()
+    #    self.py_object = cpython.PyDict_New()
+    #    for entry in value.items():
+    #        var result = cpython.PyDict_SetItem(
+    #            self.py_object, entry[].key.py_object, entry[].value.py_object
+    #        )
 
     fn __copyinit__(inout self, existing: Self):
         """Copy the object.

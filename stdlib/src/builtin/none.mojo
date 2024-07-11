@@ -29,3 +29,11 @@ struct NoneType(CollectionElement):
     fn __init__(inout self):
         """Construct an instance of the `None` type."""
         self._value = None
+
+    fn __init__(inout self, *, other: Self):
+        """Explicit copy constructor.
+
+        Args:
+            other: Another `NoneType` instance to copy.
+        """
+        self._value = None
