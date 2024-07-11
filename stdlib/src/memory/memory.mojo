@@ -170,7 +170,7 @@ fn memcmp[
 
 
 @always_inline
-fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
+fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
     """Copies a memory area.
 
     Parameters:
@@ -237,12 +237,12 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
         dest: The destination pointer.
         src: The source pointer.
     """
-    memcpy[count](dest.address, src.address)
+    memcpy[count](dest.address.address, src.address.address)
 
 
 @always_inline
 fn memcpy(
-    dest_data: LegacyPointer[Int8, *_], src_data: __type_of(dest_data), n: Int
+    dest_data: UnsafePointer[Int8, *_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
 
@@ -308,19 +308,6 @@ fn memcpy(
 
 
 @always_inline
-fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
-    """Copies a memory area.
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy.
-    """
-    var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
-
-
-@always_inline
 fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
 
@@ -342,7 +329,7 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
         src: The source pointer.
         count: The number of elements to copy (not bytes!).
     """
-    memcpy(dest.address, src.address, count)
+    memcpy(dest.address.address, src.address.address, count)
 
 
 @always_inline
