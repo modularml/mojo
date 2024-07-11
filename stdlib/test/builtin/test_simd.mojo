@@ -1546,6 +1546,41 @@ def test_contains():
     assert_false(0 in y or 5 in y)
 
 
+def test_comparison():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, 0, 2, 10)
+
+    assert_true(i.__lt__(I(-1, 1, 3, 11)).reduce_and())
+    assert_false(i.__lt__(I(-2, -1, 1, 9)).reduce_or())
+    var mixed_lt = i.__lt__((I(1, 1, 2, 9)))
+    assert_true(mixed_lt[0] and mixed_lt[1])
+    assert_false(mixed_lt[2] or mixed_lt[3])
+
+    assert_true(i.__le__(I(-2, 1, 2, 11)).reduce_and())
+    assert_false(i.__le__(I(-3, -1, 1, 9)).reduce_or())
+    var mixed_le = i.__le__((I(-2, 1, 1, 9)))
+    assert_true(mixed_le[0] and mixed_le[1])
+    assert_false(mixed_le[2] or mixed_le[3])
+
+    assert_true(i.__eq__(I(-2, 0, 2, 10)).reduce_and())
+    assert_false(i.__eq__(I(-3, 1, -2, 11)).reduce_or())
+    var mixed_eq = i.__eq__((I(-2, 0, 1, 9)))
+    assert_true(mixed_eq[0] and mixed_eq[1])
+    assert_false(mixed_eq[2] or mixed_eq[3])
+
+    assert_true(i.__gt__(I(-3, -1, 0, 8)).reduce_and())
+    assert_false(i.__gt__(I(0, 1, 3, 14)).reduce_or())
+    var mixed_gt = i.__gt__((I(-3, -1, 3, 11)))
+    assert_true(mixed_gt[0] and mixed_gt[1])
+    assert_false(mixed_gt[2] or mixed_gt[3])
+
+    assert_true(i.__ge__(I(-2, -1, 2, 8)).reduce_and())
+    assert_false(i.__ge__(I(-1, 1, 3, 14)).reduce_or())
+    var mixed_ge = i.__ge__((I(-2, -1, 3, 11)))
+    assert_true(mixed_ge[0] and mixed_ge[1])
+    assert_false(mixed_ge[2] or mixed_ge[3])
+
+
 def main():
     test_abs()
     test_add()
@@ -1595,4 +1630,5 @@ def main():
     test_modf()
     test_split()
     test_contains()
+    test_comparison()
     # TODO: add tests for __and__, __or__, anc comparison operators
