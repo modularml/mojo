@@ -2653,7 +2653,7 @@ struct SIMD[type: DType, size: Int](
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space, _]) -> Self:
-        """Loads the value the Pointer object points to.
+        """Loads the value the pointer points to.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2677,7 +2677,7 @@ struct SIMD[type: DType, size: Int](
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space, _], offset: Scalar) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2704,7 +2704,7 @@ struct SIMD[type: DType, size: Int](
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space, _], offset: Int) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2752,7 +2752,7 @@ struct SIMD[type: DType, size: Int](
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space], offset: UInt) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.

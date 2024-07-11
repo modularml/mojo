@@ -18,7 +18,7 @@
 from collections import Optional
 from sys import sizeof
 
-from memory import LegacyPointer, UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy
 
 from utils import InlineArray, StringSlice, Variant
 from utils._format import ToFormatter
