@@ -2176,9 +2176,8 @@ struct SIMD[type: DType, size: Int](
             The number of occurrences of the value in the vector.
         """
 
-        @parameter
         constrained[self.size < 256, "size must be less than 256"]()
-            # adding 256 occurences of a value would wrap to 0
+        # adding 256 occurences of a value would wrap to 0
         return (self == value).cast[DType.uint8]().reduce_add().__int__()
 
     # ===------------------------------------------------------------------=== #
