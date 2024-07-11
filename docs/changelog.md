@@ -446,6 +446,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   - `sort(ptr, len)` a pointer and length (can change to Span in future)
   - `sort[type, cmp_fn](ptr, len)` above with custom compare
 
+- `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
+  overload instead.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`

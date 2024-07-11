@@ -332,7 +332,7 @@ struct LegacyPointer[
     @always_inline
     fn free(self):
         """Frees the heap allocated memory."""
-        return _free(self)
+        return _free(self.address)
 
     # ===------------------------------------------------------------------=== #
     # Casting
