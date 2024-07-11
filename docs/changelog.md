@@ -284,7 +284,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   ```
 
 - Added `SIMD.count` method for `Scalar` rhs.
-  ([PR #3179](https://github.com/modularml/mojo/pull/3179) by [@rd4com](https://github.com/rd4com))
+  ([PR #3179](https://github.com/modularml/mojo/pull/3179)
+  by [@rd4com](https://github.com/rd4com))
 
   Example usage:
 
