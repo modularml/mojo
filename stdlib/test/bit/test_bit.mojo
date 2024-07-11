@@ -124,9 +124,9 @@ def test_bit_reverse():
     assert_equal(bit_reverse(-(2**32)), 4294967295)
     assert_equal(bit_reverse(-1), -1)
     assert_equal(bit_reverse(0), 0)
-    assert_equal(bit_reverse(1), -9223372036854775808)
-    assert_equal(bit_reverse(2), 4611686018427387904)
-    assert_equal(bit_reverse(3), -4611686018427387904)
+    assert_equal(bit_reverse(1), -(2**63))
+    assert_equal(bit_reverse(2), 2**62)
+    assert_equal(bit_reverse(8), 2**60)
     assert_equal(bit_reverse(2**63), 1)
 
 
