@@ -409,5 +409,5 @@ def main():
     test_is()
     test_iter()
     test_setitem()
-    # test_dict()
+    test_dict()
     test_none()
