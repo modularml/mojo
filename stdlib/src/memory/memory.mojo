@@ -25,7 +25,7 @@ from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
 
-from .unsafe import DTypePointer, LegacyPointer
+from .unsafe import DTypePointer
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -561,9 +561,4 @@ fn _free(ptr: UnsafePointer):
 
 @always_inline
 fn _free(ptr: DTypePointer):
-    _free(ptr.address)
-
-
-@always_inline
-fn _free(ptr: LegacyPointer):
-    _free(UnsafePointer(ptr.address))
+    _free(ptr.address.address)
