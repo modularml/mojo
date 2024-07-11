@@ -1582,6 +1582,23 @@ def test_count():
     assert_equal(e.count(-200), 1)
     assert_equal(e.count(-150), 0)
 
+    # SIMD vector size >= 256 :
+    var f = SIMD[DType.uint8, 256](1)
+    assert_equal(f.count(1), 256)
+    f[0] = 0
+    assert_equal(f.count(1), 255)
+
+    var g = SIMD[DType.uint8, 256](0)
+    assert_equal(g.count(1), 0)
+    assert_equal(g.count(0), 256)
+    g[0] = 1
+    assert_equal(g.count(1), 1)
+    assert_equal(g.count(0), 255)
+
+    var h = SIMD[DType.uint8, 512](1)
+    assert_equal(h.count(1), 512)
+    h[0] = 0
+    assert_equal(h.count(1), 511)
 
 def main():
     test_abs()
