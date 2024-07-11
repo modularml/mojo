@@ -562,6 +562,10 @@ struct CopyCountedStruct(CollectionElement):
     var counter: CopyCounter
     var value: String
 
+    fn __init__(inout self, *, other: Self):
+        self.counter = CopyCounter(other=other.counter)
+        self.value = String(other=other.value)
+
     fn __init__(inout self, value: String):
         self.counter = CopyCounter()
         self.value = value
@@ -867,6 +871,9 @@ struct DtorCounter(CollectionElement):
 
     fn __init__(inout self):
         self.payload = 0
+
+    fn __init__(inout self, *, other: Self):
+        self.payload = other.payload
 
     fn __copyinit__(inout self, existing: Self, /):
         self.payload = existing.payload

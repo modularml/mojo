@@ -171,6 +171,17 @@ struct Optional[T: CollectionElement](
         """
         return self.__bool__()
 
+    fn __eq__(self, rhs: NoneType) -> Bool:
+        """Return `True` if a value is not present.
+
+        Args:
+            rhs: The `None` value to compare to.
+
+        Returns:
+            `True` if a value is not present, `False` otherwise.
+        """
+        return self is None
+
     fn __eq__[
         T: EqualityComparableCollectionElement
     ](self: Optional[T], rhs: Optional[T]) -> Bool:
@@ -192,6 +203,17 @@ struct Optional[T: CollectionElement](
                 return self.value() == rhs.value()
             return False
         return not rhs
+
+    fn __ne__(self, rhs: NoneType) -> Bool:
+        """Return `True` if a value is present.
+
+        Args:
+            rhs: The `None` value to compare to.
+
+        Returns:
+            `False` if a value is not present, `True` otherwise.
+        """
+        return self is not None
 
     fn __ne__[
         T: EqualityComparableCollectionElement
