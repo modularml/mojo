@@ -25,8 +25,7 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
-from utils.string_slice import _utf8_byte_type
-from utils.string_slice import _StringSliceIter
+from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
 # ord
