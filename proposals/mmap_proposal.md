@@ -1,26 +1,39 @@
 # Stdlib Proposal for mmap
 
-A `mmap` module has mentioned by the community and welcomed by the core team, this proposal walks through a proposed basic API along with a brief proof of concept.
+A `mmap` module has mentioned by the community and welcomed by the core team.
+This proposal walks through a proposed basic API along with a brief proof of concept.
 
 ## What is Memory Mapping and how is it used?
 
-`mmap` creates a new mapping in the virtual address space of the program. It allows for files or devices to be mapped directly into memory, enabling faster IO operations. It has a few primary advantages: it is efficient for random access on large files, it allows multiple processes to share memory, it can improve performance by reducing system calls and copy operations.
+`mmap` creates a new mapping in the virtual address space of the program.
+It allows for files to be mapped directly into memory, enabling faster IO operations.
 
-It uses demand paging, which means that file contents are not immediately read from disk. The OS manages this mapping and returns additional pages of data as needed.
+It has a few primary advantages:
 
-Modules to access underlying OS technology surrounding memory mapped files, are available in most programming languages, and have become incredibly useful when deal with large datasets in the machine learning space.
+- It is efficient for random access on large files.
+- It allows multiple processes to share memory.
+- It can improve performance by reducing system calls and copy operations.
+
+It uses demand paging, which means that files are not immediately read from disk.
+The OS manages this mapping and returns additional pages of data as needed.
 
 ## Proposal
 
 The introduction of a `mmap` module, with two primary objects:
 
-A `MmapMode`, an enum struct, identifying the four initial `mmap` configurations, for Read-Only, Write Only, Exec, and Copy-On-Write. 
+A `MmapMode`, an enum struct, identifying the four initial `mmap` configurations:
 
-A `Mmap` object, containing the functionality for construction/destruction and interaction with memory mapped files.
+- Read Only
+- Write Only
+- Exec
+- Copy On Write
+
+A `Mmap` object, responsible for creating and working with mmap files.
 
 ### High Level Usage
 
-An initial implementation of `Mmap` in a read-only context can be used as follows. Note, the API has been meant to provide similarity with the existing `FileHandle` API.
+An initial implementation of `Mmap` in a read-only context can be used as follows.
+Note, the API will provide functionality similar to the existing `FileHandle` API.
 
 ```mojo
     var length: Int32 = 24;
@@ -37,7 +50,7 @@ An initial implementation of `Mmap` in a read-only context can be used as follow
     mmap.close()
 ```
 
-Whereas an initial implementation of `Mmap` in a read/write context can be used as follows:
+Whereas an initial implementation of `Mmap` in a write context can be used as follows:
 
 ```mojo
     var length: Int32 = 24;
@@ -55,9 +68,10 @@ Whereas an initial implementation of `Mmap` in a read/write context can be used 
     # Memory mapped files must be closed once they are finished
     mmap.close()
 ```
+
 ### Initial API
 
-An initial API for `MmapMode` and `Mmap` could look like the below. 
+An initial API for `MmapMode` and `Mmap` could look like the below.
 
 ```mojo
     struct MmapMode:
@@ -110,7 +124,7 @@ An initial API for `MmapMode` and `Mmap` could look like the below.
 
 ### Proof of Concept
 
-An initial proof of concept, which provides for read-only memory mapped files is provided below:
+An initial proof of concept, for read-only memory mapped files is provided below:
 
 ```mojo
     alias PROT_READ: Int32 = 1;
@@ -199,14 +213,26 @@ An initial proof of concept, which provides for read-only memory mapped files is
 
 ### How should the memory map be constructed?
 
-The [mmap Man page for MacOS](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/mmap.2.html), walks through mmap in detail. However, at a high level, `mmap` takes in, an address to map to, an expected size of the file, file protections, mapping options via flags, a file descriptor, and a byte offset. If successful, it returns a pointer to the start of the mapped region.
+The mmap Man page for MacOS walks through mmap in detail.
+However, at a high level, `mmap` takes in:
+
+- an address to map to
+- an expected size of the file
+- file protections
+- mapping options via flags
+- a file descriptor
+- a byte offset
+
+If successful, it returns a pointer to the start of the mapped region.
 
 Few important pieces to consider:
-* While the flags/protections can be different the vast majority of code for initializing a mmap is the same.
-* The file descriptor only needs to remain open while the mmap is being initialized. If so, we may want to handle the context window surrounding the creation/deletion of the FileDescriptor in initialization as well.
-* A mapped file in memory, must be closed, otherwise it can lead to memory leaks.
 
-Given this information, there are two primary different ways we could initialize a Mmap object. The first way could parameterize a 'mode' which should be shorthand for the `prot` and `flags` fields:
+- While the configurations vary the majority of code for creating a mmap is the same.
+- The file descriptor only needs to remain open while the mmap is being initialized.
+- A mapped file in memory, must be closed, otherwise it can lead to memory leaks.
+
+Given this, there are two primary different ways we could initialize a Mmap object.
+The first way would include a 'mode', which stands in for 'prot' and 'flags' options:
 
 ```mojo
     struct MmapMode:
@@ -225,18 +251,29 @@ Given this information, there are two primary different ways we could initialize
         fn _get_flags(mode: String) -> Int32:
             ...
 
-        fn __init__(self, fd: FileDescriptor, length: Int32, offset: Int32, address: UnsafePointer[UInt8] = UnsafePointer[UInt8](), mode: String = MmapMode.READ) raises -> Self
+        fn __init__(self, 
+                    fd: FileDescriptor, 
+                    length: Int32, 
+                    offset: Int32, 
+                    address: UnsafePointer[UInt8] = UnsafePointer[UInt8](), 
+                    mode: String = MmapMode.READ) raises -> Self
             ...
 
 ```
 
 There are a few pieces to clarify in this first method:
 
-With the mode shorthand method, we would need two small helper methods to translate between the mmap mode, and prot/flags integers, provided to the OS.
+With this method, we would need helper methods to translate between the mode provided,
+and OS flags.
 
-Additionally, the address in the initialization function provides a hint for the OS to try to place the map within that address. We can default it to a null pointer, which would tell the OS to place the map wherever it would like, with the ability for the user to overwrite this value if they see fit.
+Additionally, the address in the init function is only a hint for the OS.
+If provided with a null pointer, the OS will choose the map location.
+We've set a sane default, while allowing the user to change this value if needed.
 
-An additional way this could be done is similar to other implementations in other languages (namely [memmap2-rs](https://github.com/RazrFalcon/memmap2-rs)). Instead of a enumerated mode, individually named factory functions are provided to configure the memory map. It would look something like this, with an additional constructor provided for each 'mode':
+An additional way this oculd be done is similar to implementations in other languages.
+Instead of an enumerated mode, individually named factory functions could be used.
+Each function would provided a specifically configured map.
+It would look something like this:
 
 ```mojo
     struct Mmap:
@@ -253,13 +290,17 @@ An additional way this could be done is similar to other implementations in othe
 
 ```
 
-Ultimately, I tend to prefer the first option, as it provides a few benefits. Firstly, the constructor is clearly identified, there is little ambiguity how this class is constructed. 
+I tend to prefer the first option, as it provides a few benefits:
 
-Secondly, it is simpler in the off chance, we wanted to provide the user with a context managed mmap, (one in which the `__enter__` and `__exit__` methods, both open and close the map automatically).
+- The constructor is clearly identified.
+- Simpler, in case we want to provide the user with a context managed mmap object.
 
 ### Aside: Should we provide a `FileDescriptor` directly?
 
-With the API above, the user is expected to open a FileDescriptor directly, and pass this to the Mmap constructor. Usage would look something like this:
+With the API above, the user is expected to open a FileDescriptor directly prior.
+This is then passed to the `Mmap` constructor.
+
+Usage would look something like this:
 
 ```mojo
     # This only opens the file handle
@@ -275,11 +316,14 @@ With the API above, the user is expected to open a FileDescriptor directly, and 
 
 Given this usage pattern, there are two outstanding thoughts, I had:
 
-Firstly, Does the automatic conversion from `FileHandle` to `FileDescriptor` in the above, automatically close the `FileHandle`? If this is not the case, and the `FileHandle` needs to be deconstructed individually, we may want to manage this for the user directly.
+Does the conversion from `FileHandle` to `FileDescriptor`, close the `FileHandle`?
+If the `FileHandle` needs to be closed, we can manage this for the user directly.
 
-Secondly, this puts the responsibility for aligning between file permissions and `MmapMode` on the user. Which may be unnecessary burdensome, given that the `mode` provided during `open` must be aligned with the `MmapMode`.
+Secondly, file permissions and `MmapMode` are related.
+The above, leaves the responsibility for this with the user.
+This burden can be alleviated by managing the `FileHandle` ourselves.
 
-If we were to incorporate this responsibility in the initialization of the `Mmap` object, we could do something like this:
+To incorporate this responsibility during initialization instead, we could do this:
 
 ```mojo
     struct Mmap:
@@ -296,4 +340,3 @@ If we were to incorporate this responsibility in the initialization of the `Mmap
             fd.close()
 
 ```
-
