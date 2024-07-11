@@ -163,17 +163,10 @@ fn bit_reverse[
 fn byte_swap(val: Int) -> Int:
     """Byte-swaps an integer value with an even number of bytes.
 
-    Byte swap an integer value with an even number of bytes (positive multiple
-    of 16 bits). This is equivalent to `llvm.bswap` intrinsic that has the
-    following semantics:
-
-    The `llvm.bswap.i16` intrinsic returns an i16 value that has the high and
-    low byte of the input i16 swapped. Similarly, the `llvm.bswap.i32` intrinsic
-    returns an i32 value that has the four bytes of the input i32 swapped, so
-    that if the input bytes are numbered 0, 1, 2, 3 then the returned i32 will
-    have its bytes in 3, 2, 1, 0 order. The `llvm.bswap.i48`, `llvm.bswap.i64`
-    and other intrinsics extend this concept to additional even-byte lengths (6
-    bytes, 8 bytes and more, respectively).
+    Byte swap an integer value (8 bytes) with an even number of bytes (positive multiple
+    of 16 bits). This returns an integer value (8 bytes) that has its bytes swapped. For
+    example, if the input bytes are numbered 0, 1, 2, 3, 4, 5, 6, 7 then the returned
+    integer will have its bytes in 7, 6, 5, 4, 3, 2, 1, 0 order.
 
     Args:
         val: The input value.
@@ -191,16 +184,12 @@ fn byte_swap[
     """Byte-swaps a SIMD vector of integer values with an even number of bytes.
 
     Byte swap an integer value or vector of integer values with an even number
-    of bytes (positive multiple of 16 bits). This is equivalent to `llvm.bswap`
-    intrinsic that has the following semantics:
-
-    The `llvm.bswap.i16` intrinsic returns an i16 value that has the high and
-    low byte of the input i16 swapped. Similarly, the `llvm.bswap.i32` intrinsic
-    returns an i32 value that has the four bytes of the input i32 swapped, so
-    that if the input bytes are numbered 0, 1, 2, 3 then the returned i32 will
-    have its bytes in 3, 2, 1, 0 order. The `llvm.bswap.i48`, `llvm.bswap.i64`
-    and other intrinsics extend this concept to additional even-byte lengths (6
-    bytes, 8 bytes and more, respectively).
+    of bytes (positive multiple of 16 bits). For example, The Int16 returns an
+    Int16 value that has the high and low byte of the input Int16 swapped.
+    Similarly, Int32 returns an Int32 value that has the four bytes of the input Int32 swapped,
+    so that if the input bytes are numbered 0, 1, 2, 3 then the returned Int32 will
+    have its bytes in 3, 2, 1, 0 order. Int64 and other integer type extend this
+    concept to additional even-byte lengths (6 bytes, 8 bytes and more, respectively).
 
     Parameters:
         type: `dtype` used for the computation.
