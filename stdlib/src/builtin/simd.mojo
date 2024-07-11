@@ -1506,9 +1506,9 @@ struct SIMD[type: DType, size: Int](
             type.is_integral()
             and target.is_integral()
             and target.is_unsigned()
-            # TODO(#933): remove size constraint when llvm instrinsics can be
-            # used at compile time
-            and target.bitwidth() <= type.bitwidth()
+            # TODO(#933): remove bitwidth constraint when llvm
+            # instrinsics can be used at compile time
+            and target.bitwidth() == type.bitwidth()
         ):
 
             @parameter
