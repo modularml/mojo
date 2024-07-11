@@ -289,9 +289,7 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   Example usage:
 
   ```mojo
-  var vector_of_four_int64 = SIMD[DType.int64, 4](1)
-  vector_of_four_int64[0] = 0
-  print(vector_of_four_int64.count(1)) # 3
+  print(SIMD[DType.uint8, 4](1, 1, 1, 0).count(1)) # 3
   ```
 
 ### 🦋 Changed
