@@ -61,6 +61,7 @@ fn _align_up(value: Int, alignment: Int) -> Int:
 
 struct Variant[*Ts: CollectionElement](
     CollectionElement,
+    ExplicitlyCopyable,
 ):
     """A runtime-variant type.
 

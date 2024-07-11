@@ -172,7 +172,6 @@ struct StaticIntTuple[size: Int](
     Stringable,
     Formattable,
     Comparable,
-    CollectionElement,
 ):
     """A base struct that implements size agnostic index functions.
 

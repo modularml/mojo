@@ -59,14 +59,6 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var item = item_ref[]
             self._data[item] = self._data.get(item, 0) + 1
 
-    fn __init__(inout self, *, other: Self):
-        """Explicit copy constructor of the Counter.
-
-        Args:
-            other: The `Counter` to copy.
-        """
-        self._data = Dict[V, Int](other=other._data)
-
     # ===------------------------------------------------------------------=== #
     # Operator dunders
     # ===------------------------------------------------------------------=== #
@@ -465,15 +457,6 @@ struct CountTuple[V: KeyElement](
         """
         self._value = value
         self._count = count
-
-    fn __init__(inout self, *, other: Self):
-        """Explicit copy constructor of the CountTuple.
-
-        Args:
-            other: The `CountTuple` to copy.
-        """
-        self._value = V(other=other._value)
-        self._count = other._count
 
     fn __copyinit__(inout self, other: Self):
         """Create a new CountTuple by copying another CountTuple.
