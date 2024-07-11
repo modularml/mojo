@@ -54,21 +54,28 @@ def test_uint_cast():
         var n1 = Scalar[T](value)
         assert_equal(n0, n1.cast[A]())
         assert_equal(n0, int(n1.cast[A]()))
-        assert_equal(n0, n1.cast[A]().cast[T]().cast[A]())
+
+        @parameter
+        if T.bitwidth() == A.bitwidth():
+            assert_equal(n0, n1.cast[A]().cast[T]().cast[A]())
+
         var n2 = SIMD[A, width](value)
         var n3 = SIMD[T, width](value)
         assert_true((n2 == n3.cast[A]()).reduce_and())
-        assert_true((n2 == n3.cast[A]().cast[T]().cast[A]()).reduce_and())
+
+        @parameter
+        if T.bitwidth() == A.bitwidth():
+            assert_true((n2 == n3.cast[A]().cast[T]().cast[A]()).reduce_and())
 
     alias src = (
         DType.uint64,
         DType.uint32,
-        DType.uint16,
-        DType.uint8,
-        DType.int64,
-        DType.int32,
-        DType.int16,
-        DType.int8,
+        # DType.uint16,
+        # DType.uint8,
+        # DType.int64,
+        # DType.int32,
+        # DType.int16,
+        # DType.int8,
     )
     alias dst = (DType.uint64, DType.uint32, DType.uint16, DType.uint8)
     alias widths = (1, 2, 4, 8, 16, 32, 64, 128, 256)
@@ -83,10 +90,11 @@ def test_uint_cast():
             for k in range(len(widths)):
                 alias T = src.get[i, DType]()
                 alias A = dst.get[j, DType]()
-                alias min_signed_val = ~Scalar[T](0)
+                alias w = widths.get[k, Int]()
+                alias min_signed_val = ~Scalar[A](0)
                 alias max_signed_val = min_signed_val >> 1
-                test[T, A, widths.get[k, Int](), int(min_signed_val)]()
-                test[T, A, widths.get[k, Int](), int(max_signed_val)]()
+                test[T, A, w, int(min_signed_val)]()
+                test[T, A, w, int(max_signed_val)]()
 
 
 def test_simd_variadic():

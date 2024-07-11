@@ -1544,7 +1544,7 @@ struct SIMD[type: DType, size: Int](
                     zero_x2.join(zero_x2)
                 )
                 alias ratio = target.bitwidth() // type.bitwidth()
-                alias w: Int = ratio * size
+                alias w = ratio * size
                 alias Vec = SIMD[type, w]
                 var val: Vec
 
@@ -1569,20 +1569,32 @@ struct SIMD[type: DType, size: Int](
                     constrained[False, "no UInt128 support yet"]()
                     return SIMD[target, size](0)
 
-                # @parameter
-                # if info.is_little_endian():
-                #     val = val.shuffle[from_range[w]()]()
+                @parameter
+                if info.is_little_endian():
+                    val = val.shuffle[from_range[w]()]()
 
                 return cast_unsafe[size](val)
             else:
                 alias ratio = type.bitwidth() // target.bitwidth()
-                var val = cast_unsafe[ratio](self)
+                var val = cast_unsafe[ratio * size](self)
+
+                @parameter
+                fn shuffle_for_slice() -> StaticIntTuple[ratio * size]:
+                    var values = StaticIntTuple[ratio * size]()
+                    var idx = ratio * size - size
+
+                    @parameter
+                    for i in range(ratio - 1, ratio * size, ratio):
+                        values[idx] = i
+                        idx += 1
+                    return values
 
                 @parameter
                 if info.is_little_endian():
-                    val = val.shuffle[from_range[ratio]()]()
+                    val = val.shuffle[from_range[ratio * size]()]()
 
-                return val.slice[size, offset = ratio - size]()
+                val = val.shuffle[shuffle_for_slice()]()
+                return val.slice[size, offset = ratio * size - size]()
         else:
             return __mlir_op.`pop.cast`[
                 _type = __mlir_type[
