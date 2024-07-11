@@ -23,8 +23,8 @@ from testing import (
     assert_true,
 )
 
-from utils import unroll
 from utils.numerics import isfinite, isinf, isnan, nan
+from utils.loop import unroll
 
 
 def test_cast():
@@ -50,9 +50,12 @@ def test_cast():
 
 
 def test_uint_cast():
-    fn test[T: DType, A: DType, width: Int, value: Int]() raises:
-        var n0 = Scalar[A](value)
-        var n1 = Scalar[T](value)
+    fn test[
+        T: DType, A: DType, width: Int
+    ](value: SIMD[DType.uint64, 1]) raises:
+        var n0 = value.cast[A]()
+        var n1 = value.cast[T]()
+        assert_equal(n0, Scalar[A](n1))
         assert_equal(n0, n1.cast[A]())
         assert_equal(n0, int(n1.cast[A]()))
 
@@ -60,8 +63,8 @@ def test_uint_cast():
         if T.bitwidth() == A.bitwidth():
             assert_equal(n0, n1.cast[A]().cast[T]().cast[A]())
 
-        var n2 = SIMD[A, width](value)
-        var n3 = SIMD[T, width](value)
+        var n2 = SIMD[A, width](n0)
+        var n3 = SIMD[T, width](n1)
         assert_true((n2 == n3.cast[A]()).reduce_and())
 
         @parameter
@@ -71,12 +74,12 @@ def test_uint_cast():
     alias src = (
         DType.uint64,
         DType.uint32,
-        # DType.uint16,
-        # DType.uint8,
-        # DType.int64,
-        # DType.int32,
-        # DType.int16,
-        # DType.int8,
+        DType.uint16,
+        DType.uint8,
+        DType.int64,
+        DType.int32,
+        DType.int16,
+        DType.int8,
     )
     alias dst = (DType.uint64, DType.uint32, DType.uint16, DType.uint8)
     alias widths = (1, 2, 4, 8, 16, 32, 64, 128, 256)
@@ -92,10 +95,12 @@ def test_uint_cast():
                 alias T = src.get[i, DType]()
                 alias A = dst.get[j, DType]()
                 alias w = widths.get[k, Int]()
-                alias min_signed_val = ~Scalar[A](0)
-                alias max_signed_val = min_signed_val >> 1
-                test[T, A, w, int(min_signed_val)]()
-                test[T, A, w, int(max_signed_val)]()
+                var min_signed_val = (~Scalar[A](0)).cast[DType.uint64]() & (
+                    ~Scalar[T](0)
+                ).cast[DType.uint64]()
+                var max_signed_val = min_signed_val >> 1
+                test[T, A, w](min_signed_val)
+                test[T, A, w](max_signed_val)
 
 
 def test_simd_variadic():

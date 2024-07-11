@@ -239,16 +239,16 @@ struct SIMD[type: DType, size: Int](
         self.__copyinit__(other)
 
     @always_inline("nodebug")
-    fn __init__[A: DType, //](inout self, other: SIMD[A, size]):
+    fn __init__[A: DType, //](inout self, value: SIMD[A, size]):
         """Cast the other SIMD vector into self.
 
         Parameters:
             A: The DType of the other SIMD.
 
         Args:
-            other: The value to cast into self.
+            value: The value to cast into self.
         """
-        self = other.cast[type]()
+        self = value.cast[type]()
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
@@ -1572,7 +1572,6 @@ struct SIMD[type: DType, size: Int](
                 @parameter
                 if info.is_little_endian():
                     val = val.shuffle[from_range[w]()]()
-
                 return cast_unsafe[size](val)
             else:
                 alias ratio = type.bitwidth() // target.bitwidth()
@@ -2172,7 +2171,7 @@ struct SIMD[type: DType, size: Int](
 
         @parameter
         if size == 1:
-            return SIMD[type, 2 * size](self[0], other[0])
+            return self.join(other)
 
         return llvm_intrinsic[
             "llvm.vector.interleave2",
