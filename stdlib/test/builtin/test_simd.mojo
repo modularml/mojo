@@ -82,9 +82,7 @@ def test_uint_cast():
         DType.int8,
     )
     alias dst = (DType.uint64, DType.uint32, DType.uint16, DType.uint8)
-    # TODO(#933): remove size constraint when llvm instrinsics can be
-    # used at compile time
-    alias widths: Tuple[Int] = (1)  # , 2, 4, 8, 16, 32, 64, 128, 256)
+    alias widths = (1, 2, 4, 8, 16, 32, 64, 128, 256)
 
     @parameter
     for i in range(len(src)):
@@ -96,6 +94,12 @@ def test_uint_cast():
             for k in range(len(widths)):
                 alias T = src.get[i, DType]()
                 alias A = dst.get[j, DType]()
+
+                # TODO(#933): remove size constraint when llvm instrinsics can
+                # be used at compile time
+                @parameter
+                if T.bitwidth() != A.bitwidth():
+                    continue
                 alias w = widths.get[k, Int]()
                 var min_signed_val = (~Scalar[A](0)).cast[DType.uint64]() & (
                     ~Scalar[T](0)
