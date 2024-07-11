@@ -192,6 +192,41 @@ fn _is_valid_utf8(data: UnsafePointer[UInt8], length: Int) -> Bool:
     return _validate_utf8_simd_slice[4, True](ptr, length, iter_len) == 0
 
 
+fn _isnewline_start(
+    ptr: UnsafePointer[UInt8], read_ahead: Int = 1
+) -> (Bool, Int):
+    """Returns if the first item in the pointer is the start of
+    a newline sequence, and its length.
+    """
+    # TODO add line and paragraph separator as stringliteral
+    # once unicode escape secuences are accepted
+    alias ` ` = UInt8(ord(" "))
+    var rn = "\r\n"
+    var next_line = List[UInt8](0xC2, 0x85)
+    """TODO: \\x85"""
+    var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
+    """TODO: \\u2028"""
+    var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
+    """TODO: \\u2029"""
+
+    if read_ahead > 1:
+        if memcmp(ptr, rn.unsafe_ptr(), 2) == 0:
+            return True, 2
+
+    var val = _utf8_byte_type(ptr[0])
+    if val == 0:
+        return ptr[0] != ` ` and _isspace(ptr[0]), 1
+    elif val == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0:
+        return True, 2
+    elif val == 3 and (
+        memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
+        or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
+    ):
+        return True, 3
+    _ = next_line, unicode_line_sep, unicode_paragraph_sep
+    return False, 1
+
+
 struct StringSlice[
     is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
@@ -493,3 +528,50 @@ struct StringSlice[
         without the string getting deallocated early.
         """
         pass
+
+    fn splitlines(self, keepends: Bool = False) -> List[String]:
+        """Split the string at line boundaries.
+
+        Args:
+            keepends: If True, line breaks are kept in the resulting strings.
+
+        Returns:
+            A List of Strings containing the input split by line boundaries.
+        """
+        var output = List[String]()
+        var length = self.byte_length()
+        var current_offset = 0
+        var ptr = self.unsafe_ptr()
+
+        while current_offset < length:
+            var eol_location = length - current_offset
+            var eol_length = 0
+            var curr_ptr = ptr.offset(current_offset)
+
+            for i in range(current_offset, length):
+                var read_ahead = 2 if i + 1 < length else 1
+                var res = _isnewline_start(ptr.offset(i), read_ahead)
+                if res[0]:
+                    eol_location = i - current_offset
+                    eol_length = res[1]
+                    break
+
+            var str_len: Int
+            var end_of_string = False
+            if current_offset >= length:
+                end_of_string = True
+                str_len = 0
+            elif keepends:
+                str_len = eol_location + eol_length
+            else:
+                str_len = eol_location
+
+            output.append(
+                String(Self(unsafe_from_utf8_ptr=curr_ptr, len=str_len))
+            )
+
+            if end_of_string:
+                break
+            current_offset += eol_location + eol_length
+
+        return output
