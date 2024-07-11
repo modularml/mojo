@@ -147,6 +147,24 @@ fn str[T: Stringable](value: T) -> String:
 
 
 @no_inline
+fn str[T: Formattable](value: T, *, inout writer: Formatter):
+    """Write the string representation of a value to a formatter.
+
+    This function doesn't return anything.
+
+    Parameters:
+        T: The type conforming to Stringable.
+
+    Args:
+        value: The object to get the string representation of.
+        writer: The formatter to write the string representation to.
+
+    """
+    # TODO: rename format_to to __str__.
+    return value.format_to(writer=writer)
+
+
+@no_inline
 fn str(value: None) -> String:
     """Get the string representation of the `None` type.
 

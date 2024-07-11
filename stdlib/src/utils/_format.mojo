@@ -21,13 +21,32 @@ from builtin.io import _put
 # ===----------------------------------------------------------------------===#
 
 
+# TODO: Rename this trait to StringableToBuffer
 trait Formattable:
     """
     The `Formattable` trait describes a type that can be converted to a stream
     of UTF-8 encoded data by writing to a formatter object.
     """
 
+    # TODO: Rename this method to __str__.
     fn format_to(self, inout writer: Formatter):
+        """
+        Formats the compact string representation of this type to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        ...
+
+
+trait RepresentableToBuffer:
+    """
+    The `RepresentableToBuffer` trait describes a type that can ouput the
+    representation of itself to a buffer, as UTF-8 encoded data,
+    by writing to a formatter object.
+    """
+
+    fn __repr__(self, *, inout writer: Formatter):
         """
         Formats the string representation of this type to the provided formatter.
 

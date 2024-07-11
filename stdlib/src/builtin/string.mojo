@@ -1009,7 +1009,50 @@ struct String(
 
         @parameter
         fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
+            str(arg, writer=writer)
+
+        args.each[write_arg]()
+        _ = writer^
+
+        return output^
+
+    @staticmethod
+    @no_inline
+    fn format_sequence_repr[*Ts: RepresentableToBuffer](*args: *Ts) -> Self:
+        """
+        Construct a string by concatenating a sequence of `RepresentableToBuffer` arguments.
+
+        The output of `repr` will be used to format the arguments.
+
+        Args:
+            args: A sequence of `RepresentableToBuffer` arguments.
+
+        Parameters:
+            Ts: The types of the arguments to format. Each type must be satisfy
+                `RepresentableToBuffer`.
+
+        Returns:
+            A string formed by formatting the argument sequence.
+
+        Examples:
+
+        Construct a String from several `Formattable` arguments:
+
+        ```mojo
+        var string = String.format_sequence_repr(1, ", ", 2.0, ", ", "three")
+        print(string) # "1', '2.0', ''three'"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1', '2.0', ''three'")
+        ```
+        .
+        """
+
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+
+        @parameter
+        fn write_arg[T: RepresentableToBuffer](arg: T):
+            repr(arg, writer=writer)
 
         args.each[write_arg]()
         _ = writer^
@@ -1303,19 +1346,37 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        alias ord_squote = ord("'")
         var result = String()
+        var formatter = Formatter(result)
+        repr(self, writer=formatter)
+        return result
+
+    fn __repr__(self, *, inout writer: Formatter):
+        """Write a Mojo-compatible representation of the `String` instance to the Formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        alias ord_squote = ord("'")
         var use_dquote = False
 
         for idx in range(len(self._buffer) - 1):
             var char = self._buffer[idx]
-            result += _repr_ascii(char)
             use_dquote = use_dquote or (char == ord_squote)
 
         if use_dquote:
-            return '"' + result + '"'
+            writer.write_str['"']()
         else:
-            return "'" + result + "'"
+            writer.write_str["'"]()
+
+        for idx in range(len(self._buffer) - 1):
+            var char = self._buffer[idx]
+            str(_repr_ascii(char), writer=writer)
+
+        if use_dquote:
+            writer.write_str['"']()
+        else:
+            writer.write_str["'"]()
 
     fn __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).
