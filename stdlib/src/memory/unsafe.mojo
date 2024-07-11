@@ -522,7 +522,7 @@ struct DTypePointer[
 
     # Fields
     alias element_type = Scalar[type]
-    alias _pointer_type = Pointer[Scalar[type], address_space, exclusive]
+    alias _pointer_type = UnsafePointer[Scalar[type], address_space, exclusive]
     var address: Self._pointer_type
     """The pointed-to address."""
 
@@ -562,7 +562,7 @@ struct DTypePointer[
         Args:
             value: The scalar pointer.
         """
-        self = Pointer[
+        self = UnsafePointer[
             __mlir_type[`!pop.scalar<`, type.value, `>`], address_space
         ](value).bitcast[Scalar[type]]()
 
@@ -579,7 +579,7 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn __init__(
-        inout self, value: Pointer[Scalar[type], address_space, exclusive]
+        inout self, value: UnsafePointer[Scalar[type], address_space, exclusive]
     ):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
@@ -587,15 +587,6 @@ struct DTypePointer[
             value: The scalar pointer.
         """
         self.address = value
-
-    @always_inline("nodebug")
-    fn __init__(inout self, other: UnsafePointer[Scalar[type], address_space]):
-        """Constructs a `DTypePointer` from a scalar pointer of the same type.
-
-        Args:
-            other: The scalar pointer.
-        """
-        self.address = other.address
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
@@ -841,7 +832,7 @@ struct DTypePointer[
         """Converts the `DTypePointer` to a scalar pointer of the same dtype.
 
         Returns:
-            A `Pointer` to a scalar of the same dtype.
+            An `UnsafePointer` to a scalar of the same dtype.
         """
         return self.address.address
 
@@ -1076,7 +1067,7 @@ struct DTypePointer[
         Returns:
             The new constructed DTypePointer.
         """
-        return self.address.offset(idx)
+        return self.address.offset(int(idx))
 
     @always_inline("nodebug")
     fn offset(self, idx: UInt) -> Self:
@@ -1088,4 +1079,4 @@ struct DTypePointer[
         Returns:
             The new constructed DTypePointer.
         """
-        return self.address.offset(idx)
+        return self.address.offset(idx.value)
