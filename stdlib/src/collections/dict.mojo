@@ -522,24 +522,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __getitem__(self, key: K) raises -> V:
-        """Retrieve a value out of the dictionary.
-
-        Args:
-            key: The key to retrieve.
-
-        Returns:
-            The value associated with the key, if it's present.
-
-        Raises:
-            "KeyError" if the key isn't present.
-        """
-        return self._find_ref(key)
-
     # TODO(MSTDL-452): rename to __getitem__ returning a reference
-    fn __get_ref(
-        ref [_]self: Self, key: K
-    ) raises -> ref [__lifetime_of(self)] Self.V:
+    fn __getitem__(self, key: K) raises -> V:
         """Retrieve a value out of the dictionary.
 
         Args:
