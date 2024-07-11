@@ -1600,6 +1600,7 @@ def test_count():
     h[0] = 0
     assert_equal(h.count(1), 511)
 
+
 def main():
     test_abs()
     test_add()
