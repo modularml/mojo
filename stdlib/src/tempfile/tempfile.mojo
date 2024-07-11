@@ -31,7 +31,9 @@ fn _get_random_name(size: Int = 8) -> String:
     alias characters = String("abcdefghijklmnopqrstuvwxyz0123456789_")
     var name_list = List[UInt8](capacity=size + 1)
     for _ in range(size):
-        var rand_index = int(random.random_ui64(0, len(characters) - 1))
+        var rand_index = int(
+            random.random_ui64(0, characters.byte_length() - 1)
+        )
         name_list.append(ord(characters[rand_index]))
     name_list.append(0)
     return String(name_list^)
@@ -123,13 +125,11 @@ fn gettempdir() -> Optional[String]:
     try:
         return _get_default_tempdir()
     except:
-        return Optional[String]()
+        return None
 
 
 fn mkdtemp(
-    suffix: String = "",
-    prefix: String = "tmp",
-    dir: Optional[String] = Optional[String](),
+    suffix: String = "", prefix: String = "tmp", dir: Optional[String] = None
 ) raises -> String:
     """Create a temporary directory.
     Caller is responsible for deleting the directory when done with it.
@@ -213,7 +213,7 @@ struct TemporaryDirectory:
         inout self,
         suffix: String = "",
         prefix: String = "tmp",
-        dir: Optional[String] = Optional[String](),
+        dir: Optional[String] = None,
         ignore_cleanup_errors: Bool = False,
     ) raises:
         """Create a temporary directory.
@@ -272,10 +272,10 @@ struct NamedTemporaryFile:
     fn __init__(
         inout self,
         mode: String = "w",
-        name: Optional[String] = Optional[String](),
+        name: Optional[String] = None,
         suffix: String = "",
         prefix: String = "tmp",
-        dir: Optional[String] = Optional[String](),
+        dir: Optional[String] = None,
         delete: Bool = True,
     ) raises:
         """Create a named temporary file.
@@ -288,7 +288,7 @@ struct NamedTemporaryFile:
 
         Args:
             mode: The mode to open the file in (the mode can be "r" or "w").
-            name: The name of the temp file; if it is unspecified, then random name will be provided.
+            name: The name of the temp file. If it is unspecified, then a random name will be provided.
             suffix: Suffix to use for the file name if name is not provided.
             prefix: Prefix to use for the file name if name is not provided.
             dir: Directory in which the file will be created.
@@ -318,7 +318,6 @@ struct NamedTemporaryFile:
         except:
             raise Error("Failed to create temporary file")
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -342,7 +341,6 @@ struct NamedTemporaryFile:
         self._delete = existing._delete
         self.name = existing.name^
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads the data from the file.
 
@@ -366,11 +364,15 @@ struct NamedTemporaryFile:
         """
         return self._file_handle.read_bytes(size)
 
-    fn seek(self, offset: UInt64) raises -> UInt64:
+    fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
         """Seeks to the given offset in the file.
 
         Args:
             offset: The byte offset to seek to from the start of the file.
+            whence: The reference point for the offset:
+                os.SEEK_SET = 0: start of file (Default).
+                os.SEEK_CUR = 1: current position.
+                os.SEEK_END = 2: end of file.
 
         Raises:
             An error if this file handle is invalid, or if file seek returned a
@@ -379,7 +381,7 @@ struct NamedTemporaryFile:
         Returns:
             The resulting byte offset from the start of the file.
         """
-        return self._file_handle.seek(offset)
+        return self._file_handle.seek(offset, whence)
 
     fn write(self, data: String) raises:
         """Write the data to the file.

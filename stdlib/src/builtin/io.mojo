@@ -28,7 +28,7 @@ from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
-from utils import StringRef, unroll, StaticString, StringSlice
+from utils import StringRef, StaticString, StringSlice
 from utils._format import Formattable, Formatter, write_to
 
 # ===----------------------------------------------------------------------=== #
@@ -87,7 +87,7 @@ struct _fdopen:
 @no_inline
 fn _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
-        _ = external_call["fflush", Int32](fd)
+        _ = external_call["fflush", Int32](fd.handle)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -107,7 +107,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), Reference(loaded_pack)
         )
         _ = loaded_pack
     else:
@@ -178,7 +178,7 @@ fn _snprintf_scalar[
             return _snprintf["True"](buffer, size)
         else:
             return _snprintf["False"](buffer, size)
-    elif type.is_integral() or type is DType.address:
+    elif type.is_integral():
         return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
     elif (
         type is DType.float16 or type is DType.bfloat16 or type is DType.float32
@@ -256,7 +256,7 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
     @parameter
     if type is DType.bool:
         _put["True"]() if x else _put["False"]()
-    elif type.is_integral() or type is DType.address:
+    elif type.is_integral():
         _printf[format](x)
     elif type.is_floating_point():
 
@@ -320,7 +320,7 @@ fn _put(x: DType, file: FileDescriptor = stdout):
 @no_inline
 fn _put(x: StringSlice, file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
-    var str_len = x._byte_length()
+    var str_len = x.byte_length()
 
     if not str_len:
         return
@@ -341,7 +341,7 @@ fn _put(x: StringSlice, file: FileDescriptor = stdout):
 
         # The string can be printed, so that's fine.
         if str_len < MAX_STR_LEN:
-            _printf["%.*s"](x._byte_length(), x.unsafe_ptr(), file=file)
+            _printf["%.*s"](x.byte_length(), x.unsafe_ptr(), file=file)
             return
 
         # The string is large, then we need to chunk it.
@@ -389,7 +389,7 @@ fn print[
         writer.write(value)
 
         @parameter
-        if i < values.__len__() - 1:
+        if i < len(VariadicList(Ts)) - 1:
             writer.write(sep)
 
     values.each_idx[print_with_separator]()

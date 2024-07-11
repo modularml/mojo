@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from builtin.range import _StridedRangeIterator
+from builtin.range import _StridedRangeIterator, _UIntStridedRangeIterator
 
 # ===----------------------------------------------------------------------===#
 # __MLIRType
@@ -33,8 +33,18 @@ trait _IntNext(Copyable):
         ...
 
 
+trait _UIntNext(Copyable):
+    fn __next__(inout self) -> UInt:
+        ...
+
+
 trait _IntIter(_IntNext):
     fn __len__(self) -> Int:
+        ...
+
+
+trait _UIntIter(_UIntNext):
+    fn __len__(self) -> UInt:
         ...
 
 
@@ -45,6 +55,11 @@ trait _IntIterable(_IntIter):
 
 trait _StridedIterable(_IntIter):
     fn __iter__(self) -> _StridedRangeIterator:
+        ...
+
+
+trait _UIntStridedIterable(_UIntIter):
+    fn __iter__(self) -> _UIntStridedRangeIterator:
         ...
 
 

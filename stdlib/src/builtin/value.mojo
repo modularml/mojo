@@ -221,13 +221,27 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
+trait EqualityComparableCollectionElement(
+    CollectionElement, EqualityComparable
+):
+    """
+    This trait denotes a trait composition of the `CollectionElement` and `EqualityComparable` traits.
+
+    This is useful to have as a named entity since Mojo does not
+    currently support anonymous trait compositions to constrain
+    on `CollectionElement & EqualityComparable` in the parameter.
+    """
+
+    pass
+
+
 trait ComparableCollectionElement(CollectionElement, Comparable):
     """
-    This trait is a temporary solution to enable comparison of
-    collection elements as utilized in the `index` and `count` methods of
-    a list.
-    This approach will be revised with the introduction of conditional trait
-    conformances.
+    This trait denotes a trait composition of the `CollectionElement` and `Comparable` traits.
+
+    This is useful to have as a named entity since Mojo does not
+    currently support anonymous trait compositions to constrain
+    on `CollectionElement & Comparable` in the parameter.
     """
 
     pass

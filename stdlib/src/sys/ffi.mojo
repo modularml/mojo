@@ -231,7 +231,7 @@ fn _get_global[
 fn _get_global_or_null[name: StringLiteral]() -> UnsafePointer[NoneType]:
     return external_call[
         "KGEN_CompilerRT_GetGlobalOrNull", UnsafePointer[NoneType]
-    ](StringRef(name))
+    ](name.unsafe_ptr(), name.byte_length())
 
 
 @always_inline
@@ -311,168 +311,6 @@ fn external_call[
         )
 
 
-@always_inline("nodebug")
-fn external_call[callee: StringLiteral, type: AnyTrivialRegType]() -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None]()
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type]()
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral, type: AnyTrivialRegType, T0: AnyTrivialRegType
-](arg0: T0) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-
-    Args:
-      arg0: The first argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](arg0)
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyTrivialRegType,
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-](arg0: T0, arg1: T1) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyTrivialRegType,
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-](arg0: T0, arg1: T1, arg2: T2) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyTrivialRegType,
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3
-        )
-
-
 # ===----------------------------------------------------------------------===#
 # _external_call_const
 # ===----------------------------------------------------------------------===#
@@ -480,88 +318,29 @@ fn external_call[
 
 @always_inline("nodebug")
 fn _external_call_const[
-    callee: StringLiteral, type: AnyTrivialRegType
-]() -> type:
+    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
+](*arguments: *types) -> type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
     to the same function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-
-    Returns:
-      The external call result.
-    """
-    return __mlir_op.`pop.external_call`[
-        func = callee.value,
-        resAttrs = __mlir_attr.`[{llvm.noundef}]`,
-        funcAttrs = __mlir_attr.`["willreturn"]`,
-        memory = __mlir_attr[
-            `#llvm.memory_effects<other = none, `,
-            `argMem = none, `,
-            `inaccessibleMem = none>`,
-        ],
-        _type=type,
-    ]()
-
-
-@always_inline("nodebug")
-fn _external_call_const[
-    callee: StringLiteral, type: AnyTrivialRegType, T0: AnyTrivialRegType
-](arg0: T0) -> type:
-    """Mark the external function call as having no observable effects to the
-    program state. This allows the compiler to optimize away successive calls
-    to the same function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
 
     Args:
-      arg0: The first argument.
-
-    Returns:
-      The external call result.
-    """
-    return __mlir_op.`pop.external_call`[
-        func = callee.value,
-        resAttrs = __mlir_attr.`[{llvm.noundef}]`,
-        funcAttrs = __mlir_attr.`["willreturn"]`,
-        memory = __mlir_attr[
-            `#llvm.memory_effects<other = none, `,
-            `argMem = none, `,
-            `inaccessibleMem = none>`,
-        ],
-        _type=type,
-    ](arg0)
-
-
-@always_inline("nodebug")
-fn _external_call_const[
-    callee: StringLiteral,
-    type: AnyTrivialRegType,
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-](arg0: T0, arg1: T1) -> type:
-    """Mark the external function call as having no observable effects to the
-    program state. This allows the compiler to optimize away successive calls
-    to the same function.
+      arguments: The arguments to pass to the external function.
 
     Parameters:
       callee: The name of the external function.
       type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
+      types: The argument types.
 
     Returns:
       The external call result.
     """
+
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C printf call. Load
+    # all the members of the pack.
+    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+
     return __mlir_op.`pop.external_call`[
         func = callee.value,
         resAttrs = __mlir_attr.`[{llvm.noundef}]`,
@@ -572,4 +351,4 @@ fn _external_call_const[
             `inaccessibleMem = none>`,
         ],
         _type=type,
-    ](arg0, arg1)
+    ](loaded_pack)

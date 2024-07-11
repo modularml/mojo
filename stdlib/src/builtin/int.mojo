@@ -74,7 +74,7 @@ fn index[T: Indexer](idx: T, /) -> Int:
         idx: The value.
 
     Returns:
-        An `Int` respresenting the index value.
+        An `Int` representing the index value.
     """
     return idx.__index__()
 
@@ -236,6 +236,18 @@ fn int(value: String, base: Int = 10) raises -> Int:
     return atol(value, base)
 
 
+fn int(value: UInt) -> Int:
+    """Get the Int representation of the value.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The integral representation of the value.
+    """
+    return value.value
+
+
 # ===----------------------------------------------------------------------=== #
 #  Int
 # ===----------------------------------------------------------------------=== #
@@ -370,6 +382,15 @@ struct Int(
             value: The init value.
         """
         self = value.__index__()
+
+    @always_inline("nodebug")
+    fn __init__(inout self, value: UInt):
+        """Construct Int from the given UInt value.
+
+        Args:
+            value: The init value.
+        """
+        self = Self(value.value)
 
     # ===------------------------------------------------------------------=== #
     # Operator dunders
@@ -1044,6 +1065,7 @@ struct Int(
         """
         return self
 
+    @no_inline
     fn __str__(self) -> String:
         """Get the integer as a string.
 
@@ -1053,6 +1075,7 @@ struct Int(
 
         return String.format_sequence(self)
 
+    @no_inline
     fn __repr__(self) -> String:
         """Get the integer as a string. Returns the same `String` as `__str__`.
 

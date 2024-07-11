@@ -21,7 +21,7 @@ from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
 
-from utils import StringRef, unroll
+from utils import StringRef
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
@@ -135,6 +135,17 @@ struct PythonObject(
             ptr: The `PyObjectPtr` to take ownership of.
         """
         self.py_object = ptr
+
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, none: NoneType._mlir_type):
+        """Initialize a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = Self(none=NoneType(none))
 
     fn __init__(inout self, none: NoneType):
         """Initialize a none value object from a `None` literal.
@@ -302,7 +313,6 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-    # TODO: re-enable when this is possible
     # fn __init__(inout self, value: Dict[Self, Self]):
     #    """Initialize the object from a dictionary of PythonObjects.
     #
@@ -483,23 +493,28 @@ struct PythonObject(
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
-    fn __setitem__(inout self, *args: PythonObject) raises:
+    fn __setitem__(inout self, *args: PythonObject, value: PythonObject) raises:
         """Set the value with the given key or keys.
 
         Args:
-            args: The key or keys to set on this object, followed by the value.
+            args: The key or keys to set on this object.
+            value: The value to set.
         """
         var size = len(args)
-        debug_assert(size > 0, "must provide at least a value to __setitem__")
 
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size)
+        var tuple_obj = cpython.PyTuple_New(size + 1)
         for i in range(size):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
             var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if result != 0:
                 raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(value.py_object)
+        var result2 = cpython.PyTuple_SetItem(tuple_obj, size, value.py_object)
+        if result2 != 0:
+            raise Error("internal error: PyTuple_SetItem failed")
 
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, "__setitem__"
@@ -1170,6 +1185,26 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyLong_AsLong(self.py_object.value)
+
+    fn unsafe_get_as_pointer[type: DType](self) -> DTypePointer[type]:
+        """Convert a Python-owned and managed pointer into a Mojo pointer.
+
+        Warning: converting from an integer to a pointer is unsafe! The
+        compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
+        pointer. This is OK because the pointer originates from Python.
+
+        Parameters:
+            type: The desired DType of the pointer.
+
+        Returns:
+            A `DTypePointer` for the underlying Python data.
+        """
+        var tmp = int(self)
+        var result = UnsafePointer.address_of(tmp).bitcast[
+            DTypePointer[type]
+        ]()[]
+        _ = tmp
+        return result
 
     fn __str__(self) -> String:
         """Returns a string representation of the object.

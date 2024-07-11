@@ -124,7 +124,7 @@ def test_list_pop():
     for i in range(6):
         list.append(i)
 
-    # try poping from index 3 for 3 times
+    # try popping from index 3 for 3 times
     for i in range(3, 6):
         assert_equal(i, list.pop(3))
 
@@ -562,6 +562,10 @@ struct CopyCountedStruct(CollectionElement):
     var counter: CopyCounter
     var value: String
 
+    fn __init__(inout self, *, other: Self):
+        self.counter = CopyCounter(other=other.counter)
+        self.value = String(other=other.value)
+
     fn __init__(inout self, value: String):
         self.counter = CopyCounter()
         self.value = value
@@ -573,7 +577,7 @@ def test_no_extra_copies_with_sugared_set_by_field():
     child_list.append(CopyCountedStruct("Hello"))
     child_list.append(CopyCountedStruct("World"))
 
-    # No copies here.  Contructing with List[CopyCountedStruct](CopyCountedStruct("Hello")) is a copy.
+    # No copies here.  Constructing with List[CopyCountedStruct](CopyCountedStruct("Hello")) is a copy.
     assert_equal(0, child_list[0].counter.copy_count)
     assert_equal(0, child_list[1].counter.copy_count)
     list.append(child_list^)
@@ -592,7 +596,7 @@ def test_list_copy_constructor():
     var vec = List[Int](capacity=1)
     var vec_copy = vec
     vec_copy.append(1)  # Ensure copy constructor doesn't crash
-    _ = vec^  # To ensure previous one doesn't invoke move constuctor
+    _ = vec^  # To ensure previous one doesn't invoke move constructor
 
 
 def test_list_iter():
@@ -816,6 +820,29 @@ def test_list_contains():
     # assert_equal(List(0,1) in y,False)
 
 
+def test_list_eq_ne():
+    var l1 = List[Int](1, 2, 3)
+    var l2 = List[Int](1, 2, 3)
+    assert_true(l1 == l2)
+    assert_false(l1 != l2)
+
+    var l3 = List[Int](1, 2, 3, 4)
+    assert_false(l1 == l3)
+    assert_true(l1 != l3)
+
+    var l4 = List[Int]()
+    var l5 = List[Int]()
+    assert_true(l4 == l5)
+    assert_true(l1 != l4)
+
+    var l6 = List[String]("a", "b", "c")
+    var l7 = List[String]("a", "b", "c")
+    var l8 = List[String]("a", "b")
+    assert_true(l6 == l7)
+    assert_false(l6 != l7)
+    assert_false(l6 == l8)
+
+
 def test_list_init_span():
     var l = List[String]("a", "bb", "cc", "def")
     var sp = Span(l)
@@ -832,6 +859,58 @@ def test_indexing():
     assert_equal(l[2], 3)
 
 
+# ===-------------------------------------------------------------------===#
+# List dtor tests
+# ===-------------------------------------------------------------------===#
+var g_dtor_count: Int = 0
+
+
+struct DtorCounter(CollectionElement):
+    # NOTE: payload is required because List does not support zero sized structs.
+    var payload: Int
+
+    fn __init__(inout self):
+        self.payload = 0
+
+    fn __init__(inout self, *, other: Self):
+        self.payload = other.payload
+
+    fn __copyinit__(inout self, existing: Self, /):
+        self.payload = existing.payload
+
+    fn __moveinit__(inout self, owned existing: Self, /):
+        self.payload = existing.payload
+        existing.payload = 0
+
+    fn __del__(owned self):
+        g_dtor_count += 1
+
+
+def inner_test_list_dtor():
+    # explicitly reset global counter
+    g_dtor_count = 0
+
+    var l = List[DtorCounter]()
+    assert_equal(g_dtor_count, 0)
+
+    l.append(DtorCounter())
+    assert_equal(g_dtor_count, 0)
+
+    l.__del__()
+    assert_equal(g_dtor_count, 1)
+
+
+def test_list_dtor():
+    # call another function to force the destruction of the list
+    inner_test_list_dtor()
+
+    # verify we still only ran the destructor once
+    assert_equal(g_dtor_count, 1)
+
+
+# ===-------------------------------------------------------------------===#
+# main
+# ===-------------------------------------------------------------------===#
 def main():
     test_mojo_issue_698()
     test_list()
@@ -865,3 +944,4 @@ def main():
     test_list_mult()
     test_list_contains()
     test_indexing()
+    test_list_dtor()

@@ -20,7 +20,7 @@ from sys.intrinsics import _type_is_eq
 
 from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, Variant, unroll
+from utils import StringRef, Variant
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -67,7 +67,7 @@ struct _ImmutableString(CollectionElement, CollectionElementNew):
         return -1 if self.length < rhs.length else 1
 
 
-struct _RefCountedList(CollectionElement):
+struct _RefCountedList:
     """Python objects have the behavior that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
     to model this behavior, lists and dictionaries are implemented as
@@ -80,18 +80,9 @@ struct _RefCountedList(CollectionElement):
     fn __init__(inout self):
         self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
 
-    fn __init__(inout self, *, other: Self):
-        self.impl = other.impl
-
-    fn __copyinit__(inout self, existing: Self):
-        self = Self(other=existing)
-
-    fn __moveinit__(inout self, owned other: Self):
-        self.impl = other.impl
-
 
 @register_passable("trivial")
-struct _RefCountedListRef(CollectionElement):
+struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -179,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef(CollectionElement):
+struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -209,7 +200,7 @@ struct _RefCountedAttrsDictRef(CollectionElement):
 
 
 @register_passable("trivial")
-struct _Function(CollectionElement):
+struct _Function(CollectionElement, CollectionElementNew):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -566,6 +557,7 @@ struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
         else:
             lhs = lhs.convert_bool_to_int()
 
+    @no_inline
     fn __str__(self) -> String:
         """Returns the name (in lowercase) of the specific object type."""
         if self.is_none():
@@ -942,7 +934,7 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
         """
         return self.__bool__()
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Performs conversion to string according to Python
         semantics.

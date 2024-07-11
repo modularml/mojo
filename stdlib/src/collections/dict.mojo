@@ -480,7 +480,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     fn fromkeys(
-        keys: List[K], value: Optional[V] = Optional[V]()
+        keys: List[K], value: Optional[V] = None
     ) -> Dict[K, Optional[V]]:
         """Create a new dictionary with keys from list and values set to value.
 
@@ -636,8 +636,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return len(self).__bool__()
 
+    @no_inline
     fn __str__[
-        T: RepresentableKeyElement, U: RepresentableCollectionElement
+        T: RepresentableKeyElement, U: RepresentableCollectionElement, //
     ](self: Dict[T, U]) -> String:
         """Returns a string representation of a `Dict`.
 
@@ -710,7 +711,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         try:  # TODO(MOCO-604): push usage through
             return self._find_ref(key)
         except:
-            return Optional[V]()
+            return None
 
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
@@ -800,7 +801,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var entry = self._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
             var entry_value = entry[].unsafe_take()
-            entry[] = Optional[DictEntry[K, V]]()
+            entry[] = None
             self.size -= 1
             return entry_value.value^
         raise "KeyError"
@@ -819,12 +820,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
             "KeyError" if the dictionary is empty.
         """
 
-        var key = Optional[K]()
-        var val = Optional[V]()
+        var key = Optional[K](None)
+        var val = Optional[V](None)
 
         for item in reversed(self.items()):
-            key = Optional[K](item[].key)
-            val = Optional[V](item[].value)
+            key = Optional(item[].key)
+            val = Optional(item[].value)
             break
 
         if key:
@@ -888,14 +889,18 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var entries = List[Optional[DictEntry[K, V]]](capacity=reserve_at_least)
         # We have memory available, we'll use everything.
         for i in range(entries.capacity):
-            entries.append(Optional[DictEntry[K, V]]())
+            entries.append(None)
         return entries
 
     fn _insert(inout self, owned key: K, owned value: V):
         self._insert(DictEntry[K, V](key^, value^))
 
-    fn _insert(inout self, owned entry: DictEntry[K, V]):
-        self._maybe_resize()
+    fn _insert[
+        safe_context: Bool = False
+    ](inout self, owned entry: DictEntry[K, V]):
+        @parameter
+        if not safe_context:
+            self._maybe_resize()
         var found: Bool
         var slot: Int
         var index: Int
@@ -965,7 +970,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for i in range(len(old_entries)):
             var entry = old_entries.__get_ref(i)
             if entry[]:
-                self._insert(entry[].unsafe_take())
+                self._insert[safe_context=True](entry[].unsafe_take())
 
     fn _compact(inout self):
         self._index = _DictIndex(self._reserved())
@@ -980,7 +985,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry[].unsafe_take()
-                entry[] = Optional[DictEntry[K, V]]()
+                entry[] = None
             right += 1
 
         self._n_entries = self.size
@@ -1040,7 +1045,7 @@ struct OwnedKwargsDict[V: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, key: Self.key_type) raises -> V:
         """Retrieve a value out of the keyword dictionary.
 
@@ -1055,7 +1060,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         return self._dict[key]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __setitem__(inout self, key: Self.key_type, value: V):
         """Set a value in the keyword dictionary by key.
 
@@ -1069,7 +1074,7 @@ struct OwnedKwargsDict[V: CollectionElement](
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __contains__(self, key: Self.key_type) -> Bool:
         """Check if a given key is in the keyword dictionary or not.
 
@@ -1082,7 +1087,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         return key in self._dict
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """The number of elements currently stored in the keyword dictionary.
 
@@ -1095,7 +1100,7 @@ struct OwnedKwargsDict[V: CollectionElement](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn find(self, key: Self.key_type) -> Optional[V]:
         """Find a value in the keyword dictionary by key.
 
@@ -1108,7 +1113,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         return self._dict.find(key)
 
-    @always_inline("nodebug")
+    @always_inline
     fn pop(inout self, key: self.key_type, owned default: V) -> V:
         """Remove a value from the dictionary by key.
 
@@ -1123,7 +1128,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         return self._dict.pop(key, default^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn pop(inout self, key: self.key_type) raises -> V:
         """Remove a value from the dictionary by key.
 
@@ -1196,10 +1201,10 @@ struct OwnedKwargsDict[V: CollectionElement](
         # return self[]._dict.items()
         return _DictEntryIter(0, 0, self._dict)
 
-    @always_inline("nodebug")
+    @always_inline
     fn _insert(inout self, owned key: Self.key_type, owned value: V):
         self._dict._insert(key^, value^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn _insert(inout self, key: StringLiteral, owned value: V):
         self._insert(String(key), value^)

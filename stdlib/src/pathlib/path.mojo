@@ -38,7 +38,7 @@ fn cwd() raises -> Path:
     var buf = UnsafePointer[C_char]._from_dtype_ptr(buf0)
 
     var res = external_call["getcwd", UnsafePointer[C_char]](
-        buf, MAX_CWD_BUFFER_SIZE
+        buf, Int(MAX_CWD_BUFFER_SIZE)
     )
 
     # If we get a nullptr, then we raise an error.
@@ -62,6 +62,7 @@ fn _dir_of_current_file() raises -> Path:
 
 struct Path(
     Stringable,
+    Boolable,
     Formattable,
     CollectionElement,
     CollectionElementNew,
@@ -145,7 +146,7 @@ struct Path(
         else:
             self.path += DIR_SEPARATOR + suffix
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Returns a string representation of the path.
 
@@ -153,6 +154,15 @@ struct Path(
           A string representation of the path.
         """
         return String.format_sequence(self)
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks if the path is not empty.
+
+        Returns:
+            True if the path length is greater than zero, and False otherwise.
+        """
+        return self.path.byte_length() > 0
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -191,6 +201,17 @@ struct Path(
           True if the paths are equal and False otherwise.
         """
         return str(self) == str(other)
+
+    fn __eq__(self, other: String) -> Bool:
+        """Returns True if the two paths are equal.
+
+        Args:
+          other: The other path to compare against.
+
+        Returns:
+          True if the String and Path are equal, and False otherwise.
+        """
+        return self.path == other
 
     fn __ne__(self, other: Self) -> Bool:
         """Returns True if the two paths are not equal.
@@ -238,6 +259,26 @@ struct Path(
           True if the path exists on disk and False otherwise.
         """
         return os.path.exists(self)
+
+    fn expanduser(self) raises -> Path:
+        """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on
+        windows. If environment variables are not set or the `path` is not
+        prefixed with `~`, returns the `path` unmodified.
+
+        Returns:
+            The expanded path.
+        """
+        return os.path.expanduser(self)
+
+    @staticmethod
+    fn home() raises -> Path:
+        """Returns $HOME on posix or $USERPROFILE on windows. If environment
+        variables are not set it returns `~`.
+
+        Returns:
+            Path to user home directory.
+        """
+        return os.path.expanduser("~")
 
     fn is_dir(self) -> Bool:
         """Returns True if the path is a directory and False otherwise.
@@ -287,7 +328,6 @@ struct Path(
         with open(self, "w") as f:
             f.write(str(value))
 
-    @always_inline
     fn suffix(self) -> String:
         """The path's extension, if any.
         This includes the leading period. For example: '.txt'.
