@@ -98,7 +98,7 @@ def test_uint_cast():
                 # TODO(#933): remove size constraint when llvm instrinsics can
                 # be used at compile time
                 @parameter
-                if T.bitwidth() != A.bitwidth():
+                if T.bitwidth() < A.bitwidth():
                     continue
                 alias w = widths.get[k, Int]()
                 var min_signed_val = (~Scalar[A](0)).cast[DType.uint64]() & (
