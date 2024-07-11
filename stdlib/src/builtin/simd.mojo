@@ -2166,7 +2166,7 @@ struct SIMD[type: DType, size: Int](
         ```mojo
         var thirty_two_uint8 = SIMD[DType.uint8, 32](1)
         thirty_two_uint8[0] = 0
-        print(thirty_two_uint8.count(1)) # 31
+        print(SIMD[DType.uint8, 4](1, 1, 1, 0).count(1)) # 3
         ```
 
         Args:
