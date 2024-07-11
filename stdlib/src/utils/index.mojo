@@ -313,6 +313,14 @@ struct StaticIntTuple[size: Int](
             _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
         ](elem)
 
+    fn __init__(inout self, *, other: Self):
+        """Copy constructor.
+
+        Args:
+            other: The other tuple to copy from.
+        """
+        self.data = StaticTuple[Int, size](other=other.data)
+
     @always_inline
     fn __init__(inout self, values: VariadicList[Int]):
         """Creates a tuple constant using the specified values.

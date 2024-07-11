@@ -393,6 +393,9 @@ def test_dict_update_empty_new():
 struct DummyKey(KeyElement):
     var value: Int
 
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     fn __hash__(self) -> Int:
         return self.value
 

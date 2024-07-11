@@ -23,6 +23,9 @@ struct _SourceLocation(Formattable, Stringable):
     var col: Int
     var file_name: StringLiteral
 
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     @no_inline
     fn __str__(self) -> String:
         return String.format_sequence(self)
