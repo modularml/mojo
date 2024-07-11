@@ -112,27 +112,16 @@ struct MoveCounter[T: CollectionElementNew](
 # Otherwise we get "argument #2 cannot be converted from 'UnsafePointer[List[Int], 0, 0]' to 'UnsafePointer[List[Int], 0, 0]'"
 # This bug also appears if we pass the list as borrow and grab the address in the constructor, in
 # which case we get "argument #2 cannot be converted from 'List[Int]' to 'List[Int]'"
+@value
 struct ValueDestructorRecorder(CollectionElement):
     var value: Int
-    var destructor_counter_address: Int
-
-    fn __init__(inout self, value: Int, destructor_counter_address: Int):
-        self.value = value
-        self.destructor_counter_address = destructor_counter_address
+    var destructor_counter: Int
 
     fn __init__(inout self, *, other: Self):
         self.value = other.value
-        self.destructor_counter_address = other.destructor_counter_address
-
-    fn __copyinit__(inout self, other: Self):
-        self.value = other.value
-        self.destructor_counter_address = other.destructor_counter_address
-
-    fn __moveinit__(inout self, owned other: Self):
-        self.value = other.value
-        self.destructor_counter_address = other.destructor_counter_address
+        self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
-        UnsafePointer[Int].address_of(self.destructor_counter_address).bitcast[
+        UnsafePointer[Int].address_of(self.destructor_counter).bitcast[
             UnsafePointer[List[Int]]
         ]()[][].append(self.value)
