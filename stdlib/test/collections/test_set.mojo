@@ -495,8 +495,7 @@ def test_set_str():
 
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
-    var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
-    print("Test", name_val, "...", end="")
+    print("Test", name, "...", end="")
     try:
         _ = test_fn()
     except e:

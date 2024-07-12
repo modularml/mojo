@@ -23,14 +23,14 @@ from time import sleep
 struct SpinWaiter:
     """A proxy for the C++ runtime's SpinWaiter type."""
 
-    var storage: Pointer[NoneType]
+    var storage: UnsafePointer[NoneType]
     """Pointer to the underlying SpinWaiter instance."""
 
     fn __init__(inout self: Self):
         """Initializes a SpinWaiter instance."""
         self.storage = external_call[
             "KGEN_CompilerRT_LLCL_InitializeSpinWaiter",
-            Pointer[NoneType],
+            UnsafePointer[NoneType],
         ]()
 
     fn __del__(owned self: Self):
