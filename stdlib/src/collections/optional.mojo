@@ -343,18 +343,6 @@ struct Optional[T: CollectionElement](
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value[T]
 
-    @always_inline
-    fn _value_copy(self) -> T:
-        """Unsafely retrieve the value out of the Optional.
-
-        Note: only used for Optionals when used in a parameter context
-        due to compiler bugs.  In general, prefer using the public `Optional.value()`
-        function that returns a `Reference[T]`.
-        """
-
-        debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
-
     fn take(inout self) -> T:
         """Move the value out of the Optional.
 
