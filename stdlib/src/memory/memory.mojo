@@ -237,7 +237,7 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
         dest: The destination pointer.
         src: The source pointer.
     """
-    memcpy[count](dest.address.address, src.address.address)
+    memcpy[count](dest.address, src.address)
 
 
 @always_inline
@@ -317,7 +317,7 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy.
     """
     var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8]().address, src.bitcast[Int8]().address, n)
+    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
 
 
 @always_inline
@@ -329,7 +329,7 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
         src: The source pointer.
         count: The number of elements to copy (not bytes!).
     """
-    memcpy(dest.address.address, src.address.address, count)
+    memcpy(dest.address, src.address, count)
 
 
 @always_inline
@@ -382,10 +382,7 @@ fn memset[
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    # TODO (43028) call memset when DTypePointer's underlying data uses UnsafePointer
-    _memset_llvm(
-        ptr.address.bitcast[UInt8]().address, value, count * sizeof[type]()
-    )
+    memset(ptr.address, value, count)
 
 
 @always_inline
@@ -561,4 +558,4 @@ fn _free(ptr: UnsafePointer):
 
 @always_inline
 fn _free(ptr: DTypePointer):
-    _free(ptr.address.address)
+    _free(ptr.address)
