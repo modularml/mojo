@@ -504,7 +504,7 @@ struct StringSlice[
             start: Starting index of the slice.
 
         Returns:
-            A StringRef borrowed from the current string containing the
+            A `StringSlice` borrowed from the current string containing the
             characters of the slice starting at start.
         """
 
