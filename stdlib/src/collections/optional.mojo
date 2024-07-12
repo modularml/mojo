@@ -285,9 +285,9 @@ struct Optional[T: CollectionElement](
         """
         var output = String()
         var writer = output._unsafe_to_formatter()
-        write_to(writer, "Optional(")
+        writer.write("Optional(")
         self.format_to(writer)
-        write_to(writer, ")")
+        writer.write(")")
         return output
 
     fn format_to[
@@ -303,9 +303,9 @@ struct Optional[T: CollectionElement](
             writer: The formatter to write to.
         """
         if self:
-            write_to(writer, repr(self.value()))
+            writer.write(repr(self.value()))
         else:
-            write_to(writer, "None")
+            writer.write("None")
 
     # ===-------------------------------------------------------------------===#
     # Methods

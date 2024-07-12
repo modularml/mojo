@@ -340,14 +340,14 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             writer: The formatter to write to.
         """
-        write_to(writer, "{")
+        writer.write("{")
         var written = 0
         for item in self:
-            write_to(writer, repr(item[]))
+            writer.write(repr(item[]))
             if written < len(self) - 1:
-                write_to(writer, ", ")
+                writer.write(", ")
             written += 1
-        write_to(writer, "}")
+        writer.write("}")
 
     # ===-------------------------------------------------------------------===#
     # Methods
