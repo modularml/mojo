@@ -449,6 +449,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
   overload instead.
 
+- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
+ instead.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
