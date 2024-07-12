@@ -493,3 +493,77 @@ struct StringSlice[
         without the string getting deallocated early.
         """
         pass
+
+    fn _from_start(self, start: Int) -> Self:
+        """Gets the `StringSlice` pointing to the substring after the specified slice start position.
+
+        If start is negative, it is interpreted as the number of characters
+        from the end of the string to start at.
+
+        Args:
+            start: Starting index of the slice.
+
+        Returns:
+            A StringRef borrowed from the current string containing the
+            characters of the slice starting at start.
+        """
+
+        var self_len = len(self)
+
+        var abs_start: Int
+        if start < 0:
+            # Avoid out of bounds earlier than the start
+            # len = 5, start = -3,  then abs_start == 2, i.e. a partial string
+            # len = 5, start = -10, then abs_start == 0, i.e. the full string
+            abs_start = max(self_len + start, 0)
+        else:
+            # Avoid out of bounds past the end
+            # len = 5, start = 2,   then abs_start == 2, i.e. a partial string
+            # len = 5, start = 8,   then abs_start == 5, i.e. an empty string
+            abs_start = min(start, self_len)
+
+        debug_assert(
+            abs_start >= 0, "strref absolute start must be non-negative"
+        )
+        debug_assert(
+            abs_start <= self_len,
+            "strref absolute start must be less than source String len",
+        )
+
+        # TODO: We assumes the StringSlice only has ASCII.
+        # When we support utf-8 slicing, we should drop self._slice[abs_start:]
+        # and use something smarter.
+        return StringSlice(unsafe_from_utf8=self._slice[abs_start:])
+
+    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
+        """Finds the offset of the first occurrence of `substr` starting at
+        `start`. If not found, returns -1.
+
+        Args:
+          substr: The substring to find.
+          start: The offset from which to find.
+
+        Returns:
+          The offset of `substr` relative to the beginning of the string.
+        """
+        if not substr:
+            return 0
+
+        if len(self) < len(substr) + start:
+            return -1
+
+        # The substring to search within, offset from the beginning if `start`
+        # is positive, and offset from the end if `start` is negative.
+        var haystack_str = self._from_start(start)
+
+        var loc = stringref._memmem(
+            haystack_str.unsafe_ptr(),
+            len(haystack_str),
+            substr.unsafe_ptr(),
+            len(substr),
+        )
+
+        if not loc:
+            return -1
+
+        return int(loc) - int(self.unsafe_ptr())
