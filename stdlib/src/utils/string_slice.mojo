@@ -209,21 +209,24 @@ fn _isnewline_start(
     var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
     """TODO: \\u2029"""
 
-    if read_ahead > 1:
-        if memcmp(ptr, rn.unsafe_ptr(), 2) == 0:
-            return True, 2
-
     var val = _utf8_byte_type(ptr[0])
     if val == 0:
+        if read_ahead > 1:
+            if memcmp(ptr, rn.unsafe_ptr(), 2) == 0:
+                return True, 2
+            _ = rn
         return ptr[0] != ` ` and _isspace(ptr[0]), 1
-    elif val == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0:
-        return True, 2
-    elif val == 3 and (
-        memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
-        or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
-    ):
-        return True, 3
-    _ = next_line, unicode_line_sep, unicode_paragraph_sep
+    elif val == 2 and read_ahead > 1:
+        var comp = memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
+        _ = next_line
+        return comp, 2
+    elif val == 3 and read_ahead > 2:
+        var comp = (
+            memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
+            or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
+        )
+        _ = unicode_line_sep, unicode_paragraph_sep
+        return comp, 3
     return False, 1
 
 
@@ -552,7 +555,9 @@ struct StringSlice[
             var curr_ptr = ptr.offset(current_offset)
 
             for i in range(current_offset, length):
-                var read_ahead = 2 if i + 1 < length else 1
+                var read_ahead = 3 if i + 2 < length else (
+                    2 if i + 1 < length else 1
+                )
                 var res = _isnewline_start(ptr.offset(i), read_ahead)
                 if res[0]:
                     eol_location = i - current_offset
