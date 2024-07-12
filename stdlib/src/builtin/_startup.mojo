@@ -35,13 +35,13 @@ fn _init_global_runtime(
     case where the runtime has the same number of threads as the number of cores.
     """
     return external_call[
-        "KGEN_CompilerRT_LLCL_CreateRuntime", UnsafePointer[NoneType]
+        "KGEN_CompilerRT_AsyncRT_CreateRuntime", UnsafePointer[NoneType]
     ](0)
 
 
 fn _destroy_global_runtime(ptr: UnsafePointer[NoneType]):
     """Destroy the global runtime if ever used."""
-    external_call["KGEN_CompilerRT_LLCL_DestroyRuntime", NoneType](ptr)
+    external_call["KGEN_CompilerRT_AsyncRT_DestroyRuntime", NoneType](ptr)
 
 
 @always_inline
@@ -55,7 +55,7 @@ fn _get_current_or_global_runtime() -> UnsafePointer[NoneType]:
     is created with number of threads equal to the number of cores.
     """
     var current_runtime = external_call[
-        "KGEN_CompilerRT_LLCL_GetCurrentRuntime", UnsafePointer[NoneType]
+        "KGEN_CompilerRT_AsyncRT_GetCurrentRuntime", UnsafePointer[NoneType]
     ]()
     if current_runtime:
         return current_runtime
