@@ -1362,6 +1362,36 @@ fn strided_load[
     Returns:
       A vector containing the loaded data.
     """
+    return strided_load[type, simd_width](addr.address, stride, mask)
+
+
+@always_inline("nodebug")
+fn strided_load[
+    type: DType,
+    simd_width: Int,
+    /,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+](
+    addr: UnsafePointer[Scalar[type], address_space, _],
+    stride: Int,
+    mask: SIMD[DType.bool, simd_width],
+) -> SIMD[type, simd_width]:
+    """Loads values from addr according to a specific stride.
+
+    Parameters:
+      type: DType of `value`, the value to store.
+      simd_width: The width of the SIMD vectors.
+      address_space: The address space of the memory location.
+
+    Args:
+      addr: The memory location to load data from.
+      stride: How many lanes to skip before loading again.
+      mask: A binary vector which prevents memory access to certain lanes of
+        `value`.
+
+    Returns:
+      A vector containing the loaded data.
+    """
 
     @parameter
     if simd_width == 1:
@@ -1423,6 +1453,36 @@ fn strided_store[
 ](
     value: SIMD[type, simd_width],
     addr: DTypePointer[type, address_space, _],
+    stride: Int,
+    mask: SIMD[DType.bool, simd_width],
+):
+    """Loads values from addr according to a specific stride.
+
+    Parameters:
+      type: DType of `value`, the value to store.
+      simd_width: The width of the SIMD vectors.
+      address_space: The address space of the memory location.
+
+    Args:
+      value: The values to store.
+      addr: The location to store values at.
+      stride: How many lanes to skip before storing again.
+      mask: A binary vector which prevents memory access to certain lanes of
+        `value`.
+    """
+
+    strided_store[type, simd_width](value, addr.address, stride, mask)
+
+
+@always_inline("nodebug")
+fn strided_store[
+    type: DType,
+    simd_width: Int,
+    /,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+](
+    value: SIMD[type, simd_width],
+    addr: UnsafePointer[Scalar[type], address_space, _],
     stride: Int,
     mask: SIMD[DType.bool, simd_width],
 ):
