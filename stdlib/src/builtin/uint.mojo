@@ -612,7 +612,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
             pred = __mlir_attr.`#index<cmp_predicate ult>`
         ](self.value, rhs.value)
 
-    # TODO(rparolin): remove this before you submit this change
     @always_inline("nodebug")
     fn __lt__(self, rhs: Int) -> Bool:
         """Compare this Int to the RHS using LT comparison.
