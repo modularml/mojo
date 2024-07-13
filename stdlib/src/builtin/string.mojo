@@ -155,9 +155,8 @@ fn chr(c: Int) -> String:
     return String(ptr=p, len=num_bytes + 1)
 
 
-fn chr(values: List[Int]) -> String:
-    """Returns a String based on the given Unicode code points. This is the
-    inverse of the `ord()` function.
+fn from_unicode(values: List[Int]) -> String:
+    """Returns a String based on the given Unicode code points.
 
     Args:
         values: A List of Unicode code points.
@@ -168,7 +167,7 @@ fn chr(values: List[Int]) -> String:
 
     Examples:
     ```mojo
-    print(chr(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
+    print(from_unicode(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
     ```
     .
 

@@ -18,6 +18,7 @@ from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
     _isspace,
+    from_unicode,
 )
 from python import Python
 from testing import (
@@ -315,7 +316,7 @@ def test_chr():
     assert_equal("�", chr(0xFFFD))
     assert_equal("�", chr(0x10FFFF + 1))
     var items = List[Int](65, 97, 33, 945, 10175, 128293, 0xFFFD, 0x10FFFF + 1)
-    assert_equal("Aa!α➿🔥��", chr(items))
+    assert_equal("Aa!α➿🔥��", from_unicode(items))
 
 
 def test_string_indexing():
