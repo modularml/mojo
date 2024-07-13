@@ -815,21 +815,23 @@ struct String(
 
     @always_inline
     fn __init__(inout self, owned impl: List[UInt8]):
-        """Construct a string from a buffer of bytes.
-
-        The buffer must be terminated with a null byte:
-
-        ```mojo
-        var buf = List[UInt8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
+        """Construct a string from a buffer of bytes. The buffer must be
+        terminated with a null byte.
 
         Args:
             impl: The buffer.
+
+        Examples:
+        ```mojo
+        print(String(List[UInt8](ord("H"), ord("i"), 0))) # Hi
+        ```
+        .
         """
+        # TODO(#933): use when llvm intrinsics can be used at compile time
+        # debug_assert(
+        #     _is_valid_utf8(impl.unsafe_ptr(), len(impl)),
+        #     "String doesn't have valid UTF-8 encoding",
+        # )
         debug_assert(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
