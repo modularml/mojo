@@ -23,7 +23,7 @@ If you already installed Mojo, see [how to update](#update-mojo).
 <Tabs>
 <TabItem value="mac" label="Mac">
 
-- Apple silicon (M1 or M2 processor)
+- Apple silicon (M1 processor or newer)
 - macOS Ventura (12) or later
 - Python 3.8 - 3.11
 - Xcode or Xcode Command Line Tools
