@@ -152,6 +152,7 @@ fn chr(c: Int) -> String:
         debug_assert(False, "Invalid Unicode code point")
         p.free()
         return chr(0xFFFD)
+    p[num_bytes] = 0
     return String(ptr=p, len=num_bytes + 1)
 
 
@@ -909,9 +910,7 @@ struct String(
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
         self = Self(
-            Self._buffer_type(
-                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
-            )
+            Self._buffer_type(unsafe_pointer=ptr, size=len, capacity=len)
         )
 
     @always_inline
