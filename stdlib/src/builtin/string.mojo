@@ -2323,7 +2323,6 @@ struct String(
         var length = current_offset + 1
         var buf = List[UInt8](unsafe_pointer=ptr, size=length, capacity=max_len)
         buf[current_offset] = 0
-        buf.resize(length)
         return String(buf^)
 
     @staticmethod
@@ -2348,7 +2347,8 @@ struct String(
             This method allocates `2 * len(values)` bytes.
         """
 
-        var ptr = UnsafePointer[UInt8].alloc(2 * len(values))
+        var max_len = 2 * len(values)
+        var ptr = UnsafePointer[UInt8].alloc(max_len)
         var current_offset = 0
         var values_idx = 0
 
@@ -2394,10 +2394,9 @@ struct String(
 
             current_offset += num_bytes
             values_idx += 1 if num_bytes < 4 else 2
-        var buf = List[UInt8](
-            unsafe_pointer=ptr, size=current_offset, capacity=2 * len(values)
-        )
-        buf.resize(current_offset + 1, 0)
+        var length = current_offset + 1
+        var buf = List[UInt8](unsafe_pointer=ptr, size=length, capacity=max_len)
+        buf[current_offset] = 0
         return String(buf^)
 
 
