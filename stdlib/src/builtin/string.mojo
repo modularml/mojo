@@ -2356,9 +2356,14 @@ struct String(
             var curr_ptr = ptr.offset(current_offset)
             var c = int(values.unsafe_get(values_idx))
             var num_bytes: Int
+            alias low_6b = 0b0011_1111  # get lower 6 bits
+            alias c_byte = 0b1000_0000  # continuation byte
 
             if c < 0b1000_0000:  # ASCII
-                num_bytes = 1
+                curr_ptr[0] = UInt8(c)
+                current_offset += 1
+                values_idx += 1
+                continue
             elif c < 0x8_00:  # 2 byte long sequence
                 num_bytes = 2
             elif c < 0xD8_00 or c >= 0xE0_00:  # 3 byte long sequence
@@ -2371,7 +2376,8 @@ struct String(
                     num_bytes = 4
                     alias low_10b = 0b0011_1111_1111  # get lower 10 bits
                     var c2 = int(values.unsafe_get(values_idx + 1))
-                    c = 2**16 + ((c & low_10b) << 10) | (c2 & low_10b)
+                    var value = ((c & low_10b) << 10) | (c2 & low_10b)
+                    c = 2**16 + value
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
             if not _is_valid_utf8(curr_ptr, num_bytes):
                 debug_assert(
