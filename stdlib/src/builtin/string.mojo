@@ -2304,7 +2304,8 @@ struct String(
             end.
         """
 
-        var ptr = UnsafePointer[UInt8].alloc(4 * len(values))
+        var max_len = 4 * len(values)
+        var ptr = UnsafePointer[UInt8].alloc(max_len)
         var current_offset = 0
         for i in range(len(values)):
             var c = values[i]
@@ -2323,13 +2324,10 @@ struct String(
                 num_bytes = 3
                 _shift_unicode_to_utf8(curr_ptr, 0xFFFD, num_bytes)
             current_offset += num_bytes
-        var buf = List[UInt8](
-            unsafe_pointer=ptr,
-            size=current_offset + 1,
-            capacity=4 * len(values),
-        )
+        var length = current_offset + 1
+        var buf = List[UInt8](unsafe_pointer=ptr, size=length, capacity=max_len)
         buf[current_offset] = 0
-        buf.resize(current_offset + 1)
+        buf.resize(length)
         return String(buf^)
 
 
