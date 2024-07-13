@@ -2358,7 +2358,7 @@ struct String(
             var c = values.unsafe_get(values_idx)
             var num_bytes: Int
             alias low_6b = 0b0011_1111  # get lower 6 bits
-            alias c_byte = 1000_0000  # continuation byte
+            alias c_byte = 0b1000_0000  # continuation byte
 
             if c < 0b1000_0000:  # ASCII
                 num_bytes = 1
