@@ -2371,8 +2371,7 @@ struct String(
                     num_bytes = 4
                     alias low_10b = 0b0011_1111_1111  # get lower 10 bits
                     var c2 = int(values.unsafe_get(values_idx + 1))
-                    var value = ((c & low_10b) << 10) | (c2 & low_10b)
-                    c = 2**16 + value
+                    c = 2**16 + ((c & low_10b) << 10) | (c2 & low_10b)
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
             if not _is_valid_utf8(curr_ptr, num_bytes):
                 debug_assert(
