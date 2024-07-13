@@ -2341,7 +2341,7 @@ struct String(
 
         Examples:
         ```mojo
-        print(String.from_utf16(List[UInt16](97, 97, 0xFFFF, 97))) # "aa�a"
+        print(String.from_utf16(List[UInt16](97, 97, 0xD800, 97))) # "aa�a"
         ```
         .
 
