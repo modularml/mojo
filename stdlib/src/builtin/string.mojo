@@ -25,7 +25,7 @@ from memory import DTypePointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
-from utils.string_slice import _utf8_byte_type
+from utils.string_slice import _utf8_byte_type, _is_valid_utf8
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -97,68 +97,115 @@ fn ord(s: StringSlice) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-fn chr(c: Int) -> String:
-    """Returns a string based on the given Unicode code point.
+fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    alias Vec32 = SIMD[DType.int32, 4]
+    alias sizes = Vec32(0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
+    return int((Vec32(c) > sizes).cast[DType.uint8]().reduce_add())
 
-    Returns the string representing a character whose code point is the integer
-    `c`. For example, `chr(97)` returns the string `"a"`. This is the inverse of
-    the `ord()` function.
+
+fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
+    # Unicode (represented as UInt32 BE) to UTF-8 conversion :
+    # 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa
+    # ∴ a
+    # 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb
+    # ∴ (a >> 6)  | 0b11000000, b         | 0b10000000
+    # 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc
+    # ∴ (a >> 12) | 0b11100000, (b >> 6)  | 0b10000000, c        | 0b10000000
+    # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd
+    # ∴ (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000, d | 0b10000000
+
+    var shift = 6 * (num_bytes - 1)
+    var mask = UInt8(0xFF) >> (num_bytes + 1)
+    var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
+    ptr[0] = ((c >> shift) & mask) | num_bytes_marker
+    for i in range(1, num_bytes):
+        shift -= 6
+        ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
+    ptr[num_bytes] = 0
+
+
+fn chr(c: Int) -> String:
+    """Returns a String based on the given Unicode code point. This is the
+    inverse of the `ord()` function.
 
     Args:
         c: An integer that represents a code point.
 
     Returns:
-        A string containing a single character based on the given code point.
+        A String containing a single character based on the given code point. If
+        the Unicode codepoint is invalid, a replacement char (�) is returned.
+
+    Examples:
+    ```mojo
+    print(chr(97)) # "a"
+    print(chr(0x10FFFF + 1)) # "�"
+    ```
+    .
     """
-    # Unicode (represented as UInt32 BE) to UTF-8 conversion :
-    # 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa                                a
-    # 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb                       a >> 6  | 0b11000000, b       | 0b10000000
-    # 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc              a >> 12 | 0b11100000, b >> 6  | 0b10000000, c      | 0b10000000
-    # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd     a >> 18 | 0b11110000, b >> 12 | 0b10000000, c >> 6 | 0b10000000, d | 0b10000000
+    if c < 0b1000_0000:  # 1 byte ASCII char
+        return String(String._buffer_type(c, 0))
 
-    if (c >> 7) == 0:  # This is 1 byte ASCII char
-        return _chr_ascii(c)
+    var num_bytes = _unicode_codepoint_utf8_byte_length(c)
+    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
+    _shift_unicode_to_utf8(p, c, num_bytes)
+    if not _is_valid_utf8(p, num_bytes):
+        debug_assert(False, "Invalid Unicode code point")
+        p.free()
+        return chr(0xFFFD)
+    return String(ptr=p, len=num_bytes + 1)
 
-    @always_inline
-    fn _utf8_len(val: Int) -> Int:
-        debug_assert(
-            0 <= val <= 0x10FFFF, "Value is not a valid Unicode code point"
-        )
-        alias sizes = SIMD[DType.int32, 4](
-            0, 0b1111_111, 0b1111_1111_111, 0b1111_1111_1111_1111
-        )
-        var values = SIMD[DType.int32, 4](val)
-        var mask = values > sizes
-        return int(mask.cast[DType.uint8]().reduce_add())
 
-    var num_bytes = _utf8_len(c)
-    var p = DTypePointer[DType.uint8].alloc(num_bytes + 1)
-    var shift = 6 * (num_bytes - 1)
-    var mask = UInt8(0xFF) >> (num_bytes + 1)
-    var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    Scalar.store(p, ((c >> shift) & mask) | num_bytes_marker)
-    for i in range(1, num_bytes):
-        shift -= 6
-        Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
-    Scalar.store(p, num_bytes, 0)
-    return String(p.bitcast[DType.uint8](), num_bytes + 1)
+fn chr(values: List[Int]) -> String:
+    """Returns a String based on the given Unicode code points. This is the
+    inverse of the `ord()` function.
+
+    Args:
+        values: A List of Unicode code points.
+
+    Returns:
+        A String containing the concatenated characters. If a Unicode codepoint
+        is invalid, the parsed String has a replacement char (�) in that index.
+
+    Examples:
+    ```mojo
+    print(chr(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
+    ```
+    .
+
+    Notes:
+        This method allocates `4 * len(values)` bytes and resizes at the end.
+    """
+
+    var ptr = UnsafePointer[UInt8].alloc(4 * len(values))
+    var current_offset = 0
+    for i in range(len(values)):
+        var c = values[i]
+        if c < 0b1000_0000:  # 1 byte ASCII char
+            ptr[current_offset] = c
+            current_offset += 1
+            continue
+
+        var num_bytes = _unicode_codepoint_utf8_byte_length(c)
+        var curr_ptr = ptr.offset(current_offset)
+        _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
+        if not _is_valid_utf8(curr_ptr, num_bytes):
+            debug_assert(
+                False, "Invalid Unicode code point at index: " + str(i)
+            )
+            num_bytes = 3
+            _shift_unicode_to_utf8(curr_ptr, 0xFFFD, num_bytes)
+        current_offset += num_bytes
+    var buf = List[UInt8](
+        unsafe_pointer=ptr, size=current_offset + 1, capacity=4 * len(values)
+    )
+    buf[current_offset] = 0
+    buf.resize(current_offset + 1)
+    return String(buf^)
 
 
 # ===----------------------------------------------------------------------=== #
 # ascii
 # ===----------------------------------------------------------------------=== #
-
-
-fn _chr_ascii(c: UInt8) -> String:
-    """Returns a string based on the given ASCII code point.
-
-    Args:
-        c: An integer that represents a code point.
-
-    Returns:
-        A string containing a single character based on the given code point.
-    """
-    return String(String._buffer_type(c, 0))
 
 
 fn _repr_ascii(c: UInt8) -> String:
@@ -178,7 +225,7 @@ fn _repr_ascii(c: UInt8) -> String:
     if c == ord_back_slash:
         return r"\\"
     elif isprintable(c):
-        return _chr_ascii(c)
+        return String(String._buffer_type(c, 0))
     elif c == ord_tab:
         return r"\t"
     elif c == ord_new_line:
@@ -1493,6 +1540,11 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
+        # TODO(#933): use when llvm intrinsics can be used at compile time
+        # debug_assert(
+        #     _is_valid_utf8(self.unsafe_ptr(), self.byte_length()),
+        #     "String doesn't have valid UTF-8 encoding",
+        # )
         return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     @always_inline

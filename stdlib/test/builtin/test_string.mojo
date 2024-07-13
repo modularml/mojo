@@ -312,6 +312,10 @@ def test_chr():
     assert_equal("α", chr(945))
     assert_equal("➿", chr(10175))
     assert_equal("🔥", chr(128293))
+    assert_equal("�", chr(0xFFFD))
+    assert_equal("�", chr(0x10FFFF + 1))
+    var items = List[Int](65, 97, 33, 945, 10175, 128293, 0xFFFD, 0x10FFFF + 1)
+    assert_equal("Aa!α➿🔥��", chr(items))
 
 
 def test_string_indexing():

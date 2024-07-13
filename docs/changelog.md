@@ -167,6 +167,12 @@ and deprecated their private `_byte_length()` methods. Added a warning to
 future and `StringSlice.__len__` now does return the Unicode codepoints length.
 ([PR #2960](https://github.com/modularml/mojo/pull/2960) by [@martinvuyk](https://github.com/martinvuyk))
 
+- Added a `fn chr(values: List[Int]) -> String` function that returns a String
+containing the concatenated characters. If a Unicode codepoint is invalid,
+the parsed String has a replacement character (�) in that index.
+`fn chr(c: Int) -> String` function now returns a replacement character (�)
+if the Unicode codepoint is invalid.
+
 - Added new `StaticString` type alias. This can be used in place of
   `StringLiteral` for runtime string arguments.
 

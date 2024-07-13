@@ -22,6 +22,7 @@ from memory import DTypePointer
 from utils import StringRef
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils.string_slice import _is_valid_utf8
 
 from .string import _atol
 
@@ -227,8 +228,13 @@ struct StringLiteral(
         var new_capacity = length + 1
         buffer._realloc(new_capacity)
         buffer.size = new_capacity
-        var data: DTypePointer[DType.uint8] = self.as_uint8_ptr()
-        memcpy(DTypePointer(buffer.data), data, length)
+        var data = self.unsafe_ptr()
+        # TODO(#933): use when llvm intrinsics can be used at compile time
+        # debug_assert(
+        #     _is_valid_utf8(data, length),
+        #     "StringLiteral doesn't have valid UTF-8 encoding",
+        # )
+        memcpy(buffer.data, data, length)
         (buffer.data + length).init_pointee_move(0)
         string._buffer = buffer^
         return string
