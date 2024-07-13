@@ -2292,7 +2292,7 @@ struct String(
 
     Examples:
     ```mojo
-    print(String.from_unicode(List[Int](97, 97, 0x10FFFF + 1, 97)))
+    print(String.from_unicode(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
     ```
     .
 
