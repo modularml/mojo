@@ -172,6 +172,7 @@ containing the concatenated characters. If a Unicode codepoint is invalid,
 the parsed String has a replacement character (�) in that index.
 `fn chr(c: Int) -> String` function now returns a replacement character (�)
 if the Unicode codepoint is invalid.
+([PR #3239](https://github.com/modularml/mojo/pull/3239) by [@martinvuyk](https://github.com/martinvuyk))
 
 - Added new `StaticString` type alias. This can be used in place of
   `StringLiteral` for runtime string arguments.
