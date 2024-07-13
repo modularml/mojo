@@ -155,53 +155,6 @@ fn chr(c: Int) -> String:
     return String(ptr=p, len=num_bytes + 1)
 
 
-fn from_unicode(values: List[Int]) -> String:
-    """Returns a String based on the given Unicode code points.
-
-    Args:
-        values: A List of Unicode code points.
-
-    Returns:
-        A String containing the concatenated characters. If a Unicode codepoint
-        is invalid, the parsed String has a replacement char (�) in that index.
-
-    Examples:
-    ```mojo
-    print(from_unicode(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
-    ```
-    .
-
-    Notes:
-        This method allocates `4 * len(values)` bytes and resizes at the end.
-    """
-
-    var ptr = UnsafePointer[UInt8].alloc(4 * len(values))
-    var current_offset = 0
-    for i in range(len(values)):
-        var c = values[i]
-        if c < 0b1000_0000:  # 1 byte ASCII char
-            ptr[current_offset] = c
-            current_offset += 1
-            continue
-
-        var num_bytes = _unicode_codepoint_utf8_byte_length(c)
-        var curr_ptr = ptr.offset(current_offset)
-        _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
-        if not _is_valid_utf8(curr_ptr, num_bytes):
-            debug_assert(
-                False, "Invalid Unicode code point at index: " + str(i)
-            )
-            num_bytes = 3
-            _shift_unicode_to_utf8(curr_ptr, 0xFFFD, num_bytes)
-        current_offset += num_bytes
-    var buf = List[UInt8](
-        unsafe_pointer=ptr, size=current_offset + 1, capacity=4 * len(values)
-    )
-    buf[current_offset] = 0
-    buf.resize(current_offset + 1)
-    return String(buf^)
-
-
 # ===----------------------------------------------------------------------=== #
 # ascii
 # ===----------------------------------------------------------------------=== #
@@ -2618,3 +2571,51 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             raise "there is a single curly { left unclosed or unescaped"
 
         return entries^
+
+    @staticmethod
+    fn from_unicode(values: List[Int]) -> String:
+    """Returns a String based on the given Unicode code points.
+
+    Args:
+        values: A List of Unicode code points.
+
+    Returns:
+        A String containing the concatenated characters. If a Unicode codepoint
+        is invalid, the parsed String has a replacement char (�) in that index.
+
+    Examples:
+    ```mojo
+    print(String.from_unicode(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
+    ```
+    .
+
+    Notes:
+        This method allocates `4 * len(values)` bytes and resizes at the end.
+    """
+
+    var ptr = UnsafePointer[UInt8].alloc(4 * len(values))
+    var current_offset = 0
+    for i in range(len(values)):
+        var c = values[i]
+        if c < 0b1000_0000:  # 1 byte ASCII char
+            ptr[current_offset] = c
+            current_offset += 1
+            continue
+
+        var num_bytes = _unicode_codepoint_utf8_byte_length(c)
+        var curr_ptr = ptr.offset(current_offset)
+        _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
+        if not _is_valid_utf8(curr_ptr, num_bytes):
+            debug_assert(
+                False, "Invalid Unicode code point at index: " + str(i)
+            )
+            num_bytes = 3
+            _shift_unicode_to_utf8(curr_ptr, 0xFFFD, num_bytes)
+        current_offset += num_bytes
+    var buf = List[UInt8](
+        unsafe_pointer=ptr, size=current_offset + 1, capacity=4 * len(values)
+    )
+    buf[current_offset] = 0
+    buf.resize(current_offset + 1)
+    return String(buf^)
+
