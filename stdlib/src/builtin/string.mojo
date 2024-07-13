@@ -2377,14 +2377,15 @@ struct String(
                     curr_ptr[0] = 0xFF
                 else:
                     num_bytes = 4
+                    alias bit_over_32 = 0x1_00_00
+                    alias low_10b = 0b0011_1111_1111  # get lower 10 bits
                     var c2 = int(values.unsafe_get(values_idx + 1))
-                    var num = 0x1_00_00 + (
-                        ((int(c) & 0x3_FF) << 10) | (c2 & 0x3_FF)
-                    )
-                    curr_ptr[0] = UInt8(0xF0 | (num >> 18))
-                    curr_ptr[1] = UInt8(c_byte | ((num >> 12) & low_6b))
-                    curr_ptr[2] = UInt8(c_byte | ((num >> 6) & low_6b))
-                    curr_ptr[3] = UInt8(c_byte | (num & low_6b))
+                    var value = ((int(c) & low_10b) << 10) | (c2 & low_10b)
+                    var unicode = bit_over_32 + value
+                    curr_ptr[0] = UInt8(0xF0 | (unicode >> 18))
+                    curr_ptr[1] = UInt8(c_byte | ((unicode >> 12) & low_6b))
+                    curr_ptr[2] = UInt8(c_byte | ((unicode >> 6) & low_6b))
+                    curr_ptr[3] = UInt8(c_byte | (unicode & low_6b))
             if not _is_valid_utf8(curr_ptr, num_bytes):
                 debug_assert(
                     False, "Invalid UTF-16 value at index: " + str(values_idx)
