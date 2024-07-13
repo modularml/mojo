@@ -2300,8 +2300,7 @@ struct String(
         .
 
         Notes:
-            This method allocates `4 * len(values)` bytes and resizes at the
-            end.
+            This method allocates `4 * len(values)` bytes.
         """
 
         var max_len = 4 * len(values)
@@ -2318,9 +2317,7 @@ struct String(
             var curr_ptr = ptr.offset(current_offset)
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
             if not _is_valid_utf8(curr_ptr, num_bytes):
-                debug_assert(
-                    False, "Invalid Unicode code point at index: " + str(i)
-                )
+                debug_assert(False, "Invalid Unicode value at index: " + str(i))
                 num_bytes = 3
                 _shift_unicode_to_utf8(curr_ptr, 0xFFFD, num_bytes)
             current_offset += num_bytes
@@ -2328,6 +2325,80 @@ struct String(
         var buf = List[UInt8](unsafe_pointer=ptr, size=length, capacity=max_len)
         buf[current_offset] = 0
         buf.resize(length)
+        return String(buf^)
+
+    @staticmethod
+    fn from_utf16(values: List[UInt16]) -> String:
+        """Returns a String based on the given UTF-16 values.
+
+        Args:
+            values: A List of UTF-16 values.
+
+        Returns:
+            A String containing the concatenated characters. If a Unicode
+            codepoint is invalid, the parsed String has a replacement character
+            (�) in that index.
+
+        Examples:
+        ```mojo
+        print(String.from_utf16(List[UInt16](97, 97, 0xFFFF, 97))) # "aa�a"
+        ```
+        .
+
+        Notes:
+            This method allocates `2 * len(values)` bytes.
+        """
+
+        var ptr = UnsafePointer[UInt8].alloc(2 * len(values))
+        var current_offset = 0
+        var values_idx = 0
+
+        while values_idx < len(values):
+            var curr_ptr = ptr.offset(current_offset)
+            var c = values.unsafe_get(values_idx)
+            var num_bytes: Int
+            alias low_6b = 0b0011_1111  # get lower 6 bits
+            alias c_byte = 1000_0000  # continuation byte
+
+            if c < 0b1000_0000:  # ASCII
+                num_bytes = 1
+                curr_ptr[0] = c.cast[DType.uint8]()
+            elif c < 0x8_00:  # 2 byte long sequence
+                num_bytes = 2
+                curr_ptr[0] = (0xC0 | (c >> 6)).cast[DType.uint8]()
+                curr_ptr[1] = (c_byte | (c & low_6b)).cast[DType.uint8]()
+            elif c < 0xD8_00 or c >= 0xE0_00:  # 3 byte long sequence
+                num_bytes = 3
+                curr_ptr[0] = (0xE0 | (c >> 12)).cast[DType.uint8]()
+                curr_ptr[1] = (c_byte | ((c >> 6) & low_6b)).cast[DType.uint8]()
+                curr_ptr[2] = (c_byte | (c & low_6b)).cast[DType.uint8]()
+            else:  # 4 byte long sequence
+                if values_idx + 1 >= len(values):
+                    num_bytes = 1
+                    curr_ptr[0] = 0xFF
+                else:
+                    num_bytes = 4
+                    var c2 = int(values.unsafe_get(values_idx + 1))
+                    var num = 0x1_00_00 + (
+                        ((int(c) & 0x3_FF) << 10) | (c2 & 0x3_FF)
+                    )
+                    curr_ptr[0] = UInt8(0xF0 | (num >> 18))
+                    curr_ptr[1] = UInt8(c_byte | ((num >> 12) & low_6b))
+                    curr_ptr[2] = UInt8(c_byte | ((num >> 6) & low_6b))
+                    curr_ptr[3] = UInt8(c_byte | (num & low_6b))
+            if not _is_valid_utf8(curr_ptr, num_bytes):
+                debug_assert(
+                    False, "Invalid UTF-16 value at index: " + str(values_idx)
+                )
+                num_bytes = 3
+                _shift_unicode_to_utf8(curr_ptr, 0xFFFD, num_bytes)
+
+            current_offset += num_bytes
+            values_idx += 1 if num_bytes < 4 else 2
+        var buf = List[UInt8](
+            unsafe_pointer=ptr, size=current_offset, capacity=2 * len(values)
+        )
+        buf.resize(current_offset + 1, 0)
         return String(buf^)
 
 
