@@ -766,24 +766,6 @@ struct List[T: CollectionElement](
 
         return (self.data + normalized_idx)[]
 
-    # TODO(30737): Replace __getitem__ with this, but lots of places use it
-    fn __get_ref(
-        ref [_]self: Self, i: Int
-    ) -> Reference[T, __lifetime_of(self)]:
-        """Gets a reference to the list element at the given index.
-
-        Args:
-            i: The index of the element.
-
-        Returns:
-            An immutable reference to the element at the given index.
-        """
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += self.size
-
-        return self.unsafe_get(normalized_idx)
-
     @always_inline
     fn unsafe_get(
         ref [_]self: Self, idx: Int

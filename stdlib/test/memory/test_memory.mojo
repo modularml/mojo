@@ -489,7 +489,7 @@ def test_dtypepointer_scatter():
 def test_memcpy_unsafe_pointer():
     # Tests memcpy for the UnsafePointer type
     # Note:
-    #   Eventually as DTypePointer and LegacyPointer are fully replaced with
+    #   Eventually as DTypePointer is fully replaced with
     #   UnsafePointer, this test will be redundant as all the other tests in
     #   this file will have been updated to use `UnsafePointer`.
 

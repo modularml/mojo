@@ -19,50 +19,9 @@ from testing import assert_true
 ```
 """
 from collections import Optional
+from math import isclose
 
 from builtin._location import __call_location, _SourceLocation
-
-from utils.numerics import isfinite, isnan
-
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _isclose(
-    a: SIMD,
-    b: __type_of(a),
-    *,
-    atol: Scalar[a.type],
-    rtol: Scalar[a.type],
-    equal_nan: Bool,
-) -> SIMD[DType.bool, a.size]:
-    constrained[
-        a.type is DType.bool
-        or a.type.is_integral()
-        or a.type.is_floating_point(),
-        "input type must be boolean, integral, or floating-point",
-    ]()
-
-    @parameter
-    if a.type is DType.bool or a.type.is_integral():
-        return a == b
-    else:
-        var both_nan = isnan(a) & isnan(b)
-        if equal_nan and all(both_nan):
-            return True
-
-        var res = (a == b)
-        var atol_vec = SIMD[a.type, a.size](atol)
-        var rtol_vec = SIMD[a.type, a.size](rtol)
-        res |= (
-            isfinite(a)
-            & isfinite(b)
-            & (abs(a - b) <= (atol_vec.max(rtol_vec * abs(a).max(abs(b)))))
-        )
-
-        return res | both_nan if equal_nan else res
 
 
 # ===----------------------------------------------------------------------=== #
@@ -358,7 +317,7 @@ fn assert_almost_equal[
         "type must be boolean, integral, or floating-point",
     ]()
 
-    var almost_equal = _isclose(
+    var almost_equal = isclose(
         lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
     )
 

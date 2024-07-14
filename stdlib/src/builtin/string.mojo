@@ -21,7 +21,7 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
-from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
+from memory import DTypePointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
@@ -840,25 +840,6 @@ struct String(
         self = Self(
             Self._buffer_type(
                 unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
-            )
-        )
-
-    @always_inline
-    fn __init__(inout self, ptr: LegacyPointer[UInt8], len: Int):
-        """Creates a string from the buffer. Note that the string now owns
-        the buffer.
-
-        The buffer must be terminated with a null byte.
-
-        Args:
-            ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
-        """
-        self = Self(
-            Self._buffer_type(
-                unsafe_pointer=UnsafePointer(ptr.address),
-                size=len,
-                capacity=len,
             )
         )
 

@@ -10,18 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# REQUIRES: has_not
+# RUN: not --crash mojo -D MOJO_ENABLE_ASSERTIONS %s 2>&1
 
-from os.path import getsize
-from tempfile import NamedTemporaryFile
 from testing import assert_equal
 
 
+def test_range_uint_bad_step_size():
+    # Ensure constructing a range with a "-1" step size (i.e. reverse range)
+    # with UInt is rejected and aborts now via `debug_assert` handler.
+    var r = range(UInt(0), UInt(10), UInt(-1))
+
+
 def main():
-    with NamedTemporaryFile(delete=False) as tmp_file:
-        file_path = tmp_file.name
-        # No bytes written yet, 0 size.
-        assert_equal(getsize(file_path), 0)
-        var data_to_write = "test"
-        tmp_file.write(data_to_write)
-        assert_equal(getsize(file_path), len(data_to_write))
+    test_range_uint_bad_step_size()

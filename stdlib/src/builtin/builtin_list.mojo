@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import LegacyPointer, Reference, UnsafePointer
+from memory import Reference, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
