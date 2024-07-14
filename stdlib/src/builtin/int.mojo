@@ -1119,6 +1119,14 @@ struct Int(
             _format_scalar(writer, Int64(self))
 
     @always_inline("nodebug")
+    fn max(self, rhs: Self) -> Self:
+        return __mlir_op.`index.maxs`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn min(self, rhs: Self) -> Self:
+        return __mlir_op.`index.mins`(self.value, rhs.value)
+
+    @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
         """Convert to index.
 

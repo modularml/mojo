@@ -227,6 +227,23 @@ def test_comparison():
     assert_false(Int(5).__ge__(Int(10)))
 
 
+def test_max():
+    assert_equal(Int(5).max(3), 5)
+    assert_equal(Int(3).max(5), 5)
+    var a: Int = 0
+    assert_equal(a.max(Int.MAX), Int.MAX)
+    assert_equal(Int(3).max(-5), 3)
+    assert_equal(Int(-3).max(5), 5)
+
+
+def test_min():
+    assert_equal(Int(5).min(3), 3)
+    assert_equal(Int(3).min(5), 3)
+    var a: Int = 0
+    assert_equal(a.min(Int.MAX), 0)
+    assert_equal(a.min(Int.MIN), Int.MIN)
+
+
 def main():
     test_properties()
     test_add()
@@ -248,3 +265,5 @@ def main():
     test_decimal_digit_count()
     test_comparison()
     test_int_uint()
+    test_max()
+    test_min()
