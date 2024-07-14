@@ -103,15 +103,20 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
-    # Unicode (represented as UInt32 BE) to UTF-8 conversion :
-    # 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa
-    # ∴ a
-    # 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb
-    # ∴ (a >> 6)  | 0b11000000, b         | 0b10000000
-    # 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc
-    # ∴ (a >> 12) | 0b11100000, (b >> 6)  | 0b10000000, c        | 0b10000000
-    # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd
-    # ∴ (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000, d | 0b10000000
+    """Shift unicode to utf8 representation.
+
+    Unicode (represented as UInt32 BE) to UTF-8 conversion :
+    - 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa
+        - a
+    - 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb
+        - (a >> 6)  | 0b11000000, b         | 0b10000000
+    - 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc
+        - (a >> 12) | 0b11100000, (b >> 6)  | 0b10000000, c        | 0b10000000
+    - 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc
+    10dddddd
+        - (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000,
+        d | 0b10000000
+    """
 
     if num_bytes == 1:
         ptr[0] = UInt8(c)
@@ -124,7 +129,6 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
     for i in range(1, num_bytes):
         shift -= 6
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
-    ptr[num_bytes] = 0
 
 
 fn chr(c: Int) -> String:
@@ -827,7 +831,7 @@ struct String(
 
         Examples:
         ```mojo
-        print(String(List[UInt8](ord("H"), ord("i"), 0))) # Hi
+        print(String(List[UInt8](72, 105, 0))) # Hi
         ```
         .
         """
