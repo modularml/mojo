@@ -317,7 +317,7 @@ def test_unicode():
     var ucode = List[Int](65, 97, 33, 945, 10175, 128293, 0xFFFD, 0x10FFFF + 1)
     assert_equal("Aa!α➿🔥��", String.from_unicode(ucode))
     var utf16 = List[UInt16](
-        65, 97, 33, 0x3B1, 0x27BF, 0xD83D, 0xDD25, 0xFFFD, 0xD800
+        65, 97, 33, 945, 10175, 0xD83D, 0xDD25, 0xFFFD, 0xD800
     )
     assert_equal("Aa!α➿🔥��", String.from_utf16(utf16))
 
