@@ -145,7 +145,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
             idx: The element to return.
 
         Returns:
-            A referece to the specified element.
+            A reference to the specified element.
         """
         # Return a reference to an element at the specified index, propagating
         # mutability of self.

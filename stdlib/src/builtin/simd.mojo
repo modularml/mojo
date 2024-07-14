@@ -216,6 +216,9 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
         var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
@@ -390,8 +393,11 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
-        # TODO (#36686): This introduces uneeded casts here to work around
+        # TODO (#36686): This introduces unneeded casts here to work around
         # parameter if issues.
         @parameter
         if type is DType.float16:
@@ -1331,7 +1337,7 @@ struct SIMD[type: DType, size: Int](
             rebind[Scalar[type]](self).value
         )
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
 
@@ -1341,7 +1347,7 @@ struct SIMD[type: DType, size: Int](
 
         return String.format_sequence(self)
 
-    @always_inline
+    @no_inline
     fn __repr__(self) -> String:
         """Get the representation of the SIMD value e.g. "SIMD[DType.int8, 2](1, 2)".
 
@@ -1507,6 +1513,7 @@ struct SIMD[type: DType, size: Int](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
+    @always_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -2646,7 +2653,7 @@ struct SIMD[type: DType, size: Int](
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space, _]) -> Self:
-        """Loads the value the Pointer object points to.
+        """Loads the value the pointer points to.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2670,7 +2677,7 @@ struct SIMD[type: DType, size: Int](
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space, _], offset: Scalar) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2696,8 +2703,8 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Int) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+    ](ptr: UnsafePointer[Scalar[type], address_space, _], offset: Int) -> Self:
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2730,12 +2737,12 @@ struct SIMD[type: DType, size: Int](
             # intentionally don't unroll, otherwise the compiler vectorizes
             for i in range(size):
                 v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
-                    ptr.address.offset(int(offset) + i).address
+                    ptr.offset(int(offset) + i).address
                 )
             return v
 
         return __mlir_op.`pop.load`[alignment = alignment.value](
-            ptr.address.offset(offset).bitcast[SIMD[type, size]]().address
+            ptr.offset(offset).bitcast[SIMD[type, size]]().address
         )
 
     @staticmethod
@@ -2744,8 +2751,34 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space, _], offset: Int) -> Self:
+        """Loads the value the pointer points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to load from.
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+
+        return Self.load[alignment=alignment](ptr.address, offset)
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn load[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
     ](ptr: DTypePointer[type, address_space], offset: UInt) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
@@ -2835,12 +2868,36 @@ struct SIMD[type: DType, size: Int](
             ptr: The pointer to store to.
             val: The value to store.
         """
+        Self.store[alignment=alignment, address_space=address_space](
+            ptr.address, val
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: UnsafePointer[Scalar[type], address_space, _], val: Self):
+        """Stores a single element value.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to store to.
+            val: The value to store.
+        """
         constrained[size > 0, "width must be a positive integer value"]()
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
         __mlir_op.`pop.store`[alignment = alignment.value](
-            val, ptr.address.bitcast[SIMD[type, size]]().address
+            val, ptr.bitcast[SIMD[type, size]]().address
         )
 
     @staticmethod

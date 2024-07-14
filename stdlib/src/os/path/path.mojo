@@ -122,7 +122,7 @@ fn expanduser[PathLike: os.PathLike, //](path: PathLike) raises -> String:
     if not userhome:
         return fspath
     var path_split = fspath.split(os.sep, 1)
-    # If there is a properly formatted seperator, return expanded fspath.
+    # If there is a properly formatted separator, return expanded fspath.
     if len(path_split) == 2:
         return os.path.join(userhome, path_split[1])
     # Path was a single `~` character, return home path
@@ -344,9 +344,9 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     """
     Split a given pathname into two components: head and tail. This is useful
     for separating the directory path from the filename. If the input path ends
-    with a seperator, the tail component will be empty. If there is no seperator
+    with a separator, the tail component will be empty. If there is no separator
     in the path, the head component will be empty, and the entire path will be
-    considered the tail. Trailing seperators in the head are stripped unless the
+    considered the tail. Trailing separators in the head are stripped unless the
     head is the root directory.
 
     Parameters:

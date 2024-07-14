@@ -21,7 +21,7 @@ from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
 
-from utils import StringRef, unroll
+from utils import StringRef
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
@@ -135,6 +135,17 @@ struct PythonObject(
             ptr: The `PyObjectPtr` to take ownership of.
         """
         self.py_object = ptr
+
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, none: NoneType._mlir_type):
+        """Initialize a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = Self(none=NoneType(none))
 
     fn __init__(inout self, none: NoneType):
         """Initialize a none value object from a `None` literal.

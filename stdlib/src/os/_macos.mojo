@@ -70,6 +70,7 @@ struct _c_stat(Stringable):
         self.st_lspare = 0
         self.st_qspare = InlineArray[Int64, 2](0, 0)
 
+    @no_inline
     fn __str__(self) -> String:
         var res = String("{\n")
         res += "st_dev: " + str(self.st_dev) + ",\n"

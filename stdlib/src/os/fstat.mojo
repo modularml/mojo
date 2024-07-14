@@ -150,6 +150,7 @@ struct stat_result(Stringable):
         self.st_rdev = st_rdev
         self.st_flags = st_flags
 
+    @no_inline
     fn __str__(self) -> String:
         """Constructs a string representation of stat_result.
 

@@ -34,7 +34,7 @@ with open("my_file.txt", "r") as f:
 from os import PathLike
 from sys import external_call
 
-from memory import AddressSpace, DTypePointer, Pointer
+from memory import AddressSpace, DTypePointer
 
 
 @register_passable
@@ -239,7 +239,7 @@ struct FileHandle:
         var bytes = file.read(ptr, 8)
         print("bytes read", bytes)
 
-        var first_element = ptr.load(0)
+        var first_element = ptr[0]
         print(first_element)
 
         # Skip 2 elements
@@ -374,7 +374,7 @@ struct FileHandle:
         ```mojo
         import os
         var f = open("/tmp/example.txt", "r")
-        f.seek(os.SEEK_CUR, 32)
+        _ = f.seek(32, os.SEEK_CUR)
         ```
 
         Start from 32 bytes from the end of the file:
@@ -382,7 +382,7 @@ struct FileHandle:
         ```mojo
         import os
         var f = open("/tmp/example.txt", "r")
-        f.seek(os.SEEK_END, -32)
+        _ = f.seek(-32, os.SEEK_END)
         ```
         .
         """
@@ -409,7 +409,7 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.unsafe_ptr(), len(data))
+        self._write(data.unsafe_ptr(), data.byte_length())
 
     fn write(self, data: Span[UInt8, _]) raises:
         """Write a borrowed sequence of data to the file.

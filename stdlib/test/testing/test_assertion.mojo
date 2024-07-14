@@ -37,6 +37,7 @@ struct DummyStruct:
     fn __ne__(self, other: Self) -> Bool:
         return self.value != other.value
 
+    @no_inline
     fn __str__(self) -> String:
         return "Dummy"  # Can't be used for equality
 
@@ -66,22 +67,22 @@ def test_assert_messages():
     try:
         assert_true(False)
     except e:
-        assert_true("test_assertion.mojo:67:20: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:68:20: AssertionError:" in str(e))
 
     try:
         assert_false(True)
     except e:
-        assert_true("test_assertion.mojo:72:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:73:21: AssertionError:" in str(e))
 
     try:
         assert_equal(1, 0)
     except e:
-        assert_true("test_assertion.mojo:77:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:78:21: AssertionError:" in str(e))
 
     try:
         assert_not_equal(0, 0)
     except e:
-        assert_true("test_assertion.mojo:82:25: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:83:25: AssertionError:" in str(e))
 
 
 def test_assert_almost_equal():
@@ -145,7 +146,7 @@ def test_assert_almost_equal():
 
     _should_fail[DType.bool, 1](True, False)
     _should_fail(
-        SIMD[DType.int32, 2](0, 1), SIMD[DType.int32, 2](0, -1), atol=5.0
+        SIMD[DType.int32, 2](0, 1), SIMD[DType.int32, 2](0, -1), atol=5
     )
     _should_fail(
         SIMD[float_type, 2](-_inf, 0.0),

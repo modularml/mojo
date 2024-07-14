@@ -20,11 +20,12 @@ from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
-from bit import countl_zero
-from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
+from bit import count_leading_zeros
+from memory import DTypePointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
+from utils.string_slice import _utf8_byte_type
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -68,11 +69,11 @@ fn ord(s: StringSlice) -> Int:
     var p = s.unsafe_ptr().bitcast[UInt8]()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
-        debug_assert(s._byte_length() == 1, "input string length must be 1")
+        debug_assert(s.byte_length() == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = countl_zero(~b1)
+    var num_bytes = count_leading_zeros(~b1)
     debug_assert(
-        s._byte_length() == int(num_bytes), "input string must be one character"
+        s.byte_length() == int(num_bytes), "input string must be one character"
     )
     debug_assert(
         1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
@@ -487,7 +488,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     # NOTE: Instead of `var result *= 10.0 ** exponent`, we calculate a positive
     # integer factor as shift and multiply or divide by it based on the shift
     # direction. This allows for better precision.
-    # TODO: investigate if there is a floating point arithmethic problem.
+    # TODO: investigate if there is a floating point arithmetic problem.
     var shift: Int = 10 ** abs(exponent)
     if exponent > 0:
         result *= shift
@@ -705,20 +706,6 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _utf8_byte_type(b: UInt8) -> UInt8:
-    """UTF-8 byte type.
-
-    Returns:
-        The byte type:
-            0 -> ASCII byte.
-            1 -> continuation byte.
-            2 -> start of 2 byte long sequence.
-            3 -> start of 3 byte long sequence.
-            4 -> start of 4 byte long sequence.
-    """
-    return countl_zero(~(b & 0b1111_0000))
-
-
 @value
 struct _StringIter[
     is_mutable: Bool, //,
@@ -746,7 +733,7 @@ struct _StringIter[
         self.length = length
         self.continuation_bytes = 0
         for i in range(length):
-            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
+            if _utf8_byte_type(unsafe_pointer[i]) == 1:
                 self.continuation_bytes += 1
 
     fn __iter__(self) -> Self:
@@ -757,7 +744,7 @@ struct _StringIter[
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                var byte_type = _utf8_byte_type(self.ptr[self.index])
                 if byte_type != 0:
                     byte_len = int(byte_type)
                     self.continuation_bytes -= byte_len - 1
@@ -769,11 +756,11 @@ struct _StringIter[
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
                 if byte_type != 0:
                     while byte_type == 1:
                         byte_len += 1
-                        var b = int(self.ptr[self.index - byte_len])
+                        var b = self.ptr[self.index - byte_len]
                         byte_type = _utf8_byte_type(b)
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
@@ -927,25 +914,6 @@ struct String(
         )
 
     @always_inline
-    fn __init__(inout self, ptr: LegacyPointer[UInt8], len: Int):
-        """Creates a string from the buffer. Note that the string now owns
-        the buffer.
-
-        The buffer must be terminated with a null byte.
-
-        Args:
-            ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
-        """
-        self = Self(
-            Self._buffer_type(
-                unsafe_pointer=UnsafePointer(ptr.address),
-                size=len,
-                capacity=len,
-            )
-        )
-
-    @always_inline
     fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
@@ -989,6 +957,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
+    @no_inline
     fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
         """
         Construct a string by concatenating a sequence of formattable arguments.
@@ -1008,11 +977,10 @@ struct String(
         Construct a String from several `Formattable` arguments:
 
         ```mojo
-        from testing import assert_equal
-
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
-
-        assert_equal(string, "1, 2.0, three")
+        print(string) # "1, 2.0, three"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
         ```
         .
         """
@@ -1076,6 +1044,7 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
+        # TODO(#933): implement this for unicode when we support llvm intrinsic evaluation at compile time
         var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
         buf.append(self._buffer[normalized_idx])
@@ -1094,13 +1063,12 @@ struct String(
         var start: Int
         var end: Int
         var step: Int
-        start, end, step = span.indices(len(self))
+        # TODO(#933): implement this for unicode when we support llvm intrinsic evaluation at compile time
+
+        start, end, step = span.indices(self.byte_length())
         var r = range(start, end, step)
         if step == 1:
-            return StringRef(
-                self._buffer.data + start,
-                len(r),
-            )
+            return StringRef(self._buffer.data + start, len(r))
 
         var buffer = Self._buffer_type()
         var result_len = len(r)
@@ -1197,8 +1165,8 @@ struct String(
             return other
         if not other:
             return self
-        var self_len = len(self)
-        var other_len = len(other)
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
         var total_len = self_len + other_len
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
@@ -1237,8 +1205,8 @@ struct String(
             return
         if not other:
             return
-        var self_len = len(self)
-        var other_len = len(other)
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
         var total_len = self_len + other_len
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
@@ -1255,7 +1223,7 @@ struct String(
             An iterator of references to the string elements.
         """
         return _StringIter[__lifetime_of(self)](
-            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
@@ -1265,7 +1233,7 @@ struct String(
             A reversed iterator of references to the string elements.
         """
         return _StringIter[__lifetime_of(self), forward=False](
-            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     # ===------------------------------------------------------------------=== #
@@ -1279,20 +1247,24 @@ struct String(
         Returns:
             True if the string length is greater than zero, and False otherwise.
         """
-        return len(self) > 0
+        return self.byte_length() > 0
 
     fn __len__(self) -> Int:
-        """Gets the string length, in bytes.
+        """Gets the string length, in bytes (for now) PREFER:
+        String.byte_length(), a future version will make this method return
+        Unicode codepoints.
 
         Returns:
-            The string length, in bytes.
+            The string length, in bytes (for now).
         """
-        # Avoid returning -1 if the buffer is not initialized
-        if not self.unsafe_ptr():
-            return 0
+        var unicode_length = self.byte_length()
 
-        # The negative 1 is to account for the terminator.
-        return len(self._buffer) - 1
+        # TODO: everything uses this method assuming it's byte length
+        # for i in range(unicode_length):
+        #     if _utf8_byte_type(self._buffer[i]) == 1:
+        #         unicode_length -= 1
+
+        return unicode_length
 
     @always_inline
     fn __str__(self) -> String:
@@ -1447,7 +1419,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef(self.unsafe_ptr(), len(self))
+        return StringRef(self.unsafe_ptr(), self.byte_length())
 
     fn _strref_keepalive(self):
         """
@@ -1497,19 +1469,18 @@ struct String(
 
     @always_inline
     fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
-        """
-        Returns a contiguous slice of the bytes owned by this string.
-
-        This does not include the trailing null terminator.
+        """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
 
+        # Does NOT include the NUL terminator.
         return Span[UInt8, __lifetime_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=self._byte_length(),
+            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )
 
     @always_inline
@@ -1524,21 +1495,30 @@ struct String(
         #   guaranteed to be valid.
         return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
-    fn _byte_length(self) -> Int:
+    @always_inline
+    fn byte_length(self) -> Int:
         """Get the string length in bytes.
-
-        This does not include the trailing null terminator in the count.
 
         Returns:
             The length of this string in bytes, excluding null terminator.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
         """
+        return max(len(self._buffer) - 1, 0)
 
-        var buffer_len = len(self._buffer)
+    @always_inline
+    @deprecated("use byte_length() instead")
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
 
-        if buffer_len > 0:
-            return buffer_len - 1
-        else:
-            return buffer_len
+        Returns:
+            The length of this string in bytes, excluding null terminator.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
+        """
+        return max(len(self._buffer) - 1, 0)
 
     fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
@@ -1578,7 +1558,7 @@ struct String(
                 break
             res += 1
 
-            offset = pos + len(substr)
+            offset = pos + substr.byte_length()
 
         return res
 
@@ -1637,7 +1617,7 @@ struct String(
                 listed above, otherwise False.
         """
         # TODO add line and paragraph separator as stringliteral
-        # once unicode escape secuences are accepted
+        # once unicode escape sequences are accepted
         var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
         var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
@@ -1653,11 +1633,11 @@ struct String(
             var ptr2 = DTypePointer(item2)
             return memcmp(ptr1, ptr2, amnt) == 0
 
-        if len(self) == 0:
+        if self.byte_length() == 0:
             return False
 
         for s in self:
-            var no_null_len = len(s)
+            var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
             if no_null_len == 1 and not _isspace(ptr[0]):
                 return False
@@ -1697,15 +1677,15 @@ struct String(
         """
         var output = List[String]()
 
-        var str_iter_len = len(self) - 1
+        var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
-        var sep_len = len(sep)
+        var sep_len = sep.byte_length()
         if sep_len == 0:
             raise Error("ValueError: empty separator")
 
-        while lhs <= str_iter_len:
+        while lhs <= str_byte_len:
             rhs = self.find(sep, lhs)
             if rhs == -1:
                 output.append(self[lhs:])
@@ -1724,12 +1704,11 @@ struct String(
             output.append("")
         return output
 
-    fn split(self, *, maxsplit: Int = -1) -> List[String]:
+    fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
         """Split the string by every Whitespace separator.
 
-        Currently only uses C style separators.
-
         Args:
+            sep: None.
             maxsplit: The maximum amount of items to split from String. Defaults
                 to unlimited.
 
@@ -1745,43 +1724,40 @@ struct String(
 
         # Splitting a string with leading, trailing, and middle whitespaces
         _ = String("      hello    world     ").split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        _ = String(
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+        ).split()  # ["hello", "world"]
         ```
         .
         """
-        # TODO: implement and document splitting adjacent universal newlines:
-        # _ = String(
-        #     "hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029world"
-        # ).split()  # ["hello", "world"]
 
         var output = List[String]()
-
-        var str_iter_len = len(self) - 1
+        var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
-        # FIXME: this should iterate and build unicode strings
-        # and use self.isspace()
-        while lhs <= str_iter_len:
+        while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            while lhs <= str_iter_len:
-                if not _isspace(self._buffer.unsafe_get(lhs)):
+            for s in self[lhs:]:
+                if not str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
-                lhs += 1
+                lhs += s.byte_length()
             # if it went until the end of the String, then
             # it should be sliced up until the original
             # start of the whitespace which was already appended
-            if lhs - 1 == str_iter_len:
+            if lhs - 1 == str_byte_len:
                 break
-            elif lhs == str_iter_len:
+            elif lhs == str_byte_len:
                 # if the last char is not whitespace
-                output.append(self[str_iter_len])
+                output.append(self[str_byte_len])
                 break
             rhs = lhs + 1
-            while rhs <= str_iter_len:
-                if _isspace(self._buffer.unsafe_get(rhs)):
+            for s in self[lhs + 1 :]:
+                if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
-                rhs += 1
+                rhs += s.byte_length()
 
             if maxsplit > -1:
                 if items == maxsplit:
@@ -1804,7 +1780,7 @@ struct String(
             A List of Strings containing the input split by line boundaries.
         """
         var output = List[String]()
-        var length = len(self)
+        var length = self.byte_length()
         var current_offset = 0
 
         while current_offset < length:
@@ -1855,9 +1831,9 @@ struct String(
         var self_ptr = self.unsafe_ptr()
         var new_ptr = new.unsafe_ptr()
 
-        var self_len = len(self)
-        var old_len = len(old)
-        var new_len = len(new)
+        var self_len = self.byte_length()
+        var old_len = old.byte_length()
+        var new_len = new.byte_length()
 
         var res = List[UInt8]()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
@@ -1922,7 +1898,7 @@ struct String(
             A copy of the string with no trailing characters.
         """
 
-        var r_idx = len(self)
+        var r_idx = self.byte_length()
         while r_idx > 0 and self[r_idx - 1] in chars:
             r_idx -= 1
 
@@ -1934,8 +1910,12 @@ struct String(
         Returns:
             A copy of the string with no trailing whitespaces.
         """
-        # TODO: should use self.__iter__ and self.isspace()
-        var r_idx = len(self)
+        var r_idx = self.byte_length()
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self.__reversed__():
+        #     if not s.isspace():
+        #         break
+        #     r_idx -= 1
         while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
             r_idx -= 1
         return self[:r_idx]
@@ -1951,7 +1931,7 @@ struct String(
         """
 
         var l_idx = 0
-        while l_idx < len(self) and self[l_idx] in chars:
+        while l_idx < self.byte_length() and self[l_idx] in chars:
             l_idx += 1
 
         return self[l_idx:]
@@ -1962,9 +1942,15 @@ struct String(
         Returns:
             A copy of the string with no leading whitespaces.
         """
-        # TODO: should use self.__iter__ and self.isspace()
         var l_idx = 0
-        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)):
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self:
+        #     if not s.isspace():
+        #         break
+        #     l_idx += 1
+        while l_idx < self.byte_length() and _isspace(
+            self._buffer.unsafe_get(l_idx)
+        ):
             l_idx += 1
         return self[l_idx:]
 
@@ -1982,9 +1968,9 @@ struct String(
         var res = List[UInt8]()
         var val_ptr = val.unsafe_ptr()
         var self_ptr = self.unsafe_ptr()
-        res.reserve(len(val) * len(self) + 1)
-        for i in range(len(self)):
-            for j in range(len(val)):
+        res.reserve(val.byte_length() * self.byte_length() + 1)
+        for i in range(self.byte_length()):
+            for j in range(val.byte_length()):
                 res.append(val_ptr[j])
             res.append(self_ptr[i])
         res.append(0)
@@ -2021,7 +2007,7 @@ struct String(
 
         var char_ptr = copy.unsafe_ptr()
 
-        for i in range(len(self)):
+        for i in range(self.byte_length()):
             var char: UInt8 = char_ptr[i]
             if check_case(char):
                 var lower = _toggle_ascii_case(char)
@@ -2043,7 +2029,7 @@ struct String(
         """
         if end == -1:
             return StringRef(
-                self.unsafe_ptr() + start, len(self) - start
+                self.unsafe_ptr() + start, self.byte_length() - start
             ).startswith(prefix._strref_dangerous())
 
         return StringRef(self.unsafe_ptr() + start, end - start).startswith(
@@ -2064,7 +2050,7 @@ struct String(
         """
         if end == -1:
             return StringRef(
-                self.unsafe_ptr() + start, len(self) - start
+                self.unsafe_ptr() + start, self.byte_length() - start
             ).endswith(suffix._strref_dangerous())
 
         return StringRef(self.unsafe_ptr() + start, end - start).endswith(
@@ -2091,7 +2077,7 @@ struct String(
             or a copy of the original string otherwise.
         """
         if self.startswith(prefix):
-            return self[len(prefix) :]
+            return self[prefix.byte_length() :]
         return self
 
     fn removesuffix(self, suffix: String, /) -> String:
@@ -2114,7 +2100,7 @@ struct String(
             or a copy of the original string otherwise.
         """
         if suffix and self.endswith(suffix):
-            return self[: -len(suffix)]
+            return self[: -suffix.byte_length()]
         return self
 
     fn __int__(self) raises -> Int:
@@ -2140,7 +2126,7 @@ struct String(
         """
         if n <= 0:
             return ""
-        var len_self = len(self)
+        var len_self = self.byte_length()
         var count = len_self * n + 1
         var buf = Self._buffer_type(capacity=count)
         buf.resize(count, 0)
@@ -2193,7 +2179,10 @@ struct String(
 
         var current_automatic_arg_index = 0
         for e in entries:
-            debug_assert(pos_in_self < len(self), "pos_in_self >= len(self)")
+            debug_assert(
+                pos_in_self < self.byte_length(),
+                "pos_in_self >= self.byte_length()",
+            )
             res += self[pos_in_self : e[].first_curly]
 
             if e[].is_escaped_brace():
@@ -2216,8 +2205,8 @@ struct String(
 
             pos_in_self = e[].last_curly + 1
 
-        if pos_in_self < len(self):
-            res += self[pos_in_self : len(self)]
+        if pos_in_self < self.byte_length():
+            res += self[pos_in_self : self.byte_length()]
 
         return res^
 
@@ -2239,7 +2228,7 @@ struct String(
             return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
 
         for c in self:
-            debug_assert(c._byte_length() == 1, "only implemented for ASCII")
+            debug_assert(c.byte_length() == 1, "only implemented for ASCII")
             if is_ascii_cased(ord(c)):
 
                 @parameter
@@ -2341,7 +2330,9 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
+    var log2 = int(
+        (bitwidthof[DType.uint32]() - 1) ^ count_leading_zeros(n | 1)
+    )
     return (n0 + lookup_table[int(log2)]) >> 32
 
 
@@ -2492,7 +2483,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var entries = List[Self]()
         var start = Optional[Int](None)
         var skip_next = False
-        for i in range(len(format_src)):
+        for i in range(format_src.byte_length()):
             if skip_next:
                 skip_next = False
                 continue
@@ -2517,7 +2508,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 if start:
                     var start_value = start.value()
                     var current_entry = Self(
-                        first_curly=start_value, last_curly=i, field=None
+                        first_curly=start_value, last_curly=i, field=NoneType()
                     )
                     if i - start_value != 1:
                         var field = format_src[start_value + 1 : i]
@@ -2549,7 +2540,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                     start = None
                 else:
                     # python escapes double curlies
-                    if (i + 1) < len(format_src):
+                    if (i + 1) < format_src.byte_length():
                         if format_src[i + 1] == "}":
                             var curren_entry = Self(
                                 first_curly=i, last_curly=i + 1, field=True

@@ -20,7 +20,7 @@ from sys.intrinsics import _type_is_eq
 
 from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, Variant, unroll
+from utils import StringRef, Variant
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -250,7 +250,13 @@ struct _Function(CollectionElement, CollectionElementNew):
         )
 
 
-struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
+struct _ObjectImpl(
+    CollectionElement,
+    CollectionElementNew,
+    Stringable,
+    Representable,
+    Formattable,
+):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
     complex types.
@@ -557,18 +563,24 @@ struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
         else:
             lhs = lhs.convert_bool_to_int()
 
-    fn __str__(self) -> String:
-        """Returns the name (in lowercase) of the specific object type."""
+    fn format_to(self, inout writer: Formatter):
+        """Performs conversion to string according to Python
+        semantics.
+        """
         if self.is_none():
-            return "None"
+            writer.write("None")
+            return
         if self.is_bool():
-            return str(self.get_as_bool())
+            writer.write(str(self.get_as_bool()))
+            return
         if self.is_int():
-            return str(self.get_as_int())
+            writer.write(str(self.get_as_int()))
+            return
         if self.is_float():
-            return str(self.get_as_float())
+            writer.write(str(self.get_as_float()))
+            return
         if self.is_str():
-            return (
+            writer.write(
                 "'"
                 + str(
                     StringRef(
@@ -577,32 +589,56 @@ struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
                 )
                 + "'"
             )
+            return
         if self.is_func():
-            return "Function at address " + hex(int(self.get_as_func().value))
+            writer.write(
+                "Function at address " + hex(int(self.get_as_func().value))
+            )
+            return
         if self.is_list():
-            var res = String("[")
+            writer.write(String("["))
             for j in range(self.get_list_length()):
                 if j != 0:
-                    res += ", "
-                res += str(object(self.get_list_element(j)))
-            res += "]"
-            return res
+                    writer.write(", ")
+                writer.write(str(object(self.get_list_element(j))))
+            writer.write("]")
+            return
 
         var ptr = self.get_obj_attrs_ptr()
-        var res = String("{")
+        writer.write(String("{"))
         var print_sep = False
         for entry in ptr[].impl[].items():
             if print_sep:
-                res += ", "
-            res += (
+                writer.write(", ")
+            writer.write(
                 "'"
                 + str(entry[].key)
                 + "' = "
                 + str(object(entry[].value.copy()))
             )
             print_sep = True
-        res += "}"
-        return res
+        writer.write("}")
+        return
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return self.__str__()
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return String.format_sequence(self)
 
     # ===------------------------------------------------------------------=== #
     # List Functions
@@ -655,7 +691,9 @@ struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
 # ===----------------------------------------------------------------------=== #
 
 
-struct object(IntableRaising, ImplicitlyBoolable, Stringable):
+struct object(
+    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Formattable
+):
     """Represents an object without a concrete type.
 
     This is the type of arguments in `def` functions that do not have a type
@@ -933,7 +971,16 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
         """
         return self.__bool__()
 
-    @always_inline
+    fn format_to(self, inout writer: Formatter):
+        """Performs conversion to string according to Python
+        semantics.
+
+        Args:
+            writer: The Formatter to write to.
+        """
+        self._value.format_to(writer)
+
+    @no_inline
     fn __str__(self) -> String:
         """Performs conversion to string according to Python
         semantics.
@@ -941,7 +988,17 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
         Returns:
             The String representation of the object.
         """
-        return str(self._value)
+        return String.format_sequence(self._value)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return repr(self._value)
 
     # ===------------------------------------------------------------------=== #
     # Comparison Operators

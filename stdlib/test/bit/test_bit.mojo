@@ -19,8 +19,8 @@ from bit import (
     bit_reverse,
     bit_width,
     byte_swap,
-    countl_zero,
-    countr_zero,
+    count_leading_zeros,
+    count_trailing_zeros,
     is_power_of_two,
     pop_count,
     rotate_bits_left,
@@ -29,21 +29,21 @@ from bit import (
 from testing import assert_equal
 
 
-def test_countl_zero():
-    assert_equal(countl_zero(-(2**59)), 0)
-    assert_equal(countl_zero(-(2**20)), 0)
-    assert_equal(countl_zero(-1), 0)
-    assert_equal(countl_zero(-1), 0)
-    assert_equal(countl_zero(0), 64)
-    assert_equal(countl_zero(1), 63)
-    assert_equal(countl_zero(2), 62)
-    assert_equal(countl_zero(3), 62)
-    assert_equal(countl_zero(4), 61)
-    assert_equal(countl_zero(2**20), 43)
-    assert_equal(countl_zero(2**59), 4)
+def test_count_leading_zeros():
+    assert_equal(count_leading_zeros(-(2**59)), 0)
+    assert_equal(count_leading_zeros(-(2**20)), 0)
+    assert_equal(count_leading_zeros(-1), 0)
+    assert_equal(count_leading_zeros(-1), 0)
+    assert_equal(count_leading_zeros(0), 64)
+    assert_equal(count_leading_zeros(1), 63)
+    assert_equal(count_leading_zeros(2), 62)
+    assert_equal(count_leading_zeros(3), 62)
+    assert_equal(count_leading_zeros(4), 61)
+    assert_equal(count_leading_zeros(2**20), 43)
+    assert_equal(count_leading_zeros(2**59), 4)
 
 
-def test_countl_zero_simd():
+def test_count_leading_zeros_simd():
     alias simd_width = 4
     alias int8_t = DType.int8
     alias int16_t = DType.int16
@@ -51,36 +51,44 @@ def test_countl_zero_simd():
     alias int64_t = DType.int64
 
     alias var1 = SIMD[int8_t, simd_width](-(2**6), 0, -1, 2**6)
-    assert_equal(countl_zero(var1), SIMD[int8_t, simd_width](0, 8, 0, 1))
+    assert_equal(
+        count_leading_zeros(var1), SIMD[int8_t, simd_width](0, 8, 0, 1)
+    )
 
     alias var3 = SIMD[int16_t, simd_width](-(2**14), 0, -1, 2**14)
-    assert_equal(countl_zero(var3), SIMD[int16_t, simd_width](0, 16, 0, 1))
+    assert_equal(
+        count_leading_zeros(var3), SIMD[int16_t, simd_width](0, 16, 0, 1)
+    )
 
     alias var5 = SIMD[int32_t, simd_width](-(2**30), 0, -1, 2**30)
-    assert_equal(countl_zero(var5), SIMD[int32_t, simd_width](0, 32, 0, 1))
+    assert_equal(
+        count_leading_zeros(var5), SIMD[int32_t, simd_width](0, 32, 0, 1)
+    )
 
     # TODO: use this line after #2882 is fixed
     # alias var7 = SIMD[int64_t, simd_width](-(2**62), 0, -1, 2**62)
     alias var7 = SIMD[int64_t, simd_width](
         -4611686018427387904, 0, -1, 4611686018427387904
     )
-    assert_equal(countl_zero(var7), SIMD[int64_t, simd_width](0, 64, 0, 1))
+    assert_equal(
+        count_leading_zeros(var7), SIMD[int64_t, simd_width](0, 64, 0, 1)
+    )
 
 
-def test_countr_zero():
-    assert_equal(countr_zero(-(2**59)), 59)
-    assert_equal(countr_zero(-(2**20)), 20)
-    assert_equal(countr_zero(-1), 0)
-    assert_equal(countr_zero(0), 64)
-    assert_equal(countr_zero(1), 0)
-    assert_equal(countr_zero(2), 1)
-    assert_equal(countr_zero(3), 0)
-    assert_equal(countr_zero(4), 2)
-    assert_equal(countr_zero(2**20), 20)
-    assert_equal(countr_zero(2**59), 59)
+def test_count_trailing_zeros():
+    assert_equal(count_trailing_zeros(-(2**59)), 59)
+    assert_equal(count_trailing_zeros(-(2**20)), 20)
+    assert_equal(count_trailing_zeros(-1), 0)
+    assert_equal(count_trailing_zeros(0), 64)
+    assert_equal(count_trailing_zeros(1), 0)
+    assert_equal(count_trailing_zeros(2), 1)
+    assert_equal(count_trailing_zeros(3), 0)
+    assert_equal(count_trailing_zeros(4), 2)
+    assert_equal(count_trailing_zeros(2**20), 20)
+    assert_equal(count_trailing_zeros(2**59), 59)
 
 
-def test_countr_zero_simd():
+def test_count_trailing_zeros_simd():
     alias simd_width = 4
     alias int8_t = DType.int8
     alias int16_t = DType.int16
@@ -88,20 +96,28 @@ def test_countr_zero_simd():
     alias int64_t = DType.int64
 
     alias var1 = SIMD[int8_t, simd_width](-(2**6), 0, -1, 2**6)
-    assert_equal(countr_zero(var1), SIMD[int8_t, simd_width](6, 8, 0, 6))
+    assert_equal(
+        count_trailing_zeros(var1), SIMD[int8_t, simd_width](6, 8, 0, 6)
+    )
 
     alias var3 = SIMD[int16_t, simd_width](-(2**14), 0, -1, 2**14)
-    assert_equal(countr_zero(var3), SIMD[int16_t, simd_width](14, 16, 0, 14))
+    assert_equal(
+        count_trailing_zeros(var3), SIMD[int16_t, simd_width](14, 16, 0, 14)
+    )
 
     alias var5 = SIMD[int32_t, simd_width](-(2**30), 0, -1, 2**30)
-    assert_equal(countr_zero(var5), SIMD[int32_t, simd_width](30, 32, 0, 30))
+    assert_equal(
+        count_trailing_zeros(var5), SIMD[int32_t, simd_width](30, 32, 0, 30)
+    )
 
     # TODO: use this line after #2882 is fixed
     # alias var7 = SIMD[int64_t, simd_width](-(2**62), 0, -1, 2**62)
     alias var7 = SIMD[int64_t, simd_width](
         -4611686018427387904, 0, -1, 4611686018427387904
     )
-    assert_equal(countr_zero(var7), SIMD[int64_t, simd_width](62, 64, 0, 62))
+    assert_equal(
+        count_trailing_zeros(var7), SIMD[int64_t, simd_width](62, 64, 0, 62)
+    )
 
 
 def test_bit_reverse_simd():
@@ -453,10 +469,10 @@ def main():
     test_bit_width_simd()
     test_is_power_of_two()
     test_is_power_of_two_simd()
-    test_countl_zero()
-    test_countl_zero_simd()
-    test_countr_zero()
-    test_countr_zero_simd()
+    test_count_leading_zeros()
+    test_count_leading_zeros_simd()
+    test_count_trailing_zeros()
+    test_count_trailing_zeros_simd()
     test_bit_reverse_simd()
     test_byte_swap_simd()
     test_pop_count_simd()

@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `List[T]` values are now equality comparable with `==` and `!=` when `T` is
+  equality comparable.
+  ([PR 3195#](https://github.com/modularml/mojo/pull/3195) by
+  [@kszucs](https://github.com/kszucs))
+
 - `__setitem__` now works with variadic argument lists such as:
 
   ```mojo
@@ -33,6 +38,9 @@ what we publish.
   compiler that the user knows this pointer and all those derived from it have
   exclusive access to the underlying memory allocation. The compiler is not
   guaranteed to do anything with this information.
+
+- `Optional` values are now equality comparable with `==` and `!=` when their
+  element type is equality comparable.
 
 - Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
   dictionary-like type, matching most of the features of the Python one.
@@ -153,6 +161,12 @@ what we publish.
 
 - Added `StringSlice(..)` initializer from a `StringLiteral`.
 
+- Added a `byte_length()` method to `String`, `StringSlice`, and `StringLiteral`
+and deprecated their private `_byte_length()` methods. Added a warning to
+`String.__len__` method that it will return length in Unicode codepoints in the
+future and `StringSlice.__len__` now does return the Unicode codepoints length.
+([PR #2960](https://github.com/modularml/mojo/pull/2960) by [@martinvuyk](https://github.com/martinvuyk))
+
 - Added new `StaticString` type alias. This can be used in place of
   `StringLiteral` for runtime string arguments.
 
@@ -204,7 +218,7 @@ what we publish.
   Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
 
 - Mojo now has a `UInt` type for modeling unsigned (scalar) integers with a
-  paltform-dependent width. `UInt` implements most arithmethic operations that
+  paltform-dependent width. `UInt` implements most arithmetic operations that
   make sense for integers, with the notable exception of `__neg__`. Builtin
   functions such as `min`/`max`, as well as `math` functions like `ceildiv`,
   `align_down`, and `align_up` are also implemented for `UInt`.
@@ -274,7 +288,7 @@ what we publish.
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
   semantics bring a lot of history and baggage that are not needed in Mojo and
-  which complexify compiler optimizations. The language overall provides a
+  which complicate compiler optimizations. The language overall provides a
   stronger set of invariants around pointer aliasing with lifetimes and
   exclusive mutable references to values, etc.
 
@@ -338,7 +352,7 @@ what we publish.
 
   In the example above, `String.format_sequence(<arg>)` is used to construct a
   `String` from a type that implements `Formattable`. This pattern of
-  implementing a types `Stringable` implementation in terms of its `Formattable`
+  implementing a type's `Stringable` implementation in terms of its `Formattable`
   implementation minimizes boilerplate and duplicated code, while retaining
   backwards compatibility with the requirements of the commonly used `str(..)`
   function.
@@ -388,6 +402,12 @@ what we publish.
     print(s.start.value()) # must retrieve the value from the optional
   ```
 
+- `NoneType` is now a normal standard library type, and not an alias for a raw
+  MLIR type.
+
+  Function signatures spelled as `fn(...) -> NoneType` should transition to
+  being written as `fn(...) -> None`.
+
 - Accessing local Python modules with `Python.add_to_path(".")` is no longer
   required, it now behaves the same as Python, you can access modules in the
   same folder as the target file:
@@ -398,7 +418,7 @@ what we publish.
 - The rank argument for `algorihtm.elementwise` is no longer required and is
   only inferred.
 
-- The `ulp` function in `numerics` have been moved to the `math` module.
+- The `ulp` function in `numerics` has been moved to the `math` module.
 
 - The Mojo Language Server no longer sets `.` as a commit character for
   auto-completion.
@@ -413,7 +433,29 @@ what we publish.
 - `LegacyPointer.load/store` are now removed. It's use is replaced with
   `__getitem__` or `__setitem__`.
 
-- `memcmp` no longer takes in `LegacyPointer`, instead, use `UnsafePointer`.
+- `memcmp`, `memset` and `memset_zero` no longer take in `LegacyPointer`,
+  instead, use `UnsafePointer`.
+
+- A few bit functions have been renamed for clarity:
+- `countl_zero` -> `count_leading_zeros`
+- `countr_zero` -> `count_trailing_zeros`
+
+- `sort` no longer takes `LegacyPointer`. The current API supports:
+  - `sort(list)` just plain list
+  - `sort[type, cmp_fn](list)` list with custom compare function
+  - `sort(ptr, len)` a pointer and length (can change to Span in future)
+  - `sort[type, cmp_fn](ptr, len)` above with custom compare
+
+- `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
+  overload instead.
+
+- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
+ instead.
+
+- `UnsafePointer` now supports `simd_strided_load/store`, `gather`, and `scatter`
+  when the underlying type is `Scalar[DType]`.
+
+- `SIMD.load/store` now supports `UnsafePointer` overloads.
 
 ### ❌ Removed
 
@@ -441,3 +483,15 @@ what we publish.
 ### 🛠️ Fixed
 
 - Fixed a crash in the Mojo Language Server when importing the current file.
+
+- Fixed crash when specifying variadic keyword arguments without a type
+  expression in `def` functions, e.g.:
+
+  ```mojo
+  def foo(**kwargs): ...  # now works
+  ```
+
+- [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
+  `__setitem__` method is failing with a "must be mutable" error.
+- [#248](https://github.com/modularml/mojo/issues/248) - [Feature] Enable
+  `__setitem__` to take variadic arguments

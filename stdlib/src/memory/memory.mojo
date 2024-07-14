@@ -25,7 +25,7 @@ from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
 
-from .unsafe import DTypePointer, LegacyPointer
+from .unsafe import DTypePointer
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -170,7 +170,7 @@ fn memcmp[
 
 
 @always_inline
-fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
+fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
     """Copies a memory area.
 
     Parameters:
@@ -242,7 +242,7 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
 
 @always_inline
 fn memcpy(
-    dest_data: LegacyPointer[Int8, *_], src_data: __type_of(dest_data), n: Int
+    dest_data: UnsafePointer[Int8, *_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
 
@@ -308,19 +308,6 @@ fn memcpy(
 
 
 @always_inline
-fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
-    """Copies a memory area.
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy.
-    """
-    var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
-
-
-@always_inline
 fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
 
@@ -330,7 +317,7 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy.
     """
     var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8]().address, src.bitcast[Int8]().address, n)
+    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
 
 
 @always_inline
@@ -416,24 +403,6 @@ fn memset[
     _memset_llvm(ptr.bitcast[UInt8](), value, count * sizeof[type]())
 
 
-@always_inline
-fn memset[
-    type: AnyTrivialRegType, address_space: AddressSpace
-](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
-    """Fills memory with the given value.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: UnsafePointer to the beginning of the memory block to fill.
-        value: The value to fill with.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    _memset_llvm(ptr.bitcast[UInt8]().address, value, count * sizeof[type]())
-
-
 # ===----------------------------------------------------------------------===#
 # memset_zero
 # ===----------------------------------------------------------------------===#
@@ -460,23 +429,6 @@ fn memset_zero[
 fn memset_zero[
     type: AnyType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], count: Int):
-    """Fills memory with zeros.
-
-    Parameters:
-        type: The element type.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: UnsafePointer to the beginning of the memory block to fill.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    memset(ptr, 0, count)
-
-
-@always_inline
-fn memset_zero[
-    type: AnyTrivialRegType, address_space: AddressSpace
-](ptr: LegacyPointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
     Parameters:
@@ -607,8 +559,3 @@ fn _free(ptr: UnsafePointer):
 @always_inline
 fn _free(ptr: DTypePointer):
     _free(ptr.address)
-
-
-@always_inline
-fn _free(ptr: LegacyPointer):
-    _free(UnsafePointer(ptr.address))

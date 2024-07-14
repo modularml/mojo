@@ -283,8 +283,8 @@ def test_dict_copy_calls_copy_constructor():
     # are coming from :)
     assert_equal(1, orig["a"].copy_count)
     assert_equal(2, copy["a"].copy_count)
-    assert_equal(0, orig.__get_ref("a").copy_count)
-    assert_equal(1, copy.__get_ref("a").copy_count)
+    assert_equal(0, orig._find_ref("a").copy_count)
+    assert_equal(1, copy._find_ref("a").copy_count)
 
 
 def test_dict_update_nominal():
@@ -393,6 +393,9 @@ def test_dict_update_empty_new():
 struct DummyKey(KeyElement):
     var value: Int
 
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     fn __hash__(self) -> Int:
         return self.value
 
@@ -424,8 +427,7 @@ def test_mojo_issue_1729():
 
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
-    var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
-    print("Test", name_val, "...", end="")
+    print("Test", name, "...", end="")
     try:
         _ = test_fn()
     except e:

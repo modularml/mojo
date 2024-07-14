@@ -65,6 +65,7 @@ struct _c_stat(Stringable):
         self.st_birthtimespec = _CTimeSpec()
         self.unused = InlineArray[Int64, 3](0, 0, 0)
 
+    @no_inline
     fn __str__(self) -> String:
         var res = String("{\n")
         res += "st_dev: " + str(self.st_dev) + ",\n"

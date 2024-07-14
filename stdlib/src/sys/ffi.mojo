@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements a foreign functions interface (FFI)."""
 
-from memory import DTypePointer, LegacyPointer
+from memory import DTypePointer
 
 from utils import StringRef
 
@@ -204,19 +204,6 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 @always_inline
 fn _get_global[
     name: StringLiteral,
-    init_fn: fn (LegacyPointer[NoneType]) -> LegacyPointer[NoneType],
-    destroy_fn: fn (LegacyPointer[NoneType]) -> None,
-](
-    payload: LegacyPointer[NoneType] = LegacyPointer[NoneType]()
-) -> LegacyPointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", LegacyPointer[NoneType]
-    ](StringRef(name), payload, init_fn, destroy_fn)
-
-
-@always_inline
-fn _get_global[
-    name: StringLiteral,
     init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
     destroy_fn: fn (UnsafePointer[NoneType]) -> None,
 ](
@@ -231,7 +218,7 @@ fn _get_global[
 fn _get_global_or_null[name: StringLiteral]() -> UnsafePointer[NoneType]:
     return external_call[
         "KGEN_CompilerRT_GetGlobalOrNull", UnsafePointer[NoneType]
-    ](name.unsafe_ptr(), name._byte_length())
+    ](name.unsafe_ptr(), name.byte_length())
 
 
 @always_inline
@@ -265,7 +252,7 @@ fn _get_dylib_function[
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer.address_of(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[UnsafePointer[NoneType]]()[],
     )
 
     return new_func
