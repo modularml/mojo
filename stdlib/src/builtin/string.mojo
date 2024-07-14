@@ -2300,7 +2300,6 @@ struct String(
         ```mojo
         print(String.from_unicode(List[Int](97, 97, 0x10FFFF + 1, 97))) # "aa�a"
         ```
-        .
 
         Notes:
             This method allocates `4 * len(values)` bytes.
@@ -2340,7 +2339,6 @@ struct String(
         ```mojo
         print(String.from_utf16(List[UInt16](97, 97, 0xD800, 97))) # "aa�a"
         ```
-        .
 
         Notes:
             This method allocates `2 * len(values)` bytes.
