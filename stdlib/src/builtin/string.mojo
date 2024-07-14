@@ -98,9 +98,8 @@ fn ord(s: StringSlice) -> Int:
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
-    alias Vec32 = SIMD[DType.int32, 4]
-    alias sizes = Vec32(0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
-    return int((Vec32(c) > sizes).cast[DType.uint8]().reduce_add())
+    alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
+    return int((sizes < c).cast[DType.uint8]().reduce_add())
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
