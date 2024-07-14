@@ -1119,12 +1119,28 @@ struct Int(
             _format_scalar(writer, Int64(self))
 
     @always_inline("nodebug")
-    fn max(self, rhs: Self) -> Self:
-        return __mlir_op.`index.maxs`(self.value, rhs.value)
+    fn max(self, other: Self) -> Self:
+        """Computes the maximum between the two Ints.
+
+        Args:
+            other: The other Int.
+
+        Returns:
+            A new Int with the maximum value of self and other.
+        """
+        return __mlir_op.`index.maxs`(self.value, other.value)
 
     @always_inline("nodebug")
-    fn min(self, rhs: Self) -> Self:
-        return __mlir_op.`index.mins`(self.value, rhs.value)
+    fn min(self, other: Self) -> Self:
+        """Computes the minimum between the two Ints.
+
+        Args:
+            other: The other Int.
+
+        Returns:
+            A new Int with the minimum value of self and other.
+        """
+        return __mlir_op.`index.mins`(self.value, other.value)
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
