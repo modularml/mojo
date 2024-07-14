@@ -610,24 +610,18 @@ struct StringSlice[
         var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
         """TODO: \\u2029"""
 
-        @always_inline
-        fn _compare(
-            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
-        ) -> Bool:
-            var ptr1 = DTypePointer(item1)
-            var ptr2 = DTypePointer(item2)
-            return memcmp(ptr1, ptr2, amnt) == 0
-
         for s in self:
             var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
             if no_null_len == 1 and _isspace(ptr[0]):
                 continue
-            elif no_null_len == 2 and _compare(ptr, next_line.unsafe_ptr(), 2):
+            elif (
+                no_null_len == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
+            ):
                 continue
             elif no_null_len == 3 and (
-                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
-                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
+                memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
+                or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
             ):
                 continue
             else:
