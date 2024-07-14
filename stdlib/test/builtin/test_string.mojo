@@ -305,7 +305,7 @@ def test_ord():
     assert_equal(ord("🔥".as_string_slice()), 128293)
 
 
-def test_unicode():
+def test_chr():
     assert_equal("A", chr(65))
     assert_equal("a", chr(97))
     assert_equal("!", chr(33))
@@ -314,12 +314,16 @@ def test_unicode():
     assert_equal("🔥", chr(128293))
     assert_equal("�", chr(0xFFFD))
     assert_equal("�", chr(0x10FFFF + 1))
-    var ucode = List[Int](65, 97, 33, 945, 10175, 128293, 0xFFFD, 0x10FFFF + 1)
-    assert_equal("Aa!α➿🔥��", String.from_unicode(ucode))
-    var utf16 = List[UInt16](
-        65, 97, 33, 945, 10175, 0xD83D, 0xDD25, 0xFFFD, 0xD800
-    )
-    assert_equal("Aa!α➿🔥��", String.from_utf16(utf16))
+
+
+def test_unicode():
+    var a = List[Int](65, 97, 33, 945, 10175, 128293, 0xFFFD, 0x10FFFF + 1)
+    assert_equal("Aa!α➿🔥��", String.from_unicode(a))
+
+
+def test_utf16():
+    var a = List[UInt16](65, 97, 33, 945, 10175, 0xD83D, 0xDD25, 0xFFFD, 0xD800)
+    assert_equal("Aa!α➿🔥��", String.from_utf16(a))
 
 
 def test_string_indexing():
@@ -1442,7 +1446,9 @@ def main():
     test_stringref_from_dtypepointer()
     test_stringref_strip()
     test_ord()
+    test_chr()
     test_unicode()
+    test_utf16()
     test_string_indexing()
     test_atol()
     test_atol_base_0()
