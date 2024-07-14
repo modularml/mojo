@@ -79,6 +79,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         Returns:
             A new Counter with the keys and default value.
         """
+        debug_assert(
+            value >= 0,
+            "value must be non-negative",
+        )
         var result = Counter[V]()
         for key_ref in keys:
             var key = key_ref[]
