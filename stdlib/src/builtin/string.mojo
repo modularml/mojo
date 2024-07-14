@@ -114,6 +114,10 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
     # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd
     # ∴ (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000, d | 0b10000000
 
+    if num_bytes == 1:
+        ptr[0] = UInt8(c)
+        return
+
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
@@ -2307,11 +2311,6 @@ struct String(
         var current_offset = 0
         for i in range(len(values)):
             var c = values[i]
-            if c < 0b1000_0000:  # 1 byte ASCII char
-                ptr[current_offset] = c
-                current_offset += 1
-                continue
-
             var num_bytes = _unicode_codepoint_utf8_byte_length(c)
             var curr_ptr = ptr.offset(current_offset)
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
@@ -2356,14 +2355,9 @@ struct String(
             var curr_ptr = ptr.offset(current_offset)
             var c = int(values.unsafe_get(values_idx))
             var num_bytes: Int
-            alias low_6b = 0b0011_1111  # get lower 6 bits
-            alias c_byte = 0b1000_0000  # continuation byte
 
             if c < 0b1000_0000:  # ASCII
-                curr_ptr[0] = UInt8(c)
-                current_offset += 1
-                values_idx += 1
-                continue
+                num_bytes = 1
             elif c < 0x8_00:  # 2 byte long sequence
                 num_bytes = 2
             elif c < 0xD8_00 or c >= 0xE0_00:  # 3 byte long sequence
@@ -2371,13 +2365,14 @@ struct String(
             else:  # 4 byte long sequence
                 if values_idx + 1 >= len(values):
                     num_bytes = 1
-                    curr_ptr[0] = 0xFF
+                    c = 0xFF
                 else:
                     num_bytes = 4
                     alias low_10b = 0b0011_1111_1111  # get lower 10 bits
                     var c2 = int(values.unsafe_get(values_idx + 1))
                     var value = ((c & low_10b) << 10) | (c2 & low_10b)
                     c = 2**16 + value
+
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
             if not _is_valid_utf8(curr_ptr, num_bytes):
                 debug_assert(
