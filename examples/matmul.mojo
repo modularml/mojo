@@ -34,12 +34,14 @@ alias type = DType.float32
 # 2x or 4x helps with pipelining and running multiple SIMD operations in parallel.
 alias nelts = get_simd_width()
 
+
 fn get_simd_width() -> Int:
     @parameter
     if info.is_apple_silicon():
         return 4 * simdwidthof[type]()
     else:
         return 2 * simdwidthof[type]()
+
 
 alias tile_n = 64  # N must be a multiple of this
 alias tile_k = 4  # K must be a multiple of this
@@ -230,9 +232,8 @@ fn tile_parallel[
 # Also partially unroll the loop over the reduction dimension (K)
 # and reorder the reduction inner loop with the row iteration inner loop
 fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
-    alias nelts = simdwidthof[type]() * 8
     alias tile_m = 32
-    alias tile_n = nelts
+    alias tile_n = 32
     alias tile_k = max(4, K // 256)
 
     constrained[M % tile_m == 0, "M must be a multiple of tile_m"]()
