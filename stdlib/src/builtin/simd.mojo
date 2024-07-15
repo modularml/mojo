@@ -30,7 +30,7 @@ from sys import (
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
-from memory import bitcast
+from memory import bitcast, DTypePointer
 
 from utils import InlineArray, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
