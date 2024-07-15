@@ -41,8 +41,13 @@ def test_divmod():
 
 
 def test_min():
+    assert_equal(-2, min(-2, -1))
+    assert_equal(-1, min(0, -1))
     assert_equal(0, min(0, 1))
     assert_equal(1, min(1, 42))
+
+    assert_equal(UInt(0), min(UInt(0), UInt(1)))
+    assert_equal(UInt(1), min(UInt(1), UInt(42)))
 
     var lhs = SIMD[DType.int32, 4](1, 2, 3, 4)
     var rhs = SIMD[DType.int32, 4](0, 1, 5, 7)
@@ -52,8 +57,13 @@ def test_min():
 
 
 def test_max():
+    assert_equal(-1, max(-2, -1))
+    assert_equal(0, max(0, -1))
     assert_equal(1, max(0, 1))
-    assert_equal(2, max(1, 2))
+    assert_equal(2, max(2, 1))
+
+    assert_equal(UInt(1), max(UInt(0), UInt(1)))
+    assert_equal(UInt(2), max(UInt(1), UInt(2)))
 
     var lhs = SIMD[DType.int32, 4](1, 2, 3, 4)
     var rhs = SIMD[DType.int32, 4](0, 1, 5, 7)
@@ -71,7 +81,7 @@ def test_round():
     assert_equal(2, round(2.0))
     assert_equal(1, round(1.4, 0))
     # FIXME: round(2.5) is 2.0 (roundeven) but it's using roundhalfup
-    # Fix when the math libray is open sourced
+    # Fix when the math library is open sourced
     # assert_equal(2, round(2.5))
     # assert_equal(1.5, round(1.5, 1))
     # assert_equal(1.61, round(1.613, 2))

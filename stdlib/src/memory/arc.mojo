@@ -25,7 +25,7 @@ print(3 == p[])
 Subscripting(`[]`) is done by `Reference`,
 in order to ensure that the underlying `Arc` outlive the operation.
 
-It is highly DISCOURAGED to manipulate an `Arc` trough `UnsafePointer`.
+It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
 Mojo's ASAP deletion policy ensure values are destroyed at last use.
 Do not unsafely dereference the `Arc` inner `UnsafePointer` field.
 See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement):
+struct Arc[T: Movable](CollectionElement, CollectionElementNew):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -101,6 +101,15 @@ struct Arc[T: Movable](CollectionElement):
             value^
         )
 
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        other._inner[].add_ref()
+        self._inner = other._inner
+
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object.
 
@@ -112,6 +121,7 @@ struct Arc[T: Movable](CollectionElement):
         existing._inner[].add_ref()
         self._inner = existing._inner
 
+    @no_inline
     fn __del__(owned self):
         """Delete the smart pointer reference.
 

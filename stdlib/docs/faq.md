@@ -44,7 +44,7 @@ public-facing API has stabilized.
 
 Mojo depends on certain features that are still written in C++, collectively
 called "the compiler runtime." This may manifest in the standard library code
-through references like `KGEN_CompilerRT_LLCL_CreateRuntime`. Like the MLIR
+through references like `KGEN_CompilerRT_AsyncRT_CreateRuntime`. Like the MLIR
 dialects, the compiler runtime is currently private and undocumented.
 
 We plan on reducing the C++ dependencies in the future.

@@ -31,7 +31,7 @@ from sys.ffi import _get_global
 from builtin.dtype import _uint_type_of_width
 from memory import memcpy, memset_zero, stack_allocation
 
-# TODO remove this import onece InlineArray is moved to collections
+# TODO remove this import once InlineArray is moved to collections
 from utils import InlineArray
 
 # ===----------------------------------------------------------------------=== #
@@ -88,7 +88,11 @@ trait Hashable:
     """
 
     fn __hash__(self) -> Int:
-        """Return a 64-bit hash of the type's data."""
+        """Return a 64-bit hash of the type's data.
+
+        Returns:
+            A 64-bit integer hash of this instance's data.
+        """
         ...
 
 
@@ -120,7 +124,7 @@ fn _djbx33a_hash_update[
 # Based on the hash function used by ankerl::unordered_dense::hash
 # https://martin.ankerl.com/2022/08/27/hashmap-bench-01/#ankerl__unordered_dense__hash
 fn _ankerl_init[type: DType, size: Int]() -> SIMD[type, size]:
-    alias int_type = _uint_type_of_width[type.bitwidth()]()
+    alias int_type = _uint_type_of_width[bitwidthof[type]()]()
     alias init = Int64(-7046029254386353131).cast[int_type]()
     return SIMD[type, size](bitcast[type, 1](init))
 
@@ -129,7 +133,7 @@ fn _ankerl_hash_update[
     type: DType, size: Int
 ](data: SIMD[type, size], next: SIMD[type, size]) -> SIMD[type, size]:
     # compute the hash as though the type is uint
-    alias int_type = _uint_type_of_width[type.bitwidth()]()
+    alias int_type = _uint_type_of_width[bitwidthof[type]()]()
     var data_int = bitcast[int_type, size](data)
     var next_int = bitcast[int_type, size](next)
     var result = (data_int * next_int) ^ next_int
@@ -169,7 +173,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     var hash_data = _ankerl_init[type, size]()
     hash_data = _ankerl_hash_update(hash_data, data)
 
-    alias int_type = _uint_type_of_width[type.bitwidth()]()
+    alias int_type = _uint_type_of_width[bitwidthof[type]()]()
     var final_data = bitcast[int_type, 1](hash_data[0]).cast[DType.uint64]()
 
     @parameter
@@ -233,7 +237,7 @@ fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
         hash collision statistical properties for common data structures.
     """
     alias type = DType.uint64
-    alias type_width = type.bitwidth() // DType.int8.bitwidth()
+    alias type_width = bitwidthof[type]() // bitwidthof[DType.int8]()
     alias simd_width = simdwidthof[type]()
     # stride is the byte length of the whole SIMD vector
     alias stride = type_width * simd_width

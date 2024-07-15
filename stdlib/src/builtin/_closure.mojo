@@ -39,14 +39,12 @@ struct __ParameterClosureCaptureList[
         __mlir_op.`kgen.capture_list.expand`(self.value)
 
 
-fn __closure_wrapper_noop_dtor(
-    owned self: __mlir_type.`!kgen.pointer<none>`, /
-):
+fn __closure_wrapper_noop_dtor(self: __mlir_type.`!kgen.pointer<none>`, /):
     pass
 
 
 fn __closure_wrapper_noop_copy(
-    owned other: __mlir_type.`!kgen.pointer<none>`, /
+    other: __mlir_type.`!kgen.pointer<none>`, /
 ) -> __mlir_type.`!kgen.pointer<none>`:
     return other
 

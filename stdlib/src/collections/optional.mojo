@@ -36,8 +36,9 @@ from utils import Variant
 
 # TODO(27780): NoneType can't currently conform to traits
 @value
-struct _NoneType(CollectionElement):
-    pass
+struct _NoneType(CollectionElement, CollectionElementNew):
+    fn __init__(inout self, *, other: Self):
+        pass
 
 
 # ===----------------------------------------------------------------------===#
@@ -45,7 +46,6 @@ struct _NoneType(CollectionElement):
 # ===----------------------------------------------------------------------===#
 
 
-@value
 struct Optional[T: CollectionElement](
     CollectionElement, CollectionElementNew, Boolable
 ):
@@ -98,6 +98,17 @@ struct Optional[T: CollectionElement](
         """
         self._value = Self._type(value^)
 
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, value: NoneType._mlir_type):
+        """Construct an empty Optional.
+
+        Args:
+            value: Must be exactly `None`.
+        """
+        self = Self(value=NoneType(value))
+
     fn __init__(inout self, value: NoneType):
         """Construct an empty Optional.
 
@@ -113,6 +124,22 @@ struct Optional[T: CollectionElement](
             other: The Optional to copy.
         """
         self.__copyinit__(other)
+
+    fn __copyinit__(inout self, other: Self):
+        """Copy construct an Optional.
+
+        Args:
+            other: The Optional to copy.
+        """
+        self._value = other._value
+
+    fn __moveinit__(inout self, owned other: Self):
+        """Move this `Optional`.
+
+        Args:
+            other: The `Optional` to move from.
+        """
+        self._value = other._value^
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -144,6 +171,68 @@ struct Optional[T: CollectionElement](
         """
         return self.__bool__()
 
+    fn __eq__(self, rhs: NoneType) -> Bool:
+        """Return `True` if a value is not present.
+
+        Args:
+            rhs: The `None` value to compare to.
+
+        Returns:
+            `True` if a value is not present, `False` otherwise.
+        """
+        return self is None
+
+    fn __eq__[
+        T: EqualityComparableCollectionElement
+    ](self: Optional[T], rhs: Optional[T]) -> Bool:
+        """Return `True` if this is the same as another optional value, meaning
+        both are absent, or both are present and have the same underlying value.
+
+        Parameters:
+            T: The type of the elements in the list. Must implement the
+              traits `CollectionElement` and `EqualityComparable`.
+
+        Args:
+            rhs: The value to compare to.
+
+        Returns:
+            True if the values are the same.
+        """
+        if self:
+            if rhs:
+                return self.value() == rhs.value()
+            return False
+        return not rhs
+
+    fn __ne__(self, rhs: NoneType) -> Bool:
+        """Return `True` if a value is present.
+
+        Args:
+            rhs: The `None` value to compare to.
+
+        Returns:
+            `False` if a value is not present, `True` otherwise.
+        """
+        return self is not None
+
+    fn __ne__[
+        T: EqualityComparableCollectionElement
+    ](self: Optional[T], rhs: Optional[T]) -> Bool:
+        """Return `False` if this is the same as another optional value, meaning
+        both are absent, or both are present and have the same underlying value.
+
+        Parameters:
+            T: The type of the elements in the list. Must implement the
+              traits `CollectionElement` and `EqualityComparable`.
+
+        Args:
+            rhs: The value to compare to.
+
+        Returns:
+            False if the values are the same.
+        """
+        return not (self == rhs)
+
     # ===-------------------------------------------------------------------===#
     # Trait implementations
     # ===-------------------------------------------------------------------===#
@@ -163,6 +252,60 @@ struct Optional[T: CollectionElement](
             False if the optional has a value and True otherwise.
         """
         return not self
+
+    fn __str__[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U]) -> String:
+        """Return the string representation of the value of the Optional.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the Optional.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    # TODO: Include the Parameter type in the string as well.
+    fn __repr__[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U]) -> String:
+        """Returns the verbose string representation of the Optional.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A verbose string representation of the Optional.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        write_to(writer, "Optional(")
+        self.format_to(writer)
+        write_to(writer, ")")
+        return output
+
+    fn format_to[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U], inout writer: Formatter):
+        """Write Optional string representation to a `Formatter`.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        if self:
+            write_to(writer, repr(self.value()))
+        else:
+            write_to(writer, "None")
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -197,18 +340,6 @@ struct Optional[T: CollectionElement](
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
-
-    @always_inline
-    fn _value_copy(self) -> T:
-        """Unsafely retrieve the value out of the Optional.
-
-        Note: only used for Optionals when used in a parameter context
-        due to compiler bugs.  In general, prefer using the public `Optional.value()`
-        function that returns a `Reference[T]`.
-        """
-
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value[T]
 
@@ -248,7 +379,8 @@ struct Optional[T: CollectionElement](
         return self._value.unsafe_replace[_NoneType, T](_NoneType())
 
     fn or_else(self, default: T) -> T:
-        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
 
         Args:
             default: The new value to use if no value was present.
@@ -298,6 +430,17 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         self._value = __mlir_op.`kgen.variant.create`[
             _type = Self._mlir_type, index = Int(0).value
         ](value)
+
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, value: NoneType._mlir_type):
+        """Construct an empty Optional.
+
+        Args:
+            value: Must be exactly `None`.
+        """
+        self = Self(value=NoneType(value))
 
     fn __init__(inout self, value: NoneType):
         """Create an optional without a value from a None literal.
@@ -363,3 +506,17 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
             The contained value.
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn or_else(self, default: T) -> T:
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
+
+        Args:
+            default: The new value to use if no value was present.
+
+        Returns:
+            The underlying value contained in the Optional or a default value.
+        """
+        if self:
+            return self.value()
+        return default

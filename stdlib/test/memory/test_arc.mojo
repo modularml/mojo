@@ -29,6 +29,9 @@ def test_basic():
 struct ObservableDel(CollectionElement):
     var target: UnsafePointer[Bool]
 
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     fn __del__(owned self):
         self.target.init_pointee_move(True)
 
@@ -48,6 +51,22 @@ def test_deleter_not_called_until_no_references():
     assert_true(deleted)
 
 
+def test_deleter_not_called_until_no_references_explicit_copy():
+    var deleted = False
+    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
+    var p2 = Arc(other=p)
+    _ = p^
+    assert_false(deleted)
+
+    var vec = List[Arc[ObservableDel]]()
+    vec.append(Arc(other=p2)^)
+    _ = p2^
+    assert_false(deleted)
+    _ = vec^
+    assert_true(deleted)
+
+
 def main():
     test_basic()
     test_deleter_not_called_until_no_references()
+    test_deleter_not_called_until_no_references_explicit_copy()

@@ -25,15 +25,19 @@ fn main() raises:
 
     test_formatter_of_fixed_string()
 
+    test_formatter_write_int_padded()
+
 
 @value
 struct Point(Formattable, Stringable):
     var x: Int
     var y: Int
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         write_to(writer, "Point(", self.x, ", ", self.y, ")")
 
+    @no_inline
     fn __str__(self) -> String:
         return String.format_sequence(self)
 
@@ -76,3 +80,27 @@ fn test_formatter_of_fixed_string() raises:
     var s1_fmt = Formatter(s1)
     write_to(s1_fmt, "Hello, World!")
     assert_equal(str(s1), "Hello, World!")
+
+
+fn test_formatter_write_int_padded() raises:
+    var s1 = String()
+    var s1_fmt = Formatter(s1)
+
+    s1_fmt._write_int_padded(5, width=5)
+
+    assert_equal(s1, "    5")
+
+    s1_fmt._write_int_padded(123, width=5)
+
+    assert_equal(s1, "    5  123")
+
+    # ----------------------------------
+    # Test writing int larger than width
+    # ----------------------------------
+
+    var s2 = String()
+    var s2_fmt = Formatter(s2)
+
+    s2_fmt._write_int_padded(12345, width=3)
+
+    assert_equal(s2, "12345")

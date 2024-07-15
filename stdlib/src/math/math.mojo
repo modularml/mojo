@@ -116,6 +116,36 @@ fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
     return -(numerator // -denominator)
 
 
+# NOTE: this overload is needed because of overload precedence; without it the
+# Int overload would be preferred, and ceildiv wouldn't work on IntLiteral.
+@always_inline
+fn ceildiv(numerator: IntLiteral, denominator: IntLiteral) -> IntLiteral:
+    """Return the rounded-up result of dividing x by y.
+
+    Args:
+        numerator: The numerator.
+        denominator: The denominator.
+
+    Returns:
+        The ceiling of dividing x by y.
+    """
+    return -(numerator // -denominator)
+
+
+@always_inline("nodebug")
+fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
+    """Return the rounded-up result of dividing x by y.
+
+    Args:
+        numerator: The numerator.
+        denominator: The denominator.
+
+    Returns:
+        The ceiling of dividing x by y.
+    """
+    return __mlir_op.`index.ceildivu`(numerator.value, denominator.value)
+
+
 # ===----------------------------------------------------------------------=== #
 # trunc
 # ===----------------------------------------------------------------------=== #
@@ -169,6 +199,22 @@ fn sqrt(x: Int) -> Int:
 
 
 @always_inline
+fn _sqrt_nvvm(x: SIMD) -> __type_of(x):
+    constrained[
+        x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
+    ]()
+    alias instruction = "llvm.nvvm.sqrt.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.sqrt.approx.d"
+    var res = __type_of(x)()
+
+    @parameter
+    for i in range(x.size):
+        res[i] = llvm_intrinsic[
+            instruction, Scalar[x.type], has_side_effect=False
+        ](x[i])
+    return res
+
+
+@always_inline
 fn sqrt[
     type: DType, simd_width: Int, //
 ](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
@@ -202,15 +248,36 @@ fn sqrt[
         for i in range(simd_width):
             res[i] = sqrt(int(x[i]))
         return res
-    else:
-        return llvm_intrinsic["llvm.sqrt", __type_of(x), has_side_effect=False](
-            x
-        )
+    elif triple_is_nvidia_cuda():
+
+        @parameter
+        if x.type in (DType.float16, DType.bfloat16):
+            return _sqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
+        return _sqrt_nvvm(x)
+
+    return llvm_intrinsic["llvm.sqrt", __type_of(x), has_side_effect=False](x)
 
 
 # ===----------------------------------------------------------------------=== #
 # rsqrt
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
+    constrained[
+        x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
+    ]()
+
+    alias instruction = "llvm.nvvm.rsqrt.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.rsqrt.approx.d"
+    var res = __type_of(x)()
+
+    @parameter
+    for i in range(x.size):
+        res[i] = llvm_intrinsic[
+            instruction, Scalar[x.type], has_side_effect=False
+        ](x[i])
+    return res
 
 
 @always_inline
@@ -223,6 +290,17 @@ fn rsqrt(x: SIMD) -> __type_of(x):
     Returns:
         The elementwise reciprocal square root of x.
     """
+    constrained[x.type.is_floating_point(), "type must be floating point"]()
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if x.type in (DType.float16, DType.bfloat16):
+            return _rsqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
+
+        return _rsqrt_nvvm(x)
+
     return 1 / sqrt(x)
 
 
@@ -404,7 +482,7 @@ fn exp[
     """Calculates elementwise exponential of the input vector.
 
     Given an input vector $X$ and an output vector $Y$, sets $Y_i = e^{X_i}$ for
-    each position $i$ in the input vector (where $e$ is the mathmatical constant
+    each position $i$ in the input vector (where $e$ is the mathematical constant
     $e$).
 
     Constraints:
@@ -442,7 +520,7 @@ fn exp[
     if (
         not type is DType.float64
         and type is not DType.float32
-        and type.sizeof() < DType.float32.sizeof()
+        and sizeof[type]() < sizeof[DType.float32]()
     ):
         return exp(x.cast[DType.float32]()).cast[type]()
 
@@ -820,18 +898,29 @@ fn isclose[
         A boolean vector where a and b are equal within the specified tolerance.
     """
 
+    constrained[
+        a.type is DType.bool or a.type.is_numeric(),
+        "input type must be boolean, integral, or floating-point",
+    ]()
+
     @parameter
-    if type is DType.bool or type.is_integral():
+    if a.type is DType.bool or a.type.is_integral():
         return a == b
+    else:
+        var both_nan = isnan(a) & isnan(b)
+        if equal_nan and all(both_nan):
+            return True
 
-    var atol_vec = SIMD[type, simd_width](atol)
-    var rtol_vec = SIMD[type, simd_width](rtol)
-    var res = abs(a - b) <= (atol_vec.max(rtol_vec * abs(a).max(abs(b))))
+        var res = (a == b) | (
+            isfinite(a)
+            & isfinite(b)
+            & (
+                abs(a - b)
+                <= max(__type_of(a)(atol), rtol * max(abs(a), abs(b)))
+            )
+        )
 
-    if not equal_nan:
-        return res
-
-    return res.select(res, isnan(a) & isnan(b))
+        return res | both_nan if equal_nan else res
 
 
 # ===----------------------------------------------------------------------=== #
@@ -939,9 +1028,7 @@ fn iota(v: List[Int], offset: Int = 0):
         v: The vector to fill.
         offset: The value to fill at index 0.
     """
-    var buff = DTypePointer[DType.index](
-        Scalar[DType.index](int(v.data)).cast[DType.address]()
-    )
+    var buff = DTypePointer[DType.index](v.data.bitcast[Scalar[DType.index]]())
     iota(buff, len(v), offset=offset)
 
 
@@ -1017,6 +1104,23 @@ fn align_down(value: Int, alignment: Int) -> Int:
     return (value // alignment) * alignment
 
 
+@always_inline
+fn align_down(value: UInt, alignment: UInt) -> UInt:
+    """Returns the closest multiple of alignment that is less than or equal to
+    value.
+
+    Args:
+        value: The value to align.
+        alignment: Value to align to.
+
+    Returns:
+        Closest multiple of the alignment that is less than or equal to the
+        input value. In other words, floor(value / alignment) * alignment.
+    """
+    debug_assert(alignment != 0, "zero alignment")
+    return (value // alignment) * alignment
+
+
 # ===----------------------------------------------------------------------=== #
 # align_up
 # ===----------------------------------------------------------------------=== #
@@ -1024,6 +1128,23 @@ fn align_down(value: Int, alignment: Int) -> Int:
 
 @always_inline
 fn align_up(value: Int, alignment: Int) -> Int:
+    """Returns the closest multiple of alignment that is greater than or equal
+    to value.
+
+    Args:
+        value: The value to align.
+        alignment: Value to align to.
+
+    Returns:
+        Closest multiple of the alignment that is greater than or equal to the
+        input value. In other words, ceiling(value / alignment) * alignment.
+    """
+    debug_assert(alignment != 0, "zero alignment")
+    return ceildiv(value, alignment) * alignment
+
+
+@always_inline
+fn align_up(value: UInt, alignment: UInt) -> UInt:
     """Returns the closest multiple of alignment that is greater than or equal
     to value.
 
@@ -1790,8 +1911,8 @@ fn gcd(m: Int, n: Int, /) -> Int:
         return max(m, n)
 
     if m > 0 and n > 0:
-        var trailing_zeros_a = countr_zero(m)
-        var trailing_zeros_b = countr_zero(n)
+        var trailing_zeros_a = count_trailing_zeros(m)
+        var trailing_zeros_b = count_trailing_zeros(n)
 
         var u = m >> trailing_zeros_a
         var v = n >> trailing_zeros_b
@@ -1806,7 +1927,7 @@ fn gcd(m: Int, n: Int, /) -> Int:
             v -= u
             if u == 0:
                 break
-            v >>= countr_zero(v)
+            v >>= count_trailing_zeros(v)
         return u << trailing_zeros_common
 
     var u = m
@@ -2049,9 +2170,7 @@ fn factorial(n: Int) -> Int:
 
 
 fn _type_is_libm_supported(type: DType) -> Bool:
-    if type in (DType.float32, DType.float64):
-        return True
-    return type.is_integral()
+    return type in (DType.float32, DType.float64) or type.is_integral()
 
 
 fn _call_libm[

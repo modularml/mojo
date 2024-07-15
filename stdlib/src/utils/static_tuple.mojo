@@ -21,10 +21,7 @@ from utils import StaticTuple
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer
-
-from utils import unroll
-from memory.unsafe import UnsafeMaybeUninitialized
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -152,6 +149,14 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         _static_tuple_construction_checks[size]()
         self.array = _create_array[size, Self.element_type](values)
 
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided StaticTuple.
+
+        Args:
+            other: The StaticTuple to copy.
+        """
+        self.array = other.array
+
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
@@ -194,50 +199,40 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Self.element_type:
+    fn __getitem__(self, idx: Int) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
 
         Returns:
             The value at the specified position.
         """
-        var offset = int(index)
-        debug_assert(offset < size, "index must be within bounds")
+        debug_assert(idx < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
         var arrayCopy = self.array
         var ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(arrayCopy).address, offset.value
+            UnsafePointer.address_of(arrayCopy).address, idx.value
         )
-        var result = Pointer(ptr).load()
+        var result = UnsafePointer(ptr)[]
         _ = arrayCopy
         return result
 
     @always_inline("nodebug")
-    fn __setitem__[
-        intable: Intable
-    ](inout self, index: intable, val: Self.element_type):
+    fn __setitem__(inout self, idx: Int, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
             val: The value to store.
         """
-        var offset = int(index)
-        debug_assert(offset < size, "index must be within bounds")
+        debug_assert(idx < size, "index must be within bounds")
         var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(tmp.array).address, offset.value
+            UnsafePointer.address_of(tmp.array).address, idx.value
         )
-        Pointer(ptr).store(val)
+        UnsafePointer(ptr)[] = val
         self = tmp
 
 
@@ -246,6 +241,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
 # ===----------------------------------------------------------------------===#
 
 
+@value
 struct InlineArray[
     ElementType: CollectionElementNew,
     size: Int,
@@ -259,11 +255,7 @@ struct InlineArray[
 
     # Fields
     alias type = __mlir_type[
-        `!pop.array<`,
-        size.value,
-        `, `,
-        UnsafeMaybeUninitialized[Self.ElementType],
-        `>`,
+        `!pop.array<`, size.value, `, `, Self.ElementType, `>`
     ]
     var _array: Self.type
     """The underlying storage for the array."""
@@ -281,8 +273,8 @@ struct InlineArray[
             False,
             (
                 "Initialize with either a variadic list of arguments, a default"
-                " fill element or use the type"
-                " 'UnsafeMaybeUninitialized'."
+                " fill element or pass the keyword argument"
+                " 'unsafe_uninitialized'."
             ),
         ]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
@@ -291,28 +283,18 @@ struct InlineArray[
     fn __init__(inout self, *, unsafe_uninitialized: Bool):
         """Create an InlineArray with uninitialized memory.
 
-        Note that this is highly unsafe and should be used with extreme caution.
-        It's very difficult to get it right.
+        Note that this is highly unsafe and should be used with caution.
 
         We recommend to use the `InlineList` instead if all the objects
-        are not available when creating the array. That works well for the
-        general case.
-
-        If you do not want to pay the small performance overhead of `InlineList` and
-        still want raw uninitalized memory, then make sure to understand the
-        following:
-
-        Never use this with types that do not have a trivial destructor.
-        If you want to use an uninitialized array with a type with
-        a non-trivial destructor,
-        then use `InlineArray[UnsafeMaybeUninitialized[MyType]]`, but you'll have
-        to manually call the destructors yourself.
+        are not available when creating the array.
 
         If despite those workarounds, one still needs an uninitialized array,
         it is possible with:
+
         ```mojo
         var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
         ```
+
         Args:
             unsafe_uninitialized: A boolean to indicate if the array should be initialized.
                 Always set to `True` (it's not actually used inside the constructor).
@@ -332,9 +314,8 @@ struct InlineArray[
 
         @parameter
         for i in range(size):
-            self._get_maybe_uninitialized(i)[].write(
-                Self.ElementType(other=fill)
-            )
+            var ptr = UnsafePointer.address_of(self._get_reference_unsafe(i)[])
+            ptr.initialize_pointee_explicit_copy(fill)
 
     @always_inline
     fn __init__(inout self, owned *elems: Self.ElementType):
@@ -365,8 +346,9 @@ struct InlineArray[
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            self._get_maybe_uninitialized(i)[].move_from(
-                UnsafePointer.address_of(storage[i])
+            var eltref = self._get_reference_unsafe(i)
+            UnsafePointer.address_of(storage[i]).move_pointee_into(
+                UnsafePointer[Self.ElementType].address_of(eltref[])
             )
 
         # Mark the elements as already destroyed.
@@ -379,37 +361,12 @@ struct InlineArray[
             other: The value to copy.
         """
 
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self = Self(unsafe_uninitialized=True)
 
         for idx in range(size):
-            self._get_maybe_uninitialized(idx)[].copy_from(other[idx])
+            var ptr = self.unsafe_ptr() + idx
 
-    fn __del__(owned self):
-        """Runs the destructor for all elements of the array."""
-        for i in range(len(self)):
-            self._get_maybe_uninitialized(i)[].assume_initialized_destroy()
-
-    fn __copyinit__(inout self, other: Self):
-        """Copy construct the array.
-
-        Args:
-            other: The value to copy from.
-        """
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
-        for idx in range(size):
-            self._get_maybe_uninitialized(idx)[].copy_from(other[idx])
-
-    fn __moveinit__(inout self, owned other: Self):
-        """Move construct the array.
-
-        Args:
-            other: The value to move from.
-        """
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
-        for idx in range(size):
-            self._get_maybe_uninitialized(idx)[].move_from(
-                other._get_maybe_uninitialized(idx)[]
-            )
+            ptr.initialize_pointee_explicit_copy(other[idx])
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
@@ -433,25 +390,22 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__[
-        IntableType: Intable,
-        index: IntableType,
+        idx: Int,
     ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            IntableType: The inferred type of an intable argument.
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        alias i = int(index)
-        constrained[-size <= i < size, "Index must be within bounds."]()
+        constrained[-size <= idx < size, "Index must be within bounds."]()
 
-        var normalized_idx = i
+        var normalized_idx = idx
 
         @parameter
-        if i < 0:
+        if idx < 0:
             normalized_idx += size
 
         return self._get_reference_unsafe(normalized_idx)[]
@@ -491,16 +445,9 @@ struct InlineArray[
         Returns:
             A reference to the element at the given index.
         """
-        return self._get_maybe_uninitialized(idx)[].assume_initialized()
-
-    @always_inline
-    fn _get_maybe_uninitialized(
-        ref [_]self: Self, idx: Int
-    ) -> Reference[
-        UnsafeMaybeUninitialized[Self.ElementType], __lifetime_of(self)
-    ]:
+        var idx_as_int = index(idx)
         debug_assert(
-            0 <= idx < size,
+            0 <= idx_as_int < size,
             (
                 "Index must be within bounds when using"
                 " `InlineArray.unsafe_get()`."
@@ -508,7 +455,7 @@ struct InlineArray[
         )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self._array).address,
-            idx.value,
+            idx_as_int.value,
         )
         return UnsafePointer(ptr)[]
 
@@ -528,7 +475,9 @@ struct InlineArray[
         return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+    fn __contains__[
+        T: EqualityComparableCollectionElement, //
+    ](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo

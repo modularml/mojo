@@ -33,7 +33,6 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory import memcmp
 from memory.unsafe import DTypePointer
 
 
@@ -52,9 +51,9 @@ struct Op(Stringable):
     fn __eq__(self, other: Op) -> Bool:
         return self.op_code == other.op_code
 
-    @always_inline("nodebug")
+    @always_inline
     fn __str__(self) -> String:
-        alias op_list = List[String](
+        var op_list = List[String](
             "add", "sub", "mul", "div", "fma", "ld", "st"
         )
         return "op." + op_list[self.op_code]
@@ -257,7 +256,7 @@ fn bench_compare():
     alias type = DType.uint8
     alias width = simdwidthof[type]()
     alias unit = Unit.ns
-    # increasing will reduce the benefit of passing the size as a paramater
+    # increasing will reduce the benefit of passing the size as a parameter
     alias multiplier = 2
     # Add .5 of the elements that fit into a simd register
     alias size: Int = int(multiplier * width + (width * 0.5))

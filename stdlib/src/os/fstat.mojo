@@ -150,6 +150,7 @@ struct stat_result(Stringable):
         self.st_rdev = st_rdev
         self.st_flags = st_flags
 
+    @no_inline
     fn __str__(self) -> String:
         """Constructs a string representation of stat_result.
 
@@ -186,8 +187,13 @@ struct stat_result(Stringable):
 # ===----------------------------------------------------------------------=== #
 # stat
 # ===----------------------------------------------------------------------=== #
-fn stat(path: String) raises -> stat_result:
+
+
+fn stat[PathLike: os.PathLike](path: PathLike) raises -> stat_result:
     """Get the status of a file or a file descriptor.
+
+    Parameters:
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -196,37 +202,26 @@ fn stat(path: String) raises -> stat_result:
       Returns the stat_result on the path.
     """
     _constrain_unix()
+    var fspath = path.__fspath__()
 
     @parameter
     if os_is_macos():
-        return _stat_macos(path)._to_stat_result()
+        return _stat_macos(fspath)._to_stat_result()
     elif has_neon():
-        return _stat_linux_arm(path)._to_stat_result()
+        return _stat_linux_arm(fspath)._to_stat_result()
     else:
-        return _stat_linux_x86(path)._to_stat_result()
-
-
-fn stat[pathlike: os.PathLike](path: pathlike) raises -> stat_result:
-    """Get the status of a file or a file descriptor.
-
-    Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
-
-    Args:
-      path: The path to the directory.
-
-    Returns:
-      Returns the stat_result on the path.
-    """
-    return stat(path.__fspath__())
+        return _stat_linux_x86(fspath)._to_stat_result()
 
 
 # ===----------------------------------------------------------------------=== #
 # lstat
 # ===----------------------------------------------------------------------=== #
-fn lstat(path: String) raises -> stat_result:
+fn lstat[PathLike: os.PathLike](path: PathLike) raises -> stat_result:
     """Get the status of a file or a file descriptor (similar to stat, but does
     not follow symlinks).
+
+    Parameters:
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -235,27 +230,12 @@ fn lstat(path: String) raises -> stat_result:
       Returns the stat_result on the path.
     """
     _constrain_unix()
+    var fspath = path.__fspath__()
 
     @parameter
     if os_is_macos():
-        return _lstat_macos(path)._to_stat_result()
+        return _lstat_macos(fspath)._to_stat_result()
     elif has_neon():
-        return _lstat_linux_arm(path)._to_stat_result()
+        return _lstat_linux_arm(fspath)._to_stat_result()
     else:
-        return _lstat_linux_x86(path)._to_stat_result()
-
-
-fn lstat[pathlike: os.PathLike](path: pathlike) raises -> stat_result:
-    """Get the status of a file or a file descriptor (similar to stat, but does
-    not follow symlinks).
-
-    Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
-
-    Args:
-      path: The path to the directory.
-
-    Returns:
-      Returns the stat_result on the path.
-    """
-    return lstat(path.__fspath__())
+        return _lstat_linux_x86(fspath)._to_stat_result()
