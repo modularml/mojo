@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 LLVM_VERSION=17
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh

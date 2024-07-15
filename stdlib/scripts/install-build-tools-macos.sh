@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 # Install `lit` for use in the tests
 brew install lit
 
