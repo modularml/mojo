@@ -373,4 +373,5 @@ def main():
         bench[matmul_unrolled[3], "Unrolled - Performance Cores:"](
             python_gflops, numpy_gflops
         )
-        bench[matmul_reordered, "Reordered:"](python_gflops, numpy_gflops)
+    # CHECK: Optimized Implementation
+    bench[matmul_reordered, "Reordered:"](python_gflops, numpy_gflops)
