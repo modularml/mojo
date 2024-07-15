@@ -63,7 +63,7 @@ struct Matrix[rows: Int, cols: Int]:
     @staticmethod
     fn rand() -> Self:
         var data = DTypePointer[type].alloc(rows * cols)
-        rand(data, rows * cols)
+        rand(data.address, rows * cols)
         return Self(data)
 
     fn __getitem__(self, y: Int, x: Int) -> Scalar[type]:

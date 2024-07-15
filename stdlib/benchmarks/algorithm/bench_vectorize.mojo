@@ -266,7 +266,7 @@ fn bench_compare():
     var p1 = DTypePointer[type].alloc(size)
     var p2 = DTypePointer[type].alloc(size)
     print("Benchmark results")
-    rand(p1, size)
+    rand(p1.address, size)
 
     @parameter
     fn arg_size():
