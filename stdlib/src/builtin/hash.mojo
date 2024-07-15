@@ -17,7 +17,7 @@ There are a few main tools in this module:
 - `Hashable` trait for types implementing `__hash__(self) -> Int`
 - `hash[T: Hashable](hashable: T) -> Int` built-in function.
 - A `hash()` implementation for arbitrary byte strings,
-  `hash(data: DTypePointer[DType.uint8], n: Int) -> Int`,
+  `hash(data: UnsafePointer[UInt8], n: Int) -> Int`,
   is the workhorse function, which implements efficient hashing via SIMD
   vectors. See the documentation of this function for more details on the hash
   implementation.
@@ -186,7 +186,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     return int(final_data)
 
 
-fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
+fn hash(bytes: UnsafePointer[UInt8], n: Int) -> Int:
     """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
 
     _This hash function is not suitable for cryptographic purposes._ The
@@ -222,7 +222,7 @@ fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
     ```mojo
     from random import rand
     var n = 64
-    var rand_bytes = DTypePointer[DType.uint8].alloc(n)
+    var rand_bytes = UnsafePointer[UInt8].alloc(n)
     rand(rand_bytes, n)
     hash(rand_bytes, n)
     ```
@@ -249,7 +249,7 @@ fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
     debug_assert(n == k * stride + r, "wrong hash tail math")
 
     # 1. Reinterpret the underlying data as a larger int type
-    var simd_data = bytes.bitcast[type]()
+    var simd_data = bytes.bitcast[Scalar[type]]()
 
     # 2. Compute the hash, but strided across the SIMD vector width.
     var hash_data = _HASH_INIT[type, simd_width]()
@@ -261,10 +261,10 @@ fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
         var remaining = InlineArray[UInt8, stride](unsafe_uninitialized=True)
-        var ptr = DTypePointer[DType.uint8](remaining.unsafe_ptr())
+        var ptr = remaining.unsafe_ptr()
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = SIMD[size=simd_width].load(ptr.bitcast[type]())
+        var last_value = SIMD[size=simd_width].load(ptr.bitcast[Scalar[type]]())
         hash_data = _HASH_UPDATE(hash_data, last_value)
         _ = remaining  # We make sure the array lives long enough.
 

@@ -23,9 +23,7 @@ struct DummyHasher(_Hasher):
     fn __init__(inout self):
         self._dummy_value = 0
 
-    fn _update_with_bytes(
-        inout self, data: DTypePointer[DType.uint8], length: Int
-    ):
+    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
         for i in range(length):
             self._dummy_value += data[i].cast[DType.uint64]()
 
@@ -97,7 +95,7 @@ struct ComplexHashableStructWithList(_HashableWithHasher):
         # This is okay because self is passed as borrowed so the pointer will
         # be valid until at least the end of the function
         hasher._update_with_bytes(
-            data=DTypePointer(self._value3.unsafe_ptr()),
+            data=self._value3.unsafe_ptr(),
             length=len(self._value3),
         )
         _ = self._value3
