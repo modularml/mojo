@@ -602,7 +602,7 @@ struct StringSlice[
             return False
 
         # TODO add line and paragraph separator as stringliteral
-        # once unicode escape secuences are accepted
+        # once Unicode escape sequences are accepted
         var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
         var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
