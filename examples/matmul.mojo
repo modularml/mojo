@@ -30,9 +30,17 @@ alias N = 4096  # cols of B and C
 alias K = 512  # cols of A and rows of B
 alias type = DType.float32
 
-# simdwidth of = amount of `type` elements that fit into a single SIMD register
-# 2x multiplier will use multiple SIMD registers in parallel where possible
-alias nelts = simdwidthof[type]() * 4
+# Get optimal number of elements to run with vectorize at compile time.
+# 2x or 4x helps with pipelining and running multiple SIMD operations in parallel.
+alias nelts = get_simd_width()
+
+fn get_simd_width() -> Int:
+    @parameter
+    if info.is_apple_silicon():
+        return 4 * simdwidthof[type]()
+    else:
+        return 2 * simdwidthof[type]()
+
 alias tile_n = 64  # N must be a multiple of this
 alias tile_k = 4  # K must be a multiple of this
 
@@ -350,7 +358,7 @@ def main():
     constrained[N % tile_n == 0, "N must be a multiple of tile_n"]()
     constrained[K % tile_k == 0, "K must be a multiple of tile_k"]()
 
-    print("Problem Size (M,N,K):", M, N, K)
+    print("Problem Size (M N K):", M, N, K)
 
     test_all()
     print("CPU Results\n")
