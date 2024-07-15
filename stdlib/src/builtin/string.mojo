@@ -1600,7 +1600,7 @@ struct String(
             True if the String is one of the whitespace characters
                 listed above, otherwise False.
         """
-        # TODO add line and paragraph separator as stringliteral
+        # TODO add line and paragraph separator as StringLiteral
         # once unicode escape sequences are accepted
         var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""

@@ -198,8 +198,8 @@ fn _isnewline_start(
     """Returns if the first item in the pointer is the start of
     a newline sequence, and its length.
     """
-    # TODO add line and paragraph separator as stringliteral
-    # once unicode escape secuences are accepted
+    # TODO add line and paragraph separator as StringLiteral
+    # once Unicode escape sequences are accepted
     alias ` ` = UInt8(ord(" "))
     var rn = "\r\n"
     var next_line = List[UInt8](0xC2, 0x85)

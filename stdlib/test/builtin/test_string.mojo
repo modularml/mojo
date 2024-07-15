@@ -669,7 +669,7 @@ def test_split():
     """TODO: \\u2028"""
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
-    # TODO add line and paragraph separator as stringliteral once unicode
+    # TODO add line and paragraph separator as StringLiteral once unicode
     # escape secuences are accepted
     var univ_sep_var = (
         String(" ")
@@ -857,7 +857,6 @@ def test_splitlines():
     for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
         var in9 = "hello\x1eworld" + String(i[]) + "mojo"
         var res9 = in9.splitlines()
-        print(res9.__str__())
         assert_equal(len(res9), 3)
         assert_equal(res9[0], "hello")
         assert_equal(res9[1], "world")
@@ -967,7 +966,7 @@ def test_isspace():
     """TODO: \\u2028"""
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
-    # TODO add line and paragraph separator as stringliteral once unicode
+    # TODO add line and paragraph separator as StringLiteral once unicode
     # escape sequences are accepted
     var univ_sep_var = List[String](
         String(" "),
