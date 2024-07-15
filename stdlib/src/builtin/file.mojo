@@ -34,7 +34,7 @@ with open("my_file.txt", "r") as f:
 from os import PathLike
 from sys import external_call
 
-from memory import AddressSpace, DTypePointer, Pointer
+from memory import AddressSpace, DTypePointer
 
 
 @register_passable
