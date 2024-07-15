@@ -35,14 +35,16 @@ at the same time.
   by themselves.
 - Modular employees have to fix code of contributors which
   passes the external CI but not the internal one.
-- For each pull request, they must check that there
-  is no malicious code before syncing it.
-- After the sync they have to wait until the
-  internal CI is passing.
+- For each pull request, they must ensure
+  that there is no malicious code before syncing it.
+- After the syncing maintainers have to wait until the
+  internal CI is passing. (An immediate code review
+  may be unnecessary work or incomplete
+  if the CI is not green).
 - Modular employees have to fix broken
   nightly releases rapidly as contributors
   cannot continue their work otherwise.
-- They have to review all pull requests,
+- They have to address all pull requests,
   even if they didn't approve the feature
   beforehand or if the pull request
   isn't a good fit at all for a standard library.
@@ -50,8 +52,10 @@ at the same time.
   features in the stdlib because there isn't a
   package manager yet,
   and it's the only place which has "Modular's blessing"
-  concerning new features.
-- Maintainers have to fix everything when there are
+  concerning new features. This was similar to Python's
+  early days where the lack of a package manager
+  made the stdlib grow quickly.
+- Maintainers have to fix all code in `nightly` when there are
   breaking changes, even structs and functions which
   aren't used internally.
 
@@ -65,7 +69,7 @@ So we must find a solution to take some work off their shoulders.
 - Getting code reviews is slow as there are only
   3 maintainers and they have other tasks in their full-time jobs.
   New pull requests can wait multiple weeks without getting a code review.
-  At the time of writing, 71 pull requests are opened and most
+  At the time of writing, 76 pull requests are opened and most
   of them are waiting for a code review.
 - Contributors cannot get code reviews
   during weekends and holidays, which are the times
@@ -74,7 +78,8 @@ So we must find a solution to take some work off their shoulders.
   which depends on each other can only be rebased between 12
   and 72h after the previous pull request is merged.
   This is because the nightly release is quite flaky and often fails.
-  In the best case scenario, it's still 12-24 hours wait between merges.
+  In the best case scenario, it's still 12-24 hours wait between
+  merges of "chains" of pull requests.
 - Contributors have no visibility on why a pull request can be blocked
   by the internal CI.
 - Sometimes a pull request can even be reverted after
@@ -84,7 +89,7 @@ So we must find a solution to take some work off their shoulders.
   of questions are left unanswered, even legitimate ones.
 - As external contributors can't see internal pull requests,
   they cannot anticipate conflicts, or even worse,
-  they can recode a pull request which is already opened internally.
+  they can re-do a pull request which is already opened internally.
 
 We can really say that while the contribution
 process works, it is quite far from perfect and
@@ -111,13 +116,13 @@ branches once a day because contributors cannot build the compiler from a given 
 
 We will assume in this document that the described setup
 isn't going to change anytime soon.
-Though the proposed solution still have usefullness
+Though the proposed solution still has usefullness
 beyond the mentionned pain points.
 
 ### Proposed solution to reduce the pain of this setup
 
 From looking at opened, closed and merged external contributions,
-we can say that a very significant number of them were about new features.
+we can say that a very significant number of them are about new features.
 
 Those new features are very unlikely to be used inside Modular products and thus,
 should not create all the pain points mentionned above.
@@ -155,13 +160,13 @@ If end users want to try the functionalities of `stdlib-extensions`,
 they should download the `.mojopkg` file
 themselves. Modular and maintainers will NOT handle the distribution.
 End users should also use the stable Mojo release with `stdlib-extensions.mojopkg`,
-not the nightly.
+not the nightly. There is no garantee about backward compatibility.
 
 ### Dependencies
 
 `stdlib-extensions` should only depend on the latest stable release of Mojo.
 New dependencies will not be accepted.
-Depending on the nightly release will NOT be accepted.
+Depending on the nightly release will **not** be accepted.
 
 ### Synchronization
 
@@ -185,6 +190,10 @@ able to touch the settings of the repository
 Furthermore, they won't be able to bypass the CI to merge pull
 requests.
 
+The core-developers will have the status
+of [outside collaborator](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-outside-collaborators/adding-outside-collaborators-to-repositories-in-your-organization)
+in the `modularml` github organization.
+
 Core developers would have no obligation of reviewing PRs,
 no quota to fill, etc... just like in any other open source project.
 They are just granted additional permissions.
@@ -193,7 +202,7 @@ They are just granted additional permissions.
 
 - 1 approval from a core developer or maintainer.
 - A green CI
-- the developer certificate of origin
+- The developer certificate of origin
 - Squash and merge when accepting the changes in `main`.
 
 ### New features to `modularml/mojo`
@@ -205,7 +214,7 @@ it is considered a core abstraction in the standard library.
 
 Having the feature in `modularml/stdlib-extensions` instead
 will allow for quick iteration
-on them without requireing Modular staff involvment(but it is still possible,
+on them without requireing Modular staff involvement (but it is still possible,
 for design decisions for example).
 It will also allow Modular staff to delay the choice
 indefinitly of accepting or not a
@@ -218,6 +227,8 @@ It's also a way to judge popularity.
 
 Accepting a new feature in `modularml/stdlib-extensions` is up to the reviewer,
 which can be a core developer or Modular staff.
+In case of conflict between core developers, the Modular staff can intervene
+and take a decision.
 
 ### Transferring code from `modularml/stdlib-extensions` to `modularml/mojo` (graduating features)
 
@@ -249,7 +260,7 @@ This pull request will be used as the final quality gate.
 Modular staff will ensure the quality of the feature is
 adequate before merging it in `modularml/mojo`.
 It will also be the place to fix all breaking changes introduced in the
-nightly since the latest stable release which impacted the code of the feature.
+nightly since the latest stable release which impacted the feature's source code.
 
 ### The future of this repository when Mojo has a public source of truth
 
@@ -266,13 +277,13 @@ adding new features and tests for those features.
 
 ## Similar work
 
-One can find in open-source, repositories that have an "incubator"
-repository where new features are tested and
+One can find in open-source repositories that have an "incubator"
+repository, where new features are tested and
 mature before pulling them in the main repository.
 It's also a way to judge the popularity of new features.
 
 The author of this proposal was personnaly involved with `tensorflow-addons`,
-and believe that this was a massive improvements for the contributor's
+and believe that this was a massive improvements to the contributor's
 experience compared to the Tensorflow repository.
 
 - [Tensorflow](https://github.com/tensorflow/tensorflow) (Internal source of truth)
