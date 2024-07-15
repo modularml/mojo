@@ -282,7 +282,7 @@ fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
 @always_inline
 fn bench[
     func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
-](base_gflops: Float64, numpy_gflops: Float64) raises:
+](base_gflops: Float64, np_gflops: Float64) raises:
     var A = Matrix[M, K].rand()
     var B = Matrix[K, N].rand()
     var C = Matrix[M, N]()
@@ -300,7 +300,7 @@ fn bench[
 
     var gflops = ((2 * M * N * K) / secs) / 1e9
     var speedup: Float64 = gflops / base_gflops
-    var numpy_speedup: Float64 = gflops / numpy_gflops
+    var numpy_speedup: Float64 = gflops / np_gflops
 
     var py = Python.import_module("builtins")
     _ = py.print(
@@ -363,24 +363,18 @@ def main():
 
     test_all()
     print("CPU Results\n")
-    var python_gflops = run_matmul_python()
-    var numpy_gflops = run_matmul_numpy()
+    var py_gflops = run_matmul_python()
+    var np_gflops = run_matmul_numpy()
 
     # Don't run all these benchmarks in CI, too resource intensive
     if not getenv("CI"):
-        bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
-        bench[matmul_vectorized, "Vectorized:"](python_gflops, numpy_gflops)
-        bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
-        bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
-        bench[matmul_unrolled[0], "Unrolled:"](python_gflops, numpy_gflops)
-        bench[matmul_unrolled[1], "Unrolled - Physical Cores:"](
-            python_gflops, numpy_gflops
-        )
-        bench[matmul_unrolled[2], "Unrolled - Logical Cores:"](
-            python_gflops, numpy_gflops
-        )
-        bench[matmul_unrolled[3], "Unrolled - Performance Cores:"](
-            python_gflops, numpy_gflops
-        )
-    # CHECK: Optimized Implementation
-    bench[matmul_reordered, "Reordered:"](python_gflops, numpy_gflops)
+        bench[matmul_naive, "Naive:"](py_gflops, np_gflops)
+        bench[matmul_vectorized, "Vectorized:"](py_gflops, np_gflops)
+        bench[matmul_parallelized, "Parallelized:"](py_gflops, np_gflops)
+        bench[matmul_tiled, "Tiled:"](py_gflops, np_gflops)
+        bench[matmul_unrolled[0], "Unrolled:"](py_gflops, np_gflops)
+        bench[matmul_unrolled[1], "Physical Cores:"](py_gflops, np_gflops)
+        bench[matmul_unrolled[2], "Logical Cores:"](py_gflops, np_gflops)
+        bench[matmul_unrolled[3], "Performance Cores:"](py_gflops, np_gflops)
+    # CHECK: Reordered
+    bench[matmul_reordered, "Reordered:"](py_gflops, np_gflops)
