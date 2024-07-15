@@ -191,6 +191,76 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     return _validate_utf8_simd_slice[4, True](ptr, length, iter_len) == 0
 
 
+@value
+struct _StringSliceIter[
+    is_mutable: Bool, //,
+    lifetime: AnyLifetime[is_mutable].type,
+    forward: Bool = True,
+]:
+    """Iterator for StringSlice
+
+    Parameters:
+        is_mutable: Whether the slice is mutable.
+        lifetime: The lifetime of the underlying string data.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    var index: Int
+    var continuation_bytes: Int
+    var ptr: UnsafePointer[UInt8]
+    var length: Int
+
+    fn __init__(
+        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+    ):
+        self.index = 0 if forward else length
+        self.ptr = unsafe_pointer
+        self.length = length
+        self.continuation_bytes = 0
+        for i in range(length):
+            if _utf8_byte_type(unsafe_pointer[i]) == 1:
+                self.continuation_bytes += 1
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> StringSlice[lifetime]:
+        @parameter
+        if forward:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(self.ptr[self.index])
+                if byte_type != 0:
+                    byte_len = int(byte_type)
+                    self.continuation_bytes -= byte_len - 1
+            self.index += byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
+                len=byte_len,
+            )
+        else:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
+                if byte_type != 0:
+                    while byte_type == 1:
+                        byte_len += 1
+                        var b = self.ptr[self.index - byte_len]
+                        byte_type = _utf8_byte_type(b)
+                    self.continuation_bytes -= byte_len - 1
+            self.index -= byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
+            )
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return self.length - self.index - self.continuation_bytes
+        else:
+            return self.index - self.continuation_bytes
+
+
 struct StringSlice[
     is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
@@ -431,6 +501,28 @@ struct StringSlice[
         """
         return not self == rhs
 
+    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+        """Iterate over elements of the string slice, returning immutable references.
+
+        Returns:
+            An iterator of references to the string elements.
+        """
+        return _StringSliceIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    fn __reversed__(
+        ref [_]self,
+    ) -> _StringSliceIter[__lifetime_of(self), False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringSliceIter[__lifetime_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
@@ -492,3 +584,46 @@ struct StringSlice[
         without the string getting deallocated early.
         """
         pass
+
+    fn isspace(self) -> Bool:
+        """Determines whether every character in the given StringSlice is a
+        python whitespace String. This corresponds to Python's
+        [universal separators](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+
+        Returns:
+            True if the whole StringSlice is made up of whitespace characters
+                listed above, otherwise False.
+        """
+
+        if self.byte_length() == 0:
+            return False
+
+        # TODO add line and paragraph separator as stringliteral
+        # once Unicode escape sequences are accepted
+        var next_line = List[UInt8](0xC2, 0x85)
+        """TODO: \\x85"""
+        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
+        """TODO: \\u2028"""
+        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
+        """TODO: \\u2029"""
+
+        for s in self:
+            var no_null_len = s.byte_length()
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1 and _isspace(ptr[0]):
+                continue
+            elif (
+                no_null_len == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
+            ):
+                continue
+            elif no_null_len == 3 and (
+                memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
+                or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
+            ):
+                continue
+            else:
+                return False
+        _ = next_line, unicode_line_sep, unicode_paragraph_sep
+        return True
