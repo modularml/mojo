@@ -16,6 +16,7 @@
 from pathlib import Path, _dir_of_current_file
 from sys import os_is_windows
 from tempfile import gettempdir
+from memory import UnsafePointer
 
 from testing import assert_equal, assert_true
 
@@ -107,7 +108,7 @@ def test_file_read_to_address():
         _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr), 954)
         assert_equal(Scalar.load(ptr, 0), 76)  # L
         assert_equal(Scalar.load(ptr, 1), 111)  # o
@@ -121,14 +122,14 @@ def test_file_read_to_address():
         _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr, 1000), 954)
 
     with open(
         _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr, 30), 30)
         assert_equal(f.read(ptr, 1), 1)
         assert_equal(f.read(ptr, 2), 2)
@@ -228,14 +229,14 @@ struct Word:
 
 def test_file_read_to_dtype_pointer():
     with open(_dir_of_current_file() / "test_file_dummy_input.txt", "r") as f:
-        var ptr = DTypePointer[DType.int8].alloc(8)
+        var ptr = UnsafePointer[UInt8].alloc(8)
         var data = f.read(ptr, 8)
         assert_equal(
             str(SIMD[size=8].load(ptr, 0)),
             "[76, 111, 114, 101, 109, 32, 105, 112]",
         )
 
-        var ptr2 = DTypePointer[DType.int8].alloc(8)
+        var ptr2 = UnsafePointer[Int8].alloc(8)
         var data2 = f.read(ptr2, 8)
         assert_equal(
             str(SIMD[size=8].load(ptr2, 0)),
