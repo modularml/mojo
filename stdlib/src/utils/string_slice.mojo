@@ -198,7 +198,7 @@ struct _StringSliceIter[
     lifetime: AnyLifetime[is_mutable].type,
     forward: Bool = True,
 ]:
-    """Iterator for String.
+    """Iterator for StringSlice
 
     Parameters:
         is_mutable: Whether the slice is mutable.
@@ -503,7 +503,7 @@ struct StringSlice[
         return not self == rhs
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
-        """Iterate over elements of the string, returning immutable references.
+        """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
