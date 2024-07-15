@@ -21,7 +21,7 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
-from memory import DTypePointer, UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
@@ -132,7 +132,7 @@ fn chr(c: Int) -> String:
         return int(mask.cast[DType.uint8]().reduce_add())
 
     var num_bytes = _utf8_len(c)
-    var p = DTypePointer[DType.uint8].alloc(num_bytes + 1)
+    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
@@ -141,7 +141,7 @@ fn chr(c: Int) -> String:
         shift -= 6
         Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
     Scalar.store(p, num_bytes, 0)
-    return String(p.bitcast[DType.uint8](), num_bytes + 1)
+    return String(p.bitcast[UInt8](), num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -913,19 +913,6 @@ struct String(
             )
         )
 
-    @always_inline
-    fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
-        """Creates a string from the buffer. Note that the string now owns
-        the buffer.
-
-        The buffer must be terminated with a null byte.
-
-        Args:
-            ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
-        """
-        self = String(ptr.address, len)
-
     fn __init__(inout self, obj: PythonObject):
         """Creates a string from a python object.
 
@@ -999,7 +986,7 @@ struct String(
 
     @staticmethod
     @always_inline
-    fn _from_bytes(owned buff: DTypePointer[DType.uint8]) -> String:
+    fn _from_bytes(owned buff: UnsafePointer[UInt8]) -> String:
         """Construct a string from a sequence of bytes.
 
         This does no validation that the given bytes are valid in any specific
@@ -1171,12 +1158,12 @@ struct String(
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            DTypePointer(buffer.data),
+            buffer.data,
             self.unsafe_ptr(),
             self_len,
         )
         memcpy(
-            DTypePointer(buffer.data + self_len),
+            buffer.data + self_len,
             other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
@@ -1629,9 +1616,7 @@ struct String(
         fn _compare(
             item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
         ) -> Bool:
-            var ptr1 = DTypePointer(item1)
-            var ptr2 = DTypePointer(item2)
-            return memcmp(ptr1, ptr2, amnt) == 0
+            return memcmp(item1, item2, amnt) == 0
 
         if self.byte_length() == 0:
             return False

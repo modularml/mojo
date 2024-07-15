@@ -47,7 +47,7 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
 
 fn _validate_utf8_simd_slice[
     width: Int, remainder: Bool = False
-](ptr: DTypePointer[DType.uint8], length: Int, owned iter_len: Int) -> Int:
+](ptr: UnsafePointer[UInt8], length: Int, owned iter_len: Int) -> Int:
     """Internal method to validate utf8, use _is_valid_utf8.
 
     Parameters:
@@ -72,7 +72,7 @@ fn _validate_utf8_simd_slice[
 
         @parameter
         if not remainder:
-            d = ptr.offset(idx).simd_strided_load[width](1)
+            d = ptr.offset(idx).simd_strided_load[DType.uint8, width](1)
         else:
             debug_assert(iter_len > -1, "iter_len must be > -1")
             d = SIMD[DType.uint8, width](0)
@@ -139,11 +139,11 @@ fn _validate_utf8_simd_slice[
     return iter_len
 
 
-fn _is_valid_utf8(data: UnsafePointer[UInt8], length: Int) -> Bool:
+fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     """Verify that the bytes are valid UTF-8.
 
     Args:
-        data: The pointer to the data.
+        ptr: The pointer to the data.
         length: The length of the items pointed to.
 
     Returns:
@@ -167,7 +167,6 @@ fn _is_valid_utf8(data: UnsafePointer[UInt8], length: Int) -> Bool:
     .
     """
 
-    var ptr = DTypePointer(data)
     var iter_len = length
     if iter_len >= 64 and simdwidthof[DType.uint8]() >= 64:
         iter_len = _validate_utf8_simd_slice[64](ptr, length, iter_len)
