@@ -25,6 +25,8 @@ from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const
 from sys.info import bitwidthof, has_avx512f, simdwidthof, triple_is_nvidia_cuda
 
+from memory import UnsafePointer
+
 from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
@@ -979,7 +981,9 @@ fn iota[
         return it.cast[type]() + offset
 
 
-fn iota[type: DType](buff: DTypePointer[type], len: Int, offset: Int = 0):
+fn iota[
+    type: DType
+](buff: UnsafePointer[Scalar[type]], len: Int, offset: Int = 0):
     """Fill the buffer with numbers ranging from offset to offset + len - 1,
     spaced by 1.
 
@@ -1014,8 +1018,7 @@ fn iota[type: DType](v: List[Scalar[type]], offset: Int = 0):
         v: The vector to fill.
         offset: The value to fill at index 0.
     """
-    var buff = rebind[DTypePointer[type]](v.data)
-    iota(buff, len(v), offset)
+    iota(v.data, len(v), offset)
 
 
 fn iota(v: List[Int], offset: Int = 0):
@@ -1028,7 +1031,7 @@ fn iota(v: List[Int], offset: Int = 0):
         v: The vector to fill.
         offset: The value to fill at index 0.
     """
-    var buff = DTypePointer[DType.index](v.data.bitcast[Scalar[DType.index]]())
+    var buff = v.data.bitcast[Scalar[DType.index]]()
     iota(buff, len(v), offset=offset)
 
 
