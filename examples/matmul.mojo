@@ -204,7 +204,9 @@ fn matmul_unrolled[mode: Int](inout C: Matrix, A: Matrix, B: Matrix):
 
 
 # Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing over y.
-fn tile_parallel[tiled_fn: Tile2DFunc, tile_m: Int, tile_n: Int](end_m: Int, end_n: Int, ):
+fn tile_parallel[
+    tiled_fn: Tile2DFunc, tile_m: Int, tile_n: Int
+](end_m: Int, end_n: Int,):
     # Note: this assumes that ends are multiples of the tiles.
     @parameter
     fn row(mo: Int):
@@ -217,13 +219,13 @@ fn tile_parallel[tiled_fn: Tile2DFunc, tile_m: Int, tile_n: Int](end_m: Int, end
 
 # Use per-tile accumulator to avoid repeated reads and writes to
 # a global memory location, which can thrash the cache.
-# Also partially unroll the loop over the reduction dimension (K) 
+# Also partially unroll the loop over the reduction dimension (K)
 # and reorder the reduction inner loop with the row iteration inner loop
 fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
     alias nelts = simdwidthof[type]() * 8
     alias tile_m = 32
     alias tile_n = nelts
-    alias tile_k = max(4, K // 256) 
+    alias tile_k = max(4, K // 256)
 
     constrained[M % tile_m == 0, "M must be a multiple of tile_m"]()
     constrained[N % tile_n == 0, "N must be a multiple of tile_n"]()
@@ -232,14 +234,18 @@ fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_tile[tile_m: Int, tile_n: Int](mo: Int, no: Int):
         # Allocate the tile of accumulators on the stack.
-        var accumulator = Matrix[tile_m, tile_n](stack_allocation[tile_m * tile_n, type]())
+        var accumulator = Matrix[tile_m, tile_n](
+            stack_allocation[tile_m * tile_n, type]()
+        )
         memset_zero(accumulator.data, tile_m * tile_n)
-        
+
         for ko in range(0, A.cols, tile_k):
+
             @parameter
             fn calc_tile_row[](m: Int):
                 @parameter
                 for k in range(tile_k):
+
                     @parameter
                     fn dot[nelts: Int](n: Int):
                         accumulator.store[nelts](
@@ -249,7 +255,9 @@ fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
                             + A[mo + m, ko + k] * B.load[nelts](ko + k, no + n),
                         )
 
-                    vectorize[dot, nelts, size=tile_n, unroll_factor=tile_n // nelts]()
+                    vectorize[
+                        dot, nelts, size=tile_n, unroll_factor = tile_n // nelts
+                    ]()
 
             for m in range(tile_m):
                 calc_tile_row(m)
