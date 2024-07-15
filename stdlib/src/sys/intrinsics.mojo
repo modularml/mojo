@@ -806,11 +806,20 @@ fn llvm_intrinsic[
 # ===----------------------------------------------------------------------===#
 
 
+# NOTE: Converting from a scalar to a pointer is unsafe! The resulting pointer
+# is assumed not to alias any Mojo-derived pointer. DO NOT proliferate usage of
+# this function!
+fn _unsafe_aliasing_address_to_pointer[
+    type: DType
+](owned addr: Scalar[DType.index]) -> DTypePointer[type]:
+    return UnsafePointer.address_of(addr).bitcast[DTypePointer[type]]()[]
+
+
 @always_inline("nodebug")
 fn gather[
     type: DType, size: Int
 ](
-    base: SIMD[DType.address, size],
+    owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
     passthrough: SIMD[type, size],
     alignment: Int = 0,
@@ -859,13 +868,15 @@ fn gather[
     @parameter
     if size == 1:
         return Scalar.load(
-            DTypePointer[type](base[0])
+            _unsafe_aliasing_address_to_pointer[type](base[0])
         ) if mask else passthrough[0]
     return llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ](
-        base,
+        UnsafePointer.address_of(base).bitcast[
+            __mlir_type[`!pop.simd<`, size.value, `, address>`],
+        ]()[],
         Int32(alignment),
         mask,
         passthrough,
@@ -882,7 +893,7 @@ fn scatter[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    base: SIMD[DType.address, size],
+    owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
     alignment: Int = 0,
 ):
@@ -936,12 +947,14 @@ fn scatter[
     @parameter
     if size == 1:
         if mask:
-            var ptr = DTypePointer[type](base[0])
+            var ptr = _unsafe_aliasing_address_to_pointer[type](base[0])
             Scalar.store(ptr, value[0])
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](
         value,
-        base,
+        UnsafePointer.address_of(base).bitcast[
+            __mlir_type[`!pop.simd<`, size.value, `, address>`],
+        ]()[],
         Int32(alignment),
         mask,
     )
@@ -1168,7 +1181,7 @@ struct PrefetchOptions:
 @always_inline("nodebug")
 fn prefetch[
     params: PrefetchOptions, type: DType, address_space: AddressSpace
-](addr: DTypePointer[type, address_space]):
+](addr: DTypePointer[type, address_space, _]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
@@ -1182,7 +1195,7 @@ fn prefetch[
     Args:
       addr: The data pointer to prefetch.
     """
-    return llvm_intrinsic["llvm.prefetch", NoneType](
+    llvm_intrinsic["llvm.prefetch", NoneType](
         addr.bitcast[DType.invalid.value](),
         params.rw,
         params.locality,
@@ -1329,7 +1342,37 @@ fn strided_load[
     /,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](
-    addr: DTypePointer[type, address_space],
+    addr: DTypePointer[type, address_space, _],
+    stride: Int,
+    mask: SIMD[DType.bool, simd_width],
+) -> SIMD[type, simd_width]:
+    """Loads values from addr according to a specific stride.
+
+    Parameters:
+      type: DType of `value`, the value to store.
+      simd_width: The width of the SIMD vectors.
+      address_space: The address space of the memory location.
+
+    Args:
+      addr: The memory location to load data from.
+      stride: How many lanes to skip before loading again.
+      mask: A binary vector which prevents memory access to certain lanes of
+        `value`.
+
+    Returns:
+      A vector containing the loaded data.
+    """
+    return strided_load[type, simd_width](addr.address, stride, mask)
+
+
+@always_inline("nodebug")
+fn strided_load[
+    type: DType,
+    simd_width: Int,
+    /,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+](
+    addr: UnsafePointer[Scalar[type], address_space, _],
     stride: Int,
     mask: SIMD[DType.bool, simd_width],
 ) -> SIMD[type, simd_width]:
@@ -1362,9 +1405,7 @@ fn strided_load[
         sizeof[type]()
     )
     var passthrough = SIMD[type, simd_width]()
-    return gather[type, simd_width](
-        offset.cast[DType.address](), mask, passthrough
-    )
+    return gather[type, simd_width](offset, mask, passthrough)
 
 
 @always_inline("nodebug")
@@ -1373,7 +1414,7 @@ fn strided_load[
     simd_width: Int,
     /,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](addr: DTypePointer[type, address_space], stride: Int) -> SIMD[
+](addr: DTypePointer[type, address_space, _], stride: Int) -> SIMD[
     type, simd_width
 ]:
     """Loads values from addr according to a specific stride.
@@ -1411,7 +1452,37 @@ fn strided_store[
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](
     value: SIMD[type, simd_width],
-    addr: DTypePointer[type, address_space],
+    addr: DTypePointer[type, address_space, _],
+    stride: Int,
+    mask: SIMD[DType.bool, simd_width],
+):
+    """Loads values from addr according to a specific stride.
+
+    Parameters:
+      type: DType of `value`, the value to store.
+      simd_width: The width of the SIMD vectors.
+      address_space: The address space of the memory location.
+
+    Args:
+      value: The values to store.
+      addr: The location to store values at.
+      stride: How many lanes to skip before storing again.
+      mask: A binary vector which prevents memory access to certain lanes of
+        `value`.
+    """
+
+    strided_store[type, simd_width](value, addr.address, stride, mask)
+
+
+@always_inline("nodebug")
+fn strided_store[
+    type: DType,
+    simd_width: Int,
+    /,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+](
+    value: SIMD[type, simd_width],
+    addr: UnsafePointer[Scalar[type], address_space, _],
     stride: Int,
     mask: SIMD[DType.bool, simd_width],
 ):
@@ -1444,7 +1515,7 @@ fn strided_store[
         sizeof[type]()
     )
 
-    scatter[type, simd_width](value, offset.cast[DType.address](), mask)
+    scatter[type, simd_width](value, offset, mask)
 
 
 @always_inline("nodebug")
@@ -1455,7 +1526,7 @@ fn strided_store[
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](
     value: SIMD[type, simd_width],
-    addr: DTypePointer[type, address_space],
+    addr: DTypePointer[type, address_space, _],
     stride: Int,
 ):
     """Loads values from addr according to a specific stride.

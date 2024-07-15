@@ -71,16 +71,14 @@ struct Tuple[*element_types: Movable](Sized, Movable):
             __get_mvalue_as_litref(self.storage)
         )
 
+        # Move each element into the tuple storage.
         @parameter
-        fn initialize_elt[idx: Int]():
-            UnsafePointer.address_of(storage[idx]).move_pointee_into(
-                UnsafePointer.address_of(self[idx])
+        for i in range(Self.__len__()):
+            UnsafePointer.address_of(storage[i]).move_pointee_into(
+                UnsafePointer.address_of(self[i])
             )
 
-        # Move each element into the tuple storage.
-        unroll[initialize_elt, Self.__len__()]()
-
-        # Mark the elements as already destroyed.
+        # Mark the elements as destroyed.
         storage._is_owned = False
 
     fn __del__(owned self):
@@ -89,10 +87,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         # Run the destructor on each member, the destructor of !kgen.pack is
         # trivial and won't do anything.
         @parameter
-        fn destroy_elt[idx: Int]():
-            UnsafePointer.address_of(self[idx]).destroy_pointee()
-
-        unroll[destroy_elt, Self.__len__()]()
+        for i in range(Self.__len__()):
+            UnsafePointer.address_of(self[i]).destroy_pointee()
 
     @always_inline("nodebug")
     fn __moveinit__(inout self, owned existing: Self):
@@ -107,12 +103,10 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         )
 
         @parameter
-        fn initialize_elt[idx: Int]():
-            UnsafePointer.address_of(existing[idx]).move_pointee_into(
-                UnsafePointer.address_of(self[idx])
+        for i in range(Self.__len__()):
+            UnsafePointer.address_of(existing[i]).move_pointee_into(
+                UnsafePointer.address_of(self[i])
             )
-
-        unroll[initialize_elt, Self.__len__()]()
 
     @always_inline
     @staticmethod
@@ -151,7 +145,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
             idx: The element to return.
 
         Returns:
-            A referece to the specified element.
+            A reference to the specified element.
         """
         # Return a reference to an element at the specified index, propagating
         # mutability of self.

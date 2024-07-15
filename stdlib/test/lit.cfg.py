@@ -39,22 +39,6 @@ def has_not():
 if has_not():
     config.available_features.add("has_not")
 
-# Insert at 0th position to intentionally override
-# %mojo from the global utils/build/llvm-lit/lit.common.cfg.py
-# (only matters internally).
-# In the future, we can do other fancy things like with sanitizers
-# and build type.
-if bool(int(os.environ.get("MOJO_ENABLE_ASSERTIONS_IN_TESTS", 1))):
-    base_mojo_command = "mojo -D MOJO_ENABLE_ASSERTIONS"
-else:
-    print("Running tests with assertions disabled.")
-    base_mojo_command = "mojo"
-config.substitutions.insert(0, ("%mojo", base_mojo_command))
-
-# Mojo without assertions.  Only use this for known tests that do not work
-# with assertions enabled.
-config.substitutions.insert(1, ("%bare-mojo", "mojo"))
-
 # This makes the OS name available for `REQUIRE` directives, e.g., `# REQUIRE: darwin`.
 config.available_features.add(platform.system().lower())
 
@@ -83,6 +67,21 @@ else:
     # The tests are executed inside this build directory to avoid
     # polluting the source tree.
     config.test_exec_root = build_root / "stdlib" / "test"
+
+    # Note: only do this for external builds since we can use the common config substitutions
+    # which do the moral equivalent from our utils/build/llvm-lit/lit.common.cfg.py
+    # In the future, we can do other fancy things like with sanitizers
+    # and build type.
+    if bool(int(os.environ.get("MOJO_ENABLE_ASSERTIONS_IN_TESTS", 1))):
+        base_mojo_command = "mojo -D MOJO_ENABLE_ASSERTIONS"
+    else:
+        print("Running tests with assertions disabled.")
+        base_mojo_command = "mojo"
+    config.substitutions.insert(0, ("%mojo", base_mojo_command))
+
+    # Mojo without assertions.  Only use this for known tests that do not work
+    # with assertions enabled.
+    config.substitutions.insert(1, ("%bare-mojo", "mojo"))
 
     # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the
     # open-source stdlib, we need to specify the paths to the just-built

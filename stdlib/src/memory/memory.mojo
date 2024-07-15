@@ -25,7 +25,7 @@ from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
 
-from .unsafe import DTypePointer, LegacyPointer
+from .unsafe import DTypePointer
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -129,10 +129,10 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
 @always_inline
 fn memcmp[
-    type: AnyTrivialRegType, address_space: AddressSpace
+    type: AnyType, address_space: AddressSpace
 ](
-    s1: LegacyPointer[type, address_space],
-    s2: LegacyPointer[type, address_space],
+    s1: UnsafePointer[type, address_space],
+    s2: UnsafePointer[type, address_space],
     count: Int,
 ) -> Int:
     """Compares two buffers. Both strings are assumed to be of the same length.
@@ -170,7 +170,7 @@ fn memcmp[
 
 
 @always_inline
-fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
+fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
     """Copies a memory area.
 
     Parameters:
@@ -199,17 +199,17 @@ fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
         @parameter
         if n >= 8:
             var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]().store(src_data.bitcast[Int64]()[0])
-            dest_data.offset(n - ui64_size).bitcast[Int64]().store(
-                src_data.offset(n - ui64_size).bitcast[Int64]()[0]
-            )
+            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
+            dest_data.offset(n - ui64_size).bitcast[
+                Int64
+            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
             return
 
         var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]().store(src_data.bitcast[Int32]()[0])
-        dest_data.offset(n - ui32_size).bitcast[Int32]().store(
-            src_data.offset(n - ui32_size).bitcast[Int32]()[0]
-        )
+        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
+        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
+            n - ui32_size
+        ).bitcast[Int32]()[0]
         return
 
     var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
@@ -242,7 +242,7 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
 
 @always_inline
 fn memcpy(
-    dest_data: LegacyPointer[Int8, *_], src_data: __type_of(dest_data), n: Int
+    dest_data: UnsafePointer[Int8, *_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
 
@@ -265,16 +265,16 @@ fn memcpy(
     if n <= 16:
         if n >= 8:
             var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]().store(src_data.bitcast[Int64]()[0])
-            dest_data.offset(n - ui64_size).bitcast[Int64]().store(
-                src_data.offset(n - ui64_size).bitcast[Int64]()[0]
-            )
+            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
+            dest_data.offset(n - ui64_size).bitcast[
+                Int64
+            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
             return
         var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]().store(src_data.bitcast[Int32]()[0])
-        dest_data.offset(n - ui32_size).bitcast[Int32]().store(
-            src_data.offset(n - ui32_size).bitcast[Int32]()[0]
-        )
+        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
+        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
+            n - ui32_size
+        ).bitcast[Int32]()[0]
         return
 
     # TODO (#10566): This branch appears to cause a 12% regression in BERT by
@@ -308,19 +308,6 @@ fn memcpy(
 
 
 @always_inline
-fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
-    """Copies a memory area.
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy.
-    """
-    var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
-
-
-@always_inline
 fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
 
@@ -330,7 +317,7 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy.
     """
     var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8]().address, src.bitcast[Int8]().address, n)
+    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
 
 
 @always_inline
@@ -391,7 +378,7 @@ fn memset[
         address_space: The address space of the pointer.
 
     Args:
-        ptr: Pointer to the beginning of the memory block to fill.
+        ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
@@ -400,7 +387,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyTrivialRegType, address_space: AddressSpace
+    type: AnyType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -409,29 +396,11 @@ fn memset[
         address_space: The address space of the pointer.
 
     Args:
-        ptr: Pointer to the beginning of the memory block to fill.
+        ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
     _memset_llvm(ptr.bitcast[UInt8](), value, count * sizeof[type]())
-
-
-@always_inline
-fn memset[
-    type: AnyTrivialRegType, address_space: AddressSpace
-](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
-    """Fills memory with the given value.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: Pointer to the beginning of the memory block to fill.
-        value: The value to fill with.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    _memset_llvm(ptr.bitcast[UInt8]().address, value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#
@@ -450,7 +419,7 @@ fn memset_zero[
         address_space: The address space of the pointer.
 
     Args:
-        ptr: Pointer to the beginning of the memory block to fill.
+        ptr: UnsafePointer to the beginning of the memory block to fill.
         count: Number of elements to set (in elements, not bytes).
     """
     memset(ptr, 0, count)
@@ -458,7 +427,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyTrivialRegType, address_space: AddressSpace
+    type: AnyType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -467,24 +436,7 @@ fn memset_zero[
         address_space: The address space of the pointer.
 
     Args:
-        ptr: Pointer to the beginning of the memory block to fill.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    memset(ptr, 0, count)
-
-
-@always_inline
-fn memset_zero[
-    type: AnyTrivialRegType, address_space: AddressSpace
-](ptr: LegacyPointer[type, address_space], count: Int):
-    """Fills memory with zeros.
-
-    Parameters:
-        type: The element type.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: Pointer to the beginning of the memory block to fill.
+        ptr: UnsafePointer to the beginning of the memory block to fill.
         count: Number of elements to fill (in elements, not bytes).
     """
     memset(ptr, 0, count)
@@ -500,7 +452,7 @@ fn stack_allocation[
     count: Int,
     type: DType,
     /,
-    alignment: Int = 1,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> DTypePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
@@ -524,11 +476,11 @@ fn stack_allocation[
 @always_inline
 fn stack_allocation[
     count: Int,
-    type: AnyTrivialRegType,
+    type: AnyType,
     /,
-    alignment: Int = 1,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> Pointer[type, address_space]:
+]() -> UnsafePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -546,14 +498,14 @@ fn stack_allocation[
     if triple_is_nvidia_cuda() and address_space == _GPUAddressSpace.SHARED:
         return __mlir_op.`pop.global_alloc`[
             count = count.value,
-            _type = Pointer[type, address_space]._mlir_type,
+            _type = UnsafePointer[type, address_space]._mlir_type,
             alignment = alignment.value,
             address_space = address_space._value.value,
         ]()
     else:
         return __mlir_op.`pop.stack_allocation`[
             count = count.value,
-            _type = Pointer[type, address_space]._mlir_type,
+            _type = UnsafePointer[type, address_space]._mlir_type,
             alignment = alignment.value,
             address_space = address_space._value.value,
         ]()
@@ -566,23 +518,23 @@ fn stack_allocation[
 
 @always_inline
 fn _malloc[
-    type: AnyTrivialRegType,
+    type: AnyType,
     /,
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](size: Int, /, *, alignment: Int = -1) -> Pointer[type, address_space]:
+](size: Int, /, *, alignment: Int = -1) -> UnsafePointer[type, address_space]:
     @parameter
     if triple_is_nvidia_cuda():
         constrained[
             address_space is AddressSpace.GENERIC,
             "address space must be generic",
         ]()
-        return external_call["malloc", Pointer[NoneType, address_space]](
+        return external_call["malloc", UnsafePointer[NoneType, address_space]](
             size
         ).bitcast[type]()
     else:
         return __mlir_op.`pop.aligned_alloc`[
-            _type = Pointer[type, address_space]._mlir_type
+            _type = UnsafePointer[type, address_space]._mlir_type
         ](alignment.value, size.value)
 
 
@@ -607,8 +559,3 @@ fn _free(ptr: UnsafePointer):
 @always_inline
 fn _free(ptr: DTypePointer):
     _free(ptr.address)
-
-
-@always_inline
-fn _free(ptr: LegacyPointer):
-    _free(UnsafePointer(ptr.address))

@@ -14,7 +14,7 @@
 # RUN: %mojo %s -t
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from bit import countr_zero
+from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 
 from utils.stringref import _align_down, _memchr, _memmem
@@ -169,7 +169,7 @@ fn _memmem_baseline[
         ) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
-            var offset = i + countr_zero(mask)
+            var offset = i + count_trailing_zeros(mask)
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)

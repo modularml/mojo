@@ -64,7 +64,7 @@ def test_file_read_bytes_multi():
         assert_equal(string2, "dolor ")
 
         # Read where N is greater than the number of bytes in the file.
-        var s: String = f.read(1e9)
+        var s: String = f.read(1_000_000_000)
 
         assert_equal(len(s), 936)
         assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
@@ -154,7 +154,7 @@ def test_file_seek():
 
         _ = f.read(6)
 
-        # Seek from current possition, skip the space
+        # Seek from current position, skip the space
         pos = f.seek(1, os.SEEK_CUR)
         assert_equal(pos, 945)
         assert_equal(f.read(7), "rhoncus")
@@ -214,6 +214,7 @@ struct Word:
     var fourth_letter: UInt8
     var fith_letter: UInt8
 
+    @no_inline
     fn __str__(self) -> String:
         var word = List[UInt8](capacity=6)
         word.append(self.first_letter)

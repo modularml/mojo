@@ -302,6 +302,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             hash_value ^= hash(e[])
         return hash_value
 
+    @no_inline
     fn __str__[U: RepresentableKeyElement](self: Set[U]) -> String:
         """Returns the string representation of the set.
 
@@ -316,6 +317,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self.format_to(writer)
         return output
 
+    @no_inline
     fn __repr__[U: RepresentableKeyElement](self: Set[U]) -> String:
         """Returns the string representation of the set.
 

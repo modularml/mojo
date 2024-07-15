@@ -84,7 +84,7 @@ def test_rfind():
     assert_equal("".rfind("ab"), -1)
     assert_equal("foo".rfind(""), 3)
 
-    # Test that rfind(start) returned pos is absolute, not relative to specifed
+    # Test that rfind(start) returned pos is absolute, not relative to specified
     # start. Also tests positive and negative start offsets.
     assert_equal("hello world".rfind("l", 5), 9)
     assert_equal("hello world".rfind("l", -5), 9)

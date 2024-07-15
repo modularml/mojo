@@ -162,6 +162,71 @@ def test_bool():
     assert_false(Int(0).__as_bool__())
 
 
+def test_decimal_digit_count():
+    assert_equal(Int(0)._decimal_digit_count(), 1)
+    assert_equal(Int(1)._decimal_digit_count(), 1)
+    assert_equal(Int(2)._decimal_digit_count(), 1)
+    assert_equal(Int(3)._decimal_digit_count(), 1)
+    assert_equal(Int(9)._decimal_digit_count(), 1)
+
+    assert_equal(Int(10)._decimal_digit_count(), 2)
+    assert_equal(Int(11)._decimal_digit_count(), 2)
+    assert_equal(Int(99)._decimal_digit_count(), 2)
+
+    assert_equal(Int(100)._decimal_digit_count(), 3)
+    assert_equal(Int(101)._decimal_digit_count(), 3)
+    assert_equal(Int(999)._decimal_digit_count(), 3)
+
+    assert_equal(Int(1000)._decimal_digit_count(), 4)
+
+    assert_equal(Int(-1000)._decimal_digit_count(), 4)
+    assert_equal(Int(-999)._decimal_digit_count(), 3)
+    assert_equal(Int(-1)._decimal_digit_count(), 1)
+
+    assert_equal(Int.MAX._decimal_digit_count(), 19)
+    assert_equal(Int.MIN._decimal_digit_count(), 19)
+
+
+def test_int_uint():
+    var u1 = UInt(42)
+    assert_equal(42, int(u1))
+
+    var u2 = UInt(0)
+    assert_equal(0, int(u2))
+
+
+def test_comparison():
+    assert_true(Int(5).__lt__(Int(10)))
+    assert_true(Int(-10).__lt__(Int(-5)))
+    assert_false(Int(0).__lt__(Int(0)))
+    assert_false(Int(10).__lt__(Int(5)))
+
+    assert_true(Int(5).__le__(Int(10)))
+    assert_true(Int(-10).__le__(Int(-5)))
+    assert_true(Int(0).__le__(Int(0)))
+    assert_false(Int(10).__le__(Int(5)))
+
+    assert_true(Int(5).__eq__(Int(5)))
+    assert_true(Int(0).__eq__(Int(0)))
+    assert_false(Int(0).__eq__(Int(1)))
+    assert_false(Int(5).__eq__(Int(10)))
+
+    assert_true(Int(5).__ne__(Int(10)))
+    assert_true(Int(0).__ne__(Int(1)))
+    assert_false(Int(5).__ne__(Int(5)))
+    assert_false(Int(0).__ne__(Int(0)))
+
+    assert_true(Int(10).__gt__(Int(5)))
+    assert_true(Int(-5).__gt__(Int(-10)))
+    assert_false(Int(0).__gt__(Int(0)))
+    assert_false(Int(5).__gt__(Int(10)))
+
+    assert_true(Int(10).__ge__(Int(5)))
+    assert_true(Int(5).__ge__(Int(5)))
+    assert_true(Int(-5).__ge__(Int(-10)))
+    assert_false(Int(5).__ge__(Int(10)))
+
+
 def main():
     test_properties()
     test_add()
@@ -180,3 +245,6 @@ def main():
     test_int_representation()
     test_indexer()
     test_bool()
+    test_decimal_digit_count()
+    test_comparison()
+    test_int_uint()

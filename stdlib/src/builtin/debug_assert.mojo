@@ -22,45 +22,17 @@ from sys._build import is_kernels_debug_build
 
 from builtin._location import __call_location, _SourceLocation
 
+# Print an error and fail.
+alias _ERROR_ON_ASSERT = is_kernels_debug_build() or is_defined[
+    "MOJO_ENABLE_ASSERTIONS"
+]()
 
-@always_inline
-fn debug_assert[CondType: Boolable, //](cond: CondType, message: String):
-    """Asserts that the condition is true.
-
-    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
-    builds unless MOJO_ENABLE_ASSERTIONS is defined.
-
-    Right now, users of the mojo-sdk must explicitly specify
-    `-D MOJO_ENABLE_ASSERTIONS` to enable assertions. It is not sufficient to
-    compile programs with `-debug-level full` for enabling assertions in the
-    library.
-
-    Parameters:
-        CondType: The type of condition.
-
-    Args:
-        cond: The bool value to assert.
-        message: The message to print on failure.
-    """
-
-    # Print an error and fail.
-    alias err = is_kernels_debug_build() or is_defined[
-        "MOJO_ENABLE_ASSERTIONS"
-    ]()
-
-    # Print a warning, but do not fail (useful for testing assert behavior).
-    alias warn = is_defined["ASSERT_WARNING"]()
-
-    @parameter
-    if err or warn:
-        if not cond:
-            _debug_assert_msg[err](message, __call_location())
+# Print a warning, but do not fail (useful for testing assert behavior).
+alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
 
 
 @always_inline
-fn debug_assert[
-    *stringable: Stringable
-](cond: Bool, *message_parts: *stringable):
+fn debug_assert[stringable: Stringable](cond: Bool, message: stringable):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -71,41 +43,29 @@ fn debug_assert[
     for enabling assertions in the library.
 
     Parameters:
-        stringable: The type of the message parts.
+        stringable: The type of the message.
 
     Args:
         cond: The bool value to assert.
-        message_parts: The message parts to convert to `String` and concatenate
-            before displaying it on failure.
+        message: The message to convert to `String` before displaying it on failure.
     """
 
-    # Print an error and fail.
-    alias err = is_kernels_debug_build() or is_defined[
-        "MOJO_ENABLE_ASSERTIONS"
-    ]()
-
-    # Print a warning, but do not fail (useful for testing assert behavior).
-    alias warn = is_defined["ASSERT_WARNING"]()
-
     @parameter
-    if err or warn:
-        if not cond:
-            var full_message: String = ""
-
-            @parameter
-            fn add_to_full_message[
-                i: Int, StringableType: Stringable
-            ](msg: StringableType):
-                full_message += str(msg)
-
-            message_parts.each_idx[add_to_full_message]()
-
-            _debug_assert_msg[err](full_message, __call_location())
+    if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
+        if cond:
+            return
+        _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
+            message, __call_location()
+        )
 
 
 @no_inline
-fn _debug_assert_msg[err: Bool](msg: String, loc: _SourceLocation):
+fn _debug_assert_msg[
+    stringable: Stringable, //, *, is_warning: Bool = False
+](msg: stringable, loc: _SourceLocation):
     """Aborts with (or prints) the given message and location.
+
+    This function is intentionally marked as no_inline to reduce binary size.
 
     Note that it's important that this function doesn't get inlined; otherwise,
     an indirect recursion of @always_inline functions is possible (e.g. because
@@ -117,14 +77,14 @@ fn _debug_assert_msg[err: Bool](msg: String, loc: _SourceLocation):
         # On GPUs, assert shouldn't allocate.
 
         @parameter
-        if err:
-            abort()
-        else:
+        if is_warning:
             print("Assert Warning")
-        return
-
-    @parameter
-    if err:
-        abort(loc.prefix("Assert Error: " + msg))
+        else:
+            abort()
     else:
-        print(loc.prefix("Assert Warning:"), msg)
+
+        @parameter
+        if is_warning:
+            print(loc.prefix("Assert Warning:"), str(msg))
+        else:
+            abort(loc.prefix("Assert Error: " + str(msg)))

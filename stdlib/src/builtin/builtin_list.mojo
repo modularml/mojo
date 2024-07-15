@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import LegacyPointer, Reference, UnsafePointer
+from memory import Reference, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -455,19 +455,21 @@ struct _LITRefPackHelper[
     fn get_as_kgen_pack(self) -> Self.kgen_pack_with_pointer_type:
         return rebind[Self.kgen_pack_with_pointer_type](self.storage)
 
+    alias _variadic_with_pointers_removed = __mlir_attr[
+        `#kgen.param.expr<variadic_ptrremove_map, `,
+        Self._variadic_pointer_types,
+        `>: !kgen.variadic<!kgen.type>`,
+    ]
+
     # This is the `!kgen.pack` type that happens if one loads all the elements
     # of the pack.
     alias loaded_kgen_pack_type = __mlir_type[
-        `!kgen.pack<:variadic<type> `, Self._kgen_element_types, `>`
+        `!kgen.pack<:variadic<type> `, Self._variadic_with_pointers_removed, `>`
     ]
 
     # This returns the stored KGEN pack after loading all of the elements.
-    # FIXME(37129): This doesn't actually work because vtables aren't getting
-    # removed from TypeConstants correctly.
     fn get_loaded_kgen_pack(self) -> Self.loaded_kgen_pack_type:
-        return rebind[Self.loaded_kgen_pack_type](
-            __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
-        )
+        return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
 
 
 # ===----------------------------------------------------------------------===#

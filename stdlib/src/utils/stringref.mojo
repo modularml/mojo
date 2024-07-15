@@ -13,7 +13,7 @@
 """Implements the StringRef class.
 """
 
-from bit import countr_zero
+from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
@@ -40,6 +40,7 @@ struct StringRef(
     Sized,
     IntableRaising,
     CollectionElement,
+    CollectionElementNew,
     Stringable,
     Formattable,
     Hashable,
@@ -69,6 +70,18 @@ struct StringRef(
             Constructed `StringRef` object.
         """
         return StringRef(UnsafePointer[UInt8](), 0)
+
+    @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+        return Self(other.data, other.length)
 
     @always_inline
     fn __init__(str: StringLiteral) -> Self:
@@ -396,6 +409,7 @@ struct StringRef(
         """
         return self.length
 
+    @no_inline
     fn __str__(self) -> String:
         """Convert the string reference to a string.
 
@@ -404,6 +418,7 @@ struct StringRef(
         """
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this StringRef to the provided formatter.
@@ -419,6 +434,14 @@ struct StringRef(
         )
 
         writer.write_str(str_slice)
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation of the object.
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self.__str__()
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -659,7 +682,7 @@ fn _memchr[
         ) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
-            return source + i + countr_zero(mask)
+            return source + i + count_trailing_zeros(mask)
 
     for i in range(vectorized_end, len):
         if source[i] == char:
@@ -704,7 +727,7 @@ fn _memmem[
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
 
         while mask:
-            var offset = i + countr_zero(mask)
+            var offset = i + count_trailing_zeros(mask)
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)
