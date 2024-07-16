@@ -165,14 +165,6 @@ def test_bool():
     assert_true(FloatLiteral.__as_bool__(2.0))
 
 
-def test_equality():
-    # TODO: add tests for special values
-    assert_true(FloatLiteral.__eq__(4.4, 4.4))
-    assert_false(FloatLiteral.__eq__(4.4, 42.0))
-    assert_false(FloatLiteral.__ne__(4.4, 4.4))
-    assert_true(FloatLiteral.__ne__(4.4, 42.0))
-
-
 def test_is_special_value():
     assert_true(nan.is_nan())
     assert_false(neg_zero.is_nan())
@@ -192,6 +184,34 @@ def test_abs():
     assert_equal(FloatLiteral.__abs__(neg_inf), inf)
 
 
+def test_comparison():
+    assert_true(FloatLiteral.__lt__(4.4, 10.4))
+    assert_true(FloatLiteral.__lt__(-10.4, -4.4))
+    assert_false(FloatLiteral.__lt__(0.0, 0.0))
+    assert_false(FloatLiteral.__lt__(10.4, 4.4))
+
+    assert_true(FloatLiteral.__le__(4.4, 10.4))
+    assert_true(FloatLiteral.__le__(-10.4, 4.4))
+    assert_true(FloatLiteral.__le__(0.0, 0.0))
+    assert_false(FloatLiteral.__le__(10.4, 4.4))
+
+    # TODO: add tests for special values
+    assert_true(FloatLiteral.__eq__(4.4, 4.4))
+    assert_false(FloatLiteral.__eq__(4.4, 42.0))
+    assert_false(FloatLiteral.__ne__(4.4, 4.4))
+    assert_true(FloatLiteral.__ne__(4.4, 42.0))
+
+    assert_true(FloatLiteral.__gt__(10.4, 4.4))
+    assert_true(FloatLiteral.__gt__(-4.4, -10.4))
+    assert_false(FloatLiteral.__gt__(0.0, 0.0))
+    assert_false(FloatLiteral.__gt__(4.4, 10.4))
+
+    assert_true(FloatLiteral.__ge__(10.4, 4.4))
+    assert_true(FloatLiteral.__ge__(-4.4, -10.4))
+    assert_true(FloatLiteral.__ge__(4.4, 4.4))
+    assert_false(FloatLiteral.__ge__(4.4, 10.4))
+
+
 def main():
     test_ceil()
     test_floor()
@@ -203,6 +223,6 @@ def main():
     test_div_mod()
     test_int_conversion()
     test_bool()
-    test_equality()
     test_is_special_value()
     test_abs()
+    test_comparison()
