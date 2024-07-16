@@ -20,7 +20,7 @@ from sys import (
     strided_store,
 )
 
-from memory import DTypePointer
+from memory import UnsafePointer
 from testing import assert_equal
 
 alias F32x4 = SIMD[DType.float32, 4]
@@ -30,8 +30,8 @@ alias iota_8 = F32x8(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0)
 
 
 def test_compressed_store():
-    var vector = DTypePointer[DType.float32]().alloc(5)
-    memset_zero(vector.address, 5)
+    var vector = UnsafePointer[Float32]().alloc(5)
+    memset_zero(vector, 5)
 
     compressed_store(iota_4, vector, iota_4 >= 2)
     assert_equal(SIMD[size=4].load(vector, 0), F32x4(2.0, 3.0, 0.0, 0.0))
@@ -46,7 +46,7 @@ def test_compressed_store():
 
 
 def test_masked_load():
-    var vector = DTypePointer[DType.float32]().alloc(5)
+    var vector = UnsafePointer[Float32]().alloc(5)
     for i in range(5):
         vector[i] = 1
 
@@ -76,8 +76,8 @@ def test_masked_load():
 
 
 def test_masked_store():
-    var vector = DTypePointer[DType.float32]().alloc(5)
-    memset_zero(vector.address, 5)
+    var vector = UnsafePointer[Float32]().alloc(5)
+    memset_zero(vector, 5)
 
     masked_store[4](iota_4, vector, iota_4 < 5)
     assert_equal(SIMD[size=4].load(vector, 0), F32x4(0.0, 1.0, 2.0, 3.0))
@@ -92,7 +92,7 @@ def test_masked_store():
 
 fn test_strided_load() raises:
     alias size = 16
-    var vector = DTypePointer[DType.float32]().alloc(size)
+    var vector = UnsafePointer[Float32]().alloc(size)
 
     for i in range(size):
         vector[i] = i
@@ -105,8 +105,8 @@ fn test_strided_load() raises:
 
 fn test_strided_store() raises:
     alias size = 8
-    var vector = DTypePointer[DType.float32]().alloc(size)
-    memset_zero(vector.address, size)
+    var vector = UnsafePointer[Float32]().alloc(size)
+    memset_zero(vector, size)
 
     strided_store(SIMD[DType.float32, 4](99, 12, 23, 56), vector, 2)
     assert_equal(vector[0], 99.0)
