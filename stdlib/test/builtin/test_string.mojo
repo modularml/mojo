@@ -669,7 +669,7 @@ def test_split():
     """TODO: \\u2028"""
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
-    # TODO add line and paragraph separator as stringliteral once unicode
+    # TODO add line and paragraph separator as StringLiteral once unicode
     # escape secuences are accepted
     var univ_sep_var = (
         String(" ")
@@ -838,13 +838,29 @@ def test_splitlines():
     assert_equal(res8[2], "mojo")
     assert_equal(res8[3], "language")
 
-    # test \x1e \x85
-    var in9 = String("hello\x1eworld\x85mojo")
+    # test \x1e \x1d
+    var in9 = String("hello\x1eworld\x1dmojo")
     var res9 = in9.splitlines()
     assert_equal(len(res9), 3)
     assert_equal(res9[0], "hello")
     assert_equal(res9[1], "world")
     assert_equal(res9[2], "mojo")
+
+    # test \x85 \u2028 \u2029
+    var next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+
+    for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
+        var in9 = "hello\x1eworld" + String(i[]) + "mojo"
+        var res9 = in9.splitlines()
+        assert_equal(len(res9), 3)
+        assert_equal(res9[0], "hello")
+        assert_equal(res9[1], "world")
+        assert_equal(res9[2], "mojo")
 
     # test with keepends=True
     var res10 = in8.splitlines(keepends=True)
@@ -854,10 +870,12 @@ def test_splitlines():
     assert_equal(res10[2], "mojo\x1c")
     assert_equal(res10[3], "language\x1d")
 
-    var res11 = in9.splitlines(keepends=True)
+    var res11 = ("hello\x1eworld" + String(next_line) + "mojo").splitlines(
+        keepends=True
+    )
     assert_equal(len(res11), 3)
     assert_equal(res11[0], "hello\x1e")
-    assert_equal(res11[1], "world\x85")
+    assert_equal(res11[1], "world" + String(next_line))
     assert_equal(res11[2], "mojo")
 
 
@@ -948,7 +966,7 @@ def test_isspace():
     """TODO: \\u2028"""
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
-    # TODO add line and paragraph separator as stringliteral once unicode
+    # TODO add line and paragraph separator as StringLiteral once unicode
     # escape sequences are accepted
     var univ_sep_var = List[String](
         String(" "),
