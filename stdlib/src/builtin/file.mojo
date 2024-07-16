@@ -515,6 +515,15 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
+    fn write(self, data: UnsafePointer[UInt8], length: Int) raises:
+        """Write a borrowed sequence of data to the file.
+
+        Args:
+          data: The data to write to the file.
+          length: The amount of data to write to the file.
+        """
+        self._write(data, length)
+
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
 
