@@ -1005,31 +1005,25 @@ fn iota[
         Scalar.store(buff, i, i + offset)
 
 
-fn iota[type: DType](v: List[Scalar[type]], offset: Int = 0):
-    """Fill the vector with numbers ranging from offset to offset + len - 1,
-    spaced by 1.
-
-    The function doesn't return anything, the vector is updated inplace.
+fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
+    """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
         type: DType of the underlying data.
 
     Args:
-        v: The vector to fill.
-        offset: The value to fill at index 0.
+        v: The list to fill with numbers.
+        offset: The starting value to fill at index 0.
     """
     iota(v.data, len(v), offset)
 
 
-fn iota(v: List[Int], offset: Int = 0):
-    """Fill the vector with numbers ranging from offset to offset + len - 1,
-    spaced by 1.
-
-    The function doesn't return anything, the vector is updated inplace.
+fn iota(inout v: List[Int], offset: Int = 0):
+    """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:
-        v: The vector to fill.
-        offset: The value to fill at index 0.
+        v: The list to fill with numbers.
+        offset: The starting value to fill at index 0.
     """
     var buff = v.data.bitcast[Scalar[DType.index]]()
     iota(buff, len(v), offset=offset)
