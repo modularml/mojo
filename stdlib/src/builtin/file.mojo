@@ -562,8 +562,7 @@ struct FileHandle:
         return Int(i64_res.value)
 
     fn __len__(self) -> Int:
-        # TODO: need to fetch file byte size
-        return 0
+        return 0 # TODO: need to fetch file byte size
 
     fn __iter__(ref [_]self) -> _FileHandleIter[__lifetime_of(self)]:
         """Iterate over elements of the string slice, returning immutable references.
@@ -597,4 +596,6 @@ fn open[
     Returns:
       A file handle.
     """
+    if encoding.upper() not in ("ASCII", "UTF-8", "UTF-16", "UTF-32"):
+        raise Error("Encoding not supported: " + encoding)
     return FileHandle(path.__fspath__(), mode, encoding.upper())
