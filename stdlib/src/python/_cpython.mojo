@@ -396,6 +396,16 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PyObject_HasAttrString(
+        inout self,
+        obj: PyObjectPtr,
+        name: StringRef,
+    ) -> Int:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, DTypePointer[DType.uint8]) -> Int
+        ]("PyObject_HasAttrString")(obj, name.data)
+        return r
+
     fn PyObject_GetAttrString(
         inout self,
         obj: PyObjectPtr,

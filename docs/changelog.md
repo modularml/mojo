@@ -307,6 +307,16 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
   # pwd.struct_passwd(pw_name='root', pw_passwd='*', pw_uid=0, pw_gid=0,
   # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
+
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x: 
+     print("1 in x")
   ```
 
 - Added `Dict.__init__` overload to specify initial capacity.
