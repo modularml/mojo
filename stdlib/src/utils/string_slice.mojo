@@ -191,7 +191,7 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     return _validate_utf8_simd_slice[4, True](ptr, length, iter_len) == 0
 
 
-fn _isnewline_start(
+fn _is_newline_start(
     ptr: UnsafePointer[UInt8], read_ahead: Int = 1
 ) -> (Bool, Int):
     """Returns if the first item in the pointer is the start of
@@ -692,7 +692,7 @@ struct StringSlice[
                 var read_ahead = 3 if i < length - 2 else (
                     2 if i < length - 1 else 1
                 )
-                var res = _isnewline_start(ptr.offset(i), read_ahead)
+                var res = _is_newline_start(ptr.offset(i), read_ahead)
                 if res[0]:
                     eol_location = i - current_offset
                     eol_length = res[1]
