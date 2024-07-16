@@ -1997,7 +1997,7 @@ fn gcd(*values: Int) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-fn lcm(owned m: Int, owned n: Int, /) -> Int:
+fn lcm(m: Int, n: Int, /) -> Int:
     """Computes the least common multiple of two integers.
 
     Args:
