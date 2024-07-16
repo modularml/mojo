@@ -419,7 +419,7 @@ fn stack_allocation[
     /,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> DTypePointer[type, address_space]:
+]() -> UnsafePointer[Scalar[type], address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -519,8 +519,3 @@ fn _free(ptr: UnsafePointer):
         external_call["free", NoneType](ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)
-
-
-@always_inline
-fn _free(ptr: DTypePointer):
-    _free(ptr.address)

@@ -418,7 +418,7 @@ struct DTypePointer[
     @always_inline
     fn free(self):
         """Frees the heap allocates memory."""
-        _free(self)
+        _free(self.address)
 
     # ===------------------------------------------------------------------=== #
     # Casting
