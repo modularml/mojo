@@ -648,41 +648,6 @@ fn _isspace(c: UInt8) -> Bool:
 
 
 # ===----------------------------------------------------------------------=== #
-# _isnewline
-# ===----------------------------------------------------------------------=== #
-
-
-fn _isnewline(s: String) -> Bool:
-    if len(s._buffer) != 2:
-        return False
-
-    # TODO: add \u2028 and \u2029 when they are properly parsed
-    # FIXME: \x85 is parsed but not encoded in utf-8
-    if s == "\x85":
-        return True
-
-    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
-    alias `\n` = UInt8(ord("\n"))
-    alias `\r` = UInt8(ord("\r"))
-    alias `\f` = UInt8(ord("\f"))
-    alias `\v` = UInt8(ord("\v"))
-    alias `\x1c` = UInt8(ord("\x1c"))
-    alias `\x1d` = UInt8(ord("\x1d"))
-    alias `\x1e` = UInt8(ord("\x1e"))
-
-    var c = UInt8(ord(s))
-    return (
-        c == `\n`
-        or c == `\r`
-        or c == `\f`
-        or c == `\v`
-        or c == `\x1c`
-        or c == `\x1d`
-        or c == `\x1e`
-    )
-
-
-# ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
 
@@ -1656,7 +1621,10 @@ struct String(
         return output
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
-        """Split the string at line boundaries.
+        """Split the string at line boundaries. This corresponds to Python's
+        [universal newlines](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -1664,35 +1632,7 @@ struct String(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        var output = List[String]()
-        var length = self.byte_length()
-        var current_offset = 0
-
-        while current_offset < length:
-            var loc = -1
-            var eol_length = 1
-
-            for i in range(current_offset, length):
-                var char = self[i]
-                var next_char = self[i + 1] if i + 1 < length else ""
-
-                if _isnewline(char):
-                    loc = i
-                    if char == "\r" and next_char == "\n":
-                        eol_length = 2
-                    break
-            else:
-                output.append(self[current_offset:])
-                break
-
-            if keepends:
-                output.append(self[current_offset : loc + eol_length])
-            else:
-                output.append(self[current_offset:loc])
-
-            current_offset = loc + eol_length
-
-        return output
+        return self.as_string_slice().splitlines(keepends)
 
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`
