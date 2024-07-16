@@ -980,22 +980,13 @@ def test_abs():
     )
 
 
-def test_min_max_clamp():
+def test_clamp():
     alias F = SIMD[DType.float32, 4]
-
     var f = F(-10.5, -5.0, 5.0, 10.0)
-    assert_equal(f.min(F(-9.0, -6.0, -4.0, 10.5)), F(-10.5, -6.0, -4.0, 10.0))
-    assert_equal(f.min(-4.0), F(-10.5, -5.0, -4.0, -4.0))
-    assert_equal(f.max(F(-9.0, -6.0, -4.0, 10.5)), F(-9.0, -5.0, 5.0, 10.5))
-    assert_equal(f.max(-4.0), F(-4.0, -4.0, 5.0, 10.0))
     assert_equal(f.clamp(-6.0, 5.5), F(-6.0, -5.0, 5.0, 5.5))
 
-    alias I = SIMD[DType.float32, 4]
+    alias I = SIMD[DType.int32, 4]
     var i = I(-10, -5, 5, 10)
-    assert_equal(i.min(I(-9, -6, -4, 11)), I(-10, -6, -4, 10))
-    assert_equal(i.min(-4), I(-10, -5, -4, -4))
-    assert_equal(i.max(I(-9, -6, -4, 11)), I(-9, -5, 5, 11))
-    assert_equal(i.max(-4), I(-4, -4, 5, 10))
     assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
 
 
@@ -1373,7 +1364,7 @@ def main():
     test_join()
     test_len()
     test_limits()
-    test_min_max_clamp()
+    test_clamp()
     test_mod()
     test_pow()
     test_powf()
