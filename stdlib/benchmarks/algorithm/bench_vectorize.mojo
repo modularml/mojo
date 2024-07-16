@@ -322,15 +322,15 @@ fn bench_compare():
 
     var arg = run[arg_size](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2, size)
+    memset_zero(p2.address, size)
 
     var param = run[param_size](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2, size)
+    memset_zero(p2.address, size)
 
     var arg_unroll = run[arg_size_unroll](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2, size)
+    memset_zero(p2.address, size)
 
     var param_unroll = run[param_size_unroll](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
