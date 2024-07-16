@@ -5,7 +5,8 @@
 There are roughly 3 maintainers currently reviewing and merging pull
 requests in the Mojo stdlib.
 This is because contributor's code then goes into the internal
-monorepo where there is sensitive Modular code.
+monorepo where there is sensitive Modular code,
+so new maintainers cannot be external to Modular.
 
 Most of the pull requests made are about new functions/structs.
 
