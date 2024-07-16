@@ -689,8 +689,8 @@ struct StringSlice[
             var curr_ptr = ptr.offset(current_offset)
 
             for i in range(current_offset, length):
-                var read_ahead = 3 if i + 2 < length else (
-                    2 if i + 1 < length else 1
+                var read_ahead = 3 if i < length - 2 else (
+                    2 if i < length - 1 else 1
                 )
                 var res = _isnewline_start(ptr.offset(i), read_ahead)
                 if res[0]:
