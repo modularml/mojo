@@ -177,32 +177,16 @@ fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
         ).bitcast[Int32]()[0]
         return
 
-    var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
-    var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
+    var dest_ptr = dest_data.bitcast[Int8]()
+    var src_ptr = src_data.bitcast[Int8]()
 
     # Copy in 32-byte chunks.
     alias chunk_size = 32
     alias vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        SIMD.store(
-            dest_dtype_ptr, i, SIMD[size=chunk_size].load(src_dtype_ptr, i)
-        )
+        SIMD.store(dest_ptr, i, SIMD[size=chunk_size].load(src_ptr, i))
     for i in range(vector_end, n):
-        Scalar.store(dest_dtype_ptr, i, Scalar.load(src_dtype_ptr, i))
-
-
-@always_inline
-fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
-    """Copies a memory area.
-
-    Parameters:
-        count: The number of elements to copy (not bytes!).
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-    """
-    memcpy[count](dest.address, src.address)
+        Scalar.store(dest_ptr, i, Scalar.load(src_ptr, i))
 
 
 @always_inline
@@ -254,22 +238,16 @@ fn memcpy(
     #    )
     #    return
 
-    var dest_dtype_ptr = DTypePointer[DType.int8, dest_data.address_space](
-        dest_data
-    )
-    var src_dtype_ptr = DTypePointer[DType.int8, src_data.address_space](
-        src_data
-    )
+    var dest_ptr = dest_data.bitcast[Int8]()
+    var src_ptr = src_data.bitcast[Int8]()
 
     # Copy in 32-byte chunks.
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        SIMD.store(
-            dest_dtype_ptr, i, SIMD[size=chunk_size].load(src_dtype_ptr, i)
-        )
+        SIMD.store(dest_ptr, i, SIMD[size=chunk_size].load(src_ptr, i))
     for i in range(vector_end, n):
-        Scalar.store(dest_dtype_ptr, i, Scalar.load(src_dtype_ptr, i))
+        Scalar.store(dest_ptr, i, Scalar.load(src_ptr, i))
 
 
 @always_inline
@@ -283,39 +261,6 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
     """
     var n = count * sizeof[dest.type]()
     memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
-
-
-@always_inline
-fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
-    """Copies a memory area.
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy (not bytes!).
-    """
-    memcpy(dest.address, src.address, count)
-
-
-@always_inline
-fn memcpy[
-    dtype: DType, //
-](*, dest: UnsafePointer[Scalar[dtype]], src: __type_of(dest), count: Int):
-    """Copies a memory area.
-
-    Parameters:
-        dtype: *Inferred* The dtype of the data to copy.
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy (not bytes!).
-    """
-    memcpy(
-        dest=DTypePointer(dest),
-        src=DTypePointer(src),
-        count=count,
-    )
 
 
 # ===----------------------------------------------------------------------===#
