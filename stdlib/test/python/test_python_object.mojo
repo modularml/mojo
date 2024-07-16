@@ -574,6 +574,30 @@ fn test_py_slice() raises:
     with assert_raises(contains="list index out of range"):
         _ = with_2d[0:1][4]
 
+def test_contains_dunder():
+    with assert_raises(contains="'int' object is not iterable"):
+        var z = PythonObject(0)
+        _ = 5 in z
+
+    var x = PythonObject([1.1, 2.2])
+    assert_true(1.1 in x)
+    assert_false(3.3 in x)
+
+    x = PythonObject(["Hello", "World"])
+    assert_true("World" in x)
+
+    x = PythonObject((1.5, 2))
+    assert_true(1.5 in x)
+    assert_false(3.5 in x)
+
+    var y = Dict[PythonObject, PythonObject]()
+    y["A"] = "A"
+    y["B"] = 5
+    x = PythonObject(y)
+    assert_true("A" in x)
+    assert_false("C" in x)
+    assert_true("B" in x)
+
 
 def main():
     # initializing Python instance calls init_python
@@ -592,3 +616,4 @@ def main():
     test_getitem_raises()
     test_setitem_raises()
     test_py_slice()
+    test_contains_dunder()
