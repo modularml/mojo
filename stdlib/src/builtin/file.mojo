@@ -35,6 +35,7 @@ from os import PathLike
 from sys import external_call
 
 from memory import AddressSpace, UnsafePointer
+from utils.string_slice import _is_newline_start
 
 
 @register_passable
@@ -64,34 +65,117 @@ struct _OwnedStringRef(Boolable):
         return self.length != 0
 
 
+@value
+struct _FileHandleIter[
+    is_mutable: Bool, //,
+    lifetime: AnyLifetime[is_mutable].type,
+]:
+    """Iterator for FileHandle.
+
+    Parameters:
+        is_mutable: Whether the slice is mutable.
+        lifetime: The lifetime of the underlying data.
+    """
+
+    var index: Int
+    var continuation_bytes: Int
+    var ptr: UnsafePointer[UInt8]
+    var length: Int
+    var encoding: String
+
+    fn __init__(
+        inout self,
+        *,
+        unsafe_pointer: UnsafePointer[UInt8],
+        length: Int,
+        encoding: String,
+    ):
+        self.index = 0 
+        self.ptr = unsafe_pointer
+        self.length = length
+        self.continuation_bytes = 0
+        self.encoding = encoding
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> StringSlice[lifetime]:
+        var idx = self.index
+        while idx < self.length:
+            var read_ahead = 3 if idx < self.length -2 else (
+                2 if idx < self.length -1 else 1
+            )
+            var s = StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + idx,
+                len=read_ahead,
+            )
+            if self.encoding == "UTF-16":
+                s = String.from_utf16(List[UInt16](
+                    unsafe_pointer=self.ptr.bitcast[DType.uint16](), 
+                    size=self.length // 2, 
+                    capacity=self.length // 2,
+                )).as_string_slice()
+            elif self.encoding == "UTF-32":
+                s = String.from_unicode(List[Int](
+                    unsafe_pointer=self.ptr.bitcast[DType.index](), 
+                    size=self.length // 2, 
+                    capacity=self.length // 2,
+                )).as_string_slice()
+            var res = _is_newline_start(s.unsafe_ptr(), read_ahead):
+            if res[0]:
+                var val = StringSlice[lifetime](
+                    unsafe_from_utf8_ptr=self.ptr + idx + res[1], 
+                    len=idx - self.index,
+                )
+                self.index = idx + res[1]
+                return val
+            idx += read_ahead
+
+        return StringSlice[lifetime](
+            unsafe_from_utf8_ptr=self.ptr + self.index, len=idx - self.index
+        )
+
+    fn __len__(self) -> Int:
+        return self.length - self.index
+
+
 struct FileHandle:
     """File handle to an opened file."""
 
     var handle: UnsafePointer[NoneType]
     """The underlying pointer to the file handle."""
+    var _encoding: String
 
     fn __init__(inout self):
         """Default constructor."""
         self.handle = UnsafePointer[NoneType]()
 
-    fn __init__(inout self, path: String, mode: String) raises:
+    fn __init__(
+        inout self, path: String, mode: String, encoding: String
+    ) raises:
         """Construct the FileHandle using the file path and mode.
 
         Args:
-          path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
+            path: The file path.
+            mode: The mode to open the file in: {"r", "w", "rw"}.
+            encoding: The encoding to read the File with.
         """
-        self.__init__(path._strref_dangerous(), mode._strref_dangerous())
+        self.__init__(
+            path._strref_dangerous(), mode._strref_dangerous(), encoding
+        )
 
         _ = path
         _ = mode
 
-    fn __init__(inout self, path: StringRef, mode: StringRef) raises:
+    fn __init__(
+        inout self, path: StringRef, mode: StringRef, encoding: String
+    ) raises:
         """Construct the FileHandle using the file path and string.
 
         Args:
-          path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
+            path: The file path.
+            mode: The mode to open the file in: {"r", "w", "rw"}.
+            encoding: The encoding to read the File with.
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[
@@ -103,6 +187,7 @@ struct FileHandle:
             raise err_msg^.consume_as_error()
 
         self.handle = handle
+        self._encoding = encoding
 
     fn __del__(owned self):
         """Closes the file handle."""
@@ -297,7 +382,7 @@ struct FileHandle:
 
         Examples:
 
-        Reading the entire file into a List[Int8]:
+        Reading the entire file into a List[UInt8]:
 
         ```mojo
         var file = open("/tmp/example.txt", "r")
@@ -419,6 +504,14 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
+    fn write(self, data: List[UInt8]) raises:
+        """Write a borrowed sequence of data to the file.
+
+        Args:
+          data: The data to write to the file.
+        """
+        self._write(data.unsafe_ptr(), len(data))
+
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
 
@@ -468,10 +561,28 @@ struct FileHandle:
         ](self.handle)
         return Int(i64_res.value)
 
+    fn __len__(self) -> Int:
+        # TODO: need to fetch file byte size
+        return 0
+
+    fn __iter__(ref [_]self) -> _FileHandleIter[__lifetime_of(self)]:
+        """Iterate over elements of the string slice, returning immutable references.
+
+        Returns:
+            An iterator of references to the string elements.
+        """
+        return _FileHandleIter[__lifetime_of(self)](
+            unsafe_pointer=self.handle, # TODO: need memory mapping
+            length=len(self),
+            encoding=self._encoding,
+        )
+
 
 fn open[
     PathLike: os.PathLike
-](path: PathLike, mode: String) raises -> FileHandle:
+](
+    path: PathLike, mode: String, encoding: String = "UTF-8"
+) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
     FileHandle.
 
@@ -481,8 +592,9 @@ fn open[
     Args:
       path: The path to the file to open.
       mode: The mode to open the file in (the mode can be "r" or "w").
+      encoding: The encoding to read the File with.
 
     Returns:
       A file handle.
     """
-    return FileHandle(path.__fspath__(), mode)
+    return FileHandle(path.__fspath__(), mode, encoding.upper())
