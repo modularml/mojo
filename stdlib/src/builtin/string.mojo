@@ -2312,7 +2312,7 @@ struct String(
         var ptr = UnsafePointer[UInt8].alloc(max_len)
         var current_offset = 0
         for i in range(len(values)):
-            var c = values[i]
+            var c = values.unsafe_get(i)
             var num_bytes = _unicode_codepoint_utf8_byte_length(c)
             var curr_ptr = ptr.offset(current_offset)
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
