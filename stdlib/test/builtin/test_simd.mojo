@@ -48,6 +48,12 @@ def test_cast():
         SIMD[DType.bool, 4](False, True, False, True),
     )
 
+    var b: UInt16 = 128
+    assert_equal(int(b.cast[DType.uint8]()), 128)
+    assert_equal(int(b.cast[DType.uint16]()), 128)
+    assert_equal(int(b.cast[DType.int8]()), -128)
+    assert_equal(int(b.cast[DType.int16]()), 128)
+
 
 def test_simd_variadic():
     assert_equal(str(SIMD[DType.index, 4](52, 12, 43, 5)), "[52, 12, 43, 5]")

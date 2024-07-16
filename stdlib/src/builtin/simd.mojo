@@ -29,6 +29,7 @@ from sys import (
 
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
 from memory import bitcast, DTypePointer
 
@@ -1333,9 +1334,19 @@ struct SIMD[type: DType, size: Int](
             The value as an integer.
         """
         constrained[size == 1, "expected a scalar type"]()
-        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-            rebind[Scalar[type]](self).value
-        )
+
+        alias int_width = bitwidthof[Int]()
+        alias type_width = bitwidthof[type]()
+
+        @parameter
+        if type.is_unsigned() and int_width > type_width:
+            # If we are casting up, prevent sign extension by first casting to
+            # a large unsigned
+            return self.cast[_uint_type_of_width[int_width]()]().__int__()
+        else:
+            return __mlir_op.`pop.cast`[
+                _type = __mlir_type.`!pop.scalar<index>`
+            ](rebind[Scalar[type]](self).value)
 
     @no_inline
     fn __str__(self) -> String:
