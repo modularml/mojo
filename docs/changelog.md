@@ -480,6 +480,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - Removed the Mojo Language Server warnings for unused function arguments.
 
+- Removed the `SIMD.{add,mul,sub}_with_overflow` methods.
+
 ### 🛠️ Fixed
 
 - Fixed a crash in the Mojo Language Server when importing the current file.
