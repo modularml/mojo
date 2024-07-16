@@ -285,11 +285,32 @@ struct FileHandle:
 
         if err_msg:
             raise err_msg^.consume_as_error()
-        
-        if not _is_valid_utf8(buf, int(size_copy)):
-            raise Error("UnicodeDecodeError: Invalid UTF-8 sequence found")
+    
+        var s = StringSlice[__lifetime_of(self)](
+            unsafe_from_utf8_ptr=buf,
+            len=int(size_copy),
+        )
+        if self._encoding == "UTF-16":
+            var size = int(size_copy) // 2
+            s = String.from_utf16(List[UInt16](
+                unsafe_pointer=buf.bitcast[DType.uint16](), 
+                size=size, 
+                capacity=size,
+            )).as_string_slice()
+        elif self._encoding == "UTF-32":
+            var size = int(size_copy) // 4
+            s = String.from_unicode(List[UInt32](
+                unsafe_pointer=buf.bitcast[DType.uint32](), 
+                size=size, 
+                capacity=size,
+            )).as_string_slice()
 
-        return String(buf, int(size_copy) + 1)
+        if not _is_valid_utf8(s.unsafe_ptr(), int(size_copy)):
+            raise Error(
+                "UnicodeDecodeError: Could not parse file as: " + self._encoding
+            )
+
+        return String(s)
 
     fn read[
         type: DType
