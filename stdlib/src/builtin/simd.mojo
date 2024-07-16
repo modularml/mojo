@@ -1655,8 +1655,7 @@ struct SIMD[type: DType, size: Int](
             A new SIMD vector containing x clamped to be within lower_bound and
             upper_bound.
         """
-
-        return self.min(upper_bound).max(lower_bound)
+        return max(min(self, upper_bound), lower_bound)
 
     @always_inline("nodebug")
     fn roundeven(self) -> Self:
@@ -2042,34 +2041,6 @@ struct SIMD[type: DType, size: Int](
             rebind[Self._SIMDHalfType](res[1]),
         )
 
-    @always_inline("nodebug")
-    fn min(self, other: Self) -> Self:
-        """Computes the elementwise minimum between the two vectors.
-
-        Args:
-            other: The other SIMD vector.
-
-        Returns:
-            A new SIMD vector where each element at position `i` is
-            `min(self[i], other[i])`.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return __mlir_op.`pop.min`(self.value, other.value)
-
-    @always_inline("nodebug")
-    fn max(self, other: Self) -> Self:
-        """Computes the elementwise maximum between the two vectors.
-
-        Args:
-            other: The other SIMD vector.
-
-        Returns:
-            A new SIMD vector where each element at position `i` is
-            `max(self[i], other[i])`.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return __mlir_op.`pop.max`(self.value, other.value)
-
     # ===------------------------------------------------------------------=== #
     # Reduce operations
     # ===------------------------------------------------------------------=== #
@@ -2133,7 +2104,7 @@ struct SIMD[type: DType, size: Int](
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
                 type, width
             ]:
-                return v1.max(v2)
+                return max(v1, v2)
 
             return self.reduce[max_reduce_body, size_out]()
 
@@ -2191,7 +2162,7 @@ struct SIMD[type: DType, size: Int](
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
                 type, width
             ]:
-                return v1.min(v2)
+                return min(v1, v2)
 
             return self.reduce[min_reduce_body, size_out]()
 

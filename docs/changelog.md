@@ -496,6 +496,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - Removed the `SIMD.{add,mul,sub}_with_overflow` methods.
 
+- Removed the `SIMD.min` and `SIMD.max` methods. Identical functionality is
+  available using the builting `min` and `max` functions.
+
 ### 🛠️ Fixed
 
 - Fixed a crash in the Mojo Language Server when importing the current file.

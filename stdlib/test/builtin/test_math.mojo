@@ -49,11 +49,15 @@ def test_min():
     assert_equal(UInt(0), min(UInt(0), UInt(1)))
     assert_equal(UInt(1), min(UInt(1), UInt(42)))
 
-    var lhs = SIMD[DType.int32, 4](1, 2, 3, 4)
-    var rhs = SIMD[DType.int32, 4](0, 1, 5, 7)
-    var expected = SIMD[DType.int32, 4](0, 1, 3, 4)
-    assert_equal(expected, lhs.min(rhs))
-    assert_equal(expected, rhs.min(lhs))
+    alias F = SIMD[DType.float32, 4]
+    var f = F(-10.5, -5.0, 5.0, 10.0)
+    assert_equal(min(f, F(-9.0, -6.0, -4.0, 10.5)), F(-10.5, -6.0, -4.0, 10.0))
+    assert_equal(min(f, -4.0), F(-10.5, -5.0, -4.0, -4.0))
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-10, -5, 5, 10)
+    assert_equal(min(i, I(-9, -6, -4, 11)), I(-10, -6, -4, 10))
+    assert_equal(min(i, -4), I(-10, -5, -4, -4))
 
 
 def test_max():
@@ -65,11 +69,15 @@ def test_max():
     assert_equal(UInt(1), max(UInt(0), UInt(1)))
     assert_equal(UInt(2), max(UInt(1), UInt(2)))
 
-    var lhs = SIMD[DType.int32, 4](1, 2, 3, 4)
-    var rhs = SIMD[DType.int32, 4](0, 1, 5, 7)
-    var expected = SIMD[DType.int32, 4](1, 2, 5, 7)
-    assert_equal(expected, lhs.max(rhs))
-    assert_equal(expected, rhs.max(lhs))
+    alias F = SIMD[DType.float32, 4]
+    var f = F(-10.5, -5.0, 5.0, 10.0)
+    assert_equal(max(f, F(-9.0, -6.0, -4.0, 10.5)), F(-9.0, -5.0, 5.0, 10.5))
+    assert_equal(max(f, -4.0), F(-4.0, -4.0, 5.0, 10.0))
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-10, -5, 5, 10)
+    assert_equal(max(i, I(-9, -6, -4, 11)), I(-9, -5, 5, 11))
+    assert_equal(max(i, -4), I(-4, -4, 5, 10))
 
 
 def test_round():

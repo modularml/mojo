@@ -791,7 +791,7 @@ fn erf[
             -3.83208680e-4,
             1.72948930e-5,
         ),
-    ](x_abs.min(3.925))
+    ](min(x_abs, 3.925))
 
     r_large = r_large.fma(x_abs, x_abs)
     r_large = copysign(1 - exp(-r_large), x)
