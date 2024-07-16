@@ -35,7 +35,7 @@ from os import PathLike
 from sys import external_call
 
 from memory import AddressSpace, UnsafePointer
-from utils.string_slice import _is_newline_start
+from utils.string_slice import _is_newline_start, _is_valid_utf8
 
 
 @register_passable
@@ -285,6 +285,9 @@ struct FileHandle:
 
         if err_msg:
             raise err_msg^.consume_as_error()
+        
+        if not _is_valid_utf8(buf, int(size_copy)):
+            raise Error("UnicodeDecodeError: Invalid UTF-8 sequence found")
 
         return String(buf, int(size_copy) + 1)
 
