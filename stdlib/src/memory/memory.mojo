@@ -25,8 +25,6 @@ from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
 
-from .unsafe import DTypePointer
-
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -43,10 +41,10 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 
 
 @always_inline
-fn _memcmp_impl_unconstrained(
-    s1: DTypePointer, s2: __type_of(s1), count: Int
-) -> Int:
-    alias simd_width = simdwidthof[s1.type]()
+fn _memcmp_impl_unconstrained[
+    type: DType
+](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+    alias simd_width = simdwidthof[type]()
     if count < simd_width:
         for i in range(count):
             var s1i = s1[i]
@@ -87,44 +85,11 @@ fn _memcmp_impl_unconstrained(
 
 
 @always_inline
-fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
-    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+fn _memcmp_impl[
+    type: DType
+](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+    constrained[type.is_integral(), "the input dtype must be integral"]()
     return _memcmp_impl_unconstrained(s1, s2, count)
-
-
-@always_inline
-fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
-    """Compares two buffers. Both strings are assumed to be of the same length.
-
-    Args:
-        s1: The first buffer address.
-        s2: The second buffer address.
-        count: The number of elements in the buffers.
-
-    Returns:
-        Returns 0 if the bytes buffers are identical, 1 if s1 > s2, and -1 if
-        s1 < s2. The comparison is performed by the first different byte in the
-        buffer.
-    """
-
-    @parameter
-    if s1.type.is_floating_point():
-        alias integral_type = _integral_type_of[s1.type]()
-        return _memcmp_impl(
-            s1.bitcast[integral_type](), s2.bitcast[integral_type](), count
-        )
-
-    var byte_count = count * sizeof[s1.type]()
-
-    @parameter
-    if sizeof[s1.type]() >= sizeof[DType.int32]():
-        return _memcmp_impl(
-            s1.bitcast[DType.int32](),
-            s2.bitcast[DType.int32](),
-            byte_count // sizeof[DType.int32](),
-        )
-
-    return _memcmp_impl(s1, s2, count)
 
 
 @always_inline
@@ -155,13 +120,13 @@ fn memcmp[
 
     @parameter
     if sizeof[type]() >= sizeof[DType.int32]():
-        var ds1 = DTypePointer[DType.int32, address_space](s1.bitcast[Int32]())
-        var ds2 = DTypePointer[DType.int32, address_space](s2.bitcast[Int32]())
-        return _memcmp_impl(ds1, ds2, byte_count // sizeof[DType.int32]())
+        return _memcmp_impl(
+            s1.bitcast[Int32](),
+            s2.bitcast[Int32](),
+            byte_count // sizeof[DType.int32](),
+        )
 
-    var ds1 = DTypePointer[DType.int8, address_space](s1.bitcast[Int8]())
-    var ds2 = DTypePointer[DType.int8, address_space](s2.bitcast[Int8]())
-    return _memcmp_impl(ds1, ds2, byte_count)
+    return _memcmp_impl(s1.bitcast[Int8](), s2.bitcast[Int8](), byte_count)
 
 
 # ===----------------------------------------------------------------------===#
