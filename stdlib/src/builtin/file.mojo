@@ -116,10 +116,10 @@ struct _FileHandleIter[
                     capacity=self.length // 2,
                 )).as_string_slice()
             elif self.encoding == "UTF-32":
-                s = String.from_unicode(List[Int](
-                    unsafe_pointer=self.ptr.bitcast[DType.index](), 
-                    size=self.length // 2, 
-                    capacity=self.length // 2,
+                s = String.from_unicode(List[UInt32](
+                    unsafe_pointer=self.ptr.bitcast[DType.uint32](), 
+                    size=self.length // 4, 
+                    capacity=self.length // 4,
                 )).as_string_slice()
             var res = _is_newline_start(s.unsafe_ptr(), read_ahead):
             if res[0]:
