@@ -334,24 +334,6 @@ fn _memset_llvm[
 
 @always_inline
 fn memset[
-    type: DType, address_space: AddressSpace
-](ptr: DTypePointer[type, address_space], value: UInt8, count: Int):
-    """Fills memory with the given value.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: UnsafePointer to the beginning of the memory block to fill.
-        value: The value to fill with.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    memset(ptr.address, value, count)
-
-
-@always_inline
-fn memset[
     type: AnyType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
@@ -371,23 +353,6 @@ fn memset[
 # ===----------------------------------------------------------------------===#
 # memset_zero
 # ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn memset_zero[
-    type: DType, address_space: AddressSpace
-](ptr: DTypePointer[type, address_space], count: Int):
-    """Fills memory with zeros.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: UnsafePointer to the beginning of the memory block to fill.
-        count: Number of elements to set (in elements, not bytes).
-    """
-    memset(ptr, 0, count)
 
 
 @always_inline

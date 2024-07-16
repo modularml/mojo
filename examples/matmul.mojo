@@ -53,7 +53,7 @@ struct Matrix[rows: Int, cols: Int]:
     # Initialize zeroeing all values
     fn __init__(inout self):
         self.data = DTypePointer[type].alloc(rows * cols)
-        memset_zero(self.data, rows * cols)
+        memset_zero(self.data.address, rows * cols)
 
     # Initialize taking a pointer, don't set any elements
     fn __init__(inout self, data: DTypePointer[type]):
@@ -246,7 +246,7 @@ fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
         var accumulator = Matrix[tile_m, tile_n](
             stack_allocation[tile_m * tile_n, type]()
         )
-        memset_zero(accumulator.data, tile_m * tile_n)
+        memset_zero(accumulator.data.address, tile_m * tile_n)
 
         for ko in range(0, A.cols, tile_k):
 
