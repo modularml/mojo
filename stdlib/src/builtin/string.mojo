@@ -2288,7 +2288,7 @@ struct String(
         return True
 
     @staticmethod
-    fn from_unicode(values: List[Int]) -> String:
+    fn from_unicode(values: Variant[List[Int], List[UInt32]]) -> String:
         """Returns a String based on the given Unicode code points.
 
         Args:
@@ -2308,11 +2308,16 @@ struct String(
             This method allocates `4 * len(values)` bytes.
         """
 
-        var max_len = 4 * len(values)
+        var buf_length = len(values.unsafe_get[List[Int]]()[]) if (
+            values.isa[List[Int]]()
+        ) else len(values.unsafe_get[List[UInt32]]()[])
+        var max_len = 4 * buf_length
         var ptr = UnsafePointer[UInt8].alloc(max_len)
         var current_offset = 0
-        for i in range(len(values)):
-            var c = values.unsafe_get(i)
+        for i in range(buf_length):
+            var c = values.unsafe_get[List[Int]]()[].unsafe_get(i) if (
+                values.isa[List[Int]]()
+            ) else int(values.unsafe_get[List[UInt32]]()[].unsafe_get(i))
             var num_bytes = _unicode_codepoint_utf8_byte_length(c)
             var curr_ptr = ptr.offset(current_offset)
             _shift_unicode_to_utf8(curr_ptr, c, num_bytes)
