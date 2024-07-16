@@ -449,6 +449,14 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
   overload instead.
 
+- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
+ instead.
+
+- `UnsafePointer` now supports `simd_strided_load/store`, `gather`, and `scatter`
+  when the underlying type is `Scalar[DType]`.
+
+- `SIMD.load/store` now supports `UnsafePointer` overloads.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`

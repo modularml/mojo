@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements a foreign functions interface (FFI)."""
 
-from memory import DTypePointer, LegacyPointer
+from memory import UnsafePointer
 
 from utils import StringRef
 
@@ -51,7 +51,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
     The library is loaded on initialization and unloaded by `close`.
     """
 
-    var handle: DTypePointer[DType.int8]
+    var handle: UnsafePointer[Int8]
     """The handle to the dynamic library."""
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
@@ -67,17 +67,17 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         @parameter
         if not os_is_windows():
-            var handle = external_call["dlopen", DTypePointer[DType.int8]](
+            var handle = external_call["dlopen", UnsafePointer[Int8]](
                 path.unsafe_ptr(), flags
             )
-            if handle == DTypePointer[DType.int8]():
+            if handle == UnsafePointer[Int8]():
                 var error_message = external_call[
                     "dlerror", UnsafePointer[UInt8]
                 ]()
                 abort("dlopen failed: " + String(error_message))
             self.handle = handle
         else:
-            self.handle = DTypePointer[DType.int8]()
+            self.handle = UnsafePointer[Int8]()
 
     fn __init__(inout self, *, other: Self):
         """Copy the object.
@@ -101,9 +101,9 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
             "Checking dynamic library symbol is not supported on Windows",
         ]()
 
-        var opaque_function_ptr = external_call[
-            "dlsym", DTypePointer[DType.int8]
-        ](self.handle.address, name.unsafe_ptr())
+        var opaque_function_ptr = external_call["dlsym", UnsafePointer[Int8]](
+            self.handle.address, name.unsafe_ptr()
+        )
         if opaque_function_ptr:
             return True
 
@@ -118,7 +118,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         @parameter
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
-            self.handle = DTypePointer[DType.int8]()
+            self.handle = UnsafePointer[Int8]()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.
@@ -168,7 +168,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         @parameter
         if not os_is_windows():
             var opaque_function_ptr = external_call[
-                "dlsym", DTypePointer[DType.int8]
+                "dlsym", UnsafePointer[Int8]
             ](self.handle.address, name)
             var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
                 result_type
@@ -199,19 +199,6 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 # ===----------------------------------------------------------------------===#
 # Library Load
 # ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _get_global[
-    name: StringLiteral,
-    init_fn: fn (LegacyPointer[NoneType]) -> LegacyPointer[NoneType],
-    destroy_fn: fn (LegacyPointer[NoneType]) -> None,
-](
-    payload: LegacyPointer[NoneType] = LegacyPointer[NoneType]()
-) -> LegacyPointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", LegacyPointer[NoneType]
-    ](StringRef(name), payload, init_fn, destroy_fn)
 
 
 @always_inline
@@ -265,7 +252,7 @@ fn _get_dylib_function[
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer.address_of(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[UnsafePointer[NoneType]]()[],
     )
 
     return new_func

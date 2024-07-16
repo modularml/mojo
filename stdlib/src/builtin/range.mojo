@@ -375,7 +375,16 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     fn __init__(inout self, start: UInt, end: UInt, step: UInt):
         self.start = start
         self.end = end
-        debug_assert(step != 0, "step cannot be 0")
+        debug_assert(
+            step != 0, "range() arg 3 (the step size) must not be zero"
+        )
+        debug_assert(
+            step != UInt(-1),
+            (
+                "range() arg 3 (the step size) cannot be -1.  Reverse range is"
+                " not supported yet for UInt ranges."
+            ),
+        )
         self.step = step
 
     @always_inline
