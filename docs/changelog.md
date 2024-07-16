@@ -283,6 +283,20 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
   ```
 
+- Added `Dict.__init__` overload to specify initial capacity.
+  ([PR #3171](https://github.com/modularml/mojo/pull/3171) by [@rd4com](https://github.com/rd4com))
+
+  The capacity has to be a power of two and above or equal 8.
+
+  It allows for faster initialization by skipping incremental growth steps.
+
+  Example:
+
+  ```mojo
+  var dictionary = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+  # Insert (2/3 of 1024) entries
+  ```
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
