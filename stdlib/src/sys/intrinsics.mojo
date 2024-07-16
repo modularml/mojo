@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Defines intrinsics.
 
-You can import these APIs from the `complex` package. For example:
+You can import these APIs from the `sys` package. For example:
 
 ```mojo
 from sys import PrefetchLocality
