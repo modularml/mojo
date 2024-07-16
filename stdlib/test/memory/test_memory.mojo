@@ -48,16 +48,7 @@ def test_memcpy():
     var pair2 = Pair(0, 0)
 
     var src = UnsafePointer.address_of(pair1)
-    var dsrc = DTypePointer[DType.int8](src.bitcast[int8_pop]().address)
-
     var dest = UnsafePointer.address_of(pair2)
-    var ddest = DTypePointer[DType.int8](dest.bitcast[int8_pop]().address)
-
-    # DTypePointer test
-    memcpy(ddest, dsrc, sizeof[Pair]())
-
-    assert_equal(pair2.lo, 1)
-    assert_equal(pair2.hi, 2)
 
     # UnsafePointer test
     pair2.lo = 0
@@ -69,10 +60,10 @@ def test_memcpy():
 
     @parameter
     def _test_memcpy_buf[size: Int]():
-        var buf = DTypePointer[DType.uint8]().alloc(size * 2)
+        var buf = UnsafePointer[UInt8]().alloc(size * 2)
         memset_zero(buf + size, size)
-        var src = DTypePointer[DType.uint8]().alloc(size * 2)
-        var dst = DTypePointer[DType.uint8]().alloc(size * 2)
+        var src = UnsafePointer[UInt8]().alloc(size * 2)
+        var dst = UnsafePointer[UInt8]().alloc(size * 2)
         for i in range(size * 2):
             buf[i] = src[i] = 2
             dst[i] = 0
@@ -98,8 +89,8 @@ def test_memcpy():
 
 
 def test_memcpy_dtype():
-    var a = DTypePointer[DType.int32].alloc(4)
-    var b = DTypePointer[DType.int32].alloc(4)
+    var a = UnsafePointer[Int32].alloc(4)
+    var b = UnsafePointer[Int32].alloc(4)
     for i in range(4):
         a[i] = i
         b[i] = -1
@@ -125,25 +116,18 @@ def test_memcmp():
     var pair2 = Pair(1, 2)
 
     var ptr1 = UnsafePointer.address_of(pair1)
-    var dptr1 = DTypePointer[DType.int8](ptr1.bitcast[int8_pop]().address)
-
     var ptr2 = UnsafePointer.address_of(pair2)
-    var dptr2 = DTypePointer[DType.int8](ptr2.bitcast[int8_pop]().address)
 
-    var errors1 = memcmp(dptr1, dptr2, 1)
+    var errors = memcmp(ptr1, ptr2, 1)
 
-    assert_equal(errors1, 0)
-
-    var errors2 = memcmp(ptr1, ptr2, 1)
-
-    assert_equal(errors2, 0)
+    assert_equal(errors, 0)
     _ = pair1
     _ = pair2
 
 
 def test_memcmp_overflow():
-    var p1 = DTypePointer[DType.int8].alloc(1)
-    var p2 = DTypePointer[DType.int8].alloc(1)
+    var p1 = UnsafePointer[Int8].alloc(1)
+    var p2 = UnsafePointer[Int8].alloc(1)
     Scalar.store(p1, -120)
     Scalar.store(p2, 120)
 
@@ -157,8 +141,8 @@ def test_memcmp_overflow():
 def test_memcmp_simd():
     var length = simdwidthof[DType.int8]() + 10
 
-    var p1 = DTypePointer[DType.int8].alloc(length)
-    var p2 = DTypePointer[DType.int8].alloc(length)
+    var p1 = UnsafePointer[Int8].alloc(length)
+    var p2 = UnsafePointer[Int8].alloc(length)
     memset_zero(p1, length)
     memset_zero(p2, length)
     Scalar.store(p1, 120)
@@ -193,8 +177,8 @@ def test_memcmp_extensive[
     var ptr1 = UnsafePointer[Scalar[type]].alloc(count)
     var ptr2 = UnsafePointer[Scalar[type]].alloc(count)
 
-    var dptr1 = DTypePointer[type].alloc(count)
-    var dptr2 = DTypePointer[type].alloc(count)
+    var dptr1 = UnsafePointer[Scalar[type]].alloc(count)
+    var dptr2 = UnsafePointer[Scalar[type]].alloc(count)
 
     for i in range(count):
         ptr1[i] = i
@@ -305,13 +289,13 @@ def test_memset():
     assert_equal(pair.lo, 0)
     assert_equal(pair.hi, 0)
 
-    var buf0 = DTypePointer[DType.int32].alloc(2)
+    var buf0 = UnsafePointer[Int32].alloc(2)
     memset(buf0, 1, 2)
     assert_equal(Scalar.load(buf0, 0), 16843009)
     memset(buf0, -1, 2)
     assert_equal(Scalar.load(buf0, 0), -1)
 
-    var buf1 = DTypePointer[DType.int8].alloc(2)
+    var buf1 = UnsafePointer[Int8].alloc(2)
     memset(buf1, 5, 2)
     assert_equal(Scalar.load(buf1, 0), 5)
     _ = pair
@@ -328,10 +312,10 @@ def test_pointer_string():
 
 
 def test_dtypepointer_string():
-    var nullptr = DTypePointer[DType.float32]()
+    var nullptr = UnsafePointer[Float32]()
     assert_equal(str(nullptr), "0x0")
 
-    var ptr = DTypePointer[DType.float32].alloc(1)
+    var ptr = UnsafePointer[Float32].alloc(1)
     assert_true(str(ptr).startswith("0x"))
     assert_not_equal(str(ptr), "0x0")
     ptr.free()
@@ -373,13 +357,13 @@ def test_pointer_refitem_pair():
 
 
 def test_dtypepointer_gather():
-    var ptr = DTypePointer[DType.float32].alloc(4)
-    SIMD.store(ptr, 0, SIMD[ptr.type, 4](0.0, 1.0, 2.0, 3.0))
+    var ptr = UnsafePointer[Float32].alloc(4)
+    SIMD.store(ptr, 0, SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0))
 
     @parameter
     def _test_gather[
         width: Int
-    ](offset: SIMD[_, width], desired: SIMD[ptr.type, width]):
+    ](offset: SIMD[_, width], desired: SIMD[ptr.type.type, width]):
         var actual = ptr.gather(offset)
         assert_almost_equal(
             actual, desired, msg="_test_gather", atol=0.0, rtol=0.0
@@ -391,8 +375,8 @@ def test_dtypepointer_gather():
     ](
         offset: SIMD[_, width],
         mask: SIMD[DType.bool, width],
-        default: SIMD[ptr.type, width],
-        desired: SIMD[ptr.type, width],
+        default: SIMD[ptr.type.type, width],
+        desired: SIMD[ptr.type.type, width],
     ):
         var actual = ptr.gather(offset, mask, default)
         assert_almost_equal(
@@ -400,15 +384,15 @@ def test_dtypepointer_gather():
         )
 
     var offset = SIMD[DType.int64, 8](3, 0, 2, 1, 2, 0, 3, 1)
-    var desired = SIMD[ptr.type, 8](3.0, 0.0, 2.0, 1.0, 2.0, 0.0, 3.0, 1.0)
+    var desired = SIMD[ptr.type.type, 8](3.0, 0.0, 2.0, 1.0, 2.0, 0.0, 3.0, 1.0)
 
     _test_gather[1](UInt16(2), 2.0)
     _test_gather(offset.cast[DType.uint32]().slice[2](), desired.slice[2]())
     _test_gather(offset.cast[DType.uint64]().slice[4](), desired.slice[4]())
 
     var mask = (offset >= 0) & (offset < 3)
-    var default = SIMD[ptr.type, 8](-1.0)
-    desired = SIMD[ptr.type, 8](-1.0, 0.0, 2.0, 1.0, 2.0, 0.0, -1.0, 1.0)
+    var default = SIMD[ptr.type.type, 8](-1.0)
+    desired = SIMD[ptr.type.type, 8](-1.0, 0.0, 2.0, 1.0, 2.0, 0.0, -1.0, 1.0)
 
     _test_masked_gather[1](Int16(2), False, -1.0, -1.0)
     _test_masked_gather[1](Int32(2), True, -1.0, 2.0)
@@ -418,16 +402,16 @@ def test_dtypepointer_gather():
 
 
 def test_dtypepointer_scatter():
-    var ptr = DTypePointer[DType.float32].alloc(4)
-    SIMD.store(ptr, 0, SIMD[ptr.type, 4](0.0))
+    var ptr = UnsafePointer[Float32].alloc(4)
+    SIMD.store(ptr, 0, SIMD[ptr.type.type, 4](0.0))
 
     @parameter
     def _test_scatter[
         width: Int
     ](
         offset: SIMD[_, width],
-        val: SIMD[ptr.type, width],
-        desired: SIMD[ptr.type, 4],
+        val: SIMD[ptr.type.type, width],
+        desired: SIMD[ptr.type.type, 4],
     ):
         ptr.scatter(offset, val)
         var actual = SIMD[size=4].load(ptr, 0)
@@ -440,9 +424,9 @@ def test_dtypepointer_scatter():
         width: Int
     ](
         offset: SIMD[_, width],
-        val: SIMD[ptr.type, width],
+        val: SIMD[ptr.type.type, width],
         mask: SIMD[DType.bool, width],
-        desired: SIMD[ptr.type, 4],
+        desired: SIMD[ptr.type.type, 4],
     ):
         ptr.scatter(offset, val, mask)
         var actual = SIMD[size=4].load(ptr, 0)
@@ -450,37 +434,37 @@ def test_dtypepointer_scatter():
             actual, desired, msg="_test_masked_scatter", atol=0.0, rtol=0.0
         )
 
-    _test_scatter[1](UInt16(2), 2.0, SIMD[ptr.type, 4](0.0, 0.0, 2.0, 0.0))
+    _test_scatter[1](UInt16(2), 2.0, SIMD[ptr.type.type, 4](0.0, 0.0, 2.0, 0.0))
     _test_scatter(  # Test with repeated offsets
         SIMD[DType.uint32, 4](1, 1, 1, 1),
-        SIMD[ptr.type, 4](-1.0, 2.0, -2.0, 1.0),
-        SIMD[ptr.type, 4](0.0, 1.0, 2.0, 0.0),
+        SIMD[ptr.type.type, 4](-1.0, 2.0, -2.0, 1.0),
+        SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 0.0),
     )
     _test_scatter(
         SIMD[DType.uint64, 4](3, 2, 1, 0),
-        SIMD[ptr.type, 4](0.0, 1.0, 2.0, 3.0),
-        SIMD[ptr.type, 4](3.0, 2.0, 1.0, 0.0),
+        SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0),
+        SIMD[ptr.type.type, 4](3.0, 2.0, 1.0, 0.0),
     )
 
-    SIMD.store(ptr, 0, SIMD[ptr.type, 4](0.0))
+    SIMD.store(ptr, 0, SIMD[ptr.type.type, 4](0.0))
 
     _test_masked_scatter[1](
-        Int16(2), 2.0, False, SIMD[ptr.type, 4](0.0, 0.0, 0.0, 0.0)
+        Int16(2), 2.0, False, SIMD[ptr.type.type, 4](0.0, 0.0, 0.0, 0.0)
     )
     _test_masked_scatter[1](
-        Int32(2), 2.0, True, SIMD[ptr.type, 4](0.0, 0.0, 2.0, 0.0)
+        Int32(2), 2.0, True, SIMD[ptr.type.type, 4](0.0, 0.0, 2.0, 0.0)
     )
     _test_masked_scatter(  # Test with repeated offsets
         SIMD[DType.int64, 4](1, 1, 1, 1),
-        SIMD[ptr.type, 4](-1.0, 2.0, -2.0, 1.0),
+        SIMD[ptr.type.type, 4](-1.0, 2.0, -2.0, 1.0),
         SIMD[DType.bool, 4](True, True, True, False),
-        SIMD[ptr.type, 4](0.0, -2.0, 2.0, 0.0),
+        SIMD[ptr.type.type, 4](0.0, -2.0, 2.0, 0.0),
     )
     _test_masked_scatter(
         SIMD[DType.index, 4](3, 2, 1, 0),
-        SIMD[ptr.type, 4](0.0, 1.0, 2.0, 3.0),
+        SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0),
         SIMD[DType.bool, 4](True, False, True, True),
-        SIMD[ptr.type, 4](3.0, 2.0, 2.0, 0.0),
+        SIMD[ptr.type.type, 4](3.0, 2.0, 2.0, 0.0),
     )
 
     ptr.free()
@@ -530,7 +514,7 @@ def test_memcpy_unsafe_pointer():
 
 
 def test_indexing():
-    var ptr = DTypePointer[DType.float32].alloc(4)
+    var ptr = UnsafePointer[Float32].alloc(4)
     for i in range(4):
         ptr[i] = i
 
