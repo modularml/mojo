@@ -146,15 +146,15 @@ var needle = "school"  # a word intentionally not in the test data
 fn _memmem_baseline[
     type: DType
 ](
-    haystack: DTypePointer[type],
+    haystack: UnsafePointer[Scalar[type]],
     haystack_len: Int,
-    needle: DTypePointer[type],
+    needle: UnsafePointer[Scalar[type]],
     needle_len: Int,
-) -> DTypePointer[type]:
+) -> UnsafePointer[Scalar[type]]:
     if not needle_len:
         return haystack
     if needle_len > haystack_len:
-        return DTypePointer[type]()
+        return UnsafePointer[Scalar[type]]()
     if needle_len == 1:
         return _memchr[type](haystack, needle[0], haystack_len)
 
@@ -169,7 +169,7 @@ fn _memmem_baseline[
         ) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
-            var offset = i + count_trailing_zeros(mask)
+            var offset = int(i + count_trailing_zeros(mask))
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)
@@ -180,7 +180,7 @@ fn _memmem_baseline[
 
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             return haystack + i
-    return DTypePointer[type]()
+    return UnsafePointer[Scalar[type]]()
 
 
 # ===----------------------------------------------------------------------===#

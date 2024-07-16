@@ -34,7 +34,7 @@ with open("my_file.txt", "r") as f:
 from os import PathLike
 from sys import external_call
 
-from memory import AddressSpace, DTypePointer
+from memory import AddressSpace, UnsafePointer
 
 
 @register_passable
@@ -67,12 +67,12 @@ struct _OwnedStringRef(Boolable):
 struct FileHandle:
     """File handle to an opened file."""
 
-    var handle: DTypePointer[DType.invalid]
+    var handle: UnsafePointer[NoneType]
     """The underlying pointer to the file handle."""
 
     fn __init__(inout self):
         """Default constructor."""
-        self.handle = DTypePointer[DType.invalid]()
+        self.handle = UnsafePointer[NoneType]()
 
     fn __init__(inout self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
@@ -95,11 +95,11 @@ struct FileHandle:
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[
-            "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
+            "KGEN_CompilerRT_IO_FileOpen", UnsafePointer[NoneType]
         ](path, mode, Reference(err_msg))
 
         if err_msg:
-            self.handle = DTypePointer[DType.invalid]()
+            self.handle = UnsafePointer[NoneType]()
             raise err_msg^.consume_as_error()
 
         self.handle = handle
@@ -124,7 +124,7 @@ struct FileHandle:
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        self.handle = DTypePointer[DType.invalid]()
+        self.handle = UnsafePointer[NoneType]()
 
     fn __moveinit__(inout self, owned existing: Self):
         """Moves constructor for the file handle.
@@ -133,7 +133,7 @@ struct FileHandle:
           existing: The existing file handle.
         """
         self.handle = existing.handle
-        existing.handle = DTypePointer[DType.invalid]()
+        existing.handle = UnsafePointer[NoneType]()
 
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads data from a file and sets the file handle seek position. If
@@ -205,7 +205,7 @@ struct FileHandle:
 
     fn read[
         type: DType
-    ](self, ptr: DTypePointer[type], size: Int64 = -1) raises -> Int64:
+    ](self, ptr: UnsafePointer[Scalar[type]], size: Int64 = -1) raises -> Int64:
         """Read data from the file into the pointer. Setting size will read up
         to `sizeof(type) * size`. The default value of `size` is -1 which
         will read to the end of the file. Starts reading from the file handle
@@ -235,7 +235,7 @@ struct FileHandle:
         var file = open(file_name, "r")
 
         # Allocate and load 8 elements
-        var ptr = DTypePointer[DType.float32].alloc(8)
+        var ptr = UnsafePointer[Float32].alloc(8)
         var bytes = file.read(ptr, 8)
         print("bytes read", bytes)
 
@@ -246,7 +246,7 @@ struct FileHandle:
         _ = file.seek(2 * sizeof[DType.float32](), os.SEEK_CUR)
 
         # Allocate and load 8 more elements from file handle seek position
-        var ptr2 = DTypePointer[DType.float32].alloc(8)
+        var ptr2 = UnsafePointer[Float32].alloc(8)
         var bytes2 = file.read(ptr2, 8)
 
         var eleventh_element = ptr2[0]

@@ -232,48 +232,48 @@ struct _DictIndex:
     this in the current type system.
     """
 
-    var data: DTypePointer[DType.invalid]
+    var data: UnsafePointer[NoneType]
 
     @always_inline
     fn __init__(inout self, reserved: Int):
         if reserved <= 128:
-            var data = DTypePointer[DType.int8].alloc(reserved)
+            var data = UnsafePointer[Int8].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
         elif reserved <= 2**16 - 2:
-            var data = DTypePointer[DType.int16].alloc(reserved)
+            var data = UnsafePointer[Int16].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
         elif reserved <= 2**32 - 2:
-            var data = DTypePointer[DType.int32].alloc(reserved)
+            var data = UnsafePointer[Int32].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
         else:
-            var data = DTypePointer[DType.int64].alloc(reserved)
+            var data = UnsafePointer[Int64].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
 
     fn copy(self, reserved: Int) -> Self:
         var index = Self(reserved)
         if reserved <= 128:
-            var data = self.data.bitcast[DType.int8]()
-            var new_data = index.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[Int8]()
+            var new_data = index.data.bitcast[Int8]()
             memcpy(new_data, data, reserved)
         elif reserved <= 2**16 - 2:
-            var data = self.data.bitcast[DType.int16]()
-            var new_data = index.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[Int16]()
+            var new_data = index.data.bitcast[Int16]()
             memcpy(new_data, data, reserved)
         elif reserved <= 2**32 - 2:
-            var data = self.data.bitcast[DType.int32]()
-            var new_data = index.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[Int32]()
+            var new_data = index.data.bitcast[Int32]()
             memcpy(new_data, data, reserved)
         else:
-            var data = self.data.bitcast[DType.int64]()
-            var new_data = index.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[Int64]()
+            var new_data = index.data.bitcast[Int64]()
             memcpy(new_data, data, reserved)
         return index^
 
@@ -282,30 +282,30 @@ struct _DictIndex:
 
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
-            var data = self.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[Int8]()
             return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**16 - 2:
-            var data = self.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[Int16]()
             return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**32 - 2:
-            var data = self.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[Int32]()
             return int(Scalar.load(data, slot & (reserved - 1)))
         else:
-            var data = self.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[Int64]()
             return int(Scalar.load(data, slot & (reserved - 1)))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
-            var data = self.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[Int8]()
             return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**16 - 2:
-            var data = self.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[Int16]()
             return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**32 - 2:
-            var data = self.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[Int32]()
             return Scalar.store(data, slot & (reserved - 1), value)
         else:
-            var data = self.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[Int64]()
             return Scalar.store(data, slot & (reserved - 1), value)
 
     fn __del__(owned self):

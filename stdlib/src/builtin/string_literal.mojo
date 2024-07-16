@@ -17,8 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys.ffi import C_char
 
-from memory import DTypePointer
-
 from utils import StringRef
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -304,14 +302,12 @@ struct StringLiteral(
         Returns:
             The raw pointer to the data.
         """
-        var ptr = DTypePointer[DType.int8](
-            __mlir_op.`pop.string.address`(self.value)
-        )
+        var ptr = UnsafePointer(__mlir_op.`pop.string.address`(self.value))
 
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return UnsafePointer[Int8]._from_dtype_ptr(ptr).bitcast[UInt8]()
+        return ptr.bitcast[UInt8]()
 
     fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
@@ -322,15 +318,6 @@ struct StringLiteral(
             The pointer to the underlying memory.
         """
         return self.unsafe_ptr().bitcast[C_char]()
-
-    @always_inline("nodebug")
-    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        return self.unsafe_ptr().bitcast[UInt8]()
 
     @always_inline
     fn as_string_slice(self) -> StringSlice[ImmutableStaticLifetime]:
