@@ -931,7 +931,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         # Return (found, slot, index)
         var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))
-        var removed_slot = OptionalReg[Int](None)
+        var removed_slot = Optional[Int](None)
         while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
