@@ -14,7 +14,7 @@
 
 from testing import assert_equal
 
-from utils._format import Formattable, Formatter, write_to
+from utils._format import Formattable, Formatter
 from utils.inline_string import _FixedString
 
 
@@ -35,7 +35,7 @@ struct Point(Formattable, Stringable):
 
     @no_inline
     fn format_to(self, inout writer: Formatter):
-        write_to(writer, "Point(", self.x, ", ", self.y, ")")
+        writer.write("Point(", self.x, ", ", self.y, ")")
 
     @no_inline
     fn __str__(self) -> String:
@@ -52,11 +52,11 @@ fn test_formatter_of_string() raises:
     assert_equal(s1, "Point(2, 7)")
 
     #
-    # Test write_to(String, ..)
+    # Test fmt.write(String, ..)
     #
     var s2 = String()
     var s2_fmt = Formatter(s2)
-    write_to(s2_fmt, Point(3, 8))
+    s2_fmt.write(Point(3, 8))
     assert_equal(s2, "Point(3, 8)")
 
 
@@ -78,7 +78,7 @@ fn test_stringable_based_on_format() raises:
 fn test_formatter_of_fixed_string() raises:
     var s1 = _FixedString[100]()
     var s1_fmt = Formatter(s1)
-    write_to(s1_fmt, "Hello, World!")
+    s1_fmt.write("Hello, World!")
     assert_equal(str(s1), "Hello, World!")
 
 
