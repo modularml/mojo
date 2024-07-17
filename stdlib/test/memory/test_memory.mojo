@@ -15,7 +15,6 @@
 from sys import sizeof
 
 from memory import (
-    DTypePointer,
     UnsafePointer,
     memcmp,
     memcpy,
