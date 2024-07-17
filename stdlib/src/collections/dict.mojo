@@ -34,6 +34,7 @@ See the `Dict` docs for more details.
 from builtin.value import StringableCollectionElement
 
 from .optional import Optional
+from bit import is_power_of_two
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
@@ -232,48 +233,48 @@ struct _DictIndex:
     this in the current type system.
     """
 
-    var data: DTypePointer[DType.invalid]
+    var data: UnsafePointer[NoneType]
 
     @always_inline
     fn __init__(inout self, reserved: Int):
         if reserved <= 128:
-            var data = DTypePointer[DType.int8].alloc(reserved)
+            var data = UnsafePointer[Int8].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
         elif reserved <= 2**16 - 2:
-            var data = DTypePointer[DType.int16].alloc(reserved)
+            var data = UnsafePointer[Int16].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
         elif reserved <= 2**32 - 2:
-            var data = DTypePointer[DType.int32].alloc(reserved)
+            var data = UnsafePointer[Int32].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
         else:
-            var data = DTypePointer[DType.int64].alloc(reserved)
+            var data = UnsafePointer[Int64].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
-            self.data = data.bitcast[DType.invalid]()
+            self.data = data.bitcast[NoneType]()
 
     fn copy(self, reserved: Int) -> Self:
         var index = Self(reserved)
         if reserved <= 128:
-            var data = self.data.bitcast[DType.int8]()
-            var new_data = index.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[Int8]()
+            var new_data = index.data.bitcast[Int8]()
             memcpy(new_data, data, reserved)
         elif reserved <= 2**16 - 2:
-            var data = self.data.bitcast[DType.int16]()
-            var new_data = index.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[Int16]()
+            var new_data = index.data.bitcast[Int16]()
             memcpy(new_data, data, reserved)
         elif reserved <= 2**32 - 2:
-            var data = self.data.bitcast[DType.int32]()
-            var new_data = index.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[Int32]()
+            var new_data = index.data.bitcast[Int32]()
             memcpy(new_data, data, reserved)
         else:
-            var data = self.data.bitcast[DType.int64]()
-            var new_data = index.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[Int64]()
+            var new_data = index.data.bitcast[Int64]()
             memcpy(new_data, data, reserved)
         return index^
 
@@ -282,30 +283,30 @@ struct _DictIndex:
 
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
-            var data = self.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[Int8]()
             return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**16 - 2:
-            var data = self.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[Int16]()
             return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**32 - 2:
-            var data = self.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[Int32]()
             return int(Scalar.load(data, slot & (reserved - 1)))
         else:
-            var data = self.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[Int64]()
             return int(Scalar.load(data, slot & (reserved - 1)))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
-            var data = self.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[Int8]()
             return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**16 - 2:
-            var data = self.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[Int16]()
             return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**32 - 2:
-            var data = self.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[Int32]()
             return Scalar.store(data, slot & (reserved - 1), value)
         else:
-            var data = self.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[Int64]()
             return Scalar.store(data, slot & (reserved - 1), value)
 
     fn __del__(owned self):
@@ -442,6 +443,31 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self.size = 0
         self._n_entries = 0
         self._entries = Self._new_entries(Self._initial_reservation)
+        self._index = _DictIndex(len(self._entries))
+
+    @always_inline
+    fn __init__(inout self, *, power_of_two_initial_capacity: Int):
+        """Initialize an empty dictiontary with a pre-reserved initial capacity.
+
+        Args:
+            power_of_two_initial_capacity: At least 8, has to be a power of two.
+
+        Example usage:
+
+        ```mojo
+        var x = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+        # Insert (2/3 of 1024) entries without reallocation.
+        ```
+
+        """
+        debug_assert(
+            bit.is_power_of_two(power_of_two_initial_capacity)
+            and power_of_two_initial_capacity >= 8,
+            "power_of_two_initial_capacity need to be >=8 and a power of two",
+        )
+        self.size = 0
+        self._n_entries = 0
+        self._entries = Self._new_entries(power_of_two_initial_capacity)
         self._index = _DictIndex(len(self._entries))
 
     # TODO: add @property when Mojo supports it to make

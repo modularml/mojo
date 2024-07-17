@@ -23,8 +23,6 @@ from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 from sys.ffi import C_char
 
-from memory import DTypePointer
-
 from utils import InlineArray, StringRef
 
 from .path import isdir, split

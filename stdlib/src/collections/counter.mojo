@@ -59,13 +59,35 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var item = item_ref[]
             self._data[item] = self._data.get(item, 0) + 1
 
+    @always_inline
     fn __init__(inout self, *, other: Self):
-        """Explicit copy constructor of the Counter.
+        """Create a new Counter by copying another Counter.
 
         Args:
-            other: The `Counter` to copy.
+            other: The Counter to copy.
         """
         self._data = Dict[V, Int](other=other._data)
+
+    @staticmethod
+    fn fromkeys(keys: List[V], value: Int) -> Self:
+        """Create a new Counter from a list of keys and a default value.
+
+        Args:
+            keys: The keys to create the Counter from.
+            value: The default value to associate with each key.
+
+        Returns:
+            A new Counter with the keys and default value.
+        """
+        debug_assert(
+            value >= 0,
+            "value must be non-negative",
+        )
+        var result = Counter[V]()
+        for key_ref in keys:
+            var key = key_ref[]
+            result[key] = value
+        return result
 
     # ===------------------------------------------------------------------=== #
     # Operator dunders
@@ -118,7 +140,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """Returns the number of elements currently stored in the Counter.
 
         Returns:
-            The number of elements currently stored in the Counter.
+            The number of elements in the Counter.
         """
         return len(self._data)
 
@@ -253,6 +275,63 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self.update(other)
         self._keep_positive()
 
+    fn __sub__(self, other: Self) -> Self:
+        """Subtract counts, but keep only results with positive counts.
+
+        Args:
+            other: The other Counter to subtract from this Counter.
+
+        Returns:
+            A new Counter with the counts from the other Counter subtracted from
+            this Counter.
+        """
+        var result = Counter[V](other=self)
+
+        result.subtract(other)
+
+        return +result^  # Remove zero and negative counts
+
+    fn __isub__(inout self, other: Self) raises:
+        """Subtract counts from another Counter from this Counter.
+
+        Args:
+            other: The other Counter to subtract from this Counter.
+        """
+        self.subtract(other)
+        self._keep_positive()
+
+    fn __and__(self, other: Self) raises -> Self:
+        """Intersection: keep common elements with the minimum count.
+
+        Args:
+            other: The other Counter to intersect with.
+
+        Returns:
+            A new Counter with the common elements and the minimum count of
+            the two Counters.
+        """
+        var result = Counter[V]()
+
+        for key_ref in self.keys():
+            var key = key_ref[]
+            if key in other:
+                result[key] = min(self[key], other[key])
+
+        return result^
+
+    fn __iand__(inout self, other: Self) raises:
+        """Intersection: keep common elements with the minimum count.
+
+        Args:
+            other: The other Counter to intersect with.
+        """
+        for key_ref in self.keys():
+            var key = key_ref[]
+            if key not in other:
+                _ = self.pop(key)
+            else:
+                self[key] = min(self[key], other[key])
+
     fn _keep_positive(inout self) raises:
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
@@ -265,7 +344,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # ===------------------------------------------------------------------=== #
 
     fn __pos__(self) -> Self:
-        """Return a shallow copy of the Counter.
+        """Return a shallow copy of the Counter, stripping non-positive counts.
 
         Returns:
             A shallow copy of the Counter.
@@ -364,6 +443,18 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     fn clear(inout self):
         """Remove all elements from the Counter."""
         self._data.clear()
+
+    fn popitem(inout self) raises -> CountTuple[V]:
+        """Remove and return an arbitrary (key, value) pair from the Counter.
+
+        Returns:
+            A CountTuple containing the key and value of the removed item.
+
+        Raises:
+            "KeyError" if the Counter is empty.
+        """
+        var item_ref = self._data.popitem()
+        return CountTuple[V](item_ref.key, item_ref.value)
 
     # Special methods for counter
 

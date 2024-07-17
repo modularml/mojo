@@ -29,8 +29,9 @@ from sys import (
 
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
-from memory import bitcast
+from memory import bitcast, DTypePointer
 
 from utils import InlineArray, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -1333,9 +1334,19 @@ struct SIMD[type: DType, size: Int](
             The value as an integer.
         """
         constrained[size == 1, "expected a scalar type"]()
-        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-            rebind[Scalar[type]](self).value
-        )
+
+        alias int_width = bitwidthof[Int]()
+        alias type_width = bitwidthof[type]()
+
+        @parameter
+        if type.is_unsigned() and int_width > type_width:
+            # If we are casting up, prevent sign extension by first casting to
+            # a large unsigned
+            return self.cast[_uint_type_of_width[int_width]()]().__int__()
+        else:
+            return __mlir_op.`pop.cast`[
+                _type = __mlir_type.`!pop.scalar<index>`
+            ](rebind[Scalar[type]](self).value)
 
     @no_inline
     fn __str__(self) -> String:
@@ -1644,8 +1655,7 @@ struct SIMD[type: DType, size: Int](
             A new SIMD vector containing x clamped to be within lower_bound and
             upper_bound.
         """
-
-        return self.min(upper_bound).max(lower_bound)
+        return max(min(self, upper_bound), lower_bound)
 
     @always_inline("nodebug")
     fn roundeven(self) -> Self:
@@ -1661,105 +1671,6 @@ struct SIMD[type: DType, size: Int](
         return llvm_intrinsic["llvm.roundeven", Self, has_side_effect=False](
             self
         )
-
-    @always_inline
-    fn add_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
-        """Computes `self + rhs` and a mask of which indices overflowed.
-
-        Args:
-            rhs: The rhs value.
-
-        Returns:
-            A tuple with the results of the operation and a mask for overflows.
-            The first is a new vector whose element at position `i` is computed
-            as `self[i] + rhs[i]`. The second item is a vector of booleans where
-            a `1` at position `i` represents `self[i] + rhs[i]` overflowed.
-        """
-        constrained[type.is_integral()]()
-
-        @parameter
-        if type.is_signed():
-            var result = llvm_intrinsic[
-                "llvm.sadd.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-        else:
-            var result = llvm_intrinsic[
-                "llvm.uadd.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-
-    @always_inline
-    fn sub_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
-        """Computes `self - rhs` and a mask of which indices overflowed.
-
-        Args:
-            rhs: The rhs value.
-
-        Returns:
-            A tuple with the results of the operation and a mask for overflows.
-            The first is a new vector whose element at position `i` is computed
-            as `self[i] - rhs[i]`. The second item is a vector of booleans where
-            a `1` at position `i` represents `self[i] - rhs[i]` overflowed.
-        """
-        constrained[type.is_integral()]()
-
-        @parameter
-        if type.is_signed():
-            var result = llvm_intrinsic[
-                "llvm.ssub.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-        else:
-            var result = llvm_intrinsic[
-                "llvm.usub.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-
-    @always_inline
-    fn mul_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
-        """Computes `self * rhs` and a mask of which indices overflowed.
-
-        Args:
-            rhs: The rhs value.
-
-        Returns:
-            A tuple with the results of the operation and a mask for overflows.
-            The first is a new vector whose element at position `i` is computed
-            as `self[i] * rhs[i]`. The second item is a vector of booleans where
-            a `1` at position `i` represents `self[i] * rhs[i]` overflowed.
-        """
-        constrained[type.is_integral()]()
-
-        @parameter
-        if type.is_signed():
-            var result = llvm_intrinsic[
-                "llvm.smul.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-        else:
-            var result = llvm_intrinsic[
-                "llvm.umul.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
 
     # TODO: Move to global function.
     @always_inline("nodebug")
@@ -2130,34 +2041,6 @@ struct SIMD[type: DType, size: Int](
             rebind[Self._SIMDHalfType](res[1]),
         )
 
-    @always_inline("nodebug")
-    fn min(self, other: Self) -> Self:
-        """Computes the elementwise minimum between the two vectors.
-
-        Args:
-            other: The other SIMD vector.
-
-        Returns:
-            A new SIMD vector where each element at position `i` is
-            `min(self[i], other[i])`.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return __mlir_op.`pop.min`(self.value, other.value)
-
-    @always_inline("nodebug")
-    fn max(self, other: Self) -> Self:
-        """Computes the elementwise maximum between the two vectors.
-
-        Args:
-            other: The other SIMD vector.
-
-        Returns:
-            A new SIMD vector where each element at position `i` is
-            `max(self[i], other[i])`.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return __mlir_op.`pop.max`(self.value, other.value)
-
     # ===------------------------------------------------------------------=== #
     # Reduce operations
     # ===------------------------------------------------------------------=== #
@@ -2221,7 +2104,7 @@ struct SIMD[type: DType, size: Int](
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
                 type, width
             ]:
-                return v1.max(v2)
+                return max(v1, v2)
 
             return self.reduce[max_reduce_body, size_out]()
 
@@ -2279,7 +2162,7 @@ struct SIMD[type: DType, size: Int](
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
                 type, width
             ]:
-                return v1.min(v2)
+                return min(v1, v2)
 
             return self.reduce[min_reduce_body, size_out]()
 
@@ -2651,8 +2534,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _]) -> Self:
+    ](ptr: DTypePointer[type, *_]) -> Self:
         """Loads the value the pointer points to.
 
         Constraints:
@@ -2660,7 +2542,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2675,8 +2556,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Scalar) -> Self:
+    ](ptr: DTypePointer[type, *_], offset: Scalar) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2685,7 +2565,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2702,8 +2581,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: UnsafePointer[Scalar[type], address_space, _], offset: Int) -> Self:
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2711,7 +2589,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2750,8 +2627,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Int) -> Self:
+    ](ptr: DTypePointer[type, *_], offset: Int) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2759,7 +2635,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2772,37 +2647,11 @@ struct SIMD[type: DType, size: Int](
         return Self.load[alignment=alignment](ptr.address, offset)
 
     @staticmethod
-    @always_inline("nodebug")
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: UInt) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        return Self.load(ptr, Int(offset.value))
-
-    @staticmethod
     @always_inline
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Int, val: Self):
+    ](ptr: DTypePointer[type, *_], offset: Int, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2811,24 +2660,20 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
             offset: The offset to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.offset(offset), val
-        )
+        Self.store[alignment=alignment](ptr.offset(offset), val)
 
     @staticmethod
     @always_inline
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Scalar, val: Self):
+    ](ptr: DTypePointer[type, *_], offset: Scalar, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2836,7 +2681,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
@@ -2844,17 +2688,14 @@ struct SIMD[type: DType, size: Int](
             val: The value to store.
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr, int(offset), val
-        )
+        Self.store[alignment=alignment](ptr, int(offset), val)
 
     @staticmethod
     @always_inline("nodebug")
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], val: Self):
+    ](ptr: DTypePointer[type, *_], val: Self):
         """Stores a single element value.
 
         Constraints:
@@ -2862,23 +2703,19 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.address, val
-        )
+        Self.store[alignment=alignment](ptr.address, val)
 
     @staticmethod
     @always_inline("nodebug")
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: UnsafePointer[Scalar[type], address_space, _], val: Self):
+    ](ptr: UnsafePointer[Scalar[type], *_], val: Self):
         """Stores a single element value.
 
         Constraints:
@@ -2886,7 +2723,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
@@ -2905,8 +2741,7 @@ struct SIMD[type: DType, size: Int](
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: UInt, val: Self):
+    ](ptr: DTypePointer[type, *_], offset: UInt, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2914,16 +2749,13 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
             offset: The offset to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.offset(offset.value), val
-        )
+        Self.store[alignment=alignment](ptr.offset(offset), val)
 
 
 # ===----------------------------------------------------------------------=== #

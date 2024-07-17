@@ -175,9 +175,6 @@ struct UnsafePointer[
 
         constrained[sizeof_t > 0, "size must be greater than zero"]()
         constrained[alignment > 0, "alignment must be greater than zero"]()
-        constrained[
-            sizeof_t % alignment == 0, "size must be a multiple of alignment"
-        ]()
 
         return _malloc[T, address_space=address_space](
             sizeof_t * count, alignment=alignment

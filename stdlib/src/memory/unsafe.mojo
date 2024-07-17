@@ -418,7 +418,7 @@ struct DTypePointer[
     @always_inline
     fn free(self):
         """Frees the heap allocates memory."""
-        _free(self)
+        _free(self.address)
 
     # ===------------------------------------------------------------------=== #
     # Casting
@@ -487,7 +487,7 @@ struct DTypePointer[
             A vector which is stride loaded.
         """
         return strided_load[type, width](
-            self, int(stride), SIMD[DType.bool, width](1)
+            self.address, int(stride), SIMD[DType.bool, width](1)
         )
 
     @always_inline("nodebug")
@@ -504,7 +504,7 @@ struct DTypePointer[
             val: The SIMD value to store.
             stride: The stride between stores.
         """
-        strided_store(val, self, int(stride), True)
+        strided_store(val, self.address, int(stride), True)
 
     # ===------------------------------------------------------------------=== #
     # Gather / Scatter

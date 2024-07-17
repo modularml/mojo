@@ -18,7 +18,7 @@ from os import PathLike, listdir, stat_result
 from sys import os_is_windows
 from sys.ffi import C_char
 
-from builtin._location import __call_location
+from builtin._location import __call_location, _SourceLocation
 from memory import stack_allocation
 
 from utils import StringRef
@@ -33,7 +33,7 @@ fn cwd() raises -> Path:
       The current directory.
     """
     alias MAX_CWD_BUFFER_SIZE = 1024
-    var buf0 = stack_allocation[MAX_CWD_BUFFER_SIZE, C_char.type]()
+    var buf0 = stack_allocation[MAX_CWD_BUFFER_SIZE, C_char]()
 
     var buf = UnsafePointer[C_char]._from_dtype_ptr(buf0)
 
@@ -55,7 +55,11 @@ fn _dir_of_current_file() raises -> Path:
     Returns:
       The directory the file calling is at.
     """
-    var file_name = __call_location().file_name
+    return _dir_of_current_file_impl(__call_location().file_name)
+
+
+@no_inline
+fn _dir_of_current_file_impl(file_name: StringLiteral) raises -> Path:
     var i = str(file_name).rfind(DIR_SEPARATOR)
     return Path(str(file_name)[0:i])
 
