@@ -932,23 +932,9 @@ fn isclose[
 
 
 @always_inline
-fn iota[type: DType, simd_width: Int]() -> SIMD[type, simd_width]:
-    """Creates a SIMD vector containing an increasing sequence, starting from 0.
-
-    Parameters:
-        type: The `dtype` of the input and output SIMD vector.
-        simd_width: The width of the input and output SIMD vector.
-
-    Returns:
-        An increasing sequence of values, starting from 0.
-    """
-    return iota[type, simd_width](0)
-
-
-@always_inline
 fn iota[
     type: DType, simd_width: Int
-](offset: Scalar[type]) -> SIMD[type, simd_width]:
+](offset: Scalar[type] = 0) -> SIMD[type, simd_width]:
     """Creates a SIMD vector containing an increasing sequence, starting from
     offset.
 
