@@ -16,6 +16,27 @@ what we publish.
 
 ### ⭐️ New
 
+- Creating nested `PythonObject` from a list or tuple of python objects is
+  possible now:
+
+  ```mojo
+  var np = Python.import_module("numpy")
+  var a = np.array([1, 2, 3])
+  var b = np.array([4, 5, 6])
+  var arrays = PythonObject([a, b])
+  assert_equal(len(arrays), 2)
+  ```
+
+  Also allowing more convenient call syntax:
+
+  ```mojo
+  var stacked = np.hstack((a, b))
+  assert_equal(str(stacked), "[1 2 3 4 5 6]")
+  ```
+
+  ([PR 3264#](https://github.com/modularml/mojo/pull/3264) by
+  [@kszucs](https://github.com/kszucs))
+
 - `List[T]` values are now equality comparable with `==` and `!=` when `T` is
   equality comparable.
   ([PR 3195#](https://github.com/modularml/mojo/pull/3195) by
