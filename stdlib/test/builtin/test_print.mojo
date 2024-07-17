@@ -17,7 +17,6 @@ import sys
 
 from tempfile import NamedTemporaryFile
 from testing import assert_equal
-from memory import DTypePointer
 
 from builtin._location import __call_location, _SourceLocation
 from utils import StaticIntTuple, StringRef

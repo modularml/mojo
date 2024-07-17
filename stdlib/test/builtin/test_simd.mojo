@@ -136,7 +136,7 @@ def test_simd_repr():
 def test_issue_1625():
     var size = 16
     alias simd_width = 8
-    var ptr = DTypePointer[DType.int64].alloc(size)
+    var ptr = UnsafePointer[Int64].alloc(size)
     for i in range(size):
         ptr[i] = i
 
@@ -156,10 +156,10 @@ def test_issue_1625():
 
 
 def test_issue_20421():
-    var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
+    var a = UnsafePointer[UInt8].alloc[alignment=64](16 * 64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[DType.int32]())
+    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[Int32]())
     assert_equal(
         av16,
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),

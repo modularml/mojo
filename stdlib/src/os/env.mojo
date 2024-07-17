@@ -21,8 +21,6 @@ from os import setenv
 
 from sys import external_call, os_is_linux, os_is_macos
 
-from memory import DTypePointer
-
 from utils import StringRef
 
 
