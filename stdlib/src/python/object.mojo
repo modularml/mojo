@@ -255,7 +255,9 @@ struct PythonObject(
             var obj: PythonObject
 
             @parameter
-            if _type_is_eq[T, Int]():
+            if _type_is_eq[T, PythonObject]():
+                obj = value.get[i, PythonObject]()
+            elif _type_is_eq[T, Int]():
                 obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
                 obj = PythonObject(value.get[i, Float64]())
@@ -268,8 +270,9 @@ struct PythonObject(
             else:
                 obj = PythonObject(0)
                 constrained[
-                    False, "cannot convert nested list element to object"
+                    False, "cannot convert list element to python object"
                 ]()
+
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
@@ -295,7 +298,9 @@ struct PythonObject(
             var obj: PythonObject
 
             @parameter
-            if _type_is_eq[T, Int]():
+            if _type_is_eq[T, PythonObject]():
+                obj = value.get[i, PythonObject]()
+            elif _type_is_eq[T, Int]():
                 obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
                 obj = PythonObject(value.get[i, Float64]())
@@ -308,8 +313,9 @@ struct PythonObject(
             else:
                 obj = PythonObject(0)
                 constrained[
-                    False, "cannot convert nested list element to object"
+                    False, "cannot convert list element to python object"
                 ]()
+
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
