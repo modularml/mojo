@@ -244,8 +244,8 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> Int:
 
     # Compute our SIMD strides and tail length
     # n == k * stride + r
-    var k = n // stride
-    var r = n % stride
+    var k = n._positive_div(stride)
+    var r = n._positive_rem(stride)
     debug_assert(n == k * stride + r, "wrong hash tail math")
 
     # 1. Reinterpret the underlying data as a larger int type
