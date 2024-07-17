@@ -297,6 +297,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # Insert (2/3 of 1024) entries
   ```
 
+- `ListLiteral` now supports `__contains__`.
+  ([PR #3251](https://github.com/modularml/mojo/pull/3251) by
+  [@jjvraw](https://github.com/jjvraw))
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
