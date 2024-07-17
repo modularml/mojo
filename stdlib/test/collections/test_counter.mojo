@@ -386,6 +386,28 @@ def test_counter_setitem():
     assert_equal(c[3], 0)
 
 
+def test_or():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+
+    var c2 = Counter[String]()
+    c2["b"] = 3
+    c2["c"] = 4
+
+    var c3 = c1 | c2
+
+    assert_equal(c3["a"], 1)
+    assert_equal(c3["b"], 3)
+    assert_equal(c3["c"], 4)
+
+    c1 |= c2
+
+    assert_equal(c1["a"], 1)
+    assert_equal(c1["b"], 3)
+    assert_equal(c1["c"], 4)
+
+
 def test_pop():
     var counter = Counter[String]()
     counter["a"] = 1
@@ -439,6 +461,7 @@ def main():
     test_len()
     test_lt_le_gt_and_ge()
     test_most_common()
+    test_or()
     test_pop()
     test_popitem()
     test_substract()

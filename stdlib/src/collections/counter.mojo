@@ -332,6 +332,39 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             else:
                 self[key] = min(self[key], other[key])
 
+    fn __or__(self, other: Self) raises -> Self:
+        """Union: keep all elements with the maximum count.
+
+        Args:
+            other: The other Counter to union with.
+
+        Returns:
+            A new Counter with all elements and the maximum count of the two
+            Counters.
+        """
+        var result = Counter[V]()
+
+        for key_ref in self.keys():
+            var key = key_ref[]
+            result[key] = max(self[key], other.get(key, 0))
+
+        for key_ref in other.keys():
+            var key = key_ref[]
+            if key not in self:
+                result[key] = other[key]
+
+        return result^
+
+    fn __ior__(inout self, other: Self) raises:
+        """Union: keep all elements with the maximum count.
+
+        Args:
+            other: The other Counter to union with.
+        """
+        for key_ref in other.keys():
+            var key = key_ref[]
+            self[key] = max(self.get(key, 0), other[key])
+
     fn _keep_positive(inout self) raises:
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
