@@ -2534,8 +2534,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _]) -> Self:
+    ](ptr: DTypePointer[type, *_]) -> Self:
         """Loads the value the pointer points to.
 
         Constraints:
@@ -2543,7 +2542,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2558,8 +2556,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Scalar) -> Self:
+    ](ptr: DTypePointer[type, *_], offset: Scalar) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2568,7 +2565,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2585,8 +2581,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: UnsafePointer[Scalar[type], address_space, _], offset: Int) -> Self:
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2594,7 +2589,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2633,8 +2627,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Int) -> Self:
+    ](ptr: DTypePointer[type, *_], offset: Int) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2642,7 +2635,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2655,37 +2647,11 @@ struct SIMD[type: DType, size: Int](
         return Self.load[alignment=alignment](ptr.address, offset)
 
     @staticmethod
-    @always_inline("nodebug")
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: UInt) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        return Self.load(ptr, Int(offset.value))
-
-    @staticmethod
     @always_inline
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Int, val: Self):
+    ](ptr: DTypePointer[type, *_], offset: Int, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2694,24 +2660,20 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
             offset: The offset to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.offset(offset), val
-        )
+        Self.store[alignment=alignment](ptr.offset(offset), val)
 
     @staticmethod
     @always_inline
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], offset: Scalar, val: Self):
+    ](ptr: DTypePointer[type, *_], offset: Scalar, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2719,7 +2681,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
@@ -2727,17 +2688,14 @@ struct SIMD[type: DType, size: Int](
             val: The value to store.
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr, int(offset), val
-        )
+        Self.store[alignment=alignment](ptr, int(offset), val)
 
     @staticmethod
     @always_inline("nodebug")
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space, _], val: Self):
+    ](ptr: DTypePointer[type, *_], val: Self):
         """Stores a single element value.
 
         Constraints:
@@ -2745,23 +2703,19 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.address, val
-        )
+        Self.store[alignment=alignment](ptr.address, val)
 
     @staticmethod
     @always_inline("nodebug")
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: UnsafePointer[Scalar[type], address_space, _], val: Self):
+    ](ptr: UnsafePointer[Scalar[type], *_], val: Self):
         """Stores a single element value.
 
         Constraints:
@@ -2769,7 +2723,6 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
@@ -2788,8 +2741,7 @@ struct SIMD[type: DType, size: Int](
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: UInt, val: Self):
+    ](ptr: DTypePointer[type, *_], offset: UInt, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2797,16 +2749,13 @@ struct SIMD[type: DType, size: Int](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to store to.
             offset: The offset to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.offset(offset.value), val
-        )
+        Self.store[alignment=alignment](ptr.offset(offset), val)
 
 
 # ===----------------------------------------------------------------------=== #
