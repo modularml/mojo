@@ -38,7 +38,6 @@ jobs:
         shell: bash
     env:
       DEBIAN_FRONTEND: noninteractive
-      LLVM_VERSION: 17
 
     steps:
       - name: Checkout repo
@@ -63,30 +62,12 @@ jobs:
       - name: Install build tools (Linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh ${{env.LLVM_VERSION}}
-
-          # Make common LLVM binaries (including FileCheck) in our PATH so they work when used in an unversioned context
-          # For example, instead of saying `FileCheck-17` which exists in `/usr/bin`, this allows us to just call
-          # FileCheck unqualified.
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{env.LLVM_VERSION}} 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{env.LLVM_VERSION}} 100
-          sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-${{env.LLVM_VERSION}} 100
-          sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${{env.LLVM_VERSION}} 100
-          sudo update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-${{env.LLVM_VERSION}} 100
-          sudo update-alternatives --install /usr/bin/FileCheck FileCheck /usr/bin/FileCheck-${{env.LLVM_VERSION}} 100
-
-          python3 -m pip install lit
+          ./stdlib/scripts/install-build-tools-linux.sh
 
       - name: Install build tools (macOS)
         if: ${{ matrix.os == 'macos-14' }}
         run: |
-          # Install `lit` for use in the tests
-          brew install lit
-
-          # Ensure `FileCheck` from the pre-installed LLVM 15 package is visible
-          echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH
+          ./stdlib/scripts/install-build-tools-macos.sh
 
       - name: Run standard library tests and examples
         env:
