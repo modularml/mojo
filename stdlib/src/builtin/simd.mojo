@@ -1453,7 +1453,7 @@ struct SIMD[type: DType, size: Int](
         # TODO: see how can we implement this.
         return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the value using builtin hash.
 
         Returns:

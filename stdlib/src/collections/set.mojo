@@ -287,7 +287,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return len(self._data)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """A hash value of the elements in the set.
 
         The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).

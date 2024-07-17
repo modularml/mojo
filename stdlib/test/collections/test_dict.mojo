@@ -396,7 +396,7 @@ struct DummyKey(KeyElement):
     fn __init__(inout self, *, other: Self):
         self = other
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         return self.value
 
     fn __eq__(self, other: DummyKey) -> Bool:

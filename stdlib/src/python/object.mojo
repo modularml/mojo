@@ -453,7 +453,7 @@ struct PythonObject(
             raise Error("object has no len()")
         return result
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Returns the length of the object.
 
         Returns:
