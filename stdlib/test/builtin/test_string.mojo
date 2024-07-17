@@ -365,6 +365,9 @@ def test_atol():
     assert_equal(10, atol("0o12", 8))
     assert_equal(10, atol("0O12", 8))
     assert_equal(35, atol("Z", 36))
+    assert_equal(255, atol("0x_00_ff", 16))
+    assert_equal(18, atol("0b0001_0010", 2))
+    assert_equal(18, atol("0b_000_1001_0", 2))
 
     # Negative cases
     with assert_raises(
@@ -398,11 +401,36 @@ def test_atol():
     ):
         _ = atol("5", 5)
 
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '0x_ff'"
+    ):
+        _ = atol("0x_ff")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 3: '_12'"
+    ):
+        _ = atol("_12", 3)
+
     with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
         _ = atol("0", 1)
 
     with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
         _ = atol("0", 37)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 16: '_ff'"
+    ):
+        _ = atol("_ff", base=16)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 2: '  _01'"
+    ):
+        _ = atol("  _01", base=2)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '0x_ff'"
+    ):
+        _ = atol("0x_ff")
 
     with assert_raises(
         contains="String is not convertible to integer with base 10: ''"
@@ -433,6 +461,14 @@ def test_atol_base_0():
 
     assert_equal(0, atol("0X0", base=0))
 
+    assert_equal(255, atol("0x_00_ff", base=0))
+
+    assert_equal(18, atol("0b_0001_0010", base=0))
+    assert_equal(18, atol("0b000_1001_0", base=0))
+
+    assert_equal(10, atol("0o_000_12", base=0))
+    assert_equal(10, atol("0o00_12", base=0))
+
     with assert_raises(
         contains="String is not convertible to integer with base 0: '  0x'"
     ):
@@ -452,11 +488,6 @@ def test_atol_base_0():
         contains="String is not convertible to integer with base 0: '0r100'"
     ):
         _ = atol("0r100", base=0)
-
-    with assert_raises(
-        contains="String is not convertible to integer with base 0: '0b_0'"
-    ):
-        _ = atol("0b_0", base=0)
 
     with assert_raises(
         contains="String is not convertible to integer with base 0: '0xf__f'"
