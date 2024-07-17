@@ -676,6 +676,26 @@ struct UnsafePointer[
             _type = UnsafePointer[T, address_space]._mlir_type,
         ](self.address)
 
+    @always_inline("nodebug")
+    fn bitcast[
+        T: DType,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> UnsafePointer[Scalar[T], address_space]:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            T: The target type.
+            address_space: The address space of the result.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = UnsafePointer[Scalar[T], address_space]._mlir_type,
+        ](self.address)
+
     @always_inline
     fn destroy_pointee(self: UnsafePointer[_]):
         """Destroy the pointed-to value.
