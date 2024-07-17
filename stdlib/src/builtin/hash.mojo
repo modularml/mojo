@@ -14,7 +14,7 @@
 
 There are a few main tools in this module:
 
-- `Hashable` trait for types implementing `__hash__(self) -> Int`
+- `Hashable` trait for types implementing `__hash__(self) -> UInt`
 - `hash[T: Hashable](hashable: T) -> Int` built-in function.
 - A `hash()` implementation for arbitrary byte strings,
   `hash(data: UnsafePointer[UInt8], n: Int) -> Int`,
@@ -45,11 +45,11 @@ from utils import InlineArray
 # var HASH_SECRET = int(random.random_ui64(0, UInt64.MAX)
 
 
-fn _HASH_SECRET() -> Int:
+fn _HASH_SECRET() -> UInt:
     var ptr = _get_global[
         "HASH_SECRET", _initialize_hash_secret, _destroy_hash_secret
     ]()
-    return ptr.bitcast[Int]()[0]
+    return ptr.bitcast[UInt]()[0]
 
 
 fn _initialize_hash_secret(
@@ -79,7 +79,7 @@ trait Hashable:
     ```mojo
     @value
     struct Foo(Hashable):
-        fn __hash__(self) -> Int:
+        fn __hash__(self) -> UInt:
             return 4  # chosen by fair random dice roll
 
     var foo = Foo()
@@ -87,7 +87,7 @@ trait Hashable:
     ```
     """
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Return a 64-bit hash of the type's data.
 
         Returns:
@@ -96,7 +96,7 @@ trait Hashable:
         ...
 
 
-fn hash[T: Hashable](hashable: T) -> Int:
+fn hash[T: Hashable](hashable: T) -> UInt:
     """Hash a Hashable type using its underlying hash implementation.
 
     Parameters:
@@ -148,7 +148,7 @@ alias _HASH_UPDATE = _djbx33a_hash_update
 # performance issue we've been seeing with Dict. It's still not ideal as
 # a long-term hash function.
 @always_inline
-fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
+fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> UInt:
     """Hash a SIMD byte vector using direct DJBX33A hash algorithm.
 
     See `hash(bytes, n)` documentation for more details.
@@ -186,7 +186,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     return int(final_data)
 
 
-fn hash(bytes: UnsafePointer[UInt8], n: Int) -> Int:
+fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
     """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
 
     _This hash function is not suitable for cryptographic purposes._ The

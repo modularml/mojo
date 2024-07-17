@@ -1779,7 +1779,7 @@ struct String(
             l_idx += 1
         return self[l_idx:]
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
 
         Returns:

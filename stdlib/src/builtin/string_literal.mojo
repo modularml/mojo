@@ -242,7 +242,7 @@ struct StringLiteral(
         """
         return self.__str__().__repr__()
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
 
         Returns:

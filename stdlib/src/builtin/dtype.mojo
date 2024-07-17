@@ -230,7 +230,7 @@ struct DType(
             self._as_i8(), rhs._as_i8()
         )
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Return a 64-bit hash for this `DType` value.
 
         Returns:

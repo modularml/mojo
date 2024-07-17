@@ -471,6 +471,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD.load/store` now supports `UnsafePointer` overloads.
 
+- Now that we have a `UInt` type, use this to represent the return type of hash.
+  In general, hashes should be an unsigned integer, and can also lead to improved
+  performance in certain cases.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
