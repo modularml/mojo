@@ -15,6 +15,8 @@
 The functions and traits provided here are built-ins, so you don't need to import them.
 """
 
+from utils._format import Formatter, RepresentableToBuffer
+
 
 trait Representable:
     """A trait that describes a type that has a String representation.
@@ -75,6 +77,22 @@ fn repr[T: Representable](value: T) -> String:
         The string representation of the given value.
     """
     return value.__repr__()
+
+
+fn repr[T: RepresentableToBuffer](value: T, *, inout writer: Formatter):
+    """Write the string representation of the given value to a `Formatter`.
+
+    Does not return anything.
+
+    Args:
+        value: The value to get the string representation of.
+        writer: The formatter to write to.
+
+    Parameters:
+        T: The type of `value`. Must implement the `Representable` trait.
+
+    """
+    return value.__repr__(writer=writer)
 
 
 fn repr(value: None) -> String:
