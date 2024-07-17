@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils._format import Formattable, Formatter, write_to
+from utils._format import Formattable, Formatter
 
 
 fn main() raises:
@@ -25,7 +25,7 @@ struct Point(Formattable):
     var y: Int
 
     fn format_to(self, inout writer: Formatter):
-        write_to(writer, "Point(", self.x, ", ", self.y, ")")
+        writer.write("Point(", self.x, ", ", self.y, ")")
 
 
 # CHECK-LABEL: test_write_to_stdout
@@ -35,8 +35,8 @@ fn test_write_to_stdout():
     var stdout = Formatter.stdout()
 
     # CHECK: Hello, World!
-    write_to(stdout, "Hello, World!")
+    stdout.write("Hello, World!")
 
     # CHECK: point = Point(1, 1)
     var point = Point(1, 1)
-    write_to(stdout, "point = ", point)
+    stdout.write("point = ", point)
