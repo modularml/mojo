@@ -389,6 +389,20 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
                 result[item.key] = item.value
         return result^
 
+    fn __neg__(self) -> Self:
+        """Substract from an empty Counter. Strips positive and zero counts,
+        and flips the sign on negative counts.
+
+        Returns:
+            A new Counter with stripped counts and negative counts.
+        """
+        var result = Counter[V]()
+        for item_ref in self.items():
+            var item = item_ref[]
+            if item.value < 0:
+                result[item.key] = -item.value
+        return result
+
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
