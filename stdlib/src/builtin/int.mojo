@@ -1084,7 +1084,7 @@ struct Int(
         """
         return str(self)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the int using builtin hash.
 
         Returns:

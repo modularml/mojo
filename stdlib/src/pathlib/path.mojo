@@ -228,7 +228,7 @@ struct Path(
         """
         return not self == other
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the underlying path string using builtin hash.
 
         Returns:

@@ -228,6 +228,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var ord_letter_max = (-1, -1)
     var result = 0
     var is_negative: Bool = False
+    var has_prefix: Bool = False
     var start: Int = 0
     var str_len = len(str_ref)
     var buff = str_ref.unsafe_ptr()
@@ -250,14 +251,17 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             str_ref[start + 1] == "b" or str_ref[start + 1] == "B"
         ):
             start += 2
+            has_prefix = True
         elif base == 8 and (
             str_ref[start + 1] == "o" or str_ref[start + 1] == "O"
         ):
             start += 2
+            has_prefix = True
         elif base == 16 and (
             str_ref[start + 1] == "x" or str_ref[start + 1] == "X"
         ):
             start += 2
+            has_prefix = True
 
     alias ord_0 = ord("0")
     # FIXME:
@@ -269,6 +273,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         var real_base_new_start = _identify_base(str_ref, start)
         real_base = real_base_new_start[0]
         start = real_base_new_start[1]
+        has_prefix = real_base != 10
         if real_base == -1:
             raise Error(_atol_error(base, str_ref))
     else:
@@ -285,10 +290,9 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     var found_valid_chars_after_start = False
     var has_space_after_number = False
-    # single underscores are only allowed between digits
-    # starting "was_last_digit_undescore" to true such that
-    # if the first digit is an undesrcore an error is raised
-    var was_last_digit_undescore = True
+    # Prefixed integer literals with real_base 2, 8, 16 may begin with leading
+    # underscores under the conditions they have a prefix
+    var was_last_digit_undescore = not (real_base in (2, 8, 16) and has_prefix)
     for pos in range(start, str_len):
         var ord_current = int(buff[pos])
         if ord_current == ord_underscore:
@@ -1779,7 +1783,7 @@ struct String(
             l_idx += 1
         return self[l_idx:]
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
 
         Returns:

@@ -16,6 +16,27 @@ what we publish.
 
 ### ⭐️ New
 
+- Creating nested `PythonObject` from a list or tuple of python objects is
+  possible now:
+
+  ```mojo
+  var np = Python.import_module("numpy")
+  var a = np.array([1, 2, 3])
+  var b = np.array([4, 5, 6])
+  var arrays = PythonObject([a, b])
+  assert_equal(len(arrays), 2)
+  ```
+
+  Also allowing more convenient call syntax:
+
+  ```mojo
+  var stacked = np.hstack((a, b))
+  assert_equal(str(stacked), "[1 2 3 4 5 6]")
+  ```
+
+  ([PR 3264#](https://github.com/modularml/mojo/pull/3264) by
+  [@kszucs](https://github.com/kszucs))
+
 - `List[T]` values are now equality comparable with `==` and `!=` when `T` is
   equality comparable.
   ([PR 3195#](https://github.com/modularml/mojo/pull/3195) by
@@ -297,6 +318,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # Insert (2/3 of 1024) entries
   ```
 
+- `ListLiteral` now supports `__contains__`.
+  ([PR #3251](https://github.com/modularml/mojo/pull/3251) by
+  [@jjvraw](https://github.com/jjvraw))
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
@@ -470,6 +495,17 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   when the underlying type is `Scalar[DType]`.
 
 - `SIMD.load/store` now supports `UnsafePointer` overloads.
+
+- Now that we have a `UInt` type, use this to represent the return type of hash.
+  In general, hashes should be an unsigned integer, and can also lead to improved
+  performance in certain cases.
+
+- The `atol` function now correctly supports leading underscores,
+  (e.g.`atol("0x_ff", 0)`), when the appropriate base is specified or inferred
+  (base 0). non-base-10 integer literals as per Python's [Integer Literals](\
+  <https://docs.python.org/3/reference/lexical_analysis.html#integers>).
+  ([PR #3180](https://github.com/modularml/mojo/pull/3180)
+  by [@jjvraw](https://github.com/jjvraw))
 
 ### ❌ Removed
 
