@@ -50,7 +50,7 @@ alias tile_k = 4  # K must be a multiple of this
 struct Matrix[rows: Int, cols: Int]:
     var data: DTypePointer[type]
 
-    # Initialize zeroeing all values
+    # Initialize zeroing all values
     fn __init__(inout self):
         self.data = DTypePointer[type].alloc(rows * cols)
         memset_zero(self.data.address, rows * cols)
