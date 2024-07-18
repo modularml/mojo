@@ -118,6 +118,7 @@ def main():
         )
 
     m.dump_report()
+
     @parameter
     for i in range(len(sizes)):
         alias size = sizes.get[i, Int]()
