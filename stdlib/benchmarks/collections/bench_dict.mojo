@@ -16,7 +16,8 @@ from random import *
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from memory.memory import sizeof
-from stdlib.collections import Dict
+from bit import bit_ceil
+from stdlib.collections.dict import Dict, DictEntry
 
 
 # ===----------------------------------------------------------------------===#
@@ -55,7 +56,7 @@ fn bench_dict_insert[size: Int](inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn() raises:
-        for key in range(size, (3 * size) // 4):
+        for key in range(size, (3 * size) // 2):
             items[key] = random.random_si64(0, size).value
 
     b.iter[call_fn]()
@@ -78,6 +79,34 @@ fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
 
     b.iter[call_fn]()
     keep(bool(items))
+
+
+# ===----------------------------------------------------------------------===#
+# Benchmark Dict Memory Footprint
+# ===----------------------------------------------------------------------===#
+
+
+fn total_bytes_used(items: Dict[Int, Int]) -> Int:
+    # the allocated memory by entries:
+    var entry_size = sizeof[Optional[DictEntry[Int, Int]]]()
+    var amnt_bytes = items._entries.capacity * entry_size
+    amnt_bytes += sizeof[Dict[Int, Int]]() - entry_size
+
+    # the allocated memory by index table:
+    var reserved = bit_ceil(len(items))
+    if (len(items) * 3) > (reserved * 2):  # it resizes up if overloaded
+        reserved *= 2
+
+    if reserved <= 128:
+        amnt_bytes += sizeof[Scalar[DType.int8]]() * reserved
+    elif reserved <= 2**16 - 2:
+        amnt_bytes += sizeof[Scalar[DType.int16]]() * reserved
+    elif reserved <= 2**32 - 2:
+        amnt_bytes += sizeof[Scalar[DType.int32]]() * reserved
+    else:
+        amnt_bytes += sizeof[Scalar[DType.int64]]() * reserved
+
+    return amnt_bytes
 
 
 # ===----------------------------------------------------------------------===#
@@ -122,7 +151,7 @@ def main():
     @parameter
     for i in range(len(sizes)):
         alias size = sizes.get[i, Int]()
-        var mem_s = sizeof[Dict[Int, Int]]() * size
+        var mem_s = total_bytes_used(make_dict[size]())
         print(
             '"bench_dict_memory_size[' + str(size) + ']",' + str(mem_s) + ",0"
         )
