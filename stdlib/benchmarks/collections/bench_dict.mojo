@@ -106,13 +106,13 @@ fn total_bytes_used(items: Dict[Int, Int]) -> Int:
     # the allocated memory by index table:
     var reserved = items._reserved()
     if reserved <= 128:
-        amnt_bytes += sizeof[Scalar[DType.int8]]() * reserved
+        amnt_bytes += sizeof[Int8]() * reserved
     elif reserved <= 2**16 - 2:
-        amnt_bytes += sizeof[Scalar[DType.int16]]() * reserved
+        amnt_bytes += sizeof[Int16]() * reserved
     elif reserved <= 2**32 - 2:
-        amnt_bytes += sizeof[Scalar[DType.int32]]() * reserved
+        amnt_bytes += sizeof[Int32]() * reserved
     else:
-        amnt_bytes += sizeof[Scalar[DType.int64]]() * reserved
+        amnt_bytes += sizeof[Int64]() * reserved
 
     return amnt_bytes
 
