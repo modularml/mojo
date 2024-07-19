@@ -72,14 +72,15 @@ fn bench_dict_insert[size: Int](inout b: Bencher) raises:
 fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
     """Lookup 100 items."""
     var items = make_dict[size]()
+    var closest_divisor = ceil(100 / size)
 
     @always_inline
     @parameter
     fn call_fn() raises:
         @parameter
         if size < 100:
-            for _ in range(ceil(100 / size)):
-                for key in range(size):
+            for _ in range(closest_divisor):
+                for key in range(100 // closest_divisor):
                     var res = items[key]
                     keep(res)
         else:
