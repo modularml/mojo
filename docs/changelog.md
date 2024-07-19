@@ -553,5 +553,12 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
   `__setitem__` method is failing with a "must be mutable" error.
+
 - [#248](https://github.com/modularml/mojo/issues/248) - [Feature] Enable
   `__setitem__` to take variadic arguments
+
+- [#3065]<https://github.com/modularml/mojo/issues/3065> - Fix incorrect behavior
+  of `SIMD.__int__` on unsigned types
+
+- [#3045]<https://github.com/modularml/mojo/issues/3045> - Disable implicit SIMD
+  conversion routes through `Bool`
