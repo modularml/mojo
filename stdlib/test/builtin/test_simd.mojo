@@ -211,8 +211,8 @@ def test_issue_30237():
 
         return result
 
-    var x = 6.0
-    var x2 = x * x
+    alias x = 6.0
+    alias x2 = x * x
     var result1 = eval1(x2)
     var result2 = eval2(x2)
 
@@ -226,13 +226,6 @@ def test_bool():
     assert_false(Scalar[DType.int32](0).__bool__())
     assert_true(Scalar[DType.float32](5.0).__bool__())
     assert_false(Scalar[DType.float32](0.0).__bool__())
-
-    assert_true(Scalar[DType.bool](True).__as_bool__())
-    assert_false(Scalar[DType.bool](False).__as_bool__())
-    assert_true(Scalar[DType.int32](5).__as_bool__())
-    assert_false(Scalar[DType.int32](0).__as_bool__())
-    assert_true(Scalar[DType.float32](5.0).__as_bool__())
-    assert_false(Scalar[DType.float32](0.0).__as_bool__())
 
 
 def test_truthy():
