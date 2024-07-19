@@ -87,21 +87,3 @@ fn is_release_build() -> Bool:
         )
     else:
         return True
-
-
-@always_inline("nodebug")
-fn is_relwithdebinfo_build() -> Bool:
-    """
-    Returns True if the build is in relwithdebinfo mode.
-
-    Returns:
-        Bool: True if the build is in relwithdebinfo mode and False otherwise.
-    """
-
-    @parameter
-    if is_defined["DEBUG"]():
-        return True
-    elif is_defined["BUILD_TYPE"]():
-        return _build_type() == "relwithdebinfo"
-    else:
-        return False
