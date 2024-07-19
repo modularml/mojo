@@ -50,6 +50,7 @@ from .dtype import (
 )
 from .io import _printf, _snprintf_scalar
 from .string import _calc_format_buffer_size, _calc_initial_buffer_size
+from builtin._hasher import _Hasher, _HashableWithHasher
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
@@ -156,6 +157,7 @@ struct SIMD[type: DType, size: Int](
     Formattable,
     Truncable,
     Representable,
+    _HashableWithHasher,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -1850,6 +1852,9 @@ struct SIMD[type: DType, size: Int](
             position `i` is `(self + other)[permutation[i]]`.
         """
         return self._shuffle_list[size, mask](other)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        hasher._update_with_simd(self)
 
     @always_inline("nodebug")
     fn slice[
