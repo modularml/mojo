@@ -893,6 +893,24 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = Self._new_entries(Self._initial_reservation)
         self._index = _DictIndex(self._reserved())
 
+    fn setdefault(
+        ref [_]self: Self, key: K, owned default: V
+    ) raises -> Reference[V, __lifetime_of(self)]:
+        """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
+
+        Args:
+            key: The key to search for in the dictionary.
+            default: The default value to set if the key is not present.
+
+        Returns:
+            The value associated with the key, or the default value if it wasn't present.
+        """
+        try:
+            return self._find_ref(key)
+        except KeyError:
+            self[key] = default^
+            return self._find_ref(key)
+
     @staticmethod
     @always_inline
     fn _new_entries(reserve_at_least: Int) -> List[Optional[DictEntry[K, V]]]:

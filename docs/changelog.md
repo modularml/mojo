@@ -157,6 +157,11 @@ what we publish.
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
 
+- `Dict` now implements `setdefault`, to get a value from the dictionary by
+  key, or set it to a default if it doesn't exist
+  ([PR #2803](https://github.com/modularml/mojo/pull/2803)
+  by [@msaelices](https://github.com/msaelices))
+
 - Added new `ExplicitlyCopyable` trait, to mark types that can be copied
   explicitly, but which might not be implicitly copyable.
 
