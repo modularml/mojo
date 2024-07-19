@@ -101,13 +101,10 @@ fn total_bytes_used(items: Dict[Int, Int]) -> Int:
     # the allocated memory by entries:
     var entry_size = sizeof[Optional[DictEntry[Int, Int]]]()
     var amnt_bytes = items._entries.capacity * entry_size
-    amnt_bytes += sizeof[Dict[Int, Int]]() - entry_size
+    amnt_bytes += sizeof[Dict[Int, Int]]()
 
     # the allocated memory by index table:
-    var reserved = bit_ceil(len(items))
-    if (len(items) * 3) > (reserved * 2):  # it resizes up if overloaded
-        reserved *= 2
-
+    var reserved = items._reserved()
     if reserved <= 128:
         amnt_bytes += sizeof[Scalar[DType.int8]]() * reserved
     elif reserved <= 2**16 - 2:
