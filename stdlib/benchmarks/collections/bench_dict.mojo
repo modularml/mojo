@@ -17,6 +17,7 @@ from random import *
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from memory.memory import sizeof
 from bit import bit_ceil
+from math import ceil
 from stdlib.collections.dict import Dict, DictEntry
 
 
@@ -39,9 +40,9 @@ fn bench_dict_init(inout b: Bencher) raises:
     @parameter
     fn call_fn():
         for _ in range(1000):
-            var _d: Dict[Int, Int] = Dict[Int, Int]()
-            keep(_d._entries.data)
-            keep(_d._index.data)
+            var d = Dict[Int, Int]()
+            keep(d._entries.data)
+            keep(d._index.data)
 
     b.iter[call_fn]()
 
@@ -51,12 +52,13 @@ fn bench_dict_init(inout b: Bencher) raises:
 # ===----------------------------------------------------------------------===#
 @parameter
 fn bench_dict_insert[size: Int](inout b: Bencher) raises:
+    """Insert 100 new items."""
     var items = make_dict[size]()
 
     @always_inline
     @parameter
     fn call_fn() raises:
-        for key in range(size, (3 * size) // 2):
+        for key in range(size, size + 100):
             items[key] = random.random_si64(0, size).value
 
     b.iter[call_fn]()
@@ -68,14 +70,22 @@ fn bench_dict_insert[size: Int](inout b: Bencher) raises:
 # ===----------------------------------------------------------------------===#
 @parameter
 fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
+    """Lookup 100 items."""
     var items = make_dict[size]()
 
     @always_inline
     @parameter
     fn call_fn() raises:
-        for key in range(0, size // 4):
-            var res = items[key]
-            keep(res)
+        @parameter
+        if size < 100:
+            for _ in range(ceil(100 / size)):
+                for key in range(size):
+                    var res = items[key]
+                    keep(res)
+        else:
+            for key in range(100):
+                var res = items[key]
+                keep(res)
 
     b.iter[call_fn]()
     keep(bool(items))
@@ -118,14 +128,43 @@ def main():
     m.bench_function[bench_dict_init](BenchId("bench_dict_init"))
     alias sizes = (
         10,
+        20,
+        30,
+        40,
         50,
+        60,
+        70,
+        80,
+        90,
         100,
+        200,
+        300,
+        400,
         500,
+        600,
+        700,
+        800,
+        900,
         1000,
+        2000,
+        3000,
+        4000,
         5000,
+        6000,
+        7000,
+        8000,
+        9000,
         10_000,
+        20_000,
+        30_000,
+        40_000,
         50_000,
+        60_000,
+        70_000,
+        80_000,
+        90_000,
         100_000,
+        200_000,
         300_000,
         400_000,
         500_000,
