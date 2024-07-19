@@ -327,6 +327,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   ([PR #3251](https://github.com/modularml/mojo/pull/3251) by
   [@jjvraw](https://github.com/jjvraw))
 
+- `bit` module now supports `bit_reverse()`, `byte_swap()` and `pop_count()` for
+  `Int` type.
+  ([PR #3150](https://github.com/modularml/mojo/pull/3150) by [@LJ-9801](https://github.com/LJ-9801))
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
