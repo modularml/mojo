@@ -154,6 +154,15 @@ struct Bool(
         self = value.__bool__()
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: SIMD[DType.bool, 1]):
+        """Convert a scalar SIMD value to a Bool.
+
+        Args:
+            value: The scalar value.
+        """
+        self = value.__bool__()
+
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Convert to Bool.
 
