@@ -132,10 +132,7 @@ struct UnsafePointer[
         """
         return Self {address: other.address}
 
-    @staticmethod
-    fn from_filedescriptor(
-        value: FileDescriptor,
-    ) -> UnsafePointer[FileDescriptor, address_space, exclusive]:
+    fn __init__(value: FileDescriptor) -> Self:
         """Create a pointer using the FileDescriptor value as address.
 
         Args:
@@ -145,7 +142,7 @@ struct UnsafePointer[
             The pointer.
         """
 
-        return UnsafePointer[FileDescriptor, address_space, exclusive] {
+        return Self {
             address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
                 Scalar[DType.index](value.value).value
             )
