@@ -88,7 +88,7 @@ struct Formatter:
 
         self = Formatter(
             write_to_fd,
-            UnsafePointer.address_of(fd).bitcast[NoneType](),
+            UnsafePointer[FileDescriptor](fd).bitcast[NoneType](),
         )
 
     fn __init__(
