@@ -312,6 +312,18 @@ def test_chr():
     assert_equal("α", chr(945))
     assert_equal("➿", chr(10175))
     assert_equal("🔥", chr(128293))
+    assert_equal("�", chr(0xFFFD))
+    assert_equal("�", chr(0x10FFFF + 1))
+
+
+def test_unicode():
+    var a = List[Int](65, 97, 33, 945, 10175, 128293, 0xFFFD, 0x10FFFF + 1)
+    assert_equal("Aa!α➿🔥��", String.from_unicode(a))
+
+
+def test_utf16():
+    var a = List[UInt16](65, 97, 33, 945, 10175, 0xD83D, 0xDD25, 0xFFFD, 0xD800)
+    assert_equal("Aa!α➿🔥��", String.from_utf16(a))
 
 
 def test_string_indexing():
@@ -1484,6 +1496,8 @@ def main():
     test_stringref_strip()
     test_ord()
     test_chr()
+    test_unicode()
+    test_utf16()
     test_string_indexing()
     test_atol()
     test_atol_base_0()
