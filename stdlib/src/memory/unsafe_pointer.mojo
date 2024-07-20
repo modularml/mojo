@@ -142,11 +142,12 @@ struct UnsafePointer[
             The pointer.
         """
 
-        return Self {
-            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-                Scalar[DType.index](value.value).value
-            )
-        }
+        return Self() + value.value
+        # return Self {
+        #     address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+        #         Scalar[DType.index](value.value).value
+        #     )
+        # }
 
     # ===-------------------------------------------------------------------===#
     # Factory methods
