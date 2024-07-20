@@ -144,7 +144,7 @@ struct UnsafePointer[
 
         return Self {
             address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-                value.value.value
+                Scalar[DType.index](value.value).value
             )
         }
 
