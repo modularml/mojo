@@ -53,9 +53,8 @@ trait ToFormatter:
 
 
 struct Formatter:
-    """
-    A `Formatter` is used by types implementing the `Formattable` trait to write
-    bytes to the underlying formatter output buffer or stream.
+    """A `Formatter` is used by types implementing the `Formattable` trait to
+    write bytes to the underlying formatter output buffer or stream.
     """
 
     # FIXME(#37996):
@@ -82,7 +81,7 @@ struct Formatter:
         fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
             _put(strref, file=ptr.bitcast[Int]()[])
 
-        # FIXME: once capturing closures can be passed as runtime values
+        # FIXME(#37996): remove and use the value directly
         var ptr = UnsafePointer[Int].alloc(1)
         ptr[0] = fd.value
         self = Formatter(write_to_fd, ptr.bitcast[NoneType]())
@@ -109,8 +108,7 @@ struct Formatter:
     #   `StringSlice.__init__(StringLiteral)` implicit conversion.
     @always_inline
     fn write_str[literal: StringLiteral](inout self):
-        """
-        Write a string literal to this formatter.
+        """Write a string literal to this formatter.
 
         Parameters:
             literal: The string literal to write.
@@ -121,8 +119,7 @@ struct Formatter:
     # TODO: Constrain to only require an immutable StringSlice[..]`
     @always_inline
     fn write_str(inout self, str_slice: StringSlice[_]):
-        """
-        Write a string slice to this formatter.
+        """Write a string slice to this formatter.
 
         Args:
             str_slice: The string slice to write to this formatter. Must NOT be
@@ -169,9 +166,7 @@ struct Formatter:
     @always_inline
     @staticmethod
     fn stdout() -> Self:
-        """
-        Constructs a formatter that writes directly to stdout.
-        """
+        """Constructs a formatter that writes directly to stdout."""
 
         @always_inline
         fn write_to_stdout(_data: UnsafePointer[NoneType], strref: StringRef):
