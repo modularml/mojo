@@ -2104,6 +2104,58 @@ struct String(
                 return False
         return True
 
+    fn rjust(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string right justified in a string of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns right justified string, or self if width is not bigger than self length.
+        """
+        return self._justify(width - len(self), width, fillchar)
+
+    fn ljust(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string left justified in a string of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns left justified string, or self if width is not bigger than self length.
+        """
+        return self._justify(0, width, fillchar)
+
+    fn center(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string center justified in a string of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns center justified string, or self if width is not bigger than self length.
+        """
+        return self._justify(width - len(self) >> 1, width, fillchar)
+
+    fn _justify(
+        self, start: Int, width: Int, fillchar: StringLiteral
+    ) -> String:
+        if len(self) >= width:
+            return self
+        debug_assert(
+            len(fillchar) == 1, "fill char needs to be a one byte literal"
+        )
+        var fillbyte = fillchar.as_bytes_slice()[0]
+        var buffer = List[UInt8](capacity=width + 1)
+        buffer.resize(width, fillbyte)
+        buffer.append(0)
+        memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
+        var result = String(buffer)
+        return result^
+
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

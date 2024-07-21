@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `String` class now have `rjust`, `ljust` and `center` methods to return
+  a justified string based on width and fillchar.
+  ([PR 3278#](https://github.com/modularml/mojo/pull/3278) by
+  [@mzaks](https://github.com/mzaks))
+
 - Creating nested `PythonObject` from a list or tuple of python objects is
   possible now:
 
