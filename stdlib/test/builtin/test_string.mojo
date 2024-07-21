@@ -1450,6 +1450,107 @@ def test_format_args():
     )
 
 
+def test_format_conversion_flags():
+    assert_equal(String("{!r}").format(""), "''")
+    var special_str = "a\nb\tc"
+    assert_equal(
+        String("{} {!r}").format(special_str, special_str),
+        "a\nb\tc 'a\\nb\\tc'",
+    )
+    assert_equal(
+        String("{!s} {!r}").format(special_str, special_str),
+        "a\nb\tc 'a\\nb\\tc'",
+    )
+
+    var a = "Mojo"
+    assert_equal(String("{} {!r}").format(a, a), "Mojo 'Mojo'")
+    assert_equal(String("{!s} {!r}").format(a, a), "Mojo 'Mojo'")
+    assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
+
+    var b = 21.1
+    assert_true(
+        "21.100000000000001 SIMD[DType.float64, 1](2"
+        in String("{} {!r}").format(b, b),
+    )
+    assert_true(
+        "21.100000000000001 SIMD[DType.float64, 1](2"
+        in String("{!s} {!r}").format(b, b),
+    )
+
+    var c = 1e100
+    assert_equal(
+        String("{} {!r}").format(c, c),
+        "1e+100 SIMD[DType.float64, 1](1.0000000000000000e+100)",
+    )
+    assert_equal(
+        String("{!s} {!r}").format(c, c),
+        "1e+100 SIMD[DType.float64, 1](1.0000000000000000e+100)",
+    )
+
+    var d = 42
+    assert_equal(String("{} {!r}").format(d, d), "42 42")
+    assert_equal(String("{!s} {!r}").format(d, d), "42 42")
+
+    assert_true(
+        "Mojo SIMD[DType.float64, 1](2"
+        in String("{} {!r} {} {!r}").format(a, b, c, d)
+    )
+    assert_true(
+        "Mojo SIMD[DType.float64, 1](2"
+        in String("{!s} {!r} {!s} {!r}").format(a, b, c, d)
+    )
+
+    var e = True
+    assert_equal(String("{} {!r}").format(e, e), "True True")
+
+    assert_true(
+        "Mojo SIMD[DType.float64, 1](2"
+        in String("{0} {1!r} {2} {3}").format(a, b, c, d)
+    )
+    assert_true(
+        "Mojo SIMD[DType.float64, 1](2"
+        in String("{0!s} {1!r} {2} {3!s}").format(a, b, c, d)
+    )
+
+    assert_equal(
+        String("{3} {2} {1} {0}").format(a, d, c, b),
+        "21.100000000000001 1e+100 42 Mojo",
+    )
+
+    assert_true(
+        "'Mojo' 42 SIMD[DType.float64, 1](2"
+        in String("{0!r} {3} {1!r}").format(a, b, c, d)
+    )
+
+    assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
+
+    assert_true(
+        "True 'Mojo' 42 SIMD[DType.float64, 1](2"
+        in String("{4} {0!r} {3} {1!r}").format(a, b, c, d, True)
+    )
+
+    with assert_raises(contains='Conversion flag "x" not recognised.'):
+        _ = String("{!x}").format(1)
+
+    with assert_raises(contains="Empty conversion flag."):
+        _ = String("{!}").format(1)
+
+    with assert_raises(contains='Conversion flag "rs" not recognised.'):
+        _ = String("{!rs}").format(1)
+
+    with assert_raises(contains='Conversion flag "r123" not recognised.'):
+        _ = String("{!r123}").format(1)
+
+    with assert_raises(contains='Conversion flag "r!" not recognised.'):
+        _ = String("{!r!}").format(1)
+
+    with assert_raises(contains='Conversion flag "x" not recognised.'):
+        _ = String("{0!x}").format(1)
+
+    with assert_raises(contains='Conversion flag "r:d" not recognised.'):
+        _ = String("{!r:d}").format(1)
+
+
 def test_isdigit():
     assert_true(isdigit(ord("1")))
     assert_false(isdigit(ord("g")))
@@ -1516,5 +1617,6 @@ def main():
     test_indexing()
     test_string_iter()
     test_format_args()
+    test_format_conversion_flags()
     test_isdigit()
     test_isprintable()
