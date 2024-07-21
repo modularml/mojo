@@ -84,10 +84,10 @@ struct Formatter:
         fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
             _put(strref, file=ptr.bitcast[Int]()[])
 
-        self = Formatter(
-            write_to_fd,
-            UnsafePointer[Int](fd.value).bitcast[NoneType](),
-        )
+        # TODO: capturing closures cannot be passed as runtime values
+        var ptr = UnsafePointer[Int].alloc(1)
+        ptr[0] = fd.value
+        self = Formatter(write_to_fd, ptr.bitcast[NoneType]())
 
     fn __init__(
         inout self,
