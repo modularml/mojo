@@ -132,21 +132,22 @@ struct UnsafePointer[
         """
         return Self {address: other.address}
 
-    fn __init__(value: FileDescriptor) -> Self:
-        """Create a pointer using the FileDescriptor value as address.
+    # FIXME: need to register operation __mlir_op.`pop.index_to_pointer`
+    # fn __init__(value: FileDescriptor) -> Self:
+    #     """Create a pointer using the FileDescriptor value as address.
 
-        Args:
-            value: The FileDescriptor.
+    #     Args:
+    #         value: The FileDescriptor.
 
-        Returns:
-            The pointer.
-        """
+    #     Returns:
+    #         The pointer.
+    #     """
 
-        return Self {
-            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-                Scalar[DType.index](value.value).value
-            )
-        }
+    #     return Self {
+    #         address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+    #             Scalar[DType.index](value.value).value
+    #         )
+    #     }
 
     # ===-------------------------------------------------------------------===#
     # Factory methods

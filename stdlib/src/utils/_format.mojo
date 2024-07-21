@@ -82,13 +82,11 @@ struct Formatter:
 
         @always_inline
         fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
-            var fd0 = ptr.bitcast[FileDescriptor]()[].value
-
-            _put(strref, file=fd0)
+            _put(strref, file=ptr.bitcast[Int]()[])
 
         self = Formatter(
             write_to_fd,
-            UnsafePointer[FileDescriptor](fd).bitcast[NoneType](),
+            UnsafePointer[Int](fd.value).bitcast[NoneType](),
         )
 
     fn __init__(

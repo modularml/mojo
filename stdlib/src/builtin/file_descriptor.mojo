@@ -27,12 +27,8 @@ f.close()
 
 @register_passable("trivial")
 struct FileDescriptor(CollectionElement):
-    """File descriptor of a file.
-
-    Notes:
-        It is highly recommended to use this together with ARC/RC and manage the
-        lifetime of the underlying resource as this struct provides no lifetime
-        management of the resource itself.
+    """File descriptor of a file. This struct provides no lifetime management of
+    the underlying resource.
     """
 
     var value: Int
