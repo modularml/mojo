@@ -73,14 +73,14 @@ fn main() raises:
 
     @parameter
     fn worker(row: Int):
-        var scale_x = (max_x - min_x) / cols
-        var scale_y = (max_y - min_y) / rows
+        alias scale_x = (max_x - min_x) / cols
+        alias scale_y = (max_y - min_y) / rows
 
         @parameter
         fn compute_vector[simd_width: Int](col: Int):
             """Each time we operate on a `simd_width` vector of pixels."""
             var cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
-            var cy = min_y + row * scale_y
+            var cy = min_y + row * SIMD[float_type, simd_width](scale_y)
             var c = ComplexSIMD[float_type, simd_width](cx, cy)
             matrix.store(row, col, mandelbrot_kernel_SIMD(c))
 

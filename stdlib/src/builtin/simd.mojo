@@ -141,21 +141,21 @@ fn _has_native_bf16_support() -> Bool:
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int](
     Absable,
+    Boolable,
     Ceilable,
     CeilDivable,
     CollectionElement,
     CollectionElementNew,
     Floorable,
+    Formattable,
     Hashable,
     Intable,
-    ImplicitlyBoolable,
     Powable,
+    Representable,
     Roundable,
     Sized,
     Stringable,
-    Formattable,
     Truncable,
-    Representable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -205,29 +205,6 @@ struct SIMD[type: DType, size: Int](
         """
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: SIMD[DType.float64, 1]):
-        """Initializes the SIMD vector with a float.
-
-        The value is splatted across all the elements of the SIMD
-        vector.
-
-        Args:
-            value: The input value.
-        """
-        _simd_construction_checks[type, size]()
-        constrained[
-            type.is_floating_point(), "the SIMD type must be floating point"
-        ]()
-
-        var casted = __mlir_op.`pop.cast`[
-            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
-        ](value.value)
-        var vec = __mlir_op.`pop.simd.splat`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
-        ](casted)
-        self.value = vec
 
     @always_inline("nodebug")
     fn __init__(inout self, *, other: SIMD[type, size]):
@@ -333,19 +310,31 @@ struct SIMD[type: DType, size: Int](
         _simd_construction_checks[type, size]()
         self.value = value
 
-    # Construct via a variadic type which has the same number of elements as
-    # the SIMD value.
+    @always_inline("nodebug")
+    fn __init__(inout self, value: Scalar[type], /):
+        """Constructs a SIMD vector by splatting a scalar value.
+
+        The input value is splatted across all elements of the SIMD vector.
+
+        Args:
+            value: The value to splat to the elements of the vector.
+        """
+        _simd_construction_checks[type, size]()
+
+        # Construct by broadcasting a scalar.
+        self.value = __mlir_op.`pop.simd.splat`[
+            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        ](value.value)
+
     @always_inline("nodebug")
     fn __init__(inout self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
-        If there is just one input value, then it is splatted to all elements
-        of the SIMD vector. Otherwise, the input values are assigned to the
-        corresponding elements of the SIMD vector.
+        The input values are assigned to the corresponding elements of the SIMD
+        vector.
 
         Constraints:
-            The number of input values is 1 or equal to size of the SIMD
-            vector.
+            The number of input values is equal to size of the SIMD vector.
 
         Args:
             elems: The variadic list of elements from which the SIMD vector is
@@ -353,22 +342,9 @@ struct SIMD[type: DType, size: Int](
         """
         _simd_construction_checks[type, size]()
 
-        var num_elements = len(elems)
-        if num_elements == 1:
-            # Construct by broadcasting a scalar.
-            self.value = __mlir_op.`pop.simd.splat`[
-                _type = __mlir_type[
-                    `!pop.simd<`,
-                    size.value,
-                    `, `,
-                    type.value,
-                    `>`,
-                ]
-            ](elems[0].value)
-            return
         # TODO: Make this a compile-time check when possible.
         debug_assert(
-            size == num_elements,
+            size == len(elems),
             (
                 "mismatch in the number of elements in the SIMD variadic"
                 " constructor"
@@ -1311,18 +1287,6 @@ struct SIMD[type: DType, size: Int](
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
 
     @always_inline("nodebug")
-    fn __as_bool__(self) -> Bool:
-        """Converts the SIMD scalar into a boolean value.
-
-        Constraints:
-            The size of the SIMD vector must be 1.
-
-        Returns:
-            True if the SIMD scalar is non-zero and False otherwise.
-        """
-        return self.__bool__()
-
-    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Casts to the value to an Int. If there is a fractional component,
         then the fractional part is truncated.
@@ -1453,7 +1417,7 @@ struct SIMD[type: DType, size: Int](
         # TODO: see how can we implement this.
         return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the value using builtin hash.
 
         Returns:

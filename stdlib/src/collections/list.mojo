@@ -25,7 +25,6 @@ from sys.intrinsics import _type_is_eq
 from memory import Reference, UnsafePointer
 
 from utils import Span
-from utils._format import write_to
 
 from .optional import Optional
 
@@ -419,7 +418,7 @@ struct List[T: CollectionElement](
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(my_list.__repr__(my_list))
+        print(my_list.__repr__())
         ```
 
         When the compiler supports conditional methods, then a simple `repr(my_list)` will

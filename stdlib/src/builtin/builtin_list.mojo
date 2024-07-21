@@ -17,6 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from memory import Reference, UnsafePointer
 
+from sys.intrinsics import _type_is_eq
+
 # ===----------------------------------------------------------------------===#
 # ListLiteral
 # ===----------------------------------------------------------------------===#
@@ -74,6 +76,32 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         """
         # FIXME: Rebinding to a different lifetime.
         return UnsafePointer.address_of(self.storage[i]).bitcast[T]()[]
+
+    @always_inline("nodebug")
+    fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
+        """Determines if a given value exists in the ListLiteral.
+
+        Parameters:
+            T: The type of the value to search for. Must implement the
+              `EqualityComparable` trait.
+
+        Args:
+            value: The value to search for in the ListLiteral.
+
+        Returns:
+            True if the value is found in the ListLiteral, False otherwise.
+        """
+
+        @parameter
+        for i in range(len(VariadicList(Ts))):
+            if _type_is_eq[Ts[i], T]():
+                var elt_ptr = UnsafePointer.address_of(self.storage[i]).bitcast[
+                    T
+                ]()
+                if elt_ptr[] == value:
+                    return True
+
+        return False
 
 
 # ===----------------------------------------------------------------------===#

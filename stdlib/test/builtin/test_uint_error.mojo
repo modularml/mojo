@@ -10,15 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the utils package."""
+#
+# This file only tests that conversion of negative IntLiteral to UInt fails.
+#
+# ===----------------------------------------------------------------------=== #
+# REQUIRES: has_not
+# RUN: not mojo %s 2>&1 | FileCheck %s
 
-from .index import Index, StaticIntTuple, product
-from .inline_string import InlineString
-from .loop import unroll
-from .select_if import select
-from .span import Span
-from .static_tuple import InlineArray, StaticTuple
-from .stringref import StringRef
-from .string_slice import StaticString, StringSlice
-from .variant import Variant
-from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
+
+fn main():
+    # CHECK: integer value -1 is negative, but is being converted to an unsigned type
+    print(UInt(-1))
+    # CHECK-NOT: is never reached
+    print("is never reached")

@@ -339,6 +339,16 @@ def test_is():
     assert_true(l1 is not l2)
 
 
+def test_nested_object():
+    var a = PythonObject([1, 2, 3])
+    var b = PythonObject([4, 5, 6])
+    var nested_list = PythonObject([a, b])
+    var nested_tuple = PythonObject((a, b))
+
+    assert_equal(str(nested_list), "[[1, 2, 3], [4, 5, 6]]")
+    assert_equal(str(nested_tuple), "([1, 2, 3], [4, 5, 6])")
+
+
 fn test_iter() raises:
     var list_obj: PythonObject = ["apple", "orange", "banana"]
     var i = 0
@@ -412,3 +422,4 @@ def main():
     test_setitem()
     # test_dict()
     test_none()
+    test_nested_object()

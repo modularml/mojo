@@ -10,15 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the utils package."""
 
-from .index import Index, StaticIntTuple, product
-from .inline_string import InlineString
-from .loop import unroll
-from .select_if import select
-from .span import Span
-from .static_tuple import InlineArray, StaticTuple
-from .stringref import StringRef
-from .string_slice import StaticString, StringSlice
-from .variant import Variant
-from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
+
+@always_inline("nodebug")
+fn select[T: AnyTrivialRegType](condition: Bool, lhs: T, rhs: T) -> T:
+    """Choose one value based on a condition, without IR-level branching.
+        Use this over normal `if` branches to reduce the size of the generated IR.
+
+    Parameters:
+        T: The type of the lhs and rhs.
+
+    Args:
+        condition: The condition to test.
+        lhs: The value to select if the condition is met.
+        rhs: The value to select if the condition is not met.
+
+    Returns:
+        The value selected based on the condition.
+    """
+    return __mlir_op.`pop.select`(condition.value, lhs, rhs)
