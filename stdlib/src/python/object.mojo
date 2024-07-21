@@ -99,9 +99,10 @@ struct _PyIter(Sized):
             return 1
 
 
-# TODO: remove this wrapper which is just here because otherwise
+# TODO: Remove this wrapper. It is just here because otherwise
 # the compiler is lost if we use `Dict[PythonObject, PythonObject]`
-# directly in the constructor.
+# directly in the `PythonObject.__init__()` method. The error
+# message that we get currently is "recursive reference to declaration".
 struct _PythonDictWrapper:
     var dict_value: Dict[PythonObject, PythonObject]
 
@@ -329,6 +330,9 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
+    # TODO: Remove `_PythonDictWrapper` and use `Dict[PythonObject, PythonObject]`
+    # directly instead when the compiler stops erroring with the message
+    # "recursive reference to declaration"
     fn __init__(inout self, value: _PythonDictWrapper):
         """Initialize the object from a dictionary of PythonObjects.
 
