@@ -27,9 +27,7 @@ f.close()
 
 @register_passable("trivial")
 struct FileDescriptor(CollectionElement):
-    """File descriptor of a file. This struct provides no lifetime management of
-    the underlying resource.
-    """
+    """File descriptor of a file."""
 
     var value: Int
     """The underlying value of the file descriptor."""

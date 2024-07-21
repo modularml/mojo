@@ -76,15 +76,13 @@ struct Formatter:
         self = output._unsafe_to_formatter()
 
     fn __init__(inout self, *, fd: FileDescriptor):
-        """
-        Constructs a formatter that writes to the given file descriptor.
-        """
+        """Constructs a formatter that writes to the given file descriptor."""
 
         @always_inline
         fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
             _put(strref, file=ptr.bitcast[Int]()[])
 
-        # TODO: capturing closures cannot be passed as runtime values
+        # FIXME: once capturing closures can be passed as runtime values
         var ptr = UnsafePointer[Int].alloc(1)
         ptr[0] = fd.value
         self = Formatter(write_to_fd, ptr.bitcast[NoneType]())
@@ -94,9 +92,7 @@ struct Formatter:
         func: fn (UnsafePointer[NoneType], StringRef) -> None,
         arg: UnsafePointer[NoneType],
     ):
-        """
-        Constructs a formatter from any closure that accepts string refs.
-        """
+        """Constructs a formatter from any closure that accepts string refs."""
         self._write_func = func
         self._write_func_arg = arg
 
