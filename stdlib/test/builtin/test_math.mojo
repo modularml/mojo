@@ -81,14 +81,14 @@ def test_max():
 
 
 def test_round():
-    assert_equal(0, round(0.0))
-    assert_equal(1, round(1.0))
-    assert_equal(1, round(1.1))
-    assert_equal(1, round(1.4))
-    assert_equal(2, round(1.5))
-    assert_equal(2, round(2.0))
-    assert_equal(1, round(1.4, 0))
-    assert_equal(2, round(2.5))
+    assert_equal(0.0, round(0.0))
+    assert_equal(1.0, round(1.0))
+    assert_equal(1.0, round(1.1))
+    assert_equal(1.0, round(1.4))
+    assert_equal(2.0, round(1.5))
+    assert_equal(2.0, round(2.0))
+    assert_equal(1.0, round(1.4, 0))
+    assert_equal(2.0, round(2.5))
     assert_equal(1.5, round(1.5, 1))
     assert_equal(1.61, round(1.613, 2))
 

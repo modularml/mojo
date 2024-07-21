@@ -505,7 +505,7 @@ def test_atof():
     assert_equal(1.0, atof(String("001.")))
     assert_equal(+5.0, atof(String(" +005.")))
     assert_equal(13.0, atof(String(" 013.f  ")))
-    assert_equal(-89, atof(String("-89")))
+    assert_equal(-89.0, atof(String("-89")))
     assert_equal(-0.3, atof(String(" -0.3")))
     assert_equal(-69e3, atof(String(" -69E+3  ")))
     assert_equal(123.2e1, atof(String(" 123.2E1  ")))

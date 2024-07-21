@@ -974,6 +974,29 @@ def test_abs():
     )
 
 
+def test_equatable():
+    var s1 = SIMD[DType.int32, 2](1, 2)
+    var s2 = SIMD[DType.int32, 2](1, 6)
+    var s3 = SIMD[DType.int32, 2](6, 2)
+    var s4 = SIMD[DType.int32, 2](6, 6)
+
+    assert_equal(s1 == s1, SIMD[DType.bool, 2](True, True))
+    assert_equal(s1 != s1, SIMD[DType.bool, 2](False, False))
+    assert_equal(s1, s1)
+
+    assert_equal(s1 == s2, SIMD[DType.bool, 2](True, False))
+    assert_equal(s1 != s2, SIMD[DType.bool, 2](False, True))
+    assert_not_equal(s1, s2)
+
+    assert_equal(s1 == s3, SIMD[DType.bool, 2](False, True))
+    assert_equal(s1 != s3, SIMD[DType.bool, 2](True, False))
+    assert_not_equal(s1, s3)
+
+    assert_equal(s1 == s4, SIMD[DType.bool, 2](False, False))
+    assert_equal(s1 != s4, SIMD[DType.bool, 2](True, True))
+    assert_not_equal(s1, s4)
+
+
 def test_clamp():
     alias F = SIMD[DType.float32, 4]
     var f = F(-10.5, -5.0, 5.0, 10.0)
@@ -994,22 +1017,20 @@ def test_indexing():
 def test_reduce():
     @parameter
     def test_dtype[type: DType]():
-        alias X8 = SIMD[type, 8]
-        alias X4 = SIMD[type, 4]
-        alias X2 = SIMD[type, 2]
-        alias X1 = SIMD[type, 1]
-        var x8: X8
-        var x4: X4
-        var x2: X2
-        var x1: X1
+        var x8: SIMD[type, 8]
+        var x4: SIMD[type, 4]
+        var x2: SIMD[type, 2]
+        var x1: SIMD[type, 1]
 
         @parameter
         if type.is_numeric():
             # reduce_add
-            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
-            x4 = X4(4, 6, 8, 10)
-            x2 = X2(12, 16)
-            x1 = X1(int(28))  # TODO: fix MOCO-697 and use X1(28) instead
+            x8 = SIMD[type, 8](0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = SIMD[type, 4](4, 6, 8, 10)
+            x2 = SIMD[type, 2](12, 16)
+            x1 = SIMD[type, 1](
+                int(28)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](28) instead
             assert_equal(x8.reduce_add(), x1)
             assert_equal(x4.reduce_add(), x1)
             assert_equal(x2.reduce_add(), x1)
@@ -1020,13 +1041,15 @@ def test_reduce():
             assert_equal(x8.reduce_add[4](), x4)
             assert_equal(x4.reduce_add[4](), x4)
             assert_equal(x8.reduce_add[8](), x8)
-            assert_equal(X2(6, 3).reduce_add(), 9)
+            assert_equal(SIMD[type, 2](6, 3).reduce_add(), 9)
 
             # reduce_mul
-            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
-            x4 = X4(0, 5, 12, 21)
-            x2 = X2(0, 105)
-            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            x8 = SIMD[type, 8](0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = SIMD[type, 4](0, 5, 12, 21)
+            x2 = SIMD[type, 2](0, 105)
+            x1 = SIMD[type, 1](
+                int(0)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](0) instead
             assert_equal(x8.reduce_mul(), x1)
             assert_equal(x4.reduce_mul(), x1)
             assert_equal(x2.reduce_mul(), x1)
@@ -1037,13 +1060,15 @@ def test_reduce():
             assert_equal(x8.reduce_mul[4](), x4)
             assert_equal(x4.reduce_mul[4](), x4)
             assert_equal(x8.reduce_mul[8](), x8)
-            assert_equal(X2(6, 3).reduce_mul(), 18)
+            assert_equal(SIMD[type, 2](6, 3).reduce_mul(), 18)
 
             # reduce_min
-            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
-            x4 = X4(0, 1, 2, 3)
-            x2 = X2(0, 1)
-            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            x8 = SIMD[type, 8](0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = SIMD[type, 4](0, 1, 2, 3)
+            x2 = SIMD[type, 2](0, 1)
+            x1 = SIMD[type, 1](
+                int(0)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](0) instead
             assert_equal(x8.reduce_min(), x1)
             assert_equal(x4.reduce_min(), x1)
             assert_equal(x2.reduce_min(), x1)
@@ -1054,13 +1079,15 @@ def test_reduce():
             assert_equal(x8.reduce_min[4](), x4)
             assert_equal(x4.reduce_min[4](), x4)
             assert_equal(x8.reduce_min[8](), x8)
-            assert_equal(X2(6, 3).reduce_min(), 3)
+            assert_equal(SIMD[type, 2](6, 3).reduce_min(), 3)
 
             # reduce_max
-            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
-            x4 = X4(4, 5, 6, 7)
-            x2 = X2(6, 7)
-            x1 = X1(int(7))  # TODO: fix MOCO-697 and use X1(7) instead
+            x8 = SIMD[type, 8](0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = SIMD[type, 4](4, 5, 6, 7)
+            x2 = SIMD[type, 2](6, 7)
+            x1 = SIMD[type, 1](
+                int(7)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](7) instead
             assert_equal(x8.reduce_max(), x1)
             assert_equal(x4.reduce_max(), x1)
             assert_equal(x2.reduce_max(), x1)
@@ -1071,15 +1098,17 @@ def test_reduce():
             assert_equal(x8.reduce_max[4](), x4)
             assert_equal(x4.reduce_max[4](), x4)
             assert_equal(x8.reduce_max[8](), x8)
-            assert_equal(X2(6, 3).reduce_max(), 6)
+            assert_equal(SIMD[type, 2](6, 3).reduce_max(), 6)
 
         @parameter
         if type.is_signed():
             # reduce_add
-            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
-            x4 = X4(4, -6, 8, -10)
-            x2 = X2(12, -16)
-            x1 = X1(int(-4))  # TODO: fix MOCO-697 and use X1(-4) instead
+            x8 = SIMD[type, 8](0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = SIMD[type, 4](4, -6, 8, -10)
+            x2 = SIMD[type, 2](12, -16)
+            x1 = SIMD[type, 1](
+                int(-4)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](-4) instead
             assert_equal(x8.reduce_add(), x1)
             assert_equal(x4.reduce_add(), x1)
             assert_equal(x2.reduce_add(), x1)
@@ -1090,13 +1119,15 @@ def test_reduce():
             assert_equal(x8.reduce_add[4](), x4)
             assert_equal(x4.reduce_add[4](), x4)
             assert_equal(x8.reduce_add[8](), x8)
-            assert_equal(X2(6, -3).reduce_add(), 3)
+            assert_equal(SIMD[type, 2](6, -3).reduce_add(), 3)
 
             # reduce_mul
-            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
-            x4 = X4(0, 5, 12, 21)
-            x2 = X2(0, 105)
-            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            x8 = SIMD[type, 8](0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = SIMD[type, 4](0, 5, 12, 21)
+            x2 = SIMD[type, 2](0, 105)
+            x1 = SIMD[type, 1](
+                int(0)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](0) instead
             assert_equal(x8.reduce_mul(), x1)
             assert_equal(x4.reduce_mul(), x1)
             assert_equal(x2.reduce_mul(), x1)
@@ -1107,13 +1138,15 @@ def test_reduce():
             assert_equal(x8.reduce_mul[4](), x4)
             assert_equal(x4.reduce_mul[4](), x4)
             assert_equal(x8.reduce_mul[8](), x8)
-            assert_equal(X2(6, -3).reduce_mul(), -18)
+            assert_equal(SIMD[type, 2](6, -3).reduce_mul(), -18)
 
             # reduce_min
-            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
-            x4 = X4(0, -5, 2, -7)
-            x2 = X2(0, -7)
-            x1 = X1(int(-7))  # TODO: fix MOCO-697 and use X1(-7) instead
+            x8 = SIMD[type, 8](0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = SIMD[type, 4](0, -5, 2, -7)
+            x2 = SIMD[type, 2](0, -7)
+            x1 = SIMD[type, 1](
+                int(-7)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](-7) instead
             assert_equal(x8.reduce_min(), x1)
             assert_equal(x4.reduce_min(), x1)
             assert_equal(x2.reduce_min(), x1)
@@ -1124,13 +1157,15 @@ def test_reduce():
             assert_equal(x8.reduce_min[4](), x4)
             assert_equal(x4.reduce_min[4](), x4)
             assert_equal(x8.reduce_min[8](), x8)
-            assert_equal(X2(6, -3).reduce_min(), -3)
+            assert_equal(SIMD[type, 2](6, -3).reduce_min(), -3)
 
             # reduce_max
-            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
-            x4 = X4(4, -1, 6, -3)
-            x2 = X2(6, -1)
-            x1 = X1(int(6))  # TODO: fix MOCO-697 and use X1(6) instead
+            x8 = SIMD[type, 8](0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = SIMD[type, 4](4, -1, 6, -3)
+            x2 = SIMD[type, 2](6, -1)
+            x1 = SIMD[type, 1](
+                int(6)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](6) instead
             assert_equal(x8.reduce_max(), x1)
             assert_equal(x4.reduce_max(), x1)
             assert_equal(x2.reduce_max(), x1)
@@ -1141,7 +1176,7 @@ def test_reduce():
             assert_equal(x8.reduce_max[4](), x4)
             assert_equal(x4.reduce_max[4](), x4)
             assert_equal(x8.reduce_max[8](), x8)
-            assert_equal(X2(6, -3).reduce_max(), 6)
+            assert_equal(SIMD[type, 2](6, -3).reduce_max(), 6)
 
         @parameter
         if type is DType.bool:
@@ -1186,10 +1221,12 @@ def test_reduce():
         @parameter
         if type.is_integral():
             # reduce_and
-            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
-            x4 = X4(0, 1, 2, 3)
-            x2 = X2(0, 1)
-            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            x8 = SIMD[type, 8](0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = SIMD[type, 4](0, 1, 2, 3)
+            x2 = SIMD[type, 2](0, 1)
+            x1 = SIMD[type, 1](
+                int(0)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](0) instead
             assert_equal(x8.reduce_and(), x1)
             assert_equal(x4.reduce_and(), x1)
             assert_equal(x2.reduce_and(), x1)
@@ -1200,13 +1237,15 @@ def test_reduce():
             assert_equal(x8.reduce_and[4](), x4)
             assert_equal(x4.reduce_and[4](), x4)
             assert_equal(x8.reduce_and[8](), x8)
-            assert_equal(X2(6, 3).reduce_and(), 2)
+            assert_equal(SIMD[type, 2](6, 3).reduce_and(), 2)
 
             # reduce_or
-            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
-            x4 = X4(4, 5, 6, 7)
-            x2 = X2(6, 7)
-            x1 = X1(int(7))  # TODO: fix MOCO-697 and use X1(7) instead
+            x8 = SIMD[type, 8](0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = SIMD[type, 4](4, 5, 6, 7)
+            x2 = SIMD[type, 2](6, 7)
+            x1 = SIMD[type, 1](
+                int(7)
+            )  # TODO: fix MOCO-697 and use SIMD[type, 1](7) instead
             assert_equal(x8.reduce_or(), x1)
             assert_equal(x4.reduce_or(), x1)
             assert_equal(x2.reduce_or(), x1)
@@ -1217,7 +1256,7 @@ def test_reduce():
             assert_equal(x8.reduce_or[4](), x4)
             assert_equal(x4.reduce_or[4](), x4)
             assert_equal(x8.reduce_or[8](), x8)
-            assert_equal(X2(6, 3).reduce_or(), 7)
+            assert_equal(SIMD[type, 2](6, 3).reduce_or(), 7)
 
     test_dtype[DType.bool]()
     test_dtype[DType.int8]()
@@ -1710,3 +1749,4 @@ def main():
     test_contains()
     test_comparison()
     # TODO: add tests for __and__, __or__, anc comparison operators
+    test_equatable()
