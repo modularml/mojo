@@ -80,14 +80,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         Args:
             value: The init value.
         """
-        # TODO: Find a way to convert directly without using UInt64.
-        # This is because the existing
-        # __mlir_op.`kgen.int_literal.convert`
-        # in IntLiteral.__as_mlir_index()
-        # assumes that the index represents an signed integer.
-        # We need a variant for unsigned integers.
-        # Change when https://github.com/modularml/mojo/issues/2933 is fixed
-        self.value = int(UInt64(value)).value
+        self = value.__uint__()
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

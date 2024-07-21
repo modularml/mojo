@@ -157,6 +157,11 @@ what we publish.
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
 
+- `Dict` now implements `setdefault`, to get a value from the dictionary by
+  key, or set it to a default if it doesn't exist
+  ([PR #2803](https://github.com/modularml/mojo/pull/2803)
+  by [@msaelices](https://github.com/msaelices))
+
 - Added new `ExplicitlyCopyable` trait, to mark types that can be copied
   explicitly, but which might not be implicitly copyable.
 
@@ -321,6 +326,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `ListLiteral` now supports `__contains__`.
   ([PR #3251](https://github.com/modularml/mojo/pull/3251) by
   [@jjvraw](https://github.com/jjvraw))
+
+- `bit` module now supports `bit_reverse()`, `byte_swap()` and `pop_count()` for
+  `Int` type.
+  ([PR #3150](https://github.com/modularml/mojo/pull/3150) by [@LJ-9801](https://github.com/LJ-9801))
 
 ### 🦋 Changed
 
@@ -548,5 +557,12 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
   `__setitem__` method is failing with a "must be mutable" error.
+
 - [#248](https://github.com/modularml/mojo/issues/248) - [Feature] Enable
   `__setitem__` to take variadic arguments
+
+- [#3065]<https://github.com/modularml/mojo/issues/3065> - Fix incorrect behavior
+  of `SIMD.__int__` on unsigned types
+
+- [#3045]<https://github.com/modularml/mojo/issues/3045> - Disable implicit SIMD
+  conversion routes through `Bool`
