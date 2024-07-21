@@ -99,6 +99,16 @@ struct _PyIter(Sized):
             return 1
 
 
+# TODO: remove this wrapper which is just here because otherwise
+# the compiler is lost if we use `Dict[PythonObject, PythonObject]`
+# directly in the constructor.
+struct _PythonDictWrapper:
+    var dict_value: Dict[PythonObject, PythonObject]
+
+    fn __init__(inout self, owned dict_value: Dict[PythonObject, PythonObject]):
+        self.dict_value = dict_value^
+
+
 @register_passable
 struct PythonObject(
     ImplicitlyBoolable,
@@ -117,14 +127,6 @@ struct PythonObject(
     fn __init__(inout self):
         """Initialize the object with a `None` value."""
         self.__init__(None)
-
-    fn __init__(inout self, *, other: Self):
-        """Copy the object.
-
-        Args:
-            other: The value to copy.
-        """
-        self = other
 
     fn __init__(inout self, ptr: PyObjectPtr):
         """Initialize the object with a `PyObjectPtr` value.
@@ -319,18 +321,26 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-    # fn __init__(inout self, value: Dict[Self, Self]):
-    #    """Initialize the object from a dictionary of PythonObjects.
-    #
-    #    Args:
-    #        value: The dictionary value.
-    #    """
-    #    var cpython = _get_global_python_itf().cpython()
-    #    self.py_object = cpython.PyDict_New()
-    #    for entry in value.items():
-    #        var result = cpython.PyDict_SetItem(
-    #            self.py_object, entry[].key.py_object, entry[].value.py_object
-    #        )
+    fn __init__(inout self, value: _PythonDictWrapper):
+        """Initialize the object from a dictionary of PythonObjects.
+
+        Args:
+            value: The dictionary value.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyDict_New()
+        for entry in value.dict_value.items():
+            var result = cpython.PyDict_SetItem(
+                self.py_object, entry[].key.py_object, entry[].value.py_object
+            )
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     fn __copyinit__(inout self, existing: Self):
         """Copy the object.
