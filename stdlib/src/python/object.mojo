@@ -102,7 +102,7 @@ struct _PyIter(Sized):
 # TODO: Remove this wrapper. It is just here because otherwise
 # the compiler is lost if we use `Dict[PythonObject, PythonObject]`
 # directly in the `PythonObject.__init__()` method. The error
-# message that we get currently is "recursive reference to declaration".
+# message that we currently get is "recursive reference to declaration".
 struct _PythonDictWrapper:
     var dict_value: Dict[PythonObject, PythonObject]
 
