@@ -1342,7 +1342,7 @@ struct PythonObject(
         if cpython.PyObject_HasAttrString(self.py_object, "__contains__"):
             return self._call_single_arg_method("__contains__", rhs).__bool__()
         for v in self:
-            if v[] == rhs:
+            if v == rhs:
                 return True
         return False
 

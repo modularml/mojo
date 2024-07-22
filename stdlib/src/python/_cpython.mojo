@@ -1357,7 +1357,7 @@ struct CPython:
         name: StringRef,
     ) -> Int:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, DTypePointer[DType.uint8]) -> Int
+            fn (PyObjectPtr, UnsafePointer[UInt8]) -> Int
         ]("PyObject_HasAttrString")(obj, name.data)
         return r
 
