@@ -52,7 +52,7 @@ struct ExplicitCopyOnly(ExplicitlyCopyable):
         self.copy_count = other.copy_count + 1
 
 
-struct CopyCounter(CollectionElement, ExplicitlyCopyable):
+struct CopyCounter(CollectionElement):
     """Counts the number of copies performed on a value."""
 
     var copy_count: Int
@@ -70,9 +70,8 @@ struct CopyCounter(CollectionElement, ExplicitlyCopyable):
         self.copy_count = existing.copy_count + 1
 
 
-struct MoveCounter[T: CollectionElementNew](
+struct MoveCounter[T: CollectionElement](
     CollectionElement,
-    CollectionElementNew,
 ):
     """Counts the number of moves performed on a value."""
 
@@ -86,7 +85,7 @@ struct MoveCounter[T: CollectionElementNew](
         self.move_count = 0
 
     # TODO: This type should not be ExplicitlyCopyable, but has to be to satisfy
-    #       CollectionElementNew at the moment.
+    #       CollectionElement at the moment.
     fn __init__(inout self, *, other: Self):
         """Explicitly copy the provided value.
 

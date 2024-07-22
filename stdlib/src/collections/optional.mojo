@@ -36,7 +36,7 @@ from utils import Variant
 
 # TODO(27780): NoneType can't currently conform to traits
 @value
-struct _NoneType(CollectionElement, CollectionElementNew):
+struct _NoneType(CollectionElement):
     fn __init__(inout self, *, other: Self):
         pass
 
@@ -46,9 +46,7 @@ struct _NoneType(CollectionElement, CollectionElementNew):
 # ===----------------------------------------------------------------------===#
 
 
-struct Optional[T: CollectionElement](
-    CollectionElement, CollectionElementNew, Boolable
-):
+struct Optional[T: CollectionElement](CollectionElement, Boolable):
     """A type modeling a value which may or may not be present.
 
     Optional values can be thought of as a type-safe nullable pattern.

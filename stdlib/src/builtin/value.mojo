@@ -200,15 +200,6 @@ trait CollectionElement(Movable, ExplicitlyCopyable):
     pass
 
 
-trait CollectionElementNew(ExplicitlyCopyable, Movable):
-    """A temporary explicitly-copyable alternative to `CollectionElement`.
-
-    This trait will eventually replace `CollectionElement`.
-    """
-
-    pass
-
-
 trait StringableCollectionElement(CollectionElement, Stringable):
     """The StringableCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `Stringable` traits.

@@ -29,7 +29,7 @@ from utils._format import ToFormatter
 
 
 @value
-struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
+struct InlineString(Sized, Stringable, CollectionElement):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -308,7 +308,6 @@ struct _FixedString[CAP: Int](
     Formattable,
     ToFormatter,
     CollectionElement,
-    CollectionElementNew,
 ):
     """A string with a fixed available capacity.
 

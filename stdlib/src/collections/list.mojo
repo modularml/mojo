@@ -76,9 +76,7 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](
-    CollectionElement, CollectionElementNew, Sized, Boolable
-):
+struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying

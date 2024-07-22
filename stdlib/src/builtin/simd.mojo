@@ -145,7 +145,6 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
-    CollectionElementNew,
     Floorable,
     Formattable,
     Hashable,

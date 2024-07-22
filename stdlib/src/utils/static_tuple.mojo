@@ -245,7 +245,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](
 
 @value
 struct InlineArray[
-    ElementType: CollectionElementNew,
+    ElementType: CollectionElement,
     size: Int,
 ](Sized, Movable, Copyable, ExplicitlyCopyable):
     """A fixed-size sequence of size homogeneous elements where size is a constant expression.

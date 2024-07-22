@@ -69,7 +69,6 @@ struct Path(
     Boolable,
     Formattable,
     CollectionElement,
-    CollectionElementNew,
     PathLike,
     KeyElement,
 ):
