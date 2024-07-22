@@ -389,8 +389,8 @@ struct Optional[T: CollectionElement](
             The underlying value contained in the Optional or a default value.
         """
         if self.__bool__():
-            return self._value[T]
-        return default
+            return Self.T(other=self._value[T])
+        return Self.T(other=default)
 
 
 # ===----------------------------------------------------------------------===#
