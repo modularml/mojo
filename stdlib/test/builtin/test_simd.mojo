@@ -1334,6 +1334,202 @@ def test_contains():
     assert_false(0 in y or 5 in y)
 
 
+def test_comparison():
+    alias dtypes = (
+        DType.bool,
+        DType.int8,
+        DType.int16,
+        DType.int32,
+        DType.int64,
+        DType.uint8,
+        DType.uint16,
+        DType.uint32,
+        DType.uint64,
+        DType.float16,
+        DType.float32,
+        DType.float64,
+        DType.index,
+    )
+
+    @parameter
+    fn test_dtype[type: DType]() raises:
+        alias X4 = SIMD[type, 4]
+
+        @parameter
+        if type.is_signed():
+            var simd_val = X4(-10, -8, -6, -4)
+
+            assert_true(simd_val.__lt__(X4(-1)).reduce_and())
+            assert_false(simd_val.__lt__(X4(-12)).reduce_or())
+            var mixed_lt = simd_val.__lt__(X4(-6))
+            assert_true(mixed_lt[0])
+            assert_true(mixed_lt[1])
+            assert_false(mixed_lt[2])
+            assert_false(mixed_lt[3])
+
+            assert_true(simd_val.__le__(X4(-4)).reduce_and())
+            assert_false(simd_val.__le__(X4(-11)).reduce_or())
+            var mixed_le = simd_val.__le__(X4(-8))
+            assert_true(mixed_le[0])
+            assert_true(mixed_le[1])
+            assert_false(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(simd_val.__eq__(X4(-10, -8, -6, -4)).reduce_and())
+            assert_false(simd_val.__eq__(X4(0)).reduce_or())
+            var mixed_eq = simd_val.__eq__(X4(-10))
+            assert_true(mixed_eq[0])
+            assert_false(mixed_eq[1])
+            assert_false(mixed_eq[2])
+            assert_false(mixed_eq[3])
+
+            assert_true(simd_val.__ne__(X4(0)).reduce_and())
+            assert_false(simd_val.__ne__(X4(-10, -8, -6, -4)).reduce_or())
+            var mixed_ne = simd_val.__ne__(X4(-8))
+            assert_true(mixed_ne[0])
+            assert_false(mixed_ne[1])
+            assert_true(mixed_ne[2])
+            assert_true(mixed_ne[3])
+
+            assert_true(simd_val.__gt__(X4(-11)).reduce_and())
+            assert_false(simd_val.__gt__(X4(-1)).reduce_or())
+            var mixed_gt = simd_val.__gt__(X4(-6))
+            assert_false(mixed_gt[0])
+            assert_false(mixed_gt[1])
+            assert_false(mixed_gt[2])
+            assert_true(mixed_gt[3])
+
+            assert_true(simd_val.__ge__(X4(-10)).reduce_and())
+            assert_false(simd_val.__ge__(X4(-1)).reduce_or())
+            var mixed_ge = simd_val.__ge__(X4(-6))
+            assert_false(mixed_ge[0])
+            assert_false(mixed_ge[1])
+            assert_true(mixed_ge[2])
+            assert_true(mixed_ge[3])
+
+        @parameter
+        if type.is_numeric():
+            var simd_val = X4(1, 2, 3, 4)
+
+            assert_true(simd_val.__lt__(X4(5)).reduce_and())
+            assert_false(simd_val.__lt__(X4(0)).reduce_or())
+            var mixed_lt = simd_val.__lt__(X4(3))
+            assert_true(mixed_lt[0])
+            assert_true(mixed_lt[1])
+            assert_false(mixed_lt[2])
+            assert_false(mixed_lt[3])
+
+            assert_true(simd_val.__le__(X4(4)).reduce_and())
+            assert_false(simd_val.__le__(X4(0)).reduce_or())
+            var mixed_le = simd_val.__le__(X4(3))
+            assert_true(mixed_le[0])
+            assert_true(mixed_le[1])
+            assert_true(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(simd_val.__eq__(X4(1, 2, 3, 4)).reduce_and())
+            assert_false(simd_val.__eq__(X4(5)).reduce_or())
+            var mixed_eq = simd_val.__eq__(X4(1))
+            assert_true(mixed_eq[0])
+            assert_false(mixed_eq[1])
+            assert_false(mixed_eq[2])
+            assert_false(mixed_eq[3])
+
+            assert_true(simd_val.__ne__(X4(5)).reduce_and())
+            assert_false(simd_val.__ne__(X4(1, 2, 3, 4)).reduce_or())
+            var mixed_ne = simd_val.__ne__(X4(4))
+            assert_true(mixed_ne[0])
+            assert_true(mixed_ne[1])
+            assert_true(mixed_ne[2])
+            assert_false(mixed_ne[3])
+
+            assert_true(simd_val.__gt__(X4(0)).reduce_and())
+            assert_false(simd_val.__gt__(X4(4)).reduce_or())
+            var mixed_gt = simd_val.__gt__(X4(2))
+            assert_false(mixed_gt[0])
+            assert_false(mixed_gt[1])
+            assert_true(mixed_gt[2])
+            assert_true(mixed_gt[3])
+
+            assert_true(simd_val.__ge__(X4(1)).reduce_and())
+            assert_false(simd_val.__ge__(X4(5)).reduce_or())
+            var mixed_ge = simd_val.__ge__(X4(2))
+            assert_false(mixed_ge[0])
+            assert_true(mixed_ge[1])
+            assert_true(mixed_ge[2])
+            assert_true(mixed_ge[3])
+
+        @parameter
+        if type is DType.bool:
+            var all_true = X4(True)
+            var all_false = X4(False)
+            var mixed = X4(True, True, False, False)
+
+            assert_true(all_false.__lt__(all_true).reduce_and())
+            assert_false(all_true.__lt__(all_false).reduce_or())
+            var mixed_lt = all_false.__lt__(mixed)
+            assert_true(mixed_lt[0])
+            assert_true(mixed_lt[1])
+            assert_false(mixed_lt[2])
+            assert_false(mixed_lt[3])
+
+            assert_true(all_false.__le__(all_true).reduce_and())
+            assert_false(all_true.__le__(all_false).reduce_or())
+            var mixed_le = all_true.__le__(mixed)
+            assert_true(mixed_le[0])
+            assert_true(mixed_le[1])
+            assert_false(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(
+                all_true.__eq__(X4(True, True, True, True)).reduce_and()
+            )
+            assert_false(all_true.__eq__(all_false).reduce_or())
+            var mixed_eq = all_true.__eq__(mixed)
+            assert_true(mixed_eq[0])
+            assert_true(mixed_eq[1])
+            assert_false(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(all_true.__ne__(all_false).reduce_and())
+            assert_false(
+                all_true.__ne__(X4(True, True, True, True)).reduce_or()
+            )
+            var mixed_ne = all_true.__ne__(mixed)
+            assert_false(mixed_ne[0])
+            assert_false(mixed_ne[1])
+            assert_true(mixed_ne[2])
+            assert_true(mixed_ne[3])
+
+            assert_true(all_true.__gt__(all_false).reduce_and())
+            assert_false(all_false.__gt__(all_true).reduce_or())
+            var mixed_gt = all_true.__gt__(mixed)
+            assert_false(mixed_gt[0])
+            assert_false(mixed_gt[1])
+            assert_true(mixed_gt[2])
+            assert_true(mixed_gt[3])
+
+            assert_true(all_true.__ge__(all_false).reduce_and())
+            assert_false(all_false.__ge__(all_true).reduce_or())
+            var mixed_ge = all_true.__ge__(mixed)
+            assert_true(mixed_ge[0])
+            assert_true(mixed_ge[1])
+            assert_true(mixed_ge[2])
+            assert_true(mixed_ge[3])
+
+    @parameter
+    fn test_dtype_unrolled[i: Int]() raises:
+        alias type = dtypes.get[i, DType]()
+        test_dtype[type]()
+
+    unroll[test_dtype_unrolled, dtypes.__len__()]()
+
+    # TODO(KERN-228): support BF16 on neon systems.
+    @parameter
+    if not has_neon():
+        test_dtype[DType.bfloat16]()
+
+
 def main():
     test_abs()
     test_add()
@@ -1380,4 +1576,5 @@ def main():
     test_modf()
     test_split()
     test_contains()
+    test_comparison()
     # TODO: add tests for __and__, __or__, anc comparison operators
