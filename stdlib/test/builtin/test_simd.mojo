@@ -1145,38 +1145,42 @@ def test_reduce():
         @parameter
         if type is DType.bool:
             # reduce_and
-            x8 = X8(False, False, True, True, False, True, False, True)
-            x4 = X4(False, False, False, True)
-            x2 = X2(False, False)
-            x1 = X1(False)
-            assert_equal(x8.reduce_and(), x1)
-            assert_equal(x4.reduce_and(), x1)
-            assert_equal(x2.reduce_and(), x1)
-            assert_equal(x1.reduce_and(), x1)
-            assert_equal(x8.reduce_and[2](), x2)
-            assert_equal(x4.reduce_and[2](), x2)
-            assert_equal(x2.reduce_and[2](), x2)
-            assert_equal(x8.reduce_and[4](), x4)
-            assert_equal(x4.reduce_and[4](), x4)
-            assert_equal(x8.reduce_and[8](), x8)
-            assert_equal(X2(True, True).reduce_and(), True)
+            var x8b = SIMD[DType.bool, 8](
+                False, False, True, True, False, True, False, True
+            )
+            var x4b = SIMD[DType.bool, 4](False, False, False, True)
+            var x2b = SIMD[DType.bool, 2](False, False)
+            var x1b = SIMD[DType.bool, 1](False)
+            assert_equal(x8b.reduce_and(), x1b)
+            assert_equal(x4b.reduce_and(), x1b)
+            assert_equal(x2b.reduce_and(), x1b)
+            assert_equal(x1b.reduce_and(), x1b)
+            assert_equal(x8b.reduce_and[2](), x2b)
+            assert_equal(x4b.reduce_and[2](), x2b)
+            assert_equal(x2b.reduce_and[2](), x2b)
+            assert_equal(x8b.reduce_and[4](), x4b)
+            assert_equal(x4b.reduce_and[4](), x4b)
+            assert_equal(x8b.reduce_and[8](), x8b)
+            assert_equal(SIMD[DType.bool, 2](True, True).reduce_and(), True)
 
             # reduce_or
-            x8 = X8(False, False, True, True, False, True, False, True)
-            x4 = X4(False, True, True, True)
-            x2 = X2(True, True)
-            x1 = X1(True)
-            assert_equal(x8.reduce_or(), x1)
-            assert_equal(x4.reduce_or(), x1)
-            assert_equal(x2.reduce_or(), x1)
-            assert_equal(x1.reduce_or(), x1)
-            assert_equal(x8.reduce_or[2](), x2)
-            assert_equal(x4.reduce_or[2](), x2)
-            assert_equal(x2.reduce_or[2](), x2)
-            assert_equal(x8.reduce_or[4](), x4)
-            assert_equal(x4.reduce_or[4](), x4)
-            assert_equal(x8.reduce_or[8](), x8)
-            assert_equal(X2(False, False).reduce_or(), False)
+            x8b = SIMD[DType.bool, 8](
+                False, False, True, True, False, True, False, True
+            )
+            x4b = SIMD[DType.bool, 4](False, True, True, True)
+            x2b = SIMD[DType.bool, 2](True, True)
+            x1b = SIMD[DType.bool, 1](True)
+            assert_equal(x8b.reduce_or(), x1b)
+            assert_equal(x4b.reduce_or(), x1b)
+            assert_equal(x2b.reduce_or(), x1b)
+            assert_equal(x1b.reduce_or(), x1b)
+            assert_equal(x8b.reduce_or[2](), x2b)
+            assert_equal(x4b.reduce_or[2](), x2b)
+            assert_equal(x2b.reduce_or[2](), x2b)
+            assert_equal(x8b.reduce_or[4](), x4b)
+            assert_equal(x4b.reduce_or[4](), x4b)
+            assert_equal(x8b.reduce_or[8](), x8b)
+            assert_equal(SIMD[DType.bool, 2](False, False).reduce_or(), False)
 
         @parameter
         if type.is_integral():
@@ -1461,9 +1465,9 @@ def test_comparison():
 
         @parameter
         if type is DType.bool:
-            var all_true = X4(True)
-            var all_false = X4(False)
-            var mixed = X4(True, True, False, False)
+            var all_true = SIMD[DType.bool, 4](True)
+            var all_false = SIMD[DType.bool, 4](False)
+            var mixed = SIMD[DType.bool, 4](True, True, False, False)
 
             assert_true(all_false.__lt__(all_true).reduce_and())
             assert_false(all_true.__lt__(all_false).reduce_or())
@@ -1482,7 +1486,9 @@ def test_comparison():
             assert_false(mixed_le[3])
 
             assert_true(
-                all_true.__eq__(X4(True, True, True, True)).reduce_and()
+                all_true.__eq__(
+                    SIMD[DType.bool, 4](True, True, True, True)
+                ).reduce_and()
             )
             assert_false(all_true.__eq__(all_false).reduce_or())
             var mixed_eq = all_true.__eq__(mixed)
@@ -1493,7 +1499,9 @@ def test_comparison():
 
             assert_true(all_true.__ne__(all_false).reduce_and())
             assert_false(
-                all_true.__ne__(X4(True, True, True, True)).reduce_or()
+                all_true.__ne__(
+                    SIMD[DType.bool, 4](True, True, True, True)
+                ).reduce_or()
             )
             var mixed_ne = all_true.__ne__(mixed)
             assert_false(mixed_ne[0])
