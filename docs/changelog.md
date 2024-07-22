@@ -516,6 +516,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   ([PR #3180](https://github.com/modularml/mojo/pull/3180)
   by [@jjvraw](https://github.com/jjvraw))
 
+- `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`

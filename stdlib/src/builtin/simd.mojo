@@ -280,7 +280,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Bool):
+    fn __init__(inout self: SIMD[DType.bool, size], value: Bool, /):
         """Initializes the SIMD vector with a bool value.
 
         The bool value is splatted across all elements of the SIMD vector.
@@ -291,10 +291,10 @@ struct SIMD[type: DType, size: Int](
         _simd_construction_checks[type, size]()
 
         var casted = __mlir_op.`pop.cast`[
-            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
+            _type = __mlir_type[`!pop.simd<1, bool>`]
         ](value._as_scalar_bool())
         self.value = __mlir_op.`pop.simd.splat`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+            _type = __mlir_type[`!pop.simd<`, size.value, `, bool>`]
         ](casted)
 
     @always_inline("nodebug")
@@ -904,7 +904,7 @@ struct SIMD[type: DType, size: Int](
 
         @parameter
         if type is DType.bool:
-            return self.select(Self(False), Self(True))
+            return rebind[Self](self.select(Self(False), Self(True)))
         else:
             return self ^ -1
 
