@@ -123,6 +123,29 @@ def test_optional_take_mutates():
     assert_false(opt1)
 
 
+def test_optional_implicit_copy():
+    # Note that the implicit copy only works for types that are `Copyable`,
+    # like `Int`, `Float`, `SIMD`, etc...
+    # For other types that are not `Copyable`, but are `ExplicitlyCopyable`,
+    # the explicit copy constructor must be used instead. This concerns types
+    # like `String`, `Dict`, etc...
+    var first_optional = Optional[Int](4)
+
+    var copy_1 = first_optional
+
+    var copy_2 = first_optional
+
+    assert_equal(first_optional.value(), 4)
+    assert_equal(copy_1.value(), 4)
+    assert_equal(copy_2.value(), 4)
+
+    copy_2.value() += 6
+
+    assert_equal(first_optional.value(), 4)
+    assert_equal(copy_1.value(), 4)
+    assert_equal(copy_2.value(), 10)
+
+
 def test_optional_explicit_copy():
     var v1 = Optional[String](String("test"))
 
@@ -167,6 +190,7 @@ def main():
     test_optional_reg_is()
     test_optional_reg_isnot()
     test_optional_take_mutates()
+    test_optional_implicit_copy()
     test_optional_explicit_copy()
     test_optional_str_repr()
     test_optional_equality()
