@@ -48,21 +48,21 @@ alias tile_k = 4  # K must be a multiple of this
 
 
 struct Matrix[rows: Int, cols: Int]:
-    var data: DTypePointer[type]
+    var data: UnsafePointer[Scalar[type]]
 
     # Initialize zeroing all values
     fn __init__(inout self):
-        self.data = DTypePointer[type].alloc(rows * cols)
+        self.data = UnsafePointer[Scalar[type]].alloc(rows * cols)
         memset_zero(self.data.address, rows * cols)
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(inout self, data: DTypePointer[type]):
+    fn __init__(inout self, data: UnsafePointer[Scalar[type]]):
         self.data = data
 
     ## Initialize with random values
     @staticmethod
     fn rand() -> Self:
-        var data = DTypePointer[type].alloc(rows * cols)
+        var data = UnsafePointer[Scalar[type]].alloc(rows * cols)
         rand(data.address, rows * cols)
         return Self(data)
 
