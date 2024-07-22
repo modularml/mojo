@@ -106,16 +106,6 @@ def test_basic():
     assert_equal("i", i[String])
 
 
-def test_copy():
-    var v1 = TestVariant(TestCounter())
-    var v2 = v1
-    # didn't call copyinit
-    assert_equal(v1[TestCounter].copied, 0)
-    assert_equal(v2[TestCounter].copied, 1)
-    # test that we didn't call the other copyinit too!
-    assert_no_poison()
-
-
 def test_explicit_copy():
     var v1 = TestVariant(TestCounter())
 
@@ -218,7 +208,6 @@ def test_get_returns_mutable_reference():
 def main():
     test_basic()
     test_get_returns_mutable_reference()
-    test_copy()
     test_explicit_copy()
     test_move()
     test_del()

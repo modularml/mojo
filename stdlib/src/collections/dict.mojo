@@ -525,7 +525,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var dict = Dict[K, Optional[V]]()
         for key in keys:
-            dict[Self.K(other=key[])] = value
+            dict[Self.K(other=key[])] = Optional[V](other=value)
         return dict
 
     fn __copyinit__(inout self, existing: Self):

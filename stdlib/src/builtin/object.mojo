@@ -303,8 +303,8 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, value: Self.type):
-        self.value = value
+    fn __init__(inout self, owned value: Self.type):
+        self.value = value^
 
     @always_inline
     fn __init__(inout self):
@@ -345,11 +345,11 @@ struct _ObjectImpl(
         Args:
             other: The value to copy.
         """
-        self = other.value
+        self = Self.type(other=other.value)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
-        self = existing.value
+        self = Self(other=existing)
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
@@ -650,7 +650,7 @@ struct _ObjectImpl(
     @always_inline
     fn list_append(self, value: Self):
         var ptr = self.get_list_ptr()
-        ptr[].append(value.value)
+        ptr[].append(Self.type(other=value.value))
 
     @always_inline
     fn get_list_length(self) -> Int:

@@ -121,15 +121,30 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Args:
             other: The Optional to copy.
         """
-        self.__copyinit__(other)
+        if other is None:
+            self = Self()
+        else:
+            self = Self(Self.T(other=other.value()))
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__[
+        U: CopyableCollectionElement
+    ](inout self: Optional[U], other: Optional[U]):
         """Copy construct an Optional.
+
+        This trait is only available if `T` is `Copyable`,
+        meaning it's very cheap to copy. Typically for register-passable types.
+
+        Parameters:
+            U: The type of the element contained in the `Optional`. Must implement the
+              traits `Copyable` and `CollectionElement`.
 
         Args:
             other: The Optional to copy.
         """
-        self._value = other._value
+        if other is None:
+            self = Optional[U]()
+        else:
+            self = Optional[U](U(other=other.value()))
 
     fn __moveinit__(inout self, owned other: Self):
         """Move this `Optional`.

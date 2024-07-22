@@ -200,6 +200,15 @@ trait CollectionElement(Movable, ExplicitlyCopyable):
     pass
 
 
+trait CopyableCollectionElement(Copyable, CollectionElement):
+    """A CollectionElement type that is very cheap to copy,
+    and does not necessitate an explicit copy. This is often given
+    to types that are register-passable.
+    """
+
+    pass
+
+
 trait StringableCollectionElement(CollectionElement, Stringable):
     """The StringableCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `Stringable` traits.
