@@ -159,6 +159,26 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
+    fn alloc(count: Int, alignment: Int = alignof[T]()) -> Self:
+        """Allocate an array with specified or default alignment.
+
+        Args:
+            count: The number of elements in the array.
+            alignment: The alignment in bytes of the allocated memory.
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        alias sizeof_t = sizeof[T]()
+
+        constrained[sizeof_t > 0, "size must be greater than zero"]()
+
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
+        )
+
+    @staticmethod
+    @always_inline
     fn alloc[alignment: Int = alignof[T]()](count: Int) -> Self:
         """Allocate an array with specified or default alignment.
 
