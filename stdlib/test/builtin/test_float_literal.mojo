@@ -157,23 +157,12 @@ def test_int_conversion():
     assert_equal(int(4.0), 4)
 
 
-def test_boolean_comparable():
-    var f1 = 0.0
-    assert_false(f1)
+def test_bool():
+    assert_false(FloatLiteral.__bool__(0.0))
+    assert_false(FloatLiteral.__as_bool__(0.0))
 
-    var f2 = 2.0
-    assert_true(f2)
-
-    var f3 = 1.0
-    assert_true(f3)
-
-
-def test_equality():
-    # TODO: add tests for special values
-    assert_true(FloatLiteral.__eq__(4.4, 4.4))
-    assert_false(FloatLiteral.__eq__(4.4, 42.0))
-    assert_false(FloatLiteral.__ne__(4.4, 4.4))
-    assert_true(FloatLiteral.__ne__(4.4, 42.0))
+    assert_true(FloatLiteral.__bool__(2.0))
+    assert_true(FloatLiteral.__as_bool__(2.0))
 
 
 def test_is_special_value():
@@ -195,6 +184,34 @@ def test_abs():
     assert_equal(FloatLiteral.__abs__(neg_inf), inf)
 
 
+def test_comparison():
+    assert_true(FloatLiteral.__lt__(4.4, 10.4))
+    assert_true(FloatLiteral.__lt__(-10.4, -4.4))
+    assert_false(FloatLiteral.__lt__(0.0, 0.0))
+    assert_false(FloatLiteral.__lt__(10.4, 4.4))
+
+    assert_true(FloatLiteral.__le__(4.4, 10.4))
+    assert_true(FloatLiteral.__le__(-10.4, 4.4))
+    assert_true(FloatLiteral.__le__(0.0, 0.0))
+    assert_false(FloatLiteral.__le__(10.4, 4.4))
+
+    # TODO: add tests for special values
+    assert_true(FloatLiteral.__eq__(4.4, 4.4))
+    assert_false(FloatLiteral.__eq__(4.4, 42.0))
+    assert_false(FloatLiteral.__ne__(4.4, 4.4))
+    assert_true(FloatLiteral.__ne__(4.4, 42.0))
+
+    assert_true(FloatLiteral.__gt__(10.4, 4.4))
+    assert_true(FloatLiteral.__gt__(-4.4, -10.4))
+    assert_false(FloatLiteral.__gt__(0.0, 0.0))
+    assert_false(FloatLiteral.__gt__(4.4, 10.4))
+
+    assert_true(FloatLiteral.__ge__(10.4, 4.4))
+    assert_true(FloatLiteral.__ge__(-4.4, -10.4))
+    assert_true(FloatLiteral.__ge__(4.4, 4.4))
+    assert_false(FloatLiteral.__ge__(4.4, 10.4))
+
+
 def main():
     test_ceil()
     test_floor()
@@ -205,7 +222,7 @@ def main():
     test_mod()
     test_div_mod()
     test_int_conversion()
-    test_boolean_comparable()
-    test_equality()
+    test_bool()
     test_is_special_value()
     test_abs()
+    test_comparison()

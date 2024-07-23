@@ -34,7 +34,7 @@ with open("my_file.txt", "r") as f:
 from os import PathLike
 from sys import external_call
 
-from memory import AddressSpace, DTypePointer, Pointer
+from memory import AddressSpace, UnsafePointer
 
 
 @register_passable
@@ -67,12 +67,12 @@ struct _OwnedStringRef(Boolable):
 struct FileHandle:
     """File handle to an opened file."""
 
-    var handle: DTypePointer[DType.invalid]
+    var handle: UnsafePointer[NoneType]
     """The underlying pointer to the file handle."""
 
     fn __init__(inout self):
         """Default constructor."""
-        self.handle = DTypePointer[DType.invalid]()
+        self.handle = UnsafePointer[NoneType]()
 
     fn __init__(inout self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
@@ -95,16 +95,15 @@ struct FileHandle:
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[
-            "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
-        ](path, mode, UnsafePointer.address_of(err_msg))
+            "KGEN_CompilerRT_IO_FileOpen", UnsafePointer[NoneType]
+        ](path, mode, Reference(err_msg))
 
         if err_msg:
-            self.handle = DTypePointer[DType.invalid]()
-            raise (err_msg^).consume_as_error()
+            self.handle = UnsafePointer[NoneType]()
+            raise err_msg^.consume_as_error()
 
         self.handle = handle
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -119,13 +118,13 @@ struct FileHandle:
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
-            self.handle, UnsafePointer.address_of(err_msg)
+            self.handle, Reference(err_msg)
         )
 
         if err_msg:
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
-        self.handle = DTypePointer[DType.invalid]()
+        self.handle = UnsafePointer[NoneType]()
 
     fn __moveinit__(inout self, owned existing: Self):
         """Moves constructor for the file handle.
@@ -134,9 +133,8 @@ struct FileHandle:
           existing: The existing file handle.
         """
         self.handle = existing.handle
-        existing.handle = DTypePointer[DType.invalid]()
+        existing.handle = UnsafePointer[NoneType]()
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads data from a file and sets the file handle seek position. If
         size is left as the default of -1, it will read to the end of the file.
@@ -196,19 +194,18 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
             self.handle,
-            UnsafePointer.address_of(size_copy),
-            UnsafePointer.address_of(err_msg),
+            Reference(size_copy),
+            Reference(err_msg),
         )
 
         if err_msg:
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         return String(buf, int(size_copy) + 1)
 
-    @always_inline
     fn read[
         type: DType
-    ](self, ptr: DTypePointer[type], size: Int64 = -1) raises -> Int64:
+    ](self, ptr: UnsafePointer[Scalar[type]], size: Int64 = -1) raises -> Int64:
         """Read data from the file into the pointer. Setting size will read up
         to `sizeof(type) * size`. The default value of `size` is -1 which
         will read to the end of the file. Starts reading from the file handle
@@ -238,18 +235,18 @@ struct FileHandle:
         var file = open(file_name, "r")
 
         # Allocate and load 8 elements
-        var ptr = DTypePointer[DType.float32].alloc(8)
+        var ptr = UnsafePointer[Float32].alloc(8)
         var bytes = file.read(ptr, 8)
         print("bytes read", bytes)
 
-        var first_element = ptr.load(0)
+        var first_element = ptr[0]
         print(first_element)
 
         # Skip 2 elements
         _ = file.seek(2 * sizeof[DType.float32](), os.SEEK_CUR)
 
         # Allocate and load 8 more elements from file handle seek position
-        var ptr2 = DTypePointer[DType.float32].alloc(8)
+        var ptr2 = UnsafePointer[Float32].alloc(8)
         var bytes2 = file.read(ptr2, 8)
 
         var eleventh_element = ptr2[0]
@@ -274,7 +271,7 @@ struct FileHandle:
             self.handle,
             ptr,
             size * sizeof[type](),
-            UnsafePointer.address_of(err_msg),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -340,8 +337,8 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
-            UnsafePointer.address_of(size_copy),
-            UnsafePointer.address_of(err_msg),
+            Reference(size_copy),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -377,7 +374,7 @@ struct FileHandle:
         ```mojo
         import os
         var f = open("/tmp/example.txt", "r")
-        f.seek(os.SEEK_CUR, 32)
+        _ = f.seek(32, os.SEEK_CUR)
         ```
 
         Start from 32 bytes from the end of the file:
@@ -385,7 +382,7 @@ struct FileHandle:
         ```mojo
         import os
         var f = open("/tmp/example.txt", "r")
-        f.seek(os.SEEK_END, -32)
+        _ = f.seek(-32, os.SEEK_END)
         ```
         .
         """
@@ -398,7 +395,7 @@ struct FileHandle:
         )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, whence, UnsafePointer.address_of(err_msg)
+            self.handle, offset, whence, Reference(err_msg)
         )
 
         if err_msg:
@@ -412,7 +409,7 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.unsafe_ptr(), len(data))
+        self._write(data.unsafe_ptr(), data.byte_length())
 
     fn write(self, data: Span[UInt8, _]) raises:
         """Write a borrowed sequence of data to the file.
@@ -422,7 +419,6 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-    @always_inline
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
 
@@ -431,7 +427,6 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-    @always_inline
     fn _write[
         address_space: AddressSpace
     ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
@@ -452,7 +447,7 @@ struct FileHandle:
             self.handle,
             ptr.address,
             len,
-            UnsafePointer.address_of(err_msg),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -474,28 +469,14 @@ struct FileHandle:
         return Int(i64_res.value)
 
 
-fn open(path: String, mode: String) raises -> FileHandle:
-    """Opens the file specified by path using the mode provided, returning a
-    FileHandle.
-
-    Args:
-      path: The path to the file to open.
-      mode: The mode to open the file in.
-
-    Returns:
-      A file handle.
-    """
-    return FileHandle(path, mode)
-
-
 fn open[
-    pathlike: os.PathLike
-](path: pathlike, mode: String) raises -> FileHandle:
+    PathLike: os.PathLike
+](path: PathLike, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
     FileHandle.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file to open.

@@ -13,10 +13,10 @@
 """Implements the StringRef class.
 """
 
-from bit import countr_zero
+from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
-from memory import DTypePointer, UnsafePointer, memcmp
+from memory import UnsafePointer, memcmp
 from memory.memory import _memcmp_impl_unconstrained
 
 # ===----------------------------------------------------------------------=== #
@@ -40,6 +40,7 @@ struct StringRef(
     Sized,
     IntableRaising,
     CollectionElement,
+    CollectionElementNew,
     Stringable,
     Formattable,
     Hashable,
@@ -71,6 +72,18 @@ struct StringRef(
         return StringRef(UnsafePointer[UInt8](), 0)
 
     @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+        return Self(other.data, other.length)
+
+    @always_inline
     fn __init__(str: StringLiteral) -> Self:
         """Construct a StringRef value given a constant string.
 
@@ -89,12 +102,12 @@ struct StringRef(
 
         The constructor takes a raw pointer and a length.
 
-        Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
+        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
         as we are now storing the bytes as UInt8.
         See https://github.com/modularml/mojo/issues/2317 for more information.
 
         Args:
-            ptr: DTypePointer to the string.
+            ptr: UnsafePointer to the string.
             len: The length of the string.
 
         Returns:
@@ -102,24 +115,6 @@ struct StringRef(
         """
 
         return Self {data: ptr.bitcast[UInt8](), length: len}
-
-    @always_inline
-    fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> Self:
-        """Construct a StringRef value given a (potentially non-0 terminated
-        string).
-
-        The constructor takes a raw pointer and a length.
-
-        Args:
-            ptr: DTypePointer to the string.
-            len: The length of the string.
-
-        Returns:
-            Constructed `StringRef` object.
-        """
-        var unsafe_ptr = UnsafePointer[UInt8]._from_dtype_ptr(ptr)
-
-        return Self {data: unsafe_ptr, length: len}
 
     @always_inline
     fn __init__(ptr: UnsafePointer[UInt8]) -> Self:
@@ -132,18 +127,22 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return DTypePointer[DType.uint8](ptr)
+        var len = 0
+        while Scalar.load(ptr, len):
+            len += 1
+
+        return StringRef(ptr, len)
 
     @always_inline
     fn __init__(ptr: UnsafePointer[C_char]) -> Self:
         """Construct a StringRef value given a null-terminated string.
 
-        Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
+        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
         as we are now storing the bytes as UInt8.
         See https://github.com/modularml/mojo/issues/2317 for more information.
 
         Args:
-            ptr: DTypePointer to the string.
+            ptr: UnsafePointer to the string.
 
         Returns:
             Constructed `StringRef` object.
@@ -154,25 +153,6 @@ struct StringRef(
             len += 1
 
         return StringRef(ptr, len)
-
-    @always_inline
-    fn __init__(ptr: DTypePointer[DType.uint8]) -> Self:
-        """Construct a StringRef value given a null-terminated string.
-
-        Args:
-            ptr: DTypePointer to the string.
-
-        Returns:
-            Constructed `StringRef` object.
-        """
-
-        var len = 0
-        while Scalar.load(ptr, len):
-            len += 1
-
-        var ptr1 = UnsafePointer[C_char]._from_dtype_ptr(ptr)
-
-        return StringRef(ptr1, len)
 
     # ===-------------------------------------------------------------------===#
     # Helper methods for slicing
@@ -365,7 +345,7 @@ struct StringRef(
         """
         return len(self) != 0
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
 
         Returns:
@@ -396,6 +376,7 @@ struct StringRef(
         """
         return self.length
 
+    @no_inline
     fn __str__(self) -> String:
         """Convert the string reference to a string.
 
@@ -404,6 +385,7 @@ struct StringRef(
         """
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this StringRef to the provided formatter.
@@ -419,6 +401,14 @@ struct StringRef(
         )
 
         writer.write_str(str_slice)
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation of the object.
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self.__str__()
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -644,11 +634,11 @@ struct StringRef(
 @always_inline
 fn _memchr[
     type: DType
-](source: DTypePointer[type], char: Scalar[type], len: Int) -> DTypePointer[
-    type
-]:
+](
+    source: UnsafePointer[Scalar[type]], char: Scalar[type], len: Int
+) -> UnsafePointer[Scalar[type]]:
     if not len:
-        return DTypePointer[type]()
+        return UnsafePointer[Scalar[type]]()
     alias bool_mask_width = simdwidthof[DType.bool]()
     var first_needle = SIMD[type, bool_mask_width](char)
     var vectorized_end = _align_down(len, bool_mask_width)
@@ -659,27 +649,27 @@ fn _memchr[
         ) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
-            return source + i + countr_zero(mask)
+            return source + int(i + count_trailing_zeros(mask))
 
     for i in range(vectorized_end, len):
         if source[i] == char:
             return source + i
-    return DTypePointer[type]()
+    return UnsafePointer[Scalar[type]]()
 
 
 @always_inline
 fn _memmem[
     type: DType
 ](
-    haystack: DTypePointer[type],
+    haystack: UnsafePointer[Scalar[type]],
     haystack_len: Int,
-    needle: DTypePointer[type],
+    needle: UnsafePointer[Scalar[type]],
     needle_len: Int,
-) -> DTypePointer[type]:
+) -> UnsafePointer[Scalar[type]]:
     if not needle_len:
         return haystack
     if needle_len > haystack_len:
-        return DTypePointer[type]()
+        return UnsafePointer[Scalar[type]]()
     if needle_len == 1:
         return _memchr[type](haystack, needle[0], haystack_len)
 
@@ -704,7 +694,7 @@ fn _memmem[
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
 
         while mask:
-            var offset = i + countr_zero(mask)
+            var offset = int(i + count_trailing_zeros(mask))
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)
@@ -718,36 +708,36 @@ fn _memmem[
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             return haystack + i
 
-    return DTypePointer[type]()
+    return UnsafePointer[Scalar[type]]()
 
 
 @always_inline
 fn _memrchr[
     type: DType
-](source: DTypePointer[type], char: Scalar[type], len: Int) -> DTypePointer[
-    type
-]:
+](
+    source: UnsafePointer[Scalar[type]], char: Scalar[type], len: Int
+) -> UnsafePointer[Scalar[type]]:
     if not len:
-        return DTypePointer[type]()
+        return UnsafePointer[Scalar[type]]()
     for i in reversed(range(len)):
         if source[i] == char:
             return source + i
-    return DTypePointer[type]()
+    return UnsafePointer[Scalar[type]]()
 
 
 @always_inline
 fn _memrmem[
     type: DType
 ](
-    haystack: DTypePointer[type],
+    haystack: UnsafePointer[Scalar[type]],
     haystack_len: Int,
-    needle: DTypePointer[type],
+    needle: UnsafePointer[Scalar[type]],
     needle_len: Int,
-) -> DTypePointer[type]:
+) -> UnsafePointer[Scalar[type]]:
     if not needle_len:
         return haystack
     if needle_len > haystack_len:
-        return DTypePointer[type]()
+        return UnsafePointer[Scalar[type]]()
     if needle_len == 1:
         return _memrchr[type](haystack, needle[0], haystack_len)
     for i in reversed(range(haystack_len - needle_len + 1)):
@@ -755,4 +745,4 @@ fn _memrmem[
             continue
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             return haystack + i
-    return DTypePointer[type]()
+    return UnsafePointer[Scalar[type]]()

@@ -15,7 +15,9 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import LegacyPointer, Reference, UnsafePointer
+from memory import Reference, UnsafePointer
+
+from sys.intrinsics import _type_is_eq
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -74,6 +76,32 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         """
         # FIXME: Rebinding to a different lifetime.
         return UnsafePointer.address_of(self.storage[i]).bitcast[T]()[]
+
+    @always_inline("nodebug")
+    fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
+        """Determines if a given value exists in the ListLiteral.
+
+        Parameters:
+            T: The type of the value to search for. Must implement the
+              `EqualityComparable` trait.
+
+        Args:
+            value: The value to search for in the ListLiteral.
+
+        Returns:
+            True if the value is found in the ListLiteral, False otherwise.
+        """
+
+        @parameter
+        for i in range(len(VariadicList(Ts))):
+            if _type_is_eq[Ts[i], T]():
+                var elt_ptr = UnsafePointer.address_of(self.storage[i]).bitcast[
+                    T
+                ]()
+                if elt_ptr[] == value:
+                    return True
+
+        return False
 
 
 # ===----------------------------------------------------------------------===#
@@ -455,19 +483,21 @@ struct _LITRefPackHelper[
     fn get_as_kgen_pack(self) -> Self.kgen_pack_with_pointer_type:
         return rebind[Self.kgen_pack_with_pointer_type](self.storage)
 
+    alias _variadic_with_pointers_removed = __mlir_attr[
+        `#kgen.param.expr<variadic_ptrremove_map, `,
+        Self._variadic_pointer_types,
+        `>: !kgen.variadic<!kgen.type>`,
+    ]
+
     # This is the `!kgen.pack` type that happens if one loads all the elements
     # of the pack.
     alias loaded_kgen_pack_type = __mlir_type[
-        `!kgen.pack<:variadic<type> `, Self._kgen_element_types, `>`
+        `!kgen.pack<:variadic<type> `, Self._variadic_with_pointers_removed, `>`
     ]
 
     # This returns the stored KGEN pack after loading all of the elements.
-    # FIXME(37129): This doesn't actually work because vtables aren't getting
-    # removed from TypeConstants correctly.
     fn get_loaded_kgen_pack(self) -> Self.loaded_kgen_pack_type:
-        return rebind[Self.loaded_kgen_pack_type](
-            __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
-        )
+        return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
 
 
 # ===----------------------------------------------------------------------===#

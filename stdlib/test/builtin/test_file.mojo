@@ -16,6 +16,7 @@
 from pathlib import Path, _dir_of_current_file
 from sys import os_is_windows
 from tempfile import gettempdir
+from memory import UnsafePointer
 
 from testing import assert_equal, assert_true
 
@@ -64,7 +65,7 @@ def test_file_read_bytes_multi():
         assert_equal(string2, "dolor ")
 
         # Read where N is greater than the number of bytes in the file.
-        var s: String = f.read(1e9)
+        var s: String = f.read(1_000_000_000)
 
         assert_equal(len(s), 936)
         assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
@@ -107,7 +108,7 @@ def test_file_read_to_address():
         _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr), 954)
         assert_equal(Scalar.load(ptr, 0), 76)  # L
         assert_equal(Scalar.load(ptr, 1), 111)  # o
@@ -121,14 +122,14 @@ def test_file_read_to_address():
         _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr, 1000), 954)
 
     with open(
         _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr, 30), 30)
         assert_equal(f.read(ptr, 1), 1)
         assert_equal(f.read(ptr, 2), 2)
@@ -154,7 +155,7 @@ def test_file_seek():
 
         _ = f.read(6)
 
-        # Seek from current possition, skip the space
+        # Seek from current position, skip the space
         pos = f.seek(1, os.SEEK_CUR)
         assert_equal(pos, 945)
         assert_equal(f.read(7), "rhoncus")
@@ -214,6 +215,7 @@ struct Word:
     var fourth_letter: UInt8
     var fith_letter: UInt8
 
+    @no_inline
     fn __str__(self) -> String:
         var word = List[UInt8](capacity=6)
         word.append(self.first_letter)
@@ -227,14 +229,14 @@ struct Word:
 
 def test_file_read_to_dtype_pointer():
     with open(_dir_of_current_file() / "test_file_dummy_input.txt", "r") as f:
-        var ptr = DTypePointer[DType.int8].alloc(8)
+        var ptr = UnsafePointer[UInt8].alloc(8)
         var data = f.read(ptr, 8)
         assert_equal(
             str(SIMD[size=8].load(ptr, 0)),
             "[76, 111, 114, 101, 109, 32, 105, 112]",
         )
 
-        var ptr2 = DTypePointer[DType.int8].alloc(8)
+        var ptr2 = UnsafePointer[Int8].alloc(8)
         var data2 = f.read(ptr2, 8)
         assert_equal(
             str(SIMD[size=8].load(ptr2, 0)),

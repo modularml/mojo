@@ -20,7 +20,7 @@ from sys.intrinsics import _type_is_eq
 
 from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, Variant, unroll
+from utils import StringRef, Variant
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -28,14 +28,15 @@ from utils import StringRef, Variant, unroll
 
 
 @register_passable("trivial")
-struct _NoneMarker:
+struct _NoneMarker(CollectionElementNew):
     """This is a trivial class to indicate that an object is `None`."""
 
-    pass
+    fn __init__(inout self, *, other: Self):
+        pass
 
 
 @register_passable("trivial")
-struct _ImmutableString:
+struct _ImmutableString(CollectionElement, CollectionElementNew):
     """Python strings are immutable. This class is marked as trivially register
     passable because its memory will be managed by `_ObjectImpl`. It is a
     pointer and integer pair. Memory will be dynamically allocated.
@@ -51,6 +52,10 @@ struct _ImmutableString:
     fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
         self.data = data
         self.length = length
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -77,7 +82,7 @@ struct _RefCountedList:
 
 
 @register_passable("trivial")
-struct _RefCountedListRef:
+struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -87,6 +92,10 @@ struct _RefCountedListRef:
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         self.lst = ptr.bitcast[NoneType]()
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self.lst = other.lst
 
     @always_inline
     fn copy(self) -> Self:
@@ -161,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef:
+struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -178,6 +187,10 @@ struct _RefCountedAttrsDictRef:
         self.attrs = ptr.bitcast[Int8]()
 
     @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
+
+    @always_inline
     fn copy(self) -> Self:
         _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
         return Self {attrs: self.attrs}
@@ -187,7 +200,7 @@ struct _RefCountedAttrsDictRef:
 
 
 @register_passable("trivial")
-struct _Function:
+struct _Function(CollectionElement, CollectionElementNew):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -200,6 +213,10 @@ struct _Function:
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
         self.value = f
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
 
     alias fn0 = fn () raises -> object
     """Nullary function type."""
@@ -233,7 +250,13 @@ struct _Function:
         )
 
 
-struct _ObjectImpl(CollectionElement, Stringable):
+struct _ObjectImpl(
+    CollectionElement,
+    CollectionElementNew,
+    Stringable,
+    Representable,
+    Formattable,
+):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
     complex types.
@@ -315,6 +338,15 @@ struct _ObjectImpl(CollectionElement, Stringable):
     @always_inline
     fn __init__(inout self, value: _RefCountedAttrsDictRef):
         self.value = Self.type(value)
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other.value
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
@@ -531,18 +563,24 @@ struct _ObjectImpl(CollectionElement, Stringable):
         else:
             lhs = lhs.convert_bool_to_int()
 
-    fn __str__(self) -> String:
-        """Returns the name (in lowercase) of the specific object type."""
+    fn format_to(self, inout writer: Formatter):
+        """Performs conversion to string according to Python
+        semantics.
+        """
         if self.is_none():
-            return "None"
+            writer.write("None")
+            return
         if self.is_bool():
-            return str(self.get_as_bool())
+            writer.write(str(self.get_as_bool()))
+            return
         if self.is_int():
-            return str(self.get_as_int())
+            writer.write(str(self.get_as_int()))
+            return
         if self.is_float():
-            return str(self.get_as_float())
+            writer.write(str(self.get_as_float()))
+            return
         if self.is_str():
-            return (
+            writer.write(
                 "'"
                 + str(
                     StringRef(
@@ -551,32 +589,56 @@ struct _ObjectImpl(CollectionElement, Stringable):
                 )
                 + "'"
             )
+            return
         if self.is_func():
-            return "Function at address " + hex(int(self.get_as_func().value))
+            writer.write(
+                "Function at address " + hex(int(self.get_as_func().value))
+            )
+            return
         if self.is_list():
-            var res = String("[")
+            writer.write(String("["))
             for j in range(self.get_list_length()):
                 if j != 0:
-                    res += ", "
-                res += str(object(self.get_list_element(j)))
-            res += "]"
-            return res
+                    writer.write(", ")
+                writer.write(str(object(self.get_list_element(j))))
+            writer.write("]")
+            return
 
         var ptr = self.get_obj_attrs_ptr()
-        var res = String("{")
+        writer.write(String("{"))
         var print_sep = False
         for entry in ptr[].impl[].items():
             if print_sep:
-                res += ", "
-            res += (
+                writer.write(", ")
+            writer.write(
                 "'"
                 + str(entry[].key)
                 + "' = "
                 + str(object(entry[].value.copy()))
             )
             print_sep = True
-        res += "}"
-        return res
+        writer.write("}")
+        return
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return self.__str__()
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return String.format_sequence(self)
 
     # ===------------------------------------------------------------------=== #
     # List Functions
@@ -629,7 +691,9 @@ struct _ObjectImpl(CollectionElement, Stringable):
 # ===----------------------------------------------------------------------=== #
 
 
-struct object(IntableRaising, Boolable, Stringable):
+struct object(
+    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Formattable
+):
     """Represents an object without a concrete type.
 
     This is the type of arguments in `def` functions that do not have a type
@@ -897,7 +961,26 @@ struct object(IntableRaising, Boolable, Stringable):
 
         raise "object type cannot be converted to an integer"
 
-    @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Performs conversion to bool according to Python semantics. Integers
+        and floats are true if they are non-zero, and strings and lists are true
+        if they are non-empty.
+
+        Returns:
+            Whether the object is considered true.
+        """
+        return self.__bool__()
+
+    fn format_to(self, inout writer: Formatter):
+        """Performs conversion to string according to Python
+        semantics.
+
+        Args:
+            writer: The Formatter to write to.
+        """
+        self._value.format_to(writer)
+
+    @no_inline
     fn __str__(self) -> String:
         """Performs conversion to string according to Python
         semantics.
@@ -905,7 +988,17 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The String representation of the object.
         """
-        return str(self._value)
+        return String.format_sequence(self._value)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return repr(self._value)
 
     # ===------------------------------------------------------------------=== #
     # Comparison Operators

@@ -14,7 +14,7 @@
 
 from memory import UnsafePointer
 from test_utils import ExplicitCopyOnly, MoveCounter
-from testing import assert_equal, assert_not_equal, assert_true
+from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
 
 struct MoveOnlyType(Movable):
@@ -112,6 +112,14 @@ def test_refitem_offset():
 def test_address_of():
     var local = 1
     assert_not_equal(0, int(UnsafePointer[Int].address_of(local)))
+    _ = local
+
+
+def test_explicit_copy_of_pointer_address():
+    var local = 1
+    var ptr = UnsafePointer[Int].address_of(local)
+    var copy = UnsafePointer(other=ptr)
+    assert_equal(int(ptr), int(copy))
     _ = local
 
 
@@ -216,6 +224,28 @@ def test_indexing():
     assert_equal(ptr[3], 3)
 
 
+def test_bool():
+    var nullptr = UnsafePointer[Int]()
+    var ptr = UnsafePointer[Int].alloc(1)
+
+    assert_true(ptr.__bool__())
+    assert_false(nullptr.__bool__())
+    assert_true(ptr.__as_bool__())
+    assert_false(nullptr.__as_bool__())
+
+    ptr.free()
+
+
+def test_alignment():
+    var ptr = UnsafePointer[Int64].alloc[alignment=64](8)
+    assert_equal(int(ptr) % 64, 0)
+    ptr.free()
+
+    var ptr_2 = UnsafePointer[UInt8].alloc[alignment=32](32)
+    assert_equal(int(ptr_2) % 32, 0)
+    ptr_2.free()
+
+
 def main():
     test_address_of()
 
@@ -226,6 +256,7 @@ def main():
     test_unsafepointer_move_pointee_move_count()
     test_unsafepointer_initialize_pointee_explicit_copy()
 
+    test_explicit_copy_of_pointer_address()
     test_bitcast()
     test_unsafepointer_string()
     test_eq()
@@ -233,3 +264,5 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
+    test_bool()
+    test_alignment()

@@ -18,7 +18,7 @@
 from collections import Optional
 from sys import sizeof
 
-from memory import LegacyPointer, UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy
 
 from utils import InlineArray, StringSlice, Variant
 from utils._format import ToFormatter
@@ -29,7 +29,7 @@ from utils._format import ToFormatter
 
 
 @value
-struct InlineString(Sized, Stringable, CollectionElement):
+struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -89,6 +89,14 @@ struct InlineString(Sized, Stringable, CollectionElement):
         """
         self._storage = Self.Layout(heap_string^)
 
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
     # ===------------------------------------------------------------------=== #
     # Operator dunders
     # ===------------------------------------------------------------------=== #
@@ -115,7 +123,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
         Args:
             str_slice: The string to append.
         """
-        var total_len = len(self) + str_slice._byte_length()
+        var total_len = len(self) + str_slice.byte_length()
 
         # NOTE: Not guaranteed that we're in the small layout even if our
         #       length is shorter than the small capacity.
@@ -149,7 +157,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
             memcpy(
                 dest=buffer.unsafe_ptr() + len(self),
                 src=str_slice.unsafe_ptr(),
-                count=str_slice._byte_length(),
+                count=str_slice.byte_length(),
             )
 
             # Record that we've initialized `total_len` count of elements
@@ -222,6 +230,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
             )
             return len(self._storage[String])
 
+    @no_inline
     fn __str__(self) -> String:
         """Gets this string as a standard `String`.
 
@@ -294,7 +303,12 @@ struct InlineString(Sized, Stringable, CollectionElement):
 
 @value
 struct _FixedString[CAP: Int](
-    Sized, Stringable, Formattable, ToFormatter, CollectionElement
+    Sized,
+    Stringable,
+    Formattable,
+    ToFormatter,
+    CollectionElement,
+    CollectionElementNew,
 ):
     """A string with a fixed available capacity.
 
@@ -319,7 +333,14 @@ struct _FixedString[CAP: Int](
         self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
 
-    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
     fn __init__(inout self, literal: StringLiteral) raises:
         """Constructs a FixedString value given a string literal.
 
@@ -406,7 +427,7 @@ struct _FixedString[CAP: Int](
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         return String(self.as_string_slice())
 
@@ -421,14 +442,14 @@ struct _FixedString[CAP: Int](
         inout self,
         str_slice: StringSlice[_],
     ) -> Optional[Error]:
-        var total_len = len(self) + str_slice._byte_length()
+        var total_len = len(self) + str_slice.byte_length()
 
         # Ensure there is sufficient capacity to append `str_slice`
         if total_len > CAP:
             return Optional(
                 Error(
                     "Insufficient capacity to append len="
-                    + str(str_slice._byte_length())
+                    + str(str_slice.byte_length())
                     + " string to len="
                     + str(len(self))
                     + " FixedString with capacity="
@@ -440,7 +461,7 @@ struct _FixedString[CAP: Int](
         memcpy(
             dest=self.buffer.unsafe_ptr() + len(self),
             src=str_slice.unsafe_ptr(),
-            count=str_slice._byte_length(),
+            count=str_slice.byte_length(),
         )
 
         self.size = total_len

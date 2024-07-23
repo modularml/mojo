@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal
+from testing import assert_equal, assert_true, assert_false
 
 
 def test_add():
@@ -108,6 +108,45 @@ def test_divmod():
     assert_equal(t[1], -1)
 
 
+def test_bool():
+    assert_true(IntLiteral.__bool__(5))
+    assert_false(IntLiteral.__bool__(0))
+    assert_true(IntLiteral.__as_bool__(5))
+    assert_false(IntLiteral.__as_bool__(0))
+
+
+def test_comparison():
+    assert_true((5).__lt__(10))
+    assert_true((-10).__lt__(-5))
+    assert_false((0).__lt__(0))
+    assert_false((10).__lt__(5))
+
+    assert_true((5).__le__(10))
+    assert_true((-10).__le__(-5))
+    assert_true((0).__le__(0))
+    assert_false((10).__le__(5))
+
+    assert_true((5).__eq__(5))
+    assert_true((0).__eq__(0))
+    assert_false((0).__eq__(1))
+    assert_false((5).__eq__(10))
+
+    assert_true((5).__ne__(10))
+    assert_true((0).__ne__(1))
+    assert_false((5).__ne__(5))
+    assert_false((0).__ne__(0))
+
+    assert_true((10).__gt__(5))
+    assert_true((-5).__gt__(-10))
+    assert_false((0).__gt__(0))
+    assert_false((5).__gt__(10))
+
+    assert_true((10).__ge__(5))
+    assert_true((5).__ge__(5))
+    assert_true((-5).__ge__(-10))
+    assert_false((5).__ge__(10))
+
+
 def main():
     test_add()
     test_sub()
@@ -121,3 +160,5 @@ def main():
     test_bit_width()
     test_abs()
     test_indexer()
+    test_bool()
+    test_comparison()

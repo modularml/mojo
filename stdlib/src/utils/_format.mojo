@@ -152,6 +152,22 @@ struct Formatter:
 
         args.each[write_arg]()
 
+    fn _write_int_padded(inout self, value: Int, *, width: Int):
+        var int_width = value._decimal_digit_count()
+
+        # TODO: Assumes user wants right-aligned content.
+        if int_width < width:
+            self._write_repeated(
+                " ".as_string_slice(),
+                width - int_width,
+            )
+
+        self.write(value)
+
+    fn _write_repeated(inout self, str: StringSlice, count: Int):
+        for _ in range(count):
+            self.write_str(str)
+
     # ===------------------------------------------------------------------=== #
     # Factory methods
     # ===------------------------------------------------------------------=== #
@@ -168,16 +184,3 @@ struct Formatter:
             _put(strref)
 
         return Formatter(write_to_stdout, UnsafePointer[NoneType]())
-
-
-# TODO: Use Formatter.write instead.
-fn write_to[*Ts: Formattable](inout writer: Formatter, *args: *Ts):
-    """
-    Write a sequence of formattable arguments to the provided formatter.
-    """
-
-    @parameter
-    fn write_arg[T: Formattable](arg: T):
-        arg.format_to(writer)
-
-    args.each[write_arg]()
