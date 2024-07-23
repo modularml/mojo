@@ -336,6 +336,20 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   `Int` type.
   ([PR #3150](https://github.com/modularml/mojo/pull/3150) by [@LJ-9801](https://github.com/LJ-9801))
 
+- `String.format()` now supports conversion flags `!s` and `!r`, allowing for
+  `str()` and `repr()` conversions within format strings.
+  ([PR #3279](https://github.com/modularml/mojo/pull/3279) by [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  String("{} {!r}").format("Mojo", "Mojo")
+  # "Mojo 'Mojo'"
+
+  String("{0!s} {0!r}").format("Mojo")
+  # "Mojo 'Mojo'"
+  ```
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
