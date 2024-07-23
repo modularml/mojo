@@ -31,7 +31,6 @@ fn test_representable() raises:
     assert_equal(repr(DType.float32), "DType.float32")
     assert_equal(repr(DType.int64), "DType.int64")
     assert_equal(repr(DType.bool), "DType.bool")
-    assert_equal(repr(DType.address), "DType.address")
     assert_equal(repr(DType.index), "DType.index")
 
 
@@ -44,8 +43,15 @@ fn test_key_element() raises:
     assert_true(DType.int64 in set)
 
 
+fn test_sizeof() raises:
+    assert_equal(DType.int16.sizeof(), sizeof[DType.int16]())
+    assert_equal(DType.float32.sizeof(), sizeof[DType.float32]())
+    assert_equal(DType.index.sizeof(), sizeof[DType.index]())
+
+
 fn main() raises:
     test_equality()
     test_stringable()
     test_representable()
     test_key_element()
+    test_sizeof()

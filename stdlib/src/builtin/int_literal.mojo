@@ -20,16 +20,16 @@ from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 @register_passable("trivial")
 struct IntLiteral(
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     Comparable,
     Floorable,
+    ImplicitlyBoolable,
+    Indexer,
     Intable,
     Roundable,
     Stringable,
     Truncable,
-    Indexer,
 ):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
@@ -582,6 +582,15 @@ struct IntLiteral(
         return self != Self()
 
     @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Convert this IntLiteral to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self.__bool__()
+
+    @always_inline("nodebug")
     fn __index__(self) -> Int:
         """Return self converted to an integer, if self is suitable for use as
         an index into a list.
@@ -596,9 +605,20 @@ struct IntLiteral(
         """Convert from IntLiteral to Int.
 
         Returns:
-            The value as an integer.
+            The value as an integer of platform-specific width.
         """
         return Int(self.__as_mlir_index())
+
+    @always_inline("nodebug")
+    fn __uint__(self) -> UInt:
+        """Convert from IntLiteral to UInt.
+
+        Returns:
+            The value as an unsigned integer of platform-specific width.
+        """
+        return __mlir_op.`kgen.int_literal.convert`[
+            _type = __mlir_type.index, treatIndexAsUnsigned = __mlir_attr.unit
+        ](self.value)
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self:
@@ -673,7 +693,7 @@ struct IntLiteral(
             mod -= multiplier
         return self - mod
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Convert from IntLiteral to String.
 

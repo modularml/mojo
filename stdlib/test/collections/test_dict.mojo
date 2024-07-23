@@ -238,7 +238,7 @@ def test_dict_copy():
     orig["a"] = 1
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     assert_equal(1, copy["a"])
 
     # test there are two copies of dict and
@@ -253,7 +253,7 @@ def test_dict_copy_delete_original():
     orig["a"] = 1
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     # don't access the original dict, anymore, confirm that
     # deleting the original doesn't violate the integrity of the copy
     assert_equal(1, copy["a"])
@@ -264,7 +264,7 @@ def test_dict_copy_add_new_item():
     orig["a"] = 1
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     assert_equal(1, copy["a"])
 
     # test there are two copies of dict and
@@ -278,13 +278,13 @@ def test_dict_copy_calls_copy_constructor():
     orig["a"] = CopyCounter()
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     # I _may_ have thoughts about where our performance issues
     # are coming from :)
     assert_equal(1, orig["a"].copy_count)
     assert_equal(2, copy["a"].copy_count)
-    assert_equal(0, orig.__get_ref("a").copy_count)
-    assert_equal(1, copy.__get_ref("a").copy_count)
+    assert_equal(0, orig._find_ref("a").copy_count)
+    assert_equal(1, copy._find_ref("a").copy_count)
 
 
 def test_dict_update_nominal():
@@ -393,7 +393,10 @@ def test_dict_update_empty_new():
 struct DummyKey(KeyElement):
     var value: Int
 
-    fn __hash__(self) -> Int:
+    fn __init__(inout self, *, other: Self):
+        self = other
+
+    fn __hash__(self) -> UInt:
         return self.value
 
     fn __eq__(self, other: DummyKey) -> Bool:
@@ -424,8 +427,7 @@ def test_mojo_issue_1729():
 
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
-    var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
-    print("Test", name_val, "...", end="")
+    print("Test", name, "...", end="")
     try:
         _ = test_fn()
     except e:
@@ -548,6 +550,41 @@ fn test_clear() raises:
     assert_equal(len(some_dict), 0)
 
 
+def test_init_initial_capacity():
+    var initial_capacity = 16
+    var x = Dict[Int, Int](power_of_two_initial_capacity=initial_capacity)
+    assert_equal(x._reserved(), initial_capacity)
+    for i in range(initial_capacity):
+        x[i] = i
+    for i in range(initial_capacity):
+        assert_equal(i, x[i])
+
+    var y = Dict[Int, Int](power_of_two_initial_capacity=64)
+    assert_equal(y._reserved(), 64)
+
+
+fn test_dict_setdefault() raises:
+    var some_dict = Dict[String, Int]()
+    some_dict["key1"] = 1
+    some_dict["key2"] = 2
+    assert_equal(some_dict.setdefault("key1", 0)[], 1)
+    assert_equal(some_dict.setdefault("key2", 0)[], 2)
+    assert_equal(some_dict.setdefault("not_key", 0)[], 0)
+    assert_equal(some_dict["not_key"], 0)
+
+    # Check that there is no copy of the default value, so it's performant
+    var other_dict = Dict[String, CopyCounter]()
+    var a = CopyCounter()
+    var a_def = CopyCounter()
+    var b_def = CopyCounter()
+    other_dict["a"] = a^
+    assert_equal(1, other_dict["a"].copy_count)
+    _ = other_dict.setdefault("a", a_def^)
+    _ = other_dict.setdefault("b", b_def^)
+    assert_equal(1, other_dict["a"].copy_count)
+    assert_equal(1, other_dict["b"].copy_count)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
@@ -558,3 +595,5 @@ def main():
     test_bool_conversion()
     test_find_get()
     test_clear()
+    test_init_initial_capacity()
+    test_dict_setdefault()

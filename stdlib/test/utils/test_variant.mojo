@@ -27,6 +27,9 @@ struct TestCounter(CollectionElement):
         self.copied = 0
         self.moved = 0
 
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     fn __copyinit__(inout self, other: Self):
         self.copied = other.copied + 1
         self.moved = other.moved
@@ -62,6 +65,9 @@ fn _destroy_poison(p: UnsafePointer[NoneType]):
 struct Poison(CollectionElement):
     fn __init__(inout self):
         pass
+
+    fn __init__(inout self, *, other: Self):
+        _poison_ptr().init_pointee_move(True)
 
     fn __copyinit__(inout self, other: Self):
         _poison_ptr().init_pointee_move(True)
@@ -126,9 +132,9 @@ def test_explicit_copy():
 
 def test_move():
     var v1 = TestVariant(TestCounter())
-    var v2 = v1
-    # didn't call moveinit
     assert_equal(v1[TestCounter].moved, 1)
+    var v2 = v1^
+    # didn't call moveinit
     assert_equal(v2[TestCounter].moved, 2)
     # test that we didn't call the other moveinit too!
     assert_no_poison()
@@ -137,6 +143,9 @@ def test_move():
 @value
 struct ObservableDel(CollectionElement):
     var target: UnsafePointer[Bool]
+
+    fn __init__(inout self, *, other: Self):
+        self = other
 
     fn __del__(owned self):
         self.target.init_pointee_move(True)

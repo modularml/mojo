@@ -20,7 +20,7 @@ from collections import InlineList
 """
 
 from sys.intrinsics import _type_is_eq
-
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from utils import InlineArray
 
 
@@ -30,7 +30,7 @@ from utils import InlineArray
 @value
 struct _InlineListIter[
     list_mutability: Bool, //,
-    T: CollectionElementNew,
+    T: CollectionElement,
     capacity: Int,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
@@ -73,7 +73,7 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -89,7 +89,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     """
 
     # Fields
-    var _array: InlineArray[ElementType, capacity]
+    var _array: InlineArray[UnsafeMaybeUninitialized[ElementType], capacity]
     var _size: Int
 
     # ===-------------------------------------------------------------------===#
@@ -99,9 +99,9 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty InlineList."""
-        self._array = InlineArray[ElementType, capacity](
-            unsafe_uninitialized=True
-        )
+        self._array = InlineArray[
+            UnsafeMaybeUninitialized[ElementType], capacity
+        ]()
         self._size = 0
 
     # TODO: Avoid copying elements in once owned varargs
@@ -121,7 +121,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     fn __del__(owned self):
         """Destroy all the elements in the list and free the memory."""
         for i in range(self._size):
-            UnsafePointer.address_of(self._array[i]).destroy_pointee()
+            self._array[i].assume_initialized_destroy()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -146,7 +146,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         if idx < 0:
             idx += len(self)
 
-        return self._array[idx]
+        return self._array[idx].assume_initialized()
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -180,9 +180,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         """
         return _InlineListIter(0, self)
 
-    @always_inline
     fn __contains__[
-        C: ComparableCollectionElement
+        C: EqualityComparableCollectionElement, //
     ](self: Self, value: C) -> Bool:
         """Verify if a given value is present in the list.
 
@@ -192,7 +191,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElementNew`.
+              traits `EqualityComparable` and `CollectionElement`.
 
         Args:
             value: The value to find.
@@ -213,8 +212,9 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
-    fn count[C: ComparableCollectionElement](self: Self, value: C) -> Int:
+    fn count[
+        C: EqualityComparableCollectionElement, //
+    ](self: Self, value: C) -> Int:
         """Counts the number of occurrences of a value in the list.
 
         ```mojo
@@ -223,7 +223,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElementNew`.
+              traits `EqualityComparable` and `CollectionElement`.
 
         Args:
             value: The value to count.
@@ -241,7 +241,6 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
                 count += 1
         return count
 
-    @always_inline
     fn append(inout self, owned value: ElementType):
         """Appends a value to the list.
 
@@ -249,5 +248,5 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             value: The value to append.
         """
         debug_assert(self._size < capacity, "List is full.")
-        self._array[self._size] = value^
+        self._array[self._size].write(value^)
         self._size += 1

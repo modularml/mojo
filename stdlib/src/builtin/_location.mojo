@@ -16,16 +16,21 @@
 
 @value
 @register_passable("trivial")
-struct _SourceLocation(Stringable):
+struct _SourceLocation(Formattable, Stringable):
     """Type to carry file name, line, and column information."""
 
     var line: Int
     var col: Int
     var file_name: StringLiteral
 
-    fn __str__(self) -> String:
-        return str(self.file_name) + ":" + str(self.line) + ":" + str(self.col)
+    fn __init__(inout self, *, other: Self):
+        self = other
 
+    @no_inline
+    fn __str__(self) -> String:
+        return String.format_sequence(self)
+
+    @no_inline
     fn prefix[T: Stringable](self, msg: T) -> String:
         """Return the given message prefixed with the pretty-printer location.
 
@@ -36,6 +41,15 @@ struct _SourceLocation(Stringable):
             msg: The message to attach the prefix to.
         """
         return "At " + str(self) + ": " + str(msg)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats the source location to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        writer.write(self.file_name, ":", self.line, ":", self.col)
 
 
 @always_inline("nodebug")

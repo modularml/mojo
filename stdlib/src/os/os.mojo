@@ -23,11 +23,9 @@ from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 from sys.ffi import C_char
 
-from memory import DTypePointer
-
 from utils import InlineArray, StringRef
 
-from .path import isdir
+from .path import isdir, split
 from .pathlike import PathLike
 
 # TODO move this to a more accurate location once nt/posix like modules are in stdlib
@@ -187,36 +185,42 @@ struct _DirHandle:
 
 
 # ===----------------------------------------------------------------------=== #
-# listdir
+# getuid
 # ===----------------------------------------------------------------------=== #
-fn listdir(path: String = "") raises -> List[String]:
-    """Gets the list of entries contained in the path provided.
-
-    Args:
-      path: The path to the directory.
+fn getuid() -> Int:
+    """Retrieve the user ID of the calling process.
 
     Returns:
-      Returns the list of entries in the path provided.
+        The user ID of the calling process.
+
+    Constraints:
+        This function is constrained to run on Linux or macOS operating systems only.
     """
+    constrained[
+        not os_is_windows(), "operating system must be Linux or macOS"
+    ]()
+    return int(external_call["getuid", UInt32]())
 
-    var dir = _DirHandle(path)
-    return dir.list()
+
+# ===----------------------------------------------------------------------=== #
+# listdir
+# ===----------------------------------------------------------------------=== #
 
 
-fn listdir[pathlike: os.PathLike](path: pathlike) raises -> List[String]:
+fn listdir[PathLike: os.PathLike](path: PathLike) raises -> List[String]:
     """Gets the list of entries contained in the path provided.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
 
-
     Returns:
       Returns the list of entries in the path provided.
     """
-    return listdir(path.__fspath__())
+    var dir = _DirHandle(path.__fspath__())
+    return dir.list()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -224,8 +228,8 @@ fn listdir[pathlike: os.PathLike](path: pathlike) raises -> List[String]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
-fn abort[result: AnyType = NoneType]() -> result:
+@no_inline
+fn abort[result: AnyType = NoneType._mlir_type]() -> result:
     """Calls a target dependent trap instruction if available.
 
     Parameters:
@@ -242,9 +246,9 @@ fn abort[result: AnyType = NoneType]() -> result:
         pass
 
 
-@always_inline("nodebug")
+@no_inline
 fn abort[
-    result: AnyType = NoneType, *, formattable: Formattable
+    result: AnyType = NoneType._mlir_type, *, formattable: Formattable
 ](message: formattable) -> result:
     """Calls a target dependent trap instruction if available.
 
@@ -269,59 +273,36 @@ fn abort[
 # ===----------------------------------------------------------------------=== #
 # remove/unlink
 # ===----------------------------------------------------------------------=== #
-fn remove(path: String) raises:
+fn remove[PathLike: os.PathLike](path: PathLike) raises:
     """Removes the specified file.
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file.
 
     """
-    var error = external_call["unlink", Int32](path.unsafe_ptr())
+    var fspath = path.__fspath__()
+    var error = external_call["unlink", Int32](fspath.unsafe_ptr())
 
     if error != 0:
         # TODO get error message, the following code prints it
         # var error_str = String("Something went wrong")
         # _ = external_call["perror", UnsafePointer[NoneType]](error_str.unsafe_ptr())
         # _ = error_str
-        raise Error("Can not remove file: " + path)
+        raise Error("Can not remove file: " + fspath)
 
 
-fn remove[pathlike: os.PathLike](path: pathlike) raises:
+fn unlink[PathLike: os.PathLike](path: PathLike) raises:
     """Removes the specified file.
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
-
-    Args:
-      path: The path to the file.
-
-    """
-    remove(path.__fspath__())
-
-
-fn unlink(path: String) raises:
-    """Removes the specified file.
-    If the path is a directory or it can not be deleted, an error is raised.
-    Absolute and relative paths are allowed, relative paths are resolved from cwd.
-
-    Args:
-      path: The path to the file.
-
-    """
-    remove(path)
-
-
-fn unlink[pathlike: os.PathLike](path: pathlike) raises:
-    """Removes the specified file.
-    If the path is a directory or it can not be deleted, an error is raised.
-    Absolute and relative paths are allowed, relative paths are resolved from cwd.
-
-    Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file.
@@ -335,59 +316,98 @@ fn unlink[pathlike: os.PathLike](path: pathlike) raises:
 # ===----------------------------------------------------------------------=== #
 
 
-fn mkdir(path: String, mode: Int = 0o777) raises:
+fn mkdir[PathLike: os.PathLike](path: PathLike, mode: Int = 0o777) raises:
     """Creates a directory at the specified path.
     If the directory can not be created an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
       mode: The mode to create the directory with.
     """
 
-    var error = external_call["mkdir", Int32](path.unsafe_ptr(), mode)
+    var fspath = path.__fspath__()
+    var error = external_call["mkdir", Int32](fspath.unsafe_ptr(), mode)
     if error != 0:
-        raise Error("Can not create directory: " + path)
+        raise Error("Can not create directory: " + fspath)
 
 
-fn mkdir[pathlike: os.PathLike](path: pathlike, mode: Int = 0o777) raises:
-    """Creates a directory at the specified path.
-    If the directory can not be created an error is raised.
-    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+def makedirs[
+    PathLike: os.PathLike
+](path: PathLike, mode: Int = 0o777, exist_ok: Bool = False) -> None:
+    """Creates a specified leaf directory along with any necessary intermediate
+    directories that don't already exist.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
       mode: The mode to create the directory with.
+      exist_ok: Ignore error if `True` and path exists (default `False`).
     """
+    head, tail = split(path)
+    if not tail:
+        head, tail = split(head)
+    if head and tail and not os.path.exists(head):
+        try:
+            makedirs(head, exist_ok=exist_ok)
+        except:
+            # Defeats race condition when another thread created the path
+            pass
+        # xxx/newdir/. exists if xxx/newdir exists
+        if tail == ".":
+            return None
+    try:
+        mkdir(path, mode)
+    except e:
+        if not exist_ok:
+            raise str(
+                e
+            ) + "\nset `makedirs(path, exist_ok=True)` to allow existing dirs"
+        if not os.path.isdir(path):
+            raise "path not created: " + path.__fspath__() + "\n" + str(e)
 
-    mkdir(path.__fspath__(), mode)
 
-
-fn rmdir(path: String) raises:
-    """Removes the specified directory.
-    If the path is not a directory or it can not be deleted, an error is raised.
-    Absolute and relative paths are allowed, relative paths are resolved from cwd.
-
-    Args:
-      path: The path to the directory.
-    """
-    var error = external_call["rmdir", Int32](path.unsafe_ptr())
-    if error != 0:
-        raise Error("Can not remove directory: " + path)
-
-
-fn rmdir[pathlike: os.PathLike](path: pathlike) raises:
+fn rmdir[PathLike: os.PathLike](path: PathLike) raises:
     """Removes the specified directory.
     If the path is not a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
     """
-    rmdir(path.__fspath__())
+    var fspath = path.__fspath__()
+    var error = external_call["rmdir", Int32](fspath.unsafe_ptr())
+    if error != 0:
+        raise Error("Can not remove directory: " + fspath)
+
+
+def removedirs[PathLike: os.PathLike](path: PathLike) -> None:
+    """Remove a leaf directory and all empty intermediate ones. Directories
+    corresponding to rightmost path segments will be pruned away until either
+    the whole path is consumed or an error occurs.  Errors during this latter
+    phase are ignored, which occur when a directory was not empty.
+
+    Parameters:
+      PathLike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+    """
+    rmdir(path)
+    head, tail = os.path.split(path)
+    if not tail:
+        head, tail = os.path.split(head)
+    while head and tail:
+        try:
+            rmdir(head)
+        except:
+            break
+        head, tail = os.path.split(head)

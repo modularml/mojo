@@ -15,19 +15,17 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import OptionalReg
-from sys.intrinsics import _mlirtype_is_eq
+from collections import Optional
 
 
-@always_inline("nodebug")
-fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
-    if x and y:
-        return x.value() == y.value()
-    return not x and not y
-
-
-@register_passable("trivial")
-struct Slice(Stringable, EqualityComparable):
+@value
+struct Slice(
+    Stringable,
+    EqualityComparable,
+    Representable,
+    Formattable,
+    CollectionElement,
+):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -42,9 +40,9 @@ struct Slice(Stringable, EqualityComparable):
     ```
     """
 
-    var start: OptionalReg[Int]
+    var start: Optional[Int]
     """The starting index of the slice."""
-    var end: OptionalReg[Int]
+    var end: Optional[Int]
     """The end index of the slice."""
     var step: Int
     """The step increment value of the slice."""
@@ -64,9 +62,9 @@ struct Slice(Stringable, EqualityComparable):
     @always_inline("nodebug")
     fn __init__(
         inout self,
-        start: OptionalReg[Int],
-        end: OptionalReg[Int],
-        step: OptionalReg[Int],
+        start: Optional[Int],
+        end: Optional[Int],
+        step: Optional[Int],
     ):
         """Construct slice given the start, end and step values.
 
@@ -77,21 +75,59 @@ struct Slice(Stringable, EqualityComparable):
         """
         self.start = start
         self.end = end
-        self.step = step.value() if step else 1
+        self.step = step.or_else(1)
 
+    fn __init__(inout self, *, other: Self):
+        """Creates a deep copy of the Slice.
+
+        Args:
+            other: The slice to copy.
+        """
+        self.__init__(start=other.start, end=other.end, step=other.step)
+
+    @no_inline
     fn __str__(self) -> String:
         """Gets the string representation of the span.
 
         Returns:
             The string representation of the span.
         """
-        var res = str(self.start.value()) if self.start else ""
-        res += ":"
-        if self.end:
-            res += str(self.end.value()) if self.end else ""
-        res += ":"
-        res += str(self.step)
-        return res
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Gets the string representation of the span.
+
+        Returns:
+            The string representation of the span.
+        """
+        return self.__str__()
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """Write Slice string representation to a `Formatter`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        @parameter
+        fn write_optional(opt: Optional[Int]):
+            if opt:
+                writer.write(repr(opt.value()))
+            else:
+                writer.write(repr(None))
+
+        writer.write("slice(")
+        write_optional(self.start)
+        writer.write(", ")
+        write_optional(self.end)
+        writer.write(", ")
+        writer.write(repr(self.step))
+        writer.write(")")
 
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
@@ -105,8 +141,8 @@ struct Slice(Stringable, EqualityComparable):
             corresponding values of the other slice and False otherwise.
         """
         return (
-            _compare_optional(self.start, other.start)
-            and _compare_optional(self.end, other.end)
+            self.start == other.start
+            and self.end == other.end
             and self.step == other.step
         )
 
@@ -123,32 +159,8 @@ struct Slice(Stringable, EqualityComparable):
         """
         return not (self == other)
 
-    @always_inline
-    fn unsafe_indices(self) -> Int:
-        """Return the length of the slice.
-
-        Only use this function if start/end is guaranteed to be not None.
-
-        Returns:
-            The length of the slice.
-        """
-
-        return len(range(self.start.value(), self.end.value(), self.step))
-
-    @always_inline
-    fn __getitem__(self, idx: Int) -> Int:
-        """Get the slice index.
-
-        Args:
-            idx: The index.
-
-        Returns:
-            The slice index.
-        """
-        return self.start.value() + idx * self.step
-
     fn indices(self, length: Int) -> (Int, Int, Int):
-        """Returns a tuple of 3 intergers representing the start, end, and step
+        """Returns a tuple of 3 integers representing the start, end, and step
            of the slice if applied to a container of the given length.
 
         Uses the target container length to normalize negative, out of bounds,
@@ -179,9 +191,11 @@ struct Slice(Stringable, EqualityComparable):
         Returns:
             A tuple containing three integers for start, end, and step.
         """
+        var step = self.step
+
         var start = self.start
         var end = self.end
-        var positive_step = self.step > 0
+        var positive_step = step > 0
 
         if not start:
             start = 0 if positive_step else length - 1
@@ -201,7 +215,7 @@ struct Slice(Stringable, EqualityComparable):
         elif end.value() >= length:
             end = length if positive_step else length - 1
 
-        return (start.value(), end.value(), self.step)
+        return (start.value(), end.value(), step)
 
 
 @always_inline("nodebug")
@@ -214,7 +228,7 @@ fn slice(end: Int) -> Slice:
     Returns:
         The constructed slice.
     """
-    return Slice(0, end)
+    return Slice(None, end, None)
 
 
 @always_inline("nodebug")
@@ -233,7 +247,7 @@ fn slice(start: Int, end: Int) -> Slice:
 
 @always_inline("nodebug")
 fn slice(
-    start: OptionalReg[Int], end: OptionalReg[Int], step: OptionalReg[Int]
+    start: Optional[Int], end: Optional[Int], step: Optional[Int]
 ) -> Slice:
     """Construct a Slice given the start, end and step values.
 

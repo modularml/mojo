@@ -18,13 +18,13 @@ from testing import assert_equal
 
 
 def test_maybe_uninitialized():
-    # Every time an Int is destroyed, it's going to be reccorded here.
+    # Every time an Int is destroyed, it's going to be recorded here.
     var destructor_counter = List[Int]()
 
     var a = UnsafeMaybeUninitialized[ValueDestructorRecorder]()
     a.write(
         ValueDestructorRecorder(
-            42, UnsafePointer.address_of(destructor_counter)
+            42, int(UnsafePointer.address_of(destructor_counter))
         )
     )
 
@@ -40,7 +40,7 @@ def test_maybe_uninitialized():
     _ = a
 
     # Last use of a, but the destructor should not have run
-    # since we asssume uninitialized memory
+    # since we assume uninitialized memory
     assert_equal(len(destructor_counter), 1)
 
 

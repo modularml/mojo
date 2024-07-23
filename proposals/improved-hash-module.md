@@ -45,7 +45,7 @@ struct Person(Hashable):
 As you can see above we, computed hashes for all of the struct fields,
 but we are uncertain how to combine those values in a way which produces
 a good (non compromised) hash value. Python [docs](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
-suggest to pack fileds into a tuple and hash the tuple, but this is not
+suggest to pack fields into a tuple and hash the tuple, but this is not
 possible at this point in time in Mojo.
 
 ## Proposal
@@ -87,7 +87,7 @@ The standard library should provide a default `Hasher` implementation,
 but it would be possible for the developers to implement, or choose other
 hash algorithms, if they better fit their use case.
 
-Bellow you can see a dummy implementation of a `DefaultHasher`
+Below you can see a dummy implementation of a `DefaultHasher`
 
 ```mojo
 struct DefaultHasher(Hasher):
@@ -147,7 +147,7 @@ fn hash[T: Hashable, H: Hasher = DefaultHasher](value: T) -> UInt64:
 
 ## Prove of concept
 
-Bellow you can find a fully working POC implementation:
+Below you can find a fully working POC implementation:
 
 ```mojo
 from os.env import getenv, setenv
@@ -291,4 +291,4 @@ Current compiler does not allow parameters on trait definition.
 A parametrization on Hasher trait for for hash value dtype would be
 beneficial as a hashing algorithm might differ.
 For example in [Fowler–Noll–Vo hash function](https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function#FNV_hash_parameters)
-parameters prime and offset basis dependend on hash value width.
+parameters prime and offset basis depend on hash value width.

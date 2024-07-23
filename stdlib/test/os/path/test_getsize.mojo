@@ -12,20 +12,16 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-import os
 from os.path import getsize
+from tempfile import NamedTemporaryFile
+from testing import assert_equal
 
-from testing import assert_equal, assert_false
 
-
-fn main() raises:
-    # TODO: use `NamedTemporaryFile` once we implement it.
-    alias file_name = "test_file"
-    assert_false(os.path.exists(file_name), "File should not exist")
-    with open(file_name, "w"):
-        pass
-    assert_equal(getsize(file_name), 0)
-    with open(file_name, "w") as my_file:
-        my_file.write(String("test"))
-    assert_equal(getsize(file_name), 4)
-    os.remove(file_name)
+def main():
+    with NamedTemporaryFile(delete=False) as tmp_file:
+        file_path = tmp_file.name
+        # No bytes written yet, 0 size.
+        assert_equal(getsize(file_path), 0)
+        var data_to_write = "test"
+        tmp_file.write(data_to_write)
+        assert_equal(getsize(file_path), len(data_to_write))

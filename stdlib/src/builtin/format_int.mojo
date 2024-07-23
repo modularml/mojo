@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import List, Optional
 from utils import InlineArray, StringSlice, StaticString
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -27,7 +28,6 @@ alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
 fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
     """Return the binary string representation an integral value.
 
@@ -52,7 +52,6 @@ fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
 
 # Need this until we have constraints to stop the compiler from matching this
 # directly to bin[type: DType](num: Scalar[type]).
-@always_inline("nodebug")
 fn bin(b: Scalar[DType.bool], /, *, prefix: StaticString = "0b") -> String:
     """Returns the binary representation of a scalar bool.
 
@@ -66,7 +65,6 @@ fn bin(b: Scalar[DType.bool], /, *, prefix: StaticString = "0b") -> String:
     return bin(b.cast[DType.int8](), prefix=prefix)
 
 
-@always_inline("nodebug")
 fn bin[T: Indexer, //](num: T, /, *, prefix: StaticString = "0b") -> String:
     """Returns the binary representation of an indexer type.
 
@@ -106,7 +104,6 @@ fn hex(value: Scalar, /, *, prefix: StaticString = "0x") -> String:
     return _try_format_int(value, 16, prefix=prefix)
 
 
-@always_inline
 fn hex[T: Indexer, //](value: T, /, *, prefix: StaticString = "0x") -> String:
     """Returns the hex string representation of the given integer.
 
@@ -128,7 +125,6 @@ fn hex[T: Indexer, //](value: T, /, *, prefix: StaticString = "0x") -> String:
     return hex(Scalar[DType.index](index(value)), prefix=prefix)
 
 
-@always_inline
 fn hex(value: Scalar[DType.bool], /, *, prefix: StaticString = "0x") -> String:
     """Returns the hex string representation of the given scalar bool.
 
@@ -152,7 +148,6 @@ fn hex(value: Scalar[DType.bool], /, *, prefix: StaticString = "0x") -> String:
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
 fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
     """Returns the octal string representation of the given integer.
 
@@ -171,7 +166,6 @@ fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
     return _try_format_int(value, 8, prefix=prefix)
 
 
-@always_inline
 fn oct[T: Indexer, //](value: T, /, *, prefix: StaticString = "0o") -> String:
     """Returns the octal string representation of the given integer.
 
@@ -193,7 +187,6 @@ fn oct[T: Indexer, //](value: T, /, *, prefix: StaticString = "0o") -> String:
     return oct(Scalar[DType.index](index(value)), prefix=prefix)
 
 
-@always_inline
 fn oct(value: Scalar[DType.bool], /, *, prefix: StaticString = "0o") -> String:
     """Returns the octal string representation of the given scalar bool.
 
@@ -252,7 +245,6 @@ fn _format_int[
     return string^
 
 
-@always_inline
 fn _write_int[
     type: DType, //,
 ](
@@ -271,7 +263,6 @@ fn _write_int[
         raise err.value()
 
 
-@always_inline
 fn _try_write_int[
     type: DType, //,
 ](
@@ -295,13 +286,13 @@ fn _try_write_int[
     if radix < 2:
         return Error("Unable to format integer to string with radix < 2")
 
-    if radix > len(digit_chars):
+    if radix > digit_chars.byte_length():
         return Error(
             "Unable to format integer to string when provided radix is larger "
             "than length of available digit value characters"
         )
 
-    if not len(digit_chars) >= 2:
+    if not digit_chars.byte_length() >= 2:
         return Error(
             "Unable to format integer to string when provided digit_chars"
             " mapping len is not >= 2"
@@ -325,12 +316,24 @@ fn _try_write_int[
         # SAFETY:
         #   This static lifetime is valid as long as we're using a
         #   `StringLiteral` for `digit_chars`.
+        var zero_char = digit_chars_array[0]
+
+        # Construct a null-terminated buffer of single-byte char.
+        var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
+
         var zero = StringSlice[ImmutableStaticLifetime](
-            unsafe_from_utf8_ptr=digit_chars_array,
+            # TODO(MSTDL-720):
+            #   Support printing non-null-terminated strings on GPU and switch
+            #   back to this code without a workaround.
+            # unsafe_from_utf8_ptr=digit_chars_array,
+            unsafe_from_utf8_ptr=zero_buf.unsafe_ptr(),
             len=1,
         )
         fmt.write_str(zero)
-        return
+
+        _ = zero_buf
+
+        return None
 
     # Create a buffer to store the formatted value
 
@@ -338,14 +341,14 @@ fn _try_write_int[
     # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64 + 1  # +1 for storing NUL terminator.
 
-    var buf = InlineArray[UInt8, CAPACITY](unsafe_uninitialized=True)
+    var buf = InlineArray[UnsafeMaybeUninitialized[UInt8], CAPACITY]()
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
     # earlier in the buffer as we write the more-significant digits.
     var offset = CAPACITY - 1
 
-    buf[offset] = 0  # Write NUL terminator at the end
+    buf[offset].write(0)  # Write NUL terminator at the end
 
     # Position the offset to write the least-significant digit just before the
     # NUL terminator.
@@ -361,7 +364,7 @@ fn _try_write_int[
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset] = digit_chars_array[int(digit_value)]
+            buf[offset].write(digit_chars_array[int(digit_value)])
 
             # Position the offset to write the next digit.
             offset -= 1
@@ -399,7 +402,7 @@ fn _try_write_int[
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
     var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf_ptr,
+        unsafe_from_utf8_ptr=buf_ptr.bitcast[UInt8](),
         len=len,
     )
 

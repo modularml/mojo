@@ -17,18 +17,18 @@ from random import rand
 
 
 fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:
-    var p = Pointer[SIMD[D, 1]].alloc(size)
-    rand[D](p, size)
+    var p = UnsafePointer[SIMD[D, 1]].alloc(size)
+    rand[D](p.address, size)
     sort[D](p, size)
     for i in range(1, size - 1):
         if p[i] < p[i - 1]:
             print(name, "size:", size, "max:", max, "incorrect sort")
             print("p[", end="")
             print(i - 1, end="")
-            print("] =", p.load(i - 1))
+            print("] =", p[i - 1])
             print("p[", end="")
             print(i, end="")
-            print("] =", p.load(i))
+            print("] =", p[i])
             print()
             p.free()
             raise "Failed"

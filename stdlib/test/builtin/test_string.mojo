@@ -37,14 +37,14 @@ struct AString(Stringable):
         return "a string"
 
 
-fn test_stringable() raises:
+def test_stringable():
     assert_equal("hello", str("hello"))
     assert_equal("0", str(0))
     assert_equal("AAA", str(StringRef("AAA")))
     assert_equal("a string", str(AString()))
 
 
-fn test_repr() raises:
+def test_repr():
     # Usual cases
     assert_equal(String.__repr__("hello"), "'hello'")
     assert_equal(String.__repr__(str(0)), "'0'")
@@ -65,7 +65,7 @@ fn test_repr() raises:
     assert_equal(String.__repr__("\x7f"), r"'\x7f'")
 
 
-fn test_constructors() raises:
+def test_constructors():
     # Default construction
     assert_equal(0, len(String()))
     assert_true(not String())
@@ -99,7 +99,7 @@ fn test_constructors() raises:
     assert_equal(s4, "2")
 
 
-fn test_copy() raises:
+def test_copy():
     var s0 = String("find")
     var s1 = str(s0)
     s1._buffer[3] = ord("e")
@@ -107,7 +107,7 @@ fn test_copy() raises:
     assert_equal("fine", s1)
 
 
-fn test_equality_operators() raises:
+def test_equality_operators():
     var s0 = String("abc")
     var s1 = String("def")
     assert_equal(s0, s0)
@@ -128,7 +128,7 @@ fn test_equality_operators() raises:
     assert_not_equal(s0, "notabc")
 
 
-fn test_comparison_operators() raises:
+def test_comparison_operators():
     var abc = String("abc")
     var de = String("de")
     var ABC = String("ABC")
@@ -168,7 +168,7 @@ fn test_comparison_operators() raises:
     assert_true(String.__ge__("", ""))
 
 
-fn test_add() raises:
+def test_add():
     var s1 = String("123")
     var s2 = String("abc")
     var s3 = s1 + s2
@@ -192,7 +192,7 @@ fn test_add() raises:
     assert_equal("abc is a string", str(s8) + str(s9))
 
 
-fn test_string_join() raises:
+def test_string_join():
     var sep = String(",")
     var s0 = String("abc")
     var s1 = sep.join(s0, s0, s0, s0)
@@ -215,7 +215,7 @@ fn test_string_join() raises:
     assert_equal(s5, "1")
 
 
-fn test_string_literal_join() raises:
+def test_string_literal_join():
     var s2 = ",".join(List[UInt8](1, 2, 3))
     assert_equal(s2, "1,2,3")
 
@@ -229,7 +229,7 @@ fn test_string_literal_join() raises:
     assert_equal(s5, "1")
 
 
-fn test_stringref() raises:
+def test_stringref():
     var a = StringRef("AAA")
     var b = StringRef("BBB")
     var c = StringRef("AAA")
@@ -250,7 +250,7 @@ fn test_stringref() raises:
     assert_equal(a, c)
 
 
-fn test_stringref_from_dtypepointer() raises:
+def test_stringref_from_dtypepointer():
     var a = StringRef("AAA")
     var b = StringRef(a.data)
     assert_equal(3, len(a))
@@ -258,7 +258,7 @@ fn test_stringref_from_dtypepointer() raises:
     assert_equal(a, b)
 
 
-fn test_stringref_strip() raises:
+def test_stringref_strip():
     var a = StringRef("  mojo rocks  ")
     var b = StringRef("mojo  ")
     var c = StringRef("  mojo")
@@ -269,7 +269,7 @@ fn test_stringref_strip() raises:
     assert_equal(d.strip(), "")
 
 
-fn test_ord() raises:
+def test_ord():
     # Regular ASCII
     assert_equal(ord("A"), 65)
     assert_equal(ord("Z"), 90)
@@ -290,6 +290,7 @@ fn test_ord() raises:
     alias single_byte2 = ord("!")
     assert_equal(single_byte2, 33)
 
+    # TODO: change these to parameter domain when it work.
     var multi_byte = ord("α")
     assert_equal(multi_byte, 945)
     var multi_byte2 = ord("➿")
@@ -297,8 +298,14 @@ fn test_ord() raises:
     var multi_byte3 = ord("🔥")
     assert_equal(multi_byte3, 128293)
 
+    # Test StringSlice overload
+    assert_equal(ord("A".as_string_slice()), 65)
+    assert_equal(ord("α".as_string_slice()), 945)
+    assert_equal(ord("➿".as_string_slice()), 10175)
+    assert_equal(ord("🔥".as_string_slice()), 128293)
 
-fn test_chr() raises:
+
+def test_chr():
     assert_equal("A", chr(65))
     assert_equal("a", chr(97))
     assert_equal("!", chr(33))
@@ -307,7 +314,7 @@ fn test_chr() raises:
     assert_equal("🔥", chr(128293))
 
 
-fn test_string_indexing() raises:
+def test_string_indexing():
     var str = String("Hello Mojo!!")
 
     assert_equal("H", str[0])
@@ -334,7 +341,7 @@ fn test_string_indexing() raises:
     assert_equal("H", str[-50::50])
 
 
-fn test_atol() raises:
+def test_atol():
     # base 10
     assert_equal(375, atol(String("375")))
     assert_equal(1, atol(String("001")))
@@ -358,6 +365,9 @@ fn test_atol() raises:
     assert_equal(10, atol("0o12", 8))
     assert_equal(10, atol("0O12", 8))
     assert_equal(35, atol("Z", 36))
+    assert_equal(255, atol("0x_00_ff", 16))
+    assert_equal(18, atol("0b0001_0010", 2))
+    assert_equal(18, atol("0b_000_1001_0", 2))
 
     # Negative cases
     with assert_raises(
@@ -391,11 +401,36 @@ fn test_atol() raises:
     ):
         _ = atol("5", 5)
 
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '0x_ff'"
+    ):
+        _ = atol("0x_ff")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 3: '_12'"
+    ):
+        _ = atol("_12", 3)
+
     with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
         _ = atol("0", 1)
 
     with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
         _ = atol("0", 37)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 16: '_ff'"
+    ):
+        _ = atol("_ff", base=16)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 2: '  _01'"
+    ):
+        _ = atol("  _01", base=2)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '0x_ff'"
+    ):
+        _ = atol("0x_ff")
 
     with assert_raises(
         contains="String is not convertible to integer with base 10: ''"
@@ -408,7 +443,7 @@ fn test_atol() raises:
         _ = atol(String("9223372036854775832"))
 
 
-fn test_atol_base_0() raises:
+def test_atol_base_0():
     assert_equal(155, atol(" 155", base=0))
     assert_equal(155_155, atol("155_155 ", base=0))
 
@@ -425,6 +460,14 @@ fn test_atol_base_0() raises:
     assert_equal(17, atol("0X1_1", base=0))
 
     assert_equal(0, atol("0X0", base=0))
+
+    assert_equal(255, atol("0x_00_ff", base=0))
+
+    assert_equal(18, atol("0b_0001_0010", base=0))
+    assert_equal(18, atol("0b000_1001_0", base=0))
+
+    assert_equal(10, atol("0o_000_12", base=0))
+    assert_equal(10, atol("0o00_12", base=0))
 
     with assert_raises(
         contains="String is not convertible to integer with base 0: '  0x'"
@@ -447,11 +490,6 @@ fn test_atol_base_0() raises:
         _ = atol("0r100", base=0)
 
     with assert_raises(
-        contains="String is not convertible to integer with base 0: '0b_0'"
-    ):
-        _ = atol("0b_0", base=0)
-
-    with assert_raises(
         contains="String is not convertible to integer with base 0: '0xf__f'"
     ):
         _ = atol("0xf__f", base=0)
@@ -462,7 +500,7 @@ fn test_atol_base_0() raises:
         _ = atol("0of_", base=0)
 
 
-fn test_atof() raises:
+def test_atof():
     assert_equal(375.0, atof(String("375.f")))
     assert_equal(1.0, atof(String("001.")))
     assert_equal(+5.0, atof(String(" +005.")))
@@ -522,7 +560,7 @@ fn test_atof() raises:
         _ = atof(String(" ++94. "))
 
 
-fn test_calc_initial_buffer_size_int32() raises:
+def test_calc_initial_buffer_size_int32():
     assert_equal(1, _calc_initial_buffer_size_int32(0))
     assert_equal(1, _calc_initial_buffer_size_int32(9))
     assert_equal(2, _calc_initial_buffer_size_int32(10))
@@ -534,7 +572,7 @@ fn test_calc_initial_buffer_size_int32() raises:
     assert_equal(10, _calc_initial_buffer_size_int32(4294967295))
 
 
-fn test_calc_initial_buffer_size_int64() raises:
+def test_calc_initial_buffer_size_int64():
     assert_equal(1, _calc_initial_buffer_size_int64(0))
     assert_equal(1, _calc_initial_buffer_size_int64(9))
     assert_equal(2, _calc_initial_buffer_size_int64(10))
@@ -546,7 +584,7 @@ fn test_calc_initial_buffer_size_int64() raises:
     assert_equal(20, _calc_initial_buffer_size_int64(18446744073709551615))
 
 
-fn test_contains() raises:
+def test_contains():
     var str = String("Hello world")
 
     assert_true(str.__contains__(""))
@@ -555,11 +593,11 @@ fn test_contains() raises:
     assert_true(str.__contains__(" "))
     assert_true(str.__contains__("ld"))
 
-    assert_false(str.__contains__("bellow"))
-    assert_true("bellow" not in str)
+    assert_false(str.__contains__("below"))
+    assert_true("below" not in str)
 
 
-fn test_find() raises:
+def test_find():
     var str = String("Hello world")
 
     assert_equal(0, str.find(""))
@@ -582,7 +620,7 @@ fn test_find() raises:
     assert_equal(-1, String("abc").find("abcd"))
 
 
-fn test_count() raises:
+def test_count():
     var str = String("Hello world")
 
     assert_equal(12, str.count(""))
@@ -596,7 +634,7 @@ fn test_count() raises:
     assert_equal(String("aaaaaa").count("aa"), 3)
 
 
-fn test_replace() raises:
+def test_replace():
     # Replace empty
     var s1 = String("abc")
     assert_equal("xaxbxc", s1.replace("", "x"))
@@ -616,7 +654,7 @@ fn test_replace() raises:
     assert_equal("a  complex test case with some spaces", s3.replace("  ", " "))
 
 
-fn test_rfind() raises:
+def test_rfind():
     # Basic usage.
     assert_equal(String("hello world").rfind("world"), 6)
     assert_equal(String("hello world").rfind("bye"), -1)
@@ -628,7 +666,7 @@ fn test_rfind() raises:
     assert_equal(String("").rfind("ab"), -1)
     assert_equal(String("foo").rfind(""), 3)
 
-    # Test that rfind(start) returned pos is absolute, not relative to specifed
+    # Test that rfind(start) returned pos is absolute, not relative to specified
     # start. Also tests positive and negative start offsets.
     assert_equal(String("hello world").rfind("l", 5), 9)
     assert_equal(String("hello world").rfind("l", -5), 9)
@@ -643,7 +681,7 @@ fn test_rfind() raises:
     # assert_equal(String("🔥🔥").rfind("🔥"), 1)
 
 
-fn test_split() raises:
+def test_split():
     # empty separators default to whitespace
     var d = String("hello world").split()
     assert_true(len(d) == 2)
@@ -654,8 +692,31 @@ fn test_split() raises:
     assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
 
     # Should add all whitespace-like chars as one
-    alias utf8_spaces = String(" \t\n\r\v\f")
-    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    # test all unicode separators
+    # 0 is to build a String with null terminator
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as StringLiteral once unicode
+    # escape secuences are accepted
+    var univ_sep_var = (
+        String(" ")
+        + String("\t")
+        + String("\n")
+        + String("\r")
+        + String("\v")
+        + String("\f")
+        + String("\x1c")
+        + String("\x1d")
+        + String("\x1e")
+        + String(next_line)
+        + String(unicode_line_sep)
+        + String(unicode_paragraph_sep)
+    )
+    var s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
     d = s.split()
     assert_true(len(d) == 2)
     assert_true(d[0] == "hello" and d[1] == "world")
@@ -749,7 +810,7 @@ fn test_split() raises:
     )
 
 
-fn test_splitlines() raises:
+def test_splitlines():
     # Test with no line breaks
     var in1 = String("hello world")
     var res1 = in1.splitlines()
@@ -808,13 +869,29 @@ fn test_splitlines() raises:
     assert_equal(res8[2], "mojo")
     assert_equal(res8[3], "language")
 
-    # test \x1e \x85
-    var in9 = String("hello\x1eworld\x85mojo")
+    # test \x1e \x1d
+    var in9 = String("hello\x1eworld\x1dmojo")
     var res9 = in9.splitlines()
     assert_equal(len(res9), 3)
     assert_equal(res9[0], "hello")
     assert_equal(res9[1], "world")
     assert_equal(res9[2], "mojo")
+
+    # test \x85 \u2028 \u2029
+    var next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+
+    for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
+        var in9 = "hello\x1eworld" + String(i[]) + "mojo"
+        var res9 = in9.splitlines()
+        assert_equal(len(res9), 3)
+        assert_equal(res9[0], "hello")
+        assert_equal(res9[1], "world")
+        assert_equal(res9[2], "mojo")
 
     # test with keepends=True
     var res10 = in8.splitlines(keepends=True)
@@ -824,14 +901,16 @@ fn test_splitlines() raises:
     assert_equal(res10[2], "mojo\x1c")
     assert_equal(res10[3], "language\x1d")
 
-    var res11 = in9.splitlines(keepends=True)
+    var res11 = ("hello\x1eworld" + String(next_line) + "mojo").splitlines(
+        keepends=True
+    )
     assert_equal(len(res11), 3)
     assert_equal(res11[0], "hello\x1e")
-    assert_equal(res11[1], "world\x85")
+    assert_equal(res11[1], "world" + String(next_line))
     assert_equal(res11[2], "mojo")
 
 
-fn test_isupper() raises:
+def test_isupper():
     assert_true(isupper(ord("A")))
     assert_true(isupper(ord("B")))
     assert_true(isupper(ord("Y")))
@@ -843,8 +922,13 @@ fn test_isupper() raises:
     assert_false(isupper(ord("!")))
     assert_false(isupper(ord("0")))
 
+    assert_true(String("ASDG").isupper())
+    assert_false(String("AsDG").isupper())
+    assert_true(String("ABC123").isupper())
+    assert_false(String("1!").isupper())
 
-fn test_islower() raises:
+
+def test_islower():
     assert_true(islower(ord("a")))
     assert_true(islower(ord("b")))
     assert_true(islower(ord("y")))
@@ -856,8 +940,13 @@ fn test_islower() raises:
     assert_false(islower(ord("!")))
     assert_false(islower(ord("0")))
 
+    assert_true(String("asdfg").islower())
+    assert_false(String("asdFDg").islower())
+    assert_true(String("abc123").islower())
+    assert_false(String("1!").islower())
 
-fn test_lower() raises:
+
+def test_lower():
     assert_equal(String("HELLO").lower(), "hello")
     assert_equal(String("hello").lower(), "hello")
     assert_equal(String("FoOBaR").lower(), "foobar")
@@ -868,7 +957,7 @@ fn test_lower() raises:
     assert_equal(String("É").lower(), "É")
 
 
-fn test_upper() raises:
+def test_upper():
     assert_equal(String("hello").upper(), "HELLO")
     assert_equal(String("HELLO").upper(), "HELLO")
     assert_equal(String("FoOBaR").upper(), "FOOBAR")
@@ -879,10 +968,11 @@ fn test_upper() raises:
     assert_equal(String("É").upper(), "É")
 
 
-fn test_isspace() raises:
+def test_isspace():
     # checking true cases
     assert_true(_isspace(ord(" ")))
     assert_true(_isspace(ord("\n")))
+    assert_true(_isspace("\n"))
     assert_true(_isspace(ord("\t")))
     assert_true(_isspace(ord("\r")))
     assert_true(_isspace(ord("\v")))
@@ -890,6 +980,7 @@ fn test_isspace() raises:
 
     # Checking false cases
     assert_false(_isspace(ord("a")))
+    assert_false(_isspace("a"))
     assert_false(_isspace(ord("u")))
     assert_false(_isspace(ord("s")))
     assert_false(_isspace(ord("t")))
@@ -906,8 +997,8 @@ fn test_isspace() raises:
     """TODO: \\u2028"""
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
-    # TODO add line and paragraph separator as stringliteral once unicode
-    # escape secuences are accepted
+    # TODO add line and paragraph separator as StringLiteral once unicode
+    # escape sequences are accepted
     var univ_sep_var = List[String](
         String(" "),
         String("\t"),
@@ -938,7 +1029,7 @@ fn test_isspace() raises:
         _ = sep
 
 
-fn test_ascii_aliases() raises:
+def test_ascii_aliases():
     assert_true(String("a") in String.ASCII_LOWERCASE)
     assert_true(String("b") in String.ASCII_LOWERCASE)
     assert_true(String("y") in String.ASCII_LOWERCASE)
@@ -981,7 +1072,7 @@ fn test_ascii_aliases() raises:
         assert_true(text[i] in String.PRINTABLE)
 
 
-fn test_rstrip() raises:
+def test_rstrip():
     # with default rstrip chars
     var empty_string = String("")
     assert_true(empty_string.rstrip() == "")
@@ -1007,7 +1098,7 @@ fn test_rstrip() raises:
     assert_true(str4.rstrip("sip \n") == "mississippim")
 
 
-fn test_lstrip() raises:
+def test_lstrip():
     # with default lstrip chars
     var empty_string = String("")
     assert_true(empty_string.lstrip() == "")
@@ -1033,7 +1124,7 @@ fn test_lstrip() raises:
     assert_true(str4.lstrip("mis \n") == "ppimississippi")
 
 
-fn test_strip() raises:
+def test_strip():
     # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
@@ -1077,7 +1168,7 @@ fn test_strip() raises:
     assert_true(comp_str4_stripped == "\n mississippimississippi \n")
 
 
-fn test_hash() raises:
+def test_hash():
     fn assert_hash_equals_literal_hash[s: StringLiteral]() raises:
         assert_equal(hash(s), hash(String(s)))
 
@@ -1096,7 +1187,7 @@ Pink: No! Darkness! (Pink is floating in the air)"""
     ]()
 
 
-fn test_startswith() raises:
+def test_startswith():
     var str = String("Hello world")
 
     assert_true(str.startswith("Hello"))
@@ -1107,7 +1198,7 @@ fn test_startswith() raises:
     assert_false(str.startswith("llo", 2, 3))
 
 
-fn test_endswith() raises:
+def test_endswith():
     var str = String("Hello world")
 
     assert_true(str.endswith(""))
@@ -1121,6 +1212,7 @@ fn test_endswith() raises:
 
 
 def test_removeprefix():
+    assert_equal(String("hello world").removeprefix(""), String("hello world"))
     assert_equal(String("hello world").removeprefix("hello"), " world")
     assert_equal(String("hello world").removeprefix("world"), "hello world")
     assert_equal(String("hello world").removeprefix("hello world"), "")
@@ -1128,6 +1220,7 @@ def test_removeprefix():
 
 
 def test_removesuffix():
+    assert_equal(String("hello world").removesuffix(""), String("hello world"))
     assert_equal(String("hello world").removesuffix("world"), "hello ")
     assert_equal(String("hello world").removesuffix("hello"), "hello world")
     assert_equal(String("hello world").removesuffix("hello world"), "")
@@ -1230,7 +1323,7 @@ def test_string_iter():
         var utf8_sequence_len = 0
         var byte_idx = 0
         for v in item:
-            var byte_len = len(v)
+            var byte_len = v.byte_length()
             assert_equal(item[byte_idx : byte_idx + byte_len], v)
             byte_idx += byte_len
             utf8_sequence_len += 1
@@ -1359,14 +1452,21 @@ def test_format_args():
 
 def test_isdigit():
     assert_true(isdigit(ord("1")))
-    assert_true(isdigit("1"))
-    # TODO: What to do with multi-character strings?
-    # assert_false(isdigit("1gt"))
     assert_false(isdigit(ord("g")))
-    assert_false(isdigit("g"))
+
     assert_true(String("123").isdigit())
     assert_false(String("asdg").isdigit())
     assert_false(String("123asdg").isdigit())
+
+
+def test_isprintable():
+    assert_true(isprintable(ord("a")))
+    assert_false(isprintable(ord("\n")))
+    assert_false(isprintable(ord("\t")))
+
+    assert_true(String("aasdg").isprintable())
+    assert_false(String("aa\nae").isprintable())
+    assert_false(String("aa\tae").isprintable())
 
 
 def main():
@@ -1417,3 +1517,4 @@ def main():
     test_string_iter()
     test_format_args()
     test_isdigit()
+    test_isprintable()

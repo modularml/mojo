@@ -18,177 +18,173 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List
 from sys import bitwidthof
 
-from bit import countl_zero
-from memory import Pointer, UnsafePointer
+from bit import count_leading_zeros
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # sort
 # ===----------------------------------------------------------------------===#
 
-alias _cmp_fn_type = fn[type: AnyTrivialRegType] (type, type) capturing -> Bool
+
+struct _SortWrapper[type: CollectionElement](CollectionElement):
+    var data: type
+
+    fn __init__(inout self, owned data: type):
+        self.data = data^
+
+    fn __init__(inout self, *, other: Self):
+        self.data = type(other=other.data)
+
+    fn __moveinit__(inout self, owned other: Self):
+        self.data = other.data^
 
 
 @always_inline
 fn _insertion_sort[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int):
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], size: Int):
     """Sort the array[start:end] slice"""
 
-    for i in range(start + 1, end):
-        var value = array[i]
+    for i in range(1, size):
+        var value = type(other=array[i])
         var j = i
 
         # Find the placement of the value in the array, shifting as we try to
         # find the position. Throughout, we assume array[start:i] has already
         # been sorted.
-        while j > start and not cmp_fn[type](array[j - 1], value):
-            array[j] = array[j - 1]
+        while j > 0 and not cmp_fn(type(other=array[j - 1]), type(other=value)):
+            array[j] = type(other=array[j - 1])
             j -= 1
 
-        array[j] = value
+        array[j] = type(other=value)
 
 
+# put everything thats "<" to the left of pivot
 @always_inline
-fn _insertion_sort[
-    type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
-](array: UnsafePointer[type], start: Int, end: Int):
-    """Sort the array[start:end] slice"""
+fn _quicksort_partition_right[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], size: Int) -> Int:
+    var left = 1
+    var right = size - 1
+    var pivot_value = type(other=array[0])
 
-    for i in range(start + 1, end):
-        var value = array[i]
-        var j = i
-
-        # Find the placement of the value in the array, shifting as we try to
-        # find the position. Throughout, we assume array[start:i] has already
-        # been sorted.
-        while j > start and not cmp_fn(array[j - 1], value):
-            array[j] = array[j - 1]
-            j -= 1
-
-        array[j] = value
-
-
-@always_inline
-fn _partition[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int) -> Int:
-    if start == end:
-        return end
-
-    var pivot = start + (end - start) // 2
-
-    var pivot_value = array[pivot]
-
-    var left = start
-    var right = end - 2
-
-    swap(array[pivot], array[end - 1])
-
-    while left < right:
-        if cmp_fn[type](array[left], pivot_value):
+    while True:
+        # no need for left < right since quick sort pick median of 3 as pivot
+        while cmp_fn(type(other=array[left]), type(other=pivot_value)):
             left += 1
-        elif not cmp_fn[type](array[right], pivot_value):
+        while left < right and not cmp_fn(
+            type(other=array[right]), type(other=pivot_value)
+        ):
             right -= 1
-        else:
-            swap(array[left], array[right])
+        if left >= right:
+            var pivot_pos = left - 1
+            swap(array[pivot_pos], array[0])
+            return pivot_pos
+        swap(array[left], array[right])
+        left += 1
+        right -= 1
 
-    if cmp_fn[type](array[right], pivot_value):
-        right += 1
-    swap(array[end - 1], array[right])
-    return right
+
+# put everything thats "<=" to the left of pivot
+@always_inline
+fn _quicksort_partition_left[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], size: Int) -> Int:
+    var left = 1
+    var right = size - 1
+    var pivot_value = type(other=array[0])
+
+    while True:
+        while left < right and not cmp_fn(
+            type(other=pivot_value), type(other=array[left])
+        ):
+            left += 1
+        while cmp_fn(type(other=pivot_value), type(other=array[right])):
+            right -= 1
+        if left >= right:
+            var pivot_pos = left - 1
+            swap(array[pivot_pos], array[0])
+            return pivot_pos
+        swap(array[left], array[right])
+        left += 1
+        right -= 1
+
+
+fn _heap_sort_fix_down[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], size: Int, idx: Int):
+    var i = idx
+    var j = i * 2 + 1
+    while j < size:  # has left child
+        # if right child exist and has higher value, swap with right
+        if i * 2 + 2 < size and cmp_fn(
+            type(other=array[j]), type(other=array[i * 2 + 2])
+        ):
+            j = i * 2 + 2
+        if not cmp_fn(type(other=array[i]), type(other=array[j])):
+            return
+        swap(array[j], array[i])
+        i = j
+        j = i * 2 + 1
 
 
 @always_inline
-fn _partition[
-    type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
-](array: UnsafePointer[type], start: Int, end: Int) -> Int:
-    if start == end:
-        return end
-
-    var pivot = start + (end - start) // 2
-
-    var pivot_value = array[pivot]
-
-    var left = start
-    var right = end - 2
-
-    swap(array[pivot], array[end - 1])
-
-    while left < right:
-        if cmp_fn(array[left], pivot_value):
-            left += 1
-        elif not cmp_fn(array[right], pivot_value):
-            right -= 1
-        else:
-            swap(array[left], array[right])
-
-    if cmp_fn(array[right], pivot_value):
-        right += 1
-    swap(array[end - 1], array[right])
-    return right
+fn _heap_sort[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], owned size: Int):
+    # heapify
+    for i in range(size // 2 - 1, -1, -1):
+        _heap_sort_fix_down[type, cmp_fn](array, size, i)
+    # sort
+    while size > 1:
+        size -= 1
+        swap(array[0], array[size])
+        _heap_sort_fix_down[type, cmp_fn](array, size, 0)
 
 
 @always_inline
 fn _estimate_initial_height(size: Int) -> Int:
     # Compute the log2 of the size rounded upward.
-    var log2 = int((bitwidthof[DType.index]() - 1) ^ countl_zero(size | 1))
+    var log2 = int(
+        (bitwidthof[DType.index]() - 1) ^ count_leading_zeros(size | 1)
+    )
     return max(2, log2)
 
 
 @always_inline
-fn _quicksort[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], size: Int):
-    if size == 0:
+fn _delegate_small_sort[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], size: Int):
+    if size == 2:
+        _small_sort[2, type, cmp_fn](array)
+
+        return
+    if size == 3:
+        _small_sort[3, type, cmp_fn](array)
         return
 
-    var stack = List[Int](capacity=_estimate_initial_height(size))
-    stack.append(0)
-    stack.append(size)
-    while len(stack) > 0:
-        var end = stack.pop()
-        var start = stack.pop()
+    if size == 4:
+        _small_sort[4, type, cmp_fn](array)
+        return
 
-        var len = end - start
-        if len < 2:
-            continue
-
-        if len == 2:
-            _small_sort[2, type, cmp_fn](array + start)
-            continue
-
-        if len == 3:
-            _small_sort[3, type, cmp_fn](array + start)
-            continue
-
-        if len == 4:
-            _small_sort[4, type, cmp_fn](array + start)
-            continue
-
-        if len == 5:
-            _small_sort[5, type, cmp_fn](array + start)
-            continue
-
-        if len < 32:
-            _insertion_sort[type, cmp_fn](array, start, end)
-            continue
-
-        var pivot = _partition[type, cmp_fn](array, start, end)
-
-        stack.append(pivot + 1)
-        stack.append(end)
-
-        stack.append(start)
-        stack.append(pivot)
+    if size == 5:
+        _small_sort[5, type, cmp_fn](array)
+        return
 
 
 @always_inline
 fn _quicksort[
-    type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](array: UnsafePointer[type], size: Int):
     if size == 0:
         return
-
     var stack = List[Int](capacity=_estimate_initial_height(size))
     stack.append(0)
     stack.append(size)
@@ -197,48 +193,92 @@ fn _quicksort[
         var start = stack.pop()
 
         var len = end - start
-        if len < 2:
+
+        if len <= 5:
+            _delegate_small_sort[type, cmp_fn](array + start, len)
             continue
 
-        if len < 8:
-            _insertion_sort[type, cmp_fn](array, start, end)
+        if len < 32:
+            _insertion_sort[type, cmp_fn](array + start, len)
             continue
 
-        var pivot = _partition[type, cmp_fn](array, start, end)
+        # pick median of 3 as pivot
+        _sort3[type, cmp_fn](array, (start + end) >> 1, start, end - 1)
 
-        stack.append(pivot + 1)
-        stack.append(end)
+        # if array[start - 1] == pivot_value, then everything in between will
+        # be the same, so no need to recurse that interval
+        # already have array[start - 1] <= array[start]
+        if start > 0 and not cmp_fn(
+            type(other=array[start - 1]), type(other=array[start])
+        ):
+            var pivot = start + _quicksort_partition_left[type, cmp_fn](
+                array + start, len
+            )
+            if end > pivot + 2:
+                stack.append(pivot + 1)
+                stack.append(end)
+            continue
 
-        stack.append(start)
-        stack.append(pivot)
+        var pivot = start + _quicksort_partition_right[type, cmp_fn](
+            array + start, len
+        )
+
+        if end > pivot + 2:
+            stack.append(pivot + 1)
+            stack.append(end)
+
+        if pivot > start + 1:
+            stack.append(start)
+            stack.append(pivot)
 
 
 # ===----------------------------------------------------------------------===#
 # partition
 # ===----------------------------------------------------------------------===#
-fn partition[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](buff: Pointer[type], k: Int, size: Int):
-    """Partition the input buffer inplace such that first k elements are the
-    largest (or smallest if cmp_fn is <= operator) elements.
-    The ordering of the first k elements is undefined.
 
-    Parameters:
-        type: Trivial reg type of the underlying data.
-        cmp_fn: Comparison functor of type, type) capturing -> Bool type.
 
-    Args:
-        buff: Input buffer.
-        k: Index of the partition element.
-        size: The length of the buffer.
-    """
+@always_inline
+fn _partition[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], size: Int) -> Int:
+    if size == 0:
+        return size
+
+    var pivot = size // 2
+
+    var pivot_value = type(other=array[pivot])
+
+    var left = 0
+    var right = size - 2
+
+    swap(array[pivot], array[size - 1])
+
+    while left < right:
+        if cmp_fn(type(other=array[left]), type(other=pivot_value)):
+            left += 1
+        elif not cmp_fn(type(other=array[right]), type(other=pivot_value)):
+            right -= 1
+        else:
+            swap(array[left], array[right])
+
+    if cmp_fn(type(other=array[right]), type(other=pivot_value)):
+        right += 1
+    swap(array[size - 1], array[right])
+    return right
+
+
+fn _partition[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], k: Int, size: Int):
     var stack = List[Int](capacity=_estimate_initial_height(size))
     stack.append(0)
     stack.append(size)
     while len(stack) > 0:
         var end = stack.pop()
         var start = stack.pop()
-        var pivot = _partition[type, cmp_fn](buff, start, end)
+        var pivot = start + _partition[type, cmp_fn](array + start, end - start)
         if pivot == k:
             break
         elif k < pivot:
@@ -249,71 +289,248 @@ fn partition[
             stack.append(end)
 
 
+fn partition[
+    type: CollectionElement,
+    cmp_fn: fn (type, type) capturing -> Bool,
+](array: UnsafePointer[type], k: Int, size: Int):
+    """Partition the input buffer inplace such that first k elements are the
+    largest (or smallest if cmp_fn is < operator) elements.
+    The ordering of the first k elements is undefined.
+
+    Parameters:
+        type: Type of the underlying data.
+        cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
+
+    Args:
+        array: Input buffer.
+        k: Index of the partition element.
+        size: The length of the buffer.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: _SortWrapper[type], rhs: _SortWrapper[type]) -> Bool:
+        return cmp_fn(lhs.data, rhs.data)
+
+    _partition[type, _cmp_fn](array, k, size)
+
+
+fn partition[
+    cmp_fn: fn (Int, Int) capturing -> Bool,
+](array: UnsafePointer[Int], k: Int, size: Int):
+    """Partition the input buffer inplace such that first k elements are the
+    largest (or smallest if cmp_fn is < operator) elements.
+    The ordering of the first k elements is undefined.
+
+    Parameters:
+        cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
+
+    Args:
+        array: Input buffer.
+        k: Index of the partition element.
+        size: The length of the buffer.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return cmp_fn(lhs.data, rhs.data)
+
+    _partition[Int, _cmp_fn](array, k, size)
+
+
+fn partition[
+    type: DType,
+    cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
+](array: UnsafePointer[Scalar[type]], k: Int, size: Int):
+    """Partition the input buffer inplace such that first k elements are the
+    largest (or smallest if cmp_fn is < operator) elements.
+    The ordering of the first k elements is undefined.
+
+    Parameters:
+        type: DType of the underlying data.
+        cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
+
+    Args:
+        array: Input buffer.
+        k: Index of the partition element.
+        size: The length of the buffer.
+    """
+
+    @parameter
+    fn _cmp_fn(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return cmp_fn(lhs.data, rhs.data)
+
+    _partition[Scalar[type], _cmp_fn](array, k, size)
+
+
 # ===----------------------------------------------------------------------===#
 # sort
 # ===----------------------------------------------------------------------===#
 
 
-fn sort(inout buff: Pointer[Int], len: Int):
-    """Sort the buffer inplace.
-    The function doesn't return anything, the buffer is updated inplace.
+# Junction from public to private API
+fn _sort[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](ptr: UnsafePointer[type], len: Int):
+    if len <= 5:
+        _delegate_small_sort[type, cmp_fn](ptr, len)
+        return
 
-    Args:
-        buff: Input buffer.
-        len: The length of the buffer.
-    """
+    if len < 32:
+        _insertion_sort[type, cmp_fn](ptr, len)
+        return
 
-    @parameter
-    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
-
-    _quicksort[Int, _less_than_equal](buff, len)
-
-
-fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
-    """Sort the buffer inplace.
-    The function doesn't return anything, the buffer is updated inplace.
-
-    Parameters:
-        type: DType of the underlying data.
-
-    Args:
-        buff: Input buffer.
-        len: The length of the buffer.
-    """
-
-    @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
-
-    _quicksort[Scalar[type], _less_than_equal](buff, len)
+    _quicksort[type, cmp_fn](ptr, len)
 
 
-fn sort(inout list: List[Int]):
-    """Sort the list inplace.
-    The function doesn't return anything, the list is updated inplace.
-
-    Args:
-        list: Input integer list to sort.
-    """
-    # Downcast any pointer to register-passable pointer.
-    var ptr = rebind[Pointer[Int]](list.data)
-    sort(ptr, len(list))
-
-
-fn sort[type: DType](inout list: List[Scalar[type]]):
+# TODO (MSTDL-766): The Int and Scalar[type] overload should be remove
+# (same for partition)
+# Eventually we want a sort that takes a Span and one that takes a List with
+# optional cmp_fn.
+fn sort[
+    type: CollectionElement,
+    cmp_fn: fn (type, type) capturing -> Bool,
+](ptr: UnsafePointer[type], len: Int):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
-        type: DType of the underlying data.
+        type: CollectionElement type of the underlying data.
+        cmp_fn: The comparison function.
 
     Args:
-        list: Input vector to sort.
+        ptr: Pointer to the start of the memory to be sorted.
+        len: Number of elements from ptr that to be sorted.
     """
 
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-    sort[type](ptr, len(list))
+    @parameter
+    fn _cmp_fn(lhs: _SortWrapper[type], rhs: _SortWrapper[type]) -> Bool:
+        return cmp_fn(lhs.data, rhs.data)
+
+    _sort[type, _cmp_fn](ptr, len)
+
+
+fn sort[
+    type: CollectionElement,
+    cmp_fn: fn (Int, Int) capturing -> Bool,
+](ptr: UnsafePointer[Int], len: Int):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Parameters:
+        type: CollectionElement type of the underlying data.
+        cmp_fn: The comparison function.
+
+    Args:
+        ptr: Pointer to the start of the memory to be sorted.
+        len: Number of elements from ptr that to be sorted.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return cmp_fn(lhs.data, rhs.data)
+
+    _sort[Int, _cmp_fn](ptr, len)
+
+
+fn sort[
+    type: DType,
+    cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
+](ptr: UnsafePointer[Scalar[type]], len: Int):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Parameters:
+        type: CollectionElement type of the underlying data.
+        cmp_fn: The comparison function.
+
+    Args:
+        ptr: Pointer to the start of the memory to be sorted.
+        len: Number of elements from ptr that to be sorted.
+    """
+
+    @parameter
+    fn _cmp_fn(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return cmp_fn(lhs.data, rhs.data)
+
+    _sort[Scalar[type], _cmp_fn](ptr, len)
+
+
+fn sort(ptr: UnsafePointer[Int], len: Int):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Args:
+        ptr: Pointer to the start of the memory to be sorted.
+        len: Number of elements from ptr that to be sorted.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: Int, rhs: Int) -> Bool:
+        return lhs < rhs
+
+    sort[Int, _cmp_fn](ptr, len)
+
+
+fn sort[
+    type: DType,
+](ptr: UnsafePointer[Scalar[type]], len: Int):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Parameters:
+        type: CollectionElement type of the underlying data.
+
+    Args:
+        ptr: Pointer to the start of the memory to be sorted.
+        len: Number of elements from ptr that to be sorted.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: Scalar[type], rhs: Scalar[type]) -> Bool:
+        return lhs < rhs
+
+    sort[type, _cmp_fn](ptr, len)
+
+
+fn sort[
+    type: CollectionElement,
+    cmp_fn: fn (Int, Int) capturing -> Bool,
+](inout list: List[Int]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Parameters:
+        type: CollectionElement type of the underlying data.
+        cmp_fn: The comparison function.
+
+    Args:
+        list: Input list to sort.
+    """
+
+    sort[Int, cmp_fn](list.data, len(list))
+
+
+fn sort[
+    type: DType,
+    cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
+](inout list: List[Scalar[type]]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Parameters:
+        type: DType of the underlying data.
+        cmp_fn: The comparison function.
+
+    Args:
+        list: Input list to sort.
+    """
+
+    sort[type, cmp_fn](list.data, len(list))
 
 
 fn sort[
@@ -331,7 +548,40 @@ fn sort[
         list: Input list to sort.
     """
 
-    _quicksort[type, cmp_fn](list.data, len(list))
+    sort[type, cmp_fn](list.data, len(list))
+
+
+fn sort(inout list: List[Int]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Args:
+        list: Input integer list to sort.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: Int, rhs: Int) -> Bool:
+        return lhs < rhs
+
+    sort[Int, _cmp_fn](list.data, len(list))
+
+
+fn sort[type: DType](inout list: List[Scalar[type]]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
+
+    Parameters:
+        type: DType of the underlying data.
+
+    Args:
+        list: Input vector to sort.
+    """
+
+    @parameter
+    fn _cmp_fn(lhs: Scalar[type], rhs: Scalar[type]) -> Bool:
+        return lhs < rhs
+
+    sort[type, _cmp_fn](list.data, len(list))
 
 
 fn sort[type: ComparableCollectionElement](inout list: List[type]):
@@ -345,10 +595,10 @@ fn sort[type: ComparableCollectionElement](inout list: List[type]):
     """
 
     @parameter
-    fn _less_than_equal(a: type, b: type) -> Bool:
-        return a <= b
+    fn _cmp_fn(a: type, b: type) -> Bool:
+        return a < b
 
-    _quicksort[type, _less_than_equal](list.data, len(list))
+    sort[type, _cmp_fn](list.data, len(list))
 
 
 # ===----------------------------------------------------------------------===#
@@ -358,37 +608,51 @@ fn sort[type: ComparableCollectionElement](inout list: List[type]):
 
 @always_inline
 fn _sort2[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], offset0: Int, offset1: Int):
-    var a = array[offset0]
-    var b = array[offset1]
-    if not cmp_fn[type](a, b):
-        array[offset0] = b
-        array[offset1] = a
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], offset0: Int, offset1: Int):
+    var a = type(other=array[offset0])
+    var b = type(other=array[offset1])
+    if not cmp_fn(type(other=a), type(other=b)):
+        array[offset0] = type(other=b)
+        array[offset1] = type(other=a)
+
+
+@always_inline
+fn _sort3[
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], offset0: Int, offset1: Int, offset2: Int):
+    _sort2[type, cmp_fn](array, offset0, offset1)
+    _sort2[type, cmp_fn](array, offset1, offset2)
+    _sort2[type, cmp_fn](array, offset0, offset1)
 
 
 @always_inline
 fn _sort_partial_3[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], offset0: Int, offset1: Int, offset2: Int):
-    var a = array[offset0]
-    var b = array[offset1]
-    var c = array[offset2]
-    var r = cmp_fn[type](c, a)
-    var t = c if r else a
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type], offset0: Int, offset1: Int, offset2: Int):
+    var a = type(other=array[offset0])
+    var b = type(other=array[offset1])
+    var c = type(other=array[offset2])
+    var r = cmp_fn(type(other=c), type(other=a))
+    var t = type(other=c) if r else type(other=a)
     if r:
-        array[offset2] = a
-    if cmp_fn[type](b, t):
-        array[offset0] = b
-        array[offset1] = t
+        array[offset2] = type(other=a)
+    if cmp_fn(type(other=b), type(other=t)):
+        array[offset0] = type(other=b)
+        array[offset1] = type(other=t)
     elif r:
-        array[offset0] = t
+        array[offset0] = type(other=t)
 
 
 @always_inline
 fn _small_sort[
-    n: Int, type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type]):
+    n: Int,
+    type: CollectionElement,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](array: UnsafePointer[type]):
     @parameter
     if n == 2:
         _sort2[type, cmp_fn](array, 0, 1)

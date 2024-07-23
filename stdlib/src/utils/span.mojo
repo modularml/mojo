@@ -21,7 +21,6 @@ from utils import Span
 """
 
 from . import InlineArray
-from collections.list import ComparableCollectionElement
 from sys.intrinsics import _type_is_eq
 
 
@@ -74,7 +73,7 @@ struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
     lifetime: AnyLifetime[is_mutable].type,
-](CollectionElementNew):
+](CollectionElement):
     """A non owning view of contiguous data.
 
     Parameters:
@@ -127,7 +126,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int
+        T2: CollectionElement, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -230,7 +229,7 @@ struct Span[
 
     @always_inline
     fn copy_from[
-        lifetime: MutableLifetime,
+        lifetime: MutableLifetime, //
     ](self: Span[T, lifetime], other: Span[T, _]):
         """
         Performs an element wise copy from all elements of `other` into all elements of `self`.
@@ -243,7 +242,7 @@ struct Span[
         """
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
-            self[i] = other[i]
+            self[i] = Self.T(other=other[i])
 
     fn __bool__(self) -> Bool:
         """Check if a span is non-empty.
@@ -254,12 +253,12 @@ struct Span[
         return len(self) > 0
 
     fn __eq__[
-        T2: ComparableCollectionElement
-    ](ref [_]self: Span[T2, lifetime], ref [_]rhs: Span[T]) -> Bool:
+        T: EqualityComparableCollectionElement, //
+    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
         Parameters:
-            T2: The type of the elements in the span. Must implement the
+            T: The type of the elements in the span. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
@@ -268,29 +267,28 @@ struct Span[
         Returns:
             True if the spans are equal in length and contain the same elements, False otherwise.
         """
-        constrained[_type_is_eq[T, T2](), "T must be equal to T2"]()
         # both empty
         if not self and not rhs:
             return True
         if len(self) != len(rhs):
             return False
         # same pointer and length, so equal
-        if self.unsafe_ptr().bitcast[T]() == rhs.unsafe_ptr():
+        if self.unsafe_ptr() == rhs.unsafe_ptr():
             return True
         for i in range(len(self)):
-            if self[i] != rhs.unsafe_ptr().bitcast[T2]()[i]:
+            if self[i] != rhs[i]:
                 return False
         return True
 
     @always_inline
     fn __ne__[
-        T2: ComparableCollectionElement
-    ](ref [_]self: Span[T2, lifetime], ref [_]rhs: Span[T]) -> Bool:
+        T: EqualityComparableCollectionElement, //
+    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
         Parameters:
-            T2: The type of the elements in the span. Must implement the
-                traits `EqualityComparable` and `CollectionElement`.
+            T: The type of the elements in the span. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
 
         Args:
             rhs: The span to compare against.
@@ -298,5 +296,17 @@ struct Span[
         Returns:
             True if the spans are not equal in length or contents, False otherwise.
         """
-        constrained[_type_is_eq[T, T2](), "T must be equal to T2"]()
         return not self == rhs
+
+    fn fill[lifetime: MutableLifetime, //](self: Span[T, lifetime], value: T):
+        """
+        Fill the memory that a span references with a given value.
+
+        Parameters:
+            lifetime: The inferred mutable lifetime of the data within the Span.
+
+        Args:
+            value: The value to assign to each element.
+        """
+        for element in self:
+            element[] = Self.T(other=value)

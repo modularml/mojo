@@ -287,7 +287,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return len(self._data)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """A hash value of the elements in the set.
 
         The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).
@@ -302,6 +302,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             hash_value ^= hash(e[])
         return hash_value
 
+    @no_inline
     fn __str__[U: RepresentableKeyElement](self: Set[U]) -> String:
         """Returns the string representation of the set.
 
@@ -316,6 +317,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self.format_to(writer)
         return output
 
+    @no_inline
     fn __repr__[U: RepresentableKeyElement](self: Set[U]) -> String:
         """Returns the string representation of the set.
 
@@ -338,14 +340,14 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             writer: The formatter to write to.
         """
-        write_to(writer, "{")
+        writer.write("{")
         var written = 0
         for item in self:
-            write_to(writer, repr(item[]))
+            writer.write(repr(item[]))
             if written < len(self) - 1:
-                write_to(writer, ", ")
+                writer.write(", ")
             written += 1
-        write_to(writer, "}")
+        writer.write("}")
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -368,7 +370,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             t: The element to add to the set.
         """
-        self._data[t] = None
+        self._data[Self.T(other=t)] = None
 
     fn remove(inout self, t: T) raises:
         """Remove an element from the set.
@@ -397,9 +399,9 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         if not self:
             raise "Pop on empty set"
         var iter = self.__iter__()
-        var first = iter.__next__()[]
+        var first = Self.T(other=iter.__next__()[])
         self.remove(first)
-        return first
+        return first^
 
     fn union(self, other: Self) -> Self:
         """Set union.
