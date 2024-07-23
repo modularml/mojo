@@ -159,6 +159,26 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
+    fn alloc(count: Int, alignment: Int = alignof[T]()) -> Self:
+        """Allocate an array with specified or default alignment.
+
+        Args:
+            count: The number of elements in the array.
+            alignment: The alignment in bytes of the allocated memory.
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        alias sizeof_t = sizeof[T]()
+
+        constrained[sizeof_t > 0, "size must be greater than zero"]()
+
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
+        )
+
+    @staticmethod
+    @always_inline
     fn alloc[alignment: Int = alignof[T]()](count: Int) -> Self:
         """Allocate an array with specified or default alignment.
 
@@ -175,9 +195,6 @@ struct UnsafePointer[
 
         constrained[sizeof_t > 0, "size must be greater than zero"]()
         constrained[alignment > 0, "alignment must be greater than zero"]()
-        constrained[
-            sizeof_t % alignment == 0, "size must be a multiple of alignment"
-        ]()
 
         return _malloc[T, address_space=address_space](
             sizeof_t * count, alignment=alignment
@@ -408,7 +425,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn simd_strided_load[
         type: DType, width: Int, T: Intable
-    ](self: UnsafePointer[Scalar[type]], stride: T) -> SIMD[type, width]:
+    ](self: UnsafePointer[Scalar[type], *_], stride: T) -> SIMD[type, width]:
         """Performs a strided load of the SIMD vector.
 
         Parameters:
@@ -429,7 +446,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn simd_strided_store[
         type: DType, width: Int, T: Intable
-    ](self: UnsafePointer[Scalar[type]], val: SIMD[type, width], stride: T):
+    ](self: UnsafePointer[Scalar[type], *_], val: SIMD[type, width], stride: T):
         """Performs a strided store of the SIMD vector.
 
         Parameters:
@@ -449,9 +466,9 @@ struct UnsafePointer[
         *,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
-    ](self: UnsafePointer[Scalar[type]], offset: SIMD[_, width]) -> SIMD[
+    ](self: UnsafePointer[Scalar[type], *_], offset: SIMD[_, width]) -> SIMD[
         type, width
     ]:
         """Gathers a SIMD vector from offsets of the current pointer.
@@ -486,10 +503,10 @@ struct UnsafePointer[
         type: DType,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
     ](
-        self: UnsafePointer[Scalar[type]],
+        self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         mask: SIMD[DType.bool, width],
         default: SIMD[type, width],
@@ -543,10 +560,10 @@ struct UnsafePointer[
         type: DType,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
     ](
-        self: UnsafePointer[Scalar[type]],
+        self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         val: SIMD[type, width],
     ):
@@ -581,10 +598,10 @@ struct UnsafePointer[
         type: DType,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
     ](
-        self: UnsafePointer[Scalar[type]],
+        self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         val: SIMD[type, width],
         mask: SIMD[DType.bool, width],
@@ -677,6 +694,26 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer.bitcast`[
             _type = UnsafePointer[T, address_space]._mlir_type,
+        ](self.address)
+
+    @always_inline("nodebug")
+    fn bitcast[
+        T: DType,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> UnsafePointer[Scalar[T], address_space]:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            T: The target type.
+            address_space: The address space of the result.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = UnsafePointer[Scalar[T], address_space]._mlir_type,
         ](self.address)
 
     @always_inline

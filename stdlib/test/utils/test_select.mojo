@@ -10,17 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: has_not
-# RUN: not --crash mojo -D MOJO_ENABLE_ASSERTIONS %s 2>&1
+# RUN: %mojo %s
 
+from utils._select import _select_register_value
 from testing import assert_equal
 
 
-def test_range_uint_bad_step_size():
-    # Ensure constructing a range with a "-1" step size (i.e. reverse range)
-    # with UInt is rejected and aborts now via `debug_assert` handler.
-    var r = range(UInt(0), UInt(10), UInt(Int(-1)))
+def test_select_register_value():
+    assert_equal(_select_register_value(True, 42, 100), 42)
+    assert_equal(_select_register_value(False, 42, 100), 100)
 
 
 def main():
-    test_range_uint_bad_step_size()
+    test_select_register_value()

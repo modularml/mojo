@@ -30,6 +30,7 @@ from builtin.string import (
 from utils import InlineArray
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils._select import _select_register_value as select
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -570,15 +571,14 @@ struct Int(
         Returns:
             `floor(self/rhs)` value.
         """
-        if rhs == 0:
-            # this should raise an exception.
-            return 0
-        var div: Int = self._positive_div(rhs)
-        if self > 0 and rhs > 0:
-            return div
+        # This should raise an exception
+        var denominator = select(rhs == 0, 1, rhs)
+        var div: Int = self._positive_div(denominator)
+
         var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
-            return div - 1
+        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
+        div = select(self > 0 & rhs > 0, div, divMod)
+        div = select(rhs == 0, 0, div)
         return div
 
     @always_inline("nodebug")
@@ -591,15 +591,15 @@ struct Int(
         Returns:
             The remainder of dividing self by rhs.
         """
-        if rhs == 0:
-            # this should raise an exception.
-            return 0
-        if rhs > 0 and self > 0:
-            return self._positive_rem(rhs)
-        var div: Int = self._positive_div(rhs)
+        var denominator = select(rhs == 0, 1, rhs)
+        var div: Int = self._positive_div(denominator)
+
         var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
-            return mod + rhs
+        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
+        mod = select(
+            self > 0 & rhs > 0, self._positive_rem(denominator), divMod
+        )
+        mod = select(rhs == 0, 0, mod)
         return mod
 
     @always_inline("nodebug")
@@ -615,10 +615,10 @@ struct Int(
         if rhs == 0:
             return 0, 0
         var div: Int = self._positive_div(rhs)
-        if rhs > 0 and self > 0:
+        if rhs > 0 & self > 0:
             return div, self._positive_rem(rhs)
         var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
+        if ((rhs < 0) ^ (self < 0)) & mod:
             return div - 1, mod + rhs
         return div, mod
 
@@ -1013,7 +1013,7 @@ struct Int(
         Returns:
             The absolute value.
         """
-        return -self if self < 0 else self
+        return select(self < 0, -self, self)
 
     @always_inline("nodebug")
     fn __ceil__(self) -> Self:
@@ -1084,7 +1084,7 @@ struct Int(
         """
         return str(self)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the int using builtin hash.
 
         Returns:

@@ -17,6 +17,28 @@ from collections.counter import Counter
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
+def test_and():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+
+    var c2 = Counter[String]()
+    c2["b"] = 3
+    c2["c"] = 4
+
+    var c3 = c1 & c2
+
+    assert_equal(c3["a"], 0)
+    assert_equal(c3["b"], 2)
+    assert_equal(c3["c"], 0)
+
+    c1 &= c2
+
+    assert_equal(c1["a"], 0)
+    assert_equal(c1["b"], 2)
+    assert_equal(c1["c"], 0)
+
+
 def test_bool():
     var c = Counter[String]()
     assert_false(c)
@@ -47,6 +69,23 @@ def test_contains():
     assert_false("c" in c)
 
 
+def test_copy():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    var copy = Counter[String](other=c)
+
+    assert_equal(copy["a"], 1)
+    assert_equal(copy["b"], 2)
+    assert_equal(len(copy), 2)
+
+    c["c"] = 3
+
+    assert_equal(copy["c"], 0)
+    assert_equal(len(copy), 2)
+
+
 def test_counter_construction():
     _ = Counter[Int]()
     _ = Counter[Int](List[Int]())
@@ -60,6 +99,16 @@ def test_counter_getitem():
     assert_equal(c[3], 3)
     assert_equal(c[4], 1)
     assert_equal(c[5], 0)
+
+
+def test_fromkeys():
+    var keys = List[String]("a", "b", "c")
+    var c = Counter[String].fromkeys(keys, 3)
+
+    assert_equal(c["a"], 3)
+    assert_equal(c["b"], 3)
+    assert_equal(c["c"], 3)
+    assert_equal(len(c), 3)
 
 
 def test_get():
@@ -300,6 +349,34 @@ def test_substract():
     assert_equal(c1["c"], -3)
 
 
+def test_sub():
+    var c1 = Counter[String]()
+    c1["a"] = 4
+    c1["b"] = 2
+    c1["c"] = 0
+
+    var c2 = Counter[String]()
+    c2["a"] = 1
+    c2["b"] = -2
+    c2["c"] = 3
+
+    var c3 = c1 - c2
+
+    assert_equal(c3["a"], 3)
+    assert_equal(c3["b"], 4)
+    assert_equal(c3["c"], -3)
+    # Check that the original counters are not modified
+    assert_equal(c1["a"], 4)
+    assert_equal(c1["b"], 2)
+    assert_equal(c1["c"], 0)
+
+    c2 -= c1
+
+    assert_equal(c2["a"], -3)
+    assert_equal(c2["b"], -4)
+    assert_equal(c2["c"], 3)
+
+
 def test_counter_setitem():
     c = Counter[Int]()
     c[1] = 1
@@ -323,16 +400,36 @@ def test_pop():
     assert_equal(c, 3)
 
 
+def test_popitem():
+    var counter = Counter[String]()
+    counter["a"] = 1
+    counter["b"] = 2
+
+    var item = counter.popitem()
+    assert_equal(item[0][String], "b")
+    assert_equal(item[1][Int], 2)
+
+    item = counter.popitem()
+    assert_equal(item[0][String], "a")
+    assert_equal(item[1][Int], 1)
+
+    with assert_raises():
+        counter.popitem()
+
+
 def main():
     test_add()
+    test_and()
     test_bool()
     test_clear()
     test_contains()
+    test_copy()
     test_counter_construction()
     test_counter_getitem()
     test_counter_setitem()
     test_elements()
     test_eq_and_ne()
+    test_fromkeys()
     test_get()
     test_iter()
     test_iter_keys()
@@ -343,6 +440,7 @@ def main():
     test_lt_le_gt_and_ge()
     test_most_common()
     test_pop()
+    test_popitem()
     test_substract()
     test_total()
     test_update()

@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Set
 
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils._select import _select_register_value
 
 # ===----------------------------------------------------------------------=== #
 #  Boolable
@@ -154,6 +155,15 @@ struct Bool(
         self = value.__bool__()
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: SIMD[DType.bool, 1]):
+        """Convert a scalar SIMD value to a Bool.
+
+        Args:
+            value: The scalar value.
+        """
+        self = value.__bool__()
+
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Convert to Bool.
 
@@ -230,7 +240,7 @@ struct Bool(
         Returns:
             1 if the Bool is True, 0 otherwise.
         """
-        return __mlir_op.`pop.select`[_type=Int](self.value, Int(1), Int(0))
+        return _select_register_value(self.value, Int(1), Int(0))
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:

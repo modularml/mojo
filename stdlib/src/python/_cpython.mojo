@@ -18,7 +18,7 @@ from sys import external_call
 from sys.arg import argv
 from sys.ffi import DLHandle
 
-from memory import DTypePointer, UnsafePointer
+from memory import UnsafePointer
 
 from utils import InlineArray, StringRef
 
@@ -41,11 +41,11 @@ struct PyKeyValuePair:
 @value
 @register_passable("trivial")
 struct PyObjectPtr:
-    var value: DTypePointer[DType.int8]
+    var value: UnsafePointer[Int8]
 
     @always_inline("nodebug")
     fn __init__(inout self):
-        self.value = DTypePointer[DType.int8]()
+        self.value = UnsafePointer[Int8]()
 
     fn is_null(self) -> Bool:
         return int(self.value) == 0
@@ -308,9 +308,9 @@ struct CPython:
         inout self,
         name: StringRef,
     ) -> PyObjectPtr:
-        var r = self.lib.get_function[
-            fn (DTypePointer[DType.uint8]) -> PyObjectPtr
-        ]("PyImport_ImportModule")(name.data)
+        var r = self.lib.get_function[fn (UnsafePointer[UInt8]) -> PyObjectPtr](
+            "PyImport_ImportModule"
+        )(name.data)
         if self.logging_enabled:
             print(
                 r._get_ptr_as_int(),
@@ -332,9 +332,9 @@ struct CPython:
             `True` if the code executed successfully or `False` if the code
             raised an exception.
         """
-        var status = self.lib.get_function[
-            fn (DTypePointer[DType.uint8]) -> Int
-        ](StringRef("PyRun_SimpleString"))(strref.data)
+        var status = self.lib.get_function[fn (UnsafePointer[UInt8]) -> Int](
+            StringRef("PyRun_SimpleString")
+        )(strref.data)
         # PyRun_SimpleString returns 0 on success and -1 if an exception was
         # raised.
         return status == 0
@@ -349,8 +349,8 @@ struct CPython:
         var result = PyObjectPtr(
             self.lib.get_function[
                 fn (
-                    DTypePointer[DType.uint8], Int32, PyObjectPtr, PyObjectPtr
-                ) -> DTypePointer[DType.int8]
+                    UnsafePointer[UInt8], Int32, PyObjectPtr, PyObjectPtr
+                ) -> UnsafePointer[Int8]
             ]("PyRun_String")(strref.data, Int32(run_mode), globals, locals)
         )
         if self.logging_enabled:
@@ -376,7 +376,7 @@ struct CPython:
             self.lib.get_function[
                 fn (
                     PyObjectPtr, PyObjectPtr, PyObjectPtr
-                ) -> DTypePointer[DType.int8]
+                ) -> UnsafePointer[Int8]
             ]("PyEval_EvalCode")(co, globals, locals)
         )
         self._inc_total_rc()
@@ -390,7 +390,7 @@ struct CPython:
     ) -> PyObjectPtr:
         var r = self.lib.get_function[
             fn (
-                DTypePointer[DType.uint8], DTypePointer[DType.uint8], Int32
+                UnsafePointer[UInt8], UnsafePointer[UInt8], Int32
             ) -> PyObjectPtr
         ]("Py_CompileString")(strref.data, filename.data, Int32(compile_mode))
         self._inc_total_rc()
@@ -402,7 +402,7 @@ struct CPython:
         name: StringRef,
     ) -> PyObjectPtr:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, DTypePointer[DType.uint8]) -> PyObjectPtr
+            fn (PyObjectPtr, UnsafePointer[UInt8]) -> PyObjectPtr
         ]("PyObject_GetAttrString")(obj, name.data)
         if self.logging_enabled:
             print(
@@ -421,7 +421,7 @@ struct CPython:
         inout self, obj: PyObjectPtr, name: StringRef, new_value: PyObjectPtr
     ) -> Int:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, DTypePointer[DType.uint8], PyObjectPtr) -> Int
+            fn (PyObjectPtr, UnsafePointer[UInt8], PyObjectPtr) -> Int
         ]("PyObject_SetAttrString")(obj, name.data, new_value)
         if self.logging_enabled:
             print(
@@ -531,7 +531,7 @@ struct CPython:
     fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
         var r = self.lib.get_function[
             fn (
-                DTypePointer[DType.uint8],
+                UnsafePointer[UInt8],
                 Int,
                 UnsafePointer[C_char],
             ) -> PyObjectPtr
@@ -566,13 +566,13 @@ struct CPython:
 
     fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
         var value = self.lib.get_function[
-            fn (PyObjectPtr) -> DTypePointer[DType.int8]
+            fn (PyObjectPtr) -> UnsafePointer[Int8]
         ]("PyModule_GetDict")(name.value)
         return PyObjectPtr {value: value}
 
     fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
         var value = self.lib.get_function[
-            fn (DTypePointer[DType.uint8]) -> DTypePointer[DType.int8]
+            fn (UnsafePointer[UInt8]) -> UnsafePointer[Int8]
         ]("PyImport_AddModule")(name.data)
         return PyObjectPtr {value: value}
 
@@ -694,22 +694,20 @@ struct CPython:
         return not value.is_null()
 
     fn PyErr_Fetch(inout self) -> PyObjectPtr:
-        var type = DTypePointer[DType.int8]()
-        var value = DTypePointer[DType.int8]()
-        var traceback = DTypePointer[DType.int8]()
+        var type = UnsafePointer[Int8]()
+        var value = UnsafePointer[Int8]()
+        var traceback = UnsafePointer[Int8]()
 
-        var type_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(type)
-        var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
-            value
-        )
-        var traceback_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
+        var type_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(type)
+        var value_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(value)
+        var traceback_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(
             traceback
         )
         var func = self.lib.get_function[
             fn (
-                UnsafePointer[DTypePointer[DType.int8]],
-                UnsafePointer[DTypePointer[DType.int8]],
-                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[UnsafePointer[Int8]],
+                UnsafePointer[UnsafePointer[Int8]],
+                UnsafePointer[UnsafePointer[Int8]],
             ) -> None
         ]("PyErr_Fetch")(type_ptr, value_ptr, traceback_ptr)
         var r = PyObjectPtr {value: value}
@@ -817,20 +815,18 @@ struct CPython:
     fn PyDict_Next(
         inout self, dictionary: PyObjectPtr, p: Int
     ) -> PyKeyValuePair:
-        var key = DTypePointer[DType.int8]()
-        var value = DTypePointer[DType.int8]()
+        var key = UnsafePointer[Int8]()
+        var value = UnsafePointer[Int8]()
         var v = p
         var position = UnsafePointer[Int].address_of(v)
-        var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
-            value
-        )
-        var key_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(key)
+        var value_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(value)
+        var key_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(key)
         var result = self.lib.get_function[
             fn (
                 PyObjectPtr,
                 UnsafePointer[Int],
-                UnsafePointer[DTypePointer[DType.int8]],
-                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[UnsafePointer[Int8]],
+                UnsafePointer[UnsafePointer[Int8]],
             ) -> Int
         ]("PyDict_Next")(
             dictionary,

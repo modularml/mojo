@@ -21,11 +21,11 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
-from memory import DTypePointer, UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
-from utils.string_slice import _utf8_byte_type
+from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -132,7 +132,7 @@ fn chr(c: Int) -> String:
         return int(mask.cast[DType.uint8]().reduce_add())
 
     var num_bytes = _utf8_len(c)
-    var p = DTypePointer[DType.uint8].alloc(num_bytes + 1)
+    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
@@ -141,7 +141,7 @@ fn chr(c: Int) -> String:
         shift -= 6
         Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
     Scalar.store(p, num_bytes, 0)
-    return String(p.bitcast[DType.uint8](), num_bytes + 1)
+    return String(p.bitcast[UInt8](), num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -228,6 +228,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var ord_letter_max = (-1, -1)
     var result = 0
     var is_negative: Bool = False
+    var has_prefix: Bool = False
     var start: Int = 0
     var str_len = len(str_ref)
     var buff = str_ref.unsafe_ptr()
@@ -250,14 +251,17 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             str_ref[start + 1] == "b" or str_ref[start + 1] == "B"
         ):
             start += 2
+            has_prefix = True
         elif base == 8 and (
             str_ref[start + 1] == "o" or str_ref[start + 1] == "O"
         ):
             start += 2
+            has_prefix = True
         elif base == 16 and (
             str_ref[start + 1] == "x" or str_ref[start + 1] == "X"
         ):
             start += 2
+            has_prefix = True
 
     alias ord_0 = ord("0")
     # FIXME:
@@ -269,6 +273,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         var real_base_new_start = _identify_base(str_ref, start)
         real_base = real_base_new_start[0]
         start = real_base_new_start[1]
+        has_prefix = real_base != 10
         if real_base == -1:
             raise Error(_atol_error(base, str_ref))
     else:
@@ -285,10 +290,9 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     var found_valid_chars_after_start = False
     var has_space_after_number = False
-    # single underscores are only allowed between digits
-    # starting "was_last_digit_undescore" to true such that
-    # if the first digit is an undesrcore an error is raised
-    var was_last_digit_undescore = True
+    # Prefixed integer literals with real_base 2, 8, 16 may begin with leading
+    # underscores under the conditions they have a prefix
+    var was_last_digit_undescore = not (real_base in (2, 8, 16) and has_prefix)
     for pos in range(start, str_len):
         var ord_current = int(buff[pos])
         if ord_current == ord_underscore:
@@ -648,41 +652,6 @@ fn _isspace(c: UInt8) -> Bool:
 
 
 # ===----------------------------------------------------------------------=== #
-# _isnewline
-# ===----------------------------------------------------------------------=== #
-
-
-fn _isnewline(s: String) -> Bool:
-    if len(s._buffer) != 2:
-        return False
-
-    # TODO: add \u2028 and \u2029 when they are properly parsed
-    # FIXME: \x85 is parsed but not encoded in utf-8
-    if s == "\x85":
-        return True
-
-    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
-    alias `\n` = UInt8(ord("\n"))
-    alias `\r` = UInt8(ord("\r"))
-    alias `\f` = UInt8(ord("\f"))
-    alias `\v` = UInt8(ord("\v"))
-    alias `\x1c` = UInt8(ord("\x1c"))
-    alias `\x1d` = UInt8(ord("\x1d"))
-    alias `\x1e` = UInt8(ord("\x1e"))
-
-    var c = UInt8(ord(s))
-    return (
-        c == `\n`
-        or c == `\r`
-        or c == `\f`
-        or c == `\v`
-        or c == `\x1c`
-        or c == `\x1d`
-        or c == `\x1e`
-    )
-
-
-# ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
 
@@ -704,76 +673,6 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # String
 # ===----------------------------------------------------------------------=== #
-
-
-@value
-struct _StringIter[
-    is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
-    forward: Bool = True,
-]:
-    """Iterator for String.
-
-    Parameters:
-        is_mutable: Whether the slice is mutable.
-        lifetime: The lifetime of the underlying string data.
-        forward: The iteration direction. `False` is backwards.
-    """
-
-    var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
-    var length: Int
-
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
-        self.index = 0 if forward else length
-        self.ptr = unsafe_pointer
-        self.length = length
-        self.continuation_bytes = 0
-        for i in range(length):
-            if _utf8_byte_type(unsafe_pointer[i]) == 1:
-                self.continuation_bytes += 1
-
-    fn __iter__(self) -> Self:
-        return self
-
-    fn __next__(inout self) -> StringSlice[lifetime]:
-        @parameter
-        if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index])
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
-            self.index += byte_len
-            return StringSlice[lifetime](
-                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
-                len=byte_len,
-            )
-        else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = self.ptr[self.index - byte_len]
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
-            self.index -= byte_len
-            return StringSlice[lifetime](
-                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
-            )
-
-    fn __len__(self) -> Int:
-        @parameter
-        if forward:
-            return self.length - self.index - self.continuation_bytes
-        else:
-            return self.index - self.continuation_bytes
 
 
 struct String(
@@ -913,19 +812,6 @@ struct String(
             )
         )
 
-    @always_inline
-    fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
-        """Creates a string from the buffer. Note that the string now owns
-        the buffer.
-
-        The buffer must be terminated with a null byte.
-
-        Args:
-            ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
-        """
-        self = String(ptr.address, len)
-
     fn __init__(inout self, obj: PythonObject):
         """Creates a string from a python object.
 
@@ -999,7 +885,7 @@ struct String(
 
     @staticmethod
     @always_inline
-    fn _from_bytes(owned buff: DTypePointer[DType.uint8]) -> String:
+    fn _from_bytes(owned buff: UnsafePointer[UInt8]) -> String:
         """Construct a string from a sequence of bytes.
 
         This does no validation that the given bytes are valid in any specific
@@ -1171,12 +1057,12 @@ struct String(
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            DTypePointer(buffer.data),
+            buffer.data,
             self.unsafe_ptr(),
             self_len,
         )
         memcpy(
-            DTypePointer(buffer.data + self_len),
+            buffer.data + self_len,
             other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
@@ -1216,23 +1102,25 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringIter[__lifetime_of(self)](
+        return _StringSliceIter[__lifetime_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
+    fn __reversed__(
+        ref [_]self,
+    ) -> _StringSliceIter[__lifetime_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[__lifetime_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -1606,51 +1494,17 @@ struct String(
         )
 
     fn isspace(self) -> Bool:
-        """Determines whether the given String is a python
-        whitespace String. This corresponds to Python's
+        """Determines whether every character in the given String is a
+        python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
-            True if the String is one of the whitespace characters
+            True if the whole String is made up of whitespace characters
                 listed above, otherwise False.
         """
-        # TODO add line and paragraph separator as stringliteral
-        # once unicode escape sequences are accepted
-        var next_line = List[UInt8](0xC2, 0x85)
-        """TODO: \\x85"""
-        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
-        """TODO: \\u2028"""
-        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
-        """TODO: \\u2029"""
-
-        @always_inline
-        fn _compare(
-            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
-        ) -> Bool:
-            var ptr1 = DTypePointer(item1)
-            var ptr2 = DTypePointer(item2)
-            return memcmp(ptr1, ptr2, amnt) == 0
-
-        if self.byte_length() == 0:
-            return False
-
-        for s in self:
-            var no_null_len = s.byte_length()
-            var ptr = s.unsafe_ptr()
-            if no_null_len == 1 and not _isspace(ptr[0]):
-                return False
-            elif no_null_len == 2 and not _compare(
-                ptr, next_line.unsafe_ptr(), 2
-            ):
-                return False
-            elif no_null_len == 3 and not (
-                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
-                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
-            ):
-                return False
-        return True
+        return self.as_string_slice().isspace()
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string by a separator.
@@ -1771,7 +1625,10 @@ struct String(
         return output
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
-        """Split the string at line boundaries.
+        """Split the string at line boundaries. This corresponds to Python's
+        [universal newlines](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -1779,35 +1636,7 @@ struct String(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        var output = List[String]()
-        var length = self.byte_length()
-        var current_offset = 0
-
-        while current_offset < length:
-            var loc = -1
-            var eol_length = 1
-
-            for i in range(current_offset, length):
-                var char = self[i]
-                var next_char = self[i + 1] if i + 1 < length else ""
-
-                if _isnewline(char):
-                    loc = i
-                    if char == "\r" and next_char == "\n":
-                        eol_length = 2
-                    break
-            else:
-                output.append(self[current_offset:])
-                break
-
-            if keepends:
-                output.append(self[current_offset : loc + eol_length])
-            else:
-                output.append(self[current_offset:loc])
-
-            current_offset = loc + eol_length
-
-        return output
+        return self.as_string_slice().splitlines(keepends)
 
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`
@@ -1954,7 +1783,7 @@ struct String(
             l_idx += 1
         return self[l_idx:]
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
 
         Returns:

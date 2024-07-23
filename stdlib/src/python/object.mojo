@@ -255,7 +255,9 @@ struct PythonObject(
             var obj: PythonObject
 
             @parameter
-            if _type_is_eq[T, Int]():
+            if _type_is_eq[T, PythonObject]():
+                obj = value.get[i, PythonObject]()
+            elif _type_is_eq[T, Int]():
                 obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
                 obj = PythonObject(value.get[i, Float64]())
@@ -268,8 +270,9 @@ struct PythonObject(
             else:
                 obj = PythonObject(0)
                 constrained[
-                    False, "cannot convert nested list element to object"
+                    False, "cannot convert list element to python object"
                 ]()
+
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
@@ -295,7 +298,9 @@ struct PythonObject(
             var obj: PythonObject
 
             @parameter
-            if _type_is_eq[T, Int]():
+            if _type_is_eq[T, PythonObject]():
+                obj = value.get[i, PythonObject]()
+            elif _type_is_eq[T, Int]():
                 obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
                 obj = PythonObject(value.get[i, Float64]())
@@ -308,8 +313,9 @@ struct PythonObject(
             else:
                 obj = PythonObject(0)
                 constrained[
-                    False, "cannot convert nested list element to object"
+                    False, "cannot convert list element to python object"
                 ]()
+
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
@@ -453,7 +459,7 @@ struct PythonObject(
             raise Error("object has no len()")
         return result
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Returns the length of the object.
 
         Returns:
@@ -1186,7 +1192,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyLong_AsLong(self.py_object.value)
 
-    fn unsafe_get_as_pointer[type: DType](self) -> DTypePointer[type]:
+    fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
         """Convert a Python-owned and managed pointer into a Mojo pointer.
 
         Warning: converting from an integer to a pointer is unsafe! The
@@ -1197,11 +1203,11 @@ struct PythonObject(
             type: The desired DType of the pointer.
 
         Returns:
-            A `DTypePointer` for the underlying Python data.
+            An `UnsafePointer` for the underlying Python data.
         """
         var tmp = int(self)
         var result = UnsafePointer.address_of(tmp).bitcast[
-            DTypePointer[type]
+            UnsafePointer[Scalar[type]]
         ]()[]
         _ = tmp
         return result

@@ -22,6 +22,7 @@ from python import (
     PythonObject,
 )  # TODO: remove this and fixup downstream imports
 from math import ceildiv
+from utils._select import _select_register_value as select
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -49,13 +50,12 @@ fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
     return (numerator + denominator - 1)._positive_div(denominator)
 
 
-@always_inline
+@always_inline("nodebug")
 fn _sign(x: Int) -> Int:
-    if x > 0:
-        return 1
-    if x < 0:
-        return -1
-    return 0
+    var result = 0
+    result = select(x > 0, 1, result)
+    result = select(x < 0, -1, result)
+    return result
 
 
 # ===----------------------------------------------------------------------=== #
@@ -167,7 +167,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     fn __iter__(self) -> _StridedRangeIterator:
         return _StridedRangeIterator(self.start, self.end, self.step)
 
-    @always_inline
+    @always_inline("nodebug")
     fn __next__(inout self) -> Int:
         var result = self.start
         self.start += self.step
@@ -175,11 +175,22 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        if (self.step > 0 and self.start > self.end) or (
-            self.step < 0 and self.start < self.end
-        ):
-            return 0
-        return _div_ceil_positive(abs(self.start - self.end), abs(self.step))
+        # If the step is positive we want to check that the start is smaller
+        # than the end, if the step is negative we want to check the reverse.
+        # We break this into selects to avoid generating branches.
+        var c1 = (self.step > 0) & (self.start > self.end)
+        var c2 = (self.step < 0) & (self.start < self.end)
+        var cnd = c1 | c2
+
+        var numerator = abs(self.start - self.end)
+        var denominator = abs(self.step)
+
+        # If the start is after the end and step is positive then we
+        # are generating an empty range. In this case divide 0/1 to
+        # return 0 without a branch.
+        return _div_ceil_positive(
+            select(cnd, 0, numerator), select(cnd, 1, denominator)
+        )
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
@@ -353,9 +364,7 @@ struct _UIntStridedRangeIterator(UIntSized):
 
     @always_inline
     fn __len__(self) -> UInt:
-        if self.start < self.end:
-            return self.end - self.start
-        return 0
+        return select(self.start < self.end, self.end - self.start, 0)
 
     @always_inline
     fn __next__(inout self) -> UInt:
@@ -371,7 +380,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     var end: UInt
     var step: UInt
 
-    @always_inline
+    @always_inline("nodebug")
     fn __init__(inout self, start: UInt, end: UInt, step: UInt):
         self.start = start
         self.end = end
@@ -379,7 +388,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
             step != 0, "range() arg 3 (the step size) must not be zero"
         )
         debug_assert(
-            step != UInt(-1),
+            step != UInt(Int(-1)),
             (
                 "range() arg 3 (the step size) cannot be -1.  Reverse range is"
                 " not supported yet for UInt ranges."

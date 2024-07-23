@@ -21,9 +21,7 @@ trait _Hasher:
     fn __init__(inout self):
         ...
 
-    fn _update_with_bytes(
-        inout self, data: DTypePointer[DType.uint8], length: Int
-    ):
+    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
         ...
 
     fn _update_with_simd(inout self, value: SIMD[_, _]):

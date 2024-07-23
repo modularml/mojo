@@ -184,16 +184,3 @@ struct Formatter:
             _put(strref)
 
         return Formatter(write_to_stdout, UnsafePointer[NoneType]())
-
-
-# TODO: Use Formatter.write instead.
-fn write_to[*Ts: Formattable](inout writer: Formatter, *args: *Ts):
-    """
-    Write a sequence of formattable arguments to the provided formatter.
-    """
-
-    @parameter
-    fn write_arg[T: Formattable](arg: T):
-        arg.format_to(writer)
-
-    args.each[write_arg]()
