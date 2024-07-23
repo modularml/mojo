@@ -292,7 +292,7 @@ struct InlineArray[
             )
 
     fn __init__[
-        ThisElementType: CollectionElementNew, //
+        ThisElementType: CollectionElement, //
     ](
         inout self: InlineArray[
             UnsafeMaybeUninitialized[ThisElementType], Self.size

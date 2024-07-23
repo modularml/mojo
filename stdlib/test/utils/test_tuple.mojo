@@ -256,10 +256,10 @@ def test_inline_array_runs_destructors():
     )
     alias capacity = 32
     var inline_list = InlineArray[ValueDestructorRecorder, 4](
-        ValueDestructorRecorder(0, pointer_to_destructor_counter),
-        ValueDestructorRecorder(10, pointer_to_destructor_counter),
-        ValueDestructorRecorder(20, pointer_to_destructor_counter),
-        ValueDestructorRecorder(30, pointer_to_destructor_counter),
+        ValueDestructorRecorder(0, int(pointer_to_destructor_counter)),
+        ValueDestructorRecorder(10, int(pointer_to_destructor_counter)),
+        ValueDestructorRecorder(20, int(pointer_to_destructor_counter)),
+        ValueDestructorRecorder(30, int(pointer_to_destructor_counter)),
     )
     _ = inline_list
     # This is the last use of the inline list, so it should be destroyed here,
