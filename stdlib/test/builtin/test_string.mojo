@@ -1469,6 +1469,24 @@ def test_isprintable():
     assert_false(String("aa\tae").isprintable())
 
 
+def test_rjust():
+    assert_equal(String("hello").rjust(4), "hello")
+    assert_equal(String("hello").rjust(8), "   hello")
+    assert_equal(String("hello").rjust(8, "*"), "***hello")
+
+
+def test_ljust():
+    assert_equal(String("hello").ljust(4), "hello")
+    assert_equal(String("hello").ljust(8), "hello   ")
+    assert_equal(String("hello").ljust(8, "*"), "hello***")
+
+
+def test_center():
+    assert_equal(String("hello").center(4), "hello")
+    assert_equal(String("hello").center(8), " hello  ")
+    assert_equal(String("hello").center(8, "*"), "*hello**")
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1518,3 +1536,6 @@ def main():
     test_format_args()
     test_isdigit()
     test_isprintable()
+    test_rjust()
+    test_ljust()
+    test_center()
