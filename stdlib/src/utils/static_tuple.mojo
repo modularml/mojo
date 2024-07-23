@@ -20,7 +20,7 @@ from utils import StaticTuple
 """
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
-
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
@@ -300,8 +300,8 @@ struct InlineArray[
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
         for i in range(Self.size):
-            self._get_maybe_uninitialized(i)[].move_from(
-                unsafe_assume_initialized[i]
+            unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
+                self.unsafe_ptr() + i
             )
 
     @always_inline
