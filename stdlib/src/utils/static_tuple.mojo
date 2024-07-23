@@ -264,23 +264,6 @@ struct InlineArray[
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
-    fn __init__(inout self):
-        """This constructor will always cause a compile time error if used.
-        It is used to steer users away from uninitialized memory.
-        """
-        # TODO: Allow this constructor only if the type is `UnsafeMaybeUninitialized`
-        # and remove the `InlineArray.unsafe_uninitialized()` static method.
-        constrained[
-            False,
-            (
-                "Initialize with either a variadic list of arguments, a default"
-                " fill element or pass the keyword argument"
-                " 'unsafe_uninitialized'."
-            ),
-        ]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
-
     fn __init__(
         inout self,
         *,
@@ -329,12 +312,26 @@ struct InlineArray[
         # is not allowed for `UnsafeMaybeUninitialized`.
         return InlineArray[
             UnsafeMaybeUninitialized[Self.ElementType], Self.size
-        ](_unsafe_uninitialized=True)
+        ]()
 
     @doc_private
-    fn __init__(inout self, *, _unsafe_uninitialized: Bool):
+    fn __init__[
+        ThisElementType: CollectionElementNew, this_size: Int
+    ](
+        inout self: InlineArray[
+            UnsafeMaybeUninitialized[ThisElementType], this_size
+        ]
+    ):
         _static_tuple_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.undef`[
+            _type = __mlir_type[
+                `!pop.array<`,
+                this_size.value,
+                `, `,
+                UnsafeMaybeUninitialized[ThisElementType],
+                `>`,
+            ]
+        ]()
 
     @always_inline
     fn __init__(inout self, fill: Self.ElementType):
