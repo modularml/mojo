@@ -32,7 +32,6 @@ struct Error(
     Representable,
     Formattable,
     CollectionElement,
-    CollectionElementNew,
 ):
     """This type represents an Error."""
 

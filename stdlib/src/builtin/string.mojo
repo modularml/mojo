@@ -685,7 +685,6 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
-    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -2234,7 +2233,7 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
 
 
 @value
-struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
+struct _FormatCurlyEntry(CollectionElement):
     """
     Internally used by the `format()` method.
 

@@ -33,7 +33,6 @@ from .string import _atol
 struct StringLiteral(
     Boolable,
     Comparable,
-    CollectionElementNew,
     Formattable,
     IntableRaising,
     KeyElement,

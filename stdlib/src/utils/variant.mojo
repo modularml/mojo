@@ -61,7 +61,6 @@ fn _align_up(value: Int, alignment: Int) -> Int:
 
 struct Variant[*Ts: CollectionElement](
     CollectionElement,
-    ExplicitlyCopyable,
 ):
     """A runtime-variant type.
 
@@ -149,7 +148,9 @@ struct Variant[*Ts: CollectionElement](
         for i in range(len(VariadicList(Ts))):
             alias T = Ts[i]
             if self._get_state() == i:
-                self._get_ptr[T]().init_pointee_move(other._get_ptr[T]()[])
+                self._get_ptr[T]().initialize_pointee_explicit_copy(
+                    other._get_ptr[T]()[]
+                )
 
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
@@ -325,7 +326,7 @@ struct Variant[*Ts: CollectionElement](
         debug_assert(self.isa[Tout](), "taking out the wrong type!")
 
         var x = self.unsafe_take[Tout]()
-        self.set[Tin](value)
+        self.set[Tin](Tin(other=value))
         return x^
 
     fn set[T: CollectionElement](inout self, owned value: T):

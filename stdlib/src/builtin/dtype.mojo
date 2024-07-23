@@ -26,9 +26,7 @@ alias _mIsFloat = UInt8(1 << 6)
 
 @value
 @register_passable("trivial")
-struct DType(
-    Stringable, Formattable, Representable, KeyElement, CollectionElementNew
-):
+struct DType(Stringable, Formattable, Representable, KeyElement):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`

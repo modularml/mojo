@@ -73,7 +73,7 @@ struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
     lifetime: AnyLifetime[is_mutable].type,
-](CollectionElementNew):
+](CollectionElement):
     """A non owning view of contiguous data.
 
     Parameters:
@@ -123,7 +123,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int, //
+        T2: CollectionElement, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -239,7 +239,7 @@ struct Span[
         """
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
-            self[i] = other[i]
+            self[i] = Self.T(other=other[i])
 
     fn __bool__(self) -> Bool:
         """Check if a span is non-empty.
@@ -306,4 +306,4 @@ struct Span[
             value: The value to assign to each element.
         """
         for element in self:
-            element[] = value
+            element[] = Self.T(other=value)
