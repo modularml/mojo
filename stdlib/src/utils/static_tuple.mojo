@@ -289,31 +289,6 @@ struct InlineArray[
                 self.unsafe_ptr() + i
             )
 
-    @staticmethod
-    fn unsafe_uninitialized() -> (
-        InlineArray[UnsafeMaybeUninitialized[Self.ElementType], Self.size]
-    ):
-        """Constructs an uninitialized array.
-
-        You can use it to construct an array without initializing its elements. It returns
-        an array of `UnsafeMaybeUninitialized` elements.
-
-        Usage:
-        ```mojo
-        var arr = InlineArray[Int, 3].unsafe_uninitialized()
-        arr[0].write(42)
-        ...
-        ```
-
-        Returns:
-            An uninitialized array.
-        """
-        # Note that we rely on return value optimization here to avoid a call to `__moveinit__`, which
-        # is not allowed for `UnsafeMaybeUninitialized`.
-        return InlineArray[
-            UnsafeMaybeUninitialized[Self.ElementType], Self.size
-        ]()
-
     @doc_private
     fn __init__[
         ThisElementType: CollectionElementNew, this_size: Int
