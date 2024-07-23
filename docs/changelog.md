@@ -537,6 +537,16 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
 
+- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
+  instead. Functions that previously take in a `DTypePointer` now takes an
+  equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
+  `UnsafePointer` is
+
+  ```mojo
+  DTypePointer[type] -> UnsafePointer[Scalar[type]] and
+  DTypePointer[DType.invalid] -> UnsafePointer[NoneType]
+  ```
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`

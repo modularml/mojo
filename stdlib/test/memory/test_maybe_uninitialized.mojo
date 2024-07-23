@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from memory.unsafe import UnsafeMaybeUninitialized
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
+
 from test_utils import CopyCounter, MoveCounter, ValueDestructorRecorder
 from testing import assert_equal
 
