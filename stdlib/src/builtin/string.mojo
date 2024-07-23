@@ -1569,38 +1569,44 @@ struct String(
         var lhs = 0
         var rhs = 0
         var items = 0
+        var ptr = self.unsafe_ptr()
+        alias S = StringSlice[__lifetime_of(self)]
         while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            for s in self[lhs:]:
-                if not str(s).isspace():  # TODO: with StringSlice.isspace()
+            for s in S(unsafe_from_utf8_ptr=ptr + lhs, len=str_byte_len - lhs):
+                if not s.isspace():
                     break
                 lhs += s.byte_length()
             # if it went until the end of the String, then
             # it should be sliced up until the original
             # start of the whitespace which was already appended
-            if lhs - 1 == str_byte_len:
-                break
-            elif lhs == str_byte_len:
-                # if the last char is not whitespace
-                output.append(self[str_byte_len])
+            if lhs + 1 >= str_byte_len:
                 break
             rhs = lhs + 1
-            for s in self[lhs + 1 :]:
-                if str(s).isspace():  # TODO: with StringSlice.isspace()
+            for s in S(
+                unsafe_from_utf8_ptr=ptr + lhs + 1, len=str_byte_len - lhs
+            ):
+                if s.isspace():
                     break
                 rhs += s.byte_length()
 
             if maxsplit > -1:
                 if items == maxsplit:
-                    output.append(self[lhs:])
+                    var sl = S(
+                        unsafe_from_utf8_ptr=ptr + lhs, len=str_byte_len - lhs
+                    )
+                    output.append(sl^)
                     break
                 items += 1
 
-            output.append(self[lhs:rhs])
+            var buf = self._buffer[lhs:rhs]
+            if lhs != rhs:
+                buf.append(0)
+            output.append(buf^)
             lhs = rhs
 
-        return output
+        return output^
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's

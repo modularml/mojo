@@ -1497,7 +1497,7 @@ def main():
     test_count()
     test_replace()
     test_rfind()
-    # test_split()
+    test_split()
     test_splitlines()
     test_isupper()
     test_islower()
