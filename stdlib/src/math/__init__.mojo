@@ -74,4 +74,5 @@ from .math import (
     trunc,
     y0,
     y1,
+    clamp,
 )
