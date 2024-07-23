@@ -375,26 +375,7 @@ struct InlineArray[
             other: The array to copy.
         """
 
-        self = Self(unsafe_uninitialized=True)
-
-        for idx in range(size):
-            var ptr = self.unsafe_ptr() + idx
-
-            ptr.initialize_pointee_explicit_copy(other[idx])
-
-    fn __moveinit__(inout self, owned other: Self):
-        """Move construct the array.
-
-        Args:
-            other: The array to move.
-        """
-
-        self = Self(unsafe_uninitialized=True)
-
-        for idx in range(size):
-            var ptr = self.unsafe_ptr() + idx
-
-            ptr.move_pointee_into(other.unsafe_ptr() + idx)
+        self = Self(other=other)
 
     fn __del__(owned self):
         """Deallocate the array."""
