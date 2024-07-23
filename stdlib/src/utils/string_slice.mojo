@@ -561,6 +561,65 @@ struct StringSlice[
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Self:
+        """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
+
+        Args:
+            idx: The index value.
+
+        Returns:
+            A new string containing the character at the specified position.
+        """
+        # FIXME(#933): this can't be used at comp time
+        var normalized_idx = normalize_index["StringSlice"](idx, self)
+        var ptr = self._slice.unsafe_ptr()
+        var n_idx = 0
+        for i in range(normalized_idx):
+            if _utf8_byte_type(ptr[i]) == 1:
+                n_idx += 1
+            n_idx += 1
+        return Self(unsafe_from_utf8_ptr=ptr + n_idx, len=1)
+
+    fn __getitem__(self, span: Slice) -> Self:
+        """Gets the sequence of characters at the specified positions.
+
+        Args:
+            span: A slice that specifies positions of the new substring.
+
+        Returns:
+            A new string containing the string at the specified positions.
+        """
+
+        var start: Int
+        var end: Int
+        var step: Int
+        # FIXME(#933): this can't be used at comp time
+        start, end, step = span.indices(len(self))
+        var ptr = self._slice.unsafe_ptr()
+        var start_idx = 0
+        for i in range(start):
+            if _utf8_byte_type(ptr[i]) == 1:
+                start_idx += 1
+            start_idx += 1
+        var nominal_amnt = len(range(start, end, step))
+        var new_index = start_idx
+        var total_amnt = 0
+        var amnt = 0
+        var buf = List[UInt8](capacity=4 * nominal_amnt)
+        while amnt < nominal_amnt:
+            var value = ptr[new_index]
+            if _utf8_byte_type(value) == 1:
+                amnt -= 1
+            amnt += 1
+            total_amnt += 1
+            new_index += step
+            buf.append(value)
+
+        return Self(unsafe_from_utf8_ptr=buf.steal_data(), len=total_amnt)
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
