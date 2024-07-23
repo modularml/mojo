@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import List, Optional
 from utils import InlineArray, StringSlice, StaticString
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -340,7 +341,7 @@ fn _try_write_int[
     # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64 + 1  # +1 for storing NUL terminator.
 
-    var buf = InlineArray[UInt8, CAPACITY].unsafe_uninitialized()
+    var buf = InlineArray[UnsafeMaybeUninitialized[UInt8], CAPACITY]()
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
