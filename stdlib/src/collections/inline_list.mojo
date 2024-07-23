@@ -119,7 +119,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     fn __del__(owned self):
         """Destroy all the elements in the list and free the memory."""
         for i in range(self._size):
-            UnsafePointer.address_of(self._array[i]).destroy_pointee()
+            self._array[i].assume_initialized_destroy()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -144,7 +144,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         if idx < 0:
             idx += len(self)
 
-        return self._array[idx]
+        return self._array[idx].assume_initialized()
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -246,5 +246,5 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             value: The value to append.
         """
         debug_assert(self._size < capacity, "List is full.")
-        self._array[self._size] = value^
+        self._array[self._size].write(value^)
         self._size += 1

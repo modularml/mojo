@@ -402,6 +402,21 @@ struct InlineArray[
 
             ptr.initialize_pointee_explicit_copy(other[idx])
 
+    fn __copyinit__(inout self, other: Self):
+        """Copy construct the array.
+
+        Args:
+            other: The array to copy.
+        """
+
+        self = Self(other=other)
+
+    fn __del__(owned self):
+        """Deallocate the array."""
+        for idx in range(size):
+            var ptr = self.unsafe_ptr() + idx
+            ptr.destroy_pointee()
+
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
