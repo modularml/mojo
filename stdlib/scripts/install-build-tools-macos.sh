@@ -1,4 +1,5 @@
-# ===----------------------------------------------------------------------=== #
+#!/usr/bin/env bash
+##===----------------------------------------------------------------------===##
 # Copyright (c) 2024, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:
@@ -9,11 +10,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ===----------------------------------------------------------------------=== #
-"""Implements the memory package."""
+##===----------------------------------------------------------------------===##
+set -euo pipefail
 
-from .arc import Arc
-from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
-from .reference import AddressSpace, Reference
-from .unsafe import DTypePointer, bitcast
-from .unsafe_pointer import UnsafePointer
+# Install `lit` for use in the tests
+brew install lit
+
+# Ensure `FileCheck` from the pre-installed LLVM 15 package is visible
+echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH

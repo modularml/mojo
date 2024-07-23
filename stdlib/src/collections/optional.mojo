@@ -285,9 +285,9 @@ struct Optional[T: CollectionElement](
         """
         var output = String()
         var writer = output._unsafe_to_formatter()
-        write_to(writer, "Optional(")
+        writer.write("Optional(")
         self.format_to(writer)
-        write_to(writer, ")")
+        writer.write(")")
         return output
 
     fn format_to[
@@ -303,9 +303,9 @@ struct Optional[T: CollectionElement](
             writer: The formatter to write to.
         """
         if self:
-            write_to(writer, repr(self.value()))
+            writer.write(repr(self.value()))
         else:
-            write_to(writer, "None")
+            writer.write("None")
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -340,18 +340,6 @@ struct Optional[T: CollectionElement](
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
-
-    @always_inline
-    fn _value_copy(self) -> T:
-        """Unsafely retrieve the value out of the Optional.
-
-        Note: only used for Optionals when used in a parameter context
-        due to compiler bugs.  In general, prefer using the public `Optional.value()`
-        function that returns a `Reference[T]`.
-        """
-
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value[T]
 

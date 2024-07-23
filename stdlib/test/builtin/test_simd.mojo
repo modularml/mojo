@@ -48,6 +48,12 @@ def test_cast():
         SIMD[DType.bool, 4](False, True, False, True),
     )
 
+    var b: UInt16 = 128
+    assert_equal(int(b.cast[DType.uint8]()), 128)
+    assert_equal(int(b.cast[DType.uint16]()), 128)
+    assert_equal(int(b.cast[DType.int8]()), -128)
+    assert_equal(int(b.cast[DType.int16]()), 128)
+
 
 def test_simd_variadic():
     assert_equal(str(SIMD[DType.index, 4](52, 12, 43, 5)), "[52, 12, 43, 5]")
@@ -130,7 +136,7 @@ def test_simd_repr():
 def test_issue_1625():
     var size = 16
     alias simd_width = 8
-    var ptr = DTypePointer[DType.int64].alloc(size)
+    var ptr = UnsafePointer[Int64].alloc(size)
     for i in range(size):
         ptr[i] = i
 
@@ -150,10 +156,10 @@ def test_issue_1625():
 
 
 def test_issue_20421():
-    var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
+    var a = UnsafePointer[UInt8].alloc[alignment=64](16 * 64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[DType.int32]())
+    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[Int32]())
     assert_equal(
         av16,
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
@@ -205,8 +211,8 @@ def test_issue_30237():
 
         return result
 
-    var x = 6.0
-    var x2 = x * x
+    alias x = 6.0
+    alias x2 = x * x
     var result1 = eval1(x2)
     var result2 = eval2(x2)
 
@@ -220,13 +226,6 @@ def test_bool():
     assert_false(Scalar[DType.int32](0).__bool__())
     assert_true(Scalar[DType.float32](5.0).__bool__())
     assert_false(Scalar[DType.float32](0.0).__bool__())
-
-    assert_true(Scalar[DType.bool](True).__as_bool__())
-    assert_false(Scalar[DType.bool](False).__as_bool__())
-    assert_true(Scalar[DType.int32](5).__as_bool__())
-    assert_false(Scalar[DType.int32](0).__as_bool__())
-    assert_true(Scalar[DType.float32](5.0).__as_bool__())
-    assert_false(Scalar[DType.float32](0.0).__as_bool__())
 
 
 def test_truthy():
@@ -905,8 +904,9 @@ def test_deinterleave():
     assert_equal(tup2[1], Float32(2))
 
     var tup4 = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
-    assert_equal(tup4[0], SIMD[DType.index, 2](0, 2))
-    assert_equal(tup4[1], SIMD[DType.index, 2](1, 3))
+
+    assert_equal(tup4[0], __type_of(tup4[0])(0, 2))
+    assert_equal(tup4[1], __type_of(tup4[0])(1, 3))
 
 
 def test_extract():
@@ -952,208 +952,6 @@ def test_limits():
     test_integral_overflow[DType.uint64]()
 
 
-def test_add_with_overflow():
-    var value_u8: UInt8
-    var overflowed_u8: Scalar[DType.bool]
-    value_u8, overflowed_u8 = UInt8(UInt8.MAX).add_with_overflow(1)
-    assert_equal(value_u8, UInt8.MIN)
-    assert_equal(overflowed_u8, True)
-
-    var value_u8x4: SIMD[DType.uint8, 4]
-    var overflowed_u8x4: SIMD[DType.bool, 4]
-    value_u8x4, overflowed_u8x4 = SIMD[DType.uint8, 4](
-        1, UInt8.MAX, 1, UInt8.MAX
-    ).add_with_overflow(SIMD[DType.uint8, 4](0, 1, 0, 1))
-    assert_equal(value_u8x4, SIMD[DType.uint8, 4](1, UInt8.MIN, 1, UInt8.MIN))
-    assert_equal(overflowed_u8x4, SIMD[DType.bool, 4](False, True, False, True))
-
-    var value_i8: Int8
-    var overflowed_i8: Scalar[DType.bool]
-    value_i8, overflowed_i8 = Int8(Int8.MAX).add_with_overflow(1)
-    assert_equal(value_i8, Int8.MIN)
-    assert_equal(overflowed_i8, True)
-
-    var value_i8x4: SIMD[DType.int8, 4]
-    var overflowed_i8x4: SIMD[DType.bool, 4]
-    value_i8x4, overflowed_i8x4 = SIMD[DType.int8, 4](
-        1, Int8.MAX, 1, Int8.MAX
-    ).add_with_overflow(SIMD[DType.int8, 4](0, 1, 0, 1))
-    assert_equal(value_i8x4, SIMD[DType.int8, 4](1, Int8.MIN, 1, Int8.MIN))
-    assert_equal(overflowed_i8x4, SIMD[DType.bool, 4](False, True, False, True))
-
-    var value_u32: UInt32
-    var overflowed_u32: Scalar[DType.bool]
-    value_u32, overflowed_u32 = UInt32(UInt32.MAX).add_with_overflow(1)
-    assert_equal(value_u32, UInt32.MIN)
-    assert_equal(overflowed_u32, True)
-
-    var value_u32x4: SIMD[DType.uint32, 4]
-    var overflowed_u32x4: SIMD[DType.bool, 4]
-    value_u32x4, overflowed_u32x4 = SIMD[DType.uint32, 4](
-        1, UInt32.MAX, 1, UInt32.MAX
-    ).add_with_overflow(SIMD[DType.uint32, 4](0, 1, 0, 1))
-    assert_equal(
-        value_u32x4, SIMD[DType.uint32, 4](1, UInt32.MIN, 1, UInt32.MIN)
-    )
-    assert_equal(
-        overflowed_u32x4, SIMD[DType.bool, 4](False, True, False, True)
-    )
-
-    var value_i32: Int32
-    var overflowed_i32: Scalar[DType.bool]
-    value_i32, overflowed_i32 = Int32(Int32.MAX).add_with_overflow(1)
-    assert_equal(value_i32, Int32.MIN)
-    assert_equal(overflowed_i32, True)
-
-    var value_i32x4: SIMD[DType.int32, 4]
-    var overflowed_i32x4: SIMD[DType.bool, 4]
-    value_i32x4, overflowed_i32x4 = SIMD[DType.int32, 4](
-        1, Int32.MAX, 1, Int32.MAX
-    ).add_with_overflow(SIMD[DType.int32, 4](0, 1, 0, 1))
-    assert_equal(value_i32x4, SIMD[DType.int32, 4](1, Int32.MIN, 1, Int32.MIN))
-    assert_equal(
-        overflowed_i32x4, SIMD[DType.bool, 4](False, True, False, True)
-    )
-
-
-def test_sub_with_overflow():
-    var value_u8: UInt8
-    var overflowed_u8: Scalar[DType.bool]
-    value_u8, overflowed_u8 = UInt8(UInt8.MIN).sub_with_overflow(1)
-    assert_equal(value_u8, UInt8.MAX)
-    assert_equal(overflowed_u8, True)
-
-    var value_u8x4: SIMD[DType.uint8, 4]
-    var overflowed_u8x4: SIMD[DType.bool, 4]
-    value_u8x4, overflowed_u8x4 = SIMD[DType.uint8, 4](
-        1, UInt8.MIN, 1, UInt8.MIN
-    ).sub_with_overflow(SIMD[DType.uint8, 4](0, 1, 0, 1))
-    assert_equal(value_u8x4, SIMD[DType.uint8, 4](1, UInt8.MAX, 1, UInt8.MAX))
-    assert_equal(overflowed_u8x4, SIMD[DType.bool, 4](False, True, False, True))
-
-    var value_i8: Int8
-    var overflowed_i8: Scalar[DType.bool]
-    value_i8, overflowed_i8 = Int8(Int8.MIN).sub_with_overflow(1)
-    assert_equal(value_i8, Int8.MAX)
-    assert_equal(overflowed_i8, True)
-
-    var value_i8x4: SIMD[DType.int8, 4]
-    var overflowed_i8x4: SIMD[DType.bool, 4]
-    value_i8x4, overflowed_i8x4 = SIMD[DType.int8, 4](
-        1, Int8.MIN, 1, Int8.MIN
-    ).sub_with_overflow(SIMD[DType.int8, 4](0, 1, 0, 1))
-    assert_equal(value_i8x4, SIMD[DType.int8, 4](1, Int8.MAX, 1, Int8.MAX))
-    assert_equal(overflowed_i8x4, SIMD[DType.bool, 4](False, True, False, True))
-
-    var value_u32: UInt32
-    var overflowed_u32: Scalar[DType.bool]
-    value_u32, overflowed_u32 = UInt32(UInt32.MIN).sub_with_overflow(1)
-    assert_equal(value_u32, UInt32.MAX)
-    assert_equal(overflowed_u32, True)
-
-    var value_u32x4: SIMD[DType.uint32, 4]
-    var overflowed_u32x4: SIMD[DType.bool, 4]
-    value_u32x4, overflowed_u32x4 = SIMD[DType.uint32, 4](
-        1, UInt32.MIN, 1, UInt32.MIN
-    ).sub_with_overflow(SIMD[DType.uint32, 4](0, 1, 0, 1))
-    assert_equal(
-        value_u32x4, SIMD[DType.uint32, 4](1, UInt32.MAX, 1, UInt32.MAX)
-    )
-    assert_equal(
-        overflowed_u32x4, SIMD[DType.bool, 4](False, True, False, True)
-    )
-
-    var value_i32: Int32
-    var overflowed_i32: Scalar[DType.bool]
-    value_i32, overflowed_i32 = Int32(Int32.MIN).sub_with_overflow(1)
-    assert_equal(value_i32, Int32.MAX)
-    assert_equal(overflowed_i32, True)
-
-    var value_i32x4: SIMD[DType.int32, 4]
-    var overflowed_i32x4: SIMD[DType.bool, 4]
-    value_i32x4, overflowed_i32x4 = SIMD[DType.int32, 4](
-        1, Int32.MIN, 1, Int32.MIN
-    ).sub_with_overflow(SIMD[DType.int32, 4](0, 1, 0, 1))
-    assert_equal(value_i32x4, SIMD[DType.int32, 4](1, Int32.MAX, 1, Int32.MAX))
-    assert_equal(
-        overflowed_i32x4, SIMD[DType.bool, 4](False, True, False, True)
-    )
-
-
-def test_mul_with_overflow():
-    alias uint8_max_x2 = 254
-    var value_u8: UInt8
-    var overflowed_u8: Scalar[DType.bool]
-    value_u8, overflowed_u8 = UInt8(UInt8.MAX).mul_with_overflow(2)
-    assert_equal(value_u8, uint8_max_x2)
-    assert_equal(overflowed_u8, True)
-
-    var value_u8x4: SIMD[DType.uint8, 4]
-    var overflowed_u8x4: SIMD[DType.bool, 4]
-    value_u8x4, overflowed_u8x4 = SIMD[DType.uint8, 4](
-        1, UInt8.MAX, 1, UInt8.MAX
-    ).mul_with_overflow(SIMD[DType.uint8, 4](0, 2, 0, 2))
-    assert_equal(
-        value_u8x4, SIMD[DType.uint8, 4](0, uint8_max_x2, 0, uint8_max_x2)
-    )
-    assert_equal(overflowed_u8x4, SIMD[DType.bool, 4](False, True, False, True))
-
-    alias int8_max_x2 = -2
-    var value_i8: Int8
-    var overflowed_i8: Scalar[DType.bool]
-    value_i8, overflowed_i8 = Int8(Int8.MAX).mul_with_overflow(2)
-    assert_equal(value_i8, int8_max_x2)
-    assert_equal(overflowed_i8, True)
-
-    var value_i8x4: SIMD[DType.int8, 4]
-    var overflowed_i8x4: SIMD[DType.bool, 4]
-    value_i8x4, overflowed_i8x4 = SIMD[DType.int8, 4](
-        1, Int8.MAX, 1, Int8.MAX
-    ).mul_with_overflow(SIMD[DType.int8, 4](0, 2, 0, 2))
-    assert_equal(
-        value_i8x4, SIMD[DType.int8, 4](0, int8_max_x2, 0, int8_max_x2)
-    )
-    assert_equal(overflowed_i8x4, SIMD[DType.bool, 4](False, True, False, True))
-
-    alias uint32_max_x2 = 4294967294
-    var value_u32: UInt32
-    var overflowed_u32: Scalar[DType.bool]
-    value_u32, overflowed_u32 = UInt32(UInt32.MAX).mul_with_overflow(2)
-    assert_equal(value_u32, uint32_max_x2)
-    assert_equal(overflowed_u32, True)
-
-    var value_u32x4: SIMD[DType.uint32, 4]
-    var overflowed_u32x4: SIMD[DType.bool, 4]
-    value_u32x4, overflowed_u32x4 = SIMD[DType.uint32, 4](
-        1, UInt32.MAX, 1, UInt32.MAX
-    ).mul_with_overflow(SIMD[DType.uint32, 4](0, 2, 0, 2))
-    assert_equal(
-        value_u32x4, SIMD[DType.uint32, 4](0, uint32_max_x2, 0, uint32_max_x2)
-    )
-    assert_equal(
-        overflowed_u32x4, SIMD[DType.bool, 4](False, True, False, True)
-    )
-
-    alias int32_max_x2 = -2
-    var value_i32: Int32
-    var overflowed_i32: Scalar[DType.bool]
-    value_i32, overflowed_i32 = Int32(Int32.MAX).mul_with_overflow(2)
-    assert_equal(value_i32, int32_max_x2)
-    assert_equal(overflowed_i32, True)
-
-    var value_i32x4: SIMD[DType.int32, 4]
-    var overflowed_i32x4: SIMD[DType.bool, 4]
-    value_i32x4, overflowed_i32x4 = SIMD[DType.int32, 4](
-        1, Int32.MAX, 1, Int32.MAX
-    ).mul_with_overflow(SIMD[DType.int32, 4](0, 2, 0, 2))
-    assert_equal(
-        value_i32x4, SIMD[DType.int32, 4](0, int32_max_x2, 0, int32_max_x2)
-    )
-    assert_equal(
-        overflowed_i32x4, SIMD[DType.bool, 4](False, True, False, True)
-    )
-
-
 def test_abs():
     assert_equal(abs(Float32(1.0)), 1)
     assert_equal(abs(Float32(-1.0)), 1)
@@ -1176,22 +974,13 @@ def test_abs():
     )
 
 
-def test_min_max_clamp():
+def test_clamp():
     alias F = SIMD[DType.float32, 4]
-
     var f = F(-10.5, -5.0, 5.0, 10.0)
-    assert_equal(f.min(F(-9.0, -6.0, -4.0, 10.5)), F(-10.5, -6.0, -4.0, 10.0))
-    assert_equal(f.min(-4.0), F(-10.5, -5.0, -4.0, -4.0))
-    assert_equal(f.max(F(-9.0, -6.0, -4.0, 10.5)), F(-9.0, -5.0, 5.0, 10.5))
-    assert_equal(f.max(-4.0), F(-4.0, -4.0, 5.0, 10.0))
     assert_equal(f.clamp(-6.0, 5.5), F(-6.0, -5.0, 5.0, 5.5))
 
-    alias I = SIMD[DType.float32, 4]
+    alias I = SIMD[DType.int32, 4]
     var i = I(-10, -5, 5, 10)
-    assert_equal(i.min(I(-9, -6, -4, 11)), I(-10, -6, -4, 10))
-    assert_equal(i.min(-4), I(-10, -5, -4, -4))
-    assert_equal(i.max(I(-9, -6, -4, 11)), I(-9, -5, 5, 11))
-    assert_equal(i.max(-4), I(-4, -4, 5, 10))
     assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
 
 
@@ -1357,38 +1146,42 @@ def test_reduce():
         @parameter
         if type is DType.bool:
             # reduce_and
-            x8 = X8(False, False, True, True, False, True, False, True)
-            x4 = X4(False, False, False, True)
-            x2 = X2(False, False)
-            x1 = X1(False)
-            assert_equal(x8.reduce_and(), x1)
-            assert_equal(x4.reduce_and(), x1)
-            assert_equal(x2.reduce_and(), x1)
-            assert_equal(x1.reduce_and(), x1)
-            assert_equal(x8.reduce_and[2](), x2)
-            assert_equal(x4.reduce_and[2](), x2)
-            assert_equal(x2.reduce_and[2](), x2)
-            assert_equal(x8.reduce_and[4](), x4)
-            assert_equal(x4.reduce_and[4](), x4)
-            assert_equal(x8.reduce_and[8](), x8)
-            assert_equal(X2(True, True).reduce_and(), True)
+            var x8b = SIMD[DType.bool, 8](
+                False, False, True, True, False, True, False, True
+            )
+            var x4b = SIMD[DType.bool, 4](False, False, False, True)
+            var x2b = SIMD[DType.bool, 2](False, False)
+            var x1b = SIMD[DType.bool, 1](False)
+            assert_equal(x8b.reduce_and(), x1b)
+            assert_equal(x4b.reduce_and(), x1b)
+            assert_equal(x2b.reduce_and(), x1b)
+            assert_equal(x1b.reduce_and(), x1b)
+            assert_equal(x8b.reduce_and[2](), x2b)
+            assert_equal(x4b.reduce_and[2](), x2b)
+            assert_equal(x2b.reduce_and[2](), x2b)
+            assert_equal(x8b.reduce_and[4](), x4b)
+            assert_equal(x4b.reduce_and[4](), x4b)
+            assert_equal(x8b.reduce_and[8](), x8b)
+            assert_equal(SIMD[DType.bool, 2](True, True).reduce_and(), True)
 
             # reduce_or
-            x8 = X8(False, False, True, True, False, True, False, True)
-            x4 = X4(False, True, True, True)
-            x2 = X2(True, True)
-            x1 = X1(True)
-            assert_equal(x8.reduce_or(), x1)
-            assert_equal(x4.reduce_or(), x1)
-            assert_equal(x2.reduce_or(), x1)
-            assert_equal(x1.reduce_or(), x1)
-            assert_equal(x8.reduce_or[2](), x2)
-            assert_equal(x4.reduce_or[2](), x2)
-            assert_equal(x2.reduce_or[2](), x2)
-            assert_equal(x8.reduce_or[4](), x4)
-            assert_equal(x4.reduce_or[4](), x4)
-            assert_equal(x8.reduce_or[8](), x8)
-            assert_equal(X2(False, False).reduce_or(), False)
+            x8b = SIMD[DType.bool, 8](
+                False, False, True, True, False, True, False, True
+            )
+            x4b = SIMD[DType.bool, 4](False, True, True, True)
+            x2b = SIMD[DType.bool, 2](True, True)
+            x1b = SIMD[DType.bool, 1](True)
+            assert_equal(x8b.reduce_or(), x1b)
+            assert_equal(x4b.reduce_or(), x1b)
+            assert_equal(x2b.reduce_or(), x1b)
+            assert_equal(x1b.reduce_or(), x1b)
+            assert_equal(x8b.reduce_or[2](), x2b)
+            assert_equal(x4b.reduce_or[2](), x2b)
+            assert_equal(x2b.reduce_or[2](), x2b)
+            assert_equal(x8b.reduce_or[4](), x4b)
+            assert_equal(x4b.reduce_or[4](), x4b)
+            assert_equal(x8b.reduce_or[8](), x8b)
+            assert_equal(SIMD[DType.bool, 2](False, False).reduce_or(), False)
 
         @parameter
         if type.is_integral():
@@ -1533,8 +1326,8 @@ def test_modf():
 
 def test_split():
     var tup = SIMD[DType.index, 8](1, 2, 3, 4, 5, 6, 7, 8).split()
-    assert_equal(tup[0], SIMD[DType.index, 4](1, 2, 3, 4))
-    assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
+    assert_equal(tup[0], __type_of(tup[0])(1, 2, 3, 4))
+    assert_equal(tup[1], __type_of(tup[1])(5, 6, 7, 8))
 
 
 def test_contains():
@@ -1546,10 +1339,209 @@ def test_contains():
     assert_false(0 in y or 5 in y)
 
 
+def test_comparison():
+    alias dtypes = (
+        DType.bool,
+        DType.int8,
+        DType.int16,
+        DType.int32,
+        DType.int64,
+        DType.uint8,
+        DType.uint16,
+        DType.uint32,
+        DType.uint64,
+        DType.float16,
+        DType.float32,
+        DType.float64,
+        DType.index,
+    )
+
+    @parameter
+    fn test_dtype[type: DType]() raises:
+        alias X4 = SIMD[type, 4]
+
+        @parameter
+        if type.is_signed():
+            var simd_val = X4(-10, -8, -6, -4)
+
+            assert_true(simd_val.__lt__(X4(-1)).reduce_and())
+            assert_false(simd_val.__lt__(X4(-12)).reduce_or())
+            var mixed_lt = simd_val.__lt__(X4(-6))
+            assert_true(mixed_lt[0])
+            assert_true(mixed_lt[1])
+            assert_false(mixed_lt[2])
+            assert_false(mixed_lt[3])
+
+            assert_true(simd_val.__le__(X4(-4)).reduce_and())
+            assert_false(simd_val.__le__(X4(-11)).reduce_or())
+            var mixed_le = simd_val.__le__(X4(-8))
+            assert_true(mixed_le[0])
+            assert_true(mixed_le[1])
+            assert_false(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(simd_val.__eq__(X4(-10, -8, -6, -4)).reduce_and())
+            assert_false(simd_val.__eq__(X4(0)).reduce_or())
+            var mixed_eq = simd_val.__eq__(X4(-10))
+            assert_true(mixed_eq[0])
+            assert_false(mixed_eq[1])
+            assert_false(mixed_eq[2])
+            assert_false(mixed_eq[3])
+
+            assert_true(simd_val.__ne__(X4(0)).reduce_and())
+            assert_false(simd_val.__ne__(X4(-10, -8, -6, -4)).reduce_or())
+            var mixed_ne = simd_val.__ne__(X4(-8))
+            assert_true(mixed_ne[0])
+            assert_false(mixed_ne[1])
+            assert_true(mixed_ne[2])
+            assert_true(mixed_ne[3])
+
+            assert_true(simd_val.__gt__(X4(-11)).reduce_and())
+            assert_false(simd_val.__gt__(X4(-1)).reduce_or())
+            var mixed_gt = simd_val.__gt__(X4(-6))
+            assert_false(mixed_gt[0])
+            assert_false(mixed_gt[1])
+            assert_false(mixed_gt[2])
+            assert_true(mixed_gt[3])
+
+            assert_true(simd_val.__ge__(X4(-10)).reduce_and())
+            assert_false(simd_val.__ge__(X4(-1)).reduce_or())
+            var mixed_ge = simd_val.__ge__(X4(-6))
+            assert_false(mixed_ge[0])
+            assert_false(mixed_ge[1])
+            assert_true(mixed_ge[2])
+            assert_true(mixed_ge[3])
+
+        @parameter
+        if type.is_numeric():
+            var simd_val = X4(1, 2, 3, 4)
+
+            assert_true(simd_val.__lt__(X4(5)).reduce_and())
+            assert_false(simd_val.__lt__(X4(0)).reduce_or())
+            var mixed_lt = simd_val.__lt__(X4(3))
+            assert_true(mixed_lt[0])
+            assert_true(mixed_lt[1])
+            assert_false(mixed_lt[2])
+            assert_false(mixed_lt[3])
+
+            assert_true(simd_val.__le__(X4(4)).reduce_and())
+            assert_false(simd_val.__le__(X4(0)).reduce_or())
+            var mixed_le = simd_val.__le__(X4(3))
+            assert_true(mixed_le[0])
+            assert_true(mixed_le[1])
+            assert_true(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(simd_val.__eq__(X4(1, 2, 3, 4)).reduce_and())
+            assert_false(simd_val.__eq__(X4(5)).reduce_or())
+            var mixed_eq = simd_val.__eq__(X4(1))
+            assert_true(mixed_eq[0])
+            assert_false(mixed_eq[1])
+            assert_false(mixed_eq[2])
+            assert_false(mixed_eq[3])
+
+            assert_true(simd_val.__ne__(X4(5)).reduce_and())
+            assert_false(simd_val.__ne__(X4(1, 2, 3, 4)).reduce_or())
+            var mixed_ne = simd_val.__ne__(X4(4))
+            assert_true(mixed_ne[0])
+            assert_true(mixed_ne[1])
+            assert_true(mixed_ne[2])
+            assert_false(mixed_ne[3])
+
+            assert_true(simd_val.__gt__(X4(0)).reduce_and())
+            assert_false(simd_val.__gt__(X4(4)).reduce_or())
+            var mixed_gt = simd_val.__gt__(X4(2))
+            assert_false(mixed_gt[0])
+            assert_false(mixed_gt[1])
+            assert_true(mixed_gt[2])
+            assert_true(mixed_gt[3])
+
+            assert_true(simd_val.__ge__(X4(1)).reduce_and())
+            assert_false(simd_val.__ge__(X4(5)).reduce_or())
+            var mixed_ge = simd_val.__ge__(X4(2))
+            assert_false(mixed_ge[0])
+            assert_true(mixed_ge[1])
+            assert_true(mixed_ge[2])
+            assert_true(mixed_ge[3])
+
+        @parameter
+        if type is DType.bool:
+            var all_true = SIMD[DType.bool, 4](True)
+            var all_false = SIMD[DType.bool, 4](False)
+            var mixed = SIMD[DType.bool, 4](True, True, False, False)
+
+            assert_true(all_false.__lt__(all_true).reduce_and())
+            assert_false(all_true.__lt__(all_false).reduce_or())
+            var mixed_lt = all_false.__lt__(mixed)
+            assert_true(mixed_lt[0])
+            assert_true(mixed_lt[1])
+            assert_false(mixed_lt[2])
+            assert_false(mixed_lt[3])
+
+            assert_true(all_false.__le__(all_true).reduce_and())
+            assert_false(all_true.__le__(all_false).reduce_or())
+            var mixed_le = all_true.__le__(mixed)
+            assert_true(mixed_le[0])
+            assert_true(mixed_le[1])
+            assert_false(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(
+                all_true.__eq__(
+                    SIMD[DType.bool, 4](True, True, True, True)
+                ).reduce_and()
+            )
+            assert_false(all_true.__eq__(all_false).reduce_or())
+            var mixed_eq = all_true.__eq__(mixed)
+            assert_true(mixed_eq[0])
+            assert_true(mixed_eq[1])
+            assert_false(mixed_le[2])
+            assert_false(mixed_le[3])
+
+            assert_true(all_true.__ne__(all_false).reduce_and())
+            assert_false(
+                all_true.__ne__(
+                    SIMD[DType.bool, 4](True, True, True, True)
+                ).reduce_or()
+            )
+            var mixed_ne = all_true.__ne__(mixed)
+            assert_false(mixed_ne[0])
+            assert_false(mixed_ne[1])
+            assert_true(mixed_ne[2])
+            assert_true(mixed_ne[3])
+
+            assert_true(all_true.__gt__(all_false).reduce_and())
+            assert_false(all_false.__gt__(all_true).reduce_or())
+            var mixed_gt = all_true.__gt__(mixed)
+            assert_false(mixed_gt[0])
+            assert_false(mixed_gt[1])
+            assert_true(mixed_gt[2])
+            assert_true(mixed_gt[3])
+
+            assert_true(all_true.__ge__(all_false).reduce_and())
+            assert_false(all_false.__ge__(all_true).reduce_or())
+            var mixed_ge = all_true.__ge__(mixed)
+            assert_true(mixed_ge[0])
+            assert_true(mixed_ge[1])
+            assert_true(mixed_ge[2])
+            assert_true(mixed_ge[3])
+
+    @parameter
+    fn test_dtype_unrolled[i: Int]() raises:
+        alias type = dtypes.get[i, DType]()
+        test_dtype[type]()
+
+    unroll[test_dtype_unrolled, dtypes.__len__()]()
+
+    # TODO(KERN-228): support BF16 on neon systems.
+    @parameter
+    if not has_neon():
+        test_dtype[DType.bfloat16]()
+
+
 def main():
     test_abs()
     test_add()
-    test_add_with_overflow()
     test_cast()
     test_ceil()
     test_convert_simd_to_string()
@@ -1570,9 +1562,8 @@ def main():
     test_join()
     test_len()
     test_limits()
-    test_min_max_clamp()
+    test_clamp()
     test_mod()
-    test_mul_with_overflow()
     test_pow()
     test_powf()
     test_radd()
@@ -1588,11 +1579,11 @@ def main():
     test_shuffle()
     test_simd_variadic()
     test_sub()
-    test_sub_with_overflow()
     test_trunc()
     test_bool()
     test_truthy()
     test_modf()
     test_split()
     test_contains()
+    test_comparison()
     # TODO: add tests for __and__, __or__, anc comparison operators

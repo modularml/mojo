@@ -287,7 +287,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return len(self._data)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """A hash value of the elements in the set.
 
         The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).
@@ -340,14 +340,14 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             writer: The formatter to write to.
         """
-        write_to(writer, "{")
+        writer.write("{")
         var written = 0
         for item in self:
-            write_to(writer, repr(item[]))
+            writer.write(repr(item[]))
             if written < len(self) - 1:
-                write_to(writer, ", ")
+                writer.write(", ")
             written += 1
-        write_to(writer, "}")
+        writer.write("}")
 
     # ===-------------------------------------------------------------------===#
     # Methods

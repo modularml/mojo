@@ -21,8 +21,6 @@ from os import setenv
 
 from sys import external_call, os_is_linux, os_is_macos
 
-from memory import DTypePointer
-
 from utils import StringRef
 
 
@@ -72,9 +70,7 @@ fn getenv(name: String, default: String = "") -> String:
     if not os_is_supported:
         return default
 
-    var ptr = external_call["getenv", DTypePointer[DType.uint8]](
-        name.unsafe_ptr()
-    )
+    var ptr = external_call["getenv", UnsafePointer[UInt8]](name.unsafe_ptr())
     if not ptr:
         return default
     return String(StringRef(ptr))

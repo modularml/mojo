@@ -605,9 +605,20 @@ struct IntLiteral(
         """Convert from IntLiteral to Int.
 
         Returns:
-            The value as an integer.
+            The value as an integer of platform-specific width.
         """
         return Int(self.__as_mlir_index())
+
+    @always_inline("nodebug")
+    fn __uint__(self) -> UInt:
+        """Convert from IntLiteral to UInt.
+
+        Returns:
+            The value as an unsigned integer of platform-specific width.
+        """
+        return __mlir_op.`kgen.int_literal.convert`[
+            _type = __mlir_type.index, treatIndexAsUnsigned = __mlir_attr.unit
+        ](self.value)
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self:

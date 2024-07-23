@@ -10,18 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+#
+# This file only tests that conversion of negative IntLiteral to UInt fails.
+#
+# ===----------------------------------------------------------------------=== #
+# REQUIRES: has_not
+# RUN: not mojo %s 2>&1 | FileCheck %s
 
-from os.path import getsize
-from tempfile import NamedTemporaryFile
-from testing import assert_equal
 
-
-def main():
-    with NamedTemporaryFile(delete=False) as tmp_file:
-        file_path = tmp_file.name
-        # No bytes written yet, 0 size.
-        assert_equal(getsize(file_path), 0)
-        var data_to_write = "test"
-        tmp_file.write(data_to_write)
-        assert_equal(getsize(file_path), len(data_to_write))
+fn main():
+    # CHECK: integer value -1 is negative, but is being converted to an unsigned type
+    print(UInt(-1))
+    # CHECK-NOT: is never reached
+    print("is never reached")

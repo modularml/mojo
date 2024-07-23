@@ -12,16 +12,14 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from os.path import getsize
-from tempfile import NamedTemporaryFile
+from utils._select import _select_register_value
 from testing import assert_equal
 
 
+def test_select_register_value():
+    assert_equal(_select_register_value(True, 42, 100), 42)
+    assert_equal(_select_register_value(False, 42, 100), 100)
+
+
 def main():
-    with NamedTemporaryFile(delete=False) as tmp_file:
-        file_path = tmp_file.name
-        # No bytes written yet, 0 size.
-        assert_equal(getsize(file_path), 0)
-        var data_to_write = "test"
-        tmp_file.write(data_to_write)
-        assert_equal(getsize(file_path), len(data_to_write))
+    test_select_register_value()

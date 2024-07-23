@@ -25,6 +25,9 @@ from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const
 from sys.info import bitwidthof, has_avx512f, simdwidthof, triple_is_nvidia_cuda
 
+from memory import UnsafePointer
+
+from bit import count_trailing_zeros
 from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
@@ -789,7 +792,7 @@ fn erf[
             -3.83208680e-4,
             1.72948930e-5,
         ),
-    ](x_abs.min(3.925))
+    ](min(x_abs, 3.925))
 
     r_large = r_large.fma(x_abs, x_abs)
     r_large = copysign(1 - exp(-r_large), x)
@@ -929,23 +932,9 @@ fn isclose[
 
 
 @always_inline
-fn iota[type: DType, simd_width: Int]() -> SIMD[type, simd_width]:
-    """Creates a SIMD vector containing an increasing sequence, starting from 0.
-
-    Parameters:
-        type: The `dtype` of the input and output SIMD vector.
-        simd_width: The width of the input and output SIMD vector.
-
-    Returns:
-        An increasing sequence of values, starting from 0.
-    """
-    return iota[type, simd_width](0)
-
-
-@always_inline
 fn iota[
     type: DType, simd_width: Int
-](offset: Scalar[type]) -> SIMD[type, simd_width]:
+](offset: Scalar[type] = 0) -> SIMD[type, simd_width]:
     """Creates a SIMD vector containing an increasing sequence, starting from
     offset.
 
@@ -979,7 +968,9 @@ fn iota[
         return it.cast[type]() + offset
 
 
-fn iota[type: DType](buff: DTypePointer[type], len: Int, offset: Int = 0):
+fn iota[
+    type: DType
+](buff: UnsafePointer[Scalar[type]], len: Int, offset: Int = 0):
     """Fill the buffer with numbers ranging from offset to offset + len - 1,
     spaced by 1.
 
@@ -1014,8 +1005,7 @@ fn iota[type: DType](v: List[Scalar[type]], offset: Int = 0):
         v: The vector to fill.
         offset: The value to fill at index 0.
     """
-    var buff = rebind[DTypePointer[type]](v.data)
-    iota(buff, len(v), offset)
+    iota(v.data, len(v), offset)
 
 
 fn iota(v: List[Int], offset: Int = 0):
@@ -1028,7 +1018,7 @@ fn iota(v: List[Int], offset: Int = 0):
         v: The vector to fill.
         offset: The value to fill at index 0.
     """
-    var buff = DTypePointer[DType.index](v.data.bitcast[Scalar[DType.index]]())
+    var buff = v.data.bitcast[Scalar[DType.index]]()
     iota(buff, len(v), offset=offset)
 
 
@@ -1907,34 +1897,25 @@ fn gcd(m: Int, n: Int, /) -> Int:
     Returns:
         The greatest common divisor of the two integers.
     """
-    if m == 0 or n == 0:
-        return max(m, n)
+    var u = abs(m)
+    var v = abs(n)
+    if u == 0:
+        return v
+    if v == 0:
+        return u
 
-    if m > 0 and n > 0:
-        var trailing_zeros_a = count_trailing_zeros(m)
-        var trailing_zeros_b = count_trailing_zeros(n)
-
-        var u = m >> trailing_zeros_a
-        var v = n >> trailing_zeros_b
-        var trailing_zeros_common = min(trailing_zeros_a, trailing_zeros_b)
-
-        if u == 1 or v == 1:
-            return 1 << trailing_zeros_common
-
-        while u != v:
-            if u > v:
-                u, v = v, u
-            v -= u
-            if u == 0:
-                break
-            v >>= count_trailing_zeros(v)
-        return u << trailing_zeros_common
-
-    var u = m
-    var v = n
-    while v:
-        u, v = v, u % v
-    return abs(u)
+    var uz = count_trailing_zeros(u)
+    var vz = count_trailing_zeros(v)
+    var shift = min(uz, vz)
+    u >>= shift
+    while True:
+        v >>= vz
+        var diff = v - u
+        if diff == 0:
+            break
+        u, v = min(u, v), abs(diff)
+        vz = count_trailing_zeros(diff)
+    return u << shift
 
 
 fn gcd(s: Span[Int], /) -> Int:
@@ -1994,7 +1975,7 @@ fn gcd(*values: Int) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-fn lcm(owned m: Int, owned n: Int, /) -> Int:
+fn lcm(m: Int, n: Int, /) -> Int:
     """Computes the least common multiple of two integers.
 
     Args:
@@ -2162,6 +2143,64 @@ fn factorial(n: Int) -> Int:
     )
     debug_assert(0 <= n <= 20, "input value causes an overflow")
     return table[n]
+
+
+# ===----------------------------------------------------------------------=== #
+# clamp
+# ===----------------------------------------------------------------------=== #
+
+
+fn clamp(
+    val: Int, lower_bound: __type_of(val), upper_bound: __type_of(val)
+) -> __type_of(val):
+    """Clamps the integer value vector to be in a certain range.
+
+    Args:
+        val: The value to clamp.
+        lower_bound: Minimum of the range to clamp to.
+        upper_bound: Maximum of the range to clamp to.
+
+    Returns:
+        An integer clamped to be within lower_bound and upper_bound.
+    """
+    return max(min(val, upper_bound), lower_bound)
+
+
+fn clamp(
+    val: UInt, lower_bound: __type_of(val), upper_bound: __type_of(val)
+) -> __type_of(val):
+    """Clamps the integer value vector to be in a certain range.
+
+    Args:
+        val: The value to clamp.
+        lower_bound: Minimum of the range to clamp to.
+        upper_bound: Maximum of the range to clamp to.
+
+    Returns:
+        An integer clamped to be within lower_bound and upper_bound.
+    """
+    return max(min(val, upper_bound), lower_bound)
+
+
+fn clamp(
+    val: SIMD, lower_bound: __type_of(val), upper_bound: __type_of(val)
+) -> __type_of(val):
+    """Clamps the values in a SIMD vector to be in a certain range.
+
+    Clamp cuts values in the input SIMD vector off at the upper bound and
+    lower bound values. For example,  SIMD vector `[0, 1, 2, 3]` clamped to
+    a lower bound of 1 and an upper bound of 2 would return `[1, 1, 2, 2]`.
+
+    Args:
+        val: The value to clamp.
+        lower_bound: Minimum of the range to clamp to.
+        upper_bound: Maximum of the range to clamp to.
+
+    Returns:
+        A SIMD vector containing x clamped to be within lower_bound and
+        upper_bound.
+    """
+    return val.clamp(lower_bound, upper_bound)
 
 
 # ===----------------------------------------------------------------------=== #

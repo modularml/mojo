@@ -33,7 +33,7 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory.unsafe import DTypePointer
+from memory import UnsafePointer
 
 
 @value
@@ -70,14 +70,14 @@ fn test_vectorize[
     constrained[(N % simd_width) == 0]()
     # Create a mem of size N
     alias buffer_align = 64
-    var vector = DTypePointer[dtype].alloc(N, alignment=buffer_align)
-    var result = DTypePointer[dtype].alloc(N, alignment=buffer_align)
+    var vector = UnsafePointer[Scalar[dtype]].alloc[alignment=buffer_align](N)
+    var result = UnsafePointer[Scalar[dtype]].alloc[alignment=buffer_align](N)
 
     @always_inline
     @parameter
     fn ld_vector[simd_width: Int](idx: Int):
         SIMD[size=simd_width].store(
-            vector, idx + 1, SIMD[vector.type, simd_width](idx)
+            vector, idx + 1, SIMD[dtype, simd_width](idx)
         )
 
     @always_inline
@@ -263,10 +263,10 @@ fn bench_compare():
     alias unroll_factor = 2
     alias its = 1000
 
-    var p1 = DTypePointer[type].alloc(size)
-    var p2 = DTypePointer[type].alloc(size)
+    var p1 = UnsafePointer[Scalar[type]].alloc(size)
+    var p2 = UnsafePointer[Scalar[type]].alloc(size)
     print("Benchmark results")
-    rand(p1, size)
+    rand(p1.address, size)
 
     @parameter
     fn arg_size():
@@ -322,15 +322,15 @@ fn bench_compare():
 
     var arg = run[arg_size](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2, size)
+    memset_zero(p2.address, size)
 
     var param = run[param_size](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2, size)
+    memset_zero(p2.address, size)
 
     var arg_unroll = run[arg_size_unroll](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2, size)
+    memset_zero(p2.address, size)
 
     var param_unroll = run[param_size_unroll](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
