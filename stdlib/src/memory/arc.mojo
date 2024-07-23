@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Arc[T: Movable](CollectionElement):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.

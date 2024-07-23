@@ -36,7 +36,7 @@ from utils import Variant
 
 # TODO(27780): NoneType can't currently conform to traits
 @value
-struct _NoneType(CollectionElement, CollectionElementNew):
+struct _NoneType(CollectionElement):
     fn __init__(inout self, *, other: Self):
         pass
 
@@ -46,9 +46,7 @@ struct _NoneType(CollectionElement, CollectionElementNew):
 # ===----------------------------------------------------------------------===#
 
 
-struct Optional[T: CollectionElement](
-    CollectionElement, CollectionElementNew, Boolable
-):
+struct Optional[T: CollectionElement](CollectionElement, Boolable):
     """A type modeling a value which may or may not be present.
 
     Optional values can be thought of as a type-safe nullable pattern.
@@ -123,15 +121,30 @@ struct Optional[T: CollectionElement](
         Args:
             other: The Optional to copy.
         """
-        self.__copyinit__(other)
+        if other is None:
+            self = Self()
+        else:
+            self = Self(Self.T(other=other.value()))
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__[
+        U: CopyableCollectionElement
+    ](inout self: Optional[U], other: Optional[U]):
         """Copy construct an Optional.
+
+        This trait is only available if `T` is `Copyable`,
+        meaning it's very cheap to copy. Typically for register-passable types.
+
+        Parameters:
+            U: The type of the element contained in the `Optional`. Must implement the
+              traits `Copyable` and `CollectionElement`.
 
         Args:
             other: The Optional to copy.
         """
-        self._value = other._value
+        if other is None:
+            self = Optional[U]()
+        else:
+            self = Optional[U](U(other=other.value()))
 
     fn __moveinit__(inout self, owned other: Self):
         """Move this `Optional`.
@@ -389,8 +402,8 @@ struct Optional[T: CollectionElement](
             The underlying value contained in the Optional or a default value.
         """
         if self.__bool__():
-            return self._value[T]
-        return default
+            return Self.T(other=self._value[T])
+        return Self.T(other=default)
 
 
 # ===----------------------------------------------------------------------===#

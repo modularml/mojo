@@ -685,7 +685,6 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
-    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -2233,8 +2232,7 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
 # ===----------------------------------------------------------------------===#
 
 
-@value
-struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
+struct _FormatCurlyEntry(CollectionElement):
     """
     Internally used by the `format()` method.
 
@@ -2259,10 +2257,25 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     var field: Self._FieldVariantType
     """Store the substitution field."""
 
+    fn __init__(
+        inout self,
+        first_curly: Int,
+        last_curly: Int,
+        owned field: Self._FieldVariantType,
+    ):
+        self.first_curly = first_curly
+        self.last_curly = last_curly
+        self.field = field^
+
     fn __init__(inout self, *, other: Self):
         self.first_curly = other.first_curly
         self.last_curly = other.last_curly
         self.field = Self._FieldVariantType(other=other.field)
+
+    fn __moveinit__(inout self, owned other: Self):
+        self.first_curly = other.first_curly
+        self.last_curly = other.last_curly
+        self.field = other.field^
 
     fn is_escaped_brace(ref [_]self) -> Bool:
         return self.field.isa[Bool]()

@@ -370,7 +370,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             t: The element to add to the set.
         """
-        self._data[t] = None
+        self._data[Self.T(other=t)] = None
 
     fn remove(inout self, t: T) raises:
         """Remove an element from the set.
@@ -399,9 +399,9 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         if not self:
             raise "Pop on empty set"
         var iter = self.__iter__()
-        var first = iter.__next__()[]
+        var first = Self.T(other=iter.__next__()[])
         self.remove(first)
-        return first
+        return first^
 
     fn union(self, other: Self) -> Self:
         """Set union.

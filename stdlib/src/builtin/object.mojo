@@ -28,7 +28,7 @@ from utils import StringRef, Variant
 
 
 @register_passable("trivial")
-struct _NoneMarker(CollectionElementNew):
+struct _NoneMarker(CollectionElement):
     """This is a trivial class to indicate that an object is `None`."""
 
     fn __init__(inout self, *, other: Self):
@@ -36,7 +36,7 @@ struct _NoneMarker(CollectionElementNew):
 
 
 @register_passable("trivial")
-struct _ImmutableString(CollectionElement, CollectionElementNew):
+struct _ImmutableString(CollectionElement):
     """Python strings are immutable. This class is marked as trivially register
     passable because its memory will be managed by `_ObjectImpl`. It is a
     pointer and integer pair. Memory will be dynamically allocated.
@@ -82,7 +82,7 @@ struct _RefCountedList:
 
 
 @register_passable("trivial")
-struct _RefCountedListRef(CollectionElement, CollectionElementNew):
+struct _RefCountedListRef(CollectionElement):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -170,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
+struct _RefCountedAttrsDictRef(CollectionElement):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -200,7 +200,7 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
 
 
 @register_passable("trivial")
-struct _Function(CollectionElement, CollectionElementNew):
+struct _Function(CollectionElement):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -252,7 +252,6 @@ struct _Function(CollectionElement, CollectionElementNew):
 
 struct _ObjectImpl(
     CollectionElement,
-    CollectionElementNew,
     Stringable,
     Representable,
     Formattable,
@@ -304,8 +303,8 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, value: Self.type):
-        self.value = value
+    fn __init__(inout self, owned value: Self.type):
+        self.value = value^
 
     @always_inline
     fn __init__(inout self):
@@ -346,11 +345,11 @@ struct _ObjectImpl(
         Args:
             other: The value to copy.
         """
-        self = other.value
+        self = Self.type(other=other.value)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
-        self = existing.value
+        self = Self(other=existing)
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
@@ -651,7 +650,7 @@ struct _ObjectImpl(
     @always_inline
     fn list_append(self, value: Self):
         var ptr = self.get_list_ptr()
-        ptr[].append(value.value)
+        ptr[].append(Self.type(other=value.value))
 
     @always_inline
     fn get_list_length(self) -> Int:

@@ -28,8 +28,7 @@ from utils._format import ToFormatter
 # ===----------------------------------------------------------------------===#
 
 
-@value
-struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
+struct InlineString(Sized, Stringable, CollectionElement):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -95,7 +94,15 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         Args:
             other: The value to copy.
         """
-        self = other
+        self._storage = Self.Layout(other=other._storage)
+
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move the object.
+
+        Args:
+            existing: The value to move.
+        """
+        self._storage = existing._storage^
 
     # ===------------------------------------------------------------------=== #
     # Operator dunders
@@ -179,9 +186,9 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             A new string containing the concatenation of `self` and `other`.
         """
 
-        var string = self
+        var string = Self(other=self)
         string += StringRef(other)
-        return string
+        return string^
 
     fn __add__(self, other: String) -> Self:
         """Construct a string by appending another string at the end of this string.
@@ -193,9 +200,9 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             A new string containing the concatenation of `self` and `other`.
         """
 
-        var string = self
+        var string = Self(other=self)
         string += other.as_string_slice()
-        return string
+        return string^
 
     fn __add__(self, other: InlineString) -> Self:
         """Construct a string by appending another string at the end of this string.
@@ -207,9 +214,9 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             A new string containing the concatenation of `self` and `other`.
         """
 
-        var string = self
+        var string = Self(other=self)
         string += other.as_string_slice()
-        return string
+        return string^
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -308,7 +315,6 @@ struct _FixedString[CAP: Int](
     Formattable,
     ToFormatter,
     CollectionElement,
-    CollectionElementNew,
 ):
     """A string with a fixed available capacity.
 

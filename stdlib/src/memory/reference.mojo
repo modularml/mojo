@@ -272,7 +272,7 @@ struct Reference[
     type: AnyType,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](CollectionElementNew):
+](CollectionElement):
     """Defines a non-nullable safe reference.
 
     Parameters:

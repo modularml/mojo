@@ -30,7 +30,7 @@ from utils import InlineArray
 @value
 struct _InlineListIter[
     list_mutability: Bool, //,
-    T: CollectionElementNew,
+    T: CollectionElement,
     capacity: Int,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
@@ -73,7 +73,7 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -191,7 +191,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElementNew`.
+              traits `EqualityComparable` and `CollectionElement`.
 
         Args:
             value: The value to find.
@@ -223,7 +223,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElementNew`.
+              traits `EqualityComparable` and `CollectionElement`.
 
         Args:
             value: The value to count.

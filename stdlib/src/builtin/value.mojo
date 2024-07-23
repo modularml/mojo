@@ -188,7 +188,7 @@ trait Defaultable:
         ...
 
 
-trait CollectionElement(Copyable, Movable):
+trait CollectionElement(Movable, ExplicitlyCopyable):
     """The CollectionElement trait denotes a trait composition
     of the `Copyable` and `Movable` traits.
 
@@ -200,10 +200,10 @@ trait CollectionElement(Copyable, Movable):
     pass
 
 
-trait CollectionElementNew(ExplicitlyCopyable, Movable):
-    """A temporary explicitly-copyable alternative to `CollectionElement`.
-
-    This trait will eventually replace `CollectionElement`.
+trait CopyableCollectionElement(Copyable, CollectionElement):
+    """A CollectionElement type that is very cheap to copy,
+    and does not necessitate an explicit copy. This is often given
+    to types that are register-passable.
     """
 
     pass
