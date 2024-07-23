@@ -302,7 +302,7 @@ request into the `nightly` branch.
 First push your changes:
 
 ```bash
-git push -u [your-username] my-fix-pr
+git push -u origin my-fix-pr
 ```
 
 You'll see a link to create a PR:
