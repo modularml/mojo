@@ -315,31 +315,30 @@ def test_chr():
 
 
 def test_string_indexing():
-    pass
-    # var str = String("Hello Mojo!!")
+    var str = String("Hello Mojo!!")
 
-    # assert_equal("H", str[0])
-    # assert_equal("!", str[-1])
-    # assert_equal("H", str[-len(str)])
-    # assert_equal("llo Mojo!!", str[2:])
-    # assert_equal("lo Mojo!", str[3:-1:1])
-    # assert_equal("lo Moj", str[3:-3])
+    assert_equal("H", str[0])
+    assert_equal("!", str[-1])
+    assert_equal("H", str[-len(str)])
+    assert_equal("llo Mojo!!", str[2:])
+    assert_equal("lo Mojo!", str[3:-1:1])
+    assert_equal("lo Moj", str[3:-3])
 
-    # assert_equal("!!ojoM olleH", str[::-1])
+    assert_equal("!!ojoM olleH", str[::-1])
 
-    # assert_equal("leH", str[2::-1])
+    assert_equal("leH", str[2::-1])
 
-    # assert_equal("!oo le", str[::-2])
+    assert_equal("!oo le", str[::-2])
 
-    # assert_equal("", str[:-1:-2])
-    # assert_equal("", str[-50::-1])
-    # assert_equal("Hello Mojo!!", str[-50::])
-    # assert_equal("!!ojoM olleH", str[:-50:-1])
-    # assert_equal("Hello Mojo!!", str[:50:])
-    # assert_equal("H", str[::50])
-    # assert_equal("!", str[::-50])
-    # assert_equal("!", str[50::-50])
-    # assert_equal("H", str[-50::50])
+    assert_equal("", str[:-1:-2])
+    assert_equal("", str[-50::-1])
+    assert_equal("Hello Mojo!!", str[-50::])
+    assert_equal("!!ojoM olleH", str[:-50:-1])
+    assert_equal("Hello Mojo!!", str[:50:])
+    assert_equal("H", str[::50])
+    assert_equal("!", str[::-50])
+    assert_equal("!", str[50::-50])
+    assert_equal("H", str[-50::50])
 
 
 def test_atol():
