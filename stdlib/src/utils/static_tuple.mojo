@@ -290,10 +290,10 @@ struct InlineArray[
             )
 
     fn __init__[
-        ThisElementType: CollectionElementNew, this_size: Int
+        ThisElementType: CollectionElementNew, //
     ](
         inout self: InlineArray[
-            UnsafeMaybeUninitialized[ThisElementType], this_size
+            UnsafeMaybeUninitialized[ThisElementType], Self.size
         ]
     ):
         """Contructs an `InlineArray` without initializing the elements.
@@ -321,13 +321,12 @@ struct InlineArray[
 
         Parameters:
             ThisElementType: The element type of the array (the one wrapped inside `UnsafeMaybeUninitialized`).
-            this_size: The size of the array.
         """
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[
             _type = __mlir_type[
                 `!pop.array<`,
-                this_size.value,
+                Self.size.value,
                 `, `,
                 UnsafeMaybeUninitialized[ThisElementType],
                 `>`,
