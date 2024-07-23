@@ -16,7 +16,6 @@ from testing import assert_equal, assert_false, assert_true
 
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from utils import InlineArray, StaticIntTuple, StaticTuple
-from test_utils import ValueDestructorRecorder
 
 
 def test_static_tuple():
@@ -34,7 +33,6 @@ def test_static_tuple():
 
     assert_equal(tup3[0], 1)
     assert_equal(tup3[Int(0)], 1)
-    assert_equal(tup3[Int64(0)], 1)
 
 
 def test_static_int_tuple():
@@ -247,29 +245,6 @@ def test_array_contains():
     assert_true(not str("greetings") in arr)
 
 
-def test_inline_array_runs_destructors():
-    """Ensure we delete the right number of elements."""
-    var destructor_counter = List[Int]()
-    var pointer_to_destructor_counter = UnsafePointer.address_of(
-        destructor_counter
-    )
-    alias capacity = 32
-    var inline_list = InlineArray[ValueDestructorRecorder, 4](
-        ValueDestructorRecorder(0, pointer_to_destructor_counter),
-        ValueDestructorRecorder(10, pointer_to_destructor_counter),
-        ValueDestructorRecorder(20, pointer_to_destructor_counter),
-        ValueDestructorRecorder(30, pointer_to_destructor_counter),
-    )
-    _ = inline_list
-    # This is the last use of the inline list, so it should be destroyed here,
-    # along with each element.
-    assert_equal(len(destructor_counter), 4)
-    assert_equal(destructor_counter[0], 0)
-    assert_equal(destructor_counter[1], 10)
-    assert_equal(destructor_counter[2], 20)
-    assert_equal(destructor_counter[3], 30)
-
-
 def main():
     test_static_tuple()
     test_static_int_tuple()
@@ -280,4 +255,3 @@ def main():
     test_array_unsafe_assume_initialized_constructor_string()
     test_array_int_pointer()
     test_array_contains()
-    test_inline_array_runs_destructors()

@@ -18,16 +18,17 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 from sys import sizeof as _sizeof
 
-from utils import unroll
-
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
+alias _mIsNotInteger = UInt8(~(1 << 7))
 alias _mIsFloat = UInt8(1 << 6)
 
 
 @value
 @register_passable("trivial")
-struct DType(Stringable, Formattable, Representable, KeyElement):
+struct DType(
+    Stringable, Formattable, Representable, KeyElement, CollectionElementNew
+):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`
@@ -76,14 +77,17 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
     alias index = DType(__mlir_attr.`#kgen.dtype.constant<index> : !kgen.dtype`)
     """Represents an integral type whose bitwidth is the maximum integral value
     on the system."""
-    alias address = DType(
-        __mlir_attr.`#kgen.dtype.constant<address> : !kgen.dtype`
-    )
-    """Represents a pointer type whose bitwidth is the same as the bitwidth
-    of the hardware's pointer type (32-bit on 32-bit machines and 64-bit on
-    64-bit machines)."""
 
-    @always_inline("nodebug")
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy this DType.
+
+        Args:
+            other: The DType to copy.
+        """
+        self = other
+
+    @no_inline
     fn __str__(self) -> String:
         """Gets the name of the DType.
 
@@ -93,6 +97,7 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
 
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this dtype to the provided formatter.
@@ -133,8 +138,6 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
             return writer.write_str["float64"]()
         if self == DType.invalid:
             return writer.write_str["invalid"]()
-        if self == DType.address:
-            return writer.write_str["address"]()
 
         return writer.write_str["<<unknown>>"]()
 
@@ -227,7 +230,12 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
             self._as_i8(), rhs._as_i8()
         )
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
+        """Return a 64-bit hash for this `DType` value.
+
+        Returns:
+            A 64-bit integer hash of this `DType` value.
+        """
         return hash(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
@@ -265,6 +273,20 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
         )
 
     @always_inline("nodebug")
+    fn _is_non_index_integral(self) -> Bool:
+        """Returns True if the type parameter is a non-index integer value and False otherwise.
+
+        Returns:
+            Returns True if the input type parameter is a non-index integer.
+        """
+        return Bool(
+            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+                __mlir_op.`pop.and`(self._as_i8(), _mIsInteger.value),
+                UInt8(0).value,
+            )
+        )
+
+    @always_inline("nodebug")
     fn is_integral(self) -> Bool:
         """Returns True if the type parameter is an integer and False otherwise.
 
@@ -273,12 +295,7 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
         """
         if self is DType.index:
             return True
-        return Bool(
-            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(self._as_i8(), _mIsInteger.value),
-                UInt8(0).value,
-            )
-        )
+        return self._is_non_index_integral()
 
     @always_inline("nodebug")
     fn is_floating_point(self) -> Bool:
@@ -306,7 +323,7 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
             True if the type is a half-precision float, false otherwise..
         """
 
-        return self.bitwidth() == 16 and self.is_floating_point()
+        return self in (DType.bfloat16, DType.float16)
 
     @always_inline("nodebug")
     fn is_numeric(self) -> Bool:
@@ -326,7 +343,40 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
         Returns:
             Returns the size in bytes of the current DType.
         """
-        return __mlir_op.`pop.dtype.sizeof`(self.value)
+
+        if self._is_non_index_integral():
+            return int(
+                UInt8(
+                    __mlir_op.`pop.shl`(
+                        UInt8(1).value,
+                        __mlir_op.`pop.sub`(
+                            __mlir_op.`pop.shr`(
+                                __mlir_op.`pop.and`(
+                                    self._as_i8(), _mIsNotInteger.value
+                                ),
+                                UInt8(1).value,
+                            ),
+                            UInt8(3).value,
+                        ),
+                    )
+                )
+            )
+
+        if self == DType.bool:
+            return sizeof[DType.bool]()
+        if self == DType.index:
+            return sizeof[DType.index]()
+        if self == DType.bfloat16:
+            return sizeof[DType.bfloat16]()
+        if self == DType.float16:
+            return sizeof[DType.float16]()
+        if self == DType.float32:
+            return sizeof[DType.float32]()
+        if self == DType.tensor_float32:
+            return sizeof[DType.tensor_float32]()
+        if self == DType.float64:
+            return sizeof[DType.float64]()
+        return sizeof[DType.invalid]()
 
     @always_inline
     fn bitwidth(self) -> Int:
@@ -585,9 +635,6 @@ fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
     elif type is DType.index:
         return _index_printf_format()
 
-    elif type is DType.address:
-        return "%p"
-
     elif type.is_floating_point():
         return "%.17g"
 
@@ -595,41 +642,3 @@ fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
         constrained[False, "invalid dtype"]()
 
     return ""
-
-
-fn _get_runtime_dtype_size(type: DType) -> Int:
-    """
-    Get the size of the dynamic dtype.
-
-    We cannot directly using type.sizeof(), since that only works with
-    statically known dtypes. Instead, we have to perform a dispatch to
-    determine the size of the dtype.
-    """
-    alias type_list = List[DType](
-        DType.bool,
-        DType.int8,
-        DType.uint8,
-        DType.int16,
-        DType.uint16,
-        DType.bfloat16,
-        DType.float16,
-        DType.int32,
-        DType.uint32,
-        DType.float32,
-        DType.tensor_float32,
-        DType.int64,
-        DType.uint64,
-        DType.float64,
-        DType.index,
-        DType.address,
-    )
-
-    @parameter
-    for idx in range(len(type_list)):
-        alias concrete_type = type_list[idx]
-        if concrete_type == type:
-            return sizeof[concrete_type]()
-
-    abort("unable to get the dtype size of " + str(type))
-
-    return -1

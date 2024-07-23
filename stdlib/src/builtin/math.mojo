@@ -44,6 +44,11 @@ trait Absable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __abs__(self) -> Self:
+        """Get the absolute value of this instance.
+
+        Returns:
+            The absolute value of the instance.
+        """
         ...
 
 
@@ -141,8 +146,8 @@ fn divmod(numerator: UInt, denominator: UInt) -> Tuple[UInt, UInt]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
-fn max(x: Int, y: Int) -> Int:
+@always_inline("nodebug")
+fn max(x: Int, y: Int, /) -> Int:
     """Gets the maximum of two integers.
 
     Args:
@@ -155,20 +160,29 @@ fn max(x: Int, y: Int) -> Int:
     return __mlir_op.`index.maxs`(x.value, y.value)
 
 
-@always_inline
-fn max[
-    type: DType, simd_width: Int
-](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[
-    type, simd_width
-]:
+@always_inline("nodebug")
+fn max(x: UInt, y: UInt, /) -> UInt:
+    """Gets the maximum of two integers.
+
+    Args:
+        x: Integer input to max.
+        y: Integer input to max.
+
+    Returns:
+        Maximum of x and y.
+    """
+    return __mlir_op.`index.maxu`(x.value, y.value)
+
+
+@always_inline("nodebug")
+fn max(x: SIMD, y: __type_of(x), /) -> __type_of(x):
     """Performs elementwise maximum of x and y.
 
     An element of the result SIMD vector will be the maximum of the
     corresponding elements in x and y.
 
-    Parameters:
-        type: The `dtype` of the input and output SIMD vector.
-        simd_width: The width of the input and output SIMD vector.
+    Constraints:
+        The type of the inputs must be numeric.
 
     Args:
         x: First SIMD vector.
@@ -177,7 +191,8 @@ fn max[
     Returns:
         A SIMD vector containing the elementwise maximum of x and y.
     """
-    return x.max(y)
+    constrained[x.type.is_numeric(), "the SIMD type must be numeric"]()
+    return __mlir_op.`pop.max`(x.value, y.value)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -185,13 +200,13 @@ fn max[
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
-fn min(x: Int, y: Int) -> Int:
+@always_inline("nodebug")
+fn min(x: Int, y: Int, /) -> Int:
     """Gets the minimum of two integers.
 
     Args:
-        x: Integer input to max.
-        y: Integer input to max.
+        x: Integer input to min.
+        y: Integer input to min.
 
     Returns:
         Minimum of x and y.
@@ -199,20 +214,29 @@ fn min(x: Int, y: Int) -> Int:
     return __mlir_op.`index.mins`(x.value, y.value)
 
 
-@always_inline
-fn min[
-    type: DType, simd_width: Int
-](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[
-    type, simd_width
-]:
+@always_inline("nodebug")
+fn min(x: UInt, y: UInt, /) -> UInt:
+    """Gets the minimum of two integers.
+
+    Args:
+        x: Integer input to min.
+        y: Integer input to min.
+
+    Returns:
+        Minimum of x and y.
+    """
+    return __mlir_op.`index.minu`(x.value, y.value)
+
+
+@always_inline("nodebug")
+fn min(x: SIMD, y: __type_of(x), /) -> __type_of(x):
     """Gets the elementwise minimum of x and y.
 
     An element of the result SIMD vector will be the minimum of the
     corresponding elements in x and y.
 
-    Parameters:
-        type: The `dtype` of the input and output SIMD vector.
-        simd_width: The width of the input and output SIMD vector.
+    Constraints:
+        The type of the inputs must be numeric.
 
     Args:
         x: First SIMD vector.
@@ -221,7 +245,8 @@ fn min[
     Returns:
         A SIMD vector containing the elementwise minimum of x and y.
     """
-    return x.min(y)
+    constrained[x.type.is_numeric(), "the SIMD type must be numeric"]()
+    return __mlir_op.`pop.min`(x.value, y.value)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -311,9 +336,22 @@ trait Roundable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __round__(self) -> Self:
+        """Get a rounded value for the type.
+
+        Returns:
+            The rounded value.
+        """
         ...
 
     fn __round__(self, ndigits: Int) -> Self:
+        """Get a rounded value for the type.
+
+        Args:
+            ndigits: Number of digits after the decimal point.
+
+        Returns:
+            The rounded value.
+        """
         ...
 
 
@@ -349,7 +387,8 @@ fn round(number: FloatLiteral) -> FloatLiteral:
 
 @always_inline
 fn round[T: Roundable, //](number: T, ndigits: Int) -> T:
-    """Get the rounded value of the given object.
+    """Get the value of this object, rounded to a specified number of
+    digits after the decimal point.
 
     Parameters:
         T: The type conforming to Roundable.
@@ -367,7 +406,8 @@ fn round[T: Roundable, //](number: T, ndigits: Int) -> T:
 # TODO: remove this when conformance issue for FloatLiteral is fixed.
 @always_inline
 fn round(number: FloatLiteral, ndigits: Int) -> FloatLiteral:
-    """Get the rounded value of the given FloatLiteral.
+    """Get the  value of this FloatLiteral, rounded to a specified number of
+    digits after the decimal point.
 
     Args:
         number: The FloatLiteral to get the rounded value of.

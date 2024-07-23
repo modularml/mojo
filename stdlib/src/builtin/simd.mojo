@@ -29,8 +29,9 @@ from sys import (
 
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
-from memory import bitcast
+from memory import bitcast, DTypePointer
 
 from utils import InlineArray, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -47,7 +48,7 @@ from .dtype import (
     _integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _print_fmt, _printf, _snprintf_scalar
+from .io import _printf, _snprintf_scalar
 from .string import _calc_format_buffer_size, _calc_initial_buffer_size
 
 # ===----------------------------------------------------------------------=== #
@@ -126,6 +127,11 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
     }
 
 
+@always_inline("nodebug")
+fn _has_native_bf16_support() -> Bool:
+    return triple_is_nvidia_cuda()
+
+
 # ===----------------------------------------------------------------------=== #
 # SIMD
 # ===----------------------------------------------------------------------=== #
@@ -133,22 +139,23 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
-struct SIMD[type: DType, size: Int = simdwidthof[type]()](
+struct SIMD[type: DType, size: Int](
     Absable,
+    Boolable,
     Ceilable,
     CeilDivable,
     CollectionElement,
     CollectionElementNew,
     Floorable,
+    Formattable,
     Hashable,
     Intable,
-    ImplicitlyBoolable,
     Powable,
+    Representable,
     Roundable,
     Sized,
     Stringable,
     Truncable,
-    Representable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -198,26 +205,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: SIMD[DType.float64, 1]):
-        """Initializes the SIMD vector with a float.
-
-        The value is splatted across all the elements of the SIMD
-        vector.
-
-        Args:
-            value: The input value.
-        """
-        _simd_construction_checks[type, size]()
-
-        var casted = __mlir_op.`pop.cast`[
-            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
-        ](value.value)
-        var vec = __mlir_op.`pop.simd.splat`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
-        ](casted)
-        self.value = vec
 
     @always_inline("nodebug")
     fn __init__(inout self, *, other: SIMD[type, size]):
@@ -293,7 +280,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](casted)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Bool):
+    fn __init__(inout self: SIMD[DType.bool, size], value: Bool, /):
         """Initializes the SIMD vector with a bool value.
 
         The bool value is splatted across all elements of the SIMD vector.
@@ -304,10 +291,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         _simd_construction_checks[type, size]()
 
         var casted = __mlir_op.`pop.cast`[
-            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
+            _type = __mlir_type[`!pop.simd<1, bool>`]
         ](value._as_scalar_bool())
         self.value = __mlir_op.`pop.simd.splat`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+            _type = __mlir_type[`!pop.simd<`, size.value, `, bool>`]
         ](casted)
 
     @always_inline("nodebug")
@@ -323,19 +310,31 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         _simd_construction_checks[type, size]()
         self.value = value
 
-    # Construct via a variadic type which has the same number of elements as
-    # the SIMD value.
+    @always_inline("nodebug")
+    fn __init__(inout self, value: Scalar[type], /):
+        """Constructs a SIMD vector by splatting a scalar value.
+
+        The input value is splatted across all elements of the SIMD vector.
+
+        Args:
+            value: The value to splat to the elements of the vector.
+        """
+        _simd_construction_checks[type, size]()
+
+        # Construct by broadcasting a scalar.
+        self.value = __mlir_op.`pop.simd.splat`[
+            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        ](value.value)
+
     @always_inline("nodebug")
     fn __init__(inout self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
-        If there is just one input value, then it is splatted to all elements
-        of the SIMD vector. Otherwise, the input values are assigned to the
-        corresponding elements of the SIMD vector.
+        The input values are assigned to the corresponding elements of the SIMD
+        vector.
 
         Constraints:
-            The number of input values is 1 or equal to size of the SIMD
-            vector.
+            The number of input values is equal to size of the SIMD vector.
 
         Args:
             elems: The variadic list of elements from which the SIMD vector is
@@ -343,22 +342,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
 
-        var num_elements = len(elems)
-        if num_elements == 1:
-            # Construct by broadcasting a scalar.
-            self.value = __mlir_op.`pop.simd.splat`[
-                _type = __mlir_type[
-                    `!pop.simd<`,
-                    size.value,
-                    `, `,
-                    type.value,
-                    `>`,
-                ]
-            ](elems[0].value)
-            return
         # TODO: Make this a compile-time check when possible.
         debug_assert(
-            size == num_elements,
+            size == len(elems),
             (
                 "mismatch in the number of elements in the SIMD variadic"
                 " constructor"
@@ -384,8 +370,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
-        # TODO (#36686): This introduces uneeded casts here to work around
+        # TODO (#36686): This introduces unneeded casts here to work around
         # parameter if issues.
         @parameter
         if type is DType.float16:
@@ -498,6 +487,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self.value = __mlir_op.`pop.simd.insertelement`(
             self.value, val.value, index(idx).value
         )
+
+    fn __contains__(self, value: Scalar[type]) -> Bool:
+        """Whether the vector contains the value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            Whether the vector contains the value.
+        """
+        return (self == value).reduce_or()
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
@@ -904,7 +904,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type is DType.bool:
-            return self.select(Self(False), Self(True))
+            return rebind[Self](self.select(Self(False), Self(True)))
         else:
             return self ^ -1
 
@@ -1287,18 +1287,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
 
     @always_inline("nodebug")
-    fn __as_bool__(self) -> Bool:
-        """Converts the SIMD scalar into a boolean value.
-
-        Constraints:
-            The size of the SIMD vector must be 1.
-
-        Returns:
-            True if the SIMD scalar is non-zero and False otherwise.
-        """
-        return self.__bool__()
-
-    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Casts to the value to an Int. If there is a fractional component,
         then the fractional part is truncated.
@@ -1310,11 +1298,21 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The value as an integer.
         """
         constrained[size == 1, "expected a scalar type"]()
-        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-            rebind[Scalar[type]](self).value
-        )
 
-    @always_inline
+        alias int_width = bitwidthof[Int]()
+        alias type_width = bitwidthof[type]()
+
+        @parameter
+        if type.is_unsigned() and int_width > type_width:
+            # If we are casting up, prevent sign extension by first casting to
+            # a large unsigned
+            return self.cast[_uint_type_of_width[int_width]()]().__int__()
+        else:
+            return __mlir_op.`pop.cast`[
+                _type = __mlir_type.`!pop.scalar<index>`
+            ](rebind[Scalar[type]](self).value)
+
+    @no_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
 
@@ -1324,7 +1322,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         return String.format_sequence(self)
 
-    @always_inline
+    @no_inline
     fn __repr__(self) -> String:
         """Get the representation of the SIMD value e.g. "SIMD[DType.int8, 2](1, 2)".
 
@@ -1407,16 +1405,19 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn __round__(self, ndigits: Int) -> Self:
         """Performs elementwise rounding on the elements of a SIMD vector.
+
         This rounding goes to the nearest integer with ties away from zero.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The elementwise rounded value of this SIMD vector.
         """
         # TODO: see how can we implement this.
         return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the value using builtin hash.
 
         Returns:
@@ -1454,50 +1455,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
-        elif type is DType.bfloat16:
+        elif type is DType.bfloat16 and not _has_native_bf16_support():
             var cast_result = _bfloat16_to_f32(
                 rebind[SIMD[DType.bfloat16, size]](self)
             ).cast[target]()
             return rebind[SIMD[target, size]](cast_result)
-        elif target == DType.bfloat16:
+        elif target == DType.bfloat16 and not _has_native_bf16_support():
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
-        elif target == DType.address:
-            var index_val = __mlir_op.`pop.cast`[
-                _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
-            ](self.value)
-            var tmp = SIMD[DType.address, size](
-                __mlir_op.`pop.index_to_pointer`[
-                    _type = __mlir_type[
-                        `!pop.simd<`,
-                        size.value,
-                        `, address >`,
-                    ]
-                ](index_val)
-            )
-            return rebind[SIMD[target, size]](tmp)
-        elif (type is DType.address) and target.is_integral():
-            var index_tmp = SIMD[DType.index, size](
-                __mlir_op.`pop.pointer_to_index`[
-                    _type = __mlir_type[
-                        `!pop.simd<`,
-                        size.value,
-                        `, `,
-                        DType.index.value,
-                        `>`,
-                    ]
-                ](
-                    rebind[
-                        __mlir_type[
-                            `!pop.simd<`,
-                            size.value,
-                            `, address >`,
-                        ]
-                    ](self.value)
-                )
-            )
-            return index_tmp.cast[target]()
         else:
             return __mlir_op.`pop.cast`[
                 _type = __mlir_type[
@@ -1522,6 +1488,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
+    @always_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1550,7 +1517,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             if triple_is_nvidia_cuda():
 
                 @parameter
-                if type.is_floating_point():
+                if (
+                    type is DType.float16
+                    or type is DType.bfloat16
+                    or type is DType.float32
+                ):
+                    # We need to cast the value to float64 to print it.
+                    _printf["%g"](element.cast[DType.float64]())
+                elif type.is_floating_point():
                     # get_dtype_printf_format hardcodes 17 digits of precision.
                     _printf["%g"](element)
                 else:
@@ -1645,8 +1619,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new SIMD vector containing x clamped to be within lower_bound and
             upper_bound.
         """
-
-        return self.min(upper_bound).max(lower_bound)
+        return max(min(self, upper_bound), lower_bound)
 
     @always_inline("nodebug")
     fn roundeven(self) -> Self:
@@ -1662,105 +1635,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return llvm_intrinsic["llvm.roundeven", Self, has_side_effect=False](
             self
         )
-
-    @always_inline
-    fn add_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
-        """Computes `self + rhs` and a mask of which indices overflowed.
-
-        Args:
-            rhs: The rhs value.
-
-        Returns:
-            A tuple with the results of the operation and a mask for overflows.
-            The first is a new vector whose element at position `i` is computed
-            as `self[i] + rhs[i]`. The second item is a vector of booleans where
-            a `1` at position `i` represents `self[i] + rhs[i]` overflowed.
-        """
-        constrained[type.is_integral()]()
-
-        @parameter
-        if type.is_signed():
-            var result = llvm_intrinsic[
-                "llvm.sadd.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-        else:
-            var result = llvm_intrinsic[
-                "llvm.uadd.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-
-    @always_inline
-    fn sub_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
-        """Computes `self - rhs` and a mask of which indices overflowed.
-
-        Args:
-            rhs: The rhs value.
-
-        Returns:
-            A tuple with the results of the operation and a mask for overflows.
-            The first is a new vector whose element at position `i` is computed
-            as `self[i] - rhs[i]`. The second item is a vector of booleans where
-            a `1` at position `i` represents `self[i] - rhs[i]` overflowed.
-        """
-        constrained[type.is_integral()]()
-
-        @parameter
-        if type.is_signed():
-            var result = llvm_intrinsic[
-                "llvm.ssub.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-        else:
-            var result = llvm_intrinsic[
-                "llvm.usub.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-
-    @always_inline
-    fn mul_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
-        """Computes `self * rhs` and a mask of which indices overflowed.
-
-        Args:
-            rhs: The rhs value.
-
-        Returns:
-            A tuple with the results of the operation and a mask for overflows.
-            The first is a new vector whose element at position `i` is computed
-            as `self[i] * rhs[i]`. The second item is a vector of booleans where
-            a `1` at position `i` represents `self[i] * rhs[i]` overflowed.
-        """
-        constrained[type.is_integral()]()
-
-        @parameter
-        if type.is_signed():
-            var result = llvm_intrinsic[
-                "llvm.smul.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
-        else:
-            var result = llvm_intrinsic[
-                "llvm.umul.with.overflow",
-                _RegisterPackType[Self, Self._Mask],
-                Self,
-                Self,
-            ](self, rhs)
-            return (result[0], result[1])
 
     # TODO: Move to global function.
     @always_inline("nodebug")
@@ -1986,7 +1860,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
-        """Returns a the vector where the elements between `offset` and
+        """Returns a new vector where the elements between `offset` and
         `offset + input_width` have been replaced with the elements in `value`.
 
         Parameters:
@@ -2131,34 +2005,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             rebind[Self._SIMDHalfType](res[1]),
         )
 
-    @always_inline("nodebug")
-    fn min(self, other: Self) -> Self:
-        """Computes the elementwise minimum between the two vectors.
-
-        Args:
-            other: The other SIMD vector.
-
-        Returns:
-            A new SIMD vector where each element at position `i` is
-            `min(self[i], other[i])`.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return __mlir_op.`pop.min`(self.value, other.value)
-
-    @always_inline("nodebug")
-    fn max(self, other: Self) -> Self:
-        """Computes the elementwise maximum between the two vectors.
-
-        Args:
-            other: The other SIMD vector.
-
-        Returns:
-            A new SIMD vector where each element at position `i` is
-            `max(self[i], other[i])`.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return __mlir_op.`pop.max`(self.value, other.value)
-
     # ===------------------------------------------------------------------=== #
     # Reduce operations
     # ===------------------------------------------------------------------=== #
@@ -2222,7 +2068,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
                 type, width
             ]:
-                return v1.max(v2)
+                return max(v1, v2)
 
             return self.reduce[max_reduce_body, size_out]()
 
@@ -2280,7 +2126,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
                 type, width
             ]:
-                return v1.min(v2)
+                return min(v1, v2)
 
             return self.reduce[min_reduce_body, size_out]()
 
@@ -2649,38 +2495,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @staticmethod
     @always_inline
-    fn prefetch[
-        params: PrefetchOptions,
-        *,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space]):
-        # Prefetch at the underlying address.
-        """Prefetches memory at the underlying address.
-
-        Parameters:
-            params: Prefetch options (see `PrefetchOptions` for details).
-            address_space: The address space the pointer is in.
-
-        Args:
-            ptr: The pointer to prefetch from.
-        """
-        prefetch[params](ptr)
-
-    @staticmethod
-    @always_inline("nodebug")
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space]) -> Self:
-        """Loads the value the Pointer object points to.
+    ](ptr: DTypePointer[type, *_]) -> Self:
+        """Loads the value the pointer points to.
 
         Constraints:
             The width and alignment must be positive integer values.
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2688,27 +2513,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The loaded value.
         """
-        return Self.load[alignment=alignment, address_space=address_space](
-            ptr, 0
-        )
+        return Self.load[alignment=alignment](ptr, offset=0)
 
     @staticmethod
-    @always_inline("nodebug")
+    @always_inline
     fn load[
-        T: Intable,
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: T) -> Self:
-        """Loads the value the Pointer object points to with the given offset.
+    ](ptr: DTypePointer[type, *_], offset: Scalar) -> Self:
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
+            The offset must be integer.
 
         Parameters:
-            T: The Intable type of the offset.
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
 
         Args:
             ptr: The pointer to load from.
@@ -2717,6 +2537,34 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The loaded value.
         """
+        constrained[offset.type.is_integral(), "offset must be integer"]()
+        return Self.load[alignment=alignment](ptr, offset=int(offset))
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn load[
+        *,
+        alignment: Int = Self._default_alignment,
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int) -> Self:
+        """Loads the value the pointer points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+
+        Args:
+            ptr: The pointer to load from.
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
 
         @parameter
         if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
@@ -2729,52 +2577,89 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             # intentionally don't unroll, otherwise the compiler vectorizes
             for i in range(size):
-                v[i] = ptr.address.offset(int(offset) + i).load[
-                    alignment=alignment
-                ]()
+                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
+                    ptr.offset(int(offset) + i).address
+                )
             return v
 
-        return (
-            ptr.address.offset(offset)
-            .bitcast[SIMD[type, size]]()
-            .load[alignment=alignment]()
+        return __mlir_op.`pop.load`[alignment = alignment.value](
+            ptr.offset(offset).bitcast[SIMD[type, size]]().address
         )
 
     @staticmethod
     @always_inline("nodebug")
-    fn store[
-        T: Intable,
-        /,
+    fn load[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: T, val: Self):
-        """Stores a single element value at the given offset.
+    ](ptr: DTypePointer[type, *_], offset: Int) -> Self:
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
 
         Parameters:
-            T: The Intable type of the offset.
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to load from.
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+
+        return Self.load[alignment=alignment](ptr.address, offset)
+
+    @staticmethod
+    @always_inline
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+    ](ptr: DTypePointer[type, *_], offset: Int, val: Self):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+            The offset must be integer.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
 
         Args:
             ptr: The pointer to store to.
             offset: The offset to store to.
             val: The value to store.
         """
-        Self.store[alignment=alignment, address_space=address_space](
-            ptr.offset(offset), val
-        )
+        Self.store[alignment=alignment](ptr.offset(offset), val)
+
+    @staticmethod
+    @always_inline
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+    ](ptr: DTypePointer[type, *_], offset: Scalar, val: Self):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+
+        Args:
+            ptr: The pointer to store to.
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        constrained[offset.type.is_integral(), "offset must be integer"]()
+        Self.store[alignment=alignment](ptr, int(offset), val)
 
     @staticmethod
     @always_inline("nodebug")
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], val: Self):
+    ](ptr: DTypePointer[type, *_], val: Self):
         """Stores a single element value.
 
         Constraints:
@@ -2782,7 +2667,26 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         Parameters:
             alignment: The minimal alignment of the address.
-            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to store to.
+            val: The value to store.
+        """
+        Self.store[alignment=alignment](ptr.address, val)
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+    ](ptr: UnsafePointer[Scalar[type], *_], val: Self):
+        """Stores a single element value.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
 
         Args:
             ptr: The pointer to store to.
@@ -2792,7 +2696,30 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
-        ptr.address.bitcast[SIMD[type, size]]().store[alignment=alignment](val)
+        __mlir_op.`pop.store`[alignment = alignment.value](
+            val, ptr.bitcast[SIMD[type, size]]().address
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+    ](ptr: DTypePointer[type, *_], offset: UInt, val: Self):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+
+        Args:
+            ptr: The pointer to store to.
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        Self.store[alignment=alignment](ptr.offset(offset), val)
 
 
 # ===----------------------------------------------------------------------=== #

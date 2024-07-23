@@ -130,7 +130,7 @@ trait StringableRaising:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
+@no_inline
 fn str[T: Stringable](value: T) -> String:
     """Get the string representation of a value.
 
@@ -146,7 +146,7 @@ fn str[T: Stringable](value: T) -> String:
     return value.__str__()
 
 
-@always_inline
+@no_inline
 fn str(value: None) -> String:
     """Get the string representation of the `None` type.
 
@@ -159,7 +159,7 @@ fn str(value: None) -> String:
     return "None"
 
 
-@always_inline
+@no_inline
 fn str[T: StringableRaising](value: T) raises -> String:
     """Get the string representation of a value.
 

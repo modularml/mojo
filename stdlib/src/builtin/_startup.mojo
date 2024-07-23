@@ -35,13 +35,13 @@ fn _init_global_runtime(
     case where the runtime has the same number of threads as the number of cores.
     """
     return external_call[
-        "KGEN_CompilerRT_LLCL_CreateRuntime", UnsafePointer[NoneType]
+        "KGEN_CompilerRT_AsyncRT_CreateRuntime", UnsafePointer[NoneType]
     ](0)
 
 
 fn _destroy_global_runtime(ptr: UnsafePointer[NoneType]):
     """Destroy the global runtime if ever used."""
-    external_call["KGEN_CompilerRT_LLCL_DestroyRuntime", NoneType](ptr)
+    external_call["KGEN_CompilerRT_AsyncRT_DestroyRuntime", NoneType](ptr)
 
 
 @always_inline
@@ -55,7 +55,7 @@ fn _get_current_or_global_runtime() -> UnsafePointer[NoneType]:
     is created with number of threads equal to the number of cores.
     """
     var current_runtime = external_call[
-        "KGEN_CompilerRT_LLCL_GetCurrentRuntime", UnsafePointer[NoneType]
+        "KGEN_CompilerRT_AsyncRT_GetCurrentRuntime", UnsafePointer[NoneType]
     ]()
     if current_runtime:
         return current_runtime
@@ -70,7 +70,7 @@ fn __wrap_and_execute_main[
     argc: Int32,
     argv: __mlir_type[`!kgen.pointer<!kgen.pointer<scalar<ui8>>>`],
 ) -> Int32:
-    """Define a C-ABI compatible entry point for non-raising main function"""
+    """Define a C-ABI compatible entry point for non-raising main function."""
 
     # Initialize the global runtime.
     _ = _get_current_or_global_runtime()
@@ -94,7 +94,7 @@ fn __wrap_and_execute_raising_main[
     argc: Int32,
     argv: __mlir_type[`!kgen.pointer<!kgen.pointer<scalar<ui8>>>`],
 ) -> Int32:
-    """Define a C-ABI compatible entry point for a raising main function"""
+    """Define a C-ABI compatible entry point for a raising main function."""
 
     # Initialize the global runtime.
     _ = _get_current_or_global_runtime()
@@ -123,7 +123,7 @@ fn __wrap_and_execute_object_raising_main[
     argv: __mlir_type[`!kgen.pointer<!kgen.pointer<scalar<ui8>>>`],
 ) -> Int32:
     """Define a C-ABI compatible entry point for a raising main function that
-    returns an object"""
+    returns an object."""
 
     fn wrapped_main() raises:
         _ = main_func()

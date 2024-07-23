@@ -72,7 +72,7 @@ fn b64encode(str: String) -> String:
     alias lookup = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     var b64chars = lookup.unsafe_ptr()
 
-    var length = len(str)
+    var length = str.byte_length()
     var out = String._buffer_type(capacity=length + 1)
 
     @parameter
@@ -121,7 +121,7 @@ fn b64decode(str: String) -> String:
     Returns:
       The decoded string.
     """
-    var n = len(str)
+    var n = str.byte_length()
     debug_assert(n % 4 == 0, "Input length must be divisible by 4")
 
     var p = String._buffer_type(capacity=n + 1)
@@ -170,7 +170,7 @@ fn b16encode(str: String) -> String:
     alias lookup = "0123456789ABCDEF"
     var b16chars = lookup.unsafe_ptr()
 
-    var length = len(str)
+    var length = str.byte_length()
     var out = List[UInt8](capacity=length * 2 + 1)
 
     @parameter
@@ -221,7 +221,7 @@ fn b16decode(str: String) -> String:
 
         return -1
 
-    var n = len(str)
+    var n = str.byte_length()
     debug_assert(n % 2 == 0, "Input length must be divisible by 2")
 
     var p = List[UInt8](capacity=n // 2 + 1)

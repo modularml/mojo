@@ -115,6 +115,14 @@ def test_address_of():
     _ = local
 
 
+def test_explicit_copy_of_pointer_address():
+    var local = 1
+    var ptr = UnsafePointer[Int].address_of(local)
+    var copy = UnsafePointer(other=ptr)
+    assert_equal(int(ptr), int(copy))
+    _ = local
+
+
 def test_bitcast():
     var local = 1
     var ptr = UnsafePointer[Int].address_of(local)
@@ -228,6 +236,16 @@ def test_bool():
     ptr.free()
 
 
+def test_alignment():
+    var ptr = UnsafePointer[Int64].alloc[alignment=64](8)
+    assert_equal(int(ptr) % 64, 0)
+    ptr.free()
+
+    var ptr_2 = UnsafePointer[UInt8].alloc[alignment=32](32)
+    assert_equal(int(ptr_2) % 32, 0)
+    ptr_2.free()
+
+
 def main():
     test_address_of()
 
@@ -238,6 +256,7 @@ def main():
     test_unsafepointer_move_pointee_move_count()
     test_unsafepointer_initialize_pointee_explicit_copy()
 
+    test_explicit_copy_of_pointer_address()
     test_bitcast()
     test_unsafepointer_string()
     test_eq()
@@ -246,3 +265,4 @@ def main():
     test_unsafepointer_address_space()
     test_indexing()
     test_bool()
+    test_alignment()

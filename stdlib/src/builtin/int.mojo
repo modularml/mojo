@@ -22,11 +22,15 @@ from builtin.format_int import _try_write_int
 from builtin.hash import _hash_simd
 from builtin.io import _snprintf
 from builtin.simd import _format_scalar
-from builtin.string import _calc_initial_buffer_size
+from builtin.string import (
+    _calc_initial_buffer_size_int32,
+    _calc_initial_buffer_size_int64,
+)
 
 from utils import InlineArray
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils._select import _select_register_value as select
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -71,7 +75,7 @@ fn index[T: Indexer](idx: T, /) -> Int:
         idx: The value.
 
     Returns:
-        An `Int` respresenting the index value.
+        An `Int` representing the index value.
     """
     return idx.__index__()
 
@@ -233,6 +237,18 @@ fn int(value: String, base: Int = 10) raises -> Int:
     return atol(value, base)
 
 
+fn int(value: UInt) -> Int:
+    """Get the Int representation of the value.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The integral representation of the value.
+    """
+    return value.value
+
+
 # ===----------------------------------------------------------------------=== #
 #  Int
 # ===----------------------------------------------------------------------=== #
@@ -367,6 +383,15 @@ struct Int(
             value: The init value.
         """
         self = value.__index__()
+
+    @always_inline("nodebug")
+    fn __init__(inout self, value: UInt):
+        """Construct Int from the given UInt value.
+
+        Args:
+            value: The init value.
+        """
+        self = Self(value.value)
 
     # ===------------------------------------------------------------------=== #
     # Operator dunders
@@ -546,15 +571,14 @@ struct Int(
         Returns:
             `floor(self/rhs)` value.
         """
-        if rhs == 0:
-            # this should raise an exception.
-            return 0
-        var div: Int = self._positive_div(rhs)
-        if self > 0 and rhs > 0:
-            return div
+        # This should raise an exception
+        var denominator = select(rhs == 0, 1, rhs)
+        var div: Int = self._positive_div(denominator)
+
         var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
-            return div - 1
+        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
+        div = select(self > 0 & rhs > 0, div, divMod)
+        div = select(rhs == 0, 0, div)
         return div
 
     @always_inline("nodebug")
@@ -567,15 +591,15 @@ struct Int(
         Returns:
             The remainder of dividing self by rhs.
         """
-        if rhs == 0:
-            # this should raise an exception.
-            return 0
-        if rhs > 0 and self > 0:
-            return self._positive_rem(rhs)
-        var div: Int = self._positive_div(rhs)
+        var denominator = select(rhs == 0, 1, rhs)
+        var div: Int = self._positive_div(denominator)
+
         var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
-            return mod + rhs
+        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
+        mod = select(
+            self > 0 & rhs > 0, self._positive_rem(denominator), divMod
+        )
+        mod = select(rhs == 0, 0, mod)
         return mod
 
     @always_inline("nodebug")
@@ -591,10 +615,10 @@ struct Int(
         if rhs == 0:
             return 0, 0
         var div: Int = self._positive_div(rhs)
-        if rhs > 0 and self > 0:
+        if rhs > 0 & self > 0:
             return div, self._positive_rem(rhs)
         var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
+        if ((rhs < 0) ^ (self < 0)) & mod:
             return div - 1, mod + rhs
         return div, mod
 
@@ -989,7 +1013,7 @@ struct Int(
         Returns:
             The absolute value.
         """
-        return -self if self < 0 else self
+        return select(self < 0, -self, self)
 
     @always_inline("nodebug")
     fn __ceil__(self) -> Self:
@@ -1021,8 +1045,10 @@ struct Int(
     @always_inline("nodebug")
     fn __round__(self, ndigits: Int) -> Self:
         """Return the rounded value of the Int value, which is itself.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The Int value itself if ndigits >= 0 else the rounded value.
         """
@@ -1039,6 +1065,7 @@ struct Int(
         """
         return self
 
+    @no_inline
     fn __str__(self) -> String:
         """Get the integer as a string.
 
@@ -1048,6 +1075,7 @@ struct Int(
 
         return String.format_sequence(self)
 
+    @no_inline
     fn __repr__(self) -> String:
         """Get the integer as a string. Returns the same `String` as `__str__`.
 
@@ -1056,7 +1084,7 @@ struct Int(
         """
         return str(self)
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Hash the int using builtin hash.
 
         Returns:
@@ -1124,3 +1152,37 @@ struct Int(
             The integer modulus of `self` and `rhs` .
         """
         return __mlir_op.`index.rems`(self.value, rhs.value)
+
+    fn _decimal_digit_count(self) -> Int:
+        """
+        Returns the number of decimal digits required to display this integer.
+
+        Note that if this integer is negative, the returned count does not
+        include space to store a leading minus character.
+
+        Returns:
+            A count of the number of decimal digits required to display this integer.
+
+        Examples:
+
+        ```mojo
+        assert_equal(10._decimal_digit_count(), 2)
+
+        assert_equal(-10._decimal_digit_count(), 2)
+        ```
+        .
+        """
+
+        var n = abs(self)
+
+        alias is_32bit_system = bitwidthof[DType.index]() == 32
+
+        @parameter
+        if is_32bit_system:
+            return _calc_initial_buffer_size_int32(n)
+
+        # The value only has low-bits.
+        if n >> 32 == 0:
+            return _calc_initial_buffer_size_int32(n)
+
+        return _calc_initial_buffer_size_int64(n)

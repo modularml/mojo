@@ -20,8 +20,7 @@ from collections import InlineList
 """
 
 from sys.intrinsics import _type_is_eq
-from memory.unsafe import UnsafeMaybeUninitialized
-
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from utils import InlineArray
 
 
@@ -120,7 +119,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     fn __del__(owned self):
         """Destroy all the elements in the list and free the memory."""
         for i in range(self._size):
-            self._array[i].assume_initialized_destroy()
+            UnsafePointer.address_of(self._array[i]).destroy_pointee()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -145,7 +144,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         if idx < 0:
             idx += len(self)
 
-        return self._array[idx].assume_initialized()
+        return self._array[idx]
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -153,7 +152,11 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the length of the list."""
+        """Returns the length of the list.
+
+        Returns:
+            The number of elements in the list.
+        """
         return self._size
 
     @always_inline
@@ -175,9 +178,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         """
         return _InlineListIter(0, self)
 
-    @always_inline
     fn __contains__[
-        C: ComparableCollectionElement
+        C: EqualityComparableCollectionElement, //
     ](self: Self, value: C) -> Bool:
         """Verify if a given value is present in the list.
 
@@ -208,8 +210,9 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
-    fn count[C: ComparableCollectionElement](self: Self, value: C) -> Int:
+    fn count[
+        C: EqualityComparableCollectionElement, //
+    ](self: Self, value: C) -> Int:
         """Counts the number of occurrences of a value in the list.
 
         ```mojo
@@ -236,7 +239,6 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
                 count += 1
         return count
 
-    @always_inline
     fn append(inout self, owned value: ElementType):
         """Appends a value to the list.
 
@@ -244,5 +246,5 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             value: The value to append.
         """
         debug_assert(self._size < capacity, "List is full.")
-        self._array[self._size].write(value^)
+        self._array[self._size] = value^
         self._size += 1

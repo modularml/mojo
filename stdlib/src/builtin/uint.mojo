@@ -15,11 +15,14 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from builtin.format_int import _try_write_int
+from builtin.simd import _format_scalar
+
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(Stringable, Representable):
+struct UInt(Comparable, Formattable, Representable, Stringable):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -30,10 +33,10 @@ struct UInt(Stringable, Representable):
     `UInt8`, `UInt16`, `UInt32`, or `UInt64`.
     """
 
-    alias MAX = (2 ** bitwidthof[DType.index]()) - 1
+    alias MAX: UInt = (1 << bitwidthof[DType.index]()) - 1
     """Returns the maximum integer value."""
 
-    alias MIN = UInt(0)
+    alias MIN: UInt = 0
     """Returns the minimum value of type."""
 
     var value: __mlir_type.index
@@ -62,22 +65,33 @@ struct UInt(Stringable, Representable):
         self.value = value
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: Int):
+        """Construct UInt from the given index value.
+
+        Args:
+            value: The init value.
+        """
+        self.value = value.value
+
+    @always_inline("nodebug")
     fn __init__(inout self, value: IntLiteral):
         """Construct UInt from the given IntLiteral value.
 
         Args:
             value: The init value.
         """
-        # TODO: Find a way to convert directly without using UInt64.
-        # This is because the existing
-        # __mlir_op.`kgen.int_literal.convert`
-        # in IntLiteral.__as_mlir_index()
-        # assumes that the index represents an signed integer.
-        # We need a variant for unsigned integers.
-        # Change when https://github.com/modularml/mojo/issues/2933 is fixed
-        self.value = int(UInt64(value)).value
+        self = value.__uint__()
 
     @always_inline("nodebug")
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        return self.value
+
+    @no_inline
     fn __str__(self) -> String:
         """Convert this UInt to a string.
 
@@ -90,9 +104,9 @@ struct UInt(Stringable, Representable):
         Returns:
             The string representation of this UInt.
         """
-        return str(UInt64(self))
+        return String.format_sequence(self)
 
-    @always_inline("nodebug")
+    @no_inline
     fn __repr__(self) -> String:
         """Convert this UInt to a string.
 
@@ -200,8 +214,7 @@ struct UInt(Stringable, Representable):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        var div: UInt = self._positive_div(rhs)
-        return div
+        return __mlir_op.`index.divu`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: UInt) -> UInt:
@@ -216,7 +229,7 @@ struct UInt(Stringable, Representable):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        return self._positive_rem(rhs)
+        return __mlir_op.`index.remu`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __divmod__(self, rhs: UInt) -> Tuple[UInt, UInt]:
@@ -230,8 +243,7 @@ struct UInt(Stringable, Representable):
         """
         if rhs == 0:
             return Tuple[UInt, UInt](0, 0)
-        var div: UInt = self._positive_div(rhs)
-        return div, self._positive_rem(rhs)
+        return self // rhs, self % rhs
 
     @always_inline("nodebug")
     fn __pow__(self, exp: Self) -> Self:
@@ -245,10 +257,6 @@ struct UInt(Stringable, Representable):
         Returns:
             The value of `self` raised to the power of `exp`.
         """
-        if exp < 0:
-            # Not defined for Integers, this should raise an
-            # exception.
-            return 0
         var res: UInt = 1
         var x = self
         var n = exp
@@ -269,9 +277,6 @@ struct UInt(Stringable, Representable):
         Returns:
             `self << rhs`.
         """
-        if rhs < 0:
-            # this should raise an exception.
-            return 0
         return __mlir_op.`index.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -284,9 +289,6 @@ struct UInt(Stringable, Representable):
         Returns:
             `self >> rhs`.
         """
-        if rhs < 0:
-            # this should raise an exception.
-            return 0
         return __mlir_op.`index.shru`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -575,27 +577,15 @@ struct UInt(Stringable, Representable):
         return value ^ self
 
     @always_inline("nodebug")
-    fn _positive_div(self, rhs: UInt) -> UInt:
-        """Return the division of `self` and `rhs` assuming that the arguments
-        are both positive.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The integer division of `self` and `rhs` .
-        """
-        return __mlir_op.`index.divu`(self.value, rhs.value)
-
-    @always_inline("nodebug")
     fn __gt__(self, rhs: UInt) -> Bool:
-        """Compare this Int to the RHS using GT comparison.
+        """Return whether this UInt is strictly greater than another.
 
         Args:
-            rhs: The other Int to compare against.
+            rhs: The other UInt to compare against.
 
         Returns:
-            True if this Int is greater-than the RHS Int and False otherwise.
+            True if this UInt is greater than the other UInt and False
+            otherwise.
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ugt>`
@@ -603,6 +593,20 @@ struct UInt(Stringable, Representable):
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: UInt) -> Bool:
+        """Return whether this UInt is strictly less than another.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is less than the other UInt and False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ult>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: Int) -> Bool:
         """Compare this Int to the RHS using LT comparison.
 
         Args:
@@ -616,6 +620,35 @@ struct UInt(Stringable, Representable):
         ](self.value, rhs.value)
 
     @always_inline("nodebug")
+    fn __le__(self, rhs: UInt) -> Bool:
+        """Compare this Int to the RHS using LE comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this Int is less-than the RHS Int and False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ule>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: UInt) -> Bool:
+        """Return whether this UInt is greater than or equal to another.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is greater than or equal to the other UInt and
+            False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate uge>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Convert this Int to Bool.
 
@@ -623,19 +656,6 @@ struct UInt(Stringable, Representable):
             False Bool value if the value is equal to 0 and True otherwise.
         """
         return self != 0
-
-    @always_inline("nodebug")
-    fn _positive_rem(self, rhs: UInt) -> UInt:
-        """Return the modulus of `self` and `rhs` assuming that the arguments
-        are both positive.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The integer modulus of `self` and `rhs` .
-        """
-        return __mlir_op.`index.remu`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __index__(self) -> UInt:
@@ -677,10 +697,12 @@ struct UInt(Stringable, Representable):
         return self
 
     @always_inline("nodebug")
-    fn __round__(self, _ndigits: UInt) -> Self:
+    fn __round__(self, ndigits: UInt) -> Self:
         """Return the rounded value of the UInt value, which is itself.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The UInt value itself if ndigits >= 0 else the rounded value.
         """
@@ -703,3 +725,44 @@ struct UInt(Stringable, Representable):
             The absolute value.
         """
         return self
+
+    @always_inline("nodebug")
+    fn __pos__(self) -> UInt:
+        """Return +self.
+
+        Returns:
+            The +self value.
+        """
+        return self
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        @parameter
+        if triple_is_nvidia_cuda():
+            var err = _try_write_int(writer, UInt64(self))
+            if err:
+                abort(
+                    "unreachable: unexpected write int failure condition: "
+                    + str(err.value())
+                )
+        else:
+            _format_scalar(writer, UInt64(self))
+
+
+fn _temp_uint_from_int(x: Int) -> UInt:
+    """Constructs a UInt from an Int.
+
+    This is intentionally not an explicit constructor of UInt for
+    greppability purposes as we intend to remove this function entirely
+    once migration is done with UInt in internal code.
+
+    Args:
+        x: The Int value to construct a UInt from.
+    """
+    return UInt(x.value)

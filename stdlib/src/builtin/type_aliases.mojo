@@ -18,9 +18,6 @@ These are Mojo built-ins, so you don't need to import them.
 alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
 
-alias NoneType = __mlir_type.`!kgen.none`
-"""Represents the absence of a value."""
-
 alias ImmutableLifetime = __mlir_type.`!lit.lifetime<0>`
 """Immutable lifetime reference type."""
 

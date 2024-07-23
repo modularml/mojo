@@ -176,6 +176,17 @@ def test_equality():
     assert_true(sp[0:0] == sp3[0:0])
 
 
+def test_fill():
+    var a = List[Int](0, 1, 2, 3, 4, 5, 6, 7, 8)
+    var s = Span(a)
+
+    s.fill(2)
+
+    for i in range(len(a)):
+        assert_equal(a[i], 2)
+        assert_equal(s[i], 2)
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -185,3 +196,4 @@ def main():
     test_span_slice()
     test_equality()
     test_bool()
+    test_fill()

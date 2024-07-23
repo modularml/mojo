@@ -21,7 +21,7 @@
 # CHECK-LABEL: test_fail
 fn main():
     print("== test_fail")
-    # CHECK: Assert Error: fail,1,some string
-    debug_assert(False, "fail,", 1, String(",some string"))
+    # CHECK: Assert Error: this fails
+    debug_assert(False, "this fails")
     # CHECK-NOT: is never reached
     print("is never reached")

@@ -17,8 +17,12 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
-from builtin._stubs import _IntIterable, _StridedIterable
-from python import PythonObject
+from builtin._stubs import _IntIterable, _StridedIterable, _UIntStridedIterable
+from python import (
+    PythonObject,
+)  # TODO: remove this and fixup downstream imports
+from math import ceildiv
+from utils._select import _select_register_value as select
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -46,13 +50,12 @@ fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
     return (numerator + denominator - 1)._positive_div(denominator)
 
 
-@always_inline
+@always_inline("nodebug")
 fn _sign(x: Int) -> Int:
-    if x > 0:
-        return 1
-    if x < 0:
-        return -1
-    return 0
+    var result = 0
+    result = select(x > 0, 1, result)
+    result = select(x < 0, -1, result)
+    return result
 
 
 # ===----------------------------------------------------------------------=== #
@@ -86,6 +89,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
+        debug_assert(idx < self.__len__(), "index out of range")
         return index(idx)
 
     @always_inline("nodebug")
@@ -111,12 +115,11 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        # FIXME(#38392):
-        # return max(0, self.end - self.start)
-        return self.end - self.start if self.start < self.end else 0
+        return max(0, self.end - self.start)
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
+        debug_assert(idx < self.__len__(), "index out of range")
         return self.start + index(idx)
 
     @always_inline("nodebug")
@@ -164,7 +167,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     fn __iter__(self) -> _StridedRangeIterator:
         return _StridedRangeIterator(self.start, self.end, self.step)
 
-    @always_inline
+    @always_inline("nodebug")
     fn __next__(inout self) -> Int:
         var result = self.start
         self.start += self.step
@@ -172,14 +175,26 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        if (self.step > 0 and self.start > self.end) or (
-            self.step < 0 and self.start < self.end
-        ):
-            return 0
-        return _div_ceil_positive(abs(self.start - self.end), abs(self.step))
+        # If the step is positive we want to check that the start is smaller
+        # than the end, if the step is negative we want to check the reverse.
+        # We break this into selects to avoid generating branches.
+        var c1 = (self.step > 0) & (self.start > self.end)
+        var c2 = (self.step < 0) & (self.start < self.end)
+        var cnd = c1 | c2
+
+        var numerator = abs(self.start - self.end)
+        var denominator = abs(self.step)
+
+        # If the start is after the end and step is positive then we
+        # are generating an empty range. In this case divide 0/1 to
+        # return 0 without a branch.
+        return _div_ceil_positive(
+            select(cnd, 0, numerator), select(cnd, 1, denominator)
+        )
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
+        debug_assert(idx < self.__len__(), "index out of range")
         return self.start + index(idx) * self.step
 
     @always_inline("nodebug")
@@ -303,3 +318,131 @@ fn range[
         The constructed range.
     """
     return _StridedRange(int(start), int(end), int(step))
+
+
+# ===----------------------------------------------------------------------=== #
+# Range UInt
+# ===----------------------------------------------------------------------=== #
+
+
+@register_passable("trivial")
+struct _UIntZeroStartingRange(UIntSized):
+    var curr: UInt
+    var end: UInt
+
+    @always_inline
+    fn __init__(inout self, end: UInt):
+        self.curr = max(0, end)
+        self.end = self.curr
+
+    @always_inline
+    fn __iter__(self) -> Self:
+        return self
+
+    @always_inline
+    fn __next__(inout self) -> UInt:
+        var curr = self.curr
+        self.curr -= 1
+        return self.end - curr
+
+    @always_inline
+    fn __len__(self) -> UInt:
+        return self.curr
+
+    @always_inline
+    fn __getitem__(self, idx: UInt) -> UInt:
+        debug_assert(idx < self.__len__(), "index out of range")
+        return idx
+
+
+@value
+@register_passable("trivial")
+struct _UIntStridedRangeIterator(UIntSized):
+    var start: UInt
+    var end: UInt
+    var step: UInt
+
+    @always_inline
+    fn __len__(self) -> UInt:
+        return select(self.start < self.end, self.end - self.start, 0)
+
+    @always_inline
+    fn __next__(inout self) -> UInt:
+        var result = self.start
+        self.start += self.step
+        return result
+
+
+@value
+@register_passable("trivial")
+struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
+    var start: UInt
+    var end: UInt
+    var step: UInt
+
+    @always_inline("nodebug")
+    fn __init__(inout self, start: UInt, end: UInt, step: UInt):
+        self.start = start
+        self.end = end
+        debug_assert(
+            step != 0, "range() arg 3 (the step size) must not be zero"
+        )
+        debug_assert(
+            step != UInt(Int(-1)),
+            (
+                "range() arg 3 (the step size) cannot be -1.  Reverse range is"
+                " not supported yet for UInt ranges."
+            ),
+        )
+        self.step = step
+
+    @always_inline
+    fn __iter__(self) -> _UIntStridedRangeIterator:
+        return _UIntStridedRangeIterator(self.start, self.end, self.step)
+
+    @always_inline
+    fn __next__(inout self) -> UInt:
+        if self.start >= self.end:
+            return self.end
+        var result = self.start
+        self.start += self.step
+        return result
+
+    @always_inline
+    fn __len__(self) -> UInt:
+        if self.start >= self.end:
+            return 0
+        return ceildiv(self.end - self.start, self.step)
+
+    @always_inline
+    fn __getitem__(self, idx: UInt) -> UInt:
+        debug_assert(idx < self.__len__(), "index out of range")
+        return self.start + idx * self.step
+
+
+@always_inline
+fn range(end: UInt) -> _UIntZeroStartingRange:
+    """Constructs a [0; end) Range.
+
+    Args:
+        end: The end of the range.
+
+    Returns:
+        The constructed range.
+    """
+    return _UIntZeroStartingRange(end)
+
+
+@always_inline
+fn range(start: UInt, end: UInt, step: UInt = 1) -> _UIntStridedRange:
+    """Constructs a [start; end) Range with a given step.
+
+    Args:
+        start: The start of the range.
+        end: The end of the range.
+        step: The step for the range.  Defaults to 1.
+
+    Returns:
+        The constructed range.
+    """
+    return _UIntStridedRange(start, end, step)

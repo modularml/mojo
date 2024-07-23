@@ -13,7 +13,7 @@
 
 from pathlib import Path
 
-from memory import AddressSpace, DTypePointer, bitcast
+from memory import AddressSpace, bitcast
 
 alias _kStartTensorMarker = "["
 alias _kEndTensorMarker = "]"
@@ -23,8 +23,9 @@ alias _kCompactElemPerSide = _kCompactMaxElemsToPrint // 2
 
 
 fn _serialize_elements_compact[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
-](ptr: DTypePointer, len: Int):
+    type: DType, //,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
+](ptr: UnsafePointer[Scalar[type], _], len: Int):
     serialize_fn(_kStartTensorMarker)
     if len < _kCompactMaxElemsToPrint:
         _serialize_elements_complete[serialize_fn=serialize_fn](ptr, len)
@@ -43,20 +44,22 @@ fn _serialize_elements_compact[
 
 
 fn _serialize_elements_complete[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
-](ptr: DTypePointer, len: Int):
+    type: DType, //,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
+](ptr: UnsafePointer[Scalar[type], _], len: Int):
     if len == 0:
         return
-    serialize_fn(Scalar.load(ptr))
+    serialize_fn(Scalar[type].load(ptr))
     for i in range(1, len):
         serialize_fn(", ")
-        serialize_fn(Scalar.load(ptr, i))
+        serialize_fn(Scalar[type].load(ptr, i))
 
 
 fn _serialize_elements[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
+    type: DType, //,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
     compact: Bool = False,
-](ptr: DTypePointer, len: Int):
+](ptr: UnsafePointer[Scalar[type], _], len: Int):
     @parameter
     if compact:
         _serialize_elements_compact[serialize_fn=serialize_fn](ptr, len)
@@ -65,11 +68,12 @@ fn _serialize_elements[
 
 
 fn _serialize[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
+    type: DType, //,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
     serialize_dtype: Bool = True,
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
-](ptr: DTypePointer, shape: List[Int]):
+](ptr: UnsafePointer[Scalar[type], _], shape: List[Int]):
     var rank = len(shape)
     if rank == 0:
         if serialize_end_line:
@@ -158,7 +162,7 @@ fn _serialize[
 
     if serialize_dtype:
         serialize_fn(", dtype=")
-        serialize_fn(ptr.type)
+        serialize_fn(type)
 
     if serialize_shape:
         serialize_fn(", shape=")

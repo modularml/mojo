@@ -15,7 +15,7 @@
 You can import these APIs from the `bit` package. For example:
 
 ```mojo
-from bit import countl_zero
+from bit import count_leading_zeros
 ```
 """
 
@@ -23,12 +23,12 @@ from sys import llvm_intrinsic
 from sys.info import bitwidthof
 
 # ===----------------------------------------------------------------------===#
-# countl_zero
+# count_leading_zeros
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn countl_zero(val: Int) -> Int:
+fn count_leading_zeros(val: Int) -> Int:
     """Counts the number of leading zeros of an integer.
 
     Args:
@@ -41,7 +41,7 @@ fn countl_zero(val: Int) -> Int:
 
 
 @always_inline("nodebug")
-fn countl_zero[
+fn count_leading_zeros[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the per-element number of leading zeros in a SIMD vector.
@@ -67,12 +67,12 @@ fn countl_zero[
 
 
 # ===----------------------------------------------------------------------===#
-# countr_zero
+# count_trailing_zeros
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn countr_zero(val: Int) -> Int:
+fn count_trailing_zeros(val: Int) -> Int:
     """Counts the number of trailing zeros for an integer.
 
     Args:
@@ -85,7 +85,7 @@ fn countr_zero(val: Int) -> Int:
 
 
 @always_inline("nodebug")
-fn countr_zero[
+fn count_trailing_zeros[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the per-element number of trailing zeros in a SIMD vector.
@@ -113,7 +113,19 @@ fn countr_zero[
 # ===----------------------------------------------------------------------===#
 # bit_reverse
 # ===----------------------------------------------------------------------===#
-# TODO: implement bit_reverse for Int type
+
+
+@always_inline("nodebug")
+fn bit_reverse(val: Int) -> Int:
+    """Reverses the bitpattern of an integer value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The input value with its bitpattern reversed.
+    """
+    return llvm_intrinsic["llvm.bitreverse", Int, has_side_effect=False](val)
 
 
 @always_inline("nodebug")
@@ -145,7 +157,24 @@ fn bit_reverse[
 # ===----------------------------------------------------------------------===#
 # byte_swap
 # ===----------------------------------------------------------------------===#
-# TODO: implement byte_swap for Int type
+
+
+@always_inline("nodebug")
+fn byte_swap(val: Int) -> Int:
+    """Byte-swaps an integer value with an even number of bytes.
+
+    Byte swap an integer value (8 bytes) with an even number of bytes (positive multiple
+    of 16 bits). This returns an integer value (8 bytes) that has its bytes swapped. For
+    example, if the input bytes are numbered 0, 1, 2, 3, 4, 5, 6, 7 then the returned
+    integer will have its bytes in 7, 6, 5, 4, 3, 2, 1, 0 order.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The input value with its bytes swapped.
+    """
+    return llvm_intrinsic["llvm.bswap", Int, has_side_effect=False](val)
 
 
 @always_inline("nodebug")
@@ -155,16 +184,12 @@ fn byte_swap[
     """Byte-swaps a SIMD vector of integer values with an even number of bytes.
 
     Byte swap an integer value or vector of integer values with an even number
-    of bytes (positive multiple of 16 bits). This is equivalent to `llvm.bswap`
-    intrinsic that has the following semantics:
-
-    The `llvm.bswap.i16` intrinsic returns an i16 value that has the high and
-    low byte of the input i16 swapped. Similarly, the `llvm.bswap.i32` intrinsic
-    returns an i32 value that has the four bytes of the input i32 swapped, so
-    that if the input bytes are numbered 0, 1, 2, 3 then the returned i32 will
-    have its bytes in 3, 2, 1, 0 order. The `llvm.bswap.i48`, `llvm.bswap.i64`
-    and other intrinsics extend this concept to additional even-byte lengths (6
-    bytes, 8 bytes and more, respectively).
+    of bytes (positive multiple of 16 bits). For example, The Int16 returns an
+    Int16 value that has the high and low byte of the input Int16 swapped.
+    Similarly, Int32 returns an Int32 value that has the four bytes of the input Int32 swapped,
+    so that if the input bytes are numbered 0, 1, 2, 3 then the returned Int32 will
+    have its bytes in 3, 2, 1, 0 order. Int64 and other integer type extend this
+    concept to additional even-byte lengths (6 bytes, 8 bytes and more, respectively).
 
     Parameters:
         type: `dtype` used for the computation.
@@ -190,7 +215,19 @@ fn byte_swap[
 # ===----------------------------------------------------------------------===#
 # pop_count
 # ===----------------------------------------------------------------------===#
-# TODO: implement pop_count for Int type
+
+
+@always_inline("nodebug")
+fn pop_count(val: Int) -> Int:
+    """Counts the number of bits set in an integer value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The number of bits set in the input value.
+    """
+    return llvm_intrinsic["llvm.ctpop", Int, has_side_effect=False](val)
 
 
 @always_inline("nodebug")
@@ -222,7 +259,6 @@ fn pop_count[
 # ===----------------------------------------------------------------------===#
 # bit_not
 # ===----------------------------------------------------------------------===#
-# TODO: implement bit_not for Int type
 
 
 @always_inline("nodebug")
@@ -267,7 +303,7 @@ fn bit_width(val: Int) -> Int:
     """
     alias bitwidth = bitwidthof[Int]()
 
-    return bitwidth - countl_zero(~val if val < 0 else val)
+    return bitwidth - count_leading_zeros(~val if val < 0 else val)
 
 
 @always_inline
@@ -299,10 +335,10 @@ fn bit_width[
 
     @parameter
     if type.is_unsigned():
-        return bitwidth - countl_zero(val)
+        return bitwidth - count_leading_zeros(val)
     else:
-        var leading_zero_pos = countl_zero(val)
-        var leading_zero_neg = countl_zero(bit_not(val))
+        var leading_zero_pos = count_leading_zeros(val)
+        var leading_zero_neg = count_leading_zeros(bit_not(val))
         var leading_zero = (val < 0).select(leading_zero_neg, leading_zero_pos)
         return bitwidth - leading_zero
 
@@ -357,7 +393,7 @@ fn is_power_of_two[
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_ceil
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_ceil(val: Int) -> Int:
     """Computes the smallest power of 2 that is greater than or equal to the
     input value. Any integral value less than or equal to 1 will be ceiled to 1.

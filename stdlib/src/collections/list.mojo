@@ -25,7 +25,6 @@ from sys.intrinsics import _type_is_eq
 from memory import Reference, UnsafePointer
 
 from utils import Span
-from utils._format import write_to
 
 from .optional import Optional
 
@@ -77,7 +76,9 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
+struct List[T: CollectionElement](
+    CollectionElement, CollectionElementNew, Sized, Boolable
+):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -105,14 +106,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the given list.
 
         Args:
-            existing: The list to copy.
+            other: The list to copy.
         """
-        self.__init__(capacity=existing.capacity)
-        for e in existing:
+        self.__init__(capacity=other.capacity)
+        for e in other:
             self.append(e[])
 
     fn __init__(inout self, *, capacity: Int):
@@ -185,22 +186,77 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         for i in range(len(existing)):
             self.append(existing[i])
 
-    @always_inline
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
-        if self.data:
-            self.data.free()
+        self.data.free()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
     @always_inline
+    fn __eq__[
+        U: EqualityComparableCollectionElement, //
+    ](self: List[U], other: List[U]) -> Bool:
+        """Checks if two lists are equal.
+
+        Examples:
+        ```mojo
+        var x = List[Int](1, 2, 3)
+        var y = List[Int](1, 2, 3)
+        if x == y: print("x and y are equal")
+        ```
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+               traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            other: The list to compare with.
+
+        Returns:
+            True if the lists are equal, False otherwise.
+        """
+        if len(self) != len(other):
+            return False
+        var index = 0
+        for element in self:
+            if element[] != other[index]:
+                return False
+            index += 1
+        return True
+
+    @always_inline
+    fn __ne__[
+        U: EqualityComparableCollectionElement, //
+    ](self: List[U], other: List[U]) -> Bool:
+        """Checks if two lists are not equal.
+
+        Examples:
+
+        ```mojo
+        var x = List[Int](1, 2, 3)
+        var y = List[Int](1, 2, 4)
+        if x != y: print("x and y are not equal")
+        ```
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+               traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            other: The list to compare with.
+
+        Returns:
+            True if the lists are not equal, False otherwise.
+        """
+        return not (self == other)
+
     fn __contains__[
-        T2: ComparableCollectionElement
-    ](self: List[T], value: T2) -> Bool:
+        U: EqualityComparableCollectionElement, //
+    ](self: List[U], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -208,7 +264,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if 3 in x: print("x contains 3")
         ```
         Parameters:
-            T2: The type of the elements in the list. Must implement the
+            U: The type of the elements in the list. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
@@ -217,14 +273,11 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             True if the value is contained in the list, False otherwise.
         """
-
-        constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if rebind[Reference[T2, __lifetime_of(self)]](i)[] == value:
+            if i[] == value:
                 return True
         return False
 
-    @always_inline("nodebug")
     fn __mul__(self, x: Int) -> Self:
         """Multiplies the list by x and returns a new list.
 
@@ -237,11 +290,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # avoid the copy since it would be cleared immediately anyways
         if x == 0:
             return Self()
-        var result = List(self)
+        var result = List(other=self)
         result.__mul(x)
         return result^
 
-    @always_inline("nodebug")
     fn __imul__(inout self, x: Int):
         """Multiplies the list by x in place.
 
@@ -250,7 +302,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self.__mul(x)
 
-    @always_inline("nodebug")
     fn __add__(self, owned other: Self) -> Self:
         """Concatenates self with other and returns the result as a new list.
 
@@ -260,11 +311,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The newly created list.
         """
-        var result = List(self)
+        var result = List(other=self)
         result.extend(other^)
         return result^
 
-    @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Appends the elements of other into self.
 
@@ -311,7 +361,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         return len(self) > 0
 
-    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    @no_inline
+    fn __str__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -325,7 +376,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+        The elements' type must implement the `__repr__()` method for this to work.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -339,8 +390,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.format_to(writer)
         return output^
 
+    @no_inline
     fn format_to[
-        U: RepresentableCollectionElement
+        U: RepresentableCollectionElement, //
     ](self: List[U], inout writer: Formatter):
         """Write `my_list.__str__()` to a `Formatter`.
 
@@ -357,14 +409,16 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 writer.write(", ")
         writer.write("]")
 
-    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    @no_inline
+    fn __repr__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
         """Returns a string representation of a `List`.
+
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(my_list.__repr__(my_list))
+        print(my_list.__repr__())
         ```
 
         When the compiler supports conditional methods, then a simple `repr(my_list)` will
@@ -385,7 +439,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
     fn _realloc(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
@@ -397,7 +450,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.data = new_data
         self.capacity = new_capacity
 
-    @always_inline
     fn append(inout self, owned value: T):
         """Appends a value to this list.
 
@@ -409,7 +461,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    @always_inline
     fn insert(inout self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
@@ -439,7 +490,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             earlier_idx -= 1
             later_idx -= 1
 
-    @always_inline
     fn __mul(inout self, x: Int):
         """Appends the original elements of this list x-1 times.
 
@@ -454,12 +504,11 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if x == 0:
             self.clear()
             return
-        var orig = List(self)
+        var orig = List(other=self)
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
 
-    @always_inline
     fn extend(inout self, owned other: List[T]):
         """Extends this list by consuming the elements of `other`.
 
@@ -500,7 +549,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # list.
         self.size = final_size
 
-    @always_inline
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
@@ -525,7 +573,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 self._realloc(self.capacity // 2)
         return ret_val^
 
-    @always_inline
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
@@ -539,7 +586,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             return
         self._realloc(new_capacity)
 
-    @always_inline
     fn resize(inout self, new_size: Int, value: T):
         """Resizes the list to the given new size.
 
@@ -559,7 +605,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 (self.data + i).init_pointee_copy(value)
             self.size = new_size
 
-    @always_inline
     fn resize(inout self, new_size: Int):
         """Resizes the list to the given new size.
 
@@ -569,19 +614,18 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             new_size: The new size.
         """
-        debug_assert(
-            new_size <= self.size,
-            (
-                "New size must be smaller than or equal to current size when no"
-                " new value is provided."
-            ),
-        )
+        if self.size < new_size:
+            abort(
+                "You are calling List.resize with a new_size bigger than the"
+                " current size. If you want to make the List bigger, provide a"
+                " value to fill the new slots with. If not, make sure the new"
+                " size is smaller than the current size."
+            )
         for i in range(new_size, self.size):
             (self.data + i).destroy_pointee()
         self.size = new_size
         self.reserve(new_size)
 
-    @always_inline
     fn reverse(inout self):
         """Reverses the elements of the list."""
 
@@ -604,7 +648,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: ComparableCollectionElement
+        C: EqualityComparableCollectionElement, //
     ](
         ref [_]self: List[C],
         value: C,
@@ -629,7 +673,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         Parameters:
             C: The type of the elements in the list. Must implement the
-                `ComparableCollectionElement` trait.
+                `EqualityComparableCollectionElement` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
@@ -677,7 +721,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    @always_inline
     fn __getitem__(self, span: Slice) -> Self:
         """Gets the sequence of elements at the specified positions.
 
@@ -703,7 +746,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         return res^
 
-    @always_inline
     fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
         """Gets the list element at the given index.
 
@@ -722,24 +764,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             normalized_idx += len(self)
 
         return (self.data + normalized_idx)[]
-
-    # TODO(30737): Replace __getitem__ with this, but lots of places use it
-    fn __get_ref(
-        ref [_]self: Self, i: Int
-    ) -> Reference[T, __lifetime_of(self)]:
-        """Gets a reference to the list element at the given index.
-
-        Args:
-            i: The index of the element.
-
-        Returns:
-            An immutable reference to the element at the given index.
-        """
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += self.size
-
-        return self.unsafe_get(normalized_idx)
 
     @always_inline
     fn unsafe_get(
@@ -764,17 +788,15 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         debug_assert(
             0 <= idx < len(self),
-            "The index provided must be within the range [0,",
-            len(self),
-            "[",
-            " when using List.unsafe_get(). But you provided: ",
-            idx,
-            ".",
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_get()"
+            ),
         )
         return (self.data + idx)[]
 
     @always_inline
-    fn unsafe_set(self, idx: Int, owned value: T):
+    fn unsafe_set(inout self, idx: Int, owned value: T):
         """Write a value to a given location without checking index bounds.
 
         Users should consider using `my_list[idx] = value` instead of this method as it
@@ -800,7 +822,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         (self.data + idx).destroy_pointee()
         (self.data + idx).init_pointee_move(value^)
 
-    fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
+    fn count[
+        T: EqualityComparableCollectionElement, //
+    ](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.
