@@ -1118,11 +1118,11 @@ def test_lstrip():
 
     # with custom chars for lstrip
     var str3 = String("mississippi")
-    assert_equal(str3.lstrip("mis"), "ppi")
+    assert_true(str3.lstrip("mis") == "ppi")
 
     var str4 = String(" \n mississippimississippi")
-    assert_equal(str4.lstrip("mis "), "\n mississippimississippi")
-    assert_equal(str4.lstrip("mis \n"), "ppimississippi")
+    assert_true(str4.lstrip("mis ") == "\n mississippimississippi")
+    assert_true(str4.lstrip("mis \n") == "ppimississippi")
 
 
 def test_strip():
@@ -1154,9 +1154,7 @@ def test_strip():
 
     # with custom strip chars
     var str3 = String("mississippi")
-    assert_equal(
-        str3.strip("mips")._buffer.__str__(), String("")._buffer.__str__()
-    )
+    assert_equal(str3.strip("mips"), "")
     assert_true(str3.strip("mip") == "ssiss")
     alias comp_str3_stripped = String("mississippi").strip("mips")
     assert_true(comp_str3_stripped == "")
