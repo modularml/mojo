@@ -289,7 +289,6 @@ struct InlineArray[
                 self.unsafe_ptr() + i
             )
 
-    @doc_private
     fn __init__[
         ThisElementType: CollectionElementNew, this_size: Int
     ](
@@ -297,6 +296,33 @@ struct InlineArray[
             UnsafeMaybeUninitialized[ThisElementType], this_size
         ]
     ):
+        """Contructs an `InlineArray` without initializing the elements.
+
+        Note that this is only possible when the element type is `UnsafeMaybeUninitialized`.
+
+        For example, the following code is valid:
+
+        ```mojo
+        var arr = InlineArray[UnsafeMaybeUninitialized[Int], 2]()
+        arr[0].write(10)
+        arr[1].write(20)
+        ```
+
+        But the following is invalid:
+
+        ```mojo
+        var arr = InlineArray[Int, 2]()
+        ```
+        Since uninitialized integers is undefined behavior.
+
+        Afterwards it's the responsibility of the user to handle `UnsafeMaybeUninitialized`
+        elements correctly since, as the name implies, they are unsafe.
+        For more information on the subject, see the `UnsafeMaybeUninitialized` documentation.
+
+        Parameters:
+            ThisElementType: The element type of the array (the one wrapped inside `UnsafeMaybeUninitialized`).
+            this_size: The size of the array.
+        """
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[
             _type = __mlir_type[
