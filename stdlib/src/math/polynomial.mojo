@@ -81,15 +81,10 @@ fn _horner_evaluate[
     Returns:
         The polynomial specified by the coefficients evaluated at value x.
     """
-    alias num_coefficients = len(coefficients)
-    alias c_last = coefficients[num_coefficients - 1]
-    alias c_second_from_last = coefficients[num_coefficients - 2]
-
-    var result = x.fma(c_last, c_second_from_last)
+    var result = x.fma(coefficients[-1], coefficients[-2])
 
     @parameter
-    for i in reversed(range(num_coefficients - 2)):
-        alias c = coefficients[i]
-        result = result.fma(x, c)
+    for i in reversed(range(len(coefficients) - 2)):
+        result = result.fma(x, coefficients[i])
 
     return result
