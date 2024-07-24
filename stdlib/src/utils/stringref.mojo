@@ -461,6 +461,8 @@ struct StringRef(
 
         return res
 
+    # TODO: remove this method later on when nothing depends on it anymore.
+    # It has already been copied to `StringSlice`.
     fn find(self, substr: StringRef, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
