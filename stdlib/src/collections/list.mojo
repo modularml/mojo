@@ -44,9 +44,9 @@ struct _ListIter[
     """Iterator for List.
 
     Parameters:
+        list_mutability: The mutability of the list.
         T: The type of the elements in the list.
         small_buffer_size: The size of the small buffer.
-        T: The type of the elements in the list.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -214,7 +214,7 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         """
         self.size = existing.size
         self.capacity = existing.capacity
-        self._small_buffer = existing._small_buffer
+        self._small_buffer = Self._small_buffer_type()
 
         @parameter
         if Self.sbo_enabled:
@@ -222,6 +222,10 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
                 # Needed to avoid "potential indirect access to uninitialized value 'self.data'"
                 self.data = UnsafePointer[T]()
                 self.data = self._small_buffer.unsafe_ptr().bitcast[T]()
+
+                # We must move all elements from the previous small buffer to the new one.
+                for i in range(existing.size):
+                    (existing.data + i).move_pointee_into(self.data + i)
                 return
         self.data = existing.data
 
@@ -363,6 +367,9 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         U, Self.small_buffer_size
     ]:
         """Concatenates self with other and returns the result as a new list.
+
+        Parameters:
+            U: The type of elements in the `List`.
 
         Args:
             other: List whose elements will be combined with the elements of self.

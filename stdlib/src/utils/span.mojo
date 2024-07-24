@@ -115,9 +115,6 @@ struct Span[
     fn __init__(inout self, ref [lifetime]list: List[T, _]):
         """Construct a Span from a List.
 
-        Parameters:
-            small_buffer_size: The size of the small buffer in the list.
-
         Args:
             list: The list to which the span refers.
         """
