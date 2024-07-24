@@ -31,7 +31,7 @@ from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
-from memory import bitcast, DTypePointer
+from memory import bitcast, UnsafePointer
 
 from utils import InlineArray, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -2497,11 +2497,12 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_]) -> Self:
-        """Loads the value the pointer points to.
+    ](ptr: UnsafePointer[Scalar[type], *_]) -> Self:
+        """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
+            The offset must be integer.
 
         Parameters:
             alignment: The minimal alignment of the address.
@@ -2512,14 +2513,14 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The loaded value.
         """
-        return Self.load[alignment=alignment](ptr, offset=0)
+        return Self.load[alignment=alignment](ptr, int(0))
 
     @staticmethod
     @always_inline
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_], offset: Scalar) -> Self:
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: Scalar) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2590,7 +2591,7 @@ struct SIMD[type: DType, size: Int](
     fn load[
         *,
         alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_], offset: Int) -> Self:
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: UInt) -> Self:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -2607,14 +2608,14 @@ struct SIMD[type: DType, size: Int](
             The loaded value.
         """
 
-        return Self.load[alignment=alignment](ptr.address, offset)
+        return Self.load[alignment=alignment](ptr, int(offset))
 
     @staticmethod
     @always_inline
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_], offset: Int, val: Self):
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2636,7 +2637,7 @@ struct SIMD[type: DType, size: Int](
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_], offset: Scalar, val: Self):
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: Scalar, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2652,26 +2653,6 @@ struct SIMD[type: DType, size: Int](
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
         Self.store[alignment=alignment](ptr, int(offset), val)
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_], val: Self):
-        """Stores a single element value.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            val: The value to store.
-        """
-        Self.store[alignment=alignment](ptr.address, val)
 
     @staticmethod
     @always_inline("nodebug")
@@ -2704,7 +2685,7 @@ struct SIMD[type: DType, size: Int](
     fn store[
         *,
         alignment: Int = Self._default_alignment,
-    ](ptr: DTypePointer[type, *_], offset: UInt, val: Self):
+    ](ptr: UnsafePointer[Scalar[type], *_], offset: UInt, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:

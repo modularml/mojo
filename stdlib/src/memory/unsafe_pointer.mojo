@@ -149,14 +149,6 @@ struct UnsafePointer[
         return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
 
     @staticmethod
-    fn _from_dtype_ptr[
-        dtype: DType,
-    ](ptr: DTypePointer[dtype, address_space]) -> UnsafePointer[
-        Scalar[dtype], address_space
-    ]:
-        return ptr.address.address
-
-    @staticmethod
     @always_inline
     fn alloc(count: Int, alignment: Int = alignof[T]()) -> Self:
         """Allocate an array with specified or default alignment.
@@ -231,7 +223,7 @@ struct UnsafePointer[
             idx: The offset of the new pointer.
 
         Returns:
-            The new constructed DTypePointer.
+            The new constructed UnsafePointer.
         """
         return __mlir_op.`pop.offset`(self.address, idx.value)
 
