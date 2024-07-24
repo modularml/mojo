@@ -720,12 +720,12 @@ struct String(
     fn __init__(inout self, owned impl: Self._buffer_type):
         """Construct a string from a buffer of bytes.
 
-        The buffer must have a small buffer optimization size of 16 bytes exactly
+        The buffer must have a small buffer optimization size of 15 bytes exactly
         for this constructor to be called.
         The buffer must be terminated with a null byte:
 
         ```mojo
-        var buf = List[UInt8, 16]()
+        var buf = List[UInt8, 15]()
         buf.append(ord('H'))
         buf.append(ord('i'))
         buf.append(0)
