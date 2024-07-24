@@ -174,7 +174,7 @@ fn test_sort3_dupe_elements() raises:
         list.append(3)
         list.append(3)
 
-        _quicksort[Int, cmp_fn](list.data, len(list))
+        _quicksort[cmp_fn](list)
 
         var expected = List[Int](3, 3, 5)
         for i in range(length):
@@ -327,7 +327,7 @@ fn test_quick_sort_repeated_val() raises:
     ) -> Bool:
         return lhs.data > rhs.data
 
-    _quicksort[Float32, _greater_than](list.data, len(list))
+    _quicksort[_greater_than](list)
 
     var expected = List[Float32](
         9.0,
@@ -414,7 +414,7 @@ fn test_quick_sort_repeated_val() raises:
         9.0,
         9.0,
     )
-    _quicksort[Float32, _less_than](list.data, len(list))
+    _quicksort[_less_than](list)
     for i in range(0, length):
         assert_equal(expected[i], list[i])
 
@@ -429,7 +429,7 @@ fn test_partition_top_k(length: Int, k: Int) raises:
     fn _great_than(lhs: Float32, rhs: Float32) -> Bool:
         return lhs > rhs
 
-    _ = partition[DType.float32, _great_than](list.data, k, len(list))
+    _ = partition[_great_than](list, k)
 
     for i in range(0, k):
         assert_false(list[i] < length - k)
@@ -450,7 +450,7 @@ fn test_sort_stress() raises:
         for _ in range(length):
             list.append(int(random_si64(-length, length)))
 
-        _quicksort[Int, cmp_fn](list.data, len(list))
+        _quicksort[cmp_fn](list)
 
         for i in range(length - 1):
             assert_true(check_fn(list[i], list[i + 1]))
@@ -500,7 +500,7 @@ fn test_sort_custom() raises:
     fn compare_fn(lhs: MyStruct, rhs: MyStruct) -> Bool:
         return lhs.val < rhs.val
 
-    sort[MyStruct, compare_fn](list)
+    sort[compare_fn](list)
 
     for i in range(1, length):
         assert_false(list[i - 1].val > list[i].val)
