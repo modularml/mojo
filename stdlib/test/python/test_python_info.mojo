@@ -14,9 +14,8 @@
 # RUN: %mojo %s
 
 
-from python._cpython import PythonVersion
 from python import Python
-
+from python._cpython import PythonVersion
 from testing import assert_equal
 
 

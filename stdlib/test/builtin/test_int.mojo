@@ -14,11 +14,7 @@
 
 from sys.info import bitwidthof
 
-from testing import assert_equal
-
-
-def test_constructors():
-    var i1 = Int(3)  # Constructible from IntLiteral
+from testing import assert_equal, assert_true, assert_false
 
 
 def test_properties():
@@ -27,26 +23,33 @@ def test_properties():
 
 
 def test_add():
-    assert_equal(6, Int(3) + Int(3))
+    assert_equal(Int.__add__(Int(3), Int(3)), 6)
+    assert_equal(Int.__add__(Int(-2), Int(3)), 1)
+    assert_equal(Int.__add__(Int(2), Int(-3)), -1)
+    assert_equal(Int.__add__(Int(5), Int(-5)), 0)
+    assert_equal(Int.__add__(Int(-5), Int(-4)), -9)
 
 
 def test_sub():
-    assert_equal(3, Int(4) - Int(1))
-    assert_equal(5, Int(6) - Int(1))
+    assert_equal(Int.__sub__(Int(3), Int(3)), 0)
+    assert_equal(Int.__sub__(Int(-2), Int(3)), -5)
+    assert_equal(Int.__sub__(Int(2), Int(-3)), 5)
+    assert_equal(Int.__sub__(Int(5), Int(4)), 1)
+    assert_equal(Int.__sub__(Int(4), Int(5)), -1)
 
 
 def test_div():
     var n = Int(5)
     var d = Int(2)
-    assert_equal(2.5, n / d)
-    n /= d
+    assert_equal(2.5, Int.__truediv__(n, d))
+    Int.__itruediv__(n, d)
     assert_equal(2, n)
 
 
 def test_pow():
-    assert_equal(1, Int(3) ** Int(0))
-    assert_equal(27, Int(3) ** Int(3))
-    assert_equal(81, Int(3) ** Int(4))
+    assert_equal(1, Int.__pow__(Int(3), Int(0)))
+    assert_equal(27, Int.__pow__(Int(3), Int(3)))
+    assert_equal(81, Int.__pow__(Int(3), Int(4)))
 
 
 def test_ceil():
@@ -65,6 +68,10 @@ def test_round():
     assert_equal(Int.__round__(Int(5)), 5)
     assert_equal(Int.__round__(Int(0)), 0)
     assert_equal(Int.__round__(Int(-5)), -5)
+    assert_equal(Int.__round__(5, 1), 5)
+    assert_equal(Int.__round__(0, 1), 0)
+    assert_equal(Int.__round__(-5, 1), -5)
+    assert_equal(Int.__round__(100, -2), 100)
 
 
 def test_trunc():
@@ -74,23 +81,23 @@ def test_trunc():
 
 
 def test_floordiv():
-    assert_equal(1, Int(2) // Int(2))
-    assert_equal(0, Int(2) // Int(3))
-    assert_equal(-1, Int(2) // Int(-2))
-    assert_equal(-50, Int(99) // Int(-2))
-    assert_equal(-1, Int(-1) // Int(10))
+    assert_equal(1, Int.__floordiv__(Int(2), Int(2)))
+    assert_equal(0, Int.__floordiv__(Int(2), Int(3)))
+    assert_equal(-1, Int.__floordiv__(Int(2), Int(-2)))
+    assert_equal(-50, Int.__floordiv__(Int(99), Int(-2)))
+    assert_equal(-1, Int.__floordiv__(Int(-1), Int(10)))
 
 
 def test_mod():
-    assert_equal(0, Int(99) % Int(1))
-    assert_equal(0, Int(99) % Int(3))
-    assert_equal(-1, Int(99) % Int(-2))
-    assert_equal(3, Int(99) % Int(8))
-    assert_equal(-5, Int(99) % Int(-8))
-    assert_equal(0, Int(2) % Int(-1))
-    assert_equal(0, Int(2) % Int(-2))
-    assert_equal(-1, Int(3) % Int(-2))
-    assert_equal(1, Int(-3) % Int(2))
+    assert_equal(0, Int.__mod__(Int(99), Int(1)))
+    assert_equal(0, Int.__mod__(Int(99), Int(3)))
+    assert_equal(-1, Int.__mod__(Int(99), Int(-2)))
+    assert_equal(3, Int.__mod__(Int(99), Int(8)))
+    assert_equal(-5, Int.__mod__(Int(99), Int(-8)))
+    assert_equal(0, Int.__mod__(Int(2), Int(-1)))
+    assert_equal(0, Int.__mod__(Int(2), Int(-2)))
+    assert_equal(-1, Int.__mod__(Int(3), Int(-2)))
+    assert_equal(1, Int.__mod__(Int(-3), Int(2)))
 
 
 def test_divmod():
@@ -122,25 +129,25 @@ def test_divmod():
 
 
 def test_abs():
-    assert_equal(abs(Int(-5)), 5)
-    assert_equal(abs(Int(2)), 2)
-    assert_equal(abs(Int(0)), 0)
+    assert_equal(Int(-5).__abs__(), 5)
+    assert_equal(Int(2).__abs__(), 2)
+    assert_equal(Int(0).__abs__(), 0)
 
 
 def test_string_conversion():
-    assert_equal(str(Int(3)), "3")
-    assert_equal(str(Int(-3)), "-3")
-    assert_equal(str(Int(0)), "0")
-    assert_equal(str(Int(100)), "100")
-    assert_equal(str(Int(-100)), "-100")
+    assert_equal(Int(3).__str__(), "3")
+    assert_equal(Int(-3).__str__(), "-3")
+    assert_equal(Int(0).__str__(), "0")
+    assert_equal(Int(100).__str__(), "100")
+    assert_equal(Int(-100).__str__(), "-100")
 
 
 def test_int_representation():
-    assert_equal(repr(Int(3)), "3")
-    assert_equal(repr(Int(-3)), "-3")
-    assert_equal(repr(Int(0)), "0")
-    assert_equal(repr(Int(100)), "100")
-    assert_equal(repr(Int(-100)), "-100")
+    assert_equal(Int(3).__repr__(), "3")
+    assert_equal(Int(-3).__repr__(), "-3")
+    assert_equal(Int(0).__repr__(), "0")
+    assert_equal(Int(100).__repr__(), "100")
+    assert_equal(Int(-100).__repr__(), "-100")
 
 
 def test_indexer():
@@ -148,8 +155,79 @@ def test_indexer():
     assert_equal(987, Int(987).__index__())
 
 
+def test_bool():
+    assert_true(Int(5).__bool__())
+    assert_false(Int(0).__bool__())
+    assert_true(Int(5).__as_bool__())
+    assert_false(Int(0).__as_bool__())
+
+
+def test_decimal_digit_count():
+    assert_equal(Int(0)._decimal_digit_count(), 1)
+    assert_equal(Int(1)._decimal_digit_count(), 1)
+    assert_equal(Int(2)._decimal_digit_count(), 1)
+    assert_equal(Int(3)._decimal_digit_count(), 1)
+    assert_equal(Int(9)._decimal_digit_count(), 1)
+
+    assert_equal(Int(10)._decimal_digit_count(), 2)
+    assert_equal(Int(11)._decimal_digit_count(), 2)
+    assert_equal(Int(99)._decimal_digit_count(), 2)
+
+    assert_equal(Int(100)._decimal_digit_count(), 3)
+    assert_equal(Int(101)._decimal_digit_count(), 3)
+    assert_equal(Int(999)._decimal_digit_count(), 3)
+
+    assert_equal(Int(1000)._decimal_digit_count(), 4)
+
+    assert_equal(Int(-1000)._decimal_digit_count(), 4)
+    assert_equal(Int(-999)._decimal_digit_count(), 3)
+    assert_equal(Int(-1)._decimal_digit_count(), 1)
+
+    assert_equal(Int.MAX._decimal_digit_count(), 19)
+    assert_equal(Int.MIN._decimal_digit_count(), 19)
+
+
+def test_int_uint():
+    var u1 = UInt(42)
+    assert_equal(42, int(u1))
+
+    var u2 = UInt(0)
+    assert_equal(0, int(u2))
+
+
+def test_comparison():
+    assert_true(Int(5).__lt__(Int(10)))
+    assert_true(Int(-10).__lt__(Int(-5)))
+    assert_false(Int(0).__lt__(Int(0)))
+    assert_false(Int(10).__lt__(Int(5)))
+
+    assert_true(Int(5).__le__(Int(10)))
+    assert_true(Int(-10).__le__(Int(-5)))
+    assert_true(Int(0).__le__(Int(0)))
+    assert_false(Int(10).__le__(Int(5)))
+
+    assert_true(Int(5).__eq__(Int(5)))
+    assert_true(Int(0).__eq__(Int(0)))
+    assert_false(Int(0).__eq__(Int(1)))
+    assert_false(Int(5).__eq__(Int(10)))
+
+    assert_true(Int(5).__ne__(Int(10)))
+    assert_true(Int(0).__ne__(Int(1)))
+    assert_false(Int(5).__ne__(Int(5)))
+    assert_false(Int(0).__ne__(Int(0)))
+
+    assert_true(Int(10).__gt__(Int(5)))
+    assert_true(Int(-5).__gt__(Int(-10)))
+    assert_false(Int(0).__gt__(Int(0)))
+    assert_false(Int(5).__gt__(Int(10)))
+
+    assert_true(Int(10).__ge__(Int(5)))
+    assert_true(Int(5).__ge__(Int(5)))
+    assert_true(Int(-5).__ge__(Int(-10)))
+    assert_false(Int(5).__ge__(Int(10)))
+
+
 def main():
-    test_constructors()
     test_properties()
     test_add()
     test_sub()
@@ -166,3 +244,7 @@ def main():
     test_string_conversion()
     test_int_representation()
     test_indexer()
+    test_bool()
+    test_decimal_digit_count()
+    test_comparison()
+    test_int_uint()

@@ -378,9 +378,9 @@ Now let's write the code in a Mojo source file and run it with the
     Hello, world!
     ```
 
-If this didn't work for you, double-check that your code looks exactly like the code
-in step 1, and make sure you correctly [installed
-mojo](/mojo/install) (it includes Mojo).
+If this didn't work for you, double-check that your code looks exactly like the
+code in step 1, and make sure you correctly installed either [MAX](/max/install)
+(which includes Mojo) or [Mojo](#1-install-mojo).
 
 ## 4. Build an executable binary
 

@@ -20,7 +20,7 @@ from os.path import isdir, islink
 from pathlib import Path
 from sys import env_get_string
 
-from testing import assert_true, assert_false
+from testing import assert_false, assert_true
 
 alias TEMP_DIR = env_get_string["TEMP_DIR"]()
 
@@ -29,4 +29,4 @@ def main():
     assert_true(isdir(Path(TEMP_DIR)))
     assert_true(isdir(TEMP_DIR))
     assert_true(islink(TEMP_DIR))
-    assert_false(islink(str(Path(TEMP_DIR) / "nonexistant")))
+    assert_false(islink(str(Path(TEMP_DIR) / "nonexistent")))

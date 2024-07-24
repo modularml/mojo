@@ -28,6 +28,12 @@ trait Formattable:
     """
 
     fn format_to(self, inout writer: Formatter):
+        """
+        Formats the string representation of this type to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
         ...
 
 
@@ -69,6 +75,22 @@ struct Formatter:
     fn __init__[F: ToFormatter](inout self, inout output: F):
         self = output._unsafe_to_formatter()
 
+    fn __init__(inout self, *, fd: FileDescriptor):
+        """
+        Constructs a formatter that writes to the given file descriptor.
+        """
+
+        @always_inline
+        fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
+            var fd0 = ptr.bitcast[FileDescriptor]()[].value
+
+            _put(strref, file=fd0)
+
+        self = Formatter(
+            write_to_fd,
+            UnsafePointer.address_of(fd).bitcast[NoneType](),
+        )
+
     fn __init__(
         inout self,
         func: fn (UnsafePointer[NoneType], StringRef) -> None,
@@ -88,16 +110,63 @@ struct Formatter:
     # Methods
     # ===------------------------------------------------------------------=== #
 
+    # TODO(cleanup):
+    #   Remove this overload by defining a working
+    #   `StringSlice.__init__(StringLiteral)` implicit conversion.
     @always_inline
-    fn write_str(inout self, strref: StringRef):
+    fn write_str[literal: StringLiteral](inout self):
         """
-        Write a string to this formatter.
+        Write a string literal to this formatter.
+
+        Parameters:
+            literal: The string literal to write.
+        """
+        alias slc = literal.as_string_slice()
+        self.write_str(slc)
+
+    # TODO: Constrain to only require an immutable StringSlice[..]`
+    @always_inline
+    fn write_str(inout self, str_slice: StringSlice[_]):
+        """
+        Write a string slice to this formatter.
 
         Args:
-            strref: The string to write to this formatter. Must NOT be null
-              terminated.
+            str_slice: The string slice to write to this formatter. Must NOT be
+              null terminated.
         """
+
+        # SAFETY:
+        #   Safe because `str_slice` is a `borrowed` arg, and so alive at least
+        #   as long as this call.
+        var strref: StringRef = str_slice._strref_dangerous()
+
         self._write_func(self._write_func_arg, strref)
+
+    fn write[*Ts: Formattable](inout self: Formatter, *args: *Ts):
+        """Write a sequence of formattable arguments to the provided formatter.
+        """
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(self)
+
+        args.each[write_arg]()
+
+    fn _write_int_padded(inout self, value: Int, *, width: Int):
+        var int_width = value._decimal_digit_count()
+
+        # TODO: Assumes user wants right-aligned content.
+        if int_width < width:
+            self._write_repeated(
+                " ".as_string_slice(),
+                width - int_width,
+            )
+
+        self.write(value)
+
+    fn _write_repeated(inout self, str: StringSlice, count: Int):
+        for _ in range(count):
+            self.write_str(str)
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
@@ -115,15 +184,3 @@ struct Formatter:
             _put(strref)
 
         return Formatter(write_to_stdout, UnsafePointer[NoneType]())
-
-
-fn write_to[*Ts: Formattable](inout writer: Formatter, *args: *Ts):
-    """
-    Write a sequence of formattable arguments to the provided formatter.
-    """
-
-    @parameter
-    fn write_arg[T: Formattable](arg: T):
-        arg.format_to(writer)
-
-    args.each[write_arg]()

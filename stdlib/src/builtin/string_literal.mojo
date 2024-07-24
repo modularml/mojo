@@ -15,11 +15,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import DTypePointer
+from sys.ffi import C_char
 
 from utils import StringRef
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
+from utils._visualizers import lldb_formatter_wrapping_type
 
 from .string import _atol
 
@@ -31,14 +31,14 @@ from .string import _atol
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct StringLiteral(
-    Sized,
-    IntableRaising,
-    Stringable,
-    Representable,
-    KeyElement,
     Boolable,
-    Formattable,
     Comparable,
+    Formattable,
+    IntableRaising,
+    KeyElement,
+    Representable,
+    Sized,
+    Stringable,
 ):
     """This type represents a string literal.
 
@@ -47,10 +47,15 @@ struct StringLiteral(
     and this does not include the null terminator.
     """
 
+    # Fields
     alias type = __mlir_type.`!kgen.string`
 
     var value: Self.type
     """The underlying storage for the string literal."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Self.type):
@@ -62,65 +67,17 @@ struct StringLiteral(
         self.value = value
 
     @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        """Get the string length.
+    fn __init__(inout self, *, other: Self):
+        """Copy constructor.
 
-        Returns:
-            The length of this StringLiteral.
+        Args:
+            other: The string literal to copy.
         """
-        # TODO(MSTDL-160):
-        #   Properly count Unicode codepoints instead of returning this length
-        #   in bytes.
-        return self._byte_length()
+        self = other
 
-    @always_inline
-    fn _byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this StringLiteral in bytes.
-        """
-        return __mlir_op.`pop.string.size`(self.value)
-
-    @always_inline("nodebug")
-    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        var ptr = DTypePointer[DType.int8](
-            __mlir_op.`pop.string.address`(self.value)
-        )
-
-        return UnsafePointer[Int8]._from_dtype_ptr(ptr)
-
-    @always_inline("nodebug")
-    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        return self.unsafe_ptr().bitcast[UInt8]()
-
-    @always_inline("nodebug")
-    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        return self.unsafe_ptr().bitcast[UInt8]()
-
-    @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Convert the string to a bool value.
-
-        Returns:
-            True if the string is not empty.
-        """
-        return len(self) != 0
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __add__(self, rhs: StringLiteral) -> StringLiteral:
@@ -206,99 +163,6 @@ struct StringLiteral(
         """
         return not (self < rhs)
 
-    fn __hash__(self) -> Int:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.unsafe_ptr(), len(self))
-
-    fn __str__(self) -> String:
-        """Convert the string literal to a string.
-
-        Returns:
-            A new string.
-        """
-        var string = String()
-        var length: Int = __mlir_op.`pop.string.size`(self.value)
-        var buffer = String._buffer_type()
-        var new_capacity = length + 1
-        buffer._realloc(new_capacity)
-        buffer.size = new_capacity
-        var uint8Ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
-        ](__mlir_op.`pop.string.address`(self.value))
-        var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
-            uint8Ptr
-        )
-        memcpy(DTypePointer(buffer.data), data, length)
-        initialize_pointee_move(buffer.data + length, 0)
-        string._buffer = buffer^
-        return string
-
-    fn __repr__(self) -> String:
-        """Return a representation of the `StringLiteral` instance.
-
-        You don't need to call this method directly, use `repr("...")` instead.
-
-        Returns:
-            A new representation of the string.
-        """
-        return self.__str__().__repr__()
-
-    @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[False, ImmutableStaticLifetime]:
-        """Returns a string slice of this static string literal.
-
-        Returns:
-            A string slice pointing to this static string literal.
-        """
-
-        var bytes = self[].as_bytes_slice()
-
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in StringLiteral so this is actually
-        #   guaranteed to be valid.
-        return StringSlice[False, ImmutableStaticLifetime](
-            unsafe_from_utf8=bytes
-        )
-
-    @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, False, ImmutableStaticLifetime]:
-        """
-        Returns a contiguous slice of the bytes owned by this string.
-
-        Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-        """
-
-        var ptr = self[].unsafe_uint8_ptr()
-
-        return Span[UInt8, False, ImmutableStaticLifetime](
-            unsafe_ptr=ptr,
-            len=self[]._byte_length(),
-        )
-
-    fn format_to(self, inout writer: Formatter):
-        """
-        Formats this string literal to the provided formatter.
-
-        Args:
-            writer: The formatter to write to.
-        """
-
-        # SAFETY:
-        #   Safe because `self` is borrowed, so the lifetime of this
-        #   StringRef extends beyond this function.
-        writer.write_str(StringRef(self))
-
     fn __contains__(self, substr: StringLiteral) -> Bool:
         """Returns True if the substring is contained within the current string.
 
@@ -309,6 +173,185 @@ struct StringLiteral(
           True if the string contains the substring.
         """
         return substr in StringRef(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Get the string length.
+
+        Returns:
+            The length of this StringLiteral.
+        """
+        # TODO(MSTDL-160):
+        #   Properly count Unicode codepoints instead of returning this length
+        #   in bytes.
+        return self.byte_length()
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Convert the string to a bool value.
+
+        Returns:
+            True if the string is not empty.
+        """
+        return len(self) != 0
+
+    fn __int__(self) raises -> Int:
+        """Parses the given string as a base-10 integer and returns that value.
+
+        For example, `int("19")` returns `19`. If the given string cannot be parsed
+        as an integer value, an error is raised. For example, `int("hi")` raises an
+        error.
+
+        Returns:
+            An integer value that represents the string, or otherwise raises.
+        """
+        return _atol(self)
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Convert the string literal to a string.
+
+        Returns:
+            A new string.
+        """
+        var string = String()
+        var length = self.byte_length()
+        var buffer = String._buffer_type()
+        var new_capacity = length + 1
+        buffer._realloc(new_capacity)
+        buffer.size = new_capacity
+        var data: UnsafePointer[UInt8] = self.unsafe_ptr()
+        memcpy(buffer.data, data, length)
+        (buffer.data + length).init_pointee_move(0)
+        string._buffer = buffer^
+        return string
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Return a representation of the `StringLiteral` instance.
+
+        You don't need to call this method directly, use `repr("...")` instead.
+
+        Returns:
+            A new representation of the string.
+        """
+        return self.__str__().__repr__()
+
+    fn __hash__(self) -> UInt:
+        """Hash the underlying buffer using builtin hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures. See the `hash`
+            builtin documentation for more details.
+        """
+        return hash(self.unsafe_ptr(), len(self))
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation of the object.
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self.__str__()
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
+        """
+        return __mlir_op.`pop.string.size`(self.value)
+
+    @always_inline
+    @deprecated("use byte_length() instead")
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
+        """
+        return __mlir_op.`pop.string.size`(self.value)
+
+    @always_inline("nodebug")
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        var ptr = UnsafePointer(__mlir_op.`pop.string.address`(self.value))
+
+        # TODO(MSTDL-555):
+        #   Remove bitcast after changing pop.string.address
+        #   return type.
+        return ptr.bitcast[UInt8]()
+
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be NUL terminated, and not null.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.unsafe_ptr().bitcast[C_char]()
+
+    @always_inline
+    fn as_string_slice(self) -> StringSlice[ImmutableStaticLifetime]:
+        """Returns a string slice of this static string literal.
+
+        Returns:
+            A string slice pointing to this static string literal.
+        """
+
+        var bytes = self.as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in StringLiteral so this is actually
+        #   guaranteed to be valid.
+        return StringSlice[ImmutableStaticLifetime](unsafe_from_utf8=bytes)
+
+    @always_inline
+    fn as_bytes_slice(self) -> Span[UInt8, ImmutableStaticLifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        var ptr = self.unsafe_ptr()
+
+        return Span[UInt8, ImmutableStaticLifetime](
+            unsafe_ptr=ptr,
+            len=self.byte_length(),
+        )
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this string literal to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write_str(self.as_string_slice())
 
     fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
@@ -336,14 +379,26 @@ struct StringLiteral(
         """
         return StringRef(self).rfind(substr, start=start)
 
-    fn __int__(self) raises -> Int:
-        """Parses the given string as a base-10 integer and returns that value.
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
 
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
 
         Returns:
-            An integer value that represents the string, or otherwise raises.
+            The joined string.
         """
-        return _atol(self)
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result

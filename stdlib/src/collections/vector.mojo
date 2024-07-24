@@ -19,8 +19,9 @@ from collections.vector import InlinedFixedVector
 ```
 """
 
-from memory import UnsafePointer, Reference
-from utils import InlineArray
+from memory import Reference, UnsafePointer
+
+from utils import StaticTuple
 
 # ===----------------------------------------------------------------------===#
 # _VecIter
@@ -29,7 +30,7 @@ from utils import InlineArray
 
 @value
 struct _VecIter[
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     vec_type: AnyType,
     deref: fn (UnsafePointer[vec_type], Int) -> type,
 ](Sized):
@@ -53,7 +54,7 @@ struct _VecIter[
 
 
 @always_inline
-fn _calculate_fixed_vector_default_size[type: AnyRegType]() -> Int:
+fn _calculate_fixed_vector_default_size[type: AnyTrivialRegType]() -> Int:
     alias prefered_bytecount = 64
     alias sizeof_type = sizeof[type]()
 
@@ -69,7 +70,8 @@ fn _calculate_fixed_vector_default_size[type: AnyRegType]() -> Int:
 
 
 struct InlinedFixedVector[
-    type: AnyRegType, size: Int = _calculate_fixed_vector_default_size[type]()
+    type: AnyTrivialRegType,
+    size: Int = _calculate_fixed_vector_default_size[type](),
 ](Sized):
     """A dynamically-allocated vector with small-vector optimization and a fixed
     maximum capacity.
@@ -96,7 +98,7 @@ struct InlinedFixedVector[
     """
 
     alias static_size: Int = size
-    alias static_data_type = InlineArray[type, size]
+    alias static_data_type = StaticTuple[type, size]
     var static_data: Self.static_data_type
     """The underlying static storage, used for small vectors."""
     var dynamic_data: UnsafePointer[type]
@@ -115,7 +117,7 @@ struct InlinedFixedVector[
         Args:
             capacity: The requested maximum capacity of the vector.
         """
-        self.static_data = Self.static_data_type(unsafe_uninitialized=True)
+        self.static_data = Self.static_data_type()  # Undef initialization
         self.dynamic_data = UnsafePointer[type]()
         if capacity > Self.static_size:
             self.dynamic_data = UnsafePointer[type].alloc(capacity - size)
@@ -242,5 +244,5 @@ struct InlinedFixedVector[
             An iterator to the start of the vector.
         """
         return Self._iterator(
-            0, self.current_size, UnsafePointer(Reference(self))
+            0, self.current_size, UnsafePointer.address_of(self)
         )

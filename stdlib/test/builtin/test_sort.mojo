@@ -10,16 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D CURRENT_DIR=%S %s
+# RUN: %mojo %s
 
-from pathlib import Path
-from sys import os_is_windows, env_get_string
+from pathlib import Path, _dir_of_current_file
+from random import random_float64, random_si64, random_ui64, seed
+from sys import env_get_string, os_is_windows
 
-alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
-from testing import assert_true, assert_equal, assert_false
-from random import random_si64, random_ui64, random_float64, seed
-
-from builtin.sort import _quicksort, _small_sort
+from builtin.sort import _quicksort, _small_sort, _SortWrapper
+from testing import assert_equal, assert_false, assert_true
 
 
 fn random_numbers[
@@ -30,16 +28,16 @@ fn random_numbers[
 
         @parameter
         if (
-            dtype == DType.int8
-            or dtype == DType.int16
-            or dtype == DType.int32
-            or dtype == DType.int64
+            dtype is DType.int8
+            or dtype is DType.int16
+            or dtype is DType.int32
+            or dtype is DType.int64
         ):
             result.append(random_si64(0, max).cast[dtype]())
         elif (
-            dtype == DType.float16
-            or dtype == DType.float32
-            or dtype == DType.float64
+            dtype is DType.float16
+            or dtype is DType.float32
+            or dtype is DType.float64
         ):
             result.append(random_float64(0, max).cast[dtype]())
         else:
@@ -79,11 +77,10 @@ fn test_sort_small_3() raises:
     list.append(2)
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _less_than(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
-    var ptr = rebind[Pointer[Int]](list.data)
-    _small_sort[length, Int, _less_than_equal](ptr)
+    _small_sort[length, Int, _less_than](list.data)
 
     var expected = List[Int](1, 2, 9)
     for i in range(length):
@@ -102,11 +99,10 @@ fn test_sort_small_5() raises:
     list.append(4)
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _less_than(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
-    var ptr = rebind[Pointer[Int]](list.data)
-    _small_sort[length, Int, _less_than_equal](ptr)
+    _small_sort[length, Int, _less_than](list.data)
 
     var expected = List[Int](1, 2, 3, 4, 9)
     for i in range(length):
@@ -171,30 +167,24 @@ fn test_sort3_dupe_elements() raises:
     alias length = 3
 
     fn test[
-        cmp_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
+        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
     ]() raises:
         var list = List[Int](capacity=3)
         list.append(5)
         list.append(3)
         list.append(3)
 
-        var ptr = rebind[Pointer[Int]](list.data)
-        _quicksort[Int, cmp_fn](ptr, len(list))
+        _quicksort[Int, cmp_fn](list.data, len(list))
 
         var expected = List[Int](3, 3, 5)
         for i in range(length):
             assert_equal(expected[i], list[i])
 
     @parameter
-    fn _lt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) < rebind[Int](rhs)
-
-    @parameter
-    fn _leq[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _lt(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
     test[_lt]()
-    test[_leq]()
 
 
 fn test_sort4() raises:
@@ -315,7 +305,7 @@ fn test_sort_any_103() raises:
     for i in range(length):
         list.append(length - i - 1)
 
-    sort[DType.float32](list)
+    sort(list)
 
     for i in range(1, length):
         assert_false(list[i - 1] > list[i])
@@ -332,11 +322,12 @@ fn test_quick_sort_repeated_val() raises:
         list.append(i + 1)
 
     @parameter
-    fn _greater_than[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) > rebind[Float32](rhs)
+    fn _greater_than(
+        lhs: _SortWrapper[Float32], rhs: _SortWrapper[Float32]
+    ) -> Bool:
+        return lhs.data > rhs.data
 
-    var ptr = rebind[Pointer[Float32]](list.data)
-    _quicksort[Float32, _greater_than](ptr, len(list))
+    _quicksort[Float32, _greater_than](list.data, len(list))
 
     var expected = List[Float32](
         9.0,
@@ -380,8 +371,10 @@ fn test_quick_sort_repeated_val() raises:
         assert_equal(expected[i], list[i])
 
     @parameter
-    fn _less_than[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) < rebind[Float32](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Float32], rhs: _SortWrapper[Float32]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
     expected = List[Float32](
         1.0,
@@ -421,8 +414,7 @@ fn test_quick_sort_repeated_val() raises:
         9.0,
         9.0,
     )
-    var sptr = rebind[Pointer[Float32]](list.data)
-    _quicksort[Float32, _less_than](sptr, len(list))
+    _quicksort[Float32, _less_than](list.data, len(list))
     for i in range(0, length):
         assert_equal(expected[i], list[i])
 
@@ -434,69 +426,67 @@ fn test_partition_top_k(length: Int, k: Int) raises:
         list.append(i)
 
     @parameter
-    fn _great_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) >= rebind[Float32](rhs)
+    fn _great_than(lhs: Float32, rhs: Float32) -> Bool:
+        return lhs > rhs
 
-    var ptr = rebind[Pointer[Float32]](list.data)
-    _ = partition[Float32, _great_than_equal](ptr, k, len(list))
+    _ = partition[DType.float32, _great_than](list.data, k, len(list))
 
     for i in range(0, k):
-        if list[i] < length - k:
-            assert_true(False)
+        assert_false(list[i] < length - k)
 
 
 fn test_sort_stress() raises:
-    var lens = VariadicList[Int](3, 100, 117, 223, 500, 1000, 1500, 2000, 3000)
+    var lens = List[Int](3, 100, 117, 223, 500, 1000, 1500, 2000, 3000)
     var random_seed = 0
     seed(random_seed)
 
     @__copy_capture(random_seed)
     @parameter
     fn test[
-        cmp_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
-        check_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
+        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
+        check_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
     ](length: Int) raises:
         var list = List[Int](capacity=length)
         for _ in range(length):
             list.append(int(random_si64(-length, length)))
 
-        var ptr = rebind[Pointer[Int]](list.data)
-        _quicksort[Int, cmp_fn](ptr, len(list))
+        _quicksort[Int, cmp_fn](list.data, len(list))
 
         for i in range(length - 1):
-            assert_true(check_fn[Int](list[i], list[i + 1]))
+            assert_true(check_fn(list[i], list[i + 1]))
 
     @parameter
     @always_inline
-    fn _gt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) > rebind[Int](rhs)
+    fn _gt(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data > rhs.data
 
     @parameter
     @always_inline
-    fn _geq[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) >= rebind[Int](rhs)
+    fn _geq(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data >= rhs.data
 
     @parameter
     @always_inline
-    fn _lt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) < rebind[Int](rhs)
+    fn _lt(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
     @parameter
     @always_inline
-    fn _leq[type: AnyRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _leq(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data <= rhs.data
 
     for i in range(len(lens)):
         var length = lens[i]
         test[_gt, _geq](length)
-        test[_geq, _geq](length)
         test[_lt, _leq](length)
-        test[_leq, _leq](length)
 
 
 @value
-struct MyStruct:
+struct MyStruct(CollectionElement):
     var val: Int
+
+    fn __init__(inout self, *, other: Self):
+        self.val = other.val
 
 
 fn test_sort_custom() raises:
@@ -508,7 +498,7 @@ fn test_sort_custom() raises:
 
     @parameter
     fn compare_fn(lhs: MyStruct, rhs: MyStruct) -> Bool:
-        return lhs.val <= rhs.val
+        return lhs.val < rhs.val
 
     sort[MyStruct, compare_fn](list)
 
@@ -535,7 +525,9 @@ def test_sort_string_big_list():
 
 
 def test_sort_strings():
-    var text = (Path(CURRENT_DIR) / "test_file_dummy_input.txt").read_text()
+    var text = (
+        _dir_of_current_file() / "test_file_dummy_input.txt"
+    ).read_text()
     var strings = text.split(" ")
     sort(strings)
     assert_sorted_string(strings)
@@ -545,6 +537,10 @@ def test_sort_strings():
 struct Person(ComparableCollectionElement):
     var name: String
     var age: Int
+
+    fn __init__(inout self, *, other: Self):
+        self.name = String(other=other.name)
+        self.age = other.age
 
     fn __lt__(self, other: Self) -> Bool:
         if self.age < other.age:
@@ -594,11 +590,9 @@ def test_sort_comparamble_elements_list():
     assert_sorted(list)
 
 
-fn test_sort_empty_comparamble_elements_list() raises:
+fn test_sort_empty_comparable_elements_list() raises:
     var person_list = List[Person]()
     sort(person_list)
-    insertion_sort(person_list)
-    quick_sort(person_list)
     assert_true(len(person_list) == 0)
 
 
@@ -630,4 +624,4 @@ def main():
     test_sort_string_big_list()
     test_sort_strings()
     test_sort_comparamble_elements_list()
-    test_sort_empty_comparamble_elements_list()
+    test_sort_empty_comparable_elements_list()

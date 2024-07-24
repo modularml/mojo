@@ -8,8 +8,6 @@ services:
     build :
       context: .
       dockerfile: Dockerfile.mojosdk
-      args:
-        - AUTH_KEY=1Auth_token
       no_cache : true
     ports:
       - 8888:8888 

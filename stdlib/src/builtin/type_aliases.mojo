@@ -15,11 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-alias AnyRegType = __mlir_type.`!kgen.type`
+alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
-
-alias NoneType = __mlir_type.`!kgen.none`
-"""Represents the absence of a value."""
 
 alias ImmutableLifetime = __mlir_type.`!lit.lifetime<0>`
 """Immutable lifetime reference type."""
@@ -32,6 +29,9 @@ alias ImmutableStaticLifetime = __mlir_attr.`#lit.lifetime<0>: !lit.lifetime<0>`
 
 alias MutableStaticLifetime = __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
 """The mutable lifetime that lasts for the entire duration of program execution."""
+
+alias LifetimeSet = __mlir_type.`!lit.lifetime.set`
+"""A set of lifetime parameters."""
 
 
 # Helper to build !lit.lifetime type.

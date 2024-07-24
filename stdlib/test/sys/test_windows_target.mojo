@@ -25,7 +25,7 @@ from os._windows import (
 )
 from sys import external_call, os_is_linux, os_is_macos, os_is_windows
 
-from testing import assert_false, assert_true, assert_equal
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_os_query():
@@ -44,9 +44,7 @@ def test_last_error():
     # GetProcessId takes the handle to a process and returns its id. If the
     # handle is null this will fail and returns an invalid handle error (error
     # code 6).
-    var succeeded = external_call["GetProcessId", Int](
-        UnsafePointer[Int].get_null()
-    )
+    var succeeded = external_call["GetProcessId", Int](UnsafePointer[Int]())
 
     assert_equal(succeeded, 0)
 

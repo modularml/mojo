@@ -22,7 +22,7 @@ struct MoveOnly[T: Movable](Movable):
     var data: T
     """Test data payload."""
 
-    fn __init__(inout self, i: T):
+    fn __init__(inout self, owned i: T):
         """Construct a MoveOnly providing the payload data.
 
         Args:
@@ -39,6 +39,19 @@ struct MoveOnly[T: Movable](Movable):
         self.data = other.data^
 
 
+struct ExplicitCopyOnly(ExplicitlyCopyable):
+    var value: Int
+    var copy_count: Int
+
+    fn __init__(inout self, value: Int):
+        self.value = value
+        self.copy_count = 0
+
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
+        self.copy_count = other.copy_count + 1
+
+
 struct CopyCounter(CollectionElement):
     """Counts the number of copies performed on a value."""
 
@@ -47,6 +60,9 @@ struct CopyCounter(CollectionElement):
     fn __init__(inout self):
         self.copy_count = 0
 
+    fn __init__(inout self, *, other: Self):
+        self.copy_count = other.copy_count + 1
+
     fn __moveinit__(inout self, owned existing: Self):
         self.copy_count = existing.copy_count
 
@@ -54,7 +70,9 @@ struct CopyCounter(CollectionElement):
         self.copy_count = existing.copy_count + 1
 
 
-struct MoveCounter[T: CollectionElement](CollectionElement):
+struct MoveCounter[T: CollectionElement](
+    CollectionElement,
+):
     """Counts the number of moves performed on a value."""
 
     var value: T
@@ -66,6 +84,17 @@ struct MoveCounter[T: CollectionElement](CollectionElement):
         self.value = value^
         self.move_count = 0
 
+    # TODO: This type should not be ExplicitlyCopyable, but has to be to satisfy
+    #       CollectionElement at the moment.
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.value = T(other=other.value)
+        self.move_count = other.move_count
+
     fn __moveinit__(inout self, owned existing: Self):
         self.value = existing.value^
         self.move_count = existing.move_count + 1
@@ -74,5 +103,24 @@ struct MoveCounter[T: CollectionElement](CollectionElement):
     #       CollectionElement at the moment.
     fn __copyinit__(inout self, existing: Self):
         # print("ERROR: _MoveCounter copy constructor called unexpectedly!")
-        self.value = existing.value
+        self.value = T(other=existing.value)
         self.move_count = existing.move_count
+
+
+# TODO: Pass directly a UnsafePointer when possible, instead of an Int.
+# Otherwise we get "argument #2 cannot be converted from 'UnsafePointer[List[Int], 0, 0]' to 'UnsafePointer[List[Int], 0, 0]'"
+# This bug also appears if we pass the list as borrow and grab the address in the constructor, in
+# which case we get "argument #2 cannot be converted from 'List[Int]' to 'List[Int]'"
+@value
+struct ValueDestructorRecorder(CollectionElement):
+    var value: Int
+    var destructor_counter: Int
+
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
+        self.destructor_counter = other.destructor_counter
+
+    fn __del__(owned self):
+        UnsafePointer[Int].address_of(self.destructor_counter).bitcast[
+            UnsafePointer[List[Int]]
+        ]()[][].append(self.value)

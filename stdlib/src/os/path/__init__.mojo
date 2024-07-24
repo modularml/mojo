@@ -11,4 +11,15 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from .path import exists, isdir, isfile, islink, lexists, getsize
+from .path import (
+    dirname,
+    exists,
+    expanduser,
+    getsize,
+    isdir,
+    isfile,
+    islink,
+    join,
+    split,
+    lexists,
+)

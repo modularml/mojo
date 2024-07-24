@@ -16,12 +16,13 @@
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
+from random import rand
 from time import now
+
 from algorithm import sum
 from benchmark import Unit, benchmark, keep
 from buffer import Buffer
 from python import Python
-from random import rand
 
 # Change these numbers to reduce on different sizes
 alias size_small: Int = 1 << 21
@@ -50,11 +51,11 @@ fn stdlib_reduce_sum[size: Int](array: Buffer[type, size]) -> scalar:
     return my_sum
 
 
-def pretty_print(name: StringLiteral, elements: Int, time: Float64):
+def pretty_print(name: String, elements: Int, time: Float64):
     py = Python.import_module("builtins")
     py.print(
         py.str("{:<16} {:>11,} {:>8.2f}ms").format(
-            String(name) + " elements:", elements, time
+            name + " elements:", elements, time
         )
     )
 
@@ -62,7 +63,7 @@ def pretty_print(name: StringLiteral, elements: Int, time: Float64):
 fn bench[
     func: fn[size: Int] (buffer: Buffer[type, size]) -> scalar,
     size: Int,
-    name: StringLiteral,
+    name: String,
 ](buffer: Buffer[type, size]) raises:
     @parameter
     fn runner():
@@ -79,11 +80,11 @@ fn main() raises:
         "Shows algorithm.sum from stdlib with much better performance\n"
     )
     # Allocate and randomize data, then create two buffers
-    var ptr_small = DTypePointer[type].alloc(size_small)
-    var ptr_large = DTypePointer[type].alloc(size_large)
+    var ptr_small = UnsafePointer[Scalar[type]].alloc(size_small)
+    var ptr_large = UnsafePointer[Scalar[type]].alloc(size_large)
 
-    rand(ptr_small, size_small)
-    rand(ptr_large, size_large)
+    rand(ptr_small.address, size_small)
+    rand(ptr_large.address, size_large)
 
     var buffer_small = Buffer[type, size_small](ptr_small)
     var buffer_large = Buffer[type, size_large](ptr_large)

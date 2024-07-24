@@ -12,8 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the pathlib package."""
 
-from .path import (
-    DIR_SEPARATOR,
-    cwd,
-    Path,
-)
+from .path import DIR_SEPARATOR, Path, _dir_of_current_file, cwd

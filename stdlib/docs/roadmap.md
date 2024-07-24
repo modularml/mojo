@@ -20,7 +20,7 @@ mission](https://docs.modular.com/mojo/why-mojo).
 
 ### Core library improvements
 
-- Remove `AnyRegType` in the standard library in favor of `AnyType`.
+- Remove `AnyTrivialRegType` in the standard library in favor of `AnyType`.
 
 - Unify `Pointer` and `AnyPointer`.
 

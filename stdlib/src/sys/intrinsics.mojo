@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Defines intrinsics.
 
-You can import these APIs from the `complex` package. For example:
+You can import these APIs from the `sys` package. For example:
 
 ```mojo
 from sys import PrefetchLocality
@@ -21,7 +21,7 @@ from sys import PrefetchLocality
 
 from sys import sizeof
 
-from memory import AddressSpace, DTypePointer
+from memory import AddressSpace, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic
@@ -32,7 +32,7 @@ from memory import AddressSpace, DTypePointer
 
 @always_inline("nodebug")
 fn llvm_intrinsic[
-    intrin: StringLiteral, type: AnyRegType, has_side_effect: Bool = True
+    intrin: StringLiteral, type: AnyTrivialRegType, has_side_effect: Bool = True
 ]() -> type:
     """Calls an LLVM intrinsic with no arguments.
 
@@ -82,8 +82,8 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0) -> type:
     """Calls an LLVM intrinsic with one argument.
@@ -137,9 +137,9 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1) -> type:
     """Calls an LLVM intrinsic with two arguments.
@@ -195,10 +195,10 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2) -> type:
     """Calls an LLVM intrinsic with three arguments.
@@ -259,11 +259,11 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
     """Calls an LLVM intrinsic with four arguments.
@@ -327,12 +327,12 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
     """Calls an LLVM intrinsic with five arguments.
@@ -394,13 +394,13 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
     """Calls an LLVM intrinsic with six arguments.
@@ -465,14 +465,14 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
     """Calls an LLVM intrinsic with seven arguments.
@@ -538,15 +538,15 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -622,16 +622,16 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -711,17 +711,17 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -806,11 +806,22 @@ fn llvm_intrinsic[
 # ===----------------------------------------------------------------------===#
 
 
+# NOTE: Converting from a scalar to a pointer is unsafe! The resulting pointer
+# is assumed not to alias any Mojo-derived pointer. DO NOT proliferate usage of
+# this function!
+fn _unsafe_aliasing_address_to_pointer[
+    type: DType
+](owned addr: Scalar[DType.index]) -> UnsafePointer[Scalar[type]]:
+    return UnsafePointer.address_of(addr).bitcast[
+        UnsafePointer[Scalar[type]]
+    ]()[]
+
+
 @always_inline("nodebug")
 fn gather[
     type: DType, size: Int
 ](
-    base: SIMD[DType.address, size],
+    owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
     passthrough: SIMD[type, size],
     alignment: Int = 0,
@@ -858,12 +869,16 @@ fn gather[
 
     @parameter
     if size == 1:
-        return DTypePointer[type](base[0]).load() if mask else passthrough[0]
+        return Scalar.load(
+            _unsafe_aliasing_address_to_pointer[type](base[0])
+        ) if mask else passthrough[0]
     return llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ](
-        base,
+        UnsafePointer.address_of(base).bitcast[
+            __mlir_type[`!pop.simd<`, size.value, `, address>`],
+        ]()[],
         Int32(alignment),
         mask,
         passthrough,
@@ -880,7 +895,7 @@ fn scatter[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    base: SIMD[DType.address, size],
+    owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
     alignment: Int = 0,
 ):
@@ -934,12 +949,14 @@ fn scatter[
     @parameter
     if size == 1:
         if mask:
-            var ptr = DTypePointer[type](base[0])
-            ptr.store(value[0])
+            var ptr = _unsafe_aliasing_address_to_pointer[type](base[0])
+            Scalar.store(ptr, value[0])
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](
         value,
-        base,
+        UnsafePointer.address_of(base).bitcast[
+            __mlir_type[`!pop.simd<`, size.value, `, address>`],
+        ]()[],
         Int32(alignment),
         mask,
     )
@@ -1165,8 +1182,8 @@ struct PrefetchOptions:
 
 @always_inline("nodebug")
 fn prefetch[
-    params: PrefetchOptions, type: DType, address_space: AddressSpace
-](addr: DTypePointer[type, address_space]):
+    params: PrefetchOptions, type: DType
+](addr: UnsafePointer[Scalar[type], *_]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
@@ -1175,13 +1192,12 @@ fn prefetch[
     Parameters:
       params: Configuration options for the prefect intrinsic.
       type: The DType of value stored in addr.
-      address_space: The address space of the pointer.
 
     Args:
       addr: The data pointer to prefetch.
     """
-    return llvm_intrinsic["llvm.prefetch", NoneType](
-        addr.bitcast[DType.invalid.value](),
+    llvm_intrinsic["llvm.prefetch", NoneType](
+        addr.bitcast[NoneType](),
         params.rw,
         params.locality,
         params.cache,
@@ -1195,17 +1211,18 @@ fn prefetch[
 
 @always_inline("nodebug")
 fn masked_load[
-    size: Int
+    type: DType, //, size: Int
 ](
-    addr: DTypePointer,
+    addr: UnsafePointer[Scalar[type], *_],
     mask: SIMD[DType.bool, size],
-    passthrough: SIMD[addr.type, size],
+    passthrough: SIMD[type, size],
     alignment: Int = 1,
-) -> SIMD[addr.type, size]:
+) -> SIMD[type, size]:
     """Loads data from memory and return it, replacing masked lanes with values
     from the passthrough vector.
 
     Parameters:
+      type: DType of the return SIMD buffer.
       size: Size of the return SIMD buffer.
 
     Args:
@@ -1223,10 +1240,10 @@ fn masked_load[
 
     @parameter
     if size == 1:
-        return addr.load() if mask else passthrough[0]
+        return Scalar.load(addr) if mask else passthrough[0]
 
-    return llvm_intrinsic["llvm.masked.load", SIMD[addr.type, size]](
-        addr.bitcast[DType.invalid.value]().address,
+    return llvm_intrinsic["llvm.masked.load", SIMD[type, size]](
+        addr.bitcast[NoneType]().address,
         Int32(alignment),
         mask,
         passthrough,
@@ -1243,7 +1260,7 @@ fn masked_store[
     size: Int
 ](
     value: SIMD,
-    addr: DTypePointer[value.type],
+    addr: UnsafePointer[Scalar[value.type], *_],
     mask: SIMD[DType.bool, size],
     alignment: Int = 1,
 ):
@@ -1264,12 +1281,12 @@ fn masked_store[
     @parameter
     if size == 1:
         if mask:
-            addr.store(value[0])
+            Scalar.store(addr, value[0])
         return
 
     llvm_intrinsic["llvm.masked.store", NoneType](
         value,
-        addr.bitcast[DType.invalid.value]().address,
+        addr.bitcast[NoneType]().address,
         Int32(alignment),
         mask,
     )
@@ -1285,7 +1302,7 @@ fn compressed_store[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    addr: DTypePointer[type],
+    addr: UnsafePointer[Scalar[type], *_],
     mask: SIMD[DType.bool, size],
 ):
     """Compresses the lanes of `value`, skipping `mask` lanes, and stores
@@ -1305,12 +1322,12 @@ fn compressed_store[
     @parameter
     if size == 1:
         if mask:
-            addr.store(value[0])
+            Scalar.store(addr, value[0])
         return
 
     llvm_intrinsic["llvm.masked.compressstore", NoneType](
         value,
-        addr.bitcast[DType.invalid.value]().address,
+        addr.bitcast[NoneType]().address,
         mask,
     )
 
@@ -1322,21 +1339,17 @@ fn compressed_store[
 
 @always_inline("nodebug")
 fn strided_load[
-    type: DType,
-    simd_width: Int,
-    /,
-    address_space: AddressSpace = AddressSpace.GENERIC,
+    type: DType, simd_width: Int
 ](
-    addr: DTypePointer[type, address_space],
+    addr: UnsafePointer[Scalar[type], *_],
     stride: Int,
-    mask: SIMD[DType.bool, simd_width],
+    mask: SIMD[DType.bool, simd_width] = True,
 ) -> SIMD[type, simd_width]:
     """Loads values from addr according to a specific stride.
 
     Parameters:
       type: DType of `value`, the value to store.
       simd_width: The width of the SIMD vectors.
-      address_space: The address space of the memory location.
 
     Args:
       addr: The memory location to load data from.
@@ -1350,7 +1363,7 @@ fn strided_load[
 
     @parameter
     if simd_width == 1:
-        return addr.load() if mask else Scalar[type]()
+        return Scalar.load(addr) if mask else Scalar[type]()
 
     alias IndexTy = SIMD[DType.index, simd_width]
     var iota = llvm_intrinsic[
@@ -1360,40 +1373,7 @@ fn strided_load[
         sizeof[type]()
     )
     var passthrough = SIMD[type, simd_width]()
-    return gather[type, simd_width](
-        offset.cast[DType.address](), mask, passthrough
-    )
-
-
-@always_inline("nodebug")
-fn strided_load[
-    type: DType,
-    simd_width: Int,
-    /,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-](addr: DTypePointer[type, address_space], stride: Int) -> SIMD[
-    type, simd_width
-]:
-    """Loads values from addr according to a specific stride.
-
-    Parameters:
-      type: DType of `value`, the value to store.
-      simd_width: The width of the SIMD vectors.
-      address_space: The address space of the memory location.
-
-    Args:
-      addr: The memory location to load data from.
-      stride: How many lanes to skip before loading again.
-
-    Returns:
-      A vector containing the loaded data.
-    """
-
-    @parameter
-    if simd_width == 1:
-        return addr.load()
-
-    return strided_load[type, simd_width](addr, stride, True)
+    return gather[type, simd_width](offset, mask, passthrough)
 
 
 # ===----------------------------------------------------------------------===#
@@ -1403,22 +1383,18 @@ fn strided_load[
 
 @always_inline("nodebug")
 fn strided_store[
-    type: DType,
-    simd_width: Int,
-    /,
-    address_space: AddressSpace = AddressSpace.GENERIC,
+    type: DType, simd_width: Int
 ](
     value: SIMD[type, simd_width],
-    addr: DTypePointer[type, address_space],
+    addr: UnsafePointer[Scalar[type], *_],
     stride: Int,
-    mask: SIMD[DType.bool, simd_width],
+    mask: SIMD[DType.bool, simd_width] = True,
 ):
     """Loads values from addr according to a specific stride.
 
     Parameters:
       type: DType of `value`, the value to store.
       simd_width: The width of the SIMD vectors.
-      address_space: The address space of the memory location.
 
     Args:
       value: The values to store.
@@ -1431,7 +1407,7 @@ fn strided_store[
     @parameter
     if simd_width == 1:
         if mask:
-            addr.store(value[0])
+            Scalar.store(addr, value[0])
         return
 
     alias IndexTy = SIMD[DType.index, simd_width]
@@ -1442,39 +1418,7 @@ fn strided_store[
         sizeof[type]()
     )
 
-    scatter[type, simd_width](value, offset.cast[DType.address](), mask)
-
-
-@always_inline("nodebug")
-fn strided_store[
-    type: DType,
-    simd_width: Int,
-    /,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-](
-    value: SIMD[type, simd_width],
-    addr: DTypePointer[type, address_space],
-    stride: Int,
-):
-    """Loads values from addr according to a specific stride.
-
-    Parameters:
-      type: DType of `value`, the value to store.
-      simd_width: The width of the SIMD vectors.
-      address_space: The address space of the memory location.
-
-    Args:
-      value: The values to store.
-      addr: The location to store values at.
-      stride: How many lanes to skip before storing again.
-    """
-
-    @parameter
-    if simd_width == 1:
-        addr.store(value[0])
-        return
-
-    strided_store[type, simd_width](value, addr, stride, True)
+    scatter[type, simd_width](value, offset, mask)
 
 
 # ===-------------------------------------------------------------------===#
@@ -1482,7 +1426,7 @@ fn strided_store[
 # ===-------------------------------------------------------------------===#
 
 
-fn _mlirtype_is_eq[t1: AnyRegType, t2: AnyRegType]() -> Bool:
+fn _mlirtype_is_eq[t1: AnyTrivialRegType, t2: AnyTrivialRegType]() -> Bool:
     """Compares the two type for equality.
 
     Parameters:
@@ -1494,11 +1438,11 @@ fn _mlirtype_is_eq[t1: AnyRegType, t2: AnyRegType]() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         t1,
         `> : !kgen.type`,
         `,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         t2,
         `> : !kgen.type`,
         `> : i1`,
@@ -1517,11 +1461,11 @@ fn _type_is_eq[t1: AnyType, t2: AnyType]() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         +t1,
         `> : !kgen.type`,
         `,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         +t2,
         `> : !kgen.type`,
         `> : i1`,
@@ -1533,8 +1477,8 @@ fn _type_is_eq[t1: AnyType, t2: AnyType]() -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@register_passable
-struct _RegisterPackType[*a: AnyRegType]:
+@register_passable("trivial")
+struct _RegisterPackType[*a: AnyTrivialRegType]:
     var storage: __mlir_type[`!kgen.pack<`, a, `>`]
 
     @always_inline("nodebug")

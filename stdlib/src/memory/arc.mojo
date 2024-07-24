@@ -18,12 +18,35 @@ Example usage:
 from memory import Arc
 var p = Arc(4)
 var p2 = p
-p2.set(3)
-print(3 == p.get())
+p2[]=3
+print(3 == p[])
 ```
+
+Subscripting(`[]`) is done by `Reference`,
+in order to ensure that the underlying `Arc` outlive the operation.
+
+It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
+Mojo's ASAP deletion policy ensure values are destroyed at last use.
+Do not unsafely dereference the `Arc` inner `UnsafePointer` field.
+See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
+
+```mojo
+# Illustration of what NOT to do, in order to understand:
+print(Arc(String("ok"))._inner[].payload)
+#........................^ASAP ^already freed
+```
+
+Always use `Reference` subscripting (`[]`):
+
+```mojo
+print(Arc(String("ok"))[])
+```
+
 """
 
 from os.atomic import Atomic
+
+from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, stack_allocation
 
 
@@ -73,10 +96,19 @@ struct Arc[T: Movable](CollectionElement):
             value: The value to manage.
         """
         self._inner = UnsafePointer[Self._inner_type].alloc(1)
-        # Cannot use initialize_pointee_move as _ArcInner isn't movable.
+        # Cannot use init_pointee_move as _ArcInner isn't movable.
         __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
             value^
         )
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        other._inner[].add_ref()
+        self._inner = other._inner
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object.
@@ -89,6 +121,7 @@ struct Arc[T: Movable](CollectionElement):
         existing._inner[].add_ref()
         self._inner = existing._inner
 
+    @no_inline
     fn __del__(owned self):
         """Delete the smart pointer reference.
 
@@ -96,23 +129,36 @@ struct Arc[T: Movable](CollectionElement):
         references, delete the object and free its memory."""
         if self._inner[].drop_ref():
             # Call inner destructor, then free the memory.
-            destroy_pointee(self._inner)
+            (self._inner).destroy_pointee()
             self._inner.free()
 
-    # FIXME: This isn't right - the element should be mutable regardless
-    # of whether the 'self' type is mutable.
-    fn __getitem__(self: Reference[Self, _, _]) -> ref [self.lifetime] T:
-        """Returns a Reference to the managed value.
+    # FIXME: The lifetime returned for this is currently self lifetime, which
+    # keeps the Arc object alive as long as there are references into it.  That
+    # said, this isn't really the right modeling, we need hierarchical lifetimes
+    # to model the mutability and invalidation of the returned reference
+    # correctly.
+    fn __getitem__[
+        self_life: ImmutableLifetime
+    ](
+        ref [self_life]self: Self,
+    ) -> ref [
+        _lit_mut_cast[self_life, result_mutable=True].result
+    ] T:
+        """Returns a mutable Reference to the managed value.
+
+        Parameters:
+            self_life: The lifetime of self.
 
         Returns:
             A Reference to the managed value.
         """
-        return self[]._inner[].payload
+        return self._inner[].payload
 
-    fn as_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The UnsafePointer to the underlying memory.
         """
-        return UnsafePointer.address_of(self._inner[].payload)[]
+        # TODO: consider removing this method.
+        return UnsafePointer.address_of(self._inner[].payload)

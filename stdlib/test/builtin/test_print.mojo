@@ -10,71 +10,138 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 
-from memory import DTypePointer
-
-from utils import StringRef, StaticIntTuple
 import sys
 
+from tempfile import NamedTemporaryFile
+from testing import assert_equal
 
-# CHECK-LABEL: test_print
-fn test_print():
-    print("== test_print")
-
-    # CHECK: Hello
-    print("Hello")
-
-    # CHECK: World
-    print("World", flush=True)
-
-    var hello: StringRef = "Hello,"
-    var world: String = "world!"
-    var f: Bool = False
-    # CHECK: > Hello, world! 42 True False
-    print(">", hello, world, 42, True, f)
-
-    # CHECK: > 3.14000{{[0-9]+}} 99.90000{{[0-9]+}} -129.29018{{[0-9]+}} (1, 2, 3)
-    var float32: Float32 = 99.9
-    var float64: Float64 = -129.2901823
-    print("> ", end="")
-    print(3.14, float32, float64, StaticIntTuple[3](1, 2, 3), end="")
-    print()
-
-    # CHECK: > 9223372036854775806
-    print(">", 9223372036854775806)
-
-    var pi = 3.1415916535897743
-    # CHECK: > 3.1415916535{{[0-9]+}}
-    print(">", pi)
-    var x = (pi - 3.141591) * 1e6
-    # CHECK: > 0.6535{{[0-9]+}}
-    print(">", x)
-
-    # CHECK: Hello world
-    print(String("Hello world"))
+from builtin._location import __call_location, _SourceLocation
+from utils import StaticIntTuple, StringRef
 
 
-# CHECK-LABEL: test_print_end
-fn test_print_end():
-    print("== test_print_end")
-    # CHECK: Hello World
-    print("Hello", end=" World\n")
+@always_inline
+fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
+    return loc.prefix("AssertionError: " + str(msg))
 
 
-# CHECK-LABEL: test_print_sep
-fn test_print_sep():
-    print("== test_print_sep")
+fn _assert_equal_error(
+    lhs: String, rhs: String, msg: String, loc: _SourceLocation
+) -> String:
+    var err = (
+        "`left == right` comparison failed:\n   left: "
+        + lhs
+        + "\n  right: "
+        + rhs
+    )
+    if msg:
+        err += "\n  reason: " + msg
+    return _assert_error(err, loc)
 
-    # CHECK: a/b/c
-    print("a", "b", "c", sep="/")
 
-    # CHECK: a/1/2xx
-    print("a", 1, 2, sep="/", end="xx\n")
+struct PrintChecker:
+    var tmp: NamedTemporaryFile
+    var cursor: UInt64
+    var call_location: _SourceLocation
+
+    @always_inline
+    fn __init__(inout self) raises:
+        self.tmp = NamedTemporaryFile("rw")
+        self.call_location = __call_location()
+        self.cursor = 0
+
+    fn __enter__(owned self) -> Self:
+        return self^
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.tmp = existing.tmp^
+        self.cursor = existing.cursor
+        self.call_location = existing.call_location
+
+    fn stream(self) -> FileDescriptor:
+        return self.tmp._file_handle._get_raw_fd()
+
+    fn check_line(inout self, expected: String, msg: String = "") raises:
+        print(end="", file=self.stream(), flush=True)
+        _ = self.tmp.seek(self.cursor)
+        var result = self.tmp.read()[:-1]
+        if result != expected:
+            raise _assert_equal_error(result, expected, msg, self.call_location)
+        self.cursor += len(result) + 1
+
+    fn check_line_starts_with(
+        inout self, prefix: String, msg: String = ""
+    ) raises:
+        print(end="", file=self.stream(), flush=True)
+        _ = self.tmp.seek(self.cursor)
+        var result = self.tmp.read()[:-1]
+        var prefix_len = len(prefix)
+        if len(result) < prefix_len:
+            raise _assert_error(msg, self.call_location)
+        if result[:prefix_len] != prefix:
+            raise _assert_equal_error(
+                result[:prefix_len], prefix, msg, self.call_location
+            )
+        self.cursor += len(result) + 1
 
 
-fn main():
+def test_print():
+    with PrintChecker() as checker:
+        print("Hello", file=checker.stream())
+        checker.check_line("Hello")
+
+        print("World", flush=True, file=checker.stream())
+        checker.check_line("World")
+
+        var hello: StringRef = "Hello,"
+        var world: String = "world!"
+        var f: Bool = False
+        print(">", hello, world, 42, True, f, file=checker.stream())
+        checker.check_line("> Hello, world! 42 True False")
+
+        var float32: Float32 = 99.9
+        var float64: Float64 = -129.2901823
+        print(">", 3.14, file=checker.stream())
+        checker.check_line_starts_with("> 3.14000")
+        print(">", float32, file=checker.stream())
+        checker.check_line_starts_with("> 99.90000")
+        print(">", float64, file=checker.stream())
+        checker.check_line_starts_with("> -129.29018")
+        print(">", StaticIntTuple[3](1, 2, 3), file=checker.stream())
+        checker.check_line_starts_with("> (1, 2, 3)")
+
+        print(">", 9223372036854775806, file=checker.stream())
+        checker.check_line("> 9223372036854775806")
+
+        var pi = 3.1415916535897743
+        print(">", pi, file=checker.stream())
+        checker.check_line_starts_with("> 3.1415916535")
+        var x = (pi - 3.141591) * 1e6
+        print(">", x, file=checker.stream())
+        checker.check_line_starts_with("> 0.6535")
+
+        print(String("Hello world"), file=checker.stream())
+        checker.check_line("Hello world")
+
+
+def test_print_end():
+    with PrintChecker() as checker:
+        print("Hello", end=" World\n", file=checker.stream())
+        checker.check_line("Hello World")
+
+
+def test_print_sep():
+    with PrintChecker() as checker:
+        print("a", "b", "c", sep="/", file=checker.stream())
+        checker.check_line("a/b/c")
+
+        print("a", 1, 2, sep="/", end="xx\n", file=checker.stream())
+        checker.check_line("a/1/2xx")
+
+
+def main():
     test_print()
     test_print_end()
     test_print_sep()
