@@ -62,36 +62,36 @@ fn random_scalar_list[
 
 
 @always_inline
-fn insertion_sort[type: DType](list: List[Scalar[type]]):
+fn insertion_sort[type: DType, //](list: List[Scalar[type]]):
     @parameter
     fn _less_than(
         lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
     ) -> Bool:
         return lhs.data < rhs.data
 
-    _insertion_sort[Scalar[type], _less_than](list.data, len(list))
+    _insertion_sort[_less_than](list.data, len(list))
 
 
 @always_inline
-fn small_sort[size: Int, type: DType](list: List[Scalar[type]]):
+fn small_sort[type: DType, //, size: Int](list: List[Scalar[type]]):
     @parameter
     fn _less_than(
         lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
     ) -> Bool:
         return lhs.data < rhs.data
 
-    _small_sort[size, Scalar[type], _less_than](list.data)
+    _small_sort[_less_than, size](list.data)
 
 
 @always_inline
-fn heap_sort[type: DType](list: List[Scalar[type]]):
+fn heap_sort[type: DType, //](list: List[Scalar[type]]):
     @parameter
     fn _less_than(
         lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
     ) -> Bool:
         return lhs.data < rhs.data
 
-    _heap_sort[Scalar[type], _less_than](list.data, len(list))
+    _heap_sort[_less_than](list.data, len(list))
 
 
 # ===----------------------------------------------------------------------===#
@@ -127,7 +127,7 @@ fn bench_tiny_list_sort(inout m: Bench) raises:
                 @parameter
                 fn call_fn():
                     var l1 = list
-                    small_sort[count, dt](l1)
+                    small_sort[count](l1)
 
                 b.iter[call_fn]()
 
@@ -137,7 +137,7 @@ fn bench_tiny_list_sort(inout m: Bench) raises:
                 @parameter
                 fn call_fn():
                     var l1 = list
-                    insertion_sort[dt](l1)
+                    insertion_sort(l1)
 
                 b.iter[call_fn]()
 
@@ -185,7 +185,7 @@ fn bench_small_list_sort(inout m: Bench) raises:
                 @parameter
                 fn call_fn():
                     var l1 = list
-                    insertion_sort[dt](l1)
+                    insertion_sort(l1)
 
                 b.iter[call_fn]()
 
