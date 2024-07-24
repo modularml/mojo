@@ -32,6 +32,34 @@ alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
 
 
 @always_inline
+fn debug_assert[
+    func: fn () capturing -> Bool, stringable: Stringable
+](message: stringable):
+    """Asserts that the condition is true.
+
+    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
+    builds unless MOJO_ENABLE_ASSERTIONS is defined.
+
+    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
+    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
+    for enabling assertions in the library.
+
+    Parameters:
+        func: The function to invoke to check if the assertion holds. Can be used
+            if the function is side-effecting, in which case a debug_assert taking
+            a Bool will evaluate the expression producing the Bool even in release mode.
+        stringable: The type of the message.
+
+    Args:
+        message: The message to convert to `String` before displaying it on failure.
+    """
+
+    @parameter
+    if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
+        debug_assert(func(), message)
+
+
+@always_inline
 fn debug_assert[stringable: Stringable](cond: Bool, message: stringable):
     """Asserts that the condition is true.
 
