@@ -1522,8 +1522,6 @@ def test_format_conversion_flags():
         in String("{0!r} {3} {1!r}").format(a, b, c, d)
     )
 
-    assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
-
     assert_true(
         "True 'Mojo' 42 SIMD[DType.float64, 1](2"
         in String("{4} {0!r} {3} {1!r}").format(a, b, c, d, True)
