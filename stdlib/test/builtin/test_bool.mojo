@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import assert_equal, assert_true, assert_false
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_bool_cast_to_int():
@@ -34,12 +34,15 @@ struct MyTrue:
     fn __bool__(self) -> Bool:
         return True
 
+    fn __as_bool__(self) -> Bool:
+        return self.__bool__()
+
 
 fn takes_bool(cond: Bool) -> Bool:
     return cond
 
 
-def test_convert_from_boolable():
+def test_convert_from_implicitly_boolable():
     assert_true(takes_bool(MyTrue()))
     assert_true(bool(MyTrue()))
 
@@ -47,6 +50,11 @@ def test_convert_from_boolable():
 def test_bool_to_string():
     assert_equal(str(True), "True")
     assert_equal(str(False), "False")
+
+
+def test_bool_representation():
+    assert_equal(repr(True), "True")
+    assert_equal(repr(False), "False")
 
 
 def test_bitwise():
@@ -140,8 +148,9 @@ def test_comparisons():
 def main():
     test_bool_cast_to_int()
     test_bool_none()
-    test_convert_from_boolable()
+    test_convert_from_implicitly_boolable()
     test_bool_to_string()
+    test_bool_representation()
     test_bitwise()
     test_neg()
     test_indexer()

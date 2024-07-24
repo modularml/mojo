@@ -72,7 +72,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __eq__(self, other: AddressSpace) -> Bool:
@@ -81,7 +81,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -93,7 +93,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
 
     @always_inline("nodebug")
     fn __ne__(self, other: AddressSpace) -> Bool:
@@ -105,7 +105,55 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
+
+    @always_inline("nodebug")
+    fn __is__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __is__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
 
 
 @value
@@ -155,6 +203,15 @@ struct AddressSpace(EqualityComparable):
         return self._value
 
     @always_inline("nodebug")
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        return self._value.value
+
+    @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """True if the two address spaces are equal and False otherwise.
 
@@ -164,7 +221,7 @@ struct AddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -176,7 +233,31 @@ struct AddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
+
+    @always_inline("nodebug")
+    fn __is__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
 
 
 # ===----------------------------------------------------------------------===#
@@ -185,19 +266,18 @@ struct AddressSpace(EqualityComparable):
 
 
 @value
-@automatically_dereference
 @register_passable("trivial")
 struct Reference[
+    is_mutable: Bool, //,
     type: AnyType,
-    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]:
+](CollectionElement):
     """Defines a non-nullable safe reference.
 
     Parameters:
-        type: Type of the underlying data.
         is_mutable: Whether the referenced data may be mutated through this.
+        type: Type of the underlying data.
         lifetime: The lifetime of the reference.
         address_space: The address space of the referenced data.
     """
@@ -220,32 +300,35 @@ struct Reference[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self._mlir_type):
-        """Constructs a Reference from the MLIR reference.
+    fn __init__(
+        inout self, ref [lifetime, address_space._value.value]value: type
+    ):
+        """Constructs a Reference from a value reference.
 
         Args:
-            value: The MLIR reference.
+            value: The value reference.
         """
-        self.value = value
+        self.value = __get_mvalue_as_litref(value)
+
+    fn __init__(inout self, *, other: Self):
+        """Constructs a copy from another Reference.
+
+        Note that this does **not** copy the underlying data.
+
+        Args:
+            other: The `Reference` to copy.
+        """
+        self.value = other.value
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self:
+    fn __getitem__(self) -> ref [lifetime, address_space._value.value] type:
         """Enable subscript syntax `ref[]` to access the element.
 
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return self
-
-    @always_inline("nodebug")
-    fn __mlir_ref__(self) -> Self._mlir_type:
-        """Enable the Mojo compiler to see into `Reference`.
-
-        Returns:
-            The MLIR reference for the Mojo compiler to use.
-        """
-        return self.value
+        return __get_litref_as_mvalue(self.value)

@@ -17,8 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import alignof, sizeof
 
+from memory import UnsafePointer, memcpy
 from memory.memory import _free
-from memory import memcmp, memcpy, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Error
@@ -26,7 +26,13 @@ from memory import memcmp, memcpy, UnsafePointer
 
 
 @register_passable
-struct Error(Stringable, Boolable):
+struct Error(
+    Stringable,
+    Boolable,
+    Representable,
+    Formattable,
+    CollectionElement,
+):
     """This type represents an Error."""
 
     var data: UnsafePointer[UInt8]
@@ -40,8 +46,8 @@ struct Error(Stringable, Boolable):
     ownership and a free is executed in the destructor.
     """
 
-    @always_inline("nodebug")
-    fn __init__() -> Error:
+    @always_inline
+    fn __init__() -> Self:
         """Default constructor.
 
         Returns:
@@ -49,8 +55,8 @@ struct Error(Stringable, Boolable):
         """
         return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
 
-    @always_inline("nodebug")
-    fn __init__(value: StringLiteral) -> Error:
+    @always_inline
+    fn __init__(value: StringLiteral) -> Self:
         """Construct an Error object with a given string literal.
 
         Args:
@@ -60,13 +66,11 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         return Error {
-            # TODO: Remove cast once string UInt8 transition is complete.
-            data: value.unsafe_ptr().bitcast[UInt8](),
+            data: value.unsafe_ptr(),
             loaded_length: len(value),
         }
 
-    @always_inline("nodebug")
-    fn __init__(src: String) -> Error:
+    fn __init__(src: String) -> Self:
         """Construct an Error object with a given string.
 
         Args:
@@ -75,19 +79,17 @@ struct Error(Stringable, Boolable):
         Returns:
             The constructed Error object.
         """
-        var length = len(src)
+        var length = src.byte_length()
         var dest = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
             dest=dest,
-            # TODO: Remove cast once string UInt8 transition is complete.
-            src=src.unsafe_ptr().bitcast[UInt8](),
+            src=src.unsafe_ptr(),
             count=length,
         )
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
-    @always_inline("nodebug")
-    fn __init__(src: StringRef) -> Error:
+    fn __init__(src: StringRef) -> Self:
         """Construct an Error object with a given string ref.
 
         Args:
@@ -106,12 +108,22 @@ struct Error(Stringable, Boolable):
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            The copied `Error`.
+        """
+        return other
+
     fn __del__(owned self):
         """Releases memory if allocated."""
         if self.loaded_length < 0:
             self.data.free()
 
-    @always_inline("nodebug")
     fn __copyinit__(existing: Self) -> Self:
         """Creates a deep copy of an existing error.
 
@@ -137,23 +149,36 @@ struct Error(Stringable, Boolable):
         """
         return self.data.__bool__()
 
+    @no_inline
     fn __str__(self) -> String:
         """Converts the Error to string representation.
 
         Returns:
             A String of the error message.
         """
-        return self._message()
+        return String.format_sequence(self)
 
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this error to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid this unnecessary intermediate String allocation.
+        writer.write(self._message())
+
+    @no_inline
     fn __repr__(self) -> String:
         """Converts the Error to printable representation.
 
         Returns:
             A printable representation of the error message.
         """
-        return str(self)
+        return "Error(" + repr(self._message()) + ")"
 
-    @always_inline
     fn _message(self) -> String:
         """Converts the Error to string representation.
 
@@ -167,3 +192,9 @@ struct Error(Stringable, Boolable):
         if length < 0:
             length = -length
         return String(StringRef(self.data, length))
+
+
+@export("__mojo_debugger_raise_hook")
+fn __mojo_debugger_raise_hook():
+    """This function is used internally by the Mojo Debugger."""
+    pass

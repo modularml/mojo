@@ -18,16 +18,15 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 from sys import sizeof as _sizeof
 
-from utils import unroll
-
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
+alias _mIsNotInteger = UInt8(~(1 << 7))
 alias _mIsFloat = UInt8(1 << 6)
 
 
 @value
 @register_passable("trivial")
-struct DType(Stringable, Representable, KeyElement):
+struct DType(Stringable, Formattable, Representable, KeyElement):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`
@@ -76,55 +75,69 @@ struct DType(Stringable, Representable, KeyElement):
     alias index = DType(__mlir_attr.`#kgen.dtype.constant<index> : !kgen.dtype`)
     """Represents an integral type whose bitwidth is the maximum integral value
     on the system."""
-    alias address = DType(
-        __mlir_attr.`#kgen.dtype.constant<address> : !kgen.dtype`
-    )
-    """Represents a pointer type whose bitwidth is the same as the bitwidth
-    of the hardware's pointer type (32-bit on 32-bit machines and 64-bit on
-    64-bit machines)."""
 
-    @always_inline("nodebug")
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy this DType.
+
+        Args:
+            other: The DType to copy.
+        """
+        self = other
+
+    @no_inline
     fn __str__(self) -> String:
         """Gets the name of the DType.
 
         Returns:
             The name of the dtype.
         """
+
+        return String.format_sequence(self)
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this dtype to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
         if self == DType.bool:
-            return "bool"
+            return writer.write_str["bool"]()
         if self == DType.int8:
-            return "int8"
+            return writer.write_str["int8"]()
         if self == DType.uint8:
-            return "uint8"
+            return writer.write_str["uint8"]()
         if self == DType.int16:
-            return "int16"
+            return writer.write_str["int16"]()
         if self == DType.uint16:
-            return "uint16"
+            return writer.write_str["uint16"]()
         if self == DType.int32:
-            return "int32"
+            return writer.write_str["int32"]()
         if self == DType.uint32:
-            return "uint32"
+            return writer.write_str["uint32"]()
         if self == DType.int64:
-            return "int64"
+            return writer.write_str["int64"]()
         if self == DType.uint64:
-            return "uint64"
+            return writer.write_str["uint64"]()
         if self == DType.index:
-            return "index"
+            return writer.write_str["index"]()
         if self == DType.bfloat16:
-            return "bfloat16"
+            return writer.write_str["bfloat16"]()
         if self == DType.float16:
-            return "float16"
+            return writer.write_str["float16"]()
         if self == DType.float32:
-            return "float32"
+            return writer.write_str["float32"]()
         if self == DType.tensor_float32:
-            return "tensor_float32"
+            return writer.write_str["tensor_float32"]()
         if self == DType.float64:
-            return "float64"
+            return writer.write_str["float64"]()
         if self == DType.invalid:
-            return "invalid"
-        if self == DType.address:
-            return "address"
-        return "<<unknown>>"
+            return writer.write_str["invalid"]()
+
+        return writer.write_str["<<unknown>>"]()
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
@@ -164,6 +177,30 @@ struct DType(Stringable, Representable, KeyElement):
         ](val)
 
     @always_inline("nodebug")
+    fn __is__(self, rhs: DType) -> Bool:
+        """Compares one DType to another for equality.
+
+        Args:
+            rhs: The DType to compare against.
+
+        Returns:
+            True if the DTypes are the same and False otherwise.
+        """
+        return self == rhs
+
+    @always_inline("nodebug")
+    fn __isnot__(self, rhs: DType) -> Bool:
+        """Compares one DType to another for inequality.
+
+        Args:
+            rhs: The DType to compare against.
+
+        Returns:
+            True if the DTypes are the same and False otherwise.
+        """
+        return self != rhs
+
+    @always_inline("nodebug")
     fn __eq__(self, rhs: DType) -> Bool:
         """Compares one DType to another for equality.
 
@@ -179,7 +216,7 @@ struct DType(Stringable, Representable, KeyElement):
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: DType) -> Bool:
-        """Compares one DType to another for non-equality.
+        """Compares one DType to another for inequality.
 
         Args:
             rhs: The DType to compare against.
@@ -191,183 +228,13 @@ struct DType(Stringable, Representable, KeyElement):
             self._as_i8(), rhs._as_i8()
         )
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
+        """Return a 64-bit hash for this `DType` value.
+
+        Returns:
+            A 64-bit integer hash of this `DType` value.
+        """
         return hash(UInt8(self._as_i8()))
-
-    @always_inline("nodebug")
-    fn isa[other: DType](self) -> Bool:
-        """Checks if this DType matches the other one, specified as a
-        parameter.
-
-        Parameters:
-            other: The DType to compare against.
-
-        Returns:
-            True if the DTypes are the same and False otherwise.
-        """
-        return self == other
-
-    @always_inline("nodebug")
-    fn is_bool(self) -> Bool:
-        """Checks if this DType is Bool.
-
-        Returns:
-            True if the DType is Bool and False otherwise.
-        """
-        return self.isa[DType.bool]()
-
-    @always_inline("nodebug")
-    fn is_uint8(self) -> Bool:
-        """Checks if this DType is UInt8.
-
-        Returns:
-            True if the DType is UInt8 and False otherwise.
-        """
-        return self.isa[DType.uint8]()
-
-    @always_inline("nodebug")
-    fn is_int8(self) -> Bool:
-        """Checks if this DType is Int8.
-
-        Returns:
-            True if the DType is Int8 and False otherwise.
-        """
-        return self.isa[DType.int8]()
-
-    @always_inline("nodebug")
-    fn is_uint16(self) -> Bool:
-        """Checks if this DType is UInt16.
-
-        Returns:
-            True if the DType is UInt16 and False otherwise.
-        """
-        return self.isa[DType.uint16]()
-
-    @always_inline("nodebug")
-    fn is_int16(self) -> Bool:
-        """Checks if this DType is Int16.
-
-        Returns:
-            True if the DType is Int16 and False otherwise.
-        """
-        return self.isa[DType.int16]()
-
-    @always_inline("nodebug")
-    fn is_uint32(self) -> Bool:
-        """Checks if this DType is UInt32.
-
-        Returns:
-            True if the DType is UInt32 and False otherwise.
-        """
-        return self.isa[DType.uint32]()
-
-    @always_inline("nodebug")
-    fn is_int32(self) -> Bool:
-        """Checks if this DType is Int32.
-
-        Returns:
-            True if the DType is Int32 and False otherwise.
-        """
-        return self.isa[DType.int32]()
-
-    @always_inline("nodebug")
-    fn is_uint64(self) -> Bool:
-        """Checks if this DType is UInt64.
-
-        Returns:
-            True if the DType is UInt64 and False otherwise.
-        """
-        return self.isa[DType.uint64]()
-
-    @always_inline("nodebug")
-    fn is_int64(self) -> Bool:
-        """Checks if this DType is Int64.
-
-        Returns:
-            True if the DType is Int64 and False otherwise.
-        """
-        return self.isa[DType.int64]()
-
-    @always_inline("nodebug")
-    fn is_bfloat16(self) -> Bool:
-        """Checks if this DType is BFloat16.
-
-        Returns:
-            True if the DType is BFloat16 and False otherwise.
-        """
-        return self.isa[DType.bfloat16]()
-
-    @always_inline("nodebug")
-    fn is_float16(self) -> Bool:
-        """Checks if this DType is Float16.
-
-        Returns:
-            True if the DType is Float16 and False otherwise.
-        """
-        return self.isa[DType.float16]()
-
-    @always_inline("nodebug")
-    fn is_float32(self) -> Bool:
-        """Checks if this DType is Float32.
-
-        Returns:
-            True if the DType is Float32 and False otherwise.
-        """
-        return self.isa[DType.float32]()
-
-    @always_inline("nodebug")
-    fn is_tensor_float32(self) -> Bool:
-        """Checks if this DType is Tensor Float32.
-
-        Returns:
-            True if the DType is Tensor Float32 and False otherwise.
-        """
-        return self.isa[DType.tensor_float32]()
-
-    @always_inline("nodebug")
-    fn is_float64(self) -> Bool:
-        """Checks if this DType is Float64.
-
-        Returns:
-            True if the DType is Float64 and False otherwise.
-        """
-        return self.isa[DType.float64]()
-
-    @always_inline("nodebug")
-    fn is_index(self) -> Bool:
-        """Checks if this DType is Index.
-
-        Returns:
-            True if the DType is Index and False otherwise.
-        """
-        return self.isa[DType.index]()
-
-    @always_inline("nodebug")
-    fn is_index32(self) -> Bool:
-        """Checks if this DType is Index and 32 bit.
-
-        Returns:
-            True if this DType is Index and 32 bit, False otherwise.
-        """
-        return self.is_index() and (self.sizeof() == DType.int32.sizeof())
-
-    @always_inline("nodebug")
-    fn is_index64(self) -> Bool:
-        """Checks if this DType is Index and 64 bit.
-
-        Returns:
-            True if this DType is Index and 64 bit, False otherwise.
-        """
-        return self.is_index() and (self.sizeof() == DType.int64.sizeof())
-
-    @always_inline("nodebug")
-    fn is_address(self) -> Bool:
-        """Checks if this DType is Address.
-
-        Returns:
-            True if the DType is Address and False otherwise.
-        """
-        return self.isa[DType.address]()
 
     @always_inline("nodebug")
     fn is_unsigned(self) -> Bool:
@@ -392,7 +259,7 @@ struct DType(Stringable, Representable, KeyElement):
         Returns:
             Returns True if the input type parameter is signed.
         """
-        if self.is_index() or self.is_floating_point():
+        if self is DType.index or self.is_floating_point():
             return True
         if not self.is_integral():
             return False
@@ -404,20 +271,29 @@ struct DType(Stringable, Representable, KeyElement):
         )
 
     @always_inline("nodebug")
-    fn is_integral(self) -> Bool:
-        """Returns True if the type parameter is an integer and False otherwise.
+    fn _is_non_index_integral(self) -> Bool:
+        """Returns True if the type parameter is a non-index integer value and False otherwise.
 
         Returns:
-            Returns True if the input type parameter is an integer.
+            Returns True if the input type parameter is a non-index integer.
         """
-        if self.is_index():
-            return True
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
                 __mlir_op.`pop.and`(self._as_i8(), _mIsInteger.value),
                 UInt8(0).value,
             )
         )
+
+    @always_inline("nodebug")
+    fn is_integral(self) -> Bool:
+        """Returns True if the type parameter is an integer and False otherwise.
+
+        Returns:
+            Returns True if the input type parameter is an integer.
+        """
+        if self is DType.index:
+            return True
+        return self._is_non_index_integral()
 
     @always_inline("nodebug")
     fn is_floating_point(self) -> Bool:
@@ -445,7 +321,7 @@ struct DType(Stringable, Representable, KeyElement):
             True if the type is a half-precision float, false otherwise..
         """
 
-        return self.is_float16() or self.is_bfloat16()
+        return self in (DType.bfloat16, DType.float16)
 
     @always_inline("nodebug")
     fn is_numeric(self) -> Bool:
@@ -465,7 +341,40 @@ struct DType(Stringable, Representable, KeyElement):
         Returns:
             Returns the size in bytes of the current DType.
         """
-        return __mlir_op.`pop.dtype.sizeof`(self.value)
+
+        if self._is_non_index_integral():
+            return int(
+                UInt8(
+                    __mlir_op.`pop.shl`(
+                        UInt8(1).value,
+                        __mlir_op.`pop.sub`(
+                            __mlir_op.`pop.shr`(
+                                __mlir_op.`pop.and`(
+                                    self._as_i8(), _mIsNotInteger.value
+                                ),
+                                UInt8(1).value,
+                            ),
+                            UInt8(3).value,
+                        ),
+                    )
+                )
+            )
+
+        if self == DType.bool:
+            return sizeof[DType.bool]()
+        if self == DType.index:
+            return sizeof[DType.index]()
+        if self == DType.bfloat16:
+            return sizeof[DType.bfloat16]()
+        if self == DType.float16:
+            return sizeof[DType.float16]()
+        if self == DType.float32:
+            return sizeof[DType.float32]()
+        if self == DType.tensor_float32:
+            return sizeof[DType.tensor_float32]()
+        if self == DType.float64:
+            return sizeof[DType.float64]()
+        return sizeof[DType.invalid]()
 
     @always_inline
     fn bitwidth(self) -> Int:
@@ -474,8 +383,7 @@ struct DType(Stringable, Representable, KeyElement):
         Returns:
             Returns the size in bits of the current DType.
         """
-        var size_in_bytes = self.sizeof()
-        return 8 * size_in_bytes
+        return 8 * self.sizeof()
 
     # ===----------------------------------------------------------------------===#
     # dispatch_integral
@@ -493,23 +401,23 @@ struct DType(Stringable, Representable, KeyElement):
         Parameters:
             func: A parametrized on dtype function to dispatch.
         """
-        if self.is_uint8():
+        if self is DType.uint8:
             func[DType.uint8]()
-        elif self.is_int8():
+        elif self is DType.int8:
             func[DType.int8]()
-        elif self.is_uint16():
+        elif self is DType.uint16:
             func[DType.uint16]()
-        elif self.is_int16():
+        elif self is DType.int16:
             func[DType.int16]()
-        elif self.is_uint32():
+        elif self is DType.uint32:
             func[DType.uint32]()
-        elif self.is_int32():
+        elif self is DType.int32:
             func[DType.int32]()
-        elif self.is_uint64():
-            func[DType.uint64.value]()
-        elif self.is_int64():
+        elif self is DType.uint64:
+            func[DType.uint64]()
+        elif self is DType.int64:
             func[DType.int64]()
-        elif self.is_index():
+        elif self is DType.index:
             func[DType.index]()
         else:
             raise Error("only integral types are supported")
@@ -530,14 +438,14 @@ struct DType(Stringable, Representable, KeyElement):
         Parameters:
             func: A parametrized on dtype function to dispatch.
         """
-        if self.is_float16():
+        if self is DType.float16:
             func[DType.float16]()
         # TODO(#15473): Enable after extending LLVM support
-        # elif self.is_bfloat16():
+        # elif self is DType.bfloat16:
         #     func[DType.bfloat16]()
-        elif self.is_float32():
+        elif self is DType.float32:
             func[DType.float32]()
-        elif self.is_float64():
+        elif self is DType.float64:
             func[DType.float64]()
         else:
             raise Error("only floating point types are supported")
@@ -627,18 +535,34 @@ fn _integral_type_of[type: DType]() -> DType:
         return type
 
     @parameter
-    if type == DType.bfloat16 or type == DType.float16:
+    if type is DType.bfloat16 or type is DType.float16:
         return DType.int16
 
     @parameter
-    if type == DType.float32 or type == DType.tensor_float32:
+    if type is DType.float32 or type is DType.tensor_float32:
         return DType.int32
 
     @parameter
-    if type == DType.float64:
+    if type is DType.float64:
         return DType.int64
 
     return type.invalid
+
+
+fn _scientific_notation_digits[type: DType]() -> StringLiteral:
+    """Get the number of digits as a StringLiteral for the scientific notation
+    representation of a float.
+    """
+    constrained[type.is_floating_point(), "expected floating point type"]()
+
+    @parameter
+    if type is DType.bfloat16 or type is DType.float16:
+        return "4"
+    elif type is DType.float32 or type is DType.tensor_float32:
+        return "8"
+    else:
+        constrained[type is DType.float64, "unknown floating point type"]()
+        return "16"
 
 
 # ===-------------------------------------------------------------------===#
@@ -678,39 +602,36 @@ fn _index_printf_format() -> StringLiteral:
 @always_inline
 fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
     @parameter
-    if type == DType.bool:
+    if type is DType.bool:
         return _index_printf_format()
-    elif type == DType.uint8:
+    elif type is DType.uint8:
         return "%hhu"
-    elif type == DType.int8:
+    elif type is DType.int8:
         return "%hhi"
-    elif type == DType.uint16:
+    elif type is DType.uint16:
         return "%hu"
-    elif type == DType.int16:
+    elif type is DType.int16:
         return "%hi"
-    elif type == DType.uint32:
+    elif type is DType.uint32:
         return "%u"
-    elif type == DType.int32:
+    elif type is DType.int32:
         return "%i"
-    elif type == DType.int64:
+    elif type is DType.int64:
 
         @parameter
         if os_is_windows():
             return "%lld"
         else:
             return "%ld"
-    elif type == DType.uint64:
+    elif type is DType.uint64:
 
         @parameter
         if os_is_windows():
             return "%llu"
         else:
             return "%lu"
-    elif type == DType.index:
+    elif type is DType.index:
         return _index_printf_format()
-
-    elif type == DType.address:
-        return "%p"
 
     elif type.is_floating_point():
         return "%.17g"
@@ -719,41 +640,3 @@ fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
         constrained[False, "invalid dtype"]()
 
     return ""
-
-
-fn _get_runtime_dtype_size(type: DType) -> Int:
-    """
-    Get the size of the dynamic dtype.
-
-    We cannot directly using type.sizeof(), since that only works with
-    statically known dtypes. Instead, we have to perform a dispatch to
-    determine the size of the dtype.
-    """
-    alias type_list = List[DType](
-        DType.bool,
-        DType.int8,
-        DType.uint8,
-        DType.int16,
-        DType.uint16,
-        DType.bfloat16,
-        DType.float16,
-        DType.int32,
-        DType.uint32,
-        DType.float32,
-        DType.tensor_float32,
-        DType.int64,
-        DType.uint64,
-        DType.float64,
-        DType.index,
-        DType.address,
-    )
-
-    @parameter
-    for idx in range(len(type_list)):
-        alias concrete_type = type_list[idx]
-        if concrete_type == type:
-            return sizeof[concrete_type]()
-
-    abort("unable to get the dtype size of " + str(type))
-
-    return -1

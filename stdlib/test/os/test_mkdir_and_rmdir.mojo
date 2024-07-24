@@ -12,68 +12,90 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from os import mkdir, rmdir, remove
+import os
 from os.path import exists
 from pathlib import Path
 
-from testing import assert_true, assert_false, assert_raises
+from testing import assert_false, assert_raises, assert_true
 
 
-fn create_dir_and_test_delete_string[
-    func_create: fn (String, Int) raises -> None,
-    func_delete: fn (String) raises -> None,
-](dir_name: String) raises:
+fn create_and_delete(path: String) raises:
     # verify that the test dir does not exist before starting the test
     assert_false(
-        exists(dir_name),
-        "Unexpected dir " + dir_name + " it should not exist",
+        exists(path),
+        "Unexpected dir " + path + " it should not exist",
     )
 
-    func_create(dir_name, 0o777)
-    assert_true(exists(dir_name))
+    os.mkdir(path, 0o777)
+    assert_true(exists(path))
 
-    func_delete(dir_name)
+    os.rmdir(path)
     # trying to delete non existing dir
     with assert_raises(contains="Can not remove directory: "):
-        func_delete(dir_name)
+        os.rmdir(path)
 
 
-fn create_dir_and_test_delete_path[
-    func_create: fn[pathlike: PathLike] (pathlike, Int) raises -> None,
-    func_delete: fn[pathlike: PathLike] (pathlike) raises -> None,
-](dir_path: Path) raises:
+fn test_mkdir_and_rmdir(path: String) raises:
+    try:
+        os.rmdir(path)
+    except:
+        pass
     # verify that the test dir does not exist before starting the test
     assert_false(
-        exists(dir_path),
-        "Unexpected dir " + dir_path.__fspath__() + " it should not exist",
+        exists(path),
+        "Unexpected dir " + str(path) + " it should not exist",
     )
 
-    func_create(dir_path, 0o777)
-    assert_true(exists(dir_path))
+    os.mkdir(path, 0o777)
+    assert_true(exists(path))
 
-    func_delete(dir_path)
+    os.rmdir(path)
     # trying to delete non existing dir
     with assert_raises(contains="Can not remove directory: "):
-        func_delete(dir_path)
+        os.rmdir(path)
 
 
-fn test_mkdir_and_rmdir() raises:
-    var cwd_path = Path()
-    var my_dir_path = cwd_path / "my_dir"
-    var my_dir_name = str(my_dir_path)
+fn test_mkdir_and_rmdir(path: Path) raises:
+    try:
+        os.rmdir(path)
+    except:
+        pass
+    # verify that the test dir does not exist before starting the test
+    assert_false(
+        exists(path),
+        "Unexpected dir " + str(path) + " it should not exist",
+    )
 
-    create_dir_and_test_delete_path[mkdir, rmdir](my_dir_path)
-    create_dir_and_test_delete_string[mkdir, rmdir](my_dir_name)
+    os.mkdir(path, 0o777)
+    assert_true(exists(path))
 
-    # test relative path
-    create_dir_and_test_delete_string[mkdir, rmdir]("my_relative_dir")
-    create_dir_and_test_delete_path[mkdir, rmdir](Path("my_relative_dir"))
+    os.rmdir(path)
+    # trying to delete non existing dir
+    with assert_raises(contains="Can not remove directory: "):
+        os.rmdir(path)
+
+
+fn test_makedirs_and_removedirs(path: Path) raises:
+    try:
+        os.removedirs(path)
+    except:
+        pass
+    # verify that the test dir does not exist before starting the test
+    assert_false(
+        exists(path),
+        "Unexpected dir " + str(path) + " it should not exist",
+    )
+    os.makedirs(path, exist_ok=True)
+    assert_true(exists(path))
+    with assert_raises():
+        os.makedirs(path)
+    # Make sure this doesn't throw error
+    os.makedirs(path, exist_ok=True)
+    os.removedirs(path)
 
 
 fn test_mkdir_mode() raises:
-    var cwd_path = Path()
-    var my_dir_path = cwd_path / "my_dir"
-    var file_name = my_dir_path / "file.txt"
+    var my_dir_path = Path("my_dir")
 
     assert_false(
         exists(my_dir_path),
@@ -81,7 +103,7 @@ fn test_mkdir_mode() raises:
     )
 
     # creating dir without writing permission
-    mkdir(my_dir_path, 0o111)
+    os.mkdir(my_dir_path, 0o111)
 
     # TODO: This test is failing on Graviton internally in CI, revisit.
     # with assert_raises(contains="Permission denied"):
@@ -91,12 +113,11 @@ fn test_mkdir_mode() raises:
     #         remove(file_name)
 
     if exists(my_dir_path):
-        rmdir(my_dir_path)
+        os.rmdir(my_dir_path)
 
 
 fn test_rmdir_not_empty() raises:
-    var cwd_path = Path()
-    var my_dir_path = cwd_path / "my_dir"
+    var my_dir_path = Path("my_dir")
     var file_name = my_dir_path / "file.txt"
 
     assert_false(
@@ -104,19 +125,26 @@ fn test_rmdir_not_empty() raises:
         "Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
     )
 
-    mkdir(my_dir_path)
+    os.mkdir(my_dir_path)
     with open(file_name, "w"):
         pass
 
     with assert_raises(contains="Can not remove directory: "):
-        rmdir(my_dir_path)
+        os.rmdir(my_dir_path)
 
-    remove(file_name)
-    rmdir(my_dir_path)
+    os.remove(file_name)
+    os.rmdir(my_dir_path)
     assert_false(exists(my_dir_path), "Failed to remove dir")
 
 
 def main():
-    test_mkdir_and_rmdir()
+    test_mkdir_and_rmdir("my_dir")
+    test_mkdir_and_rmdir(Path("my_dir"))
+    if os.env.getenv("HOME") or os.env.getenv("USERPROFILE"):
+        test_mkdir_and_rmdir(Path("~/my_dir").expanduser())
+
+    test_makedirs_and_removedirs(os.path.join("dir1", "dir2", "dir3"))
+    test_makedirs_and_removedirs(Path("dir1") / "dir2" / "dir3")
+
     test_mkdir_mode()
     test_rmdir_not_empty()

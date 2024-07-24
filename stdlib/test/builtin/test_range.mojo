@@ -14,8 +14,6 @@
 
 from testing import assert_equal
 
-from testing import assert_equal
-
 
 def test_range_len():
     # Usual cases
@@ -32,13 +30,48 @@ def test_range_len():
     assert_equal(range(0, 0).__len__(), 0, "len(range(0, 0))")
     assert_equal(range(10, 0).__len__(), 0, "len(range(10, 0))")
     assert_equal(range(0, 0, 1).__len__(), 0, "len(range(0, 0, 1))")
-    # FIXME(#38392)
-    # assert_equal(range(5, 10, -1).__len__(), 0, "len(range(5, 10, -1))")
-    # assert_equal(range(10, 5, 1).__len__(), 0, "len(range(10, 5, 1))")
-    # assert_equal(range(5, 10, -10).__len__(), 0, "len(range(5, 10, -10))")
-    # assert_equal(range(10, 5, 10).__len__(), 0, "len(range(10, 5, 10))")
+
+    assert_equal(range(5, 10, -1).__len__(), 0, "len(range(5, 10, -1))")
+    assert_equal(range(10, 5, 1).__len__(), 0, "len(range(10, 5, 1))")
+    assert_equal(range(5, 10, -10).__len__(), 0, "len(range(5, 10, -10))")
+    assert_equal(range(10, 5, 10).__len__(), 0, "len(range(10, 5, 10))")
     assert_equal(range(5, 10, 20).__len__(), 1, "len(range(5, 10, 20))")
     assert_equal(range(10, 5, -20).__len__(), 1, "len(range(10, 5, -20))")
+
+
+def test_range_len_uint_maxuint():
+    assert_equal(
+        range(UInt(0), UInt.MAX).__len__(), UInt.MAX, "len(range(0, UInt.MAX))"
+    )
+    assert_equal(
+        range(UInt.MAX, UInt(0), UInt(1)).__len__(),
+        0,
+        "len(range(UInt.MAX, 0, 1))",
+    )
+
+
+def test_range_len_uint_empty():
+    assert_equal(
+        range(UInt(0), UInt(0), UInt(1)).__len__(), 0, "len(range(0, 0, 1))"
+    )
+    assert_equal(
+        range(UInt(10), UInt(10), UInt(1)).__len__(), 0, "len(range(10, 10, 1))"
+    )
+
+
+def test_range_len_uint():
+    assert_equal(range(UInt(10)).__len__(), 10, "len(range(10))")
+
+    # start < end
+    assert_equal(range(UInt(0), UInt(10)).__len__(), 10, "len(range(0, 10))")
+    assert_equal(range(UInt(5), UInt(10)).__len__(), 5, "len(range(5, 10))")
+    assert_equal(
+        range(UInt(0), UInt(10), UInt(2)).__len__(), 5, "len(range(0, 10, 2))"
+    )
+    # start > end
+    assert_equal(
+        range(UInt(10), UInt(0), UInt(1)).__len__(), 0, "len(range(10, 0, 1))"
+    )
 
 
 def test_range_getitem():
@@ -50,6 +83,22 @@ def test_range_getitem():
     assert_equal(range(10, 0, -1)[2], 8, "range(10, 0, -1)[2]")
     assert_equal(range(0, 10, 2)[4], 8, "range(0, 10, 2)[4]")
     assert_equal(range(38, -13, -23)[1], 15, "range(38, -13, -23)[1]")
+
+
+def test_range_getitem_uint():
+    assert_equal(range(UInt(10))[3], 3, "range(10)[3]")
+
+    assert_equal(range(UInt(0), UInt(10))[3], 3, "range(0, 10)[3]")
+    assert_equal(range(UInt(5), UInt(10))[3], 8, "range(5, 10)[3]")
+    assert_equal(range(UInt(5), UInt(10))[4], 9, "range(5, 10)[4]")
+
+    # Specify the step size > 1
+    assert_equal(range(UInt(0), UInt(10), UInt(2))[4], 8, "range(0, 10, 2)[4]")
+
+    # start > end
+    var bad_strided_uint_range = range(UInt(10), UInt(5), UInt(1))
+    var bad_strided_uint_range_iter = bad_strided_uint_range.__iter__()
+    assert_equal(UInt(0), bad_strided_uint_range_iter.__len__())
 
 
 def test_range_reversed():
@@ -122,8 +171,29 @@ def test_indexing():
     assert_equal(r[3], 3)
 
 
+def test_range_bounds():
+    var start = 0
+    var end = 10
+
+    # verify loop iteration
+    var r = range(start, end)
+    var last_seen = -1
+    for x in r:
+        last_seen = x
+    assert_equal(last_seen, end - 1)
+
+    # verify index lookup
+    var ln = r.__len__()
+    assert_equal(r[ln - 1], last_seen)
+
+
 def main():
     test_range_len()
+    test_range_len_uint()
+    test_range_len_uint_maxuint()
+    test_range_len_uint_empty()
     test_range_getitem()
+    test_range_getitem_uint()
     test_range_reversed()
     test_indexing()
+    test_range_bounds()

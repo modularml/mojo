@@ -15,32 +15,17 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.intrinsics import _mlirtype_is_eq
+from collections import Optional
 
 
-@always_inline("nodebug")
-fn _int_max_value() -> Int:
-    # FIXME: The `slice` type should have the concept of `None` indices, but the
-    # effect of a `None` end index is the same as a very large end index.
-    return int(Int32.MAX)
-
-
-@always_inline("nodebug")
-fn _default_or[T: AnyRegType](value: T, default: Int) -> Int:
-    # TODO: Handle `__index__` for other types when we have traits!
-    @parameter
-    if _mlirtype_is_eq[T, Int]():
-        return __mlir_op.`kgen.rebind`[_type=Int](value)
-    else:
-        __mlir_op.`kgen.param.assert`[
-            cond = (_mlirtype_is_eq[T, NoneType]()).__mlir_i1__(),
-            message = "expected Int or NoneType".value,
-        ]()
-        return default
-
-
-@register_passable("trivial")
-struct Slice(Sized, Stringable, EqualityComparable):
+@value
+struct Slice(
+    Stringable,
+    EqualityComparable,
+    Representable,
+    Formattable,
+    CollectionElement,
+):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -55,9 +40,9 @@ struct Slice(Sized, Stringable, EqualityComparable):
     ```
     """
 
-    var start: Int
+    var start: Optional[Int]
     """The starting index of the slice."""
-    var end: Int
+    var end: Optional[Int]
     """The end index of the slice."""
     var step: Int
     """The step increment value of the slice."""
@@ -75,38 +60,74 @@ struct Slice(Sized, Stringable, EqualityComparable):
         self.step = 1
 
     @always_inline("nodebug")
-    fn __init__[
-        T0: AnyRegType, T1: AnyRegType, T2: AnyRegType
-    ](inout self, start: T0, end: T1, step: T2):
+    fn __init__(
+        inout self,
+        start: Optional[Int],
+        end: Optional[Int],
+        step: Optional[Int],
+    ):
         """Construct slice given the start, end and step values.
-
-        Parameters:
-            T0: Type of the start value.
-            T1: Type of the end value.
-            T2: Type of the step value.
 
         Args:
             start: The start value.
             end: The end value.
             step: The step value.
         """
-        self.start = _default_or(start, 0)
-        self.end = _default_or(end, _int_max_value())
-        self.step = _default_or(step, 1)
+        self.start = start
+        self.end = end
+        self.step = step.or_else(1)
 
+    fn __init__(inout self, *, other: Self):
+        """Creates a deep copy of the Slice.
+
+        Args:
+            other: The slice to copy.
+        """
+        self.__init__(start=other.start, end=other.end, step=other.step)
+
+    @no_inline
     fn __str__(self) -> String:
         """Gets the string representation of the span.
 
         Returns:
             The string representation of the span.
         """
-        var res = str(self.start)
-        res += ":"
-        if self._has_end():
-            res += str(self.end)
-        res += ":"
-        res += str(self.step)
-        return res
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Gets the string representation of the span.
+
+        Returns:
+            The string representation of the span.
+        """
+        return self.__str__()
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """Write Slice string representation to a `Formatter`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        @parameter
+        fn write_optional(opt: Optional[Int]):
+            if opt:
+                writer.write(repr(opt.value()))
+            else:
+                writer.write(repr(None))
+
+        writer.write("slice(")
+        write_optional(self.start)
+        writer.write(", ")
+        write_optional(self.end)
+        writer.write(", ")
+        writer.write(repr(self.step))
+        writer.write(")")
 
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
@@ -138,31 +159,63 @@ struct Slice(Sized, Stringable, EqualityComparable):
         """
         return not (self == other)
 
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        """Return the length of the slice.
+    fn indices(self, length: Int) -> (Int, Int, Int):
+        """Returns a tuple of 3 integers representing the start, end, and step
+           of the slice if applied to a container of the given length.
 
-        Returns:
-            The length of the slice.
-        """
+        Uses the target container length to normalize negative, out of bounds,
+        or None indices.
 
-        return len(range(self.start, self.end, self.step))
+        Negative indices are wrapped using the length of the container.
+        ```mojo
+        s = slice(0, -1, 1)
+        s.indices(5) # returns (0, 4, 1)
+        ```
 
-    @always_inline
-    fn __getitem__(self, idx: Int) -> Int:
-        """Get the slice index.
+        None indices are defaulted to the start or the end of the container
+        based on whether `step` is positive or negative.
+        ```mojo
+        s = slice(None, None, 1)
+        s.indices(5) # returns (0, 5, 1)
+        ```
+
+        Out of bounds indices are clamped using the size of the container.
+        ```mojo
+        s = slice(20)
+        s.indices(5) # returns (0, 5, 1)
+        ```
 
         Args:
-            idx: The index.
+            length: The length of the target container.
 
         Returns:
-            The slice index.
+            A tuple containing three integers for start, end, and step.
         """
-        return self.start + index(idx) * self.step
+        var step = self.step
 
-    @always_inline("nodebug")
-    fn _has_end(self) -> Bool:
-        return self.end != _int_max_value()
+        var start = self.start
+        var end = self.end
+        var positive_step = step > 0
+
+        if not start:
+            start = 0 if positive_step else length - 1
+        elif start.value() < 0:
+            start = start.value() + length
+            if start.value() < 0:
+                start = 0 if positive_step else -1
+        elif start.value() >= length:
+            start = length if positive_step else length - 1
+
+        if not end:
+            end = length if positive_step else -1
+        elif end.value() < 0:
+            end = end.value() + length
+            if end.value() < 0:
+                end = 0 if positive_step else -1
+        elif end.value() >= length:
+            end = length if positive_step else length - 1
+
+        return (start.value(), end.value(), step)
 
 
 @always_inline("nodebug")
@@ -175,7 +228,7 @@ fn slice(end: Int) -> Slice:
     Returns:
         The constructed slice.
     """
-    return Slice(0, end)
+    return Slice(None, end, None)
 
 
 @always_inline("nodebug")
@@ -192,17 +245,11 @@ fn slice(start: Int, end: Int) -> Slice:
     return Slice(start, end)
 
 
-# TODO(30496): Modernize the slice type
 @always_inline("nodebug")
-fn slice[
-    T0: AnyRegType, T1: AnyRegType, T2: AnyRegType
-](start: T0, end: T1, step: T2) -> Slice:
+fn slice(
+    start: Optional[Int], end: Optional[Int], step: Optional[Int]
+) -> Slice:
     """Construct a Slice given the start, end and step values.
-
-    Parameters:
-        T0: Type of the start value.
-        T1: Type of the end value.
-        T2: Type of the step value.
 
     Args:
         start: The start value.

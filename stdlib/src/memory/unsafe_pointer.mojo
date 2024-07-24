@@ -19,22 +19,35 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof
-from sys.intrinsics import _mlirtype_is_eq
+from sys import alignof, sizeof, triple_is_nvidia_cuda
+from sys.intrinsics import (
+    _mlirtype_is_eq,
+    _type_is_eq,
+    gather,
+    scatter,
+    strided_load,
+    strided_store,
+)
 
+from bit import is_power_of_two
 from memory.memory import _free, _malloc
 
 
 # ===----------------------------------------------------------------------=== #
 # UnsafePointer
 # ===----------------------------------------------------------------------=== #
+
+
 @register_passable("trivial")
 struct UnsafePointer[
-    T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
+    T: AnyType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](
-    Boolable,
+    ImplicitlyBoolable,
     CollectionElement,
     Stringable,
+    Formattable,
     Intable,
     Comparable,
 ):
@@ -43,19 +56,21 @@ struct UnsafePointer[
     Parameters:
         T: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     # Fields
     alias _mlir_type = __mlir_type[
-        `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
+        `!kgen.pointer<`,
+        T,
+        `, `,
+        address_space._value.value,
+        ` exclusive(`,
+        exclusive.value,
+        `)>`,
     ]
 
     alias type = T
-
-    # We're unsafe, so we can have unsafe things. References we make have
-    # an immortal mutable lifetime, since we can't come up with a meaningful
-    # lifetime for them anyway.
-    alias _ref_type = Reference[T, True, MutableStaticLifetime, address_space]
 
     """The underlying pointer type."""
     var address: Self._mlir_type
@@ -72,7 +87,9 @@ struct UnsafePointer[
         Returns:
             A null pointer.
         """
-        return Self.get_null()
+        return Self {
+            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+        }
 
     @always_inline
     fn __init__(value: Self._mlir_type) -> Self:
@@ -87,89 +104,40 @@ struct UnsafePointer[
         return Self {address: value}
 
     @always_inline
-    fn __init__(value: Reference[T, _, _, address_space]) -> Self:
-        """Create an unsafe UnsafePointer from a safe Reference.
+    fn __init__(other: UnsafePointer[T, address_space, _]) -> Self:
+        """Exclusivity parameter cast a pointer.
 
         Args:
-            value: The input reference to construct with.
+            other: Pointer to cast.
 
         Returns:
-            The pointer.
-        """
-        return Self {address: __mlir_op.`lit.ref.to_pointer`(value.value)}
-
-    @always_inline
-    fn __init__(*, address: Int) -> Self:
-        """Create an unsafe UnsafePointer from an address in an integer.
-
-        Args:
-            address: The address to construct the pointer with.
-
-        Returns:
-            The pointer.
+            Constructed UnsafePointer object.
         """
         return Self {
-            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-                Scalar[DType.index](address).value
+            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+                other.address
             )
         }
+
+    @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            A copy of the object.
+        """
+        return Self {address: other.address}
 
     # ===-------------------------------------------------------------------===#
     # Factory methods
     # ===-------------------------------------------------------------------===#
 
     @staticmethod
-    fn _from_dtype_ptr[
-        dtype: DType
-    ](ptr: DTypePointer[dtype]) -> UnsafePointer[Scalar[dtype]]:
-        # TODO:
-        #   Is there a better way to create an UnsafePointer from a
-        #   DTypePointer?
-        return UnsafePointer[Scalar[dtype]](address=int(ptr))
-
-    @staticmethod
     @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a UnsafePointer representing nullptr.
-
-        Returns:
-            Constructed nullptr UnsafePointer object.
-        """
-        return Self {
-            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
-        }
-
-    @staticmethod
-    @always_inline
-    fn alloc(count: Int) -> Self:
-        """Allocate an array with default alignment.
-
-        Args:
-            count: The number of elements in the array.
-
-        Returns:
-            The pointer to the newly allocated array.
-        """
-        alias sizeof_t = sizeof[T]()
-        alias alignof_t = alignof[T]()
-
-        constrained[sizeof_t > 0, "size must be greater than zero"]()
-        constrained[alignof_t > 0, "alignment must be greater than zero"]()
-        constrained[
-            sizeof_t % alignof_t == 0, "size must be a multiple of alignment"
-        ]()
-
-        return Self(
-            address=int(
-                _malloc[Int8, address_space=address_space](
-                    sizeof_t * count, alignment=alignof_t
-                )
-            )
-        )
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn address_of(arg: Reference[T, _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: T) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -178,25 +146,91 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        return Self(arg)
+        return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
+
+    @staticmethod
+    @always_inline
+    fn alloc(count: Int, alignment: Int = alignof[T]()) -> Self:
+        """Allocate an array with specified or default alignment.
+
+        Args:
+            count: The number of elements in the array.
+            alignment: The alignment in bytes of the allocated memory.
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        alias sizeof_t = sizeof[T]()
+
+        constrained[sizeof_t > 0, "size must be greater than zero"]()
+
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
+        )
+
+    @staticmethod
+    @always_inline
+    fn alloc[alignment: Int = alignof[T]()](count: Int) -> Self:
+        """Allocate an array with specified or default alignment.
+
+        Parameters:
+            alignment: The alignment in bytes of the allocated memory.
+
+        Args:
+            count: The number of elements in the array.
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        alias sizeof_t = sizeof[T]()
+
+        constrained[sizeof_t > 0, "size must be greater than zero"]()
+        constrained[alignment > 0, "alignment must be greater than zero"]()
+
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
+        )
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __refitem__(self) -> Self._ref_type:
+    fn __getitem__(
+        self,
+    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
         """Return a reference to the underlying data.
 
         Returns:
             A reference to the value.
         """
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self._ref_type._mlir_type
-        ](self.address)
+
+        # We're unsafe, so we can have unsafe things. References we make have
+        # an immortal mutable lifetime, since we can't come up with a meaningful
+        # lifetime for them anyway.
+        alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
+        return __get_litref_as_mvalue(
+            __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
+                UnsafePointer[T, address_space, False](self).address
+            )
+        )
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
+    fn offset(self, idx: Int) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Args:
+            idx: The offset of the new pointer.
+
+        Returns:
+            The new constructed UnsafePointer.
+        """
+        return __mlir_op.`pop.offset`(self.address, idx.value)
+
+    @always_inline
+    fn __getitem__(
+        self, offset: Int
+    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
         """Return a reference to the underlying data, offset by the given index.
 
         Args:
@@ -205,7 +239,7 @@ struct UnsafePointer[
         Returns:
             An offset reference.
         """
-        return (self + offset).__refitem__()
+        return (self + offset)[]
 
     @always_inline
     fn __add__(self, offset: Int) -> Self:
@@ -238,7 +272,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self = Self(address=int(self) + offset * sizeof[T]())
+        self = self + offset
 
     @always_inline
     fn __isub__(inout self, offset: Int):
@@ -247,7 +281,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self.__iadd__(-offset)
+        self = self - offset
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -337,38 +371,312 @@ struct UnsafePointer[
         return int(self) != 0
 
     @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Return true if the pointer is non-null.
+
+        Returns:
+            Whether the pointer is null.
+        """
+        return self.__bool__()
+
+    @always_inline
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
         Returns:
           The address of the pointer as an Int.
         """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
+        return __mlir_op.`pop.pointer_to_index`(self.address)
 
+    @no_inline
     fn __str__(self) -> String:
-        return hex(self)
+        """Gets a string representation of the pointer.
+
+        Returns:
+            The string representation of the pointer.
+        """
+        return hex(int(self))
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this pointer address to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid intermediate String allocation.
+        writer.write(str(self))
 
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
+    @always_inline("nodebug")
+    fn simd_strided_load[
+        type: DType, width: Int, T: Intable
+    ](self: UnsafePointer[Scalar[type], *_], stride: T) -> SIMD[type, width]:
+        """Performs a strided load of the SIMD vector.
+
+        Parameters:
+            type: DType of returned SIMD value.
+            width: The SIMD width.
+            T: The Intable type of the stride.
+
+        Args:
+            stride: The stride between loads.
+
+        Returns:
+            A vector which is stride loaded.
+        """
+        return strided_load[type, width](
+            self, int(stride), SIMD[DType.bool, width](1)
+        )
+
+    @always_inline("nodebug")
+    fn simd_strided_store[
+        type: DType, width: Int, T: Intable
+    ](self: UnsafePointer[Scalar[type], *_], val: SIMD[type, width], stride: T):
+        """Performs a strided store of the SIMD vector.
+
+        Parameters:
+            type: DType of `val`, the SIMD value to store.
+            width: The SIMD width.
+            T: The Intable type of the stride.
+
+        Args:
+            val: The SIMD value to store.
+            stride: The stride between stores.
+        """
+        strided_store(val, self, int(stride), True)
+
+    @always_inline("nodebug")
+    fn gather[
+        type: DType,
+        *,
+        width: Int = 1,
+        alignment: Int = alignof[
+            SIMD[type, width]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](self: UnsafePointer[Scalar[type], *_], offset: SIMD[_, width]) -> SIMD[
+        type, width
+    ]:
+        """Gathers a SIMD vector from offsets of the current pointer.
+
+        This method loads from memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            type: DType of the return SIMD.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to gather from.
+
+        Returns:
+            The SIMD vector containing the gathered values.
+        """
+        var mask = SIMD[DType.bool, width](True)
+        var default = SIMD[type, width]()
+        return self.gather[width=width, alignment=alignment](
+            offset, mask, default
+        )
+
+    @always_inline("nodebug")
+    fn gather[
+        *,
+        type: DType,
+        width: Int = 1,
+        alignment: Int = alignof[
+            SIMD[type, width]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](
+        self: UnsafePointer[Scalar[type], *_],
+        offset: SIMD[_, width],
+        mask: SIMD[DType.bool, width],
+        default: SIMD[type, width],
+    ) -> SIMD[type, width]:
+        """Gathers a SIMD vector from offsets of the current pointer.
+
+        This method loads from memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector,
+        or takes from the `default` SIMD vector, depending on the values of
+        the `mask` SIMD vector.
+
+        If a mask element is `True`, the respective result element is given
+        by the current pointer and the `offset` SIMD vector; otherwise, the
+        result element is taken from the `default` SIMD vector.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            type: DType of the return SIMD.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to gather from.
+            mask: The SIMD vector of boolean values, indicating for each
+                element whether to load from memory or to take from the
+                `default` SIMD vector.
+            default: The SIMD vector providing default values to be taken
+                where the `mask` SIMD vector is `False`.
+
+        Returns:
+            The SIMD vector containing the gathered values.
+        """
+        constrained[
+            offset.type.is_integral(),
+            "offset type must be an integral type",
+        ]()
+        constrained[
+            is_power_of_two(alignment),
+            "alignment must be a power of two integer value",
+        ]()
+
+        var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        return gather(base, mask, default, alignment)
+
+    @always_inline("nodebug")
+    fn scatter[
+        *,
+        type: DType,
+        width: Int = 1,
+        alignment: Int = alignof[
+            SIMD[type, width]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](
+        self: UnsafePointer[Scalar[type], *_],
+        offset: SIMD[_, width],
+        val: SIMD[type, width],
+    ):
+        """Scatters a SIMD vector into offsets of the current pointer.
+
+        This method stores at memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector.
+
+        If the same offset is targeted multiple times, the values are stored
+        in the order they appear in the `val` SIMD vector, from the first to
+        the last element.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            type: DType of `value`, the result SIMD buffer.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to scatter into.
+            val: The SIMD vector containing the values to be scattered.
+        """
+        var mask = SIMD[DType.bool, width](True)
+        self.scatter[width=width, alignment=alignment](offset, val, mask)
+
+    @always_inline("nodebug")
+    fn scatter[
+        *,
+        type: DType,
+        width: Int = 1,
+        alignment: Int = alignof[
+            SIMD[type, width]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](
+        self: UnsafePointer[Scalar[type], *_],
+        offset: SIMD[_, width],
+        val: SIMD[type, width],
+        mask: SIMD[DType.bool, width],
+    ):
+        """Scatters a SIMD vector into offsets of the current pointer.
+
+        This method stores at memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector,
+        depending on the values of the `mask` SIMD vector.
+
+        If a mask element is `True`, the respective element in the `val` SIMD
+        vector is stored at the memory address defined by the current pointer
+        and the `offset` SIMD vector; otherwise, no action is taken for that
+        element in `val`.
+
+        If the same offset is targeted multiple times, the values are stored
+        in the order they appear in the `val` SIMD vector, from the first to
+        the last element.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            type: DType of `value`, the result SIMD buffer.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to scatter into.
+            val: The SIMD vector containing the values to be scattered.
+            mask: The SIMD vector of boolean values, indicating for each
+                element whether to store at memory or not.
+        """
+        constrained[
+            offset.type.is_integral(),
+            "offset type must be an integral type",
+        ]()
+        constrained[
+            is_power_of_two(alignment),
+            "alignment must be a power of two integer value",
+        ]()
+
+        var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        scatter(val, base, mask, alignment)
+
+    @always_inline
+    fn initialize_pointee_explicit_copy[
+        T: ExplicitlyCopyable, //
+    ](self: UnsafePointer[T], value: T):
+        """Emplace a copy of `value` into this pointer location.
+
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
+
+        When compared to `init_pointee_move`, this avoids an extra move on
+        the callee side when the value must be copied.
+
+        Parameters:
+            T: The type the pointer points to, which must be
+               `ExplicitlyCopyable`.
+
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = T(other=value)
+
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space](address=int(self)).free()
+        _free(self)
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: AnyType = T,
+        T: AnyType = Self.T,
         /,
         address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[new_type, address_space]:
+    ](self) -> UnsafePointer[T, address_space]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
-            new_type: The target type.
+            T: The target type.
             address_space: The address space of the result.
 
         Returns:
@@ -376,143 +684,137 @@ struct UnsafePointer[
             as the original UnsafePointer.
         """
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, address_space]._mlir_type,
+            _type = UnsafePointer[T, address_space]._mlir_type,
+        ](self.address)
+
+    @always_inline("nodebug")
+    fn bitcast[
+        T: DType,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> UnsafePointer[Scalar[T], address_space]:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            T: The target type.
+            address_space: The address space of the result.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = UnsafePointer[Scalar[T], address_space]._mlir_type,
         ](self.address)
 
     @always_inline
-    fn offset(self, offset: Int) -> Self:
-        """Return a pointer at an offset from the current one.
+    fn destroy_pointee(self: UnsafePointer[_]):
+        """Destroy the pointed-to value.
 
-        Args:
-            offset: The offset index.
+        The pointer must not be null, and the pointer memory location is assumed
+        to contain a valid initialized instance of `T`.  This is equivalent to
+        `_ = self.take_pointee()` but doesn't require `Movable` and is
+        more efficient because it doesn't invoke `__moveinit__`.
+
+        """
+        _ = __get_address_as_owned_value(self.address)
+
+    @always_inline
+    fn take_pointee[
+        T: Movable, //,
+    ](self: UnsafePointer[T]) -> T:
+        """Move the value at the pointer out, leaving it uninitialized.
+
+        The pointer must not be null, and the pointer memory location is assumed
+        to contain a valid initialized instance of `T`.
+
+        This performs a _consuming_ move, ending the lifetime of the value stored
+        in this pointer memory location. Subsequent reads of this pointer are
+        not valid. If a new valid value is stored using `init_pointee_move()`, then
+        reading from this pointer becomes valid again.
+
+        Parameters:
+            T: The type the pointer points to, which must be `Movable`.
 
         Returns:
-            An offset pointer.
+            The value at the pointer.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
+        return __get_address_as_owned_value(self.address)
 
+    # TODO: Allow overloading on more specific traits
+    @always_inline
+    fn init_pointee_move[
+        T: Movable, //,
+    ](self: UnsafePointer[T], owned value: T):
+        """Emplace a new value into the pointer location, moving from `value`.
 
-# ===----------------------------------------------------------------------=== #
-# UnsafePointer extensions
-# ===----------------------------------------------------------------------=== #
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
 
-# TODO: These should be methods when we have conditional conformance.  None of
-# these can work with pointers in generic address spaces, because they need to
-# invoke methods like del or moveinit or copyinit, which take borrowed arguments
-# in the corresponding traits.
+        When compared to `init_pointee_copy`, this avoids an extra copy on
+        the caller side when the value is an `owned` rvalue.
 
+        Parameters:
+            T: The type the pointer points to, which must be `Movable`.
 
-@always_inline
-fn destroy_pointee(ptr: UnsafePointer[_]):
-    """Destroy the pointed-to value.
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = value^
 
-    The pointer must not be null, and the pointer memory location is assumed
-    to contain a valid initialized instance of `T`.  This is equivalent to
-    `_ = move_from_pointee(ptr)` but doesn't require `Movable` and is more
-    efficient becase it doesn't invoke `__moveinit__`.
+    @always_inline
+    fn init_pointee_copy[
+        T: Copyable, //,
+    ](self: UnsafePointer[T], value: T):
+        """Emplace a copy of `value` into the pointer location.
 
-    Args:
-        ptr: The pointer whose pointee this destroys.
-    """
-    _ = __get_address_as_owned_value(ptr.address)
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
 
+        When compared to `init_pointee_move`, this avoids an extra move on
+        the callee side when the value must be copied.
 
-@always_inline
-fn move_from_pointee[T: Movable](ptr: UnsafePointer[T]) -> T:
-    """Move the value at the pointer out.
+        Parameters:
+            T: The type the pointer points to, which must be `Copyable`.
 
-    The pointer must not be null, and the pointer memory location is assumed
-    to contain a valid initialized instance of `T`.
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = value
 
-    This performs a _consuming_ move, ending the lifetime of the value stored
-    in this pointer memory location. Subsequent reads of this pointer are
-    not valid. If a new valid value is stored using `initialize_pointee_move()`, then
-    reading from this pointer becomes valid again.
+    @always_inline
+    fn move_pointee_into[
+        T: Movable, //,
+    ](self: UnsafePointer[T], dst: UnsafePointer[T]):
+        """Moves the value `self` points to into the memory location pointed to by
+        `dst`.
 
-    Parameters:
-        T: The type the pointer points to, which must be `Movable`.
+        This performs a consuming move (using `__moveinit__()`) out of the
+        memory location pointed to by `self`. Subsequent reads of this
+        pointer are not valid unless and until a new, valid value has been
+        moved into this pointer's memory location using `init_pointee_move()`.
 
-    Args:
-        ptr: The pointer whose pointee this moves from.
+        This transfers the value out of `self` and into `dest` using at most one
+        `__moveinit__()` call.
 
-    Returns:
-        The value at the pointer.
-    """
-    return __get_address_as_owned_value(ptr.address)
+        Safety:
+            * `self` must be non-null
+            * `self` must contain a valid, initialized instance of `T`
+            * `dst` must not be null
+            * The contents of `dst` should be uninitialized. If `dst` was
+                previously written with a valid value, that value will be be
+                overwritten and its destructor will NOT be run.
 
+        Parameters:
+            T: The type the pointer points to, which must be `Movable`.
 
-@always_inline
-fn initialize_pointee_move[T: Movable](ptr: UnsafePointer[T], owned value: T):
-    """Emplace a new value into the pointer location, moving from `value`.
-
-    The pointer memory location is assumed to contain uninitialized data,
-    and consequently the current contents of this pointer are not destructed
-    before writing `value`. Similarly, ownership of `value` is logically
-    transferred into the pointer location.
-
-    When compared to `initialize_pointee_copy`, this avoids an extra copy on
-    the caller side when the value is an `owned` rvalue.
-
-    Parameters:
-        T: The type the pointer points to, which must be `Movable`.
-
-    Args:
-        ptr: The pointer to initialize through.
-        value: The value to emplace.
-    """
-    __get_address_as_uninit_lvalue(ptr.address) = value^
-
-
-@always_inline
-fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T], value: T):
-    """Emplace a copy of `value` into the pointer location.
-
-    The pointer memory location is assumed to contain uninitialized data,
-    and consequently the current contents of this pointer are not destructed
-    before writing `value`. Similarly, ownership of `value` is logically
-    transferred into the pointer location.
-
-    When compared to `initialize_pointee_move`, this avoids an extra move on
-    the callee side when the value must be copied.
-
-    Parameters:
-        T: The type the pointer points to, which must be `Copyable`.
-
-    Args:
-        ptr: The pointer to initialize through.
-        value: The value to emplace.
-    """
-    __get_address_as_uninit_lvalue(ptr.address) = value
-
-
-@always_inline
-fn move_pointee[T: Movable](*, src: UnsafePointer[T], dst: UnsafePointer[T]):
-    """Moves the value `src` points to into the memory location pointed to by
-    `dest`.
-
-    This performs a consuming move (using `__moveinit__()`) out of the
-    memory location pointed to by `src`. Subsequent reads of this
-    pointer are not valid unless and until a new, valid value has been
-    moved into this pointer's memory location using `initialize_pointee_move()`.
-
-    This transfers the value out of `self` and into `dest` using at most one
-    `__moveinit__()` call.
-
-    Safety:
-        * `src` must not be null
-        * `src` must contain a valid, initialized instance of `T`
-        * `dst` must not be null
-        * The contents of `dst` should be uninitialized. If `dst` was
-            previously written with a valid value, that value will be be
-            overwritten and its destructor will NOT be run.
-
-    Parameters:
-        T: The type the pointer points to, which must be `Movable`.
-
-    Args:
-        src: Source pointer that the value will be moved from.
-        dst: Destination pointer that the value will be moved into.
-    """
-    __get_address_as_uninit_lvalue(dst.address) = __get_address_as_owned_value(
-        src.address
-    )
+        Args:
+            dst: Destination pointer that the value will be moved into.
+        """
+        __get_address_as_uninit_lvalue(
+            dst.address
+        ) = __get_address_as_owned_value(self.address)

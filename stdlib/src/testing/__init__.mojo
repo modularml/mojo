@@ -14,10 +14,12 @@
 """Implements the testing package."""
 
 from .testing import (
-    assert_true,
-    assert_false,
-    assert_equal,
-    assert_not_equal,
     assert_almost_equal,
+    assert_equal,
+    assert_false,
+    assert_not_equal,
     assert_raises,
+    assert_true,
+    assert_is,
+    assert_is_not,
 )

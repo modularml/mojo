@@ -12,4 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the time package."""
 
-from .time import now, time_function, sleep
+from .time import now, perf_counter, perf_counter_ns, sleep, time_function

@@ -14,9 +14,9 @@
 # RUN: %mojo -debug-level full %s
 
 from builtin._location import (
-    _SourceLocation,
-    __source_location,
     __call_location,
+    __source_location,
+    _SourceLocation,
 )
 from testing import assert_equal, assert_true
 

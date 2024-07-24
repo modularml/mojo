@@ -19,8 +19,12 @@ from testing import (
     assert_not_equal,
     assert_raises,
     assert_true,
+    assert_is,
+    assert_is_not,
 )
+
 from utils.numerics import inf, nan
+from builtin._location import _SourceLocation
 
 
 @value
@@ -33,6 +37,7 @@ struct DummyStruct:
     fn __ne__(self, other: Self) -> Bool:
         return self.value != other.value
 
+    @no_inline
     fn __str__(self) -> String:
         return "Dummy"  # Can't be used for equality
 
@@ -62,22 +67,22 @@ def test_assert_messages():
     try:
         assert_true(False)
     except e:
-        assert_true("test_assertion.mojo:63:20: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:68:20: AssertionError:" in str(e))
 
     try:
         assert_false(True)
     except e:
-        assert_true("test_assertion.mojo:68:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:73:21: AssertionError:" in str(e))
 
     try:
         assert_equal(1, 0)
     except e:
-        assert_true("test_assertion.mojo:73:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:78:21: AssertionError:" in str(e))
 
     try:
         assert_not_equal(0, 0)
     except e:
-        assert_true("test_assertion.mojo:78:25: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:83:25: AssertionError:" in str(e))
 
 
 def test_assert_almost_equal():
@@ -141,7 +146,7 @@ def test_assert_almost_equal():
 
     _should_fail[DType.bool, 1](True, False)
     _should_fail(
-        SIMD[DType.int32, 2](0, 1), SIMD[DType.int32, 2](0, -1), atol=5.0
+        SIMD[DType.int32, 2](0, 1), SIMD[DType.int32, 2](0, -1), atol=5
     )
     _should_fail(
         SIMD[float_type, 2](-_inf, 0.0),
@@ -180,9 +185,37 @@ def test_assert_almost_equal():
     )
 
 
+def test_assert_is():
+    var a = PythonObject("mojo")
+    var b = a
+    assert_is(a, b)
+
+
+def test_assert_is_not():
+    var a = PythonObject("mojo")
+    var b = PythonObject("mojo")
+    assert_is_not(a, b)
+
+
+def test_assert_custom_location():
+    var location = _SourceLocation(2, 0, "my_file_location.mojo")
+    try:
+        assert_true(
+            False,
+            msg="always_false",
+            location=location,
+        )
+    except e:
+        assert_true(str(location) in str(e))
+        assert_true("always_false" in str(e))
+
+
 def main():
     test_assert_equal_is_generic()
     test_assert_not_equal_is_generic()
     test_assert_equal_with_simd()
     test_assert_messages()
     test_assert_almost_equal()
+    test_assert_is()
+    test_assert_is_not()
+    test_assert_custom_location()

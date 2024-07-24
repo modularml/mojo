@@ -12,12 +12,16 @@
 # ===----------------------------------------------------------------------=== #
 """Implements a foreign functions interface (FFI)."""
 
-from memory import DTypePointer, LegacyPointer
+from memory import UnsafePointer
 
 from utils import StringRef
 
 from .info import os_is_linux, os_is_windows
 from .intrinsics import _mlirtype_is_eq
+from builtin.builtin_list import _LITRefPackHelper
+
+alias C_char = Int8
+"""C `char` type."""
 
 
 struct RTLD:
@@ -40,14 +44,14 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 
 @value
-@register_passable
+@register_passable("trivial")
 struct DLHandle(CollectionElement, Boolable):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
-    The library is loaded on initialization and unloaded on deletion of the object.
+    The library is loaded on initialization and unloaded by `close`.
     """
 
-    var handle: DTypePointer[DType.int8]
+    var handle: UnsafePointer[Int8]
     """The handle to the dynamic library."""
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
@@ -63,11 +67,47 @@ struct DLHandle(CollectionElement, Boolable):
 
         @parameter
         if not os_is_windows():
-            self.handle = external_call["dlopen", DTypePointer[DType.int8]](
-                path.unsafe_ptr(), flags
+            var handle = external_call["dlopen", UnsafePointer[Int8]](
+                path.unsafe_cstr_ptr(), flags
             )
+            if handle == UnsafePointer[Int8]():
+                var error_message = external_call[
+                    "dlerror", UnsafePointer[UInt8]
+                ]()
+                abort("dlopen failed: " + String(error_message))
+            self.handle = handle
         else:
-            self.handle = DTypePointer[DType.int8]()
+            self.handle = UnsafePointer[Int8]()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
+    fn check_symbol(self, name: String) -> Bool:
+        """Check that the symbol exists in the dynamic library.
+
+        Args:
+            name: The symbol to check.
+
+        Returns:
+            `True` if the symbol exists.
+        """
+        constrained[
+            not os_is_windows(),
+            "Checking dynamic library symbol is not supported on Windows",
+        ]()
+
+        var opaque_function_ptr = external_call["dlsym", UnsafePointer[Int8]](
+            self.handle.address, name.unsafe_cstr_ptr()
+        )
+        if opaque_function_ptr:
+            return True
+
+        return False
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
@@ -78,7 +118,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
-            self.handle = DTypePointer[DType.int8].get_null()
+            self.handle = UnsafePointer[Int8]()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.
@@ -90,7 +130,9 @@ struct DLHandle(CollectionElement, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn get_function[result_type: AnyRegType](self, name: String) -> result_type:
+    fn get_function[
+        result_type: AnyTrivialRegType
+    ](self, name: String) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -104,12 +146,12 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name.unsafe_ptr())
+        return self._get_function[result_type](name.unsafe_cstr_ptr())
 
     @always_inline
     fn _get_function[
-        result_type: AnyRegType
-    ](self, name: DTypePointer[DType.int8]) -> result_type:
+        result_type: AnyTrivialRegType
+    ](self, name: UnsafePointer[C_char]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -126,15 +168,19 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             var opaque_function_ptr = external_call[
-                "dlsym", DTypePointer[DType.int8]
+                "dlsym", UnsafePointer[Int8]
             ](self.handle.address, name)
-            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
+            var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
+                result_type
+            ]()[]
+            _ = opaque_function_ptr
+            return result
         else:
             return abort[result_type]("get_function isn't supported on windows")
 
     @always_inline
     fn _get_function[
-        func_name: StringLiteral, result_type: AnyRegType
+        func_name: StringLiteral, result_type: AnyTrivialRegType
     ](self) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
@@ -147,25 +193,12 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.unsafe_ptr())
+        return self._get_function[result_type](func_name.unsafe_cstr_ptr())
 
 
 # ===----------------------------------------------------------------------===#
 # Library Load
 # ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _get_global[
-    name: StringLiteral,
-    init_fn: fn (LegacyPointer[NoneType]) -> LegacyPointer[NoneType],
-    destroy_fn: fn (LegacyPointer[NoneType]) -> None,
-](
-    payload: LegacyPointer[NoneType] = LegacyPointer[NoneType]()
-) -> LegacyPointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", LegacyPointer[NoneType]
-    ](StringRef(name), payload, init_fn, destroy_fn)
 
 
 @always_inline
@@ -185,7 +218,7 @@ fn _get_global[
 fn _get_global_or_null[name: StringLiteral]() -> UnsafePointer[NoneType]:
     return external_call[
         "KGEN_CompilerRT_GetGlobalOrNull", UnsafePointer[NoneType]
-    ](StringRef(name))
+    ](name.unsafe_ptr(), name.byte_length())
 
 
 @always_inline
@@ -206,18 +239,20 @@ fn _get_dylib_function[
     func_name: StringLiteral,
     init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
     destroy_fn: fn (UnsafePointer[NoneType]) -> None,
-    result_type: AnyRegType,
+    result_type: AnyTrivialRegType,
 ](payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()) -> result_type:
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return UnsafePointer(func_ptr).bitcast[result_type]()[]
+        var result = UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
+        _ = func_ptr
+        return result
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[UnsafePointer[NoneType]]()[],
     )
 
     return new_func
@@ -229,1010 +264,37 @@ fn _get_dylib_function[
 
 
 @always_inline("nodebug")
-fn external_call[callee: StringLiteral, type: AnyRegType]() -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None]()
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type]()
-
-
-@always_inline("nodebug")
 fn external_call[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType
-](arg0: T0) -> type:
+    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
+](*arguments: *types) -> type:
     """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
 
     Args:
-      arg0: The first argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](arg0)
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType, T1: AnyRegType
-](arg0: T0, arg1: T1) -> type:
-    """Calls an external function.
+      arguments: The arguments to pass to the external function.
 
     Parameters:
       callee: The name of the external function.
       type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
+      types: The argument types.
 
     Returns:
       The external call result.
     """
+
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C printf call. Load
+    # all the members of the pack.
+    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
         __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1
+            loaded_pack
         )
         return rebind[type](None)
     else:
         return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-](arg0: T0, arg1: T1, arg2: T2) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4, arg5
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4, arg5
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-      T9: The tenth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-      arg9: The tenth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-    arg10: T10,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-      T9: The tenth argument type.
-      T10: The eleventh argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-      arg9: The tenth argument.
-      arg10: The eleventh argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-    arg10: T10,
-    arg11: T11,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-      T9: The tenth argument type.
-      T10: The eleventh argument type.
-      T11: The twelfth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-      arg9: The tenth argument.
-      arg10: The eleventh argument.
-      arg11: The twelfth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-    T12: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-    arg10: T10,
-    arg11: T11,
-    arg12: T12,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-      T9: The tenth argument type.
-      T10: The eleventh argument type.
-      T11: The twelfth argument type.
-      T12: The thirteenth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-      arg9: The tenth argument.
-      arg10: The eleventh argument.
-      arg11: The twelfth argument.
-      arg12: The thirteenth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-            arg12,
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-            arg12,
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-    T12: AnyRegType,
-    T13: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-    arg10: T10,
-    arg11: T11,
-    arg12: T12,
-    arg13: T13,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-      T9: The tenth argument type.
-      T10: The eleventh argument type.
-      T11: The twelfth argument type.
-      T12: The thirteenth argument type.
-      T13: The fourteenth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-      arg9: The tenth argument.
-      arg10: The eleventh argument.
-      arg11: The twelfth argument.
-      arg12: The thirteenth argument.
-      arg13: The fourteenth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-            arg12,
-            arg13,
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-            arg12,
-            arg13,
-        )
-
-
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-    T12: AnyRegType,
-    T13: AnyRegType,
-    T14: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-    arg10: T10,
-    arg11: T11,
-    arg12: T12,
-    arg13: T13,
-    arg14: T14,
-) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-      T5: The sixth argument type.
-      T6: The seventh argument type.
-      T7: The eighth argument type.
-      T8: The ninth argument type.
-      T9: The tenth argument type.
-      T10: The eleventh argument type.
-      T11: The twelfth argument type.
-      T12: The thirteenth argument type.
-      T13: The fourteenth argument type.
-      T14: The fifteenth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-      arg5: The sixth argument.
-      arg6: The seventh argument.
-      arg7: The eighth argument.
-      arg8: The ninth argument.
-      arg9: The tenth argument.
-      arg10: The eleventh argument.
-      arg11: The twelfth argument.
-      arg12: The thirteenth argument.
-      arg13: The fourteenth argument.
-      arg14: The fifteenth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-            arg12,
-            arg13,
-            arg14,
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0,
-            arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            arg6,
-            arg7,
-            arg8,
-            arg9,
-            arg10,
-            arg11,
-            arg12,
-            arg13,
-            arg14,
+            loaded_pack
         )
 
 
@@ -1242,84 +304,30 @@ fn external_call[
 
 
 @always_inline("nodebug")
-fn _external_call_const[callee: StringLiteral, type: AnyRegType]() -> type:
-    """Mark the external function call as having no observable effects to the
-    program state. This allows the compiler to optimize away successive calls
-    to the same function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-
-    Returns:
-      The external call result.
-    """
-    return __mlir_op.`pop.external_call`[
-        func = callee.value,
-        resAttrs = __mlir_attr.`[{llvm.noundef}]`,
-        funcAttrs = __mlir_attr.`["willreturn"]`,
-        memory = __mlir_attr[
-            `#llvm.memory_effects<other = none, `,
-            `argMem = none, `,
-            `inaccessibleMem = none>`,
-        ],
-        _type=type,
-    ]()
-
-
-@always_inline("nodebug")
 fn _external_call_const[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType
-](arg0: T0) -> type:
+    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
+](*arguments: *types) -> type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
     to the same function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
 
     Args:
-      arg0: The first argument.
-
-    Returns:
-      The external call result.
-    """
-    return __mlir_op.`pop.external_call`[
-        func = callee.value,
-        resAttrs = __mlir_attr.`[{llvm.noundef}]`,
-        funcAttrs = __mlir_attr.`["willreturn"]`,
-        memory = __mlir_attr[
-            `#llvm.memory_effects<other = none, `,
-            `argMem = none, `,
-            `inaccessibleMem = none>`,
-        ],
-        _type=type,
-    ](arg0)
-
-
-@always_inline("nodebug")
-fn _external_call_const[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType, T1: AnyRegType
-](arg0: T0, arg1: T1) -> type:
-    """Mark the external function call as having no observable effects to the
-    program state. This allows the compiler to optimize away successive calls
-    to the same function.
+      arguments: The arguments to pass to the external function.
 
     Parameters:
       callee: The name of the external function.
       type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
+      types: The argument types.
 
     Returns:
       The external call result.
     """
+
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C printf call. Load
+    # all the members of the pack.
+    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+
     return __mlir_op.`pop.external_call`[
         func = callee.value,
         resAttrs = __mlir_attr.`[{llvm.noundef}]`,
@@ -1330,4 +338,4 @@ fn _external_call_const[
             `inaccessibleMem = none>`,
         ],
         _type=type,
-    ](arg0, arg1)
+    ](loaded_pack)

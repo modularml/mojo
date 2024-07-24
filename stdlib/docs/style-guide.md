@@ -119,7 +119,16 @@ defined on structs.
 struct MyStruct(Sized, Stringable):
     """Description goes here."""
 
+    # ===-------------------------------------------------------------------===#
+    # Aliases
+    # ===-------------------------------------------------------------------===#
+
+    alias factor = 5
+
+    # ===-------------------------------------------------------------------===#
     # Fields
+    # ===-------------------------------------------------------------------===#
+
     var field: Int
 
     # ===-------------------------------------------------------------------===#
@@ -147,7 +156,6 @@ struct MyStruct(Sized, Stringable):
 
     fn __getitem__
     fn __getitem__
-    fn __refitem__
 
     fn __add__
     fn __iadd__
@@ -159,6 +167,8 @@ struct MyStruct(Sized, Stringable):
     fn __bool__
     fn __len__
     fn __str__
+
+    fn __abs__
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -208,9 +218,9 @@ The following table shows our preferred use of different case styles.
 | `alias` type             | `alias Int8 = Scalar[DType.int8]`                      | `PascalCase`
 | `alias` value global / local scope | `alias CHUNK_SIZE = 32` / `alias chunk_size = 32` | `SCREAMING_SNAKE_CASE` / `snake_case`
 | `struct` type parameter  | `struct List[ElementType: Movable]`                    | `PascalCase`
-| `struct` value parameter | `struct Array[ElementType: Movable, Length: Int]`      | `PascalCase`
+| `struct` value parameter | `struct Array[ElementType: Movable, length: Int]`      | `snake_case`
 | `fn` type parameter      | `fn do_it[Action: Actionable](action: Action)`         | `PascalCase`
-| `fn` value parameter     | `fn repeat[Count: Int]()`                              | `PascalCase`
+| `fn` value parameter     | `fn repeat[count: Int]()`                              | `snake_case`
 
 Although these are our style conventions, not all code currently adheres to it.
 When preparing a new change, it is important to adhere to the style and naming
@@ -231,8 +241,8 @@ struct LinkedList[ElementType: Movable] # 🟢 Preferred
 #### ℹ️ Order type parameters ahead of value parameters
 
 ```mojo
-struct Array[LENGTH: Int, ElementType: Movable] # 🔴 Avoid
-struct Array[ElementType: Movable, Length: Int] # 🟢 Preferred
+struct Array[length: Int, ElementType: Movable] # 🔴 Avoid
+struct Array[ElementType: Movable, length: Int] # 🟢 Preferred
 ```
 
 ### Container lifecycle semantics
@@ -283,7 +293,7 @@ Every public function and public struct (including data fields) in the standard
 library must have docstrings (code comments that describe the API behavior).
 Mojo includes tooling to ensure that public functions include docstrings.
 
-You can run `./stdlib/scripts/check-doc-strings.sh` to validate
+You can run `./stdlib/scripts/check-docstrings.py` to validate
 docstrings. If the command exits with a `0` exit code, the docstrings are
 compliant; otherwise, an error will be shown. This is also enforced by the LSP
 with warnings for anything that doesn’t conform, you can generate docstrings

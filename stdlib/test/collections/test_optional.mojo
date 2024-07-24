@@ -14,7 +14,7 @@
 
 from collections import Optional, OptionalReg
 
-from testing import assert_true, assert_false, assert_equal
+from testing import *
 
 
 def test_basic():
@@ -37,7 +37,7 @@ def test_basic():
     assert_true(b or True)
     assert_false(b or False)
 
-    assert_equal(1, a.value()[])
+    assert_equal(1, a.value())
 
     # Test invert operator
     assert_false(~a)
@@ -56,8 +56,8 @@ def test_basic():
     # We may want to come back and add an immutable test once
     # there are the language features to do so.
     var a2 = Optional(1)
-    a2.value()[] = 2
-    assert_equal(a2.value()[], 2)
+    a2.value() = 2
+    assert_equal(a2.value(), 2)
 
 
 def test_optional_reg_basic():
@@ -74,6 +74,9 @@ def test_optional_reg_basic():
 
     assert_true(False or val)
     assert_true(True and val)
+
+    assert_equal(OptionalReg[Int]().or_else(33), 33)
+    assert_equal(OptionalReg[Int](42).or_else(33), 42)
 
 
 def test_optional_is():
@@ -120,6 +123,42 @@ def test_optional_take_mutates():
     assert_false(opt1)
 
 
+def test_optional_explicit_copy():
+    var v1 = Optional[String](String("test"))
+
+    var v2 = Optional(other=v1)
+
+    assert_equal(v1.value(), "test")
+    assert_equal(v2.value(), "test")
+
+    v2.value() += "ing"
+
+    assert_equal(v1.value(), "test")
+    assert_equal(v2.value(), "testing")
+
+
+def test_optional_str_repr():
+    var o = Optional(10)
+    assert_equal(o.__str__(), "10")
+    assert_equal(o.__repr__(), "Optional(10)")
+    assert_equal(Optional[Int](None).__str__(), "None")
+    assert_equal(Optional[Int](None).__repr__(), "Optional(None)")
+
+
+def test_optional_equality():
+    o = Optional(10)
+    n = Optional[Int]()
+    assert_true(o == 10)
+    assert_true(o != 11)
+    assert_true(o != n)
+    # TODO: Find a way to allow "o != None" again.
+    assert_true(o.__ne__(None))
+    assert_true(n != 11)
+    assert_true(n == n)
+    # TODO: Find a way to allow "o == None" again.
+    assert_true(n.__eq__(None))
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -128,3 +167,6 @@ def main():
     test_optional_reg_is()
     test_optional_reg_isnot()
     test_optional_take_mutates()
+    test_optional_explicit_copy()
+    test_optional_str_repr()
+    test_optional_equality()

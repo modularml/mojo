@@ -14,8 +14,7 @@
 
 from random import random_float64
 
-
-from testing import assert_equal, assert_false, assert_true, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_object_ctors():
@@ -302,6 +301,7 @@ def test_convert_to_string():
     assert_equal(str(a.bar), "'hello'")
     a.bar = [1, 2]
     assert_equal(str(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
+    assert_equal(repr(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
 
 
 def main():

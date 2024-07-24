@@ -22,13 +22,13 @@ your issues resolved.
 
 ## Standard library code
 
-### 1. Why do we have both `AnyRegType` and `AnyType`?
+### 1. Why do we have both `AnyTrivialRegType` and `AnyType`?
 
-This is largely a historical thing as the library only worked on `AnyRegType`
+This is largely a historical thing as the library only worked on `AnyTrivialRegType`
 when it was first written. As we introduced the notion of memory-only types and
 traits, `AnyType` was born. Over time, we expect to rewrite nearly
 the entire library to have everything work on `AnyType` and be generalized to
-not just work on `AnyRegType`. Several things need to happen in tandem with
+not just work on `AnyTrivialRegType`. Several things need to happen in tandem with
 the compiler team to make this possible.
 
 ### 2. Are the MLIR dialects private?
@@ -44,7 +44,7 @@ public-facing API has stabilized.
 
 Mojo depends on certain features that are still written in C++, collectively
 called "the compiler runtime." This may manifest in the standard library code
-through references like `KGEN_CompilerRT_LLCL_CreateRuntime`. Like the MLIR
+through references like `KGEN_CompilerRT_AsyncRT_CreateRuntime`. Like the MLIR
 dialects, the compiler runtime is currently private and undocumented.
 
 We plan on reducing the C++ dependencies in the future.

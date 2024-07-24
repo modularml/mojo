@@ -14,548 +14,589 @@ what we publish.
 
 ## UNRELEASED
 
-### 🔥 Legendary
-
 ### ⭐️ New
 
-- Add a `sort` function for list of `ComparableCollectionElement`s.
-  [PR #2609](https://github.com/modularml/mojo/pull/2609) by
-  [@mzaks](https://github.com/mzaks)
+- `String` class now have `rjust`, `ljust` and `center` methods to return
+  a justified string based on width and fillchar.
+  ([PR 3278#](https://github.com/modularml/mojo/pull/3278) by
+  [@mzaks](https://github.com/mzaks))
 
-- Mojo functions can return an auto-dereferenced refeference to storage with a
-  new `ref` keyword in the result type specifier.  For example:
-
-  ```mojo
-  struct Pair:
-    var first: Int
-    var second: Int
-    fn get_first_ref(inout self) -> ref[__lifetime_of(self)] Int:
-      return self.first
-  fn show_mutation():
-    var somePair = ...
-    get_first_ref(somePair) = 1
-  ```
-
-- Mojo has introduced `@parameter for`, a new feature for compile-time
-  programming. `@parameter for` defines a for loop where the sequence and the
-  induction values in the sequence must be parameter values. For example:
+- Creating nested `PythonObject` from a list or tuple of python objects is
+  possible now:
 
   ```mojo
-  fn parameter_for[max: Int]():
-      @parameter
-      for i in range(max)
-          @parameter
-          if i == 10:
-              print("found 10!")
+  var np = Python.import_module("numpy")
+  var a = np.array([1, 2, 3])
+  var b = np.array([4, 5, 6])
+  var arrays = PythonObject([a, b])
+  assert_equal(len(arrays), 2)
   ```
 
-  Currently, `@parameter for` requires the sequence's `__iter__` method to
-  return a `_StridedRangeIterator`, meaning the induction variables must be
-  `Int`. The intention is to lift these restrictions in the future.
-
-- Mojo added support for the inferred parameters. Inferred parameters must
-  appear at the beginning of the parameter list and cannot be explicitly
-  specified by the user. They are declared to the left of a `//` marker, much
-  like positional-only parameters. This allows programmers to define functions
-  with dependent parameters to be called without the caller specifying all the
-  necessary parameters. For example:
+  Also allowing more convenient call syntax:
 
   ```mojo
-  fn parameter_simd[dt: DType, //, value: Scalar[dt]]():
-      print(value)
-
-  fn call_it():
-      parameter_simd[Int32(42)]()
+  var stacked = np.hstack((a, b))
+  assert_equal(str(stacked), "[1 2 3 4 5 6]")
   ```
 
-  In the above example, `Int32(42)` is passed directly into `value`, the first
-  non-inferred parameter. `dt` is inferred from the parameter itself to be
-  `DType.int32`.
+  ([PR 3264#](https://github.com/modularml/mojo/pull/3264) by
+  [@kszucs](https://github.com/kszucs))
 
-  This also works with structs. For example:
+- `List[T]` values are now equality comparable with `==` and `!=` when `T` is
+  equality comparable.
+  ([PR 3195#](https://github.com/modularml/mojo/pull/3195) by
+  [@kszucs](https://github.com/kszucs))
+
+- `__setitem__` now works with variadic argument lists such as:
 
   ```mojo
-  struct ScalarContainer[dt: DType, //, value: Scalar[dt]]:
-      pass
-
-  fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred as `DType.int32`
-      pass
+  struct YourType:
+      fn __setitem__(inout self, *indices: Int, val: Int): ...
   ```
 
-  This should make working with dependent parameters more ergonomic.
+  The Mojo compiler now always passes the "new value" being set using the last
+  keyword argument of the `__setitem__`, e.g. turning `yourType[1, 2] = 3` into
+  `yourType.__setitem__(1, 2, val=3)`.  This fixes
+  [Issue #248](https://github.com/modularml/mojo/issues/248).
 
-- Mojo now allows functions overloaded on parameters to be resolved when forming
-  references to, but not calling, those functions. For example, the following
-  now works:
+- The pointer variants (`DTypePointer`, `UnsafePointer`, etc.) now have a new
+  `exclusive: Bool = False` parameter. Setting this parameter to true tells the
+  compiler that the user knows this pointer and all those derived from it have
+  exclusive access to the underlying memory allocation. The compiler is not
+  guaranteed to do anything with this information.
+
+- `Optional` values are now equality comparable with `==` and `!=` when their
+  element type is equality comparable.
+
+- Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
+  dictionary-like type, matching most of the features of the Python one.
+  ([PR 2910#](https://github.com/modularml/mojo/pull/2910) by
+  [@msaelices](https://github.com/msaelices))
+
+- Mojo context managers used in regions of code that may raise no longer need to
+  define a "conditional" exit function in the form of
+  `fn __exit__(self, e: Error) -> Bool`. This function allows the context
+  manager to conditionally intercept and handle the error and allow the function
+  to continue executing. This is useful for some applications, but in many cases
+  the conditional exit would delegate to the unconditional exit function
+  `fn __exit__(self)`.
+
+  Concretely, this enables defining `with` regions that unconditionally
+  propagate inner errors, allowing code like:
 
   ```mojo
-  fn overloaded_parameters[value: Int32]():
-      pass
+  def might_raise() -> Int:
+      ...
 
-  fn overloaded_parameters[value: Float32]():
-      pass
+  def foo() -> Int:
+      with ContextMgr():
+          return might_raise()
+      # no longer complains about missing return
 
-  fn form_reference():
-      alias ref = overloaded_parameters[Int32()] # works!
+  def bar():
+      var x: Int
+      with ContextMgr():
+          x = might_raise()
+      print(x) # no longer complains about 'x' being uninitialized
   ```
 
-- Mojo now supports adding a `@deprecated` decorator on structs, functions,
-  traits, aliases, and global variables. The decorator marks the attached decl
-  as deprecated and causes a warning to be emitted when the deprecated decl is
-  referenced in user code. The decorator requires a deprecation message to be
-  specified as a string literal.
+- Now supports "conditional conformances" where some methods on a struct have
+  additional trait requirements that the struct itself doesn't. This is
+  expressed through an explicitly declared `self` type:
 
   ```mojo
-  @deprecated("Foo is deprecated, use Bar instead")
-  struct Foo:
-      pass
+  struct GenericThing[Type: AnyType]:  # Works with anything
+    # Sugar for 'fn normal_method[Type: AnyType](self: GenericThing[Type]):'
+    fn normal_method(self): ...
 
-  fn outdated_api(x: Foo): # warning: Foo is deprecated, use Bar instead
-      pass
+    # Just redeclare the requirements with more specific types:
+    fn needs_move[Type: Movable](self: GenericThing[Type], owned val: Type):
+      var tmp = val^  # Ok to move 'val' since it is Movable
+      ...
+  fn usage_example():
+    var a = GenericThing[Int]()
+    a.normal_method() # Ok, Int conforms to AnyType
+    a.needs_move(42)  # Ok, Int is movable
 
-  @deprecated("use another function!")
-  fn bar():
-      pass
+    var b = GenericThing[NonMovable]()
+    b.normal_method() # Ok, NonMovable conforms to AnyType
 
-  fn techdebt():
-      bar() # warning: use another function!
+      # error: argument type 'NonMovable' does not conform to trait 'Movable'
+    b.needs_move(NonMovable())
   ```
 
-- Mojo has changed how `def` arguments are processed.  Previously, by default,
-  arguments to a `def` were treated treated according to the `owned` convention,
-  which makes a copy of the value, enabling that value to be mutable in the callee.
-  This "worked", but was a major performance footgun, and required you to declare
-  non-copyable types as `borrowed` explicitly.  Now Mojo takes a different approach:
-  it takes the arguments as `borrowed` (consistent with `fn`s) but will make a local
-  copy of the value **only if the argument is mutated** in the body of the function.
-  This improves consistency, performance, and ease of use.
+  Conditional conformance works with dunder methods and other things as well.
 
-- `int()` can now take a string and a specified base to parse an integer from a
-  string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
-  specified, the string will be parsed as if it was an integer literal, with the
-  base determined by whether the string contains the prefix `"0x"`, `"0o"`, or
-  `"0b"`. ([PR #2273](https://github.com/modularml/mojo/pull/2273) by
-  [@artemiogr97](https://github.com/artemiogr97), fixes
-  [#2274](https://github.com/modularml/mojo/issues/2274))
-
-- Mojo now supports types to opt in to use the `abs` and `round` functions by
-  implementing the `__abs__` and `__round__` methods (i.e. by conforming to the
-  new `Absable` and `Roundable` traits), respectively, e.g.:
+- `async` functions now support memory-only results (like `String`, `List`,
+  etc.) and `raises`. Accordingly, both `Coroutine` and `RaisingCoroutine` have
+  been changed to accept `AnyType` instead of `AnyTrivialRegType`. This means
+  the result types of `async` functions do not need to be `Movable`.
 
   ```mojo
-  from math import sqrt
-
-  @value
-  struct Complex(Absable, Roundable):
-      var re: Float64
-      var im: Float64
-
-      fn __abs__(self) -> Self:
-          return Self(sqrt(self.re * self.re + self.im * self.im), 0.0)
-
-      fn __round__(self) -> Self:
-          return Self(round(self.re), round(self.im))
+  async fn raise_or_string(c: Bool) raises -> String:
+      if c:
+          raise "whoops!"
+      return "hello world!"
   ```
 
-- The `abs`, `round`, `min`, `max`, and `divmod` functions have moved from
-  `math` to `builtin`, so you no longer need to do
-  `from math import abs, round, min, max, divmod`.
+  Note that `async` functions do not yet support indirect calls, `ref` results,
+  and constructors.
 
-- Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
-  functions in the `math` module by implementing the `__floor__()`,
-  `__ceil__()`, and `__trunc__()` methods (and so conforming to the new
-  `math.Floorable`, `math.Ceilable`, and `math.Truncable` traits, respectively).
-  For example:
-
-  ```mojo
-    from math import Ceilable, Floorable, Truncable, ceil, floor, trunc
-
-    @value
-    struct Complex(Ceilable, Floorable, Truncable):
-      var re: Float64
-      var im: Float64
-
-      fn __ceil__(self) -> Self:
-          return Self(ceil(re), ceil(im))
-
-      fn __floor__(self) -> Self:
-          return Self(floor(re), floor(im))
-
-      fn __trunc__(self) -> Self:
-          return Self(trunc(re), trunc(im))
-  ```
-
-- You can now use the builtin `any()` and `all()` functions to check for truthy
-  elements in a collection. Because `SIMD.__bool__()` is now constrained to
-  `size=1`, You must explicity use these to get the truthy value of a SIMD
-  vector. This avoids common bugs around implicit conversion of `SIMD` to
-  `Bool`.
-    ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
-
-  For example:
-
-  ```mojo
-    fn truthy_simd():
-        var vec = SIMD[DType.int32, 4](0, 1, 2, 3)
-        if any(vec):
-            print("any elements are truthy")
-        if all(vec):
-            print("all elements are truthy")
-  ```
-
-- Add an `InlinedArray` type that works on memory-only types.
-  Compare with the existing `StaticTuple` type, which is conceptually an array
-  type, but only worked on `AnyRegType`.
-    ([PR #2294](https://github.com/modularml/mojo/pull/2294) by [@lsh](https://github.com/lsh))
-
-- Base64 decoding support has been added.
-    ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
-
-- Add Base16 encoding and decoding support.
-  ([PR #2584](https://github.com/modularml/mojo/pull/2584)
-   by [@kernhanda](https://github.com/kernhanda))
-
-- Add `repr()` function and `Representable` trait.
-    ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
-
-- Add `SIMD.shuffle()` with `StaticIntTuple` mask.
-    ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
-
-- Invoking `mojo package my-package -o my-dir` on the command line, where
-  `my-package` is a Mojo package source directory, and `my-dir` is an existing
-  directory, now outputs a Mojo package to `my-dir/my-package.mojopkg`.
-  Previously, this had to be spelled out, as in `-o my-dir/my-package.mojopkg`.
-
-- The Mojo Language Server now reports a warning when a local variable is unused.
-
-- Implicit variable definitions in a `def` are more flexible: you can now
-  implicitly declare variables as the result of a tuple return, using
-  `a,b,c = foo()`, and can now shadow global immutable symbols using
-  `slice = foo()` without getting a compiler error.
-
-- The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
-  allow users to opt into the `math.ceildiv` function.
-
-- Mojo now allows methods to declare `self` as a `Reference` directly, which
-  can be useful for advanced cases of parametric mutabilty and custom lifetime
-  processing.  Previously it required the use of an internal MLIR type to
-  achieve this.
-
-- `object` now implements all the bitwise operators.
-    ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
-
-- A new `--validate-doc-strings` option has been added to `mojo` to emit errors
-  on invalid doc strings instead of warnings.
-
-- Several `mojo` subcommands now support a `--diagnostic-format` option that
-  changes the format with which errors, warnings, and other diagnostics are
-  printed. By specifying `--diagnostic-format json` on the command line, errors
-  and other diagnostics will be output in a structured
-  [JSON Lines](https://jsonlines.org) format that is easier for machines to
-  parse.
-
-  The full list of subcommands that support `--diagnostic-format` is as follows:
-  `mojo build`, `mojo doc`, `mojo run`, `mojo package`, and `mojo test`.
-  Further, the `mojo test --json` option has been subsumed into this new option;
-  for the same behavior, run `mojo test --diagnostic-format json`.
-
-  Note that the format of the JSON output may change; we don't currently
-  guarantee its stability across releases of Mojo.
-
-- A new decorator, `@doc_private`, was added that can be used to hide a decl
-  from being generated in the output of `mojo doc`. It also removes the
-  requirement that the decl has documentation (e.g. when used with
-  --diagnose-missing-doc-strings).
-
-- Added a new `Span` type for taking slices of contiguous collections.
-  ([PR #2595](https://github.com/modularml/mojo/pull/2595) by [lsh](https://github.com/lsh))
-
-- Added a new `as_bytes_slice()` method to `String` and `StringLiteral`, which
-  returns a `Span` of the bytes owned by the string.
-
-- Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
-
-- Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
-
-- `Dict` now implements `get(key)` and `get(key, default)` functions.
-    ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
-
-- Debugger users can now set breakpoints on function calls in O0 builds even if
-  the call has been inlined by the compiler.
-
-- The `os` module now provides functionality for adding and removing directories
-  using `mkdir` and `rmdir`.
-    ([PR #2430](https://github.com/modularml/mojo/pull/2430) by [@artemiogr97](https://github.com/artemiogr97))
-
-- `Dict.__get_ref(key)`, allowing to get references to dictionary values.
-
-- `String.strip()`, `lstrip()` and `rstrip()` can now remove custom characters
-  other than whitespace.  In addition, there are now several useful aliases for
-  whitespace, ASCII lower/uppercase, and so on.
-    ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
-
-- `List` has a simplified syntax to call the `count` method: `my_list.count(x)`.
-    ([PR #2675](https://github.com/modularml/mojo/pull/2675) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
-
-- `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
-    ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
-
-- `Dict` now has a simplified conversion to `String` with `my_dict.__str__()`.
-  Note that `Dict` does not conform to the `Stringable` trait so `str(my_dict)`
-  is not possible yet.
-    ([PR #2674](https://github.com/modularml/mojo/pull/2674) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
-
-- `List()` now supports `__contains__`.
-    ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
-
-- `InlineList()` now supports `__contains__`, `__iter__`.
-    ([PR #2703](https://github.com/modularml/mojo/pull/2703) by [@ChristopherLR](https://github.com/ChristopherLR))
-
-- `List` now has an `index` method that allows one to find the (first) location
-  of an element in a `List` of `EqualityComparable` types. For example:
-
-  ```mojo
-  var my_list = List[Int](2, 3, 5, 7, 3)
-  print(my_list.index(3))  # prints 1
-  ```
-
-- `List` can now be converted to a `String` with a simplified syntax:
-
-  ```mojo
-  var my_list = List[Int](2, 3)
-  print(my_list.__str__())  # prints [2, 3]
-  ```
-
-  Note that `List` doesn't conform to the `Stringable` trait yet so you cannot
-  use `str(my_list)` yet.
-    ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
-
-- Added the `Indexer` trait to denote types that implement the `__index__()`
-  method which allows these types to be accepted in common `__getitem__` and
-  `__setitem__` implementations, as well as allow a new builtin `index` function
-  to be called on them. Most stdlib containers are now able to be indexed by
-  any type that implements `Indexer`. For example:
+- As a specific form of "conditional conformances", initializers in a struct
+  may indicate specific parameter bindings to use in the type of their `self`
+  argument. For example:
 
   ```mojo
   @value
-  struct AlwaysZero(Indexer):
-      fn __index__(self) -> Int:
-          return 0
+  struct MyStruct[size: Int]:
+      fn __init__(inout self: MyStruct[0]): pass
+      fn __init__(inout self: MyStruct[1], a: Int): pass
+      fn __init__(inout self: MyStruct[2], a: Int, b: Int): pass
 
-  struct MyList:
-      var data: List[Int]
-
-      fn __init__(inout self):
-          self.data = List[Int](1, 2, 3, 4)
-
-      fn __getitem__[T: Indexer](self, idx: T) -> T:
-          return self.data[index(idx)]
-
-  print(MyList()[AlwaysZero()])  # prints `1`
+  def test(x: Int):
+      a = MyStruct()      # Infers size=0 from 'self' type.
+      b = MyStruct(x)     # Infers size=1 from 'self' type.
+      c = MyStruct(x, x)  # Infers size=2 from 'self' type.
   ```
 
-  ([PR #2685](https://github.com/modularml/mojo/pull/2685) by [@bgreni](https://github.com/bgreni))
+- The `Reference` type (and many iterators) now use "inferred" parameters to
+  represent the mutability of their lifetime, simplifying the interface.
 
-  Types conforming to the `Indexer` trait are implicitly convertible to Int.
-  This means you can write generic APIs that take `Int` instead of making them
-  take a generic type that conforms to `Indexer`, e.g.
+- `Dict` now implements `setdefault`, to get a value from the dictionary by
+  key, or set it to a default if it doesn't exist
+  ([PR #2803](https://github.com/modularml/mojo/pull/2803)
+  by [@msaelices](https://github.com/msaelices))
+
+- Added new `ExplicitlyCopyable` trait, to mark types that can be copied
+  explicitly, but which might not be implicitly copyable.
+
+  This supports work to transition the standard library collection types away
+  from implicit copyability, which can lead to unintended expensive copies.
+
+- Added `Identifiable` trait, used to describe types that implement the `__is__`
+  and `__isnot__` trait methods.
+  ([PR #2807](https://github.com/modularml/mojo/pull/2807))
+
+  - Also added new `assert_is()` and `assert_is_not()` test utilities to the
+    `testing` module.
+
+- `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
+  ([PR #2701](https://github.com/modularml/mojo/pull/2701)
+  by [@jayzhan211](https://github.com/jayzhan211))
+
+- Added `unsafe_cstr_ptr()` method to `String` and `StringLiteral`, that
+  returns an `UnsafePointer[C_char]` for convenient interoperability with C
+  APIs.
+
+- Added `C_char` type alias in `sys.ffi`.
+
+- Added `StringSlice(..)` initializer from a `StringLiteral`.
+
+- Added a `byte_length()` method to `String`, `StringSlice`, and `StringLiteral`
+and deprecated their private `_byte_length()` methods. Added a warning to
+`String.__len__` method that it will return length in Unicode codepoints in the
+future and `StringSlice.__len__` now does return the Unicode codepoints length.
+([PR #2960](https://github.com/modularml/mojo/pull/2960) by [@martinvuyk](https://github.com/martinvuyk))
+
+- Added new `StaticString` type alias. This can be used in place of
+  `StringLiteral` for runtime string arguments.
+
+- Added `TemporaryDirectory` in module `tempfile`.
+  ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `NamedTemporaryFile` in module `tempfile`.
+  ([PR 2762](https://github.com/modularml/mojo/pull/2762) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `oct(..)` function for formatting an integer in octal.
+  ([PR #2914](https://github.com/modularml/mojo/pull/2914) by [@bgreni](https://github.com/bgreni))
+
+- Added `String.format` method.
+  ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
+
+  Support automatic and manual indexing of `*args`.
+
+  Examples:
 
   ```mojo
-  @value
-  struct AlwaysZero(Indexer):
-      fn __index__(self) -> Int:
-          return 0
-
-  @value
-  struct Incrementer:
-      fn __getitem__(self, idx: Int) -> Int:
-          return idx + 1
-
-  var a = Incrementer()
-  print(a[AlwaysZero()])  # works and prints 1
+  print(
+    String("{1} Welcome to {0} {1}").format("mojo", "🔥")
+  )
+  # 🔥 Wecome to mojo 🔥
   ```
-
-- `StringRef` now implements `strip()` which can be used to remove leading and
-  trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
-  by [@fknfilewalker](https://github.com/fknfilewalker))
-
-- The `bencher` module as part of the `benchmark` package is now public
-  and documented. This module provides types such as `Bencher` which provides
-  the ability to execute a `Benchmark` and allows for benchmarking configuration
-  via the `BenchmarkConfig` struct.
-
-- Added the `bin()` builtin function to convert integral types into their binary
-  string representation. ([PR #2603](https://github.com/modularml/mojo/pull/2603)
-  by [@bgreni](https://github.com/bgreni))
-
-- Added `atof()` function which can convert a `String` to a `float64`.
-  ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
-
-- `Tuple()` now supports `__contains__`. ([PR #2709](https://github.com/modularml/mojo/pull/2709)
-  by [@rd4com](https://github.com/rd4com)) For example:
 
   ```mojo
-  var x = Tuple(1, 2, True)
-  if 1 in x:
-      print("x contains 1")
+  print(String("{} {} {}").format(True, 1.125, 2))
+  #True 1.125 2
   ```
 
-- Added `os.getsize` function, which gives the size in bytes of a path.
-    ([PR 2626](https://github.com/modularml/mojo/pull/2626) by [@artemiogr97](https://github.com/artemiogr97))
+- Environment variable `MOJO_PYTHON` can be pointed to an executable to pin Mojo
+  to a specific version:
 
-- `List` now has a method `unsafe_get` to get the reference to an
-    element without bounds check or wraparound for negative indices.
-    Note that this method is unsafe. Use with caution.
-    ([PR #2800](https://github.com/modularml/mojo/pull/2800) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+  ```sh
+  export MOJO_PYTHON="/usr/bin/python3.11"
+  ```
 
-- Added `fromkeys` method to `Dict` to return a `Dict` with the specified keys
-  and value.
-  ([PR 2622](https://github.com/modularml/mojo/pull/2622) by [@artemiogr97](https://github.com/artemiogr97))
+  Or a virtual environment to always have access to those Python modules:
 
-- Added `clear` method  to `Dict`.
-  ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
+  ```sh
+  export MOJO_PYTHON="~/venv/bin/python"
+  ```
 
-- `StringRef` now implements `startswith()` and `endswith()`.
-    ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
+  `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
+  but no Python executable.
 
-- The Mojo Language Server now supports renaming local variables.
+- The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
+  Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
+
+- Mojo now has a `UInt` type for modeling unsigned (scalar) integers with a
+  paltform-dependent width. `UInt` implements most arithmetic operations that
+  make sense for integers, with the notable exception of `__neg__`. Builtin
+  functions such as `min`/`max`, as well as `math` functions like `ceildiv`,
+  `align_down`, and `align_up` are also implemented for `UInt`.
+
+- `os.path.expanduser()` and `pathlib.Path.exapanduser()` have been added to
+  allow expanding a prefixed `~` in a `String` or `Path` with the users home
+  path:
+
+  ```mojo
+  import os
+  print(os.path.expanduser("~/.modular"))
+  # /Users/username/.modular
+  print(os.path.expanduser("~root/folder"))
+  # /var/root/folder (on macos)
+  # /root/folder     (on linux)
+  ```
+
+- `Path.home()` has been added to return a path of the users home directory.
+
+- `os.path.split()` has been added for splitting a path into `head, tail`:
+
+  ```mojo
+  import os
+  head, tail = os.path.split("/this/is/head/tail")
+  print("head:", head)
+  print("tail:", tail)
+  # head: /this/is/head
+  # tail: tail
+  ```
+
+- `os.path.makedirs()` and `os.path.removedirs()` have been added for creating
+  and removing nested directories:
+
+  ```mojo
+  import os
+  path = os.path.join("dir1", "dir2", "dir3")
+  os.path.makedirs(path, exist_ok=True)
+  os.path.removedirs(path)
+  ```
+
+- The `pwd` module has been added for accessing user information in
+  `/etc/passwd` on POSIX systems. This follows the same logic as Python:
+
+  ```mojo
+  import pwd
+  import os
+  current_user = pwd.getpwuid(os.getuid())
+  print(current_user)
+
+  # pwd.struct_passwd(pw_name='jack', pw_passwd='********', pw_uid=501,
+  # pw_gid=20, pw_gecos='Jack Clayton', pw_dir='/Users/jack',
+  # pw_shell='/bin/zsh')
+
+  print(current_user.pw_uid)
+
+  # 501
+
+  root = pwd.getpwnam("root")
+  print(root)
+
+  # pwd.struct_passwd(pw_name='root', pw_passwd='*', pw_uid=0, pw_gid=0,
+  # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
+  ```
+
+- Added `Dict.__init__` overload to specify initial capacity.
+  ([PR #3171](https://github.com/modularml/mojo/pull/3171) by [@rd4com](https://github.com/rd4com))
+
+  The capacity has to be a power of two and above or equal 8.
+
+  It allows for faster initialization by skipping incremental growth steps.
+
+  Example:
+
+  ```mojo
+  var dictionary = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+  # Insert (2/3 of 1024) entries
+  ```
+
+- `ListLiteral` now supports `__contains__`.
+  ([PR #3251](https://github.com/modularml/mojo/pull/3251) by
+  [@jjvraw](https://github.com/jjvraw))
+
+- `bit` module now supports `bit_reverse()`, `byte_swap()` and `pop_count()` for
+  `Int` type.
+  ([PR #3150](https://github.com/modularml/mojo/pull/3150) by [@LJ-9801](https://github.com/LJ-9801))
+
+- `String.format()` now supports conversion flags `!s` and `!r`, allowing for
+  `str()` and `repr()` conversions within format strings.
+  ([PR #3279](https://github.com/modularml/mojo/pull/3279) by [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  String("{} {!r}").format("Mojo", "Mojo")
+  # "Mojo 'Mojo'"
+
+  String("{0!s} {0!r}").format("Mojo")
+  # "Mojo 'Mojo'"
+  ```
 
 ### 🦋 Changed
 
-- The `let` keyword has been completely removed from the language. We previously
-  removed `let` declarations but still provided an error message to users. Now,
-  it is completely gone from the grammar. Long live `var`!
+- The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
+  C-like set of semantics around pointer aliasing and derivation. However, the C
+  semantics bring a lot of history and baggage that are not needed in Mojo and
+  which complicate compiler optimizations. The language overall provides a
+  stronger set of invariants around pointer aliasing with lifetimes and
+  exclusive mutable references to values, etc.
 
-- The `abs` and `round` functions have moved from `math` to `builtin`, so you no
-  longer need to do `from math import abs, round`.
+  It is now forbidden to convert a non-pointer-typed value derived from a
+  Mojo-allocated pointer, such as an integer address, to a pointer-typed value.
+  "Derived" means there is overlap in the bits of the non-pointer-typed value
+  with the original pointer value.
 
-- Many functions returning a pointer type have been unified to have a public
-  API function of `unsafe_ptr()`.
+  It is still possible to make this conversion in certain cases where it is
+  absolutely necessary, such as interoperating with other languages like Python.
+  In this case, the compiler makes two assumptions: any pointer derived from a
+  non-pointer-typed value does not alias any Mojo-derived pointer and that any
+  external function calls have arbitrary memory effects.
 
-- The `--warn-missing-doc-strings` flag for `mojo` has been renamed to
-  `--diagnose-missing-doc-strings`.
-
-- The `take` function in `Variant` and `Optional` has been renamed to
-  `unsafe_take`.
-
-- The `get` function in `Variant` has been replaced by `__refitem__`. That is,
-  `v.get[T]()` should be replaced with `v[T]`.
-
-- Various functions in the `algorithm` module are now moved to be
-  builtin-functions.  This includes `sort`, `swap`, and `partition`.
-  `swap` and `partition` will likely shuffle around as we're reworking
-  our builtin `sort` function and optimizing it.
-
-- `SIMD.bool()` is constrained only for when the `size` is `1` now. Instead,
-  explicitly use `any()` or `all()`.
-    ([PR #2502](https://github.com/modularml/mojo/pull/2502) by [@helehex](https://github.com/helehex))
-
-- The `SIMD.reduce_or()` and `SIMD.reduce_and()` methods are now bitwise
-  operations, and support integer types.
-    ([PR #2671](https://github.com/modularml/mojo/pull/2671) by [@helehex](https://github.com/helehex))
-
-- `ListLiteral` and `Tuple` now only require that element types be `Copyable`.
-  Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
+- `await` on a coroutine now consumes it. This strengthens the invariant that
+  coroutines can only be awaited once.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
-  - `String.unsafe_ptr()` now returns an `UnsafePointer` (was `DTypePointer`)
-  - `String.unsafe_uint8_ptr()` now returns `UnsafePointer` (was
-    `DTypePointer`)
-  - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
-    `DTypePointer`).
-  - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
-    returns an `UnsafePointer[UInt8]` (was `DTypePointer[DType.int8]`).
-  - `StringRef.data` is now an `UnsafePointer` (was `DTypePointer`)
-  - `StringRef.unsafe_ptr()` now returns an `UnsafePointer[UInt8]` (was
-    `DTypePointer[DType.int8]`).
-  - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
-    the same behavior.
 
-- Changed `isspace(..)` to take an `Int`.
+  - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
+    (was `UnsafePointer[Int8]`)
+  - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
+    (was `UnsafePointer[Int8]`)
 
-- Added `UnsafePointer.offset()` method.
+- `print()` now requires that its arguments conform to the `Formattable` trait.
+  This enables efficient stream-based writing by default, avoiding unnecessary
+  intermediate String heap allocations.
 
-- The `math.bit` module has been moved to a new top-level `bit` module. The
-  following functions in this module have been renamed:
-  - `ctlz` -> `countl_zero`
-  - `cttz` -> `countr_zero`
-  - `bit_length` -> `bit_width`
-  - `ctpop` -> `pop_count`
-  - `bswap` -> `byte_reverse`
-  - `bitreverse` -> `bit_reverse`
+  Previously, `print()` required types conform to `Stringable`. This meant that
+  to execute a call like `print(a, b, c)`, at least three separate String heap
+  allocations were down, to hold the formatted values of `a`, `b`, and `c`
+  respectively. The total number of allocations could be much higher if, for
+  example, `a.__str__()` was implemented to concatenate together the fields of
+  `a`, like in the following example:
 
-- The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
-  moved to the `bit` module.
+  ```mojo
+  struct Point(Stringable):
+      var x: Float64
+      var y: Float64
 
-- The implementation of the following functions have been moved from the `math`
-  module to the new `utils.numerics` module: `isfinite`, `isinf`, `isnan`,
-  `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
-  `math` module.
+      fn __str__(self) -> String:
+          # Performs 3 allocations: 1 each for str(..) of each of the fields,
+          # and then the final returned `String` allocation.
+          return "(" + str(self.x) + ", " + str(self.y) + ")"
+  ```
 
-- `InlinedString` has been renamed to `InlineString` to be consistent with other
-  types.
+  A type like the one above can transition to additionally implementing
+  `Formattable` with the following changes:
+
+  ```mojo
+  struct Point(Stringable, Formattable):
+      var x: Float64
+      var y: Float64
+
+      fn __str__(self) -> String:
+          return String.format_sequence(self)
+
+      fn format_to(self, inout writer: Formatter):
+          writer.write("(", self.x, ", ", self.y, ")")
+  ```
+
+  In the example above, `String.format_sequence(<arg>)` is used to construct a
+  `String` from a type that implements `Formattable`. This pattern of
+  implementing a type's `Stringable` implementation in terms of its `Formattable`
+  implementation minimizes boilerplate and duplicated code, while retaining
+  backwards compatibility with the requirements of the commonly used `str(..)`
+  function.
+
+  <!-- TODO(MOCO-891): Remove this warning when error is improved. -->
+
+  > [!WARNING]
+  > The error shown when passing a type that does not implement `Formattable` to
+  > `print()` is currently not entirely descriptive of the underlying cause:
+  >
+  > ```shell
+  > error: invalid call to 'print': callee with non-empty variadic pack argument expects 0 positional operands, but 1 was specified
+  >    print(point)
+  >    ~~~~~^~~~~~~
+  > ```
+  >
+  > If the above error is seen, ensure that all argument types implement
+  > `Formattable`.
+
+- The `StringRef` constructors from `DTypePointer.int8` have been changed to
+  take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
+  C APIs.
+
+- The global functions for working with `UnsafePointer` have transitioned to
+  being methods through the use of conditional conformances:
+
+  - `destroy_pointee(p)` => `p.destroy_pointee()`
+  - `move_from_pointee(p)` => `p.take_pointee()`
+  - `initialize_pointee_move(p, value)` => `p.init_pointee_move(value)`
+  - `initialize_pointee_copy(p, value)` => `p.init_pointee_copy(value)`
+  - `move_pointee(src=p1, dst=p2)` => `p.move_pointee_into(p2)`
+
+- `DTypePointer.load/store/prefetch` has been now moved to `SIMD`. Instead of
+  using `ptr.load[width=4](offset)` one should use `SIMD[size=4].load(ptr, offset)`.
+  Note the default load width before was 1, but the default size of `SIMD` is
+  the size of the SIMD type.
+  The default store size is the size of the `SIMD` value to be stored.
+
+- `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
+  a constructor which accepts optional values. `Slice._has_end()` has also been
+  removed since a Slice with no end is now represented by an empty `Slice.end`
+  option.
+  ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
+
+  ```mojo
+    var s = Slice(1, None, 2)
+    print(s.start.value()) # must retrieve the value from the optional
+  ```
+
+- `NoneType` is now a normal standard library type, and not an alias for a raw
+  MLIR type.
+
+  Function signatures spelled as `fn(...) -> NoneType` should transition to
+  being written as `fn(...) -> None`.
+
+- Accessing local Python modules with `Python.add_to_path(".")` is no longer
+  required, it now behaves the same as Python, you can access modules in the
+  same folder as the target file:
+
+  - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
+  - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
+
+- The rank argument for `algorihtm.elementwise` is no longer required and is
+  only inferred.
+
+- The `ulp` function in `numerics` has been moved to the `math` module.
+
+- The Mojo Language Server no longer sets `.` as a commit character for
+  auto-completion.
+
+- Types conforming to `Boolable` (i.e. those implementing `__bool__`) no longer
+  implicitly convert to `Bool`. A new `ImplicitlyBoolable` trait is introduced
+  for types where this behavior is desired.
+
+- The `time.now()` function has been deprecated. Please use `time.perf_counter`
+  or `time.perf_counter_ns` instead.
+
+- `LegacyPointer.load/store` are now removed. It's use is replaced with
+  `__getitem__` or `__setitem__`.
+
+- `memcmp`, `memset` and `memset_zero` no longer take in `LegacyPointer`,
+  instead, use `UnsafePointer`.
+
+- A few bit functions have been renamed for clarity:
+- `countl_zero` -> `count_leading_zeros`
+- `countr_zero` -> `count_trailing_zeros`
+
+- `sort` no longer takes `LegacyPointer`. The current API supports:
+  - `sort(list)` just plain list
+  - `sort[type, cmp_fn](list)` list with custom compare function
+  - `sort(ptr, len)` a pointer and length (can change to Span in future)
+  - `sort[type, cmp_fn](ptr, len)` above with custom compare
+
+- `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
+  overload instead.
+
+- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
+ instead.
+
+- `UnsafePointer` now supports `simd_strided_load/store`, `gather`, and `scatter`
+  when the underlying type is `Scalar[DType]`.
+
+- `SIMD.load/store` now supports `UnsafePointer` overloads.
+
+- Now that we have a `UInt` type, use this to represent the return type of hash.
+  In general, hashes should be an unsigned integer, and can also lead to improved
+  performance in certain cases.
+
+- The `atol` function now correctly supports leading underscores,
+  (e.g.`atol("0x_ff", 0)`), when the appropriate base is specified or inferred
+  (base 0). non-base-10 integer literals as per Python's [Integer Literals](\
+  <https://docs.python.org/3/reference/lexical_analysis.html#integers>).
+  ([PR #3180](https://github.com/modularml/mojo/pull/3180)
+  by [@jjvraw](https://github.com/jjvraw))
+
+- `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
+
+- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
+  instead. Functions that previously take in a `DTypePointer` now takes an
+  equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
+  `UnsafePointer` is
+
+  ```mojo
+  DTypePointer[type] -> UnsafePointer[Scalar[type]] and
+  DTypePointer[DType.invalid] -> UnsafePointer[NoneType]
+  ```
 
 ### ❌ Removed
 
-- The `@unroll` decorator has been deprecated and removed. The decorator was
-  supposed to guarantee that a decorated loop would be unrolled, or else the
-  compiler would error. In practice, this guarantee was eroded over time, as
-  a compiler-based approach cannot be as robust as the Mojo parameter system.
-  In addition, the `@unroll` decorator did not make the loop induction variables
-  parameter values, limiting its usefulness. Please see `@parameter for` for a
-  replacement!
+- It is no longer possible to cast (implicitly or explicitly) from `Reference`
+  to `UnsafePointer`. Instead of `UnsafePointer(someRef)` please use the
+  `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
+  `UnsafePointer` gets the address of what the reference points to.
 
-- The method `object.print()` has been removed. Since now, `object` has the
-  `Stringable` trait, you can use `print(my_object)` instead.
+- Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the
+  same thing.
 
-- The `math.clamp` function has been removed in favor of a new `SIMD.clamp`
-  method.
+- Removed `StringLiteral.unsafe_uint8_ptr()` and `StringLiteral.as_uint8_ptr()`.
 
-- The `math.round_half_down` and `math.round_half_up` functions are removed.
-  These can be trivially implemented using the `ceil` and `floor` functions.
+- Removed `UnsafePointer.offset(offset:Int)`.
 
-- The `add`, `sub`, `mul`, `div`, and `mod` functions have been removed from the
-  `math` module. Instead, users should rely on the `+`, `-`, `*`, `/`, and `%`
-  operators, respectively.
+- Removed `SIMD.splat(value: Scalar[type])`. Use the constructor for SIMD
+  instead.
 
-- The `math.roundeven` function has been removed from the `math` module. The new
-  `SIMD.roundeven` method now provides the identical functionality.
+- The builtin `tensor` module has been removed. Identical functionality is
+  available in `max.tensor`, but it is generally recommended to use `buffer`
+  when possible instead.
 
-- The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
-  function.
+- Removed the Mojo Language Server warnings for unused function arguments.
 
-- The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
-  same functionality is available in the builtin `SIMD.select` and
-  `SIMD.__and__` methods, respectively.
+- Removed the `SIMD.{add,mul,sub}_with_overflow` methods.
 
-- The `math.rotate_left` and `math.rotate_right` functions have been removed.
-  The same functionality is available in the builtin `SIMD.rotate_{left,right}`
-  methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
-  `Int`.
-
-- The `math.limit` module has been removed. The same functionality is available
-  as follows:
-  - `math.limit.inf`: use `utils.numerics.max_or_inf`
-  - `math.limit.neginf`: use `utils.numerics.min_or_neg_inf`
-  - `math.limit.max_finite`: use `utils.numerics.max_finite`
-  - `math.limit.min_finite`: use `utils.numerics.min_finite`
-
-- The `tensor.random` module has been removed. The same functionality is now
-  accessible via the `Tensor.rand` and `Tensor.randn` static methods.
-
-- The builtin `SIMD` struct no longer conforms to `Indexer`; users must
-  explicitly cast `Scalar` values using `int`.
+- Removed the `SIMD.min` and `SIMD.max` methods. Identical functionality is
+  available using the builting `min` and `max` functions.
 
 ### 🛠️ Fixed
 
-- [#1837](https://github.com/modularml/mojo/issues/1837) Fix self-referential
-  variant crashing the compiler.
-- [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
-  simple trait definitions.
-- [#1787](https://github.com/modularml/mojo/issues/1787) Fix error when using
-  `//` on `FloatLiteral` in alias expression.
-- Made several improvements to dictionary performance. Dicts with integer keys
-  are most heavily affected, but large dicts and dicts with large values
-  will also see large improvements.
-- [#2692](https://github.com/modularml/mojo/issues/2692) Fix `assert_raises`
-  to include calling location.
+- Fixed a crash in the Mojo Language Server when importing the current file.
+
+- Fixed crash when specifying variadic keyword arguments without a type
+  expression in `def` functions, e.g.:
+
+  ```mojo
+  def foo(**kwargs): ...  # now works
+  ```
+
+- [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
+  `__setitem__` method is failing with a "must be mutable" error.
+
+- [#248](https://github.com/modularml/mojo/issues/248) - [Feature] Enable
+  `__setitem__` to take variadic arguments
+
+- [#3065](https://github.com/modularml/mojo/issues/3065) - Fix incorrect behavior
+  of `SIMD.__int__` on unsigned types
+
+- [#3045](https://github.com/modularml/mojo/issues/3045) - Disable implicit SIMD
+  conversion routes through `Bool`
+
+- [#3126](https://github.com/modularml/mojo/issues/3126) - [BUG] List doesn't
+  work at compile time.

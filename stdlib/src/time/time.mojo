@@ -19,7 +19,9 @@ from time import now
 ```
 """
 
-from sys import external_call, os_is_linux, os_is_windows
+from sys import external_call, os_is_linux, os_is_windows, triple_is_nvidia_cuda
+from sys._assembly import inlined_assembly
+from math import floor
 
 from memory import UnsafePointer
 
@@ -65,6 +67,7 @@ struct _CTimeSpec(Stringable):
         else:
             return self.tv_sec * _NSEC_PER_SEC + self.tv_subsec * _NSEC_PER_USEC
 
+    @no_inline
     fn __str__(self) -> String:
         return str(self.as_nanoseconds()) + "ns"
 
@@ -96,9 +99,7 @@ fn _clock_gettime(clockid: Int) -> _CTimeSpec:
     var ts = _CTimeSpec()
 
     # Call libc's clock_gettime.
-    _ = external_call["clock_gettime", Int32](
-        Int32(clockid), UnsafePointer.address_of(ts)
-    )
+    _ = external_call["clock_gettime", Int32](Int32(clockid), Reference(ts))
 
     return ts
 
@@ -127,9 +128,7 @@ fn _monotonic_nanoseconds() -> Int:
     @parameter
     if os_is_windows():
         var ft = _FILETIME()
-        external_call["GetSystemTimePreciseAsFileTime", NoneType](
-            UnsafePointer.address_of(ft)
-        )
+        external_call["GetSystemTimePreciseAsFileTime", NoneType](Reference(ft))
 
         return ft.as_nanoseconds()
     else:
@@ -158,13 +157,53 @@ fn _thread_cputime_nanoseconds() -> Int:
 
 
 # ===----------------------------------------------------------------------===#
+# perf_counter
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn perf_counter() -> Float64:
+    """Return the value (in fractional seconds) of a performance counter, i.e.
+    a clock with the highest available resolution to measure a short duration.
+    It does include time elapsed during sleep and is system-wide. The reference
+    point of the returned value is undefined, so that only the difference
+    between the results of two calls is valid.
+
+    Returns:
+        The current time in ns.
+    """
+    return Float64(_monotonic_nanoseconds()) / _NSEC_PER_SEC
+
+
+# ===----------------------------------------------------------------------===#
+# perf_counter_ns
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn perf_counter_ns() -> Int:
+    """Return the value (in nanoseconds) of a performance counter, i.e.
+    a clock with the highest available resolution to measure a short duration.
+    It does include time elapsed during sleep and is system-wide. The reference
+    point of the returned value is undefined, so that only the difference
+    between the results of two calls is valid.
+
+    Returns:
+        The current time in ns.
+    """
+    return _monotonic_nanoseconds()
+
+
+# ===----------------------------------------------------------------------===#
 # now
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline
 fn now() -> Int:
-    """Returns the current monotonic time time in nanoseconds. This function
+    """Deprecated: Please use time.perf_counter_ns instead.
+
+    Returns the current monotonic time time in nanoseconds. This function
     queries the current platform's monotonic clock, making it useful for
     measuring time differences, but the significance of the returned value
     varies depending on the underlying implementation.
@@ -172,7 +211,7 @@ fn now() -> Int:
     Returns:
         The current time in ns.
     """
-    return _monotonic_nanoseconds()
+    return perf_counter_ns()
 
 
 # ===----------------------------------------------------------------------===#
@@ -227,9 +266,9 @@ fn time_function[func: fn () capturing -> None]() -> Int:
     if os_is_windows():
         return _time_function_windows[func]()
 
-    var tic = now()
+    var tic = perf_counter_ns()
     func()
-    var toc = now()
+    var toc = perf_counter_ns()
     return toc - tic
 
 
@@ -244,15 +283,27 @@ fn sleep(sec: Float64):
     Args:
         sec: The number of seconds to sleep for.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        var nsec = sec * 1.0e9
+        inlined_assembly["nanosleep.u32 $0;", NoneType, constraints="r"](
+            nsec.cast[DType.uint32]()
+        )
+        return
+
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
-    var total_secs = sec.__floor__()
+    var total_secs = floor(sec)
     var tv_spec = _CTimeSpec(
-        int(total_secs.cast[DType.index]()),
+        int(total_secs),
         int((sec - total_secs) * NANOSECONDS_IN_SECOND),
     )
     var req = UnsafePointer[_CTimeSpec].address_of(tv_spec)
-    var rem = UnsafePointer[_CTimeSpec].get_null()
+    var rem = UnsafePointer[_CTimeSpec]()
     _ = external_call["nanosleep", Int32](req, rem)
+    _ = tv_spec
+    _ = req
+    _ = rem
 
 
 fn sleep(sec: Int):
@@ -267,4 +318,4 @@ fn sleep(sec: Int):
         # In Windows the argument is in milliseconds.
         external_call["Sleep", NoneType](sec * 1000)
     else:
-        external_call["sleep", NoneType](sec)
+        external_call["sleep", NoneType](Int32(sec))

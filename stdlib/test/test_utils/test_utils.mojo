@@ -37,7 +37,7 @@ fn libm_call[
     constrained[type.is_floating_point(), "input type must be floating point"]()
 
     @parameter
-    if type == DType.float64:
+    if type is DType.float64:
         return _simd_apply[_float64_dispatch, type, simd_width](arg)
     return _simd_apply[_float32_dispatch, DType.float32, simd_width](
         arg.cast[DType.float32]()

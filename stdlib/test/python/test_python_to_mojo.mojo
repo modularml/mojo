@@ -14,7 +14,6 @@
 # RUN: %mojo %s
 
 from python import Python, PythonObject
-
 from testing import assert_equal, assert_false, assert_true
 
 

@@ -13,7 +13,8 @@
 # RUN: %mojo %s
 
 from sys import os_is_windows
-from time import now, sleep, time_function
+from time import now, perf_counter, perf_counter_ns, sleep, time_function
+
 from testing import assert_true
 
 
@@ -50,6 +51,8 @@ fn time_capturing_function(iters: Int) -> Int:
 fn test_time() raises:
     alias ns_per_sec = 1_000_000_000
 
+    assert_true(perf_counter() > 0)
+    assert_true(perf_counter_ns() > 0)
     assert_true(now() > 0)
 
     var t1 = time_function[time_me]()
@@ -64,10 +67,10 @@ fn test_time() raises:
     assert_true(t3 > 1 * ns_per_sec)
     assert_true(t3 < 10 * ns_per_sec)
 
-    # test now() directly since time_function doesn't use now on windows
-    var t4 = now()
+    # test perf_counter_ns() directly since time_function doesn't use now on windows
+    var t4 = perf_counter_ns()
     time_me()
-    var t5 = now()
+    var t5 = perf_counter_ns()
     assert_true((t5 - t4) > 1 * ns_per_sec)
     assert_true((t5 - t4) < 10 * ns_per_sec)
 

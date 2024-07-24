@@ -21,7 +21,7 @@ from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
 
-from utils import StringRef, unroll
+from utils import StringRef
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
@@ -58,16 +58,16 @@ struct _PyIter(Sized):
         var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
         if maybeNextItem.is_null():
             self.isDone = True
-            self.preparedNextItem = PyObjectPtr.null_ptr()
+            self.preparedNextItem = PythonObject(PyObjectPtr())
         else:
-            self.preparedNextItem = maybeNextItem
+            self.preparedNextItem = PythonObject(maybeNextItem)
             self.isDone = False
 
     fn __init__(inout self):
         """Initialize an empty iterator."""
-        self.iterator = PyObjectPtr.null_ptr()
+        self.iterator = PythonObject(PyObjectPtr())
         self.isDone = True
-        self.preparedNextItem = PyObjectPtr.null_ptr()
+        self.preparedNextItem = PythonObject(PyObjectPtr())
 
     fn __next__(inout self: _PyIter) -> PythonObject:
         """Return the next item and update to point to subsequent item.
@@ -84,7 +84,7 @@ struct _PyIter(Sized):
         if maybeNextItem.is_null():
             self.isDone = True
         else:
-            self.preparedNextItem = maybeNextItem
+            self.preparedNextItem = PythonObject(maybeNextItem)
         return current
 
     fn __len__(self) -> Int:
@@ -99,15 +99,26 @@ struct _PyIter(Sized):
             return 1
 
 
+# TODO: Remove this wrapper. It is just here because otherwise
+# the compiler is lost if we use `Dict[PythonObject, PythonObject]`
+# directly in the `PythonObject.__init__()` method. The error
+# message that we currently get is "recursive reference to declaration".
+struct _PythonDictWrapper:
+    var dict_value: Dict[PythonObject, PythonObject]
+
+    fn __init__(inout self, owned dict_value: Dict[PythonObject, PythonObject]):
+        self.dict_value = dict_value^
+
+
 @register_passable
 struct PythonObject(
-    Boolable,
-    CollectionElement,
+    ImplicitlyBoolable,
     Indexer,
     Intable,
     KeyElement,
     SizedRaising,
     Stringable,
+    Formattable,
 ):
     """A Python object."""
 
@@ -118,6 +129,14 @@ struct PythonObject(
         """Initialize the object with a `None` value."""
         self.__init__(None)
 
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
     fn __init__(inout self, ptr: PyObjectPtr):
         """Initialize the object with a `PyObjectPtr` value.
 
@@ -127,6 +146,17 @@ struct PythonObject(
             ptr: The `PyObjectPtr` to take ownership of.
         """
         self.py_object = ptr
+
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, none: NoneType._mlir_type):
+        """Initialize a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = Self(none=NoneType(none))
 
     fn __init__(inout self, none: NoneType):
         """Initialize a none value object from a `None` literal.
@@ -177,7 +207,7 @@ struct PythonObject(
             self.py_object = cpython.toPython(int_val)
         else:
             var fp_val = value.cast[DType.float64]()
-            self.py_object = cpython.PyFloat_FromDouble(fp_val.value)
+            self.py_object = cpython.PyFloat_FromDouble(fp_val)
 
     fn __init__(inout self, value: Bool):
         """Initialize the object from a bool.
@@ -228,7 +258,7 @@ struct PythonObject(
         self.py_object = cpython.PyList_New(len(value))
 
         @parameter
-        fn fill[i: Int]():
+        for i in range(len(VariadicList(Ts))):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -236,25 +266,26 @@ struct PythonObject(
             var obj: PythonObject
 
             @parameter
-            if _type_is_eq[T, Int]():
-                obj = value.get[i, Int]()
+            if _type_is_eq[T, PythonObject]():
+                obj = value.get[i, PythonObject]()
+            elif _type_is_eq[T, Int]():
+                obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
-                obj = value.get[i, Float64]()
+                obj = PythonObject(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
-                obj = value.get[i, Bool]()
+                obj = PythonObject(value.get[i, Bool]())
             elif _type_is_eq[T, StringRef]():
-                obj = value.get[i, StringRef]()
+                obj = PythonObject(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
-                obj = value.get[i, StringLiteral]()
+                obj = PythonObject(value.get[i, StringLiteral]())
             else:
                 obj = PythonObject(0)
                 constrained[
-                    False, "cannot convert nested list element to object"
+                    False, "cannot convert list element to python object"
                 ]()
+
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
-
-        unroll[fill, len(VariadicList(Ts))]()
 
     fn __init__[*Ts: Movable](inout self, value: Tuple[Ts]):
         """Initialize the object from a tuple literal.
@@ -270,7 +301,7 @@ struct PythonObject(
         self.py_object = cpython.PyTuple_New(length)
 
         @parameter
-        fn fill[i: Int]():
+        for i in range(length):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -278,27 +309,31 @@ struct PythonObject(
             var obj: PythonObject
 
             @parameter
-            if _type_is_eq[T, Int]():
-                obj = value.get[i, Int]()
+            if _type_is_eq[T, PythonObject]():
+                obj = value.get[i, PythonObject]()
+            elif _type_is_eq[T, Int]():
+                obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
-                obj = value.get[i, Float64]()
+                obj = PythonObject(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
-                obj = value.get[i, Bool]()
+                obj = PythonObject(value.get[i, Bool]())
             elif _type_is_eq[T, StringRef]():
-                obj = value.get[i, StringRef]()
+                obj = PythonObject(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
-                obj = value.get[i, StringLiteral]()
+                obj = PythonObject(value.get[i, StringLiteral]())
             else:
                 obj = PythonObject(0)
                 constrained[
-                    False, "cannot convert nested list element to object"
+                    False, "cannot convert list element to python object"
                 ]()
+
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[fill, length]()
-
-    fn __init__(inout self, value: Dict[Self, Self]):
+    # TODO: Remove `_PythonDictWrapper` and use `Dict[PythonObject, PythonObject]`
+    # directly instead when the compiler stops erroring with the message
+    # "recursive reference to declaration"
+    fn __init__(inout self, value: _PythonDictWrapper):
         """Initialize the object from a dictionary of PythonObjects.
 
         Args:
@@ -306,7 +341,7 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyDict_New()
-        for entry in value.items():
+        for entry in value.dict_value.items():
             var result = cpython.PyDict_SetItem(
                 self.py_object, entry[].key.py_object, entry[].value.py_object
             )
@@ -335,7 +370,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         var iter = cpython.PyObject_GetIter(self.py_object)
         Python.throw_python_exception_if_error_state(cpython)
-        return _PyIter(iter)
+        return _PyIter(PythonObject(iter))
 
     fn __del__(owned self):
         """Destroy the object.
@@ -345,7 +380,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         if not self.py_object.is_null():
             cpython.Py_DecRef(self.py_object)
-        self.py_object = PyObjectPtr.null_ptr()
+        self.py_object = PyObjectPtr()
 
     fn __getattr__(self, name: StringLiteral) raises -> PythonObject:
         """Return the value of the object attribute with the given name.
@@ -390,6 +425,15 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyObject_IsTrue(self.py_object) == 1
 
+    @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Evaluate the boolean value of the object.
+
+        Returns:
+            Whether the object evaluates as true.
+        """
+        return self.__bool__()
+
     fn __is__(self, other: PythonObject) -> Bool:
         """Test if the PythonObject is the `other` PythonObject, the same as `x is y` in
         Python.
@@ -429,7 +473,7 @@ struct PythonObject(
             raise Error("object has no len()")
         return result
 
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Returns the length of the object.
 
         Returns:
@@ -469,23 +513,28 @@ struct PythonObject(
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
-    fn __setitem__(inout self, *args: PythonObject) raises:
+    fn __setitem__(inout self, *args: PythonObject, value: PythonObject) raises:
         """Set the value with the given key or keys.
 
         Args:
-            args: The key or keys to set on this object, followed by the value.
+            args: The key or keys to set on this object.
+            value: The value to set.
         """
         var size = len(args)
-        debug_assert(size > 0, "must provide at least a value to __setitem__")
 
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size)
+        var tuple_obj = cpython.PyTuple_New(size + 1)
         for i in range(size):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
             var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if result != 0:
                 raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(value.py_object)
+        var result2 = cpython.PyTuple_SetItem(tuple_obj, size, value.py_object)
+        if result2 != 0:
+            raise Error("internal error: PyTuple_SetItem failed")
 
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, "__setitem__"
@@ -928,16 +977,16 @@ struct PythonObject(
         """
         return self._call_single_arg_inplace_method("__lshift__", rhs)
 
-    fn __pow__(self, rhs: PythonObject) raises -> PythonObject:
+    fn __pow__(self, exp: PythonObject) raises -> PythonObject:
         """Raises this object to the power of the given value.
 
         Args:
-            rhs: The exponent.
+            exp: The exponent.
 
         Returns:
             The result of raising this by the given exponent.
         """
-        return self._call_single_arg_method("__pow__", rhs)
+        return self._call_single_arg_method("__pow__", exp)
 
     fn __rpow__(self, lhs: PythonObject) raises -> PythonObject:
         """Reverse power of.
@@ -1083,6 +1132,13 @@ struct PythonObject(
     ) raises -> PythonObject:
         """Call the underlying object as if it were a function.
 
+        Args:
+            args: Positional arguments to the function.
+            kwargs: Keyword arguments to the function.
+
+        Raises:
+            If the function cannot be called for any reason.
+
         Returns:
             The return value from the called object.
         """
@@ -1150,6 +1206,26 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyLong_AsLong(self.py_object.value)
 
+    fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
+        """Convert a Python-owned and managed pointer into a Mojo pointer.
+
+        Warning: converting from an integer to a pointer is unsafe! The
+        compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
+        pointer. This is OK because the pointer originates from Python.
+
+        Parameters:
+            type: The desired DType of the pointer.
+
+        Returns:
+            An `UnsafePointer` for the underlying Python data.
+        """
+        var tmp = int(self)
+        var result = UnsafePointer.address_of(tmp).bitcast[
+            UnsafePointer[Scalar[type]]
+        ]()[]
+        _ = tmp
+        return result
+
     fn __str__(self) -> String:
         """Returns a string representation of the object.
 
@@ -1167,3 +1243,14 @@ struct PythonObject(
         # keep python object alive so the copy can occur
         _ = python_str
         return mojo_str
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this Python object to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid this intermediate String allocation, if possible.
+        writer.write(str(self))

@@ -14,7 +14,8 @@
 
 from collections import Set
 
-from testing import assert_raises, assert_true, assert_false
+from testing import assert_false, assert_raises, assert_true
+from testing import assert_equal as AE
 
 
 fn assert_equal[T: EqualityComparable](lhs: T, rhs: T) raises:
@@ -252,7 +253,7 @@ def test_pop_insertion_order():
     assert_equal(s, Set[Int]())
 
     with assert_raises():
-        s.pop()  # pop from empty set raises
+        _ = s.pop()  # pop from empty set raises
 
 
 def test_issubset():
@@ -484,9 +485,17 @@ def test_clear():
     assert_true(len(set5) == 0)
 
 
+def test_set_str():
+    var a = Set[Int](1, 2, 3)
+    AE(a.__str__(), "{1, 2, 3}")
+    AE(a.__repr__(), "{1, 2, 3}")
+    var b = Set[String]("a", "b")
+    AE(b.__str__(), "{'a', 'b'}")
+    AE(Set[Int]().__str__(), "{}")
+
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
-    var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
-    print("Test", name_val, "...", end="")
+    print("Test", name, "...", end="")
     try:
         _ = test_fn()
     except e:
@@ -518,3 +527,4 @@ def main():
     test["test_symmetric_difference_update", test_symmetric_difference_update]()
     test["test_discard", test_discard]()
     test["test_clear", test_clear]()
+    test["test_set_str", test_set_str]()

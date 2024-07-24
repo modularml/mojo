@@ -21,26 +21,27 @@ from utils import Span
 """
 
 from . import InlineArray
+from sys.intrinsics import _type_is_eq
 
 
 @value
 struct _SpanIter[
+    is_mutable: Bool, //,
     T: CollectionElement,
-    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for Span.
 
     Parameters:
-        T: The type of the elements in the span.
         is_mutable: Whether the reference to the span is mutable.
+        T: The type of the elements in the span.
         lifetime: The lifetime of the Span.
         forward: The iteration direction. `False` is backwards.
     """
 
     var index: Int
-    var src: Span[T, is_mutable, lifetime]
+    var src: Span[T, lifetime]
 
     @always_inline
     fn __iter__(self) -> Self:
@@ -49,14 +50,14 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Reference[T, is_mutable, lifetime]:
+    ) -> Reference[T, lifetime]:
         @parameter
         if forward:
             self.index += 1
-            return self.src._refitem__(self.index - 1)
+            return self.src[self.index - 1]
         else:
             self.index -= 1
-            return self.src._refitem__(self.index)
+            return self.src[self.index]
 
     @always_inline
     fn __len__(self) -> Int:
@@ -69,15 +70,15 @@ struct _SpanIter[
 
 @value
 struct Span[
+    is_mutable: Bool, //,
     T: CollectionElement,
-    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
-]:
+](CollectionElement):
     """A non owning view of contiguous data.
 
     Parameters:
-        T: The type of the elements in the span.
         is_mutable: Whether the span is mutable.
+        T: The type of the elements in the span.
         lifetime: The lifetime of the Span.
     """
 
@@ -101,33 +102,42 @@ struct Span[
         self._len = len
 
     @always_inline
-    fn __init__[
-        small_buffer_size: Int
-    ](
-        inout self,
-        list: Reference[List[T, small_buffer_size], is_mutable, lifetime],
-    ):
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided Span.
+
+        Args:
+            other: The Span to copy.
+        """
+        self._data = other._data
+        self._len = other._len
+
+    @always_inline
+    fn __init__(inout self, ref [lifetime]list: List[T, _]):
         """Construct a Span from a List.
 
         Args:
             list: The list to which the span refers.
         """
-        self._data = list[].data
-        self._len = len(list[])
+        self._data = list.data
+        self._len = len(list)
 
     @always_inline
     fn __init__[
-        size: Int
-    ](inout self, array: Reference[InlineArray[T, size], is_mutable, lifetime]):
+        T2: CollectionElement, size: Int, //
+    ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
+            T2: The type of the elements in the span.
             size: The size of the InlineArray.
 
         Args:
             array: The array to which the span refers.
         """
-        self._data = UnsafePointer(array).bitcast[T]()
+
+        constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
+
+        self._data = UnsafePointer.address_of(array).bitcast[T]()
         self._len = size
 
     # ===------------------------------------------------------------------===#
@@ -135,70 +145,51 @@ struct Span[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn _refitem__[
-        intable: Intable
-    ](self, idx: intable) -> Reference[T, is_mutable, lifetime]:
+    fn __getitem__(self, idx: Int) -> ref [lifetime] T:
+        """Get a reference to an element in the span.
+
+        Args:
+            idx: The index of the value to return.
+
+        Returns:
+            An element reference.
+        """
+        # TODO: Simplify this with a UInt type.
         debug_assert(
             -self._len <= int(idx) < self._len, "index must be within bounds"
         )
 
-        var offset = int(idx)
+        var offset = idx
         if offset < 0:
             offset += len(self)
-        return (self._data + offset)[]
+        return self._data[offset]
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> Reference[T, is_mutable, lifetime]:
-        """Get a `Reference` to the element at the given index.
-
-        Args:
-            idx: The index of the item.
-
-        Returns:
-            A reference to the item at the given index.
-        """
-        # note that self._refitem__ is already bounds checking
-        return self._refitem__(idx)
-
-    @always_inline
-    fn __setitem__(inout self, idx: Int, value: T):
-        """Get a `Reference` to the element at the given index.
-
-        Args:
-            idx: The index of the item.
-            value: The value to set at the given index.
-        """
-        # note that self._refitem__ is already bounds checking
-        var r = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
-            UnsafePointer(self._refitem__(idx))[]
-        )
-        r[] = value
-
-    @always_inline
-    fn __getitem__(self, slice: Slice) -> Self:
+    fn __getitem__(self, slc: Slice) -> Self:
         """Get a new span from a slice of the current span.
 
         Args:
-            slice: The slice specifying the range of the new subslice.
+            slc: The slice specifying the range of the new subslice.
 
         Returns:
             A new span that points to the same data as the current span.
         """
-        var adjusted_span = self._adjust_span(slice)
+        var start: Int
+        var end: Int
+        var step: Int
+        start, end, step = slc.indices(len(self))
         debug_assert(
-            0 <= adjusted_span.start <= self._len
-            and 0 <= adjusted_span.end <= self._len,
-            "Slice must be within bounds.",
+            step == 1, "Slice must be within bounds and step must be 1"
         )
         var res = Self(
-            unsafe_ptr=(self._data + adjusted_span.start),
-            len=len(adjusted_span),
+            unsafe_ptr=(self._data + start),
+            len=len(range(start, end, step)),
         )
 
         return res
 
     @always_inline
-    fn __iter__(self) -> _SpanIter[T, is_mutable, lifetime]:
+    fn __iter__(self) -> _SpanIter[T, lifetime]:
         """Get an iterator over the elements of the span.
 
         Returns:
@@ -223,26 +214,6 @@ struct Span[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the list length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
-
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """
         Gets a pointer to the first element of this slice.
@@ -252,3 +223,87 @@ struct Span[
         """
 
         return self._data
+
+    @always_inline
+    fn copy_from[
+        lifetime: MutableLifetime, //
+    ](self: Span[T, lifetime], other: Span[T, _]):
+        """
+        Performs an element wise copy from all elements of `other` into all elements of `self`.
+
+        Parameters:
+            lifetime: The inferred mutable lifetime of the data within the Span.
+
+        Args:
+            other: The Span to copy all elements from.
+        """
+        debug_assert(len(self) == len(other), "Spans must be of equal length")
+        for i in range(len(self)):
+            self[i] = Self.T(other=other[i])
+
+    fn __bool__(self) -> Bool:
+        """Check if a span is non-empty.
+
+        Returns:
+           True if a span is non-empty, False otherwise.
+        """
+        return len(self) > 0
+
+    fn __eq__[
+        T: EqualityComparableCollectionElement, //
+    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+        """Verify if span is equal to another span.
+
+        Parameters:
+            T: The type of the elements in the span. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            rhs: The span to compare against.
+
+        Returns:
+            True if the spans are equal in length and contain the same elements, False otherwise.
+        """
+        # both empty
+        if not self and not rhs:
+            return True
+        if len(self) != len(rhs):
+            return False
+        # same pointer and length, so equal
+        if self.unsafe_ptr() == rhs.unsafe_ptr():
+            return True
+        for i in range(len(self)):
+            if self[i] != rhs[i]:
+                return False
+        return True
+
+    @always_inline
+    fn __ne__[
+        T: EqualityComparableCollectionElement, //
+    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+        """Verify if span is not equal to another span.
+
+        Parameters:
+            T: The type of the elements in the span. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            rhs: The span to compare against.
+
+        Returns:
+            True if the spans are not equal in length or contents, False otherwise.
+        """
+        return not self == rhs
+
+    fn fill[lifetime: MutableLifetime, //](self: Span[T, lifetime], value: T):
+        """
+        Fill the memory that a span references with a given value.
+
+        Parameters:
+            lifetime: The inferred mutable lifetime of the data within the Span.
+
+        Args:
+            value: The value to assign to each element.
+        """
+        for element in self:
+            element[] = Self.T(other=value)
