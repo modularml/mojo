@@ -904,7 +904,7 @@ struct DtorCounter(CollectionElement):
         g_dtor_count += 1
 
 
-def inner_test_list_dtor():
+def inner_test_list_dtor[sbo_size: Int]():
     # explicitly reset global counter
     g_dtor_count = 0
 
@@ -918,9 +918,9 @@ def inner_test_list_dtor():
     assert_equal(g_dtor_count, 1)
 
 
-def test_list_dtor():
+def test_list_dtor[sbo_size: Int]():
     # call another function to force the destruction of the list
-    inner_test_list_dtor()
+    inner_test_list_dtor[sbo_size]()
 
     # verify we still only ran the destructor once
     assert_equal(g_dtor_count, 1)
@@ -964,4 +964,4 @@ def main():
         test_list_contains[small_buffer_size]()
         test_indexing[small_buffer_size]()
         test_materialization[small_buffer_size]()
-    # test_list_dtor()
+        test_list_dtor[small_buffer_size]()
