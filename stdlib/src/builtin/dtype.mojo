@@ -568,6 +568,24 @@ fn _scientific_notation_digits[type: DType]() -> StringLiteral:
 
 
 # ===-------------------------------------------------------------------===#
+# _int_type_of_width
+# ===-------------------------------------------------------------------===#
+
+
+fn _int_type_of_width[width: Int]() -> DType:
+    @parameter
+    if width == 8:
+        return DType.int8
+    elif width == 16:
+        return DType.int16
+    elif width == 32:
+        return DType.int32
+    else:
+        constrained[width == 64]()
+        return DType.int64
+
+
+# ===-------------------------------------------------------------------===#
 # _uint_type_of_width
 # ===-------------------------------------------------------------------===#
 
