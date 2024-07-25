@@ -196,6 +196,34 @@ struct Atomic[type: DType]:
             value_integral_addr, expected_integral, desired_integral
         )
 
+    @staticmethod
+    @always_inline
+    fn max(ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]):
+        """Performs atomic in-place max on the pointer.
+
+        Atomically replaces the current value pointer to by `ptr` by the result
+        of max of the value and arg. The operation is a read-modify-write
+        operation. The operation is a read-modify-write operation perform
+        according to sequential consistency semantics.
+
+        Constraints:
+            The input type must be either integral or floating-point type.
+
+        Args:
+            ptr: The source pointer.
+            rhs: Value to max.
+        """
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
+
+        var value_addr = ptr.bitcast[
+            __mlir_type[`!pop.scalar<`, type.value, `>`]
+        ]()
+        _ = __mlir_op.`pop.atomic.rmw`[
+            bin_op = __mlir_attr.`#pop<bin_op max>`,
+            ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+            _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
+        ](value_addr.address, rhs.value)
+
     @always_inline
     fn max(inout self, rhs: Scalar[type]):
         """Performs atomic in-place max.
@@ -213,9 +241,31 @@ struct Atomic[type: DType]:
         """
         constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        var value_addr = UnsafePointer.address_of(self.value.value)
+        Self.max(UnsafePointer.address_of(self.value), rhs)
+
+    @staticmethod
+    @always_inline
+    fn min(ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]):
+        """Performs atomic in-place min on the pointer.
+
+        Atomically replaces the current value pointer to by `ptr` by the result
+        of min of the value and arg. The operation is a read-modify-write
+        operation. The operation is a read-modify-write operation perform
+        according to sequential consistency semantics.
+
+        Constraints:
+            The input type must be either integral or floating-point type.
+
+        Args:
+            ptr: The source pointer.
+            rhs: Value to min.
+        """
+
+        var value_addr = ptr.bitcast[
+            __mlir_type[`!pop.scalar<`, type.value, `>`]
+        ]()
         _ = __mlir_op.`pop.atomic.rmw`[
-            bin_op = __mlir_attr.`#pop<bin_op max>`,
+            bin_op = __mlir_attr.`#pop<bin_op min>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](value_addr.address, rhs.value)
@@ -238,12 +288,7 @@ struct Atomic[type: DType]:
 
         constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        var value_addr = UnsafePointer.address_of(self.value.value)
-        _ = __mlir_op.`pop.atomic.rmw`[
-            bin_op = __mlir_attr.`#pop<bin_op min>`,
-            ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-        ](value_addr.address, rhs.value)
+        Self.min(UnsafePointer.address_of(self.value), rhs)
 
 
 # ===----------------------------------------------------------------------===#
