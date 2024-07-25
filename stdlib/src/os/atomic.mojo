@@ -178,52 +178,23 @@ struct Atomic[type: DType]:
 
         @parameter
         if type.is_integral():
-            var value_addr = UnsafePointer.address_of(self.value.value)
-            var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
-                bin_op = __mlir_attr.`#pop<bin_op sub>`,
-                failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-                success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            ](
-                value_addr.address,
-                expected.value,
-                desired.value,
+            return _compare_exchange_weak_integral_impl(
+                UnsafePointer.address_of(self.value), expected, desired
             )
-            var ok = Bool(
-                __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
-                    cmpxchg_res
-                )
-            )
-            if not ok:
-                expected = self.load()
-            return ok
 
         # For the floating point case, we need to bitcast the floating point
         # values to their integral representation and perform the atomic
         # operation on that.
 
         alias integral_type = _integral_type_of[type]()
-        var value_integral_addr = UnsafePointer.address_of(
-            self.value.value
-        ).bitcast[__mlir_type[`!pop.scalar<`, integral_type.value, `>`]]()
+        var value_integral_addr = UnsafePointer.address_of(self.value).bitcast[
+            Scalar[integral_type]
+        ]()
         var expected_integral = bitcast[integral_type](expected)
         var desired_integral = bitcast[integral_type](desired)
-
-        var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
-            failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-        ](
-            value_integral_addr.address,
-            expected_integral.value,
-            desired_integral.value,
+        return _compare_exchange_weak_integral_impl(
+            value_integral_addr, expected_integral, desired_integral
         )
-        var ok = Bool(
-            __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
-                cmpxchg_res
-            )
-        )
-        if not ok:
-            expected = self.load()
-        return ok
 
     @always_inline
     fn max(inout self, rhs: Scalar[type]):
@@ -240,10 +211,7 @@ struct Atomic[type: DType]:
         Args:
             rhs: Value to max.
         """
-        constrained[
-            type.is_integral() or type.is_floating_point(),
-            "the input type must be arithmetic",
-        ]()
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
         var value_addr = UnsafePointer.address_of(self.value.value)
         _ = __mlir_op.`pop.atomic.rmw`[
@@ -268,10 +236,7 @@ struct Atomic[type: DType]:
             rhs: Value to min.
         """
 
-        constrained[
-            type.is_integral() or type.is_floating_point(),
-            "the input type must be arithmetic",
-        ]()
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
         var value_addr = UnsafePointer.address_of(self.value.value)
         _ = __mlir_op.`pop.atomic.rmw`[
@@ -279,3 +244,38 @@ struct Atomic[type: DType]:
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](value_addr.address, rhs.value)
+
+
+# ===----------------------------------------------------------------------===#
+# Utilities
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _compare_exchange_weak_integral_impl[
+    type: DType, //
+](
+    value_addr: UnsafePointer[Scalar[type], *_],
+    inout expected: Scalar[type],
+    desired: Scalar[type],
+) -> Bool:
+    constrained[type.is_integral(), "the input type must be integral"]()
+    var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
+        bin_op = __mlir_attr.`#pop<bin_op sub>`,
+        failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+    ](
+        value_addr.bitcast[
+            __mlir_type[`!pop.scalar<`, type.value, `>`]
+        ]().address,
+        expected.value,
+        desired.value,
+    )
+    var ok = Bool(
+        __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
+            cmpxchg_res
+        )
+    )
+    if not ok:
+        expected = value_addr[]
+    return ok
