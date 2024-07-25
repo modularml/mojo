@@ -60,7 +60,7 @@ struct Atomic[type: DType]:
     @staticmethod
     @always_inline
     fn _fetch_add(
-        ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]
+        ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]
     ) -> Scalar[type]:
         """Performs atomic in-place add.
 
@@ -245,7 +245,7 @@ struct Atomic[type: DType]:
 
     @staticmethod
     @always_inline
-    fn min(ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]):
+    fn min(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
         """Performs atomic in-place min on the pointer.
 
         Atomically replaces the current value pointer to by `ptr` by the result
