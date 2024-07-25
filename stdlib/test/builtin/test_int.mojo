@@ -52,6 +52,49 @@ def test_pow():
     assert_equal(81, Int.__pow__(Int(3), Int(4)))
 
 
+def test_pow_mod():
+    assert_equal(1, Int.__pow__(Int(2), Int(4), Int(5)))
+    assert_equal(4, Int.__pow__(Int(2), Int(5), Int(7)))
+    assert_equal(6, Int.__pow__(Int(3), Int(3), Int(7)))
+    assert_equal(2, Int.__pow__(Int(2), Int(1000), Int(7)))
+    assert_equal(1, Int.__pow__(Int(10), Int(3), Int(3)))
+    assert_equal(1, Int.__pow__(Int(3), Int(5), Int(2)))
+
+    assert_equal(1, Int.__pow__(Int(5), Int(0), Int(7)))
+
+    assert_equal(4, Int.__pow__(Int(2), Int(-1), Int(7)))
+    assert_equal(2, Int.__pow__(Int(3), Int(-1), Int(5)))
+
+    assert_equal(0, Int.__pow__(Int(0), Int(5), Int(7)))
+    assert_equal(2, Int.__pow__(Int(100), Int(100), Int(7)))
+    assert_equal(6, Int.__pow__(Int(-2), Int(3), Int(7)))
+    assert_equal(1, Int.__pow__(Int(3), Int(2), Int(2)))
+    assert_equal(
+        598987215, Int.__pow__(Int(123456789), Int(123456789), Int(987654321))
+    )
+    assert_equal(1, Int.__pow__(Int(2), Int(10), Int(11)))
+
+    # TODO: Test negative cases when possible.
+
+
+def test_mod_inverse():
+    assert_equal(4, Int(3)._mod_inverse(11))
+    assert_equal(3, Int(5)._mod_inverse(14))
+
+    assert_equal(9, Int(-3)._mod_inverse(13))
+
+    assert_equal(521, Int(12345)._mod_inverse(1024))
+
+    assert_equal(3, Int(17)._mod_inverse(5))
+
+    assert_equal(1, Int(1)._mod_inverse(2))
+
+    assert_equal(3, Int(6)._mod_inverse(17))
+    assert_equal(1, Int(1)._mod_inverse(2))
+
+    # TODO: Test negative cases when possible.
+
+
 def test_ceil():
     assert_equal(Int.__ceil__(Int(5)), 5)
     assert_equal(Int.__ceil__(Int(0)), 0)
@@ -233,6 +276,8 @@ def main():
     test_sub()
     test_div()
     test_pow()
+    test_pow_mod()
+    test_mod_inverse()
     test_ceil()
     test_floor()
     test_round()

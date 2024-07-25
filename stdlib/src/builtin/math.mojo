@@ -309,6 +309,22 @@ fn pow(base: SIMD, exp: Int) -> __type_of(base):
     return base.__pow__(exp)
 
 
+fn pow(base: Int, exp: Int, mod: Int) -> Int:
+    """Compute modular exponentiation of an integer raised to a power, modulo
+    another integer.
+
+    Args:
+        base: The base integer.
+        exp: The exponent. Can be positive or negative.
+        mod: The modulus. Must be greater than 1.
+
+    Returns:
+        The result of `base` raised to `exp` power, modulo `mod`.
+
+    """
+    return base.__pow__(exp, mod)
+
+
 # ===----------------------------------------------------------------------=== #
 # round
 # ===----------------------------------------------------------------------=== #

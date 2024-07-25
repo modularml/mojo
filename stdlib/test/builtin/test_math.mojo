@@ -114,6 +114,15 @@ def test_pow():
     assert_equal(pow(I(0, 1, 2, 3), int(2)), I(0, 1, 4, 9))
 
 
+def test_pow_mod():
+    assert_equal(1, pow(2, 4, 5))
+    assert_equal(2, pow(2, 1000, 7))
+    assert_equal(4, pow(2, -1, 7))
+    assert_equal(1, pow(5, 0, 7))
+
+    # TODO: Test negative cases when possible.
+
+
 def main():
     test_abs()
     test_divmod()
@@ -121,3 +130,4 @@ def main():
     test_min()
     test_round()
     test_pow()
+    test_pow_mod()

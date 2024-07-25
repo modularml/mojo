@@ -649,6 +649,56 @@ struct Int(
         return res
 
     @always_inline("nodebug")
+    fn __pow__(self, exp: Self, mod: Self) -> Self:
+        """Returns `self` raised to `exp` power, modulo `mod`.
+
+        This method uses the square-and-multiply algorithm to compute
+        modular exponentiation.
+
+        Args:
+            exp: The exponent. Can be positive or negative.
+            mod: The modulus. Must be greater than 1.
+
+        Returns:
+            The result of `self` raised to `exp` power mod `mod`.
+
+        Note:
+            - If mod <= 1, returns 0 to indicate an error.
+            - For negative exponents, it computes the modular multiplicative
+              inverse of self before exponentiation. If no inverse exists,
+              returns 0.
+        """
+        if mod == 0:
+            # Modulus must be greater than 1.
+            # This should raise an exception.
+            debug_assert(False, "Modulus must be greater than 1.")
+            return 0
+
+        if mod == 1:
+            return 0
+
+        var base: Int = self % mod
+        var e = exp
+
+        if e < 0:
+            base = self._mod_inverse(mod)
+            if not base:
+                # Inverse of `base` mod `mod` does not exist
+                # This should raise an exception.
+                return 0
+            e = -e
+
+        var res: Int = 1
+
+        while e > 0:
+            if e & 1 == 1:
+                res = (res * base) % mod
+            base = (base * base) % mod
+            e >>= 1
+
+        return res
+
+    @always_inline("nodebug")
     fn __lshift__(self, rhs: Int) -> Int:
         """Return `self << rhs`.
 
@@ -1098,6 +1148,63 @@ struct Int(
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
+
+    fn _mod_inverse(self, modulus: Self) -> Self:
+        """Compute the modular multiplicative inverse of `self` modulo `m`.
+
+        This method uses the extended Euclidean algorithm to find the modular
+        multiplicative inverse.
+        The result `x` satisfies (`self` * `x`) % `m` == 1.
+
+        Args:
+            modulus: The modulus. Must be greater than 1.
+
+        Returns:
+            The modular multiplicative inverse of `self` modulo `m`, if it exists.
+            Returns 0 if no inverse exists or if an error occurs.
+
+        Note:
+            - If `self` and `m` are not coprime, no modular inverse exists,
+              and the method returns 0.
+        """
+        if modulus <= 1:
+            # Modulus must be greater than 1.
+            # This should raise an exception.
+            debug_assert(False, "Modulus must be greater than 1.")
+            return 0
+
+        var current = self
+        var mod = modulus
+        var x_prev = 0
+        var x_curr = 1
+        var y_prev = 1
+        var y_curr = 0
+
+        while current != 0:
+            var quotient = mod // current
+            x_prev, x_curr = x_curr, x_prev - quotient * x_curr
+            y_prev, y_curr = y_curr, y_prev - quotient * y_curr
+            mod, current = current, mod - quotient * current
+
+        if mod > 1:
+            # There exists no modular inverse for `self` mod `modulus`.
+            # The numbers are not coprime.
+            # This should raise an exception.
+            debug_assert(
+                False,
+                "No modular inverse exists for "
+                + str(self)
+                + " modulo "
+                + str(modulus)
+                + ". The numbers are not coprime (gcd = "
+                + str(mod)
+                + ").",
+            )
+            return 0
+
+        if x_prev < 0:
+            x_prev += modulus
+        return x_prev
 
     fn format_to(self, inout writer: Formatter):
         """

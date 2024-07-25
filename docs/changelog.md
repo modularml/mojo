@@ -350,6 +350,17 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # "Mojo 'Mojo'"
   ```
 
+- Modular exponentation for is now supported via `math.pow(Int, Int, Int)`
+  ([PR #3307](https://github.com/modularml/mojo/pull/3307) by
+  [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  pow(2, 4, 5) # 1
+  pow(2, -1, 7) # 4
+  ```
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
