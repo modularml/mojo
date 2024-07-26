@@ -150,12 +150,24 @@ struct UnsafePointer[
         return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
 
     @staticmethod
-    fn _from_dtype_ptr[
-        dtype: DType,
-    ](ptr: DTypePointer[dtype, address_space]) -> UnsafePointer[
-        Scalar[dtype], address_space
-    ]:
-        return ptr.address.address
+    @always_inline
+    fn alloc(count: Int, alignment: Int = alignof[T]()) -> Self:
+        """Allocate an array with specified or default alignment.
+
+        Args:
+            count: The number of elements in the array.
+            alignment: The alignment in bytes of the allocated memory.
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        alias sizeof_t = sizeof[T]()
+
+        constrained[sizeof_t > 0, "size must be greater than zero"]()
+
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
+        )
 
     @staticmethod
     @always_inline
@@ -212,7 +224,7 @@ struct UnsafePointer[
             idx: The offset of the new pointer.
 
         Returns:
-            The new constructed DTypePointer.
+            The new constructed UnsafePointer.
         """
         return __mlir_op.`pop.offset`(self.address, idx.value)
 
@@ -405,7 +417,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn simd_strided_load[
         type: DType, width: Int, T: Intable
-    ](self: UnsafePointer[Scalar[type]], stride: T) -> SIMD[type, width]:
+    ](self: UnsafePointer[Scalar[type], *_], stride: T) -> SIMD[type, width]:
         """Performs a strided load of the SIMD vector.
 
         Parameters:
@@ -426,7 +438,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn simd_strided_store[
         type: DType, width: Int, T: Intable
-    ](self: UnsafePointer[Scalar[type]], val: SIMD[type, width], stride: T):
+    ](self: UnsafePointer[Scalar[type], *_], val: SIMD[type, width], stride: T):
         """Performs a strided store of the SIMD vector.
 
         Parameters:
@@ -446,9 +458,9 @@ struct UnsafePointer[
         *,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
-    ](self: UnsafePointer[Scalar[type]], offset: SIMD[_, width]) -> SIMD[
+    ](self: UnsafePointer[Scalar[type], *_], offset: SIMD[_, width]) -> SIMD[
         type, width
     ]:
         """Gathers a SIMD vector from offsets of the current pointer.
@@ -483,10 +495,10 @@ struct UnsafePointer[
         type: DType,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
     ](
-        self: UnsafePointer[Scalar[type]],
+        self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         mask: SIMD[DType.bool, width],
         default: SIMD[type, width],
@@ -540,10 +552,10 @@ struct UnsafePointer[
         type: DType,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
     ](
-        self: UnsafePointer[Scalar[type]],
+        self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         val: SIMD[type, width],
     ):
@@ -578,10 +590,10 @@ struct UnsafePointer[
         type: DType,
         width: Int = 1,
         alignment: Int = alignof[
-            Scalar[type]
+            SIMD[type, width]
         ]() if triple_is_nvidia_cuda() else 1,
     ](
-        self: UnsafePointer[Scalar[type]],
+        self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         val: SIMD[type, width],
         mask: SIMD[DType.bool, width],

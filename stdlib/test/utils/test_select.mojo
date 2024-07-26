@@ -10,10 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the memory package."""
+# RUN: %mojo %s
 
-from .arc import Arc
-from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
-from .reference import AddressSpace, Reference
-from .unsafe import bitcast
-from .unsafe_pointer import UnsafePointer
+from utils._select import _select_register_value
+from testing import assert_equal
+
+
+def test_select_register_value():
+    assert_equal(_select_register_value(True, 42, 100), 42)
+    assert_equal(_select_register_value(False, 42, 100), 100)
+
+
+def main():
+    test_select_register_value()
