@@ -54,7 +54,17 @@ fn test_range() raises:
 
 fn test_python_to_string() raises:
     var os = Python.import_module("os")
-    assert_true(str(os.environ).startswith("environ({"))
+    var environ_str = str(os.environ)
+    assert_true(environ_str.startswith("environ({"))
+    assert_true(environ_str.endswith("})"))
+    
+    var list_obj = PythonObject([1, 2, 3])
+    assert_equal(str(list_obj), "[1, 2, 3]")
+    
+    var dict_obj = PythonObject({"a": 1, "b": 2})
+    var dict_str = str(dict_obj)
+    assert_true(dict_str.startswith("{") and dict_str.endswith("}"))
+    assert_true("'a': 1" in dict_str and "'b': 2" in dict_str)
 
 
 def main():
