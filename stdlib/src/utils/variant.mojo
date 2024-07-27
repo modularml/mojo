@@ -132,7 +132,8 @@ struct Variant[*Ts: CollectionElement](
             value: The value to initialize the variant with.
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
-        self._get_state() = Self._check[T]()
+        alias idx = Self._check[T]()
+        self._get_state() = idx
         self._get_ptr[T]().init_pointee_move(value^)
 
     fn __init__(inout self, *, other: Self):
@@ -149,6 +150,7 @@ struct Variant[*Ts: CollectionElement](
             alias T = Ts[i]
             if self._get_state() == i:
                 self._get_ptr[T]().init_pointee_move(other._get_ptr[T]()[])
+                return
 
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
@@ -175,6 +177,7 @@ struct Variant[*Ts: CollectionElement](
             if self._get_state() == i:
                 # Calls the correct __moveinit__
                 other._get_ptr[T]().move_pointee_into(self._get_ptr[T]())
+                return
 
     fn __del__(owned self):
         """Destroy the variant."""
@@ -219,7 +222,8 @@ struct Variant[*Ts: CollectionElement](
 
     fn _get_state(ref [_]self: Self) -> ref [__lifetime_of(self)] Int8:
         var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
-        return (int8_self + Self._size())[]
+        alias size = Self._size()
+        return (int8_self + size)[]
 
     @always_inline
     fn _call_correct_deleter(inout self):
@@ -227,6 +231,7 @@ struct Variant[*Ts: CollectionElement](
         for i in range(len(VariadicList(Ts))):
             if self._get_state() == i:
                 self._get_ptr[Ts[i]]().destroy_pointee()
+                return
 
     @always_inline
     fn take[T: CollectionElement](inout self) -> T:
@@ -274,7 +279,7 @@ struct Variant[*Ts: CollectionElement](
     @always_inline
     fn replace[
         Tin: CollectionElement, Tout: CollectionElement
-    ](inout self, value: Tin) -> Tout:
+    ](inout self, owned value: Tin) -> Tout:
         """Replace the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -296,12 +301,12 @@ struct Variant[*Ts: CollectionElement](
         if not self.isa[Tout]():
             abort("taking out the wrong type!")
 
-        return self.unsafe_replace[Tin, Tout](value)
+        return self.unsafe_replace[Tin, Tout](value^)
 
     @always_inline
     fn unsafe_replace[
         Tin: CollectionElement, Tout: CollectionElement
-    ](inout self, value: Tin) -> Tout:
+    ](inout self, owned value: Tin) -> Tout:
         """Unsafely replace the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -324,7 +329,7 @@ struct Variant[*Ts: CollectionElement](
         debug_assert(self.isa[Tout](), "taking out the wrong type!")
 
         var x = self.unsafe_take[Tout]()
-        self.set[Tin](value)
+        self.set[Tin](value^)
         return x^
 
     fn set[T: CollectionElement](inout self, owned value: T):
@@ -377,13 +382,11 @@ struct Variant[*Ts: CollectionElement](
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:
-        var result = -1
-
         @parameter
         for i in range(len(VariadicList(Ts))):
             if _type_is_eq[Ts[i], T]():
-                result = i
-        return result
+                return i
+        return -1
 
     @staticmethod
     fn _size() -> Int:
@@ -391,5 +394,6 @@ struct Variant[*Ts: CollectionElement](
 
         @parameter
         for i in range(len(VariadicList(Ts))):
-            size = max(size, _align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
+            alias element_size = _align_up(sizeof[Ts[i]](), alignof[Ts[i]]())
+            size = max(size, element_size)
         return _align_up(size, alignof[Int]())

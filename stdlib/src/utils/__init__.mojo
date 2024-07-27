@@ -15,7 +15,6 @@
 from .index import Index, StaticIntTuple, product
 from .inline_string import InlineString
 from .loop import unroll
-from .select_if import select
 from .span import Span
 from .static_tuple import InlineArray, StaticTuple
 from .stringref import StringRef

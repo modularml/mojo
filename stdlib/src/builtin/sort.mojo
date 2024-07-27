@@ -37,9 +37,12 @@ struct _SortWrapper[type: CollectionElement](CollectionElement):
 @always_inline
 fn _insertion_sort[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int):
+](span: Span[type, lifetime]):
     """Sort the array[start:end] slice"""
+    var array = span.unsafe_ptr()
+    var size = len(span)
 
     for i in range(1, size):
         var value = array[i]
@@ -59,8 +62,12 @@ fn _insertion_sort[
 @always_inline
 fn _quicksort_partition_right[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int) -> Int:
+](span: Span[type, lifetime]) -> Int:
+    var array = span.unsafe_ptr()
+    var size = len(span)
+
     var left = 1
     var right = size - 1
     var pivot_value = array[0]
@@ -84,8 +91,12 @@ fn _quicksort_partition_right[
 @always_inline
 fn _quicksort_partition_left[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int) -> Int:
+](span: Span[type, lifetime]) -> Int:
+    var array = span.unsafe_ptr()
+    var size = len(span)
+
     var left = 1
     var right = size - 1
     var pivot_value = array[0]
@@ -106,8 +117,11 @@ fn _quicksort_partition_left[
 
 fn _heap_sort_fix_down[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int, idx: Int):
+](span: Span[type, lifetime], idx: Int):
+    var array = span.unsafe_ptr()
+    var size = len(span)
     var i = idx
     var j = i * 2 + 1
     while j < size:  # has left child
@@ -124,16 +138,19 @@ fn _heap_sort_fix_down[
 @always_inline
 fn _heap_sort[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], owned size: Int):
+](span: Span[type, lifetime]):
+    var array = span.unsafe_ptr()
+    var size = len(span)
     # heapify
     for i in range(size // 2 - 1, -1, -1):
-        _heap_sort_fix_down[type, cmp_fn](array, size, i)
+        _heap_sort_fix_down[cmp_fn](span, i)
     # sort
     while size > 1:
         size -= 1
         swap(array[0], array[size])
-        _heap_sort_fix_down[type, cmp_fn](array, size, 0)
+        _heap_sort_fix_down[cmp_fn](span, 0)
 
 
 @always_inline
@@ -148,8 +165,11 @@ fn _estimate_initial_height(size: Int) -> Int:
 @always_inline
 fn _delegate_small_sort[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int):
+](span: Span[type, lifetime]):
+    var array = span.unsafe_ptr()
+    var size = len(span)
     if size == 2:
         _small_sort[2, type, cmp_fn](array)
 
@@ -170,8 +190,11 @@ fn _delegate_small_sort[
 @always_inline
 fn _quicksort[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int):
+](span: Span[type, lifetime]):
+    var array = span.unsafe_ptr()
+    var size = len(span)
     if size == 0:
         return
     var stack = List[Int](capacity=_estimate_initial_height(size))
@@ -184,11 +207,15 @@ fn _quicksort[
         var len = end - start
 
         if len <= 5:
-            _delegate_small_sort[type, cmp_fn](array + start, len)
+            _delegate_small_sort[cmp_fn](
+                Span[type, lifetime](unsafe_ptr=array + start, len=len)
+            )
             continue
 
         if len < 32:
-            _insertion_sort[type, cmp_fn](array + start, len)
+            _insertion_sort[cmp_fn](
+                Span[type, lifetime](unsafe_ptr=array + start, len=len)
+            )
             continue
 
         # pick median of 3 as pivot
@@ -198,16 +225,16 @@ fn _quicksort[
         # be the same, so no need to recurse that interval
         # already have array[start - 1] <= array[start]
         if start > 0 and not cmp_fn(array[start - 1], array[start]):
-            var pivot = start + _quicksort_partition_left[type, cmp_fn](
-                array + start, len
+            var pivot = start + _quicksort_partition_left[cmp_fn](
+                Span[type, lifetime](unsafe_ptr=array + start, len=len)
             )
             if end > pivot + 2:
                 stack.append(pivot + 1)
                 stack.append(end)
             continue
 
-        var pivot = start + _quicksort_partition_right[type, cmp_fn](
-            array + start, len
+        var pivot = start + _quicksort_partition_right[cmp_fn](
+            Span[type, lifetime](unsafe_ptr=array + start, len=len)
         )
 
         if end > pivot + 2:
@@ -227,11 +254,14 @@ fn _quicksort[
 @always_inline
 fn _partition[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], size: Int) -> Int:
-    if size == 0:
-        return size
+](span: Span[type, lifetime]) -> Int:
+    var size = len(span)
+    if size <= 1:
+        return 0
 
+    var array = span.unsafe_ptr()
     var pivot = size // 2
 
     var pivot_value = array[pivot]
@@ -257,89 +287,89 @@ fn _partition[
 
 fn _partition[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](array: UnsafePointer[type], k: Int, size: Int):
-    var stack = List[Int](capacity=_estimate_initial_height(size))
-    stack.append(0)
-    stack.append(size)
-    while len(stack) > 0:
-        var end = stack.pop()
-        var start = stack.pop()
-        var pivot = start + _partition[type, cmp_fn](array + start, end - start)
+](owned span: Span[type, lifetime], owned k: Int):
+    while True:
+        var pivot = _partition[cmp_fn](span)
         if pivot == k:
-            break
+            return
         elif k < pivot:
-            stack.append(start)
-            stack.append(pivot)
+            span._len = pivot
+            span = span[:pivot]
         else:
-            stack.append(pivot + 1)
-            stack.append(end)
+            span._data += pivot + 1
+            span._len -= pivot + 1
+            k -= pivot + 1
 
 
 fn partition[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (type, type) capturing -> Bool,
-](array: UnsafePointer[type], k: Int, size: Int):
+](span: Span[type, lifetime], k: Int):
     """Partition the input buffer inplace such that first k elements are the
     largest (or smallest if cmp_fn is < operator) elements.
     The ordering of the first k elements is undefined.
 
     Parameters:
         type: Type of the underlying data.
+        lifetime: Lifetime of span.
         cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
 
     Args:
-        array: Input buffer.
+        span: Input buffer.
         k: Index of the partition element.
-        size: The length of the buffer.
     """
 
     @parameter
     fn _cmp_fn(lhs: _SortWrapper[type], rhs: _SortWrapper[type]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _partition[type, _cmp_fn](array, k, size)
+    _partition[_cmp_fn](span, k)
 
 
 fn partition[
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (Int, Int) capturing -> Bool,
-](array: UnsafePointer[Int], k: Int, size: Int):
+](span: Span[Int, lifetime], k: Int):
     """Partition the input buffer inplace such that first k elements are the
     largest (or smallest if cmp_fn is < operator) elements.
     The ordering of the first k elements is undefined.
 
     Parameters:
+        lifetime: Lifetime of span.
         cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
 
     Args:
-        array: Input buffer.
+        span: Input buffer.
         k: Index of the partition element.
-        size: The length of the buffer.
     """
 
     @parameter
     fn _cmp_fn(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _partition[Int, _cmp_fn](array, k, size)
+    _partition[_cmp_fn](span, k)
 
 
 fn partition[
     type: DType,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
-](array: UnsafePointer[Scalar[type]], k: Int, size: Int):
+](span: Span[Scalar[type], lifetime], k: Int):
     """Partition the input buffer inplace such that first k elements are the
     largest (or smallest if cmp_fn is < operator) elements.
     The ordering of the first k elements is undefined.
 
     Parameters:
         type: DType of the underlying data.
+        lifetime: Lifetime of span.
         cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
 
     Args:
-        array: Input buffer.
+        span: Input buffer.
         k: Index of the partition element.
-        size: The length of the buffer.
     """
 
     @parameter
@@ -348,7 +378,7 @@ fn partition[
     ) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _partition[Scalar[type], _cmp_fn](array, k, size)
+    _partition[_cmp_fn](span, k)
 
 
 # ===----------------------------------------------------------------------===#
@@ -359,17 +389,18 @@ fn partition[
 # Junction from public to private API
 fn _sort[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](ptr: UnsafePointer[type], len: Int):
-    if len <= 5:
-        _delegate_small_sort[type, cmp_fn](ptr, len)
+](span: Span[type, lifetime]):
+    if len(span) <= 5:
+        _delegate_small_sort[cmp_fn](span)
         return
 
-    if len < 32:
-        _insertion_sort[type, cmp_fn](ptr, len)
+    if len(span) < 32:
+        _insertion_sort[cmp_fn](span)
         return
 
-    _quicksort[type, cmp_fn](ptr, len)
+    _quicksort[cmp_fn](span)
 
 
 # TODO (MSTDL-766): The Int and Scalar[type] overload should be remove
@@ -378,64 +409,65 @@ fn _sort[
 # optional cmp_fn.
 fn sort[
     type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (type, type) capturing -> Bool,
-](ptr: UnsafePointer[type], len: Int):
+](span: Span[type, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
         type: CollectionElement type of the underlying data.
+        lifetime: Lifetime of span.
         cmp_fn: The comparison function.
 
     Args:
-        ptr: Pointer to the start of the memory to be sorted.
-        len: Number of elements from ptr that to be sorted.
+        span: The span to be sorted.
     """
 
     @parameter
     fn _cmp_fn(lhs: _SortWrapper[type], rhs: _SortWrapper[type]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[type, _cmp_fn](ptr, len)
+    _sort[_cmp_fn](span)
 
 
 fn sort[
-    type: CollectionElement,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (Int, Int) capturing -> Bool,
-](ptr: UnsafePointer[Int], len: Int):
+](span: Span[Int, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
-        type: CollectionElement type of the underlying data.
+        lifetime: Lifetime of span.
         cmp_fn: The comparison function.
 
     Args:
-        ptr: Pointer to the start of the memory to be sorted.
-        len: Number of elements from ptr that to be sorted.
+        span: The span to be sorted.
     """
 
     @parameter
     fn _cmp_fn(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[Int, _cmp_fn](ptr, len)
+    _sort[_cmp_fn](span)
 
 
 fn sort[
     type: DType,
+    lifetime: MutableLifetime, //,
     cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
-](ptr: UnsafePointer[Scalar[type]], len: Int):
+](span: Span[Scalar[type], lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
-        type: CollectionElement type of the underlying data.
+        type: DType type of the underlying data.
+        lifetime: Lifetime of span.
         cmp_fn: The comparison function.
 
     Args:
-        ptr: Pointer to the start of the memory to be sorted.
-        len: Number of elements from ptr that to be sorted.
+        span: The span to be sorted.
     """
 
     @parameter
@@ -444,148 +476,70 @@ fn sort[
     ) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[Scalar[type], _cmp_fn](ptr, len)
+    _sort[_cmp_fn](span)
 
 
-fn sort(ptr: UnsafePointer[Int], len: Int):
+fn sort[
+    lifetime: MutableLifetime, //,
+](span: Span[Int, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
+    Parameters:
+        lifetime: Lifetime of span.
+
     Args:
-        ptr: Pointer to the start of the memory to be sorted.
-        len: Number of elements from ptr that to be sorted.
+        span: The span to be sorted.
     """
 
     @parameter
     fn _cmp_fn(lhs: Int, rhs: Int) -> Bool:
         return lhs < rhs
 
-    sort[Int, _cmp_fn](ptr, len)
+    sort[_cmp_fn](span)
 
 
 fn sort[
     type: DType,
-](ptr: UnsafePointer[Scalar[type]], len: Int):
+    lifetime: MutableLifetime, //,
+](span: Span[Scalar[type], lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
         type: CollectionElement type of the underlying data.
+        lifetime: Lifetime of span.
 
     Args:
-        ptr: Pointer to the start of the memory to be sorted.
-        len: Number of elements from ptr that to be sorted.
+        span: The span to be sorted.
     """
 
     @parameter
     fn _cmp_fn(lhs: Scalar[type], rhs: Scalar[type]) -> Bool:
         return lhs < rhs
 
-    sort[type, _cmp_fn](ptr, len)
+    sort[_cmp_fn](span)
 
 
 fn sort[
-    type: CollectionElement,
-    cmp_fn: fn (Int, Int) capturing -> Bool,
-](inout list: List[Int]):
-    """Sort the list inplace.
-    The function doesn't return anything, the list is updated inplace.
-
-    Parameters:
-        type: CollectionElement type of the underlying data.
-        cmp_fn: The comparison function.
-
-    Args:
-        list: Input list to sort.
-    """
-
-    sort[Int, cmp_fn](list.data, len(list))
-
-
-fn sort[
-    type: DType,
-    cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
-](inout list: List[Scalar[type]]):
-    """Sort the list inplace.
-    The function doesn't return anything, the list is updated inplace.
-
-    Parameters:
-        type: DType of the underlying data.
-        cmp_fn: The comparison function.
-
-    Args:
-        list: Input list to sort.
-    """
-
-    sort[type, cmp_fn](list.data, len(list))
-
-
-fn sort[
-    type: CollectionElement,
-    cmp_fn: fn (type, type) capturing -> Bool,
-](inout list: List[type]):
-    """Sort the list inplace.
-    The function doesn't return anything, the list is updated inplace.
-
-    Parameters:
-        type: CollectionElement type of the underlying data.
-        cmp_fn: The comparison function.
-
-    Args:
-        list: Input list to sort.
-    """
-
-    sort[type, cmp_fn](list.data, len(list))
-
-
-fn sort(inout list: List[Int]):
-    """Sort the list inplace.
-    The function doesn't return anything, the list is updated inplace.
-
-    Args:
-        list: Input integer list to sort.
-    """
-
-    @parameter
-    fn _cmp_fn(lhs: Int, rhs: Int) -> Bool:
-        return lhs < rhs
-
-    sort[Int, _cmp_fn](list.data, len(list))
-
-
-fn sort[type: DType](inout list: List[Scalar[type]]):
-    """Sort the list inplace.
-    The function doesn't return anything, the list is updated inplace.
-
-    Parameters:
-        type: DType of the underlying data.
-
-    Args:
-        list: Input vector to sort.
-    """
-
-    @parameter
-    fn _cmp_fn(lhs: Scalar[type], rhs: Scalar[type]) -> Bool:
-        return lhs < rhs
-
-    sort[type, _cmp_fn](list.data, len(list))
-
-
-fn sort[type: ComparableCollectionElement](inout list: List[type]):
+    type: ComparableCollectionElement,
+    lifetime: MutableLifetime, //,
+](span: Span[type, lifetime]):
     """Sort list of the order comparable elements in-place.
 
     Parameters:
         type: The order comparable collection element type.
+        lifetime: Lifetime of span.
 
     Args:
-        list: The list of the scalars which will be sorted in-place.
+        span: The span to be sorted.
     """
 
     @parameter
     fn _cmp_fn(a: type, b: type) -> Bool:
         return a < b
 
-    sort[type, _cmp_fn](list.data, len(list))
+    sort[_cmp_fn](span)
 
 
 # ===----------------------------------------------------------------------===#
