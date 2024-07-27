@@ -992,31 +992,25 @@ fn iota[
         Scalar.store(buff, i, i + offset)
 
 
-fn iota[type: DType](v: List[Scalar[type]], offset: Int = 0):
-    """Fill the vector with numbers ranging from offset to offset + len - 1,
-    spaced by 1.
-
-    The function doesn't return anything, the vector is updated inplace.
+fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
+    """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
         type: DType of the underlying data.
 
     Args:
-        v: The vector to fill.
-        offset: The value to fill at index 0.
+        v: The list to fill with numbers.
+        offset: The starting value to fill at index 0.
     """
     iota(v.data, len(v), offset)
 
 
-fn iota(v: List[Int], offset: Int = 0):
-    """Fill the vector with numbers ranging from offset to offset + len - 1,
-    spaced by 1.
-
-    The function doesn't return anything, the vector is updated inplace.
+fn iota(inout v: List[Int], offset: Int = 0):
+    """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:
-        v: The vector to fill.
-        offset: The value to fill at index 0.
+        v: The list to fill with numbers.
+        offset: The starting value to fill at index 0.
     """
     var buff = v.data.bitcast[Scalar[DType.index]]()
     iota(buff, len(v), offset=offset)
@@ -2143,6 +2137,64 @@ fn factorial(n: Int) -> Int:
     )
     debug_assert(0 <= n <= 20, "input value causes an overflow")
     return table[n]
+
+
+# ===----------------------------------------------------------------------=== #
+# clamp
+# ===----------------------------------------------------------------------=== #
+
+
+fn clamp(
+    val: Int, lower_bound: __type_of(val), upper_bound: __type_of(val)
+) -> __type_of(val):
+    """Clamps the integer value vector to be in a certain range.
+
+    Args:
+        val: The value to clamp.
+        lower_bound: Minimum of the range to clamp to.
+        upper_bound: Maximum of the range to clamp to.
+
+    Returns:
+        An integer clamped to be within lower_bound and upper_bound.
+    """
+    return max(min(val, upper_bound), lower_bound)
+
+
+fn clamp(
+    val: UInt, lower_bound: __type_of(val), upper_bound: __type_of(val)
+) -> __type_of(val):
+    """Clamps the integer value vector to be in a certain range.
+
+    Args:
+        val: The value to clamp.
+        lower_bound: Minimum of the range to clamp to.
+        upper_bound: Maximum of the range to clamp to.
+
+    Returns:
+        An integer clamped to be within lower_bound and upper_bound.
+    """
+    return max(min(val, upper_bound), lower_bound)
+
+
+fn clamp(
+    val: SIMD, lower_bound: __type_of(val), upper_bound: __type_of(val)
+) -> __type_of(val):
+    """Clamps the values in a SIMD vector to be in a certain range.
+
+    Clamp cuts values in the input SIMD vector off at the upper bound and
+    lower bound values. For example,  SIMD vector `[0, 1, 2, 3]` clamped to
+    a lower bound of 1 and an upper bound of 2 would return `[1, 1, 2, 2]`.
+
+    Args:
+        val: The value to clamp.
+        lower_bound: Minimum of the range to clamp to.
+        upper_bound: Maximum of the range to clamp to.
+
+    Returns:
+        A SIMD vector containing x clamped to be within lower_bound and
+        upper_bound.
+    """
+    return val.clamp(lower_bound, upper_bound)
 
 
 # ===----------------------------------------------------------------------=== #

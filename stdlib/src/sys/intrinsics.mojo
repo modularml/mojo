@@ -1182,8 +1182,8 @@ struct PrefetchOptions:
 
 @always_inline("nodebug")
 fn prefetch[
-    params: PrefetchOptions, type: DType, address_space: AddressSpace
-](addr: UnsafePointer[Scalar[type], address_space, _]):
+    params: PrefetchOptions, type: DType
+](addr: UnsafePointer[Scalar[type], *_]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
@@ -1192,7 +1192,6 @@ fn prefetch[
     Parameters:
       params: Configuration options for the prefect intrinsic.
       type: The DType of value stored in addr.
-      address_space: The address space of the pointer.
 
     Args:
       addr: The data pointer to prefetch.
@@ -1261,7 +1260,7 @@ fn masked_store[
     size: Int
 ](
     value: SIMD,
-    addr: UnsafePointer[Scalar[value.type]],
+    addr: UnsafePointer[Scalar[value.type], *_],
     mask: SIMD[DType.bool, size],
     alignment: Int = 1,
 ):
@@ -1303,7 +1302,7 @@ fn compressed_store[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    addr: UnsafePointer[Scalar[type]],
+    addr: UnsafePointer[Scalar[type], *_],
     mask: SIMD[DType.bool, size],
 ):
     """Compresses the lanes of `value`, skipping `mask` lanes, and stores
@@ -1340,12 +1339,9 @@ fn compressed_store[
 
 @always_inline("nodebug")
 fn strided_load[
-    type: DType,
-    simd_width: Int,
-    /,
-    address_space: AddressSpace = AddressSpace.GENERIC,
+    type: DType, simd_width: Int
 ](
-    addr: UnsafePointer[Scalar[type], address_space, _],
+    addr: UnsafePointer[Scalar[type], *_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ) -> SIMD[type, simd_width]:
@@ -1354,7 +1350,6 @@ fn strided_load[
     Parameters:
       type: DType of `value`, the value to store.
       simd_width: The width of the SIMD vectors.
-      address_space: The address space of the memory location.
 
     Args:
       addr: The memory location to load data from.
@@ -1388,13 +1383,10 @@ fn strided_load[
 
 @always_inline("nodebug")
 fn strided_store[
-    type: DType,
-    simd_width: Int,
-    /,
-    address_space: AddressSpace = AddressSpace.GENERIC,
+    type: DType, simd_width: Int
 ](
     value: SIMD[type, simd_width],
-    addr: UnsafePointer[Scalar[type], address_space, _],
+    addr: UnsafePointer[Scalar[type], *_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ):
@@ -1403,7 +1395,6 @@ fn strided_store[
     Parameters:
       type: DType of `value`, the value to store.
       simd_width: The width of the SIMD vectors.
-      address_space: The address space of the memory location.
 
     Args:
       value: The values to store.
