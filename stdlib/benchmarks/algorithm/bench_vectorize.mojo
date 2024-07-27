@@ -266,7 +266,7 @@ fn bench_compare():
     var p1 = UnsafePointer[Scalar[type]].alloc(size)
     var p2 = UnsafePointer[Scalar[type]].alloc(size)
     print("Benchmark results")
-    rand(p1.address, size)
+    rand(p1, size)
 
     @parameter
     fn arg_size():
@@ -322,15 +322,15 @@ fn bench_compare():
 
     var arg = run[arg_size](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2.address, size)
+    memset_zero(p2, size)
 
     var param = run[param_size](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2.address, size)
+    memset_zero(p2, size)
 
     var arg_unroll = run[arg_size_unroll](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))
-    memset_zero(p2.address, size)
+    memset_zero(p2, size)
 
     var param_unroll = run[param_size_unroll](max_runtime_secs=0.5).mean(unit)
     print(SIMD[size=size].load(p2))

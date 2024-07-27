@@ -13,27 +13,12 @@
 """Implements functionality to start a mojo execution."""
 
 from sys import external_call
-
-
-@always_inline
-fn _get_global[
-    name: StringLiteral,
-    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
-    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
-](
-    payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()
-) -> UnsafePointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", UnsafePointer[NoneType]
-    ](StringRef(name), payload, init_fn, destroy_fn)
+from sys.ffi import _get_global
 
 
 fn _init_global_runtime(
     ignored: UnsafePointer[NoneType],
 ) -> UnsafePointer[NoneType]:
-    """Initialize the global runtime. This is a singleton that handle the common
-    case where the runtime has the same number of threads as the number of cores.
-    """
     return external_call[
         "KGEN_CompilerRT_AsyncRT_CreateRuntime", UnsafePointer[NoneType]
     ](0)
@@ -46,14 +31,6 @@ fn _destroy_global_runtime(ptr: UnsafePointer[NoneType]):
 
 @always_inline
 fn _get_current_or_global_runtime() -> UnsafePointer[NoneType]:
-    """Returns the current runtime, or returns the Mojo singleton global
-    runtime, creating it if it does not already exist. When Mojo is used within
-    the Modular Execution Engine the current runtime will be that already
-    constructed by the execution engine. If the user has already manually
-    constructed a runtime and added tasks to it, the current runtime for those
-    tasks will be that runtime. Otherwise, the singleton runtime is used, which
-    is created with number of threads equal to the number of cores.
-    """
     var current_runtime = external_call[
         "KGEN_CompilerRT_AsyncRT_GetCurrentRuntime", UnsafePointer[NoneType]
     ]()

@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `String` class now have `rjust`, `ljust` and `center` methods to return
+  a justified string based on width and fillchar.
+  ([PR 3278#](https://github.com/modularml/mojo/pull/3278) by
+  [@mzaks](https://github.com/mzaks))
+
 - Creating nested `PythonObject` from a list or tuple of python objects is
   possible now:
 
@@ -331,6 +336,20 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   `Int` type.
   ([PR #3150](https://github.com/modularml/mojo/pull/3150) by [@LJ-9801](https://github.com/LJ-9801))
 
+- `String.format()` now supports conversion flags `!s` and `!r`, allowing for
+  `str()` and `repr()` conversions within format strings.
+  ([PR #3279](https://github.com/modularml/mojo/pull/3279) by [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  String("{} {!r}").format("Mojo", "Mojo")
+  # "Mojo 'Mojo'"
+
+  String("{0!s} {0!r}").format("Mojo")
+  # "Mojo 'Mojo'"
+  ```
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
@@ -517,6 +536,36 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   by [@jjvraw](https://github.com/jjvraw))
 
 - `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
+
+- `DTypePointer` has been removed.
+  Please use [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/)
+  instead. Functions that previously took a `DTypePointer` now take an
+  equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
+  `UnsafePointer` is:
+
+  ```mojo
+  DTypePointer[type] -> UnsafePointer[Scalar[type]]
+  ```
+
+  There could be places that you have code of the form
+
+  ```mojo
+  fn f(ptr: DTypePointer):
+  ```
+
+  which is equivalent to `DTypePointer[*_]`. In this case you would have to add
+  a type parameter to the function:
+
+  ```mojo
+  fn f[type: DType, //](ptr: UnsafePointer[Scalar[type]]):
+  ```
+
+  because we can’t have an unbound struct inside the parameter.
+
+  There could also be places where you use `DTypePointer[Scalar[DType.invalid/index]]`,
+  and it would be natural to change it to `UnsafePointer[NoneType/Int]`. But
+  since they are not an `UnsafePointer` that stores a `Scalar`, you might have to
+  `rebind/bitcast` to appropriate types.
 
 ### ❌ Removed
 

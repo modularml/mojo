@@ -164,6 +164,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         Returns:
             A handle to the function.
         """
+        debug_assert(self.handle, "Dylib handle is null")
 
         @parameter
         if not os_is_windows():
