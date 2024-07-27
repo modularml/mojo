@@ -832,6 +832,25 @@ fn tanh[
     Returns:
         The result of the elementwise tanh operation.
     """
+
+    constrained[
+        type.is_floating_point(), "the input type must be floating point"
+    ]()
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias instruction = "tanh.approx.f32"
+
+        @parameter
+        if sizeof[type]() < sizeof[DType.float32]():
+            return _call_ptx_intrinsic[
+                instruction=instruction, constraints="=f,f"
+            ](x.cast[DType.float32]()).cast[type]()
+        elif type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction=instruction, constraints="=f,f"
+            ](x)
+
     var xc = x.clamp(-9, 9)
     var x_squared = xc * xc
 
