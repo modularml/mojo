@@ -266,7 +266,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return +result^  # Remove zero and negative counts
 
-    fn __iadd__(inout self, other: Self) raises:
+    fn __iadd__(inout self, other: Self):
         """Add counts from another Counter to this Counter.
 
         Args:
@@ -291,7 +291,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return +result^  # Remove zero and negative counts
 
-    fn __isub__(inout self, other: Self) raises:
+    fn __isub__(inout self, other: Self):
         """Subtract counts from another Counter from this Counter.
 
         Args:
@@ -300,7 +300,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self.subtract(other)
         self._keep_positive()
 
-    fn __and__(self, other: Self) raises -> Self:
+    fn __and__(self, other: Self) -> Self:
         """Intersection: keep common elements with the minimum count.
 
         Args:
@@ -315,11 +315,11 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         for key_ref in self.keys():
             var key = key_ref[]
             if key in other:
-                result[key] = min(self[key], other[key])
+                result[key] = min(self.get(key, 0), other.get(key, 0))
 
         return result^
 
-    fn __iand__(inout self, other: Self) raises:
+    fn __iand__(inout self, other: Self):
         """Intersection: keep common elements with the minimum count.
 
         Args:
@@ -328,11 +328,14 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         for key_ref in self.keys():
             var key = key_ref[]
             if key not in other:
-                _ = self.pop(key)
+                try:
+                    _ = self.pop(key)
+                except:
+                    pass  # this should not happen
             else:
-                self[key] = min(self[key], other[key])
+                self[key] = min(self.get(key, 0), other.get(key, 0))
 
-    fn __or__(self, other: Self) raises -> Self:
+    fn __or__(self, other: Self) -> Self:
         """Union: keep all elements with the maximum count.
 
         Args:
@@ -346,18 +349,18 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         for key_ref in self.keys():
             var key = key_ref[]
-            var newcount = max(self[key], other.get(key, 0))
+            var newcount = max(self.get(key, 0), other.get(key, 0))
             if newcount > 0:
                 result[key] = newcount
 
         for key_ref in other.keys():
             var key = key_ref[]
-            if key not in self and other[key] > 0:
-                result[key] = other[key]
+            if key not in self and other.get(key, 0) > 0:
+                result[key] = other.get(key, 0)
 
         return result^
 
-    fn __ior__(inout self, other: Self) raises:
+    fn __ior__(inout self, other: Self):
         """Union: keep all elements with the maximum count.
 
         Args:
@@ -365,16 +368,19 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         for key_ref in other.keys():
             var key = key_ref[]
-            var newcount = max(self.get(key, 0), other[key])
+            var newcount = max(self.get(key, 0), other.get(key, 0))
             if newcount > 0:
                 self[key] = newcount
 
-    fn _keep_positive(inout self) raises:
+    fn _keep_positive(inout self):
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
             var key = key_ref[]
-            if self[key] <= 0:
-                _ = self.pop(key)
+            if self.get(key, 0) <= 0:
+                try:
+                    _ = self.pop(key)
+                except:
+                    pass  # this should not happen
 
     # ===------------------------------------------------------------------=== #
     # Unary operators
