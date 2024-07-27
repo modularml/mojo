@@ -469,49 +469,6 @@ def test_dtypepointer_scatter():
     ptr.free()
 
 
-def test_memcpy_unsafe_pointer():
-    # Tests memcpy for the UnsafePointer type
-    # Note:
-    #   Eventually as DTypePointer is fully replaced with
-    #   UnsafePointer, this test will be redundant as all the other tests in
-    #   this file will have been updated to use `UnsafePointer`.
-
-    var list_a = List[Int8](capacity=10)
-    var list_b = List[Int8](1, 2, 3, 4, 5)
-
-    assert_equal(len(list_b), 5)
-
-    var dest_ptr: UnsafePointer[Int8] = list_a.unsafe_ptr()
-
-    memcpy(
-        dest=dest_ptr,
-        src=list_b.unsafe_ptr(),
-        count=len(list_b),
-    )
-    memcpy(
-        dest=dest_ptr + 5,
-        src=list_b.unsafe_ptr(),
-        count=len(list_b),
-    )
-
-    _ = list_b^
-
-    # Mark the initialized size of list_a.
-    list_a.size = 10
-
-    assert_equal(len(list_a), 10)
-    assert_equal(list_a[0], 1)
-    assert_equal(list_a[1], 2)
-    assert_equal(list_a[2], 3)
-    assert_equal(list_a[3], 4)
-    assert_equal(list_a[4], 5)
-    assert_equal(list_a[5], 1)
-    assert_equal(list_a[6], 2)
-    assert_equal(list_a[7], 3)
-    assert_equal(list_a[8], 4)
-    assert_equal(list_a[9], 5)
-
-
 def test_indexing():
     var ptr = UnsafePointer[Float32].alloc(4)
     for i in range(4):
@@ -529,7 +486,6 @@ def main():
     test_memcmp_overflow()
     test_memcmp_simd()
     test_memcmp_extensive()
-    test_memcpy_unsafe_pointer()
     test_memset()
 
     test_pointer_explicit_copy()
