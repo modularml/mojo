@@ -36,10 +36,10 @@ alias max_y = 1.5
 
 
 struct Matrix[type: DType, rows: Int, cols: Int]:
-    var data: DTypePointer[type]
+    var data: UnsafePointer[Scalar[type]]
 
     fn __init__(inout self):
-        self.data = DTypePointer[type].alloc(rows * cols)
+        self.data = UnsafePointer[Scalar[type]].alloc(rows * cols)
 
     fn store[nelts: Int](self, row: Int, col: Int, val: SIMD[type, nelts]):
         SIMD[size=nelts].store(self.data, row * cols + col, val)

@@ -1472,9 +1472,7 @@ struct String(
           The offset of `substr` relative to the beginning of the string.
         """
 
-        return self._strref_dangerous().find(
-            substr._strref_dangerous(), start=start
-        )
+        return self.as_string_slice().find(substr.as_string_slice(), start)
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -1966,7 +1964,7 @@ struct String(
             )
         return String(buf^)
 
-    fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
+    fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
         """Format a template with *args.
 
         Example of manual indexing:
@@ -2021,14 +2019,21 @@ struct String(
                 @parameter
                 for i in range(num_pos_args):
                     if i == e[].field[Int]:
-                        res += str(args[i])
+                        if e[].conversion_flag == "r":
+                            res += repr(args[i])
+                        else:
+                            res += str(args[i])
 
             if e[].is_automatic_indexing():
 
                 @parameter
                 for i in range(num_pos_args):
                     if i == current_automatic_arg_index:
-                        res += str(args[i])
+                        if e[].conversion_flag == "r":
+                            res += repr(args[i])
+                        else:
+                            res += str(args[i])
+
                 current_automatic_arg_index += 1
 
             pos_in_self = e[].last_curly + 1
@@ -2102,6 +2107,58 @@ struct String(
             if not isprintable(ord(c)):
                 return False
         return True
+
+    fn rjust(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string right justified in a string of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns right justified string, or self if width is not bigger than self length.
+        """
+        return self._justify(width - len(self), width, fillchar)
+
+    fn ljust(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string left justified in a string of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns left justified string, or self if width is not bigger than self length.
+        """
+        return self._justify(0, width, fillchar)
+
+    fn center(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string center justified in a string of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns center justified string, or self if width is not bigger than self length.
+        """
+        return self._justify(width - len(self) >> 1, width, fillchar)
+
+    fn _justify(
+        self, start: Int, width: Int, fillchar: StringLiteral
+    ) -> String:
+        if len(self) >= width:
+            return self
+        debug_assert(
+            len(fillchar) == 1, "fill char needs to be a one byte literal"
+        )
+        var fillbyte = fillchar.as_bytes_slice()[0]
+        var buffer = List[UInt8](capacity=width + 1)
+        buffer.resize(width, fillbyte)
+        buffer.append(0)
+        memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
+        var result = String(buffer)
+        return result^
 
 
 # ===----------------------------------------------------------------------=== #
@@ -2232,6 +2289,22 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
 # ===----------------------------------------------------------------------===#
 
 
+trait StringRepresentable(Stringable, Representable):
+    """The `StringRepresentable` trait denotes a trait composition of the
+    `Stringable` and `Representable` traits.
+
+    This trait is used by the `format()` method to support both `{!s}` (or `{}`)
+    and `{!r}` format specifiers. It allows the method to handle types that
+    can be formatted using both their string representation and their
+    more detailed representation.
+
+    Types implementing this trait must provide both `__str__()` and `__repr__()`
+    methods as defined in `Stringable` and `Representable` traits respectively.
+    """
+
+    pass
+
+
 @value
 struct _FormatCurlyEntry(CollectionElement):
     """
@@ -2249,6 +2322,9 @@ struct _FormatCurlyEntry(CollectionElement):
     var last_curly: Int
     """The index of an closing brace around a substitution field."""
 
+    var conversion_flag: String
+    """Store the format specifier (e.g., 'r' for repr)."""
+
     alias _FieldVariantType = Variant[
         String,  # kwargs indexing (`{field_name}`)
         Int,  # args manual indexing (`{3}`)
@@ -2261,6 +2337,7 @@ struct _FormatCurlyEntry(CollectionElement):
     fn __init__(inout self, *, other: Self):
         self.first_curly = other.first_curly
         self.last_curly = other.last_curly
+        self.conversion_flag = other.conversion_flag
         self.field = Self._FieldVariantType(other=other.field)
 
     fn is_escaped_brace(ref [_]self) -> Bool:
@@ -2307,6 +2384,10 @@ struct _FormatCurlyEntry(CollectionElement):
         var raised_manual_index = Optional[Int](None)
         var raised_automatic_index = Optional[Int](None)
         var raised_kwarg_field = Optional[String](None)
+        alias supported_conversion_flags = (
+            String("s"),  # __str__
+            String("r"),  # __repr__
+        )
 
         var entries = List[Self]()
         var start = Optional[Int](None)
@@ -2320,10 +2401,13 @@ struct _FormatCurlyEntry(CollectionElement):
                     # already one there.
                     if i - start.value() == 1:
                         # python escapes double curlies
-                        var curren_entry = Self(
-                            first_curly=start.value(), last_curly=i, field=False
+                        var current_entry = Self(
+                            first_curly=start.value(),
+                            last_curly=i,
+                            field=False,
+                            conversion_flag="",
                         )
-                        entries.append(curren_entry^)
+                        entries.append(current_entry^)
                         start = None
                         continue
                     raise (
@@ -2336,27 +2420,68 @@ struct _FormatCurlyEntry(CollectionElement):
                 if start:
                     var start_value = start.value()
                     var current_entry = Self(
-                        first_curly=start_value, last_curly=i, field=NoneType()
+                        first_curly=start_value,
+                        last_curly=i,
+                        field=NoneType(),
+                        conversion_flag="",
                     )
+
                     if i - start_value != 1:
                         var field = format_src[start_value + 1 : i]
-                        try:
-                            # field is a number for manual indexing:
-                            var number = int(field)
-                            current_entry.field = number
-                            if number >= len_pos_args or number < 0:
-                                raised_manual_index = number
+                        var exclamation_index = field.find("!")
+
+                        # TODO: Future implementation of format specifiers
+                        # When implementing format specifiers, modify this section to handle:
+                        # replacement_field ::= "{" [field_name] ["!" conversion] [":" format_spec] "}"
+                        # this will involve:
+                        # 1. finding a colon ':' after the conversion flag (if present)
+                        # 2. extracting the format_spec if a colon is found
+                        # 3. adjusting the field and conversion_flag parsing accordingly
+
+                        if exclamation_index != -1:
+                            if exclamation_index + 1 < len(field):
+                                var conversion_flag: String = field[
+                                    exclamation_index + 1 :
+                                ]
+                                if (
+                                    conversion_flag
+                                    not in supported_conversion_flags
+                                ):
+                                    raise 'Conversion flag "' + conversion_flag + '" not recognised.'
+                                current_entry.conversion_flag = conversion_flag
+                            else:
+                                raise "Empty conversion flag."
+
+                            field = field[:exclamation_index]
+
+                        if (
+                            field == ""
+                        ):  # an empty field, so it's automatic indexing
+                            if automatic_indexing_count >= len_pos_args:
+                                raised_automatic_index = (
+                                    automatic_indexing_count
+                                )
                                 break
-                            manual_indexing_count += 1
-                        except e:
-                            debug_assert(
-                                "not convertible to integer" in str(e),
-                                "Not the expected error from atol",
-                            )
-                            # field is an keyword for **kwargs:
-                            current_entry.field = field
-                            raised_kwarg_field = field
-                            break
+                            automatic_indexing_count += 1
+                        else:
+                            try:
+                                # field is a number for manual indexing:
+                                var number = int(field)
+                                current_entry.field = number
+                                if number >= len_pos_args or number < 0:
+                                    raised_manual_index = number
+                                    break
+                                manual_indexing_count += 1
+                            except e:
+                                debug_assert(
+                                    "not convertible to integer" in str(e),
+                                    "Not the expected error from atol",
+                                )
+                                # field is an keyword for **kwargs:
+                                current_entry.field = field
+                                raised_kwarg_field = field
+                                break
+
                     else:
                         # automatic indexing
                         # current_entry.field is already None
@@ -2371,7 +2496,10 @@ struct _FormatCurlyEntry(CollectionElement):
                     if (i + 1) < format_src.byte_length():
                         if format_src[i + 1] == "}":
                             var curren_entry = Self(
-                                first_curly=i, last_curly=i + 1, field=True
+                                first_curly=i,
+                                last_curly=i + 1,
+                                field=True,
+                                conversion_flag="",
                             )
                             entries.append(curren_entry^)
                             skip_next = True

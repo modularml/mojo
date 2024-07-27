@@ -12,14 +12,14 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils import select
+from utils._select import _select_register_value
 from testing import assert_equal
 
 
-def test_select():
-    assert_equal(select(True, 42, 100), 42)
-    assert_equal(select(False, 42, 100), 100)
+def test_select_register_value():
+    assert_equal(_select_register_value(True, 42, 100), 42)
+    assert_equal(_select_register_value(False, 42, 100), 100)
 
 
 def main():
-    test_select()
+    test_select_register_value()

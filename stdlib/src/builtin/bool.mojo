@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Set
 
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import select
+from utils._select import _select_register_value
 
 # ===----------------------------------------------------------------------=== #
 #  Boolable
@@ -240,7 +240,7 @@ struct Bool(
         Returns:
             1 if the Bool is True, 0 otherwise.
         """
-        return select(self.value, Int(1), Int(0))
+        return _select_register_value(self.value, Int(1), Int(0))
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:
