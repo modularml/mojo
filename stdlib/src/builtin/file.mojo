@@ -42,8 +42,9 @@ struct _OwnedStringRef(Boolable):
     var data: UnsafePointer[UInt8]
     var length: Int
 
-    fn __init__() -> _OwnedStringRef:
-        return Self {data: UnsafePointer[UInt8](), length: 0}
+    fn __init__(inout self):
+        self.data = UnsafePointer[UInt8]()
+        self.length = 0
 
     fn __del__(owned self):
         if self.data:
