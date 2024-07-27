@@ -68,7 +68,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         @parameter
         if not os_is_windows():
             var handle = external_call["dlopen", UnsafePointer[Int8]](
-                path.unsafe_ptr(), flags
+                path.unsafe_cstr_ptr(), flags
             )
             if handle == UnsafePointer[Int8]():
                 var error_message = external_call[
@@ -102,7 +102,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         ]()
 
         var opaque_function_ptr = external_call["dlsym", UnsafePointer[Int8]](
-            self.handle.address, name.unsafe_ptr()
+            self.handle.address, name.unsafe_cstr_ptr()
         )
         if opaque_function_ptr:
             return True
@@ -164,6 +164,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         Returns:
             A handle to the function.
         """
+        debug_assert(self.handle, "Dylib handle is null")
 
         @parameter
         if not os_is_windows():

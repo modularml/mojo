@@ -259,6 +259,38 @@ fn test_utf8_validation() raises:
         assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
 
 
+def test_find():
+    haystack = str("abcdefg").as_string_slice()
+    haystack_with_special_chars = str("abcdefg@#$").as_string_slice()
+    haystack_repeated_chars = str("aaaaaaaaaaaaaaaaaaaaaaaa").as_string_slice()
+
+    assert_equal(haystack.find(str("a").as_string_slice()), 0)
+    assert_equal(haystack.find(str("ab").as_string_slice()), 0)
+    assert_equal(haystack.find(str("abc").as_string_slice()), 0)
+    assert_equal(haystack.find(str("bcd").as_string_slice()), 1)
+    assert_equal(haystack.find(str("de").as_string_slice()), 3)
+    assert_equal(haystack.find(str("fg").as_string_slice()), 5)
+    assert_equal(haystack.find(str("g").as_string_slice()), 6)
+    assert_equal(haystack.find(str("z").as_string_slice()), -1)
+    assert_equal(haystack.find(str("zzz").as_string_slice()), -1)
+
+    assert_equal(haystack.find(str("@#$").as_string_slice()), -1)
+    assert_equal(
+        haystack_with_special_chars.find(str("@#$").as_string_slice()), 7
+    )
+
+    assert_equal(haystack_repeated_chars.find(str("aaa").as_string_slice()), 0)
+    assert_equal(haystack_repeated_chars.find(str("AAa").as_string_slice()), -1)
+
+    assert_equal(
+        haystack.find(str("hijklmnopqrstuvwxyz").as_string_slice()), -1
+    )
+
+    assert_equal(
+        str("").as_string_slice().find(str("abc").as_string_slice()), -1
+    )
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
@@ -267,3 +299,4 @@ fn main() raises:
     test_slice_eq()
     test_slice_bool()
     test_utf8_validation()
+    test_find()

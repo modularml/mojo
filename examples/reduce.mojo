@@ -80,11 +80,11 @@ fn main() raises:
         "Shows algorithm.sum from stdlib with much better performance\n"
     )
     # Allocate and randomize data, then create two buffers
-    var ptr_small = DTypePointer[type].alloc(size_small)
-    var ptr_large = DTypePointer[type].alloc(size_large)
+    var ptr_small = UnsafePointer[Scalar[type]].alloc(size_small)
+    var ptr_large = UnsafePointer[Scalar[type]].alloc(size_large)
 
-    rand(ptr_small.address, size_small)
-    rand(ptr_large.address, size_large)
+    rand(ptr_small, size_small)
+    rand(ptr_large, size_large)
 
     var buffer_small = Buffer[type, size_small](ptr_small)
     var buffer_large = Buffer[type, size_large](ptr_large)

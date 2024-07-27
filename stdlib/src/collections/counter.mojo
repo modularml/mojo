@@ -536,7 +536,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         fn comparator(a: CountTuple[V], b: CountTuple[V]) -> Bool:
             return a < b
 
-        sort[CountTuple[V], comparator](items)
+        sort[comparator](items)
         return items[:n]
 
     fn elements(self) -> List[V]:
