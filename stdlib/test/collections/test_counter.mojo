@@ -407,18 +407,21 @@ def test_or():
     var c2 = Counter[String]()
     c2["b"] = 3
     c2["c"] = 4
+    c2["d"] = -1
 
     var c3 = c1 | c2
 
     assert_equal(c3["a"], 1)
     assert_equal(c3["b"], 3)
     assert_equal(c3["c"], 4)
+    assert_equal(c3["d"], 0)
 
     c1 |= c2
 
     assert_equal(c1["a"], 1)
     assert_equal(c1["b"], 3)
     assert_equal(c1["c"], 4)
+    assert_equal(c1["d"], 0)
 
 
 def test_pop():

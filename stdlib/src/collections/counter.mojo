@@ -346,11 +346,13 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         for key_ref in self.keys():
             var key = key_ref[]
-            result[key] = max(self[key], other.get(key, 0))
+            var newcount = max(self[key], other.get(key, 0))
+            if newcount > 0:
+                result[key] = newcount
 
         for key_ref in other.keys():
             var key = key_ref[]
-            if key not in self:
+            if key not in self and other[key] > 0:
                 result[key] = other[key]
 
         return result^
@@ -363,7 +365,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         for key_ref in other.keys():
             var key = key_ref[]
-            self[key] = max(self.get(key, 0), other[key])
+            var newcount = max(self.get(key, 0), other[key])
+            if newcount > 0:
+                self[key] = newcount
 
     fn _keep_positive(inout self) raises:
         """Remove zero and negative counts from the Counter."""
