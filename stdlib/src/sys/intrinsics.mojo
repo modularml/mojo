@@ -988,17 +988,14 @@ struct PrefetchLocality:
     """Extremely local locality (keep in cache)."""
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> PrefetchLocality:
+    fn __init__(inout self, value: Int):
         """Constructs a prefetch locality option.
 
         Args:
             value: An integer value representing the locality. Should be a value
                    in the range `[0, 3]`.
-
-        Returns:
-            The prefetch locality constructed.
         """
-        return PrefetchLocality {value: value}
+        self.value = value
 
 
 @register_passable("trivial")
@@ -1013,17 +1010,14 @@ struct PrefetchRW:
     """Write prefetch."""
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> PrefetchRW:
+    fn __init__(inout self, value: Int):
         """Constructs a prefetch read-write option.
 
         Args:
             value: An integer value representing the prefetch read-write option
                    to be used. Should be a value in the range `[0, 1]`.
-
-        Returns:
-            The prefetch read-write option constructed.
         """
-        return PrefetchRW {value: value}
+        self.value = value
 
 
 # LLVM prefetch cache type
@@ -1039,17 +1033,14 @@ struct PrefetchCache:
     """The data prefetching option."""
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> PrefetchCache:
+    fn __init__(inout self, value: Int):
         """Constructs a prefetch option.
 
         Args:
             value: An integer value representing the prefetch cache option to be
                    used. Should be a value in the range `[0, 1]`.
-
-        Returns:
-            The prefetch cache type that was constructed.
         """
-        return PrefetchCache {value: value}
+        self.value = value
 
 
 @register_passable("trivial")
