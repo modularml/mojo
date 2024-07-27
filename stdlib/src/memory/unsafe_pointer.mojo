@@ -82,55 +82,38 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__() -> Self:
-        """Create a null pointer.
-
-        Returns:
-            A null pointer.
-        """
-        return Self {
-            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
-        }
+    fn __init__(inout self):
+        """Create a null pointer."""
+        self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @always_inline
-    fn __init__(value: Self._mlir_type) -> Self:
+    fn __init__(inout self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
         Args:
             value: The MLIR value of the pointer to construct with.
-
-        Returns:
-            The pointer.
         """
-        return Self {address: value}
+        self.address = value
 
     @always_inline
-    fn __init__(other: UnsafePointer[T, address_space, _]) -> Self:
+    fn __init__(inout self, other: UnsafePointer[T, address_space, _]):
         """Exclusivity parameter cast a pointer.
 
         Args:
             other: Pointer to cast.
-
-        Returns:
-            Constructed UnsafePointer object.
         """
-        return Self {
-            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
-                other.address
-            )
-        }
+        self.address = __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+            other.address
+        )
 
     @always_inline
-    fn __init__(*, other: Self) -> Self:
+    fn __init__(inout self, *, other: Self):
         """Copy the object.
 
         Args:
             other: The value to copy.
-
-        Returns:
-            A copy of the object.
         """
-        return Self {address: other.address}
+        self.address = other.address
 
     # ===-------------------------------------------------------------------===#
     # Factory methods
