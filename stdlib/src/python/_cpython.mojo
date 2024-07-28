@@ -68,7 +68,7 @@ struct PythonVersion:
     var minor: Int
     var patch: Int
 
-    fn __init__(version: StringRef) -> PythonVersion:
+    fn __init__(inout self, version: StringRef):
         var version_string = String(version)
         var components = InlineArray[Int, 3](-1)
         var start = 0
@@ -86,7 +86,7 @@ struct PythonVersion:
                 i += 1
                 start = next_idx + 1
             next_idx += 1
-        return PythonVersion(components[0], components[1], components[2])
+        self = PythonVersion(components[0], components[1], components[2])
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:

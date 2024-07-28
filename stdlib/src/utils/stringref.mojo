@@ -63,40 +63,31 @@ struct StringRef(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__() -> Self:
-        """Construct a StringRef value with length zero.
-
-        Returns:
-            Constructed `StringRef` object.
-        """
-        return StringRef(UnsafePointer[UInt8](), 0)
+    fn __init__(inout self):
+        """Construct a StringRef value with length zero."""
+        self = StringRef(UnsafePointer[UInt8](), 0)
 
     @always_inline
-    fn __init__(*, other: Self) -> Self:
+    fn __init__(inout self, *, other: Self):
         """Copy the object.
 
         Args:
             other: The value to copy.
-
-        Returns:
-            Constructed `StringRef` object.
         """
-        return Self(other.data, other.length)
+        self.data = other.data
+        self.length = other.length
 
     @always_inline
-    fn __init__(str: StringLiteral) -> Self:
+    fn __init__(inout self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
         Args:
             str: The input constant string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
-        return StringRef(str.unsafe_ptr(), len(str))
+        self = StringRef(str.unsafe_ptr(), len(str))
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[C_char], len: Int) -> Self:
+    fn __init__(inout self, ptr: UnsafePointer[C_char], len: Int):
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -109,32 +100,27 @@ struct StringRef(
         Args:
             ptr: UnsafePointer to the string.
             len: The length of the string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
 
-        return Self {data: ptr.bitcast[UInt8](), length: len}
+        self.data = ptr.bitcast[UInt8]()
+        self.length = len
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[UInt8]) -> Self:
+    fn __init__(inout self, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
             ptr: UnsafePointer to the string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
 
         var len = 0
         while Scalar.load(ptr, len):
             len += 1
 
-        return StringRef(ptr, len)
+        self = StringRef(ptr, len)
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[C_char]) -> Self:
+    fn __init__(inout self, ptr: UnsafePointer[C_char]):
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `UnsafePointer[UInt8]` instead
@@ -143,16 +129,13 @@ struct StringRef(
 
         Args:
             ptr: UnsafePointer to the string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
 
         var len = 0
         while Scalar.load(ptr, len):
             len += 1
 
-        return StringRef(ptr, len)
+        self = StringRef(ptr, len)
 
     # ===-------------------------------------------------------------------===#
     # Helper methods for slicing
