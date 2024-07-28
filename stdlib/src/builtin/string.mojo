@@ -1509,9 +1509,7 @@ struct String(
           The offset of `substr` relative to the beginning of the string.
         """
 
-        return self._strref_dangerous().find(
-            substr._strref_dangerous(), start=start
-        )
+        return self.as_string_slice().find(substr.as_string_slice(), start)
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at

@@ -503,7 +503,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         Returns:
             The contained value.
         """
-        return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+        return __mlir_op.`kgen.variant.get`[index = Int(0).value](self._value)
 
     fn or_else(self, default: T) -> T:
         """Return the underlying value contained in the Optional or a default
