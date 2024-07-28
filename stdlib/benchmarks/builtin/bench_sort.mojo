@@ -62,18 +62,18 @@ fn random_scalar_list[
 
 
 @always_inline
-fn insertion_sort[type: DType](list: List[Scalar[type]]):
+fn insertion_sort[type: DType](inout list: List[Scalar[type]]):
     @parameter
     fn _less_than(
         lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
     ) -> Bool:
         return lhs.data < rhs.data
 
-    _insertion_sort[Scalar[type], _less_than](list.data, len(list))
+    _insertion_sort[_less_than](list)
 
 
 @always_inline
-fn small_sort[size: Int, type: DType](list: List[Scalar[type]]):
+fn small_sort[size: Int, type: DType](inout list: List[Scalar[type]]):
     @parameter
     fn _less_than(
         lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
@@ -84,14 +84,14 @@ fn small_sort[size: Int, type: DType](list: List[Scalar[type]]):
 
 
 @always_inline
-fn heap_sort[type: DType](list: List[Scalar[type]]):
+fn heap_sort[type: DType](inout list: List[Scalar[type]]):
     @parameter
     fn _less_than(
         lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
     ) -> Bool:
         return lhs.data < rhs.data
 
-    _heap_sort[Scalar[type], _less_than](list.data, len(list))
+    _heap_sort[_less_than](list)
 
 
 # ===----------------------------------------------------------------------===#

@@ -60,7 +60,7 @@ struct Atomic[type: DType]:
     @staticmethod
     @always_inline
     fn _fetch_add(
-        ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]
+        ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]
     ) -> Scalar[type]:
         """Performs atomic in-place add.
 
@@ -178,52 +178,51 @@ struct Atomic[type: DType]:
 
         @parameter
         if type.is_integral():
-            var value_addr = UnsafePointer.address_of(self.value.value)
-            var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
-                bin_op = __mlir_attr.`#pop<bin_op sub>`,
-                failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-                success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            ](
-                value_addr.address,
-                expected.value,
-                desired.value,
+            return _compare_exchange_weak_integral_impl(
+                UnsafePointer.address_of(self.value), expected, desired
             )
-            var ok = Bool(
-                __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
-                    cmpxchg_res
-                )
-            )
-            if not ok:
-                expected = self.load()
-            return ok
 
         # For the floating point case, we need to bitcast the floating point
         # values to their integral representation and perform the atomic
         # operation on that.
 
         alias integral_type = _integral_type_of[type]()
-        var value_integral_addr = UnsafePointer.address_of(
-            self.value.value
-        ).bitcast[__mlir_type[`!pop.scalar<`, integral_type.value, `>`]]()
+        var value_integral_addr = UnsafePointer.address_of(self.value).bitcast[
+            Scalar[integral_type]
+        ]()
         var expected_integral = bitcast[integral_type](expected)
         var desired_integral = bitcast[integral_type](desired)
+        return _compare_exchange_weak_integral_impl(
+            value_integral_addr, expected_integral, desired_integral
+        )
 
-        var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
-            failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-        ](
-            value_integral_addr.address,
-            expected_integral.value,
-            desired_integral.value,
-        )
-        var ok = Bool(
-            __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
-                cmpxchg_res
-            )
-        )
-        if not ok:
-            expected = self.load()
-        return ok
+    @staticmethod
+    @always_inline
+    fn max(ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]):
+        """Performs atomic in-place max on the pointer.
+
+        Atomically replaces the current value pointer to by `ptr` by the result
+        of max of the value and arg. The operation is a read-modify-write
+        operation. The operation is a read-modify-write operation perform
+        according to sequential consistency semantics.
+
+        Constraints:
+            The input type must be either integral or floating-point type.
+
+        Args:
+            ptr: The source pointer.
+            rhs: Value to max.
+        """
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
+
+        var value_addr = ptr.bitcast[
+            __mlir_type[`!pop.scalar<`, type.value, `>`]
+        ]()
+        _ = __mlir_op.`pop.atomic.rmw`[
+            bin_op = __mlir_attr.`#pop<bin_op max>`,
+            ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+            _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
+        ](value_addr.address, rhs.value)
 
     @always_inline
     fn max(inout self, rhs: Scalar[type]):
@@ -240,14 +239,33 @@ struct Atomic[type: DType]:
         Args:
             rhs: Value to max.
         """
-        constrained[
-            type.is_integral() or type.is_floating_point(),
-            "the input type must be arithmetic",
-        ]()
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        var value_addr = UnsafePointer.address_of(self.value.value)
+        Self.max(UnsafePointer.address_of(self.value), rhs)
+
+    @staticmethod
+    @always_inline
+    fn min(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+        """Performs atomic in-place min on the pointer.
+
+        Atomically replaces the current value pointer to by `ptr` by the result
+        of min of the value and arg. The operation is a read-modify-write
+        operation. The operation is a read-modify-write operation perform
+        according to sequential consistency semantics.
+
+        Constraints:
+            The input type must be either integral or floating-point type.
+
+        Args:
+            ptr: The source pointer.
+            rhs: Value to min.
+        """
+
+        var value_addr = ptr.bitcast[
+            __mlir_type[`!pop.scalar<`, type.value, `>`]
+        ]()
         _ = __mlir_op.`pop.atomic.rmw`[
-            bin_op = __mlir_attr.`#pop<bin_op max>`,
+            bin_op = __mlir_attr.`#pop<bin_op min>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](value_addr.address, rhs.value)
@@ -268,14 +286,41 @@ struct Atomic[type: DType]:
             rhs: Value to min.
         """
 
-        constrained[
-            type.is_integral() or type.is_floating_point(),
-            "the input type must be arithmetic",
-        ]()
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        var value_addr = UnsafePointer.address_of(self.value.value)
-        _ = __mlir_op.`pop.atomic.rmw`[
-            bin_op = __mlir_attr.`#pop<bin_op min>`,
-            ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-        ](value_addr.address, rhs.value)
+        Self.min(UnsafePointer.address_of(self.value), rhs)
+
+
+# ===----------------------------------------------------------------------===#
+# Utilities
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _compare_exchange_weak_integral_impl[
+    type: DType, //
+](
+    value_addr: UnsafePointer[Scalar[type], *_],
+    inout expected: Scalar[type],
+    desired: Scalar[type],
+) -> Bool:
+    constrained[type.is_integral(), "the input type must be integral"]()
+    var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
+        bin_op = __mlir_attr.`#pop<bin_op sub>`,
+        failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+    ](
+        value_addr.bitcast[
+            __mlir_type[`!pop.scalar<`, type.value, `>`]
+        ]().address,
+        expected.value,
+        desired.value,
+    )
+    var ok = Bool(
+        __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
+            cmpxchg_res
+        )
+    )
+    if not ok:
+        expected = value_addr[]
+    return ok

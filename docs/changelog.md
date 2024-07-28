@@ -537,15 +537,35 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
 
-- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
-  instead. Functions that previously take in a `DTypePointer` now takes an
+- `DTypePointer` has been removed.
+  Please use [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/)
+  instead. Functions that previously took a `DTypePointer` now take an
   equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
-  `UnsafePointer` is
+  `UnsafePointer` is:
 
   ```mojo
-  DTypePointer[type] -> UnsafePointer[Scalar[type]] and
-  DTypePointer[DType.invalid] -> UnsafePointer[NoneType]
+  DTypePointer[type] -> UnsafePointer[Scalar[type]]
   ```
+
+  There could be places that you have code of the form
+
+  ```mojo
+  fn f(ptr: DTypePointer):
+  ```
+
+  which is equivalent to `DTypePointer[*_]`. In this case you would have to add
+  a type parameter to the function:
+
+  ```mojo
+  fn f[type: DType, //](ptr: UnsafePointer[Scalar[type]]):
+  ```
+
+  because we can’t have an unbound struct inside the parameter.
+
+  There could also be places where you use `DTypePointer[Scalar[DType.invalid/index]]`,
+  and it would be natural to change it to `UnsafePointer[NoneType/Int]`. But
+  since they are not an `UnsafePointer` that stores a `Scalar`, you might have to
+  `rebind/bitcast` to appropriate types.
 
 ### ❌ Removed
 
