@@ -120,16 +120,13 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
         )
 
     @always_inline
-    fn __init__(handle: AnyCoroutine) -> Self:
+    fn __init__(inout self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:
             handle: The init handle.
-
-        Returns:
-            The constructed coroutine object.
         """
-        return Self {_handle: handle}
+        self._handle = handle
 
     @always_inline
     fn __del__(owned self):
@@ -204,16 +201,13 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         )
 
     @always_inline
-    fn __init__(handle: AnyCoroutine) -> Self:
+    fn __init__(inout self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:
             handle: The init handle.
-
-        Returns:
-            An owning coroutine.
         """
-        return Self {_handle: handle}
+        self._handle = handle
 
     @always_inline
     fn __del__(owned self):
