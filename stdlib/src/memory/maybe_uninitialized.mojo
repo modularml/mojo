@@ -107,9 +107,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        self.unsafe_ptr().initialize_pointee_explicit_copy(
-            other.assume_initialized()
-        )
+        self.unsafe_ptr().init_pointee_explicit_copy(other.assume_initialized())
 
     @always_inline
     fn copy_from[
@@ -125,7 +123,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        self.unsafe_ptr().initialize_pointee_explicit_copy(other)
+        self.unsafe_ptr().init_pointee_explicit_copy(other)
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):

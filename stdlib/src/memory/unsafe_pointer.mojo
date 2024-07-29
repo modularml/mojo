@@ -624,29 +624,6 @@ struct UnsafePointer[
         scatter(val, base, mask, alignment)
 
     @always_inline
-    fn initialize_pointee_explicit_copy[
-        T: ExplicitlyCopyable, //
-    ](self: UnsafePointer[T], value: T):
-        """Emplace a copy of `value` into this pointer location.
-
-        The pointer memory location is assumed to contain uninitialized data,
-        and consequently the current contents of this pointer are not destructed
-        before writing `value`. Similarly, ownership of `value` is logically
-        transferred into the pointer location.
-
-        When compared to `init_pointee_move`, this avoids an extra move on
-        the callee side when the value must be copied.
-
-        Parameters:
-            T: The type the pointer points to, which must be
-               `ExplicitlyCopyable`.
-
-        Args:
-            value: The value to emplace.
-        """
-        __get_address_as_uninit_lvalue(self.address) = T(other=value)
-
-    @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
         _free(self)
@@ -769,6 +746,29 @@ struct UnsafePointer[
             value: The value to emplace.
         """
         __get_address_as_uninit_lvalue(self.address) = value
+
+    @always_inline
+    fn init_pointee_explicit_copy[
+        T: ExplicitlyCopyable, //
+    ](self: UnsafePointer[T], value: T):
+        """Emplace a copy of `value` into this pointer location.
+
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
+
+        When compared to `init_pointee_move`, this avoids an extra move on
+        the callee side when the value must be copied.
+
+        Parameters:
+            T: The type the pointer points to, which must be
+               `ExplicitlyCopyable`.
+
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = T(other=value)
 
     @always_inline
     fn move_pointee_into[
