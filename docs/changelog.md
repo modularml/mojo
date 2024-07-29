@@ -569,6 +569,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 ### ❌ Removed
 
+- Support for the legacy `fn __init__(...) -> Self:` form has been removed from
+  the compiler, please switch to using `fn __init__(inout self, ...):` instead.
+
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
   to `UnsafePointer`. Instead of `UnsafePointer(someRef)` please use the
   `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
