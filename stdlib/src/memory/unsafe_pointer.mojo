@@ -200,8 +200,11 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn offset(self, idx: Int) -> Self:
+    fn offset[T: IntLike](self, idx: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             idx: The offset of the new pointer.
@@ -209,7 +212,7 @@ struct UnsafePointer[
         Returns:
             The new constructed UnsafePointer.
         """
-        return __mlir_op.`pop.offset`(self.address, idx.value)
+        return __mlir_op.`pop.offset`(self.address, idx.__mlir_index__())
 
     @always_inline
     fn __getitem__(
