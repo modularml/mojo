@@ -21,8 +21,7 @@ from random import seed
 
 from sys import bitwidthof, external_call
 from time import perf_counter_ns
-from collections import Optional
-
+from collections import Optional, List
 from memory import UnsafePointer
 from math import floor
 import math
@@ -221,3 +220,19 @@ fn randn[
     for i in range(size):
         ptr[i] = randn_float64(mean, variance).cast[type]()
     return
+
+
+fn shuffle[T: CollectionElement, //](inout list: List[T]):
+    """Shuffles the elements of the list randomly.
+
+    Performs an in-place Fisher-Yates shuffle on the provided list.
+
+    Args:
+        list: The list to modify.
+
+    Parameters:
+        T: The type of element in the List.
+    """
+    for i in reversed(range(len(list))):
+        var j = int(random_ui64(0, i))
+        swap(list.unsafe_get(i), list.unsafe_get(j))
