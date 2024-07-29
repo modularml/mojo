@@ -231,7 +231,6 @@ def test_comparison():
     assert_false(FloatLiteral.__eq__(neg_inf, nan))
     assert_false(FloatLiteral.__eq__(nan, neg_zero))
 
-
     assert_false(FloatLiteral.__ne__(4.4, 4.4))
     assert_true(FloatLiteral.__ne__(4.4, 42.0))
     assert_false(FloatLiteral.__ne__(neg_inf, neg_inf))
@@ -262,7 +261,6 @@ def test_comparison():
     assert_false(FloatLiteral.__gt__(neg_inf, nan))
     assert_false(FloatLiteral.__gt__(nan, neg_zero))
 
-
     assert_true(FloatLiteral.__ge__(10.4, 4.4))
     assert_true(FloatLiteral.__ge__(-4.4, -10.4))
     assert_true(FloatLiteral.__ge__(4.4, 4.4))
@@ -278,7 +276,6 @@ def test_comparison():
     assert_false(FloatLiteral.__ge__(inf, nan))
     assert_false(FloatLiteral.__ge__(neg_inf, nan))
     assert_false(FloatLiteral.__ge__(nan, neg_zero))
-
 
 
 def main():
