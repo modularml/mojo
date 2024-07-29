@@ -22,7 +22,7 @@ from builtin.simd import _format_scalar
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(Comparable, Formattable, Representable, Stringable):
+struct UInt(IntLike):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
