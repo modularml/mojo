@@ -315,7 +315,7 @@ struct InlineArray[
         @parameter
         for i in range(size):
             var ptr = UnsafePointer.address_of(self.unsafe_get(i))
-            ptr.initialize_pointee_explicit_copy(fill)
+            ptr.init_pointee_explicit_copy(fill)
 
     @always_inline
     fn __init__(inout self, owned *elems: Self.ElementType):
@@ -368,7 +368,7 @@ struct InlineArray[
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
 
-            ptr.initialize_pointee_explicit_copy(other[idx])
+            ptr.init_pointee_explicit_copy(other[idx])
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
