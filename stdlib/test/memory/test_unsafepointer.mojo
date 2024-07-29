@@ -246,6 +246,17 @@ def test_alignment():
     ptr_2.free()
 
 
+def test_offset():
+    var ptr = UnsafePointer[Int].alloc(5)
+    for i in range(5):
+        ptr[i] = i
+    var x = UInt(3)
+    var y = Int(4)
+    assert_equal(ptr[x], 3)
+    assert_equal(ptr[y], 4)
+    ptr.free()
+
+
 def main():
     test_address_of()
 
