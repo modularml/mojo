@@ -308,6 +308,52 @@ fn rsqrt(x: SIMD) -> __type_of(x):
 
 
 # ===----------------------------------------------------------------------=== #
+# recip
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _recip_nvvm(x: SIMD) -> __type_of(x):
+    constrained[
+        x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
+    ]()
+
+    alias instruction = "llvm.nvvm.rcp.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.rcp.approx.ftz.d"
+    var res = __type_of(x)()
+
+    @parameter
+    for i in range(x.size):
+        res[i] = llvm_intrinsic[
+            instruction, Scalar[x.type], has_side_effect=False
+        ](x[i])
+    return res
+
+
+@always_inline
+fn recip(x: SIMD) -> __type_of(x):
+    """Performs elementwise reciprocal on a SIMD vector.
+
+    Args:
+        x: SIMD vector to perform reciprocal on.
+
+    Returns:
+        The elementwise reciprocal of x.
+    """
+    constrained[x.type.is_floating_point(), "type must be floating point"]()
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if x.type in (DType.float16, DType.bfloat16):
+            return _recip_nvvm(x.cast[DType.float32]()).cast[x.type]()
+
+        return _recip_nvvm(x)
+
+    return 1 / x
+
+
+# ===----------------------------------------------------------------------=== #
 # exp2
 # ===----------------------------------------------------------------------=== #
 
