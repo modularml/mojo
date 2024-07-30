@@ -19,6 +19,7 @@ from python import Python
 ```
 """
 
+from collections import Dict
 from os.env import getenv
 from sys import external_call, sizeof
 from sys.ffi import _get_global
