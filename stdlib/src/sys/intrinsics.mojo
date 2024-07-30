@@ -32,7 +32,10 @@ from memory import AddressSpace, UnsafePointer
 
 @always_inline("nodebug")
 fn llvm_intrinsic[
-    intrin: StringLiteral, type: AnyTrivialRegType, has_side_effect: Bool = True
+    intrin: StringLiteral,
+    type: AnyTrivialRegType,
+    *,
+    has_side_effect: Bool = True,
 ]() -> type:
     """Calls an LLVM intrinsic with no arguments.
 
@@ -84,6 +87,7 @@ fn llvm_intrinsic[
     T0: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0) -> type:
     """Calls an LLVM intrinsic with one argument.
@@ -140,6 +144,7 @@ fn llvm_intrinsic[
     T1: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1) -> type:
     """Calls an LLVM intrinsic with two arguments.
@@ -199,6 +204,7 @@ fn llvm_intrinsic[
     T2: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2) -> type:
     """Calls an LLVM intrinsic with three arguments.
@@ -264,6 +270,7 @@ fn llvm_intrinsic[
     T3: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
     """Calls an LLVM intrinsic with four arguments.
@@ -333,6 +340,7 @@ fn llvm_intrinsic[
     T4: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
     """Calls an LLVM intrinsic with five arguments.
@@ -401,6 +409,7 @@ fn llvm_intrinsic[
     T5: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
     """Calls an LLVM intrinsic with six arguments.
@@ -473,6 +482,7 @@ fn llvm_intrinsic[
     T6: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
     """Calls an LLVM intrinsic with seven arguments.
@@ -547,6 +557,7 @@ fn llvm_intrinsic[
     T7: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -632,6 +643,7 @@ fn llvm_intrinsic[
     T8: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -722,6 +734,7 @@ fn llvm_intrinsic[
     T9: AnyTrivialRegType, //,
     intrin: StringLiteral,
     type: AnyTrivialRegType,
+    *,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
