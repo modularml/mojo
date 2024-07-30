@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from memory import UnsafePointer
+from memory import UnsafePointer, AddressSpace
 from test_utils import ExplicitCopyOnly, MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
