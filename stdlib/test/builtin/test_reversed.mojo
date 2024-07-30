@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from collections import Dict
 from testing import assert_equal
 
 

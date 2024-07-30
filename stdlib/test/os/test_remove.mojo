@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from os import remove, unlink
+from os import remove, unlink, PathLike
 from os.path import exists
 from pathlib import Path
 
