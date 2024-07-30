@@ -31,6 +31,7 @@ print(d)  # prints 2
 ```
 """
 
+from os import abort
 from utils import Variant
 
 
