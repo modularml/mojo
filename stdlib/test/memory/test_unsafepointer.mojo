@@ -257,6 +257,21 @@ def test_offset():
     ptr.free()
 
 
+def test_load_and_store_simd():
+    var ptr = UnsafePointer[Int8].alloc(16)
+    for i in range(16):
+        ptr[i] = i
+    for i in range(0, 16, 4):
+        var vec = ptr.load[width=4](i)
+        assert_equal(vec, SIMD[DType.int8, 4](i, i + 1, i + 2, i + 3))
+
+    var ptr2 = UnsafePointer[Int8].alloc(16)
+    for i in range(0, 16, 4):
+        ptr2.store[width=4](i, i)
+    for i in range(16):
+        assert_equal(ptr2[i], i // 4 * 4)
+
+
 def main():
     test_address_of()
 
@@ -277,3 +292,5 @@ def main():
     test_indexing()
     test_bool()
     test_alignment()
+    test_offset()
+    test_load_and_store_simd()
