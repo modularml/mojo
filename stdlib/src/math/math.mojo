@@ -1053,9 +1053,9 @@ fn iota[
     alias simd_width = simdwidthof[type]()
     var vector_end = align_down(len, simd_width)
     for i in range(0, vector_end, simd_width):
-        SIMD.store(buff, i, iota[type, simd_width](i + offset))
+        buff.store(i, iota[type, simd_width](i + offset))
     for i in range(vector_end, len):
-        Scalar.store(buff, i, i + offset)
+        buff.store(i, i + offset)
 
 
 fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
