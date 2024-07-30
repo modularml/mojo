@@ -62,8 +62,8 @@ fn _memcmp_impl_unconstrained[
     var last = count - simd_width
 
     for i in range(0, last, simd_width):
-        var s1i = SIMD[size=simd_width].load(s1, i)
-        var s2i = SIMD[size=simd_width].load(s2, i)
+        var s1i = s1.load[width=simd_width](i)
+        var s2i = s2.load[width=simd_width](i)
         var diff = s1i != s2i
         if any(diff):
             var index = int(
@@ -73,8 +73,8 @@ fn _memcmp_impl_unconstrained[
             )
             return -1 if s1i[index] < s2i[index] else 1
 
-    var s1i = SIMD[size=simd_width].load(s1, last)
-    var s2i = SIMD[size=simd_width].load(s2, last)
+    var s1i = s1.load[width=simd_width](last)
+    var s2i = s2.load[width=simd_width](last)
     var diff = s1i != s2i
     if any(diff):
         var index = int(
@@ -184,9 +184,9 @@ fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
     alias chunk_size = 32
     alias vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        SIMD.store(dest_ptr, i, SIMD[size=chunk_size].load(src_ptr, i))
+        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
     for i in range(vector_end, n):
-        Scalar.store(dest_ptr, i, Scalar.load(src_ptr, i))
+        dest_ptr.store(i, src_ptr.load(i))
 
 
 @always_inline
@@ -245,9 +245,9 @@ fn memcpy(
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        SIMD.store(dest_ptr, i, SIMD[size=chunk_size].load(src_ptr, i))
+        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
     for i in range(vector_end, n):
-        Scalar.store(dest_ptr, i, Scalar.load(src_ptr, i))
+        dest_ptr.store(i, src_ptr.load(i))
 
 
 @always_inline

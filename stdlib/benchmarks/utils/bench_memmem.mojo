@@ -164,9 +164,7 @@ fn _memmem_baseline[
         haystack_len - needle_len + 1, bool_mask_width
     )
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = SIMD[size=bool_mask_width].load(
-            haystack, i
-        ) == first_needle
+        var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
             var offset = int(i + count_trailing_zeros(mask))

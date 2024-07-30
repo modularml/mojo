@@ -882,9 +882,9 @@ fn gather[
 
     @parameter
     if size == 1:
-        return Scalar.load(
-            _unsafe_aliasing_address_to_pointer[type](base[0])
-        ) if mask else passthrough[0]
+        return _unsafe_aliasing_address_to_pointer[type](
+            base[0]
+        ).load() if mask else passthrough[0]
     return llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
@@ -963,7 +963,7 @@ fn scatter[
     if size == 1:
         if mask:
             var ptr = _unsafe_aliasing_address_to_pointer[type](base[0])
-            Scalar.store(ptr, value[0])
+            ptr.store(value[0])
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](
         value,
@@ -1244,7 +1244,7 @@ fn masked_load[
 
     @parameter
     if size == 1:
-        return Scalar.load(addr) if mask else passthrough[0]
+        return addr.load() if mask else passthrough[0]
 
     return llvm_intrinsic["llvm.masked.load", SIMD[type, size]](
         addr.bitcast[NoneType]().address,
@@ -1285,7 +1285,7 @@ fn masked_store[
     @parameter
     if size == 1:
         if mask:
-            Scalar.store(addr, value[0])
+            addr.store(value[0])
         return
 
     llvm_intrinsic["llvm.masked.store", NoneType](
@@ -1326,7 +1326,7 @@ fn compressed_store[
     @parameter
     if size == 1:
         if mask:
-            Scalar.store(addr, value[0])
+            addr.store(value[0])
         return
 
     llvm_intrinsic["llvm.masked.compressstore", NoneType](
@@ -1367,7 +1367,7 @@ fn strided_load[
 
     @parameter
     if simd_width == 1:
-        return Scalar.load(addr) if mask else Scalar[type]()
+        return addr.load() if mask else Scalar[type]()
 
     alias IndexTy = SIMD[DType.index, simd_width]
     var iota = llvm_intrinsic[
@@ -1411,7 +1411,7 @@ fn strided_store[
     @parameter
     if simd_width == 1:
         if mask:
-            Scalar.store(addr, value[0])
+            addr.store(value[0])
         return
 
     alias IndexTy = SIMD[DType.index, simd_width]
