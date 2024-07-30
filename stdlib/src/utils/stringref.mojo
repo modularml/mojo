@@ -605,7 +605,8 @@ struct StringRef(
         Returns:
           True if the self[start:end] is suffixed by the input suffix.
         """
-
+        if len(suffix) > len(self):
+            return False
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
         return StringRef(self.unsafe_ptr() + start, end - start).endswith(
