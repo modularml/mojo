@@ -227,7 +227,7 @@ def test_named_temporary_file_write():
 
     with open(file_name, "r") as my_file:
         contents = my_file.read()
-    assert_equal("hello world", contents)
+    assert_equal(contents, "hello world")
     os.remove(file_name)
 
 

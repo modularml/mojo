@@ -95,7 +95,7 @@ def test_basic():
 
     # get
     assert_equal(4, i[Int])
-    assert_equal("4", s[String])
+    assert_equal(s[String], "4")
     # we don't test what happens when you `get` the wrong type.
     # have fun!
 
@@ -103,7 +103,7 @@ def test_basic():
     i.set[String]("i")
     assert_false(i.isa[Int]())
     assert_true(i.isa[String]())
-    assert_equal("i", i[String])
+    assert_equal(i[String], "i")
 
 
 def test_copy():

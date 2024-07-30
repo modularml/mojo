@@ -81,16 +81,16 @@ def test_max():
 
 
 def test_round():
-    assert_equal(0.0, round(0.0))
-    assert_equal(1.0, round(1.0))
-    assert_equal(1.0, round(1.1))
-    assert_equal(1.0, round(1.4))
-    assert_equal(2.0, round(1.5))
-    assert_equal(2.0, round(2.0))
-    assert_equal(1.0, round(1.4, 0))
-    assert_equal(2.0, round(2.5))
-    assert_equal(1.5, round(1.5, 1))
-    assert_equal(1.61, round(1.613, 2))
+    assert_equal(round(0.0), 0)
+    assert_equal(round(1.0), 1)
+    assert_equal(round(1.1), 1)
+    assert_equal(round(1.4), 1)
+    assert_equal(round(1.5), 2)
+    assert_equal(round(2.0), 2)
+    assert_equal(round(1.4, 0), 1)
+    assert_equal(round(2.5), 2)
+    assert_equal(round(1.5, 1), 1.5)
+    assert_equal(round(1.613, 2), 1.61)
 
     var lhs = SIMD[DType.float32, 4](1.1, 1.5, 1.9, 2.0)
     var expected = SIMD[DType.float32, 4](1.0, 2.0, 2.0, 2.0)

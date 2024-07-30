@@ -560,15 +560,15 @@ def test_no_extra_copies_with_sugared_set_by_field():
     child_list.append(CopyCountedStruct("World"))
 
     # No copies here.  Constructing with List[CopyCountedStruct](CopyCountedStruct("Hello")) is a copy.
-    assert_equal(0, child_list[0].counter.copy_count)
-    assert_equal(0, child_list[1].counter.copy_count)
+    assert_equal(child_list[0].counter.copy_count, 0)
+    assert_equal(child_list[1].counter.copy_count, 0)
     list.append(child_list^)
 
     list[0][1].value = "Mojo"
-    assert_equal("Mojo", list[0][1].value)
+    assert_equal(list[0][1].value, "Mojo")
 
-    assert_equal(0, list[0][0].counter.copy_count)
-    assert_equal(0, list[0][1].counter.copy_count)
+    assert_equal(list[0][0].counter.copy_count, 0)
+    assert_equal(list[0][1].counter.copy_count, 0)
 
 
 # Ensure correct behavior of __copyinit__

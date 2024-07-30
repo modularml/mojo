@@ -302,7 +302,7 @@ struct _StringSliceIter[
 struct StringSlice[
     is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
-](Stringable, Sized, Formattable):
+](Stringable, Sized, Formattable, EqualityComparable):
     """
     A non-owning view to encoded string data.
 
@@ -458,8 +458,25 @@ struct StringSlice[
         """
         return len(self._slice) > 0
 
-    fn __eq__(self, rhs: StringSlice) -> Bool:
+    fn __eq__(self, rhs: Self) -> Bool:
         """Verify if a string slice is equal to another string slice.
+
+        Args:
+            rhs: The string slice to compare against.
+
+        Returns:
+            True if the string slices are equal in length and contain the same elements, False otherwise.
+        """
+        return self.__eq__[rhs_lifetime=lifetime](rhs)
+
+    fn __eq__[
+        rhs_mutability: Bool, //, rhs_lifetime: AnyLifetime[rhs_mutability].type
+    ](self, rhs: StringSlice[rhs_lifetime]) -> Bool:
+        """Verify if a string slice is equal to another string slice.
+
+        Parameters:
+            rhs_mutability: The mutability of the string slice to compare against.
+            rhs_lifetime: The lifetime of the string slice to compare against.
 
         Args:
             rhs: The string slice to compare against.
@@ -503,9 +520,25 @@ struct StringSlice[
         """
         return self == rhs.as_string_slice()
 
-    @always_inline
-    fn __ne__(self, rhs: StringSlice) -> Bool:
+    fn __ne__(self, rhs: Self) -> Bool:
         """Verify if span is not equal to another string slice.
+
+        Args:
+            rhs: The string slice to compare against.
+
+        Returns:
+            True if the string slices are not equal in length or contents, False otherwise.
+        """
+        return self.__ne__[rhs_lifetime=lifetime](rhs)
+
+    fn __ne__[
+        rhs_mutability: Bool, //, rhs_lifetime: AnyLifetime[rhs_mutability].type
+    ](self, rhs: StringSlice[rhs_lifetime]) -> Bool:
+        """Verify if span is not equal to another string slice.
+
+        Parameters:
+            rhs_mutability: The mutability of the string slice to compare against.
+            rhs_lifetime: The lifetime of the string slice to compare against.
 
         Args:
             rhs: The string slice to compare against.

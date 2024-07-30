@@ -86,7 +86,7 @@ fn assert_false[
         raise _assert_error(msg, location.or_else(__call_location()))
 
 
-trait Testable(EqualityComparable, Stringable):
+trait EqualityTestable(EqualityComparable, Stringable):
     """A trait that a struct should conform to if we do equality testing on it.
     """
 
@@ -95,7 +95,7 @@ trait Testable(EqualityComparable, Stringable):
 
 @always_inline
 fn assert_equal[
-    T: Testable
+    T: EqualityTestable
 ](
     lhs: T,
     rhs: T,
@@ -124,36 +124,9 @@ fn assert_equal[
         )
 
 
-# TODO: Remove the String and SIMD overloads once we have more powerful traits.
-@always_inline
-fn assert_equal(
-    lhs: String,
-    rhs: String,
-    msg: String = "",
-    *,
-    location: Optional[_SourceLocation] = None,
-) raises:
-    """Asserts that the input values are equal. If it is not then an Error
-    is raised.
-
-    Args:
-        lhs: The lhs of the equality.
-        rhs: The rhs of the equality.
-        msg: The message to be printed if the assertion fails.
-        location: The location of the error (default to the `__call_location`).
-
-    Raises:
-        An Error with the provided message if assert fails and `None` otherwise.
-    """
-    if lhs != rhs:
-        raise _assert_cmp_error["`left == right` comparison"](
-            lhs, rhs, msg=msg, loc=location.or_else(__call_location())
-        )
-
-
 @always_inline
 fn assert_not_equal[
-    T: Testable
+    T: EqualityTestable
 ](
     lhs: T,
     rhs: T,
@@ -179,32 +152,6 @@ fn assert_not_equal[
     if lhs == rhs:
         raise _assert_cmp_error["`left != right` comparison"](
             str(lhs), str(rhs), msg=msg, loc=location.or_else(__call_location())
-        )
-
-
-@always_inline
-fn assert_not_equal(
-    lhs: String,
-    rhs: String,
-    msg: String = "",
-    *,
-    location: Optional[_SourceLocation] = None,
-) raises:
-    """Asserts that the input values are not equal. If it is not then an
-    an Error is raised.
-
-    Args:
-        lhs: The lhs of the inequality.
-        rhs: The rhs of the inequality.
-        msg: The message to be printed if the assertion fails.
-        location: The location of the error (default to the `__call_location`).
-
-    Raises:
-        An Error with the provided message if assert fails and `None` otherwise.
-    """
-    if lhs == rhs:
-        raise _assert_cmp_error["`left != right` comparison"](
-            lhs, rhs, msg=msg, loc=location.or_else(__call_location())
         )
 
 

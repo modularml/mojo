@@ -680,6 +680,7 @@ struct String(
     Stringable,
     Representable,
     IntableRaising,
+    EqualityComparable,
     KeyElement,
     Comparable,
     Boolable,
