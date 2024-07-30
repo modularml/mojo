@@ -27,6 +27,8 @@ from sys import (
     triple_is_nvidia_cuda,
 )
 
+from sys._assembly import inlined_assembly
+
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
@@ -1446,6 +1448,23 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if type == target:
             return rebind[SIMD[target, size]](self)
+        elif (
+            triple_is_nvidia_cuda()
+            and type is DType.float32
+            and target is DType.bfloat16
+            and size == 2
+        ):
+            var bf16x2_as_uint32 = inlined_assembly[
+                "cvt.rn.bf16x2.f32 $0, $1, $2;",
+                UInt32,
+                constraints="=r,f,f",
+                has_side_effect=False,
+            ](rebind[Float32](self[1]), rebind[Float32](self[0]))
+
+            return rebind[SIMD[target, size]](
+                bitcast[DType.bfloat16, 2](bf16x2_as_uint32)
+            )
+
         elif has_neon() and (
             type is DType.bfloat16 or target == DType.bfloat16
         ):
