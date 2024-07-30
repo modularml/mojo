@@ -1537,6 +1537,8 @@ struct String(
         var sep_len = sep.byte_length()
         if sep_len == 0:
             raise Error("ValueError: empty separator")
+        if str_byte_len < 0:
+            output.append("")
 
         while lhs <= str_byte_len:
             rhs = self.find(sep, lhs)
