@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from builtin.format_int import _try_write_int
 from builtin.simd import _format_scalar
+from sys import triple_is_nvidia_cuda, bitwidthof
 
 
 @lldb_formatter_wrapping_type

@@ -32,6 +32,7 @@ from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 
+from utils import Span
 from utils.index import StaticIntTuple
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple

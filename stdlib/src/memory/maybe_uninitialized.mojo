@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from os import abort
+
 
 struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     """A memory location that may or may not be initialized.

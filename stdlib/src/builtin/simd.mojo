@@ -35,7 +35,7 @@ from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
 from memory import bitcast, UnsafePointer
 
-from utils import InlineArray, StringSlice
+from utils import InlineArray, StringSlice, StaticIntTuple
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -44,6 +44,7 @@ from utils.numerics import max_or_inf as _max_or_inf
 from utils.numerics import min_finite as _min_finite
 from utils.numerics import min_or_neg_inf as _min_or_neg_inf
 from utils.numerics import nan as _nan
+from sys import sizeof, alignof
 
 from .dtype import (
     _get_dtype_printf_format,

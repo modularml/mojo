@@ -38,6 +38,7 @@ print(to_string(who_knows))
 ```
 """
 
+from os import abort
 from sys import alignof, sizeof
 from sys.intrinsics import _type_is_eq
 

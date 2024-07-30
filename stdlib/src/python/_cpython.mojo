@@ -16,7 +16,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle
+from sys.ffi import DLHandle, C_char
 
 from memory import UnsafePointer
 
