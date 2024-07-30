@@ -110,13 +110,13 @@ def test_file_read_to_address():
     ) as f:
         var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr), 954)
-        assert_equal(Scalar.load(ptr, 0), 76)  # L
-        assert_equal(Scalar.load(ptr, 1), 111)  # o
-        assert_equal(Scalar.load(ptr, 2), 114)  # r
-        assert_equal(Scalar.load(ptr, 3), 101)  # e
-        assert_equal(Scalar.load(ptr, 4), 109)  # m
-        assert_equal(Scalar.load(ptr, 5), 32)  # <space>
-        assert_equal(Scalar.load(ptr, 56), 10)  # <LF>
+        assert_equal(ptr.load(0), 76)  # L
+        assert_equal(ptr.load(1), 111)  # o
+        assert_equal(ptr.load(2), 114)  # r
+        assert_equal(ptr.load(3), 101)  # e
+        assert_equal(ptr.load(4), 109)  # m
+        assert_equal(ptr.load(5), 32)  # <space>
+        assert_equal(ptr.load(56), 10)  # <LF>
 
     with open(
         _dir_of_current_file() / "test_file_dummy_input.txt",
