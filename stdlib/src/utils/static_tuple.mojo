@@ -503,7 +503,7 @@ struct InlineArray[
             "T must be equal to Self.ElementType",
         ]()
 
-        # TODO: use @parameter for soon once it stabilizes a bit
+        @parameter
         for i in range(size):
             if (
                 rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
