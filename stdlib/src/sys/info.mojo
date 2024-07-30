@@ -108,6 +108,22 @@ fn has_avx512f() -> Bool:
 
 
 @always_inline("nodebug")
+fn has_fma() -> Bool:
+    """Returns True if the host system has FMA (Fused Multiply-Add) support,
+    otherwise returns False.
+
+    Returns:
+        True if the host system has FMA support, otherwise returns False.
+    """
+    return __mlir_attr[
+        `#kgen.param.expr<target_has_feature,`,
+        _current_target(),
+        `, "fma" : !kgen.string`,
+        `> : i1`,
+    ]
+
+
+@always_inline("nodebug")
 fn has_vnni() -> Bool:
     """Returns True if the host system has avx512_vnni, otherwise returns False.
 
