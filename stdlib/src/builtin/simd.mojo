@@ -33,6 +33,7 @@ from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
+from builtin.format_int import _try_write_int
 from memory import bitcast, UnsafePointer
 
 from utils import InlineArray, StringSlice, StaticIntTuple
@@ -1540,29 +1541,34 @@ struct SIMD[type: DType, size: Int](
 
             @parameter
             if triple_is_nvidia_cuda():
+                # FIXME(MSTDL-406):
+                #   The uses of `printf` below prints "out of band" with the
+                #   `Formatter` passed in, meaning this will only work if
+                #   `Formatter` is an unbuffered wrapper around printf (which
+                #   Formatter.stdout currently is by default).
+                #
+                #   This is a workaround to permit debug formatting of
+                #   floating-point values on GPU, where printing to stdout
+                #   is the only way the Formatter framework is currently
+                #   used.
 
                 @parameter
-                if (
-                    type is DType.float16
-                    or type is DType.bfloat16
-                    or type is DType.float32
-                ):
-                    # We need to cast the value to float64 to print it.
-                    _printf["%g"](element.cast[DType.float64]())
-                elif type.is_floating_point():
+                if type is DType.float64:
                     # get_dtype_printf_format hardcodes 17 digits of precision.
                     _printf["%g"](element)
+                elif type.is_floating_point():
+                    # We need to cast the value to float64 to print it, to avoid
+                    # an ABI mismatch.
+                    _printf["%g"](element.cast[DType.float64]())
+                elif type.is_integral():
+                    var err = _try_write_int(writer, element)
+                    if err:
+                        abort(
+                            "unreachable: unexpected write int failure"
+                            " condition: "
+                            + str(err.value())
+                        )
                 else:
-                    # FIXME(MSTDL-406):
-                    #   This prints "out of band" with the `Formatter` passed
-                    #   in, meaning this will only work if `Formatter` is an
-                    #   unbuffered wrapper around printf (which Formatter.stdout
-                    #   currently is by default).
-                    #
-                    #   This is a workaround to permit debug formatting of
-                    #   floating-point values on GPU, where printing to stdout
-                    #   is the only way the Formatter framework is currently
-                    #   used.
                     _printf[_get_dtype_printf_format[type]()](element)
             else:
 
@@ -1571,7 +1577,7 @@ struct SIMD[type: DType, size: Int](
                     alias float_format = "%." + _scientific_notation_digits[
                         type
                     ]() + "e"
-                    _format_scalar[type, float_format](writer, element)
+                    _format_scalar[float_format](writer, element)
                 else:
                     _format_scalar(writer, element)
 
@@ -2999,12 +3005,10 @@ fn _simd_apply[
 
 
 # ===----------------------------------------------------------------------=== #
-# _format_scalar
-# ===----------------------------------------------------------------------=== #
 
 
 fn _format_scalar[
-    dtype: DType,
+    dtype: DType, //,
     float_format: StringLiteral = "%.17g",
 ](inout writer: Formatter, value: Scalar[dtype]):
     # Stack allocate enough bytes to store any formatted Scalar value of any
@@ -3021,12 +3025,11 @@ fn _format_scalar[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
-    )
+    var span = Span[UInt8](buf)[:wrote]
+
+    var str_slice = StringSlice(unsafe_from_utf8=span)
 
     writer.write_str(str_slice)
-    _ = buf^
 
 
 # ===----------------------------------------------------------------------=== #

@@ -18,10 +18,8 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.format_int import _try_write_int
 from builtin.hash import _hash_simd
 from builtin.io import _snprintf
-from builtin.simd import _format_scalar
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -1130,16 +1128,7 @@ struct Int(
             writer: The formatter to write to.
         """
 
-        @parameter
-        if triple_is_nvidia_cuda():
-            var err = _try_write_int(writer, Int64(self))
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
-        else:
-            _format_scalar(writer, Int64(self))
+        writer.write(Int64(self))
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
