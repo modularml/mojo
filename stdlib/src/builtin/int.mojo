@@ -178,6 +178,35 @@ trait IntableRaising:
 
 
 # ===----------------------------------------------------------------------=== #
+#  IntLike
+# ===----------------------------------------------------------------------=== #
+
+
+trait IntLike(
+    Absable,
+    Ceilable,
+    Comparable,
+    Floorable,
+    Formattable,
+    Powable,
+    Stringable,
+    Truncable,
+):
+    """
+    The `IntLike` trait is a tag for `Int` or `UInt`. This allows writing
+    functions that works on either.
+    """
+
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
 #  int
 # ===----------------------------------------------------------------------=== #
 
@@ -258,20 +287,13 @@ fn int(value: UInt) -> Int:
 @value
 @register_passable("trivial")
 struct Int(
-    Absable,
-    Ceilable,
     CeilDivable,
-    Comparable,
-    Floorable,
-    Formattable,
     Indexer,
     Intable,
     ImplicitlyBoolable,
     KeyElement,
-    Powable,
     Roundable,
-    Stringable,
-    Truncable,
+    IntLike,
 ):
     """This type represents an integer value."""
 
