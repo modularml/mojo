@@ -232,14 +232,14 @@ def test_file_read_to_dtype_pointer():
         var ptr = UnsafePointer[UInt8].alloc(8)
         var data = f.read(ptr, 8)
         assert_equal(
-            str(SIMD[size=8].load(ptr, 0)),
+            str(ptr.load[width=8](0)),
             "[76, 111, 114, 101, 109, 32, 105, 112]",
         )
 
         var ptr2 = UnsafePointer[Int8].alloc(8)
         var data2 = f.read(ptr2, 8)
         assert_equal(
-            str(SIMD[size=8].load(ptr2, 0)),
+            str(ptr2.load[width=8](0)),
             "[115, 117, 109, 32, 100, 111, 108, 111]",
         )
 
