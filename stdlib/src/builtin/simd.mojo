@@ -29,7 +29,7 @@ from sys import (
 
 from sys._assembly import inlined_assembly
 
-from bit import pop_count
+from bit import is_power_of_two, pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
@@ -107,7 +107,7 @@ fn _simd_construction_checks[type: DType, size: Int]():
         type is not DType.invalid, "simd type cannot be DType.invalid"
     ]()
     constrained[size > 0, "simd width must be > 0"]()
-    constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
+    constrained[is_power_of_two(size), "simd width must be power of 2"]()
     constrained[
         type is not DType.bfloat16 or not has_neon(),
         "bf16 is not supported for ARM architectures",
