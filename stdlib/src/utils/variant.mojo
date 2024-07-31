@@ -135,7 +135,7 @@ struct Variant[*Ts: CollectionElement](
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         alias idx = Self._check[T]()
-        self._get_state() = idx
+        self._get_discr() = idx
         self._get_ptr[T]().init_pointee_move(value^)
 
     fn __init__(inout self, *, other: Self):
@@ -145,12 +145,12 @@ struct Variant[*Ts: CollectionElement](
             other: The value to copy from.
         """
         self = Self(unsafe_uninitialized=())
-        self._get_state() = other._get_state()
+        self._get_discr() = other._get_discr()
 
         @parameter
         for i in range(len(VariadicList(Ts))):
             alias T = Ts[i]
-            if self._get_state() == i:
+            if self._get_discr() == i:
                 self._get_ptr[T]().init_pointee_move(other._get_ptr[T]()[])
                 return
 
@@ -171,19 +171,24 @@ struct Variant[*Ts: CollectionElement](
             other: The variant to move.
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
-        self._get_state() = other._get_state()
+        self._get_discr() = other._get_discr()
 
         @parameter
         for i in range(len(VariadicList(Ts))):
             alias T = Ts[i]
-            if self._get_state() == i:
+            if self._get_discr() == i:
                 # Calls the correct __moveinit__
                 other._get_ptr[T]().move_pointee_into(self._get_ptr[T]())
                 return
 
     fn __del__(owned self):
         """Destroy the variant."""
-        self._call_correct_deleter()
+
+        @parameter
+        for i in range(len(VariadicList(Ts))):
+            if self._get_discr() == i:
+                self._get_ptr[Ts[i]]().destroy_pointee()
+                return
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -216,24 +221,23 @@ struct Variant[*Ts: CollectionElement](
     # Methods
     # ===-------------------------------------------------------------------===#
 
+    @always_inline("nodebug")
     fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
-        constrained[
-            Self._check[T]() != Self._sentinel, "not a union element type"
-        ]()
-        return UnsafePointer.address_of(self._impl).bitcast[T]()
+        alias idx = Self._check[T]()
+        constrained[idx != Self._sentinel, "not a union element type"]()
+        var ptr = UnsafePointer.address_of(self._impl).address
+        var discr_ptr = __mlir_op.`pop.variant.bitcast`[
+            _type = UnsafePointer[T]._mlir_type, index = idx.value
+        ](ptr)
+        return discr_ptr
 
-    fn _get_state(ref [_]self: Self) -> ref [__lifetime_of(self)] Int8:
-        var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
-        alias size = Self._size()
-        return (int8_self + size)[]
-
-    @always_inline
-    fn _call_correct_deleter(inout self):
-        @parameter
-        for i in range(len(VariadicList(Ts))):
-            if self._get_state() == i:
-                self._get_ptr[Ts[i]]().destroy_pointee()
-                return
+    @always_inline("nodebug")
+    fn _get_discr(ref [_]self: Self) -> ref [__lifetime_of(self)] UInt8:
+        var ptr = UnsafePointer.address_of(self._impl).address
+        var discr_ptr = __mlir_op.`pop.variant.discr_gep`[
+            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
+        ](ptr)
+        return UnsafePointer(discr_ptr).bitcast[UInt8]()[]
 
     @always_inline
     fn take[T: CollectionElement](inout self) -> T:
@@ -275,7 +279,7 @@ struct Variant[*Ts: CollectionElement](
         """
         debug_assert(self.isa[T](), "taking wrong type")
         # don't call the variant's deleter later
-        self._get_state() = Self._sentinel
+        self._get_discr() = Self._sentinel
         return self._get_ptr[T]().take_pointee()
 
     @always_inline
@@ -358,7 +362,7 @@ struct Variant[*Ts: CollectionElement](
             True if the variant contains the requested type.
         """
         alias idx = Self._check[T]()
-        return self._get_state() == idx
+        return self._get_discr() == idx
 
     fn unsafe_get[
         T: CollectionElement
@@ -383,19 +387,9 @@ struct Variant[*Ts: CollectionElement](
         return self._get_ptr[T]()[]
 
     @staticmethod
-    fn _check[T: CollectionElement]() -> Int8:
+    fn _check[T: CollectionElement]() -> Int:
         @parameter
         for i in range(len(VariadicList(Ts))):
             if _type_is_eq[Ts[i], T]():
                 return i
-        return -1
-
-    @staticmethod
-    fn _size() -> Int:
-        var size = 0
-
-        @parameter
-        for i in range(len(VariadicList(Ts))):
-            alias element_size = _align_up(sizeof[Ts[i]](), alignof[Ts[i]]())
-            size = max(size, element_size)
-        return _align_up(size, alignof[Int]())
+        return Self._sentinel
