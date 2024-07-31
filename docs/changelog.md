@@ -578,6 +578,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
 
+- `SIMD.load/store` are moved to `UnsafePointer`.
+
 ### ❌ Removed
 
 - Support for the legacy `fn __init__(...) -> Self:` form has been removed from
