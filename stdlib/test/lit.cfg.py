@@ -91,6 +91,8 @@ else:
     # here to support both versions of the compiler.
     os.environ["MODULAR_MOJO_IMPORT_PATH"] = str(build_root)
     os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = str(build_root)
+    os.environ["MODULAR_MOJO_MAX_IMPORT_PATH"] = str(build_root)
+    os.environ["MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"] = str(build_root)
 
     # Pass through several environment variables
     # to the underlying subprocesses that run the tests.
@@ -100,5 +102,7 @@ else:
             "MODULAR_HOME",
             "MODULAR_MOJO_IMPORT_PATH",
             "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
+            "MODULAR_MOJO_MAX_IMPORT_PATH",
+            "MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH",
         ]
     )
