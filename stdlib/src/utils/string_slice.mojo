@@ -323,19 +323,15 @@ struct StringSlice[
     # Initializers
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self, literal: StringLiteral):
+    @always_inline
+    fn __init__(
+        inout self: StringSlice[ImmutableStaticLifetime], lit: StringLiteral
+    ):
         """Construct a new string slice from a string literal.
 
         Args:
-            literal: The literal to construct this string slice from.
+            lit: The literal to construct this string slice from.
         """
-
-        # Its not legal to try to mutate a StringLiteral. String literals are
-        # static data.
-        constrained[
-            not is_mutable, "cannot create mutable StringSlice of StringLiteral"
-        ]()
-
         # Since a StringLiteral has static lifetime, it will outlive
         # whatever arbitrary `lifetime` the user has specified they need this
         # slice to live for.
@@ -348,8 +344,8 @@ struct StringSlice[
         #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[lifetime](
-            unsafe_from_utf8_ptr=literal.unsafe_ptr(), len=literal.byte_length()
+        self = StringSlice[ImmutableStaticLifetime](
+            unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 
     @always_inline
