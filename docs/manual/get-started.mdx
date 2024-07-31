@@ -7,313 +7,18 @@ description: Install Mojo now and start developing
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-On this page, we'll show you how to install Mojo and create the classic "Hello
+On this page, we'll show you how to create the classic "Hello
 world" starter program with Mojo, in three different ways. If you'd rather read
 how to write Mojo code beyond just printing text, see the [introduction to
 Mojo](/mojo/manual/basics).
 
-:::tip Updating?
-
-If you already installed Mojo, see [how to update](#update-mojo).
-
-:::
-
-## Requirements
-
-<Tabs>
-<TabItem value="mac" label="Mac">
-
-- Apple silicon (M1 or M2 processor)
-- macOS Ventura (12) or later
-- Python 3.9 - 3.11
-- Xcode or Xcode Command Line Tools
-- [Homebrew](https://brew.sh)
-
-</TabItem>
-<TabItem value="linux" label="Linux">
-
-- Ubuntu 20.04/22.04 LTS
-- x86-64 CPU (with [SSE4.2 or
-  newer](https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html))
-  or AWS Graviton2/3 CPU
-- Minimum 8 GiB RAM
-- Python 3.9 - 3.11
-- g++ or clang++ C++ compiler
-
-</TabItem>
-<TabItem value="windows" label="Windows">
-
-Windows support is still in development.
-
-In the meantime, you can use Mojo on Windows [with
-WSL](https://learn.microsoft.com/en-us/windows/wsl/install), using a compatible
-version of Ubuntu (see our requirements for Linux).
-
-</TabItem>
-</Tabs>
-
 ## 1. Install Mojo
 
-If you already [installed MAX](/max/install), you can [skip to the next
-section](#2-run-code-in-the-repl) because MAX includes Mojo.
-
-The Mojo SDK is available as either a stable build or a nightly build.
-We strive to release stable builds once a month and release nightly builds as
-often as possible (not necessarily every day).
-
-<Tabs>
-{/*############################*/}
-{/*#### STABLE BUILD SETUP ####*/}
-{/*############################*/}
-<TabItem value="stable" label="Stable">
-
-1. Open a terminal and install the [`modular`](/cli/) command line tool with
-   this helper script:
-
-   ```sh
-   curl -s https://get.modular.com | sh -
-   ```
-
-    <details>
-      <summary>
-        Or, click here to see the manual install commands.
-      </summary>
-      <div>
-
-      <Tabs>
-      <TabItem value="mac" label="Mac">
-
-   ```sh
-   brew update && brew install modularml/packages/modular
-   ```
-
-      </TabItem>
-      <TabItem value="linux" label="Linux">
-
-   ```sh
-   apt-get install -y apt-transport-https &&
-     keyring_location=/usr/share/keyrings/modular-installer-archive-keyring.gpg &&
-     curl -1sLf 'https://dl.modular.com/bBNWiLZX5igwHXeu/installer/gpg.0E4925737A3895AD.key' |  gpg --dearmor >> ${keyring_location} &&
-     curl -1sLf 'https://dl.modular.com/bBNWiLZX5igwHXeu/installer/config.deb.txt?distro=debian&codename=wheezy' > /etc/apt/sources.list.d/modular-installer.list &&
-     apt-get update &&
-     apt-get install -y modular
-   ```
-
-      </TabItem>
-      </Tabs>
-
-      </div>
-    </details>
-
-2. Create a virtual environment:
-
-   Because Mojo interoperates with Python,
-   it's important to define a predictable Python version and package library to
-   use. We suggest you do that with either venv or conda:
-
-    <Tabs>
-      <TabItem value="venv" label="venv">
-
-    For most users, we recommend venv (it's included with Python):
-
-    ```sh
-    python3 -m venv mojo-venv && source mojo-venv/bin/activate
-    ```
-
-      </TabItem>
-      <TabItem value="conda" label="conda">
-
-    Only if you already use conda as your preferred environment, we suggest you
-    use that:
-
-    ```sh
-    conda create -n mojo python=3.10 -y && conda activate mojo
-    ```
-
-      </TabItem>
-    </Tabs>
-
-3. Install the Mojo SDK:
-
-   ```sh
-   modular install mojo
-   ```
-
-4. Set environment variables so you can access the [`mojo`](/mojo/cli/) CLI:
-
-    <Tabs>
-      <TabItem value="bash" label="Bash">
-
-      If you're using Bash, run this command:
-
-      ```sh
-      MOJO_PATH=$(modular config mojo.path) \
-        && BASHRC=$( [ -f "$HOME/.bash_profile" ] && echo "$HOME/.bash_profile" || echo "$HOME/.bashrc" ) \
-        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> "$BASHRC" \
-        && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> "$BASHRC" \
-        && source "$BASHRC"
-      ```
-
-      </TabItem>
-      <TabItem value="zsh" label="ZSH">
-
-      If you're using ZSH, run this command:
-
-      ```sh
-      MOJO_PATH=$(modular config mojo.path) \
-        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> ~/.zshrc \
-        && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> ~/.zshrc \
-        && source ~/.zshrc
-      ```
-
-      </TabItem>
-      <TabItem value="fish" label="fish">
-
-      If you're using fish, run this command:
-
-      ```sh
-      set MOJO_PATH (modular config mojo.path) \
-        && set -Ux MODULAR_HOME $HOME/.modular \
-        && fish_add_path $MOJO_PATH/bin
-      ```
-
-      </TabItem>
-    </Tabs>
-
-</TabItem>
-{/*############################*/}
-{/*### NIGHTLY BUILD SETUP ####*/}
-{/*############################*/}
-<TabItem value="nightly" label="Nightly">
-
-:::caution
-
-Nightly builds are not fully tested. They might include incomplete features,
-performance regressions, and new bugs. When using code from the
-[mojo](https://github.com/modularml/mojo) GitHub repo, be sure you checkout
-the `nightly` branch, because the `main` branch might not be compatible with
-nightly builds.
-
-:::
-
-1. Open a terminal and install the [`modular`](/cli/) command line tool with
-   this helper script (this is the same for stable and nightly builds):
-
-   ```sh
-   curl -s https://get.modular.com | sh -
-   ```
-
-    <details>
-      <summary>
-        Or, click here to see the manual install commands.
-      </summary>
-      <div>
-
-      <Tabs>
-      <TabItem value="mac" label="Mac">
-
-    ```sh
-    brew update && brew install modularml/packages/modular
-    ```
-
-      </TabItem>
-      <TabItem value="linux" label="Linux">
-
-    ```sh
-    apt-get install -y apt-transport-https &&
-      keyring_location=/usr/share/keyrings/modular-installer-archive-keyring.gpg &&
-      curl -1sLf 'https://dl.modular.com/bBNWiLZX5igwHXeu/installer/gpg.0E4925737A3895AD.key' |  gpg --dearmor >> ${keyring_location} &&
-      curl -1sLf 'https://dl.modular.com/bBNWiLZX5igwHXeu/installer/config.deb.txt?distro=debian&codename=wheezy' > /etc/apt/sources.list.d/modular-installer.list &&
-      apt-get update &&
-      apt-get install -y modular
-    ```
-
-      </TabItem>
-      </Tabs>
-
-      </div>
-    </details>
-
-2. Create a virtual environment for nightly builds:
-
-   Because Mojo interoperates with Python,
-   it's important to define a predictable Python version and package library to
-   use. We suggest you do that with either venv or conda:
-
-    <Tabs>
-      <TabItem value="venv" label="venv">
-
-    For most users, we recommend venv (it's included with Python):
-
-    ```sh
-    python3 -m venv mojo-nightly-venv && source mojo-nightly-venv/bin/activate
-    ```
-
-      </TabItem>
-      <TabItem value="conda" label="conda">
-
-    Only if you already use conda as your preferred environment, we suggest you
-    use that:
-
-    ```sh
-    conda create -n mojo-nightly python=3.10 -y && conda activate mojo-nightly
-    ```
-
-      </TabItem>
-    </Tabs>
-
-3. Install the nightly Mojo SDK:
-
-   ```sh
-   modular install nightly/mojo
-   ```
-
-4. Set environment variables so you can access the nightly [`mojo`](/mojo/cli/)
-   CLI:
-
-    <Tabs>
-      <TabItem value="bash" label="Bash">
-
-      If you're using Bash, run this command:
-
-      ```sh
-      MOJO_NIGHTLY_PATH=$(modular config mojo-nightly.path) \
-        && BASHRC=$( [ -f "$HOME/.bash_profile" ] && echo "$HOME/.bash_profile" || echo "$HOME/.bashrc" ) \
-        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> "$BASHRC" \
-        && echo 'export PATH="'$MOJO_NIGHTLY_PATH'/bin:$PATH"' >> "$BASHRC" \
-        && source "$BASHRC"
-      ```
-
-      </TabItem>
-      <TabItem value="zsh" label="ZSH">
-
-      If you're using ZSH, run this command:
-
-      ```sh
-      MOJO_NIGHTLY_PATH=$(modular config mojo-nightly.path) \
-        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> ~/.zshrc \
-        && echo 'export PATH="'$MOJO_NIGHTLY_PATH'/bin:$PATH"' >> ~/.zshrc \
-        && source ~/.zshrc
-      ```
-
-      </TabItem>
-      <TabItem value="fish" label="fish">
-
-      If you're using fish, run this command:
-
-      ```sh
-      set MOJO_NIGHTLY_PATH (modular config mojo-nightly.path) \
-        && set -Ux MODULAR_HOME $HOME/.modular \
-        && fish_add_path $MOJO_NIGHTLY_PATH/bin
-      ```
-
-      </TabItem>
-    </Tabs>
-
-</TabItem>
-</Tabs>
-
-Now you're ready to go.
+Mojo is now bundled with MAX, which provides everything you need to compile,
+run, debug, and package Mojo code. (Read [why we bundled Mojo with
+MAX](/max/faq#why-bundle-mojo-with-max).)
+
+Follow the guide to [install MAX & Mojo](/max/install), and then return here.
 
 ## 2. Run code in the REPL
 
@@ -451,55 +156,19 @@ more](/mojo/faq#does-the-mojo-sdk-collect-telemetry).
 
 ## Update Mojo
 
-To check your current Mojo version, use the `--version` option:
+Because Mojo is now a part of MAX, you soon won't be able to update the
+standalone `mojo` package, and you must instead install/update the `max`
+package. (Read [why we bundled Mojo with
+MAX](/max/faq#why-bundle-mojo-with-max).)
+
+If you already installed Mojo on its own, you'll need to install MAX to get all
+future Mojo updates.
+
+Before you install `max`, you should uninstall Mojo to avoid conflicting
+toolchain versions between the `mojo` and `max` packages:
 
 ```sh
-mojo --version
+modular uninstall mojo
 ```
 
-And compare your version to the latest stable version in the [Mojo
-changelog](/mojo/changelog). Or if you installed a nightly build, look for
-release announcements in [this Discord
-channel](https://discord.com/channels/1087530497313357884/1224434323193594059).
-
-If it's time to update, here's what to do:
-
-1. Make sure you have the latest `modular` CLI:
-
-    <Tabs>
-    <TabItem value="mac" label="Mac">
-
-    ```sh
-    brew update \
-      && brew upgrade modular
-    ```
-
-    </TabItem>
-    <TabItem value="linux" label="Linux">
-
-    ```sh
-    sudo apt update \
-      && sudo apt install modular
-    ```
-
-    </TabItem>
-    </Tabs>
-
-2. Update the `mojo` package:
-
-    <Tabs>
-    <TabItem value="stable" label="Stable">
-
-    ```sh
-    modular update mojo
-    ```
-
-    </TabItem>
-    <TabItem value="nightly" label="Nightly">
-
-    ```sh
-    modular update nightly/mojo
-    ```
-
-    </TabItem>
-    </Tabs>
+Then follow the guide to [install MAX & Mojo](/max/install).
