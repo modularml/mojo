@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
+from utils import Variant
 
 
 @value

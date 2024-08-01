@@ -21,9 +21,8 @@ from collections import List
 
 
 from sys.intrinsics import _type_is_eq
-
+from os import abort
 from memory import Reference, UnsafePointer
-
 from utils import Span
 
 from .optional import Optional

@@ -73,9 +73,9 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
+    arg0_type: AnyTrivialRegType, //,
     asm: StringLiteral,
     result_type: AnyTrivialRegType,
-    arg0_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r",
@@ -126,10 +126,10 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
+    arg0_type: AnyTrivialRegType,
+    arg1_type: AnyTrivialRegType, //,
     asm: StringLiteral,
     result_type: AnyTrivialRegType,
-    arg0_type: AnyTrivialRegType,
-    arg1_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r",
@@ -180,11 +180,11 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
-    arg2_type: AnyTrivialRegType,
+    arg2_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r",
@@ -235,12 +235,12 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
-    arg3_type: AnyTrivialRegType,
+    arg3_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r",
@@ -293,13 +293,13 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
     arg3_type: AnyTrivialRegType,
-    arg4_type: AnyTrivialRegType,
+    arg4_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r,r",
@@ -356,14 +356,14 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
     arg3_type: AnyTrivialRegType,
     arg4_type: AnyTrivialRegType,
-    arg5_type: AnyTrivialRegType,
+    arg5_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r,r,r",
@@ -421,15 +421,15 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
     arg3_type: AnyTrivialRegType,
     arg4_type: AnyTrivialRegType,
     arg5_type: AnyTrivialRegType,
-    arg6_type: AnyTrivialRegType,
+    arg6_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r,r,r,r",
@@ -488,8 +488,6 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
@@ -497,7 +495,9 @@ fn inlined_assembly[
     arg4_type: AnyTrivialRegType,
     arg5_type: AnyTrivialRegType,
     arg6_type: AnyTrivialRegType,
-    arg7_type: AnyTrivialRegType,
+    arg7_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r,r,r,r,r",
@@ -557,8 +557,6 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
@@ -567,7 +565,9 @@ fn inlined_assembly[
     arg5_type: AnyTrivialRegType,
     arg6_type: AnyTrivialRegType,
     arg7_type: AnyTrivialRegType,
-    arg8_type: AnyTrivialRegType,
+    arg8_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r,r,r,r,r,r",
@@ -628,8 +628,6 @@ fn inlined_assembly[
 
 @always_inline("nodebug")
 fn inlined_assembly[
-    asm: StringLiteral,
-    result_type: AnyTrivialRegType,
     arg0_type: AnyTrivialRegType,
     arg1_type: AnyTrivialRegType,
     arg2_type: AnyTrivialRegType,
@@ -639,7 +637,9 @@ fn inlined_assembly[
     arg6_type: AnyTrivialRegType,
     arg7_type: AnyTrivialRegType,
     arg8_type: AnyTrivialRegType,
-    arg9_type: AnyTrivialRegType,
+    arg9_type: AnyTrivialRegType, //,
+    asm: StringLiteral,
+    result_type: AnyTrivialRegType,
     /,
     *,
     constraints: StringLiteral = "r,r,r,r,r,r,r,r,r,r",
