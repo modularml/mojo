@@ -16,6 +16,30 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo now supports named result bindings. Named result bindings are useful for
+  directly emplacing function results into the output slot of a function. This
+  feature provides more flexibility and guarantees around emplacing the result
+  of a function compared to "guaranteed" NRVO. If a `@register_passable` result
+  is bound to a name, the result value is made accessible as a mutable
+  reference.
+
+  ```mojo
+  fn efficiently_return_string(b: Bool) -> String as output:
+      if b:
+          output = "emplaced!"
+          mutate(output)
+          return
+      return "regular return"
+  ```
+
+  If we used a temporary for `output` instead, we would need to move into the
+  result slot, which wouldn't work if the result type was non-movable.
+
+  In a function with a named result, `return` may be used with no operand to
+  signal an exit from the function, or it can be used normally to specify the
+  return value of the function. The compiler will error if the result is not
+  initialized on all normal exit paths from the function.
+
 - `String` class now have `rjust`, `ljust` and `center` methods to return
   a justified string based on width and fillchar.
   ([PR 3278#](https://github.com/modularml/mojo/pull/3278) by
