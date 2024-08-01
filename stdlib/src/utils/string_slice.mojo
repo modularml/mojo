@@ -23,6 +23,9 @@ from utils import StringSlice
 from bit import count_leading_zeros
 from utils import Span
 from builtin.string import _isspace
+from collections import List
+from memory import memcmp
+from sys import simdwidthof
 
 alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""

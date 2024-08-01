@@ -127,8 +127,8 @@ def test_memcmp():
 def test_memcmp_overflow():
     var p1 = UnsafePointer[Int8].alloc(1)
     var p2 = UnsafePointer[Int8].alloc(1)
-    Scalar.store(p1, -120)
-    Scalar.store(p2, 120)
+    p1.store(-120)
+    p2.store(120)
 
     var c = memcmp(p1, p2, 1)
     assert_equal(c, -1, "-120 is smaller than 120")
@@ -144,10 +144,10 @@ def test_memcmp_simd():
     var p2 = UnsafePointer[Int8].alloc(length)
     memset_zero(p1, length)
     memset_zero(p2, length)
-    Scalar.store(p1, 120)
-    Scalar.store(p1, 1, 100)
-    Scalar.store(p2, 120)
-    Scalar.store(p2, 1, 90)
+    p1.store(120)
+    p1.store(1, 100)
+    p2.store(120)
+    p2.store(1, 90)
 
     var c = memcmp(p1, p2, length)
     assert_equal(c, 1, "[120, 100, 0, ...] is bigger than [120, 90, 0, ...]")
@@ -158,10 +158,10 @@ def test_memcmp_simd():
     memset_zero(p1, length)
     memset_zero(p2, length)
 
-    Scalar.store(p1, length - 2, 120)
-    Scalar.store(p1, length - 1, 100)
-    Scalar.store(p2, length - 2, 120)
-    Scalar.store(p2, length - 1, 90)
+    p1.store(length - 2, 120)
+    p1.store(length - 1, 100)
+    p2.store(length - 2, 120)
+    p2.store(length - 1, 90)
 
     c = memcmp(p1, p2, length)
     assert_equal(c, 1, "[..., 0, 120, 100] is bigger than [..., 0, 120, 90]")
@@ -290,13 +290,13 @@ def test_memset():
 
     var buf0 = UnsafePointer[Int32].alloc(2)
     memset(buf0, 1, 2)
-    assert_equal(Scalar.load(buf0, 0), 16843009)
+    assert_equal(buf0.load(0), 16843009)
     memset(buf0, -1, 2)
-    assert_equal(Scalar.load(buf0, 0), -1)
+    assert_equal(buf0.load(0), -1)
 
     var buf1 = UnsafePointer[Int8].alloc(2)
     memset(buf1, 5, 2)
-    assert_equal(Scalar.load(buf1, 0), 5)
+    assert_equal(buf1.load(0), 5)
     _ = pair
 
 
@@ -357,7 +357,7 @@ def test_pointer_refitem_pair():
 
 def test_dtypepointer_gather():
     var ptr = UnsafePointer[Float32].alloc(4)
-    SIMD.store(ptr, 0, SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0))
+    ptr.store(0, SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0))
 
     @parameter
     def _test_gather[
@@ -402,7 +402,7 @@ def test_dtypepointer_gather():
 
 def test_dtypepointer_scatter():
     var ptr = UnsafePointer[Float32].alloc(4)
-    SIMD.store(ptr, 0, SIMD[ptr.type.type, 4](0.0))
+    ptr.store(0, SIMD[ptr.type.type, 4](0.0))
 
     @parameter
     def _test_scatter[
@@ -413,7 +413,7 @@ def test_dtypepointer_scatter():
         desired: SIMD[ptr.type.type, 4],
     ):
         ptr.scatter(offset, val)
-        var actual = SIMD[size=4].load(ptr, 0)
+        var actual = ptr.load[width=4](0)
         assert_almost_equal(
             actual, desired, msg="_test_scatter", atol=0.0, rtol=0.0
         )
@@ -428,7 +428,7 @@ def test_dtypepointer_scatter():
         desired: SIMD[ptr.type.type, 4],
     ):
         ptr.scatter(offset, val, mask)
-        var actual = SIMD[size=4].load(ptr, 0)
+        var actual = ptr.load[width=4](0)
         assert_almost_equal(
             actual, desired, msg="_test_masked_scatter", atol=0.0, rtol=0.0
         )
@@ -445,7 +445,7 @@ def test_dtypepointer_scatter():
         SIMD[ptr.type.type, 4](3.0, 2.0, 1.0, 0.0),
     )
 
-    SIMD.store(ptr, 0, SIMD[ptr.type.type, 4](0.0))
+    ptr.store(0, SIMD[ptr.type.type, 4](0.0))
 
     _test_masked_scatter[1](
         Int16(2), 2.0, False, SIMD[ptr.type.type, 4](0.0, 0.0, 0.0, 0.0)

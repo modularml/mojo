@@ -14,6 +14,7 @@
 # RUN: %mojo %s | FileCheck %s
 
 from random import rand
+from utils import Span
 
 
 fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:
