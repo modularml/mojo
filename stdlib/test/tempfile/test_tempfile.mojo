@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 import os
+from collections import Dict, Optional
 from os.path import exists
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory, gettempdir, mkdtemp

@@ -81,55 +81,38 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__() -> Self:
-        """Create a null pointer.
-
-        Returns:
-            A null pointer.
-        """
-        return Self {
-            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
-        }
+    fn __init__(inout self):
+        """Create a null pointer."""
+        self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @always_inline
-    fn __init__(value: Self._mlir_type) -> Self:
+    fn __init__(inout self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
         Args:
             value: The MLIR value of the pointer to construct with.
-
-        Returns:
-            The pointer.
         """
-        return Self {address: value}
+        self.address = value
 
     @always_inline
-    fn __init__(other: UnsafePointer[T, address_space, _]) -> Self:
+    fn __init__(inout self, other: UnsafePointer[T, address_space, _]):
         """Exclusivity parameter cast a pointer.
 
         Args:
             other: Pointer to cast.
-
-        Returns:
-            Constructed UnsafePointer object.
         """
-        return Self {
-            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
-                other.address
-            )
-        }
+        self.address = __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+            other.address
+        )
 
     @always_inline
-    fn __init__(*, other: Self) -> Self:
+    fn __init__(inout self, *, other: Self):
         """Copy the object.
 
         Args:
             other: The value to copy.
-
-        Returns:
-            A copy of the object.
         """
-        return Self {address: other.address}
+        self.address = other.address
 
     # ===-------------------------------------------------------------------===#
     # Factory methods
@@ -216,8 +199,11 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn offset(self, idx: Int) -> Self:
+    fn offset[T: IntLike](self, idx: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             idx: The offset of the new pointer.
@@ -225,7 +211,7 @@ struct UnsafePointer[
         Returns:
             The new constructed UnsafePointer.
         """
-        return __mlir_op.`pop.offset`(self.address, idx.value)
+        return __mlir_op.`pop.offset`(self.address, idx.__mlir_index__())
 
     @always_inline
     fn __getitem__(
@@ -412,6 +398,259 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn load[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](self: UnsafePointer[Scalar[type], *_]) -> SIMD[type, width]:
+        """Loads the value the pointer points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+            The offset must be integer.
+
+        Parameters:
+            type: The data type of SIMD vector.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Returns:
+            The loaded value.
+        """
+        return self.load[width=width, alignment=alignment](int(0))
+
+    @always_inline
+    fn load[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](self: UnsafePointer[Scalar[type], *_], offset: Scalar) -> SIMD[
+        type, width
+    ]:
+        """Loads the value the pointer points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+            The offset must be integer.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+        constrained[offset.type.is_integral(), "offset must be integer"]()
+        return self.load[width=width, alignment=alignment](int(offset))
+
+    @always_inline("nodebug")
+    fn load[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](self: UnsafePointer[Scalar[type], *_], offset: Int) -> SIMD[type, width]:
+        """Loads the value the pointer points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
+
+        @parameter
+        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
+            # regardless of the alignment that is passed. This causes issues if
+            # this method is called on an unaligned pointer.
+            # TODO #37823 We can make this smarter when we add an `aligned`
+            # trait to the pointer class.
+            var v = SIMD[type, width]()
+
+            # intentionally don't unroll, otherwise the compiler vectorizes
+            for i in range(width):
+                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
+                    self.offset(int(offset) + i).address
+                )
+            return v
+
+        return __mlir_op.`pop.load`[alignment = alignment.value](
+            self.offset(offset).bitcast[SIMD[type, width]]().address
+        )
+
+    @always_inline("nodebug")
+    fn load[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](self: UnsafePointer[Scalar[type], *_], offset: UInt) -> SIMD[type, width]:
+        """Loads the value the pointer points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+
+        return self.load[width=width, alignment=alignment](int(offset))
+
+    @always_inline
+    fn store[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](
+        self: UnsafePointer[Scalar[type], *_],
+        offset: Int,
+        val: SIMD[type, width],
+    ):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+            The offset must be integer.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        self.offset(offset).store[alignment=alignment](val)
+
+    @always_inline
+    fn store[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](
+        self: UnsafePointer[Scalar[type], *_],
+        offset: Scalar,
+        val: SIMD[type, width],
+    ):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        constrained[offset.type.is_integral(), "offset must be integer"]()
+        self.offset(int(offset)).store[alignment=alignment](val)
+
+    @always_inline("nodebug")
+    fn store[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](self: UnsafePointer[Scalar[type], *_], val: SIMD[type, width]):
+        """Stores a single element value.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            val: The value to store.
+        """
+        constrained[width > 0, "width must be a positive integer value"]()
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
+        __mlir_op.`pop.store`[alignment = alignment.value](
+            val, self.bitcast[SIMD[type, width]]().address
+        )
+
+    @always_inline("nodebug")
+    fn store[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = alignof[
+            Scalar[type]
+        ]() if triple_is_nvidia_cuda() else 1,
+    ](
+        self: UnsafePointer[Scalar[type], *_],
+        offset: UInt,
+        val: SIMD[type, width],
+    ):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            type: The data type of SIMD vector elements.
+            width: The size of the SIMD vector.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        self.offset(offset).store[alignment=alignment](val)
 
     @always_inline("nodebug")
     fn simd_strided_load[
@@ -640,29 +879,6 @@ struct UnsafePointer[
         scatter(val, base, mask, alignment)
 
     @always_inline
-    fn initialize_pointee_explicit_copy[
-        T: ExplicitlyCopyable, //
-    ](self: UnsafePointer[T], value: T):
-        """Emplace a copy of `value` into this pointer location.
-
-        The pointer memory location is assumed to contain uninitialized data,
-        and consequently the current contents of this pointer are not destructed
-        before writing `value`. Similarly, ownership of `value` is logically
-        transferred into the pointer location.
-
-        When compared to `init_pointee_move`, this avoids an extra move on
-        the callee side when the value must be copied.
-
-        Parameters:
-            T: The type the pointer points to, which must be
-               `ExplicitlyCopyable`.
-
-        Args:
-            value: The value to emplace.
-        """
-        __get_address_as_uninit_lvalue(self.address) = T(other=value)
-
-    @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
         _free(self)
@@ -785,6 +1001,29 @@ struct UnsafePointer[
             value: The value to emplace.
         """
         __get_address_as_uninit_lvalue(self.address) = value
+
+    @always_inline
+    fn init_pointee_explicit_copy[
+        T: ExplicitlyCopyable, //
+    ](self: UnsafePointer[T], value: T):
+        """Emplace a copy of `value` into this pointer location.
+
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
+
+        When compared to `init_pointee_move`, this avoids an extra move on
+        the callee side when the value must be copied.
+
+        Parameters:
+            T: The type the pointer points to, which must be
+               `ExplicitlyCopyable`.
+
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = T(other=value)
 
     @always_inline
     fn move_pointee_into[

@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
-from testing import assert_equal
+from testing import assert_equal, assert_true
 
 
 def test_copy_reference_explicitly():
@@ -27,5 +27,15 @@ def test_copy_reference_explicitly():
     assert_equal(c[][0], 4)
 
 
+def test_equality():
+    var a = List[Int](1, 2, 3)
+    var b = List[Int](4, 5, 6)
+
+    assert_true(Reference(a) == Reference(a))
+    assert_true(Reference(b) == Reference(b))
+    assert_true(Reference(a) != Reference(b))
+
+
 def main():
     test_copy_reference_explicitly()
+    test_equality()

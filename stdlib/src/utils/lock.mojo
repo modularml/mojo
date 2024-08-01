@@ -11,8 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from memory import UnsafePointer
 from os import Atomic
 from time import sleep
+from sys import external_call
 
 
 # ===----------------------------------------------------------------------===#

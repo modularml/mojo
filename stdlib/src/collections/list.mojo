@@ -21,9 +21,8 @@ from collections import List
 
 
 from sys.intrinsics import _type_is_eq
-
+from os import abort
 from memory import Reference, UnsafePointer
-
 from utils import Span
 
 from .optional import Optional
@@ -703,7 +702,7 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         else:
             self.reserve(new_size)
             for i in range(self.size, new_size):
-                (self.data + i).initialize_pointee_explicit_copy(value)
+                (self.data + i).init_pointee_explicit_copy(value)
             self.size = new_size
 
     fn resize(inout self, new_size: Int):
