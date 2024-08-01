@@ -19,7 +19,7 @@ from bit import count_leading_zeros
 ```
 """
 
-from sys import llvm_intrinsic
+from sys import llvm_intrinsic, sizeof
 from sys.info import bitwidthof
 
 # ===----------------------------------------------------------------------===#

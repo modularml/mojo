@@ -332,3 +332,29 @@ struct Reference[
             The MLIR reference for the Mojo compiler to use.
         """
         return __get_litref_as_mvalue(self.value)
+
+    @always_inline("nodebug")
+    fn __eq__(self, rhs: Reference[type, _, address_space]) -> Bool:
+        """Returns True if the two pointers are equal.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if the two pointers are equal and False otherwise.
+        """
+        return UnsafePointer(
+            __mlir_op.`lit.ref.to_pointer`(self.value)
+        ) == UnsafePointer(__mlir_op.`lit.ref.to_pointer`(rhs.value))
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: Reference[type, _, address_space]) -> Bool:
+        """Returns True if the two pointers are not equal.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if the two pointers are not equal and False otherwise.
+        """
+        return not (self == rhs)

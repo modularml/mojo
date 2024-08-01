@@ -16,7 +16,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle
+from sys.ffi import DLHandle, C_char
 
 from memory import UnsafePointer
 
@@ -68,7 +68,7 @@ struct PythonVersion:
     var minor: Int
     var patch: Int
 
-    fn __init__(version: StringRef) -> PythonVersion:
+    fn __init__(inout self, version: StringRef):
         var version_string = String(version)
         var components = InlineArray[Int, 3](-1)
         var start = 0
@@ -86,7 +86,7 @@ struct PythonVersion:
                 i += 1
                 start = next_idx + 1
             next_idx += 1
-        return PythonVersion(components[0], components[1], components[2])
+        self = PythonVersion(components[0], components[1], components[2])
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:
@@ -261,7 +261,7 @@ struct CPython:
     fn _Py_REFCNT(inout self, ptr: PyObjectPtr) -> Int:
         if ptr._get_ptr_as_int() == 0:
             return -1
-        return int(Scalar.load(ptr.value))
+        return int(ptr.value.load())
 
     fn PyDict_New(inout self) -> PyObjectPtr:
         var r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()

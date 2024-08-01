@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import Set
+from collections import Set, List
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value
