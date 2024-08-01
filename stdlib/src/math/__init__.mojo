@@ -75,4 +75,5 @@ from .math import (
     y0,
     y1,
     clamp,
+    recip,
 )

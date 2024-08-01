@@ -19,6 +19,7 @@ from os.path import isdir
 ```
 """
 
+from collections import List
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
 

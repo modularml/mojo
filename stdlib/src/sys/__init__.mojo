@@ -22,6 +22,7 @@ from .info import (
     has_avx,
     has_avx2,
     has_avx512f,
+    has_fma,
     has_intel_amx,
     has_neon,
     has_neon_int8_dotprod,

@@ -32,6 +32,7 @@ from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 
+from utils import Span
 from utils.index import StaticIntTuple
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
@@ -305,6 +306,52 @@ fn rsqrt(x: SIMD) -> __type_of(x):
         return _rsqrt_nvvm(x)
 
     return 1 / sqrt(x)
+
+
+# ===----------------------------------------------------------------------=== #
+# recip
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _recip_nvvm(x: SIMD) -> __type_of(x):
+    constrained[
+        x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
+    ]()
+
+    alias instruction = "llvm.nvvm.rcp.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.rcp.approx.ftz.d"
+    var res = __type_of(x)()
+
+    @parameter
+    for i in range(x.size):
+        res[i] = llvm_intrinsic[
+            instruction, Scalar[x.type], has_side_effect=False
+        ](x[i])
+    return res
+
+
+@always_inline
+fn recip(x: SIMD) -> __type_of(x):
+    """Performs elementwise reciprocal on a SIMD vector.
+
+    Args:
+        x: SIMD vector to perform reciprocal on.
+
+    Returns:
+        The elementwise reciprocal of x.
+    """
+    constrained[x.type.is_floating_point(), "type must be floating point"]()
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if x.type in (DType.float16, DType.bfloat16):
+            return _recip_nvvm(x.cast[DType.float32]()).cast[x.type]()
+
+        return _recip_nvvm(x)
+
+    return 1 / x
 
 
 # ===----------------------------------------------------------------------=== #
@@ -832,6 +879,25 @@ fn tanh[
     Returns:
         The result of the elementwise tanh operation.
     """
+
+    constrained[
+        type.is_floating_point(), "the input type must be floating point"
+    ]()
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias instruction = "tanh.approx.f32"
+
+        @parameter
+        if sizeof[type]() < sizeof[DType.float32]():
+            return _call_ptx_intrinsic[
+                instruction=instruction, constraints="=f,f"
+            ](x.cast[DType.float32]()).cast[type]()
+        elif type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction=instruction, constraints="=f,f"
+            ](x)
+
     var xc = x.clamp(-9, 9)
     var x_squared = xc * xc
 
@@ -987,9 +1053,9 @@ fn iota[
     alias simd_width = simdwidthof[type]()
     var vector_end = align_down(len, simd_width)
     for i in range(0, vector_end, simd_width):
-        SIMD.store(buff, i, iota[type, simd_width](i + offset))
+        buff.store(i, iota[type, simd_width](i + offset))
     for i in range(vector_end, len):
-        Scalar.store(buff, i, i + offset)
+        buff.store(i, i + offset)
 
 
 fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):

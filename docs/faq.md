@@ -270,7 +270,11 @@ dashboard](https://www.modular.com/max/performance).
 
 ### How can I get access to the SDK?
 
-You can [get the Mojo SDK here](https://developer.modular.com/download)!
+Mojo is included with the MAX SDK, which you can [download and use for
+free](/max/install).
+
+Read more about [why Mojo is bundled with
+MAX](/max/faq#why-bundle-mojo-with-max).
 
 ### Is the Mojo Playground still available?
 
@@ -302,14 +306,6 @@ and does not require login.
 ### What are the license terms for the SDK?
 
 Please read the [Mojo SDK License Terms](https://www.modular.com/legal/mojo).
-
-### What does the Mojo SDK ship with?
-
-The Mojo SDK includes the Mojo standard library and `mojo` command-line tool,
-which provides a REPL similar to the `python` command, along with `build`,
-`run`, `package`, `doc` and `format` commands. We've also published a [Mojo
-language extension for VS
-Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo).
 
 ### What operating systems are supported?
 
@@ -382,20 +378,6 @@ Mojo development is moving fast and we are regularly releasing updates.
 Please join the [Mojo Discord channel](http://discord.gg/modular) for
 notifications and [sign up for our newsletter](https://www.modular.com/newsletter)
 for more coarse-grain updates.
-
-## Mojo Playground {#mojo-playground}
-
-### What sort of computer is backing each instance in the Mojo Playground?
-
-The Mojo Playground runs on a fleet of [AWS EC2
-C6i](https://aws.amazon.com/ec2/instance-types/c6i/) (c6i.8xlarge) instances
-that is divided among active users. Due to the shared nature of the system, the
-number of vCPU cores provided to your session may vary. We guarantee 1 vCPU
-core per session, but that may increase when the total number of active users is
-low.
-
-Each user also has a dedicated volume in which you can save your own files that
-persist across sessions.
 
 ## Open Source
 

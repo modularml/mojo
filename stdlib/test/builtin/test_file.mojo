@@ -110,13 +110,13 @@ def test_file_read_to_address():
     ) as f:
         var ptr = UnsafePointer[UInt8].alloc(1000)
         assert_equal(f.read(ptr), 954)
-        assert_equal(Scalar.load(ptr, 0), 76)  # L
-        assert_equal(Scalar.load(ptr, 1), 111)  # o
-        assert_equal(Scalar.load(ptr, 2), 114)  # r
-        assert_equal(Scalar.load(ptr, 3), 101)  # e
-        assert_equal(Scalar.load(ptr, 4), 109)  # m
-        assert_equal(Scalar.load(ptr, 5), 32)  # <space>
-        assert_equal(Scalar.load(ptr, 56), 10)  # <LF>
+        assert_equal(ptr.load(0), 76)  # L
+        assert_equal(ptr.load(1), 111)  # o
+        assert_equal(ptr.load(2), 114)  # r
+        assert_equal(ptr.load(3), 101)  # e
+        assert_equal(ptr.load(4), 109)  # m
+        assert_equal(ptr.load(5), 32)  # <space>
+        assert_equal(ptr.load(56), 10)  # <LF>
 
     with open(
         _dir_of_current_file() / "test_file_dummy_input.txt",
@@ -232,14 +232,14 @@ def test_file_read_to_dtype_pointer():
         var ptr = UnsafePointer[UInt8].alloc(8)
         var data = f.read(ptr, 8)
         assert_equal(
-            str(SIMD[size=8].load(ptr, 0)),
+            str(ptr.load[width=8](0)),
             "[76, 111, 114, 101, 109, 32, 105, 112]",
         )
 
         var ptr2 = UnsafePointer[Int8].alloc(8)
         var data2 = f.read(ptr2, 8)
         assert_equal(
-            str(SIMD[size=8].load(ptr2, 0)),
+            str(ptr2.load[width=8](0)),
             "[115, 117, 109, 32, 100, 111, 108, 111]",
         )
 
