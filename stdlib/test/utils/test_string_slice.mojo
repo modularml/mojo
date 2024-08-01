@@ -14,7 +14,7 @@
 
 from testing import assert_equal, assert_true, assert_false
 
-from utils import Span
+from utils import Span, StringSlice
 from utils.string_slice import _is_valid_utf8
 
 

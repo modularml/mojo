@@ -15,6 +15,7 @@ themselves to a string.
 """
 
 from builtin.io import _put
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Interface traits

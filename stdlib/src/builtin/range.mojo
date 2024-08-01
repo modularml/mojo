@@ -29,27 +29,6 @@ from utils._select import _select_register_value as select
 # ===----------------------------------------------------------------------=== #
 
 
-# TODO: use math.ceildiv when open sourced.
-@always_inline
-fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
-    """Divides an integer by another integer, and round up to the nearest
-    integer.
-
-    Constraints:
-      Will raise an exception if denominator is zero.
-      Assumes that both inputs are positive.
-
-    Args:
-      numerator: The numerator.
-      denominator: The denominator.
-
-    Returns:
-      The ceiling of numerator divided by denominator.
-    """
-    debug_assert(denominator != 0, "divide by zero")
-    return (numerator + denominator - 1)._positive_div(denominator)
-
-
 @always_inline("nodebug")
 fn _sign(x: Int) -> Int:
     var result = 0
@@ -188,9 +167,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         # If the start is after the end and step is positive then we
         # are generating an empty range. In this case divide 0/1 to
         # return 0 without a branch.
-        return _div_ceil_positive(
-            select(cnd, 0, numerator), select(cnd, 1, denominator)
-        )
+        return ceildiv(select(cnd, 0, numerator), select(cnd, 1, denominator))
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:

@@ -18,6 +18,8 @@ from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
 from memory import UnsafePointer, memcmp
 from memory.memory import _memcmp_impl_unconstrained
+from utils import StringSlice
+from sys.ffi import C_char
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -63,40 +65,31 @@ struct StringRef(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__() -> Self:
-        """Construct a StringRef value with length zero.
-
-        Returns:
-            Constructed `StringRef` object.
-        """
-        return StringRef(UnsafePointer[UInt8](), 0)
+    fn __init__(inout self):
+        """Construct a StringRef value with length zero."""
+        self = StringRef(UnsafePointer[UInt8](), 0)
 
     @always_inline
-    fn __init__(*, other: Self) -> Self:
+    fn __init__(inout self, *, other: Self):
         """Copy the object.
 
         Args:
             other: The value to copy.
-
-        Returns:
-            Constructed `StringRef` object.
         """
-        return Self(other.data, other.length)
+        self.data = other.data
+        self.length = other.length
 
     @always_inline
-    fn __init__(str: StringLiteral) -> Self:
+    fn __init__(inout self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
         Args:
             str: The input constant string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
-        return StringRef(str.unsafe_ptr(), len(str))
+        self = StringRef(str.unsafe_ptr(), len(str))
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[C_char], len: Int) -> Self:
+    fn __init__(inout self, ptr: UnsafePointer[C_char], len: Int):
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -109,32 +102,27 @@ struct StringRef(
         Args:
             ptr: UnsafePointer to the string.
             len: The length of the string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
 
-        return Self {data: ptr.bitcast[UInt8](), length: len}
+        self.data = ptr.bitcast[UInt8]()
+        self.length = len
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[UInt8]) -> Self:
+    fn __init__(inout self, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
             ptr: UnsafePointer to the string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
 
         var len = 0
-        while Scalar.load(ptr, len):
+        while ptr.load(len):
             len += 1
 
-        return StringRef(ptr, len)
+        self = StringRef(ptr, len)
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[C_char]) -> Self:
+    fn __init__(inout self, ptr: UnsafePointer[C_char]):
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `UnsafePointer[UInt8]` instead
@@ -143,16 +131,13 @@ struct StringRef(
 
         Args:
             ptr: UnsafePointer to the string.
-
-        Returns:
-            Constructed `StringRef` object.
         """
 
         var len = 0
-        while Scalar.load(ptr, len):
+        while ptr.load(len):
             len += 1
 
-        return StringRef(ptr, len)
+        self = StringRef(ptr, len)
 
     # ===-------------------------------------------------------------------===#
     # Helper methods for slicing
@@ -620,7 +605,8 @@ struct StringRef(
         Returns:
           True if the self[start:end] is suffixed by the input suffix.
         """
-
+        if len(suffix) > len(self):
+            return False
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
         return StringRef(self.unsafe_ptr() + start, end - start).endswith(
@@ -646,9 +632,7 @@ fn _memchr[
     var vectorized_end = _align_down(len, bool_mask_width)
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = SIMD[size=bool_mask_width].load(
-            source, i
-        ) == first_needle
+        var bool_mask = source.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
             return source + int(i + count_trailing_zeros(mask))
@@ -684,9 +668,9 @@ fn _memmem[
     var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var first_block = SIMD[size=bool_mask_width].load(haystack, i)
-        var last_block = SIMD[size=bool_mask_width].load(
-            haystack, i + needle_len - 1
+        var first_block = haystack.load[width=bool_mask_width](i)
+        var last_block = haystack.load[width=bool_mask_width](
+            i + needle_len - 1
         )
 
         var eq_first = first_needle == first_block
