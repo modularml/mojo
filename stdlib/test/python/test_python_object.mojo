@@ -13,6 +13,7 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo %s
 
+from collections import Dict
 from python import Python, PythonObject
 from testing import assert_equal, assert_false, assert_raises, assert_true
 

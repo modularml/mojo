@@ -48,6 +48,11 @@ trait Ceilable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
         ...
 
 
@@ -80,6 +85,11 @@ trait Floorable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
         ...
 
 
@@ -196,4 +206,9 @@ trait Truncable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
         ...
