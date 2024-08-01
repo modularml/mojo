@@ -47,37 +47,26 @@ struct Error(
     """
 
     @always_inline
-    fn __init__() -> Self:
-        """Default constructor.
-
-        Returns:
-            The constructed Error object.
-        """
-        return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
+    fn __init__(inout self):
+        """Default constructor."""
+        self.data = UnsafePointer[UInt8]()
+        self.loaded_length = 0
 
     @always_inline
-    fn __init__(value: StringLiteral) -> Self:
+    fn __init__(inout self, value: StringLiteral):
         """Construct an Error object with a given string literal.
 
         Args:
             value: The error message.
-
-        Returns:
-            The constructed Error object.
         """
-        return Error {
-            data: value.unsafe_ptr(),
-            loaded_length: len(value),
-        }
+        self.data = value.unsafe_ptr()
+        self.loaded_length = len(value)
 
-    fn __init__(src: String) -> Self:
+    fn __init__(inout self, src: String):
         """Construct an Error object with a given string.
 
         Args:
             src: The error message.
-
-        Returns:
-            The constructed Error object.
         """
         var length = src.byte_length()
         var dest = UnsafePointer[UInt8].alloc(length + 1)
@@ -87,16 +76,14 @@ struct Error(
             count=length,
         )
         dest[length] = 0
-        return Error {data: dest, loaded_length: -length}
+        self.data = dest
+        self.loaded_length = -length
 
-    fn __init__(src: StringRef) -> Self:
+    fn __init__(inout self, src: StringRef):
         """Construct an Error object with a given string ref.
 
         Args:
             src: The error message.
-
-        Returns:
-            The constructed Error object.
         """
         var length = len(src)
         var dest = UnsafePointer[UInt8].alloc(length + 1)
@@ -106,40 +93,37 @@ struct Error(
             count=length,
         )
         dest[length] = 0
-        return Error {data: dest, loaded_length: -length}
+        self.data = dest
+        self.loaded_length = -length
 
-    fn __init__(*, other: Self) -> Self:
+    fn __init__(inout self, *, other: Self):
         """Copy the object.
 
         Args:
             other: The value to copy.
-
-        Returns:
-            The copied `Error`.
         """
-        return other
+        self = other
 
     fn __del__(owned self):
         """Releases memory if allocated."""
         if self.loaded_length < 0:
             self.data.free()
 
-    fn __copyinit__(existing: Self) -> Self:
+    fn __copyinit__(inout self, existing: Self):
         """Creates a deep copy of an existing error.
 
-        Returns:
-            The copy of the original error.
+        Args:
+            existing: The error to copy from.
         """
         if existing.loaded_length < 0:
             var length = -existing.loaded_length
             var dest = UnsafePointer[UInt8].alloc(length + 1)
             memcpy(dest, existing.data, length)
             dest[length] = 0
-            return Error {data: dest, loaded_length: existing.loaded_length}
+            self.data = dest
         else:
-            return Error {
-                data: existing.data, loaded_length: existing.loaded_length
-            }
+            self.data = existing.data
+        self.loaded_length = existing.loaded_length
 
     fn __bool__(self) -> Bool:
         """Returns True if the error is set and false otherwise.

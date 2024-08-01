@@ -14,8 +14,9 @@
 """
 
 import os
+from collections import List
 from os import PathLike, listdir, stat_result
-from sys import os_is_windows
+from sys import os_is_windows, external_call
 from sys.ffi import C_char
 
 from builtin._location import __call_location, _SourceLocation

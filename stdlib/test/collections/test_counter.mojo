@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections.counter import Counter
+from collections import Optional
 
 from testing import assert_equal, assert_false, assert_raises, assert_true
 

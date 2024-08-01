@@ -17,7 +17,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys.ffi import C_char
 
-from utils import StringRef
+from memory import memcpy
+from collections import List
+from utils import StringRef, Span, StringSlice
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 

@@ -254,7 +254,7 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
     # 2. Compute the hash, but strided across the SIMD vector width.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        var update = SIMD[size=simd_width].load(simd_data, i * simd_width)
+        var update = simd_data.load[width=simd_width](i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
@@ -264,7 +264,7 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
         var ptr = remaining.unsafe_ptr().bitcast[UInt8]()
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = SIMD[size=simd_width].load(ptr.bitcast[Scalar[type]]())
+        var last_value = ptr.bitcast[Scalar[type]]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
         _ = remaining  # We make sure the array lives long enough.
 
