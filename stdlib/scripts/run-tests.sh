@@ -25,7 +25,7 @@ source "${SCRIPT_DIR}"/build-stdlib.sh
 
 echo "Packaging up the test_utils."
 TEST_UTILS_PATH="${REPO_ROOT}/stdlib/test/test_utils"
-mojo package "${TEST_UTILS_PATH}" -o "${BUILD_DIR}/test_utils.mojopkg"
+MODULAR_MOJO_NIGHTLY_IMPORT_PATH="${BUILD_DIR}" mojo package "${TEST_UTILS_PATH}" -o "${BUILD_DIR}/test_utils.mojopkg"
 
 TEST_PATH="${REPO_ROOT}/stdlib/test"
 if [[ $# -gt 0 ]]; then
