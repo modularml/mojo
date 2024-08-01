@@ -16,8 +16,7 @@
 # ===----------------------------------------------------------------------=== #
 from ._linux import _getpw_linux
 from ._macos import _getpw_macos
-from sys.info import os_is_macos
-from sys.info import os_is_linux
+from sys import os_is_windows, os_is_macos, os_is_linux
 
 
 @value

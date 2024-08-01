@@ -15,15 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import KeyElement, List
+from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
+from python import PythonObject
 
-from utils import Span, StaticIntTuple, StringRef, StringSlice
+from utils import Span, StaticIntTuple, StringRef, StringSlice, Variant
 from utils._format import Formattable, Formatter, ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
@@ -136,11 +137,11 @@ fn chr(c: Int) -> String:
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    Scalar.store(p, ((c >> shift) & mask) | num_bytes_marker)
+    p.store[width=1](((c >> shift) & mask) | num_bytes_marker)
     for i in range(1, num_bytes):
         shift -= 6
-        Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
-    Scalar.store(p, num_bytes, 0)
+        p.store[width=1](i, ((c >> shift) & 0b00111111) | 0b10000000)
+    p.store[width=1](num_bytes, 0)
     return String(p.bitcast[UInt8](), num_bytes + 1)
 
 
@@ -1572,6 +1573,8 @@ struct String(
         var sep_len = sep.byte_length()
         if sep_len == 0:
             raise Error("ValueError: empty separator")
+        if str_byte_len < 0:
+            output.append("")
 
         while lhs <= str_byte_len:
             rhs = self.find(sep, lhs)

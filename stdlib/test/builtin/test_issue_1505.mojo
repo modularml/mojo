@@ -15,6 +15,7 @@
 
 from random import random_ui64
 
+from utils import StaticIntTuple
 from testing import assert_equal
 
 

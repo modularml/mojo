@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
-from sys import sizeof as _sizeof
+from sys import sizeof as _sizeof, bitwidthof, os_is_windows
 
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
@@ -547,6 +547,40 @@ fn _integral_type_of[type: DType]() -> DType:
         return DType.int64
 
     return type.invalid
+
+
+# ===-------------------------------------------------------------------===#
+# _unsigned_integral_type_of
+# ===-------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn _unsigned_integral_type_of[type: DType]() -> DType:
+    """Gets the unsigned integral type which has the same bitwidth as
+    the input type."""
+
+    @parameter
+    if type.is_integral():
+        return _uint_type_of_width[bitwidthof[type]()]()
+
+    @parameter
+    if type is DType.bfloat16 or type is DType.float16:
+        return DType.uint16
+
+    @parameter
+    if type is DType.float32 or type is DType.tensor_float32:
+        return DType.uint32
+
+    @parameter
+    if type is DType.float64:
+        return DType.uint64
+
+    return type.invalid
+
+
+# ===-------------------------------------------------------------------===#
+# _scientific_notation_digits
+# ===-------------------------------------------------------------------===#
 
 
 fn _scientific_notation_digits[type: DType]() -> StringLiteral:

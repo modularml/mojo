@@ -12,8 +12,18 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.info import (
+from sys import (
     alignof,
+    has_avx,
+    has_avx2,
+    has_avx512f,
+    has_fma,
+    has_intel_amx,
+    has_neon,
+    has_neon_int8_dotprod,
+    has_neon_int8_matmul,
+    has_sse4,
+    has_vnni,
     num_logical_cores,
     num_performance_cores,
     num_physical_cores,
@@ -53,7 +63,22 @@ fn test_cores() raises:
     assert_true(num_performance_cores() > 0)
 
 
+fn test_target_has_feature():
+    # Ensures target feature check functions exist and return a boolable value.
+    var has_feature: Bool = has_avx()
+    has_feature = has_avx2()
+    has_feature = has_avx512f()
+    has_feature = has_fma()
+    has_feature = has_intel_amx()
+    has_feature = has_neon()
+    has_feature = has_neon_int8_dotprod()
+    has_feature = has_neon_int8_matmul()
+    has_feature = has_sse4()
+    has_feature = has_vnni()
+
+
 def main():
     test_sizeof()
     test_alignof()
     test_cores()
+    test_target_has_feature()
