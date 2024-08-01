@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 from .pwd import Passwd
 from memory import UnsafePointer
+from sys.ffi import C_char
 
 alias uid_t = Int32
 alias gid_t = Int32

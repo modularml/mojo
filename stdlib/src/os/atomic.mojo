@@ -19,8 +19,9 @@ from os import Atomic
 ```
 """
 
-from builtin.dtype import _integral_type_of
+from builtin.dtype import _integral_type_of, _unsigned_integral_type_of
 from memory import UnsafePointer, bitcast
+from sys.info import triple_is_nvidia_cuda
 
 
 struct Atomic[type: DType]:
@@ -198,7 +199,7 @@ struct Atomic[type: DType]:
 
     @staticmethod
     @always_inline
-    fn max(ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]):
+    fn max(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
         """Performs atomic in-place max on the pointer.
 
         Atomically replaces the current value pointer to by `ptr` by the result
@@ -215,14 +216,7 @@ struct Atomic[type: DType]:
         """
         constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        var value_addr = ptr.bitcast[
-            __mlir_type[`!pop.scalar<`, type.value, `>`]
-        ]()
-        _ = __mlir_op.`pop.atomic.rmw`[
-            bin_op = __mlir_attr.`#pop<bin_op max>`,
-            ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-        ](value_addr.address, rhs.value)
+        _max_impl(ptr, rhs)
 
     @always_inline
     fn max(inout self, rhs: Scalar[type]):
@@ -260,15 +254,9 @@ struct Atomic[type: DType]:
             ptr: The source pointer.
             rhs: Value to min.
         """
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        var value_addr = ptr.bitcast[
-            __mlir_type[`!pop.scalar<`, type.value, `>`]
-        ]()
-        _ = __mlir_op.`pop.atomic.rmw`[
-            bin_op = __mlir_attr.`#pop<bin_op min>`,
-            ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
-            _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-        ](value_addr.address, rhs.value)
+        _min_impl(ptr, rhs)
 
     @always_inline
     fn min(inout self, rhs: Scalar[type]):
@@ -324,3 +312,71 @@ fn _compare_exchange_weak_integral_impl[
     if not ok:
         expected = value_addr[]
     return ok
+
+
+@always_inline
+fn _max_impl_base[
+    type: DType, //
+](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    var value_addr = ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]()
+    _ = __mlir_op.`pop.atomic.rmw`[
+        bin_op = __mlir_attr.`#pop<bin_op max>`,
+        ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
+    ](value_addr.address, rhs.value)
+
+
+@always_inline
+fn _min_impl_base[
+    type: DType, //
+](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    var value_addr = ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]()
+    _ = __mlir_op.`pop.atomic.rmw`[
+        bin_op = __mlir_attr.`#pop<bin_op min>`,
+        ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
+    ](value_addr.address, rhs.value)
+
+
+@always_inline
+fn _max_impl[
+    type: DType, //
+](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    @parameter
+    if triple_is_nvidia_cuda() and type.is_floating_point():
+        alias integral_type = _integral_type_of[type]()
+        alias unsigned_integral_type = _unsigned_integral_type_of[type]()
+        if rhs >= 0:
+            _max_impl_base(
+                ptr.bitcast[integral_type](), bitcast[integral_type](rhs)
+            )
+            return
+        _min_impl_base(
+            ptr.bitcast[unsigned_integral_type](),
+            bitcast[unsigned_integral_type](rhs),
+        )
+        return
+
+    _max_impl_base(ptr, rhs)
+
+
+@always_inline
+fn _min_impl[
+    type: DType, //
+](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    @parameter
+    if triple_is_nvidia_cuda() and type.is_floating_point():
+        alias integral_type = _integral_type_of[type]()
+        alias unsigned_integral_type = _unsigned_integral_type_of[type]()
+        if rhs >= 0:
+            _min_impl_base(
+                ptr.bitcast[integral_type](), bitcast[integral_type](rhs)
+            )
+            return
+        _max_impl_base(
+            ptr.bitcast[unsigned_integral_type](),
+            bitcast[unsigned_integral_type](rhs),
+        )
+        return
+
+    _min_impl_base(ptr, rhs)

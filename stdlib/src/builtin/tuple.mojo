@@ -38,7 +38,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         `!kgen.pack<:!kgen.variadic<`,
         Movable,
         `> `,
-        +element_types,
+        element_types,
         `>`,
     ]
 
