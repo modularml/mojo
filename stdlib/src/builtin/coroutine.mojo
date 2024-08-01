@@ -134,8 +134,7 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
         __mlir_op.`co.destroy`(self._handle)
 
     @always_inline
-    @__named_result(out)
-    fn __await__(owned self) -> type:
+    fn __await__(owned self) -> type as out:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
@@ -215,8 +214,7 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         __mlir_op.`co.destroy`(self._handle)
 
     @always_inline
-    @__named_result(out)
-    fn __await__(owned self) raises -> type:
+    fn __await__(owned self) raises -> type as out:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
