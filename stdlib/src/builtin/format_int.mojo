@@ -27,7 +27,34 @@ alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 # ===----------------------------------------------------------------------===#
 
 
-fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
+fn bin(
+    value: Scalar, /, *, inout writer: Formatter, prefix: StaticString = "0b"
+):
+    """Writes the binary string representation an integral value to a formatter.
+
+    ```mojo
+    print(bin(123))
+    print(bin(-123))
+    ```
+    ```plaintext
+    '0b1111011'
+    '-0b1111011'
+    ```
+
+    Args:
+        value: An integral scalar value.
+        writer: The formatter to write to.
+        prefix: The prefix of the formatted int.
+    """
+
+    @parameter
+    if value.type is DType.bool:
+        bin(value.cast[DType.int8](), writer=writer, prefix=prefix)
+    else:
+        _try_write_int(writer, value, 2, prefix=prefix)
+
+
+fn bin(value: Scalar, /, *, prefix: StaticString = "0b") -> String:
     """Return the binary string representation an integral value.
 
     ```mojo
@@ -40,49 +67,76 @@ fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
     ```
 
     Args:
-        num: An integral scalar value.
+        value: An integral scalar value.
         prefix: The prefix of the formatted int.
 
     Returns:
         The binary string representation of num.
     """
-    return _try_format_int(num, 2, prefix=prefix)
+    var result = String()
+    var writer = Formatter(result)
+    bin(value, writer=writer, prefix=prefix)
+    return result^
 
 
-# Need this until we have constraints to stop the compiler from matching this
-# directly to bin[type: DType](num: Scalar[type]).
-fn bin(b: Scalar[DType.bool], /, *, prefix: StaticString = "0b") -> String:
-    """Returns the binary representation of a scalar bool.
+fn bin[
+    T: Indexer, //
+](value: T, /, *, inout writer: Formatter, prefix: StaticString = "0b"):
+    """Writes the binary representation of an indexer type to a formatter.
+
+    Parameters:
+        T: The Indexer type.
 
     Args:
-        b: A scalar bool value.
+        value: An indexer value.
+        writer: The formatter to write to.
         prefix: The prefix of the formatted int.
-
-    Returns:
-        The binary string representation of b.
     """
-    return bin(b.cast[DType.int8](), prefix=prefix)
+    bin(Scalar[DType.index](index(value)), writer=writer, prefix=prefix)
 
 
-fn bin[T: Indexer, //](num: T, /, *, prefix: StaticString = "0b") -> String:
+fn bin[T: Indexer, //](value: T, /, *, prefix: StaticString = "0b") -> String:
     """Returns the binary representation of an indexer type.
 
     Parameters:
         T: The Indexer type.
 
     Args:
-        num: An indexer value.
+        value: An indexer value.
         prefix: The prefix of the formatted int.
 
     Returns:
         The binary string representation of num.
     """
-    return bin(Scalar[DType.index](index(num)), prefix=prefix)
+    return bin(Scalar[DType.index](index(value)), prefix=prefix)
 
 
 # ===----------------------------------------------------------------------===#
 # hex
 # ===----------------------------------------------------------------------===#
+
+
+fn hex(
+    value: Scalar, /, *, inout writer: Formatter, prefix: StaticString = "0x"
+):
+    """Writes the hex string representation of the given integer to a formatter.
+
+    The hexadecimal representation is a base-16 encoding of the integer value.
+
+    The formatted string will be prefixed with "0x" to indicate that the
+    subsequent digits are hex.
+
+    Args:
+        value: The integer value to format.
+        writer: The formatter to write to.
+        prefix: The prefix of the formatted int.
+    """
+
+    @parameter
+    if value.type is DType.bool:
+        hex(value.cast[DType.int8](), writer=writer, prefix=prefix)
+    else:
+        _try_write_int(writer, value, 16, prefix=prefix)
 
 
 fn hex(value: Scalar, /, *, prefix: StaticString = "0x") -> String:
@@ -100,7 +154,31 @@ fn hex(value: Scalar, /, *, prefix: StaticString = "0x") -> String:
     Returns:
         A string containing the hex representation of the given integer.
     """
-    return _try_format_int(value, 16, prefix=prefix)
+    var result = String()
+    var writer = Formatter(result)
+    hex(value, writer=writer, prefix=prefix)
+    return result^
+
+
+fn hex[
+    T: Indexer, //
+](value: T, /, *, inout writer: Formatter, prefix: StaticString = "0x"):
+    """Writes the hex string representation of the given integer to a formatter.
+
+    The hexadecimal representation is a base-16 encoding of the integer value.
+
+    The formatted string will be prefixed with "0x" to indicate that the
+    subsequent digits are hex.
+
+    Parameters:
+        T: The indexer type to represent in hexadecimal.
+
+    Args:
+        value: The integer value to format.
+        writer: The formatter to write to.
+        prefix: The prefix of the formatted int.
+    """
+    hex(Scalar[DType.index](index(value)), writer=writer, prefix=prefix)
 
 
 fn hex[T: Indexer, //](value: T, /, *, prefix: StaticString = "0x") -> String:
@@ -124,27 +202,32 @@ fn hex[T: Indexer, //](value: T, /, *, prefix: StaticString = "0x") -> String:
     return hex(Scalar[DType.index](index(value)), prefix=prefix)
 
 
-fn hex(value: Scalar[DType.bool], /, *, prefix: StaticString = "0x") -> String:
-    """Returns the hex string representation of the given scalar bool.
-
-    The hexadecimal representation is a base-16 encoding of the bool.
-
-    The returned string will be prefixed with "0x" to indicate that the
-    subsequent digits are hex.
-
-    Args:
-        value: The bool value to format.
-        prefix: The prefix of the formatted int.
-
-    Returns:
-        A string containing the hex representation of the given bool.
-    """
-    return hex(value.cast[DType.int8](), prefix=prefix)
-
-
 # ===----------------------------------------------------------------------===#
 # oct
 # ===----------------------------------------------------------------------===#
+
+
+fn oct(
+    value: Scalar, /, *, inout writer: Formatter, prefix: StaticString = "0o"
+):
+    """Writes the octal string representation of the given integer to a formatter.
+
+    The octal representation is a base-8 encoding of the integer value.
+
+    The formatted string will be prefixed with "0o" to indicate that the
+    subsequent digits are octal.
+
+    Args:
+        value: The integer value to format.
+        writer: The formatter to write to.
+        prefix: The prefix of the formatted int.
+    """
+
+    @parameter
+    if value.type is DType.bool:
+        oct(value.cast[DType.int8](), writer=writer, prefix=prefix)
+    else:
+        _try_write_int(writer, value, 8, prefix=prefix)
 
 
 fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
@@ -162,7 +245,31 @@ fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
     Returns:
         A string containing the octal representation of the given integer.
     """
-    return _try_format_int(value, 8, prefix=prefix)
+    var result = String()
+    var writer = Formatter(result)
+    oct(value, writer=writer, prefix=prefix)
+    return result^
+
+
+fn oct[
+    T: Indexer, //
+](value: T, /, *, inout writer: Formatter, prefix: StaticString = "0o"):
+    """Writes the octal string representation of the given integer to a formatter.
+
+    The octal representation is a base-8 encoding of the integer value.
+
+    The formatted string will be prefixed with "0o" to indicate that the
+    subsequent digits are octal.
+
+    Parameters:
+        T: The indexer type to represent in octal.
+
+    Args:
+        value: The integer value to format.
+        writer: The formatter to write to.
+        prefix: The prefix of the formatted int.
+    """
+    oct(Scalar[DType.index](index(value)), writer=writer, prefix=prefix)
 
 
 fn oct[T: Indexer, //](value: T, /, *, prefix: StaticString = "0o") -> String:
@@ -186,24 +293,6 @@ fn oct[T: Indexer, //](value: T, /, *, prefix: StaticString = "0o") -> String:
     return oct(Scalar[DType.index](index(value)), prefix=prefix)
 
 
-fn oct(value: Scalar[DType.bool], /, *, prefix: StaticString = "0o") -> String:
-    """Returns the octal string representation of the given scalar bool.
-
-    The octal representation is a base-8 encoding of the bool.
-
-    The returned string will be prefixed with "0o" to indicate that the
-    subsequent digits are octal.
-
-    Args:
-        value: The bool value to format.
-        prefix: The prefix of the formatted int.
-
-    Returns:
-        A string containing the octal representation of the given bool.
-    """
-    return oct(value.cast[DType.int8](), prefix=prefix)
-
-
 # ===----------------------------------------------------------------------===#
 # Integer formatting utilities
 # ===----------------------------------------------------------------------===#
@@ -214,17 +303,13 @@ fn _try_format_int(
     /,
     radix: Int = 10,
     *,
+    digit_chars: StaticString = _DEFAULT_DIGIT_CHARS,
     prefix: StaticString = "",
 ) -> String:
-    try:
-        return _format_int(value, radix, prefix=prefix)
-    except e:
-        # This should not be reachable as _format_int only throws if we pass
-        # incompatible radix and custom digit chars, which we aren't doing
-        # above.
-        return abort[String](
-            "unexpected exception formatting value as hexadecimal: " + str(e)
-        )
+    var string = String()
+    var writer = Formatter(string)
+    _try_write_int(writer, value, radix, digit_chars=digit_chars, prefix=prefix)
+    return string^
 
 
 fn _format_int[
@@ -237,11 +322,29 @@ fn _format_int[
     prefix: StaticString = "",
 ) raises -> String:
     var string = String()
-    var fmt = string._unsafe_to_formatter()
-
-    _write_int(fmt, value, radix, digit_chars=digit_chars, prefix=prefix)
-
+    var writer = Formatter(string)
+    _write_int(writer, value, radix, digit_chars=digit_chars, prefix=prefix)
     return string^
+
+
+fn _try_write_int[
+    type: DType, //,
+](
+    inout fmt: Formatter,
+    value: Scalar[type],
+    /,
+    radix: Int = 10,
+    *,
+    digit_chars: StaticString = _DEFAULT_DIGIT_CHARS,
+    prefix: StaticString = "",
+):
+    try:
+        _write_int(fmt, value, radix, digit_chars=digit_chars, prefix=prefix)
+    except e:
+        # This should not be reachable as _format_int only throws if we pass
+        # incompatible radix and custom digit chars, which we aren't doing
+        # above.
+        abort("unexpected exception formatting value as hexadecimal: " + str(e))
 
 
 fn _write_int[
@@ -255,24 +358,6 @@ fn _write_int[
     digit_chars: StaticString = _DEFAULT_DIGIT_CHARS,
     prefix: StaticString = "",
 ) raises:
-    var err = _try_write_int(
-        fmt, value, radix, digit_chars=digit_chars, prefix=prefix
-    )
-    if err:
-        raise err.value()
-
-
-fn _try_write_int[
-    type: DType, //,
-](
-    inout fmt: Formatter,
-    value: Scalar[type],
-    /,
-    radix: Int = 10,
-    *,
-    digit_chars: StaticString = _DEFAULT_DIGIT_CHARS,
-    prefix: StaticString = "",
-) -> Optional[Error]:
     """Writes a formatted string representation of the given integer using the
     specified radix.
 
@@ -283,16 +368,16 @@ fn _try_write_int[
 
     # Check that the radix and available digit characters are valid
     if radix < 2:
-        return Error("Unable to format integer to string with radix < 2")
+        raise Error("Unable to format integer to string with radix < 2")
 
     if radix > digit_chars.byte_length():
-        return Error(
+        raise Error(
             "Unable to format integer to string when provided radix is larger "
             "than length of available digit value characters"
         )
 
     if not digit_chars.byte_length() >= 2:
-        return Error(
+        raise Error(
             "Unable to format integer to string when provided digit_chars"
             " mapping len is not >= 2"
         )
@@ -331,8 +416,6 @@ fn _try_write_int[
         fmt.write_str(zero)
 
         _ = zero_buf
-
-        return None
 
     # Create a buffer to store the formatted value
 
@@ -407,5 +490,3 @@ fn _try_write_int[
 
     fmt.write_str(str_slice)
     _ = buf^
-
-    return None

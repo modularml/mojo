@@ -382,7 +382,7 @@ struct UnsafePointer[
         Returns:
             The string representation of the pointer.
         """
-        return hex(int(self))
+        return String.format_sequence(self)
 
     @no_inline
     fn format_to(self, inout writer: Formatter):
@@ -392,9 +392,7 @@ struct UnsafePointer[
         Args:
             writer: The formatter to write to.
         """
-
-        # TODO: Avoid intermediate String allocation.
-        writer.write(str(self))
+        hex(int(self), writer=writer)
 
     # ===-------------------------------------------------------------------===#
     # Methods
