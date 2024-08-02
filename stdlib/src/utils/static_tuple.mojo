@@ -109,7 +109,9 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](
+    Sized, CollectionElement
+):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:
@@ -243,7 +245,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
 
 @value
 struct InlineArray[
-    ElementType: CollectionElementNew,
+    ElementType: CollectionElement,
     size: Int,
 ](Sized, Movable, Copyable, ExplicitlyCopyable):
     """A fixed-size sequence of size homogeneous elements where size is a constant expression.

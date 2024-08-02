@@ -14,7 +14,7 @@
 from os import abort
 
 
-struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
+struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElement):
     """A memory location that may or may not be initialized.
 
     Note that the destructor is a no-op. If the memory was initialized, the caller

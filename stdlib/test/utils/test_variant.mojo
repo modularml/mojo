@@ -132,9 +132,9 @@ def test_explicit_copy():
 
 def test_move():
     var v1 = TestVariant(TestCounter())
-    var v2 = v1
-    # didn't call moveinit
     assert_equal(v1[TestCounter].moved, 1)
+    var v2 = v1^
+    # didn't call moveinit
     assert_equal(v2[TestCounter].moved, 2)
     # test that we didn't call the other moveinit too!
     assert_no_poison()

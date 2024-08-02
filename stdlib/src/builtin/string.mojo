@@ -686,7 +686,6 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
-    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -2310,7 +2309,7 @@ trait StringRepresentable(Stringable, Representable):
 
 
 @value
-struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
+struct _FormatCurlyEntry(CollectionElement):
     """
     Internally used by the `format()` method.
 
