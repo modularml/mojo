@@ -20,7 +20,7 @@ from utils import StaticTuple
 """
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
-
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
@@ -104,12 +104,14 @@ fn _static_tuple_construction_checks[size: Int]():
     Parameters:
       size: The number of elements.
     """
-    constrained[size > 0, "number of elements in `StaticTuple` must be > 0"]()
+    constrained[size >= 0, "number of elements in `StaticTuple` must be >= 0"]()
 
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](
+    Sized, CollectionElement
+):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:
@@ -243,7 +245,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
 
 @value
 struct InlineArray[
-    ElementType: CollectionElementNew,
+    ElementType: CollectionElement,
     size: Int,
 ](Sized, Movable, Copyable, ExplicitlyCopyable):
     """A fixed-size sequence of size homogeneous elements where size is a constant expression.
@@ -264,43 +266,74 @@ struct InlineArray[
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
-    fn __init__(inout self):
-        """This constructor will always cause a compile time error if used.
-        It is used to steer users away from uninitialized memory.
-        """
-        constrained[
-            False,
-            (
-                "Initialize with either a variadic list of arguments, a default"
-                " fill element or pass the keyword argument"
-                " 'unsafe_uninitialized'."
-            ),
-        ]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+    fn __init__(
+        inout self,
+        *,
+        owned unsafe_assume_initialized: InlineArray[
+            UnsafeMaybeUninitialized[Self.ElementType], Self.size
+        ],
+    ):
+        """Constructs an `InlineArray` from an `InlineArray` of `UnsafeMaybeUninitialized`.
 
-    @always_inline
-    fn __init__(inout self, *, unsafe_uninitialized: Bool):
-        """Create an InlineArray with uninitialized memory.
+        Calling this function assumes that all elements in the input array are initialized.
 
-        Note that this is highly unsafe and should be used with caution.
-
-        We recommend to use the `InlineList` instead if all the objects
-        are not available when creating the array.
-
-        If despite those workarounds, one still needs an uninitialized array,
-        it is possible with:
-
-        ```mojo
-        var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
-        ```
+        If the elements of the input array are not initialized, the behavior is undefined,
+        even  if `ElementType` is valid *for every possible bit pattern* (e.g. `Int` or `Float`).
 
         Args:
-            unsafe_uninitialized: A boolean to indicate if the array should be initialized.
-                Always set to `True` (it's not actually used inside the constructor).
+            unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
+        """
+
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        for i in range(Self.size):
+            unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
+                self.unsafe_ptr() + i
+            )
+
+    fn __init__[
+        ThisElementType: CollectionElement, //
+    ](
+        inout self: InlineArray[
+            UnsafeMaybeUninitialized[ThisElementType], Self.size
+        ]
+    ):
+        """Contructs an `InlineArray` without initializing the elements.
+
+        Note that this is only possible when the element type is `UnsafeMaybeUninitialized`.
+
+        For example, the following code is valid:
+
+        ```mojo
+        var arr = InlineArray[UnsafeMaybeUninitialized[Int], 2]()
+        arr[0].write(10)
+        arr[1].write(20)
+        ```
+
+        But the following is invalid:
+
+        ```mojo
+        var arr = InlineArray[Int, 2]()
+        ```
+        Since uninitialized integers is undefined behavior.
+
+        Afterwards it's the responsibility of the user to handle `UnsafeMaybeUninitialized`
+        elements correctly since, as the name implies, they are unsafe.
+        For more information on the subject, see the `UnsafeMaybeUninitialized` documentation.
+
+        Parameters:
+            ThisElementType: The element type of the array (the one wrapped inside `UnsafeMaybeUninitialized`).
         """
         _static_tuple_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.undef`[
+            _type = __mlir_type[
+                `!pop.array<`,
+                Self.size.value,
+                `, `,
+                UnsafeMaybeUninitialized[ThisElementType],
+                `>`,
+            ]
+        ]()
 
     @always_inline
     fn __init__(inout self, fill: Self.ElementType):
@@ -363,12 +396,27 @@ struct InlineArray[
             other: The value to copy.
         """
 
-        self = Self(unsafe_uninitialized=True)
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
 
             ptr.init_pointee_explicit_copy(other[idx])
+
+    fn __copyinit__(inout self, other: Self):
+        """Copy construct the array.
+
+        Args:
+            other: The array to copy.
+        """
+
+        self = Self(other=other)
+
+    fn __del__(owned self):
+        """Deallocate the array."""
+        for idx in range(size):
+            var ptr = self.unsafe_ptr() + idx
+            ptr.destroy_pointee()
 
     # ===------------------------------------------------------------------===#
     # Operator dunders

@@ -28,7 +28,7 @@ from utils import StringRef, Variant
 
 
 @register_passable("trivial")
-struct _NoneMarker(CollectionElementNew):
+struct _NoneMarker(CollectionElement):
     """This is a trivial class to indicate that an object is `None`."""
 
     fn __init__(inout self, *, other: Self):
@@ -36,7 +36,7 @@ struct _NoneMarker(CollectionElementNew):
 
 
 @register_passable("trivial")
-struct _ImmutableString(CollectionElement, CollectionElementNew):
+struct _ImmutableString(CollectionElement):
     """Python strings are immutable. This class is marked as trivially register
     passable because its memory will be managed by `_ObjectImpl`. It is a
     pointer and integer pair. Memory will be dynamically allocated.
@@ -82,7 +82,7 @@ struct _RefCountedList:
 
 
 @register_passable("trivial")
-struct _RefCountedListRef(CollectionElement, CollectionElementNew):
+struct _RefCountedListRef(CollectionElement):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -170,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
+struct _RefCountedAttrsDictRef(CollectionElement):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -200,7 +200,7 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
 
 
 @register_passable("trivial")
-struct _Function(CollectionElement, CollectionElementNew):
+struct _Function(CollectionElement):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -252,7 +252,6 @@ struct _Function(CollectionElement, CollectionElementNew):
 
 struct _ObjectImpl(
     CollectionElement,
-    CollectionElementNew,
     Stringable,
     Representable,
     Formattable,

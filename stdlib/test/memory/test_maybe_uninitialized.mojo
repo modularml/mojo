@@ -25,7 +25,7 @@ def test_maybe_uninitialized():
     var a = UnsafeMaybeUninitialized[ValueDestructorRecorder]()
     a.write(
         ValueDestructorRecorder(
-            42, UnsafePointer.address_of(destructor_counter)
+            42, int(UnsafePointer.address_of(destructor_counter))
         )
     )
 
