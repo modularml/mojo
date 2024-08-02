@@ -36,6 +36,10 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
     var storage: Tuple[Ts]
     """The underlying storage for the list."""
 
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
     @always_inline("nodebug")
     fn __init__(inout self, owned *args: *Ts):
         """Construct the list literal from the given values.
@@ -54,6 +58,10 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
 
         self.storage = existing.storage^
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Get the list length.
@@ -62,6 +70,10 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
             The length of this ListLiteral.
         """
         return len(self.storage)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn get[i: Int, T: Movable](self) -> ref [__lifetime_of(self)] T:
@@ -76,6 +88,10 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         """
         # FIXME: Rebinding to a different lifetime.
         return UnsafePointer.address_of(self.storage[i]).bitcast[T]()[]
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
@@ -291,6 +307,10 @@ struct VariadicListMem[
     # the VariadicListMem is destroyed.
     var _is_owned: Bool
 
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
     # Provide support for borrowed variadic arguments.
     @always_inline
     fn __init__(inout self, value: Self._mlir_type):
@@ -375,6 +395,10 @@ struct VariadicListMem[
             for i in reversed(range(len(self))):
                 UnsafePointer.address_of(self[i]).destroy_pointee()
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn __len__(self) -> Int:
         """Gets the size of the list.
@@ -383,6 +407,10 @@ struct VariadicListMem[
             The number of elements on the variadic list.
         """
         return __mlir_op.`pop.variadic.size`(self.value)
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __getitem__(
@@ -536,6 +564,10 @@ struct VariadicPack[
     var _value: Self._mlir_type
     var _is_owned: Bool
 
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn __init__(inout self, value: Self._mlir_type, is_owned: Bool):
         """Constructs a VariadicPack from the internal representation.
@@ -562,6 +594,10 @@ struct VariadicPack[
             @parameter
             for i in reversed(range(Self.__len__())):
                 UnsafePointer.address_of(self[i]).destroy_pointee()
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     @staticmethod
@@ -590,6 +626,10 @@ struct VariadicPack[
         """
         return Self.__len__()
 
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn __getitem__[
         index: Int
@@ -614,6 +654,10 @@ struct VariadicPack[
             __get_litref_as_mvalue(litref_elt)
         )
         return ref_elt.bitcast[element_types[index.value]]()[]
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn each[func: fn[T: element_trait] (T) capturing -> None](self):
