@@ -1501,7 +1501,7 @@ struct SIMD[type: DType, size: Int](
                 ]
             ](self.value)
 
-    @always_inline
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1514,7 +1514,7 @@ struct SIMD[type: DType, size: Int](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
-    @always_inline
+    @no_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
