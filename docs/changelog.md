@@ -542,6 +542,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   > If the above error is seen, ensure that all argument types implement
   > `Formattable`.
 
+- `debug_assert()` now also requires that its `message` argument conform to
+  `Formattable`.
+
 - The `StringRef` constructors from `DTypePointer.int8` have been changed to
   take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
   C APIs.

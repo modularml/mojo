@@ -17,10 +17,31 @@
 # RUN: %mojo -D DEBUG -debug-level full %s | FileCheck %s -check-prefix=CHECK-OK
 
 
-# CHECK-OK-LABEL: test_ok
-fn main():
-    print("== test_ok")
+def main():
+    test_debug_assert()
+    test_debug_assert_formattable()
+
+
+# CHECK-OK-LABEL: test_debug_assert
+def test_debug_assert():
+    print("== test_debug_assert")
     debug_assert(True, "ok")
     debug_assert(3, Error("also ok"))
     # CHECK-OK: is reached
     print("is reached")
+
+
+# CHECK-OK-LABEL: test_debug_assert_formattable
+def test_debug_assert_formattable():
+    print("== test_debug_assert_formattable")
+    debug_assert(True, FormattableOnly("failed with Formattable arg"))
+    # CHECK-OK: is reached
+    print("is reached")
+
+
+@value
+struct FormattableOnly:
+    var message: String
+
+    fn format_to(self, inout writer: Formatter):
+        writer.write(self.message)

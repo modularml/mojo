@@ -33,8 +33,8 @@ alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
 
 @always_inline
 fn debug_assert[
-    func: fn () capturing -> Bool, stringable: Stringable
-](message: stringable):
+    func: fn () capturing -> Bool, formattable: Formattable
+](message: formattable):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -48,7 +48,7 @@ fn debug_assert[
         func: The function to invoke to check if the assertion holds. Can be used
             if the function is side-effecting, in which case a debug_assert taking
             a Bool will evaluate the expression producing the Bool even in release mode.
-        stringable: The type of the message.
+        formattable: The type of the message.
 
     Args:
         message: The message to convert to `String` before displaying it on failure.
@@ -60,7 +60,7 @@ fn debug_assert[
 
 
 @always_inline
-fn debug_assert[stringable: Stringable](cond: Bool, message: stringable):
+fn debug_assert[formattable: Formattable](cond: Bool, message: formattable):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -71,7 +71,7 @@ fn debug_assert[stringable: Stringable](cond: Bool, message: stringable):
     for enabling assertions in the library.
 
     Parameters:
-        stringable: The type of the message.
+        formattable: The type of the message.
 
     Args:
         cond: The bool value to assert.
@@ -89,8 +89,8 @@ fn debug_assert[stringable: Stringable](cond: Bool, message: stringable):
 
 @no_inline
 fn _debug_assert_msg[
-    stringable: Stringable, //, *, is_warning: Bool = False
-](msg: stringable, loc: _SourceLocation):
+    formattable: Formattable, //, *, is_warning: Bool = False
+](msg: formattable, loc: _SourceLocation):
     """Aborts with (or prints) the given message and location.
 
     This function is intentionally marked as no_inline to reduce binary size.
@@ -113,6 +113,6 @@ fn _debug_assert_msg[
 
         @parameter
         if is_warning:
-            print(loc.prefix("Assert Warning:"), str(msg))
+            print(loc.prefix("Assert Warning:"), msg)
         else:
-            abort(loc.prefix("Assert Error: " + str(msg)))
+            abort(loc.prefix("Assert Error: " + String.format_sequence(msg)))
