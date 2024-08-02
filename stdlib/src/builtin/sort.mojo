@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import List
 from sys import bitwidthof
+from math import ceil
 
 from bit import count_leading_zeros
 from memory import UnsafePointer
@@ -25,6 +26,8 @@ from utils import Span
 # ===----------------------------------------------------------------------===#
 # sort
 # ===----------------------------------------------------------------------===#
+
+alias insertion_sort_threshold = 32
 
 
 @value
@@ -160,7 +163,9 @@ fn _estimate_initial_height(size: Int) -> Int:
     var log2 = int(
         (bitwidthof[DType.index]() - 1) ^ count_leading_zeros(size | 1)
     )
-    return max(2, log2)
+    # The number 1.3 was chosen by experimenting the max stack size for random
+    # input. This also depends on insertion_sort_threshold
+    return max(2, int(ceil(1.3 * log2)))
 
 
 @always_inline
@@ -188,6 +193,13 @@ fn _delegate_small_sort[
         return
 
 
+# FIXME (MSTDL-808): Using _Pair over Span results in 1-3% improvement
+# @value
+# struct _Pair[type: AnyType]:
+#     var ptr: UnsafePointer[type]
+#     var len: Int
+
+
 @always_inline
 fn _quicksort[
     type: CollectionElement,
@@ -198,53 +210,50 @@ fn _quicksort[
     var size = len(span)
     if size == 0:
         return
-    var stack = List[Int](capacity=_estimate_initial_height(size))
-    stack.append(0)
-    stack.append(size)
+    var stack = List[Span[type, lifetime]](
+        capacity=_estimate_initial_height(size)
+    )
+    stack.append(span)
     while len(stack) > 0:
-        var end = stack.pop()
-        var start = stack.pop()
-
-        var len = end - start
+        var interval = stack.pop()
+        var ptr = interval.unsafe_ptr()
+        var len = len(interval)
 
         if len <= 5:
-            _delegate_small_sort[cmp_fn](
-                Span[type, lifetime](unsafe_ptr=array + start, len=len)
-            )
+            _delegate_small_sort[cmp_fn](interval)
             continue
 
-        if len < 32:
-            _insertion_sort[cmp_fn](
-                Span[type, lifetime](unsafe_ptr=array + start, len=len)
-            )
+        if len < insertion_sort_threshold:
+            _insertion_sort[cmp_fn](interval)
             continue
 
         # pick median of 3 as pivot
-        _sort3[type, cmp_fn](array, (start + end) >> 1, start, end - 1)
+        _sort3[type, cmp_fn](ptr, len >> 1, 0, len - 1)
 
-        # if array[start - 1] == pivot_value, then everything in between will
+        # if ptr[-1] == pivot_value, then everything in between will
         # be the same, so no need to recurse that interval
-        # already have array[start - 1] <= array[start]
-        if start > 0 and not cmp_fn(array[start - 1], array[start]):
-            var pivot = start + _quicksort_partition_left[cmp_fn](
-                Span[type, lifetime](unsafe_ptr=array + start, len=len)
-            )
-            if end > pivot + 2:
-                stack.append(pivot + 1)
-                stack.append(end)
+        # already have array[-1] <= array[0]
+        if ptr > array and not cmp_fn(ptr[-1], ptr[0]):
+            var pivot = _quicksort_partition_left[cmp_fn](interval)
+            if len > pivot + 2:
+                stack.append(
+                    Span[type, lifetime](
+                        unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1
+                    )
+                )
             continue
 
-        var pivot = start + _quicksort_partition_right[cmp_fn](
-            Span[type, lifetime](unsafe_ptr=array + start, len=len)
-        )
+        var pivot = _quicksort_partition_right[cmp_fn](interval)
 
-        if end > pivot + 2:
-            stack.append(pivot + 1)
-            stack.append(end)
+        if len > pivot + 2:
+            stack.append(
+                Span[type, lifetime](
+                    unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1
+                )
+            )
 
-        if pivot > start + 1:
-            stack.append(start)
-            stack.append(pivot)
+        if pivot > 1:
+            stack.append(Span[type, lifetime](unsafe_ptr=ptr, len=pivot))
 
 
 # ===----------------------------------------------------------------------===#
@@ -397,7 +406,7 @@ fn _sort[
         _delegate_small_sort[cmp_fn](span)
         return
 
-    if len(span) < 32:
+    if len(span) < insertion_sort_threshold:
         _insertion_sort[cmp_fn](span)
         return
 
