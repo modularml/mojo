@@ -81,25 +81,47 @@ struct Dialect:
         self._valid = _validate_dialect(self)
 
 
-struct reader[delimiter: String, quotechar: String]:
+struct reader:
     """
     CSV reader.
-
-    Parameters:
-        delimiter: The delimiter used to separate fields.
-        quotechar: The character used to quote fields containing special
-            characters.
     """
 
     var _dialect: Dialect
 
-    fn __init__(inout self: Self) raises:
+    fn __init__(
+        inout self: Self,
+        csvfile: FileHandle,
+        delimiter: String,
+        quotechar: String,
+        escapechar: String = "",
+        doublequote: Bool = False,
+        skipinitialspace: Bool = False,
+        lineterminator: String = "\r\n",
+        quoting: Int = QUOTE_MINIMAL,
+    ) raises:
         """
-        Initialize a CSV reader.
+        Initialize a Dialect object.
+
+        Args:
+            csvfile: The CSV file to read from.
+            delimiter: The delimiter used to separate fields.
+            quotechar: The character used to quote fields containing special
+                characters.
+            escapechar: The character used to escape the delimiter or quotechar.
+            doublequote: Whether quotechar inside a field is doubled.
+            skipinitialspace: Whether whitespace immediately following the
+                delimiter is ignored.
+            lineterminator: The sequence used to terminate lines.
+            quoting: The quoting mode.
         """
         self._dialect = Dialect(
             delimiter=delimiter,
             quotechar=quotechar,
+            escapechar=escapechar,
+            doublequote=doublequote,
+            skipinitialspace=skipinitialspace,
+            lineterminator=lineterminator,
+            quoting=quoting,
         )
         self._dialect.validate()
 
