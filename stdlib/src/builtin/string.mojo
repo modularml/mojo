@@ -723,12 +723,10 @@ struct String(
     fn __init__(inout self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
-        The buffer must have a small buffer optimization size of 15 bytes exactly
-        for this constructor to be called.
         The buffer must be terminated with a null byte:
 
         ```mojo
-        var buf = List[UInt8, 15]()
+        var buf = List[UInt8]()
         buf.append(ord('H'))
         buf.append(ord('i'))
         buf.append(0)
@@ -747,35 +745,6 @@ struct String(
         var capacity = impl.capacity
         self._buffer = Self._buffer_type(
             unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
-        )
-
-    @always_inline
-    fn __init__(inout self, owned impl: List[UInt8, _]):
-        """Construct a string from a buffer of bytes.
-
-        The buffer must be terminated with a null byte:
-        ```mojo
-        var buf = List[Int8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
-
-        Args:
-            impl: The buffer.
-        """
-        debug_assert(
-            impl[-1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
-        var length = len(impl)
-        var capacity = impl.capacity
-        self._buffer = Self._buffer_type(
-            unsafe_pointer=impl.steal_data(),
-            size=length,
-            capacity=capacity,
         )
 
     @always_inline
