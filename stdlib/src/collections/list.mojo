@@ -543,8 +543,11 @@ struct List[
             new_data = UnsafePointer[T].alloc(new_capacity)
             self.capacity = new_capacity
 
-        for i in range(self.size):
-            (self.data + i).move_pointee_into(new_data + i)
+        _move_pointee_into_many_elements[hint_trivial_type](
+            dest=new_data,
+            src=self.data,
+            size=self.size,
+        )
 
         self._free_data_if_possible()
         self.data = new_data
