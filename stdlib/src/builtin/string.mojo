@@ -735,12 +735,11 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
+        # We make a backup because steal_data() will clear size and capacity.
         var size = impl.size
         var capacity = impl.capacity
-        var ptr = impl.data
-        impl.data = UnsafePointer[UInt8]()
         self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr, size=size, capacity=capacity
+            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
         )
 
     @always_inline
