@@ -13,11 +13,14 @@
 # RUN: %mojo %s
 
 from csv import reader
+from pathlib import Path, _dir_of_current_file
 
 
 def test_dialect():
-    r = reader[delimiter=",", quotechar='"']()
-    # TODO: Add more tests
+    var csv_path = _dir_of_current_file() / "people.csv"
+    with open(csv_path, "r") as csv_file:
+        r = reader(csv_file, delimiter=",", quotechar='"')
+        # TODO: Add more tests
 
 
 def main():
