@@ -694,7 +694,9 @@ struct String(
     # buffer optimization. We can put back 16 when
     # the flag has been removed from List.
     alias _small_buffer_size = 15
-    alias _buffer_type = List[UInt8, Self._small_buffer_size]
+    alias _buffer_type = List[
+        UInt8, Self._small_buffer_size, hint_trivial_type=True
+    ]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -718,7 +720,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, owned impl: Self._buffer_type):
+    fn __init__(inout self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
         The buffer must have a small buffer optimization size of 15 bytes exactly
@@ -740,7 +742,12 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        self._buffer = impl^
+        # We make a backup because steal_data() will clear size and capacity.
+        var size = impl.size
+        var capacity = impl.capacity
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
+        )
 
     @always_inline
     fn __init__(inout self, owned impl: List[UInt8, _]):
@@ -2193,7 +2200,7 @@ struct String(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
         var fillbyte = fillchar.as_bytes_slice()[0]
-        var buffer = List[UInt8](capacity=width + 1)
+        var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))

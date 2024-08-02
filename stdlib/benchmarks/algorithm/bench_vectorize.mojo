@@ -33,7 +33,7 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory import UnsafePointer
+from memory import UnsafePointer, memset_zero
 
 
 @value

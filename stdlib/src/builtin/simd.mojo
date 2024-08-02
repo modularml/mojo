@@ -36,7 +36,7 @@ from builtin.hash import _hash_simd
 from builtin.format_int import _try_write_int
 from memory import bitcast, UnsafePointer
 
-from utils import InlineArray, StringSlice, StaticIntTuple
+from utils import InlineArray, StringSlice, StaticIntTuple, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -1500,7 +1500,7 @@ struct SIMD[type: DType, size: Int](
                 ]
             ](self.value)
 
-    @always_inline
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1513,7 +1513,7 @@ struct SIMD[type: DType, size: Int](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
-    @always_inline
+    @no_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.

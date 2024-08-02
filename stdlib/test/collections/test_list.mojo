@@ -687,6 +687,16 @@ def test_list_span[sbo_size: Int]():
     assert_equal(es[0], 1)
 
 
+def test_list_realloc_trivial_types[sbo_size: Int]():
+    a = List[Int, sbo_size, hint_trivial_type=True]()
+    for i in range(100):
+        a.append(i)
+
+    b = List[Int8, sbo_size, hint_trivial_type=True]()
+    for i in range(100):
+        b.append(Int8(i))
+
+
 def test_list_boolable[sbo_size: Int]():
     assert_true(List[Int, sbo_size](1))
     assert_false(List[Int, sbo_size]())
@@ -953,6 +963,7 @@ def main():
         test_list_iter[small_buffer_size]()
         test_list_iter_mutable[small_buffer_size]()
         test_list_span[small_buffer_size]()
+        test_list_realloc_trivial_types[small_buffer_size]()
         test_list_boolable[small_buffer_size]()
         test_constructor_from_pointer[small_buffer_size]()
         test_constructor_from_other_list_through_pointer[small_buffer_size]()
