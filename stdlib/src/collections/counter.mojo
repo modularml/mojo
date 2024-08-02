@@ -57,8 +57,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data = Dict[V, Int]()
         for item_ref in items:
-            var item = item_ref[]
-            self._data[item] = self._data.get(item, 0) + 1
+            self._data[Self.V(other=item_ref[])] = (
+                self._data.get(item_ref[], 0) + 1
+            )
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -86,8 +87,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         )
         var result = Counter[V]()
         for key_ref in keys:
-            var key = key_ref[]
-            result[key] = value
+            result[key_ref[]] = value
         return result
 
     # ===------------------------------------------------------------------=== #
@@ -112,7 +112,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             value: The value to associate with the specified count.
             count: The count to store in the Counter.
         """
-        self._data[value] = count
+        self._data[Self.V(other=value)] = count
 
     fn __iter__(self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
         """Iterate over the keyword dict's keys as immutable references.
@@ -171,8 +171,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         @always_inline
         fn is_eq(keys: _DictKeyIter[V, Int, _]) -> Bool:
             for e_ref in keys:
-                var e = e_ref[]
-                if self.get(e, 0) != other.get(e, 0):
+                if self.get(e_ref[], 0) != other.get(e_ref[], 0):
                     return False
             return True
 
@@ -204,8 +203,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         @always_inline
         fn is_le(keys: _DictKeyIter[V, Int, _]) -> Bool:
             for e_ref in keys:
-                var e = e_ref[]
-                if self.get(e, 0) > other.get(e, 0):
+                if self.get(e_ref[], 0) > other.get(e_ref[], 0):
                     return False
             return True
 
@@ -314,9 +312,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         var result = Counter[V]()
 
         for key_ref in self.keys():
-            var key = key_ref[]
-            if key in other:
-                result[key] = min(self[key], other[key])
+            if key_ref[] in other:
+                result[Self.V(other=key_ref[])] = min(
+                    self[key_ref[]], other[key_ref[]]
+                )
 
         return result^
 
@@ -327,18 +326,18 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             other: The other Counter to intersect with.
         """
         for key_ref in self.keys():
-            var key = key_ref[]
-            if key not in other:
-                _ = self.pop(key)
+            if key_ref[] not in other:
+                _ = self.pop(key_ref[])
             else:
-                self[key] = min(self[key], other[key])
+                self[Self.V(other=key_ref[])] = min(
+                    self[key_ref[]], other[key_ref[]]
+                )
 
     fn _keep_positive(inout self) raises:
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
-            var key = key_ref[]
-            if self[key] <= 0:
-                _ = self.pop(key)
+            if self[key_ref[]] <= 0:
+                _ = self.pop(key_ref[])
 
     # ===------------------------------------------------------------------=== #
     # Unary operators
@@ -504,7 +503,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         for item_ref in self._data.items():
             var item = item_ref[]
             for _ in range(item.value):
-                elements.append(item.key)
+                elements.append(Self.V(other=item.key))
         return elements
 
     fn update(inout self, other: Self):
@@ -516,7 +515,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         for item_ref in other.items():
             var item = item_ref[]
-            self._data[item.key] = self._data.get(item.key, 0) + item.value
+            self._data[Self.V(other=item.key)] = (
+                self._data.get(item.key, 0) + item.value
+            )
 
     fn subtract(inout self, other: Self):
         """Subtract count. Both inputs and outputs may be zero or negative.
@@ -555,8 +556,17 @@ struct CountTuple[V: KeyElement](
             value: The value in the Counter.
             count: The count of the value in the Counter.
         """
-        self._value = value
+        self._value = Self.V(other=value)
         self._count = count
+
+    fn __init__(inout self, *, other: Self):
+        """Explicit copy constructor of the CountTuple.
+
+        Args:
+            other: The `CountTuple` to copy.
+        """
+        self._value = V(other=other._value)
+        self._count = other._count
 
     fn __copyinit__(inout self, other: Self):
         """Create a new CountTuple by copying another CountTuple.
@@ -564,7 +574,7 @@ struct CountTuple[V: KeyElement](
         Args:
             other: The CountTuple to copy.
         """
-        self._value = other._value
+        self._value = Self.V(other=other._value)
         self._count = other._count
 
     fn __moveinit__(inout self, owned other: Self):
@@ -617,6 +627,6 @@ struct CountTuple[V: KeyElement](
             "index must be within bounds",
         )
         if idx == 0:
-            return self._value
+            return Self.V(other=self._value)
         else:
             return self._count

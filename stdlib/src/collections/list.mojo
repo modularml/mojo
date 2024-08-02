@@ -113,7 +113,7 @@ struct List[T: CollectionElement](
         """
         self.__init__(capacity=other.capacity)
         for e in other:
-            self.append(e[])
+            self.append(Self.T(other=e[]))
 
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
@@ -135,7 +135,7 @@ struct List[T: CollectionElement](
         """
         self = Self(capacity=len(values))
         for value in values:
-            self.append(value[])
+            self.append(Self.T(other=value[]))
 
     fn __init__(inout self, span: Span[T]):
         """Constructs a list from the a Span of values.
@@ -145,7 +145,7 @@ struct List[T: CollectionElement](
         """
         self = Self(capacity=len(span))
         for value in span:
-            self.append(value[])
+            self.append(Self.T(other=value[]))
 
     fn __init__(
         inout self: Self,
@@ -183,7 +183,7 @@ struct List[T: CollectionElement](
         """
         self = Self(capacity=existing.capacity)
         for i in range(len(existing)):
-            self.append(existing[i])
+            self.append(Self.T(other=existing[i]))
 
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
@@ -601,7 +601,7 @@ struct List[T: CollectionElement](
         else:
             self.reserve(new_size)
             for i in range(self.size, new_size):
-                (self.data + i).init_pointee_copy(value)
+                (self.data + i).init_pointee_explicit_copy(value)
             self.size = new_size
 
     fn resize(inout self, new_size: Int):
@@ -741,7 +741,7 @@ struct List[T: CollectionElement](
 
         var res = Self(capacity=len(r))
         for i in r:
-            res.append(self[i])
+            res.append(Self.T(other=self[i]))
 
         return res^
 
