@@ -263,9 +263,7 @@ fn _stol(str_slice: StringSlice, base: Int = 10) raises -> (Int, String):
                     start += 1  # Move past the prefix character
                 else:
                     # Invalid prefix or digit after prefix
-                    return 0, String(
-                        str_slice.unsafe_ptr() + start
-                    )
+                    return 0, String(str_slice.unsafe_ptr() + start)
         else:
             real_base = 10
         has_prefix = real_base != 10
