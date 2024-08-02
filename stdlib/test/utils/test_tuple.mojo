@@ -14,7 +14,9 @@
 
 from testing import assert_equal, assert_false, assert_true
 
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from utils import InlineArray, StaticIntTuple, StaticTuple
+from test_utils import ValueDestructorRecorder
 
 
 def test_static_tuple():
@@ -182,6 +184,40 @@ def test_array_str():
     assert_equal(arr3[0], "hi")
 
 
+def test_array_unsafe_assume_initialized_constructor_string():
+    var maybe_uninitialized_arr = InlineArray[
+        UnsafeMaybeUninitialized[String], 3
+    ]()
+    maybe_uninitialized_arr[0].write("hello")
+    maybe_uninitialized_arr[1].write("mojo")
+    maybe_uninitialized_arr[2].write("world")
+
+    var initialized_arr = InlineArray(
+        unsafe_assume_initialized=maybe_uninitialized_arr^
+    )
+
+    assert_equal(initialized_arr[0], "hello")
+    assert_equal(initialized_arr[1], "mojo")
+    assert_equal(initialized_arr[2], "world")
+
+    # trigger a move
+    var initialized_arr2 = initialized_arr^
+
+    assert_equal(initialized_arr2[0], "hello")
+    assert_equal(initialized_arr2[1], "mojo")
+    assert_equal(initialized_arr2[2], "world")
+
+    # trigger a copy
+    var initialized_arr3 = InlineArray(other=initialized_arr2)
+
+    assert_equal(initialized_arr3[0], "hello")
+    assert_equal(initialized_arr3[1], "mojo")
+    assert_equal(initialized_arr3[2], "world")
+
+    # We assume the destructor was called correctly, but one
+    # might want to add a test for that in the future.
+
+
 def test_array_int_pointer():
     var arr = InlineArray[Int, 3](0, 10, 20)
 
@@ -212,6 +248,29 @@ def test_array_contains():
     assert_true(not str("greetings") in arr)
 
 
+def test_inline_array_runs_destructors():
+    """Ensure we delete the right number of elements."""
+    var destructor_counter = List[Int]()
+    var pointer_to_destructor_counter = UnsafePointer.address_of(
+        destructor_counter
+    )
+    alias capacity = 32
+    var inline_list = InlineArray[ValueDestructorRecorder, 4](
+        ValueDestructorRecorder(0, int(pointer_to_destructor_counter)),
+        ValueDestructorRecorder(10, int(pointer_to_destructor_counter)),
+        ValueDestructorRecorder(20, int(pointer_to_destructor_counter)),
+        ValueDestructorRecorder(30, int(pointer_to_destructor_counter)),
+    )
+    _ = inline_list
+    # This is the last use of the inline list, so it should be destroyed here,
+    # along with each element.
+    assert_equal(len(destructor_counter), 4)
+    assert_equal(destructor_counter[0], 0)
+    assert_equal(destructor_counter[1], 10)
+    assert_equal(destructor_counter[2], 20)
+    assert_equal(destructor_counter[3], 30)
+
+
 def main():
     test_static_tuple()
     test_static_int_tuple()
@@ -219,5 +278,7 @@ def main():
     test_array_unsafe_get()
     test_array_int()
     test_array_str()
+    test_array_unsafe_assume_initialized_constructor_string()
     test_array_int_pointer()
     test_array_contains()
+    test_inline_array_runs_destructors()

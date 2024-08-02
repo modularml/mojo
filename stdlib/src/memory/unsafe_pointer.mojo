@@ -46,7 +46,6 @@ struct UnsafePointer[
 ](
     ImplicitlyBoolable,
     CollectionElement,
-    CollectionElementNew,
     Stringable,
     Formattable,
     Intable,

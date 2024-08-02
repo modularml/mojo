@@ -99,7 +99,7 @@ trait ImplicitlyBoolable(Boolable):
 @value
 @register_passable("trivial")
 struct Bool(
-    CollectionElementNew,
+    CollectionElement,
     ComparableCollectionElement,
     ImplicitlyBoolable,
     Indexer,

@@ -686,12 +686,17 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
-    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
     # Fields
-    alias _buffer_type = List[UInt8]
+    # It's of size 15 because one byte is taken in the List with small
+    # buffer optimization. We can put back 16 when
+    # the flag has been removed from List.
+    alias _small_buffer_size = 15
+    alias _buffer_type = List[
+        UInt8, Self._small_buffer_size, hint_trivial_type=True
+    ]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -715,7 +720,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, owned impl: List[UInt8]):
+    fn __init__(inout self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
         The buffer must be terminated with a null byte:
@@ -735,12 +740,19 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        self._buffer = impl^
+        # We make a backup because steal_data() will clear size and capacity.
+        var size = impl.size
+        var capacity = impl.capacity
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
+        )
 
     @always_inline
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+        # The Null terminator is cheap because it is on the stack
+        self._buffer.append(0)
 
     fn __init__(inout self, *, other: Self):
         """Explicitly copy the provided value.
@@ -1336,7 +1348,7 @@ struct String(
         """
         return self.unsafe_ptr().bitcast[C_char]()
 
-    fn as_bytes(self) -> List[UInt8]:
+    fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -1665,7 +1677,7 @@ struct String(
         var old_len = old.byte_length()
         var new_len = new.byte_length()
 
-        var res = List[UInt8]()
+        var res = Self._buffer_type()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -1795,7 +1807,7 @@ struct String(
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = List[UInt8]()
+        var res = Self._buffer_type()
         var val_ptr = val.unsafe_ptr()
         var self_ptr = self.unsafe_ptr()
         res.reserve(val.byte_length() * self.byte_length() + 1)
@@ -2157,7 +2169,7 @@ struct String(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
         var fillbyte = fillchar.as_bytes_slice()[0]
-        var buffer = List[UInt8](capacity=width + 1)
+        var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
@@ -2310,7 +2322,7 @@ trait StringRepresentable(Stringable, Representable):
 
 
 @value
-struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
+struct _FormatCurlyEntry(CollectionElement):
     """
     Internally used by the `format()` method.
 
