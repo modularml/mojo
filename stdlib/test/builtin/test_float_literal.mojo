@@ -125,6 +125,65 @@ def test_division():
     assert_equal(FloatLiteral.__floordiv__(-4.4, -0.5), 8.0)
 
 
+def test_exp():
+    assert_almost_equal(FloatLiteral.__exp__(0.0), 1.0)
+    assert_almost_equal(FloatLiteral.__exp__(0.5), 1.6487212707_0012814684)
+    assert_almost_equal(FloatLiteral.__exp__(-0.6), 0.5488116360_9402643262)
+    assert_almost_equal(FloatLiteral.__exp__(2.2), 9.0250134994_3412092647)
+    assert_almost_equal(FloatLiteral.__exp__(-3.7), 0.0247235264_7033939120)
+    assert_almost_equal(FloatLiteral.__exp__(1.0), 2.7182818284_5904523536)
+    assert_almost_equal(FloatLiteral.__exp__(10.0), 22026.4657948067_1651695790)
+
+
+def test_log():
+    assert_almost_equal(
+        FloatLiteral.__log__(0.0), FloatLiteral.nan, equal_nan=True
+    )
+    assert_almost_equal(FloatLiteral.__log__(0.5), -0.6931471805_5994530941)
+    assert_almost_equal(
+        FloatLiteral.__log__(-0.6), FloatLiteral.nan, equal_nan=True
+    )
+    assert_almost_equal(FloatLiteral.__log__(2.2), 0.7884573603_6427016946)
+    assert_almost_equal(
+        FloatLiteral.__log__(-3.7), FloatLiteral.nan, equal_nan=True
+    )
+    assert_almost_equal(FloatLiteral.__log__(1.0), 0.0)
+    assert_almost_equal(FloatLiteral.__log__(10.0), 2.3025850929_9404568401)
+
+
+def test_pow():
+    assert_almost_equal(FloatLiteral.__pow__(0.0, 0.5), 0.0)
+    assert_almost_equal(FloatLiteral.__pow__(0.0, -2.5), 0.0)
+    assert_almost_equal(FloatLiteral.__pow__(0.0, 1), 0.0)
+    assert_almost_equal(FloatLiteral.__pow__(0.0, -2), 0.0)
+
+    assert_almost_equal(FloatLiteral.__pow__(1.0, 0.5), 1.0)
+    assert_almost_equal(FloatLiteral.__pow__(1.0, -2.5), 1.0)
+    assert_almost_equal(FloatLiteral.__pow__(1.0, 1), 1.0)
+    assert_almost_equal(FloatLiteral.__pow__(1.0, -2), 1.0)
+
+    assert_almost_equal(
+        FloatLiteral.__pow__(-1.0, 0.5), FloatLiteral.nan, equal_nan=True
+    )
+    assert_almost_equal(
+        FloatLiteral.__pow__(-1.0, -2.5), FloatLiteral.nan, equal_nan=True
+    )
+    assert_almost_equal(FloatLiteral.__pow__(-1.0, 1), -1.0)
+    assert_almost_equal(FloatLiteral.__pow__(-1.0, 2), 1.0)
+    assert_almost_equal(FloatLiteral.__pow__(-1.0, -3), -1.0)
+    assert_almost_equal(FloatLiteral.__pow__(-1.0, 100), 1.0)
+    assert_almost_equal(FloatLiteral.__pow__(-1.0, 101), -1.0)
+
+    assert_almost_equal(FloatLiteral.__pow__(2.3, 0.4), 1.3953756318_5563997952)
+    assert_almost_equal(FloatLiteral.__pow__(0.8, 0.2), 0.9563524997_9003698571)
+    assert_almost_equal(FloatLiteral.__pow__(10.0, -4), 0.0001)
+    assert_almost_equal(FloatLiteral.__pow__(10.0, -4.0), 0.0001)
+    assert_almost_equal(FloatLiteral.__pow__(-4.0, -2), 0.0625)
+    assert_almost_equal(FloatLiteral.__pow__(-4.0, -2.0), 0.0625)
+    assert_almost_equal(FloatLiteral.__pow__(-4.0, 2), 16)
+    assert_almost_equal(FloatLiteral.__pow__(-4.0, 2.0), 16)
+
+
 def test_mod():
     assert_equal(FloatLiteral.__mod__(4.5, 2), 0.5)
     assert_equal(FloatLiteral.__mod__(-4.5, 2), 1.5)
@@ -219,6 +278,9 @@ def main():
     test_round()
     test_round10()
     test_division()
+    test_exp()
+    test_log()
+    test_pow()
     test_mod()
     test_div_mod()
     test_int_conversion()

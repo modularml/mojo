@@ -435,7 +435,95 @@ struct FloatLiteral(
         """
         return rhs // self
 
-    # TODO - maybe __pow__?
+    @always_inline("nodebug")
+    fn __exp__[atol: FloatLiteral = 0.1e-20](self) -> FloatLiteral:
+        """Calculates exponential of `self`.
+
+        Parameters:
+            atol: The absolute tolerance for selecting the desired precision.
+
+        Returns:
+            `e` raised to the power of `self`.
+        """
+        if self.is_nan():
+            return self
+        var result: FloatLiteral = 1.0
+        var count: IntLiteral = 1
+        var term: FloatLiteral = self
+        while abs(term) > atol:
+            result += term
+            count += 1
+            term *= self / count
+        return result
+
+    @always_inline("nodebug")
+    fn __log__[atol: FloatLiteral = 0.1e-20](self) -> FloatLiteral:
+        """Computes natural log (base `e`) of `self`.
+
+        Parameters:
+            atol: The absolute tolerance for selecting the desired precision.
+
+        Returns:
+            The natural log base `e` of `self`.
+        """
+        if self <= 0:
+            return FloatLiteral.nan
+        var term: FloatLiteral = (self - 1) / (self + 1)
+        var ratio: FloatLiteral = term * term
+        var count: FloatLiteral = 1
+        var result: FloatLiteral = term
+        while abs(term) > atol:
+            term *= ratio
+            count += 2
+            result += term / count
+        return 2 * result
+
+    @always_inline("nodebug")
+    fn __pow__[
+        atol: FloatLiteral = 0.1e-20
+    ](owned self, owned exp: IntLiteral) -> FloatLiteral:
+        """Computes `self` raised to the power of `exp`.
+
+        Parameters:
+            atol: The absolute tolerance for selecting the desired precision.
+
+        Args:
+            exp: The exponent of the power operation.
+
+        Returns:
+            `self` raised to the power of `exp`.
+        """
+        if 0 < exp < 16:
+            while exp > 1:
+                self *= self
+                exp -= 1
+            return self
+        else:
+            return self.__pow__[atol](FloatLiteral(exp))
+
+    @always_inline("nodebug")
+    fn __pow__[
+        atol: FloatLiteral = 0.1e-20
+    ](self, exp: FloatLiteral) -> FloatLiteral:
+        """Computes `self` raised to the power of `exp`.
+
+        Parameters:
+            atol: The absolute tolerance for selecting the desired precision.
+
+        Args:
+            exp: The exponent of the power operation.
+
+        Returns:
+            `self` raised to the power of `exp`.
+        """
+        if self == 0.0:
+            return 0.0
+        elif self < 0.0 and exp == exp.__int_literal__():
+            return (exp * (-self).__log__[atol]()).__exp__[atol]() * (
+                1 - ((exp % 2) * 2)
+            )
+        else:
+            return (exp * self.__log__[atol]()).__exp__[atol]()
 
     # ===------------------------------------------------------------------===#
     # In-place Arithmetic Operators
