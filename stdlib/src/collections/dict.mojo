@@ -84,7 +84,7 @@ struct _DictEntryIter[
         return self
 
     @always_inline
-    fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
+    fn __next__(inout self) -> Reference[DictEntry[K, V], dict_lifetime]:
         while True:
             var opt_entry_ref = Reference(self.src[]._entries[self.index])
 
