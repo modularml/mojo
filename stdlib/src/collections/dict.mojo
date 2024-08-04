@@ -895,7 +895,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(self._reserved())
 
     fn setdefault(
-        ref [_]self: Self, key: K, owned default: V
+        inout self, key: K, owned default: V
     ) raises -> Reference[V, __lifetime_of(self)]:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
