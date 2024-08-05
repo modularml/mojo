@@ -269,9 +269,29 @@ trait Powable:
         var numerator: Float64
         var denominator: Float64
 
-        fn __pow__(self,exp: Self)  -> Self:
+        fn __init__(inout self, numerator: Float64, denominator: Float64):
+            self.numerator = numerator
+            self.denominator = denominator
+
+        fn __pow__(self, exp: Self)  -> Self:
             var exp_value = exp.numerator / exp.denominator
-            return Self(pow(self.numerator,exp_value), pow(self.denominator,exp_value))
+            return Self(pow(self.numerator, exp_value), pow(self.denominator, exp_value))
+    ```
+
+    You can now use the ** operator to exponentiate objects
+    inside generic functions:
+
+    ```mojo
+    fn exponentiate[T: Powable](a: T, b: T) -> T:
+        return a ** b
+
+    var base = Rational(Float64(3.0), 5.0)
+    var exp = Rational(Float64(1.0), 2.0)
+    var res = exponentiate(base, exp)
+    ```
+
+    ```plaintext
+    raising to power
     ```
     """
 
