@@ -282,8 +282,8 @@ trait Powable:
     inside generic functions:
 
     ```mojo
-    fn exponentiate[T: Powable](a: T, b: T) -> T:
-        return a ** b
+    fn exponentiate[T: Powable](base: T, exp: T) -> T:
+        return base ** exp
 
     var base = Rational(Float64(3.0), 5.0)
     var exp = Rational(Float64(1.0), 2.0)
