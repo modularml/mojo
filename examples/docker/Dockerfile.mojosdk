@@ -24,6 +24,8 @@ FROM ubuntu:20.04
 
 ARG DEFAULT_TZ=America/Los_Angeles
 ENV DEFAULT_TZ=$DEFAULT_TZ
+ENV CERT_FOLDER="/usr/local/share/ca-certificates"
+ENV CERT_FILE="$CERT_FOLDER/modular_installer.crt"
 
 RUN apt-get update \
    && DEBIAN_FRONTEND=noninteractive TZ=$DEFAULT_TZ apt-get install -y \
@@ -50,7 +52,13 @@ RUN pip install \
         matplotlib \
         ipywidgets
 
-RUN curl -s https://get.modular.com | sh -
+# Check SSL certificates to access release url
+RUN sudo echo | openssl s_client -showcerts -servername dl.modular.com -connect dl.modular.com:443 2>/dev/null | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > modular_installer.crt && \
+        sudo mkdir -p "$CERT_FOLDER" && \
+        sudo mv modular_installer.crt "$CERT_FILE" && \
+        sudo update-ca-certificates
+
+RUN curl -ks https://get.modular.com | sh -s -- 8842a5c8-4da3-4d7a-bbfa-fc7f0ed5fe13
 RUN modular install mojo
 
 ARG MODULAR_HOME="/root/.modular"
