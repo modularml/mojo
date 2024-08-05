@@ -262,7 +262,17 @@ trait Powable:
     Types that conform to `Powable` will work with the builtin `pow` function,
     which will return the same type as the inputs.
 
-    TODO: add example
+    For example:
+    ```mojo
+    @value
+    struct Rational(Powable):
+        var numerator: Float64
+        var denominator: Float64
+
+        fn __pow__(self,exp: Self)  -> Self:
+            var frac = exp.numerator / exp.denominator
+            return Self(pow(self.numerator,frac), pow(self.denominator,frac))
+    ```
     """
 
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
