@@ -58,7 +58,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     fn __init__(
         inout self,
         *,
-        owned storage: VariadicPack[_, _, Movable, element_types],
+        owned storage: VariadicPack[_, Movable, element_types],
     ):
         """Construct the tuple from a low-level internal representation.
 
