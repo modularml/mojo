@@ -227,9 +227,7 @@ struct _VariadicListMemIter[
         list_lifetime: The lifetime of the VariadicListMem.
     """
 
-    alias variadic_list_type = VariadicListMem[
-        elt_type, elt_is_mutable.value, elt_lifetime
-    ]
+    alias variadic_list_type = VariadicListMem[elt_type, elt_lifetime]
 
     var index: Int
     var src: Reference[Self.variadic_list_type, list_lifetime]
@@ -278,8 +276,8 @@ struct _lit_mut_cast[
 
 
 struct VariadicListMem[
+    elt_is_mutable: __mlir_type.i1, //,
     element_type: AnyType,
-    elt_is_mutable: __mlir_type.i1,
     lifetime: __mlir_type[`!lit.lifetime<`, elt_is_mutable, `>`],
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
@@ -287,9 +285,9 @@ struct VariadicListMem[
     way that can be enumerated.  Each element may be accessed with `elt[]`.
 
     Parameters:
-        element_type: The type of the elements in the list.
         elt_is_mutable: True if the elements of the list are mutable for an
                         inout or owned argument.
+        element_type: The type of the elements in the list.
         lifetime: The reference lifetime of the underlying elements.
     """
 
@@ -535,7 +533,7 @@ struct _LITRefPackHelper[
 
 @register_passable
 struct VariadicPack[
-    elt_is_mutable: __mlir_type.i1,
+    elt_is_mutable: __mlir_type.i1, //,
     lifetime: __mlir_type[`!lit.lifetime<`, elt_is_mutable, `>`],
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
