@@ -331,7 +331,7 @@ struct InlineArray[
     fn __init__(
         inout self,
         *,
-        owned storage: VariadicListMem[Self.ElementType, _, _],
+        owned storage: VariadicListMem[Self.ElementType, _],
     ):
         """Construct an array from a low-level internal representation.
 

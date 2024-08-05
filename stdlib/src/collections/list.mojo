@@ -133,7 +133,7 @@ struct List[T: CollectionElement](
         """
         self = Self(variadic_list=values^)
 
-    fn __init__(inout self, *, owned variadic_list: VariadicListMem[T, _, _]):
+    fn __init__(inout self, *, owned variadic_list: VariadicListMem[T, _]):
         """Constructs a list from the given values.
 
         Args:
