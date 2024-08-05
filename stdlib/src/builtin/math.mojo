@@ -270,8 +270,8 @@ trait Powable:
         var denominator: Float64
 
         fn __pow__(self,exp: Self)  -> Self:
-            var exponent_value = exp.numerator / exp.denominator
-            return Self(pow(self.numerator,exponent_value), pow(self.denominator,exponent_value))
+            var exp_value = exp.numerator / exp.denominator
+            return Self(pow(self.numerator,exp_value), pow(self.denominator,exp_value))
     ```
     """
 
