@@ -19,6 +19,7 @@ alias QUOTE_STRINGS = 4
 alias QUOTE_NOTNULL = 5
 
 
+@value
 struct Dialect:
     """
     Describe a CSV dialect.
@@ -83,16 +84,17 @@ struct Dialect:
 
 @value
 struct _ReaderIter[
-    get_line: fn (UnsafePointer[reader], Int) raises -> String,
+    reader_mutability: Bool, //,
+    reader_lifetime: AnyLifetime[reader_mutability].type,
 ](Sized):
     """Iterator for any random-access container"""
 
-    var readerptr: UnsafePointer[reader]
+    var reader_ref: Reference[reader, reader_lifetime]
     var idx: Int
 
     @always_inline
     fn __next__(inout self: Self) raises -> String:
-        var line = get_line(self.readerptr, self.idx)
+        var line = self.reader_ref[].get_line(self.idx)
         self.idx += 1
         return line
 
@@ -100,12 +102,12 @@ struct _ReaderIter[
         return 1
 
 
+@value
 struct reader:
     """
     CSV reader.
     """
 
-    alias _iterator = _ReaderIter[Self._get_line]
     var _dialect: Dialect
     var _lines: List[String]
 
@@ -145,22 +147,30 @@ struct reader:
             quoting=quoting,
         )
         self._dialect.validate()
+
         # TODO: Implement streaming to prevent loading the entire file into memory
         self._lines = csvfile.read().split(lineterminator)
 
-    @staticmethod
-    fn _get_line(selfptr: UnsafePointer[Self], idx: Int) raises -> String:
-        return selfptr[]._lines[idx]
+    fn get_line(self: Self, idx: Int) raises -> String:
+        """
+        Returns an specific line in the CSV file.
 
-    fn __iter__(self: Self) raises -> Self._iterator:
+        Args:
+            idx: The index of the line to return.
+
+        Returns:
+            The line at the given index.
+        """
+        return self._lines[idx]
+
+    fn __iter__(self: Self) raises -> _ReaderIter[__lifetime_of(self)]:
         """
         Iterate through the CSV lines.
 
         Returns:
             Iterator.
         """
-        var selfptr = UnsafePointer[Self].address_of(self)
-        return _ReaderIter[Self._get_line](readerptr=selfptr, idx=0)
+        return _ReaderIter[__lifetime_of(self)](reader_ref=self, idx=0)
 
 
 # ===------------------------------------------------------------------=== #
