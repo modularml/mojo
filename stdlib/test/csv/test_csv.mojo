@@ -20,10 +20,13 @@ from pathlib import Path, _dir_of_current_file
 def test_dialect():
     var csv_path = _dir_of_current_file() / "people.csv"
     with open(csv_path, "r") as csv_file:
-        var r = reader(csv_file, delimiter=",", quotechar='"')
-        assert_equal(r.__iter__().__next__(), "foo")
-        # for line in r:
-        #    print(line)
+        var r = reader(
+            csv_file, delimiter=",", quotechar='"', lineterminator="\n"
+        )
+        var r_it = r.__iter__()
+        assert_equal(r_it.__next__(), "Name,Age,Gender")
+        assert_equal(r_it.__next__(), "Peter,23,Male")
+        assert_equal(r_it.__next__(), "Sarah,21,Female")
 
 
 def main():
