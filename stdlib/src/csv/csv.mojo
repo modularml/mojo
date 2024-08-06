@@ -83,14 +83,18 @@ struct Dialect:
 
 @value
 struct _ReaderIter[
-    deref: fn (UnsafePointer[reader]) raises -> String,
+    get_line: fn (UnsafePointer[reader], Int) raises -> String,
 ](Sized):
     """Iterator for any random-access container"""
 
     var readerptr: UnsafePointer[reader]
+    var idx: Int
 
-    fn __next__(self) raises -> String:
-        return deref(self.readerptr)
+    @always_inline
+    fn __next__(inout self: Self) raises -> String:
+        var line = get_line(self.readerptr, self.idx)
+        self.idx += 1
+        return line
 
     fn __len__(self) -> Int:
         return 1
@@ -101,9 +105,9 @@ struct reader:
     CSV reader.
     """
 
-    alias _iterator = _ReaderIter[Self._deref_iter_impl]
+    alias _iterator = _ReaderIter[Self._get_line]
     var _dialect: Dialect
-    var _csvcontent: String
+    var _lines: List[String]
 
     fn __init__(
         inout self: Self,
@@ -142,15 +146,13 @@ struct reader:
         )
         self._dialect.validate()
         # TODO: Implement streaming to prevent loading the entire file into memory
-        self._csvcontent = csvfile.read()
-        raise Error(self._csvcontent)
+        self._lines = csvfile.read().split(lineterminator)
 
     @staticmethod
-    fn _deref_iter_impl(selfptr: UnsafePointer[Self]) raises -> String:
-        var line = selfptr[]._csvcontent
-        return line
+    fn _get_line(selfptr: UnsafePointer[Self], idx: Int) raises -> String:
+        return selfptr[]._lines[idx]
 
-    fn __iter__(self: Self) -> Self._iterator:
+    fn __iter__(self: Self) raises -> Self._iterator:
         """
         Iterate through the CSV lines.
 
@@ -158,7 +160,7 @@ struct reader:
             Iterator.
         """
         var selfptr = UnsafePointer[Self].address_of(self)
-        return _ReaderIter[Self._deref_iter_impl](readerptr=selfptr)
+        return _ReaderIter[Self._get_line](readerptr=selfptr, idx=0)
 
 
 # ===------------------------------------------------------------------=== #
