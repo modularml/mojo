@@ -192,7 +192,7 @@ def test_array_unsafe_assume_initialized_constructor_string():
     maybe_uninitialized_arr[1].write("mojo")
     maybe_uninitialized_arr[2].write("world")
 
-    var initialized_arr = InlineArray(
+    var initialized_arr = InlineArray[String, 3](
         unsafe_assume_initialized=maybe_uninitialized_arr^
     )
 
@@ -255,7 +255,9 @@ def test_inline_array_runs_destructors():
         destructor_counter
     )
     alias capacity = 32
-    var inline_list = InlineArray[ValueDestructorRecorder, 4](
+    var inline_list = InlineArray[
+        ValueDestructorRecorder, 4, run_destructors=True
+    ](
         ValueDestructorRecorder(0, pointer_to_destructor_counter),
         ValueDestructorRecorder(10, pointer_to_destructor_counter),
         ValueDestructorRecorder(20, pointer_to_destructor_counter),

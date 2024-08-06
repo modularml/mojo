@@ -245,12 +245,15 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
 struct InlineArray[
     ElementType: CollectionElementNew,
     size: Int,
+    *,
+    run_destructors: Bool = False,
 ](Sized, Movable, Copyable, ExplicitlyCopyable):
     """A fixed-size sequence of size homogeneous elements where size is a constant expression.
 
     Parameters:
         ElementType: The type of the elements in the array.
         size: The size of the array.
+        run_destructors: Whether to run destructors on the elements.  Defaults to False for *backwards compatibility* reasons only.  Eventually this will default to `True` and/or the parameter will be removed to unconditionally run destructors on the elements.
     """
 
     # Fields
@@ -356,7 +359,7 @@ struct InlineArray[
     fn __init__(
         inout self,
         *,
-        owned storage: VariadicListMem[Self.ElementType, _, _],
+        owned storage: VariadicListMem[Self.ElementType, _],
     ):
         """Construct an array from a low-level internal representation.
 
@@ -406,9 +409,14 @@ struct InlineArray[
 
     fn __del__(owned self):
         """Deallocate the array."""
-        for idx in range(size):
-            var ptr = self.unsafe_ptr() + idx
-            ptr.destroy_pointee()
+
+        @parameter
+        if Self.run_destructors:
+
+            @parameter
+            for idx in range(size):
+                var ptr = self.unsafe_ptr() + idx
+                ptr.destroy_pointee()
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
