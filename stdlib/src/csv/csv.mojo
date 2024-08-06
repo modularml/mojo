@@ -93,7 +93,7 @@ struct _ReaderIter[
     var idx: Int
 
     @always_inline
-    fn __next__(inout self: Self) raises -> String:
+    fn __next__(inout self: Self) raises -> List[String]:
         var line = self.reader_ref[].get_line(self.idx)
         self.idx += 1
         return line
@@ -149,9 +149,9 @@ struct reader:
         self._dialect.validate()
 
         # TODO: Implement streaming to prevent loading the entire file into memory
-        self._lines = csvfile.read().split(lineterminator)
+        self._lines = csvfile.read().split(self._dialect.lineterminator)
 
-    fn get_line(self: Self, idx: Int) raises -> String:
+    fn get_line(self: Self, idx: Int) raises -> List[String]:
         """
         Returns an specific line in the CSV file.
 
@@ -161,7 +161,7 @@ struct reader:
         Returns:
             The line at the given index.
         """
-        return self._lines[idx]
+        return self._lines[idx].split(self._dialect.delimiter)
 
     fn __iter__(self: Self) raises -> _ReaderIter[__lifetime_of(self)]:
         """

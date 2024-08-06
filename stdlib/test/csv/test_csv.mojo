@@ -13,8 +13,12 @@
 # RUN: %mojo %s
 
 from csv import reader
-from testing import assert_equal
 from pathlib import Path, _dir_of_current_file
+
+
+fn assert_line_equal(lhs: List[String], rhs: List[String]) raises:
+    if not lhs == rhs:
+        raise Error("AssertionError: values not equal")
 
 
 def test_dialect():
@@ -24,9 +28,17 @@ def test_dialect():
             csv_file, delimiter=",", quotechar='"', lineterminator="\n"
         )
         var r_it = r.__iter__()
-        assert_equal(r_it.__next__(), "Name,Age,Gender")
-        assert_equal(r_it.__next__(), "Peter,23,Male")
-        assert_equal(r_it.__next__(), "Sarah,21,Female")
+        assert_line_equal(
+            r_it.__next__(),
+            List(String("Name"), String("Age"), String("Gender")),
+        )
+        assert_line_equal(
+            r_it.__next__(), List(String("Peter"), String("23"), String("Male"))
+        )
+        assert_line_equal(
+            r_it.__next__(),
+            List(String("Sarah"), String("21"), String("Female")),
+        )
 
 
 def main():
