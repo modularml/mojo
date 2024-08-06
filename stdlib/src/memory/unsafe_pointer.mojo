@@ -200,7 +200,7 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn offset[T: IntLike](self, idx: T) -> Self:
+    fn offset[T: IntLike, //](self, idx: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
 
         Parameters:
@@ -229,8 +229,11 @@ struct UnsafePointer[
         return (self + offset)[]
 
     @always_inline
-    fn __add__(self, offset: Int) -> Self:
+    fn __add__[T: IntLike, //](self, offset: T) -> Self:
         """Return a pointer at an offset from the current one.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -241,8 +244,11 @@ struct UnsafePointer[
         return self.offset(offset)
 
     @always_inline
-    fn __sub__(self, offset: Int) -> Self:
+    fn __sub__[T: IntLike, //](self, offset: T) -> Self:
         """Return a pointer at an offset from the current one.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -250,11 +256,14 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return self + (-offset)
+        return self + (-1 * Int(offset.__mlir_index__()))
 
     @always_inline
-    fn __iadd__(inout self, offset: Int):
+    fn __iadd__[T: IntLike, //](inout self, offset: T):
         """Add an offset to this pointer.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -262,8 +271,11 @@ struct UnsafePointer[
         self = self + offset
 
     @always_inline
-    fn __isub__(inout self, offset: Int):
+    fn __isub__[T: IntLike, //](inout self, offset: T):
         """Subtract an offset from this pointer.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
