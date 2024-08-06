@@ -695,9 +695,17 @@ def test_list_realloc_trivial_types():
     for i in range(100):
         a.append(i)
 
+    assert_equal(len(a), 100)
+    for i in range(100):
+        assert_equal(a[i], i)
+
     b = List[Int8, hint_trivial_type=True]()
     for i in range(100):
         b.append(Int8(i))
+
+    assert_equal(len(b), 100)
+    for i in range(100):
+        assert_equal(b[i], Int8(i))
 
 
 def test_list_boolable():

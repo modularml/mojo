@@ -895,7 +895,7 @@ fn _clip(value: Int, start: Int, end: Int) -> Int:
 
 fn _move_pointee_into_many_elements[
     T: CollectionElement, //, hint_trivial_type: Bool
-](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int,):
+](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
     @parameter
     if hint_trivial_type:
         memcpy(
