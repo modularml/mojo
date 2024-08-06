@@ -81,12 +81,29 @@ struct Dialect:
         self._valid = _validate_dialect(self)
 
 
+@value
+struct _ReaderIter[
+    deref: fn (UnsafePointer[reader]) raises -> String,
+](Sized):
+    """Iterator for any random-access container"""
+
+    var readerptr: UnsafePointer[reader]
+
+    fn __next__(self) raises -> String:
+        return deref(self.readerptr)
+
+    fn __len__(self) -> Int:
+        return 1
+
+
 struct reader:
     """
     CSV reader.
     """
 
+    alias _iterator = _ReaderIter[Self._deref_iter_impl]
     var _dialect: Dialect
+    var _csvcontent: String
 
     fn __init__(
         inout self: Self,
@@ -124,6 +141,24 @@ struct reader:
             quoting=quoting,
         )
         self._dialect.validate()
+        # TODO: Implement streaming to prevent loading the entire file into memory
+        self._csvcontent = csvfile.read()
+        raise Error(self._csvcontent)
+
+    @staticmethod
+    fn _deref_iter_impl(selfptr: UnsafePointer[Self]) raises -> String:
+        var line = selfptr[]._csvcontent
+        return line
+
+    fn __iter__(self: Self) -> Self._iterator:
+        """
+        Iterate through the CSV lines.
+
+        Returns:
+            Iterator.
+        """
+        var selfptr = UnsafePointer[Self].address_of(self)
+        return _ReaderIter[Self._deref_iter_impl](readerptr=selfptr)
 
 
 # ===------------------------------------------------------------------=== #

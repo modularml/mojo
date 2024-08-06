@@ -13,14 +13,17 @@
 # RUN: %mojo %s
 
 from csv import reader
+from testing import assert_equal
 from pathlib import Path, _dir_of_current_file
 
 
 def test_dialect():
     var csv_path = _dir_of_current_file() / "people.csv"
     with open(csv_path, "r") as csv_file:
-        r = reader(csv_file, delimiter=",", quotechar='"')
-        # TODO: Add more tests
+        var r = reader(csv_file, delimiter=",", quotechar='"')
+        assert_equal(r.__iter__().__next__(), "foo")
+        # for line in r:
+        #    print(line)
 
 
 def main():
