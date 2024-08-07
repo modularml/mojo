@@ -20,6 +20,7 @@ from collections import InlineArray
 """
 
 from sys.intrinsics import _type_is_eq
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -100,6 +101,31 @@ struct InlineArray[
         """
         _inline_array_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    fn __init__(
+        inout self,
+        *,
+        owned unsafe_assume_initialized: InlineArray[
+            UnsafeMaybeUninitialized[Self.ElementType], Self.size
+        ],
+    ):
+        """Constructs an `InlineArray` from an `InlineArray` of `UnsafeMaybeUninitialized`.
+
+        Calling this function assumes that all elements in the input array are initialized.
+
+        If the elements of the input array are not initialized, the behavior is undefined,
+        even  if `ElementType` is valid *for every possible bit pattern* (e.g. `Int` or `Float`).
+
+        Args:
+            unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
+        """
+
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        for i in range(Self.size):
+            unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
+                self.unsafe_ptr() + i
+            )
 
     @always_inline
     fn __init__(inout self, fill: Self.ElementType):
