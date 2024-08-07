@@ -93,11 +93,6 @@ def test_constructors():
     var s3 = String(ptr, 4)
     assert_equal(s3, "abc")
 
-    # Construction from PythonObject
-    var py = Python.evaluate("1 + 1")
-    var s4 = String(py)
-    assert_equal(s4, "2")
-
 
 def test_copy():
     var s0 = String("find")

@@ -813,14 +813,6 @@ struct String(
             )
         )
 
-    fn __init__(inout self, obj: PythonObject):
-        """Creates a string from a python object.
-
-        Args:
-            obj: A python object.
-        """
-        self = str(obj)
-
     @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Creates a deep copy of an existing string.

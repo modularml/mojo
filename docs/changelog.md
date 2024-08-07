@@ -656,3 +656,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - [#3126](https://github.com/modularml/mojo/issues/3126) - [BUG] List doesn't
   work at compile time.
+
+- [#3237](https://github.com/modularml/mojo/issues/3237) - [BUG] Difference
+  between `__getitem__` and `[.]` operator.
+
+- [#3336](https://github.com/modularml/mojo/issues/3336) - Fix outdated
+  references to `let` in REPL documentation.

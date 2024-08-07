@@ -14,8 +14,9 @@
 
 from .counter import Counter
 from .dict import Dict, KeyElement
+from .inline_array import InlineArray
 from .inline_list import InlineList
 from .list import List
 from .optional import Optional, OptionalReg
 from .set import Set
-from .vector import CollectionElement, InlinedFixedVector
+from .vector import InlinedFixedVector

@@ -20,7 +20,6 @@ from utils import Span
 ```
 """
 
-from . import InlineArray
 from memory import Reference
 from sys.intrinsics import _type_is_eq
 
