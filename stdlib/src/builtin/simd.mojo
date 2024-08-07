@@ -36,7 +36,7 @@ from builtin.hash import _hash_simd
 from builtin.format_int import _try_write_int
 from memory import bitcast, UnsafePointer
 
-from utils import InlineArray, StringSlice, StaticIntTuple, Span
+from utils import StringSlice, StaticIntTuple, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
