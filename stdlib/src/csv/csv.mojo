@@ -99,6 +99,8 @@ struct _ReaderIter[
         return line
 
     fn __len__(self) -> Int:
+        # This is the current way to imitate the StopIteration exception
+        # TODO: Remove when the iterators are implemented and streaming is done
         return self.reader_ref[].lines_count()
 
 
