@@ -567,11 +567,7 @@ fn exp[
             ](x * inv_lg2)
 
     @parameter
-    if (
-        not type is DType.float64
-        and type is not DType.float32
-        and sizeof[type]() < sizeof[DType.float32]()
-    ):
+    if type not in (DType.float32, DType.float64):
         return exp(x.cast[DType.float32]()).cast[type]()
 
     var min_val: SIMD[type, simd_width]
