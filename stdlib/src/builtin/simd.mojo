@@ -526,7 +526,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type is DType.bfloat16:
+        if _is_sm_80() and type.is_half_float():
             return self.fma(1, rhs)
 
         return __mlir_op.`pop.add`(self.value, rhs.value)
@@ -545,7 +545,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type is DType.bfloat16:
+        if _is_sm_80() and type.is_half_float():
             return rhs.fma(-1, self)
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
@@ -568,7 +568,7 @@ struct SIMD[type: DType, size: Int](
             ]()
 
         @parameter
-        if _is_sm_80() and type is DType.bfloat16:
+        if _is_sm_80() and type.is_half_float():
             return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
@@ -1706,12 +1706,13 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type is DType.bfloat16:
+        if _is_sm_80() and type.is_half_float():
+            alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
 
             @parameter
             if size == 1:
                 return inlined_assembly[
-                    "fma.rn.bf16 $0, $1, $2, $3;",
+                    prefix + " $0, $1, $2, $3;",
                     Self,
                     constraints="=h,h,h,h",
                     has_side_effect=False,
@@ -1722,7 +1723,7 @@ struct SIMD[type: DType, size: Int](
             @parameter
             for i in range(0, size, 2):
                 var val = inlined_assembly[
-                    "fma.rn.bf16x2 $0, $1, $2, $3;",
+                    prefix + "x2 $0, $1, $2, $3;",
                     SIMD[type, 2],
                     constraints="=r,r,r,r",
                     has_side_effect=False,
