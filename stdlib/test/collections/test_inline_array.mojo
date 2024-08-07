@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 from testing import assert_equal, assert_false, assert_true
-
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from test_utils import ValueDestructorRecorder
 
 
@@ -148,6 +148,40 @@ def test_array_int_pointer():
     _ = arr
 
 
+def test_array_unsafe_assume_initialized_constructor_string():
+    var maybe_uninitialized_arr = InlineArray[
+        UnsafeMaybeUninitialized[String], 3
+    ](unsafe_uninitialized=True)
+    maybe_uninitialized_arr[0].write("hello")
+    maybe_uninitialized_arr[1].write("mojo")
+    maybe_uninitialized_arr[2].write("world")
+
+    var initialized_arr = InlineArray[String, 3](
+        unsafe_assume_initialized=maybe_uninitialized_arr^
+    )
+
+    assert_equal(initialized_arr[0], "hello")
+    assert_equal(initialized_arr[1], "mojo")
+    assert_equal(initialized_arr[2], "world")
+
+    # trigger a move
+    var initialized_arr2 = initialized_arr^
+
+    assert_equal(initialized_arr2[0], "hello")
+    assert_equal(initialized_arr2[1], "mojo")
+    assert_equal(initialized_arr2[2], "world")
+
+    # trigger a copy
+    var initialized_arr3 = InlineArray(other=initialized_arr2)
+
+    assert_equal(initialized_arr3[0], "hello")
+    assert_equal(initialized_arr3[1], "mojo")
+    assert_equal(initialized_arr3[2], "world")
+
+    # We assume the destructor was called correctly, but one
+    # might want to add a test for that in the future.
+
+
 def test_array_contains():
     var arr = InlineArray[String, 3]("hi", "hello", "hey")
     assert_true(str("hi") in arr)
@@ -184,5 +218,6 @@ def main():
     test_array_int()
     test_array_str()
     test_array_int_pointer()
+    test_array_unsafe_assume_initialized_constructor_string()
     test_array_contains()
     test_inline_array_runs_destructors()
