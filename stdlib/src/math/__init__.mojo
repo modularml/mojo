@@ -64,7 +64,7 @@ from .math import (
     logb,
     modf,
     remainder,
-    rsqrt,
+    isqrt,
     scalb,
     sin,
     sinh,
