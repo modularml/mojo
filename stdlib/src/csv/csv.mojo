@@ -99,7 +99,7 @@ struct _ReaderIter[
         return line
 
     fn __len__(self) -> Int:
-        return 1
+        return self.reader_ref[].lines_count()
 
 
 @value
@@ -162,6 +162,16 @@ struct reader:
             The line at the given index.
         """
         return self._lines[idx].split(self._dialect.delimiter)
+
+    fn lines_count(self: Self) -> Int:
+        """
+        Returns the number of lines in the CSV file.
+
+        Returns:
+            The number of lines in the CSV file.
+        """
+        # TODO: This has no sense once we implement streaming
+        return len(self._lines)
 
     fn __iter__(self: Self) raises -> _ReaderIter[__lifetime_of(self)]:
         """

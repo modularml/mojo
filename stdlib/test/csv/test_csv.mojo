@@ -19,7 +19,12 @@ from pathlib import Path, _dir_of_current_file
 
 fn assert_line_equal(lhs: List[String], rhs: List[String]) raises:
     if not lhs == rhs:
-        raise Error("AssertionError: values not equal")
+        raise Error(
+            "AssertionError: value "
+            + lhs.__repr__()
+            + " not equal to "
+            + rhs.__repr__()
+        )
 
 
 def test_dialect():
@@ -52,6 +57,10 @@ def test_reader():
         assert_line_equal(
             r_it.__next__(),
             List(String("Sarah"), String("21"), String("Female")),
+        )
+        assert_line_equal(
+            r_it.__next__(),
+            List(String("")),
         )
 
 
