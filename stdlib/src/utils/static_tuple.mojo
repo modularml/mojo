@@ -18,7 +18,7 @@ You can import these APIs from the `utils` package. For example:
 from utils import StaticTuple
 ```
 """
-from memory.maybe_uninitialized import UnsafeMaybeUninitialized
+
 from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
