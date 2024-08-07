@@ -22,7 +22,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticIntTuple, InlineArray
+from utils import unroll, StaticIntTuple
 from utils.numerics import isfinite, isinf, isnan, nan
 
 

@@ -21,7 +21,7 @@ from sys import sizeof
 
 from memory import UnsafePointer, memcpy
 
-from utils import InlineArray, StringSlice, Variant
+from utils import StringSlice, Variant
 from utils._format import ToFormatter
 
 # ===----------------------------------------------------------------------===#
