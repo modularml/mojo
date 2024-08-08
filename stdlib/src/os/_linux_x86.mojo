@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from time.time import _CTimeSpec
+from collections import InlineArray
 
 from .fstat import stat_result
 
