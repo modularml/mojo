@@ -84,7 +84,7 @@ struct _DictEntryIter[
         return self
 
     @always_inline
-    fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
+    fn __next__(inout self) -> Reference[DictEntry[K, V], dict_lifetime]:
         while True:
             var opt_entry_ref = Reference(self.src[]._entries[self.index])
 
@@ -895,7 +895,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(self._reserved())
 
     fn setdefault(
-        ref [_]self: Self, key: K, owned default: V
+        inout self, key: K, owned default: V
     ) raises -> Reference[V, __lifetime_of(self)]:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
