@@ -371,6 +371,20 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 ### 🦋 Changed
 
+- The set of automatically imported entities (types, aliases, functions) into user's
+  Mojo programs has been dramatically reduced.  Before, with the way the `builtin`
+  module was handled, all of the entities in the following modules would be automatically
+  included:
+
+  {'memory', 'sys', 'os', 'utils', 'python', 'bit', 'random', 'math',
+   'builtin', 'collections'}
+
+  Now, only the explicitly enumerated entities in `prelude/__init__.mojo` are
+  the ones automatically imported into user's Mojo programs.  This will break
+  a lot of user code as users will need to explicitly import what they're using
+  for cases previously commonly included before (such as `Optional`, `Variant`,
+  and so on).
+
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
   semantics bring a lot of history and baggage that are not needed in Mojo and
