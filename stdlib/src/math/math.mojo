@@ -268,7 +268,7 @@ fn sqrt[
 
 
 @always_inline
-fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
+fn _isqrt_nvvm(x: SIMD) -> __type_of(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
     ]()
@@ -285,7 +285,7 @@ fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn rsqrt(x: SIMD) -> __type_of(x):
+fn isqrt(x: SIMD) -> __type_of(x):
     """Performs elementwise reciprocal square root on a SIMD vector.
 
     Args:
@@ -301,9 +301,9 @@ fn rsqrt(x: SIMD) -> __type_of(x):
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
-            return _rsqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
+            return _isqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
 
-        return _rsqrt_nvvm(x)
+        return _isqrt_nvvm(x)
 
     return 1 / sqrt(x)
 
@@ -567,11 +567,7 @@ fn exp[
             ](x * inv_lg2)
 
     @parameter
-    if (
-        not type is DType.float64
-        and type is not DType.float32
-        and sizeof[type]() < sizeof[DType.float32]()
-    ):
+    if type not in (DType.float32, DType.float64):
         return exp(x.cast[DType.float32]()).cast[type]()
 
     var min_val: SIMD[type, simd_width]

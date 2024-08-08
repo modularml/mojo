@@ -207,6 +207,9 @@ struct InlineArray[
 
         self = Self(other=other)
 
+    # We want to be explicit about lifecycle methods.
+    # @value makes it implicit but since we're low level
+    # here, it's better to be explicit about what a move means.
     fn __moveinit__(inout self, owned other: Self):
         """Move construct the array.
 
