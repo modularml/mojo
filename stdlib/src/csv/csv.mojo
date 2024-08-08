@@ -11,6 +11,22 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""
+CSV module.
+
+This module implements classes to read and write CSV files.
+
+Example:
+
+    >>> import csv
+    >>> with open("example.csv", "r") as csvfile:
+    ...     reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+    ...     for row in reader:
+    ...         print(row)
+    ['a', 'b', 'c']
+    ['1', '2', '3']
+"""
+
 alias QUOTE_MINIMAL = 0
 alias QUOTE_ALL = 1
 alias QUOTE_NONNUMERIC = 2
@@ -108,6 +124,17 @@ struct _ReaderIter[
 struct reader:
     """
     CSV reader.
+
+    This class reads CSV files.
+
+    Example:
+
+        >>> with open("example.csv", "r") as csvfile:
+        ...     reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+        ...     for row in reader:
+        ...         print(row)
+        ['a', 'b', 'c']
+        ['1', '2', '3']
     """
 
     var _dialect: Dialect
