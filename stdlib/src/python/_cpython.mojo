@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from collections import InlineArray
 from os import getenv, setenv
 from os.path import dirname
 from pathlib import Path

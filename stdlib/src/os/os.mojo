@@ -19,7 +19,7 @@ from os import listdir
 ```
 """
 
-from collections import List
+from collections import List, InlineArray
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda, external_call
 from sys.ffi import C_char
 
