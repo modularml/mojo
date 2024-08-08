@@ -184,13 +184,7 @@ struct InlineArray[
         # Mark the elements as already destroyed.
         storage._is_owned = False
 
-    fn __init__(
-        inout self: InlineArray[
-            ElementType, size, run_destructors=run_destructors
-        ],
-        *,
-        other: InlineArray[ElementType, size, run_destructors=run_destructors],
-    ):
+    fn __init__(inout self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
