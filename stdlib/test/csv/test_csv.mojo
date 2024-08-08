@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 from csv import reader, Dialect
-from testing import assert_equal
+from testing import assert_equal, assert_raises
 from pathlib import Path, _dir_of_current_file
 
 
@@ -38,6 +38,11 @@ def test_dialect():
     assert_equal(d.skipinitialspace, False)
     d.validate()
     assert_equal(d._valid, True)
+
+    d = Dialect(delimiter=",,", quotechar='"', lineterminator="\n", quoting=1)
+    assert_equal(d.quoting, 1)
+    with assert_raises(contains="delimiter must be a 1-character string"):
+        d.validate()
 
 
 def test_reader():
