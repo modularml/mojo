@@ -377,6 +377,24 @@ fn exp2[
         Vector containing $2^n$ computed elementwise, where n is an element in
         the input SIMD vector.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if type is DType.float16:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.f16", constraints="=h,h"
+            ](x)
+        elif type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.ftz.f32", constraints="=f,f"
+            ](x)
+
+    @parameter
+    if type not in (DType.float32, DType.float64):
+        return exp2(x.cast[DType.float32]()).cast[type]()
+
     alias integral_type = FPUtils[type].integral_type
 
     var xc = x.clamp(-126, 126)
