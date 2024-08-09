@@ -25,6 +25,7 @@ f.close()
 """
 
 
+@value
 struct FileDescriptor:
     """File descriptor of a file."""
 
