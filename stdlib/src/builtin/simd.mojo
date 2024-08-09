@@ -54,7 +54,10 @@ from .dtype import (
     _scientific_notation_digits,
 )
 from .io import _printf, _snprintf_scalar
-from .string import _calc_format_buffer_size, _calc_initial_buffer_size
+from collections.string import (
+    _calc_format_buffer_size,
+    _calc_initial_buffer_size,
+)
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
