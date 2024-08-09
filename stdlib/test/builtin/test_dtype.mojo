@@ -49,9 +49,27 @@ fn test_sizeof() raises:
     assert_equal(DType.index.sizeof(), sizeof[DType.index]())
 
 
-fn main() raises:
+def test_from_str():
+    assert_equal(DType._from_str("bool"), DType.bool)
+    assert_equal(DType._from_str("DType.bool"), DType.bool)
+
+    alias dt = DType._from_str("bool")
+    assert_equal(dt, DType.bool)
+
+    assert_equal(DType._from_str("bfloat16"), DType.bfloat16)
+    assert_equal(DType._from_str("DType.bfloat16"), DType.bfloat16)
+
+    assert_equal(DType._from_str("int64"), DType.int64)
+    assert_equal(DType._from_str("DType.int64"), DType.int64)
+
+    assert_equal(DType._from_str("blahblah"), DType.invalid)
+    assert_equal(DType._from_str("DType.blahblah"), DType.invalid)
+
+
+def main():
     test_equality()
     test_stringable()
     test_representable()
     test_key_element()
     test_sizeof()
+    test_from_str()
