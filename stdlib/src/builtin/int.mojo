@@ -20,7 +20,7 @@ from collections import KeyElement
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from builtin.io import _snprintf
-from builtin.string import (
+from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )

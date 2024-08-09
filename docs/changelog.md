@@ -385,6 +385,11 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   for cases previously commonly included before (such as `Optional`, `Variant`,
   and so on).
 
+- Some types from the `builtin` module have been moved to different modules for clarity
+  which is made possible now that we have a `prelude` module that can re-export symbols
+  from modules other than `builtin`.
+  - `builtin.string` has been moved to `collections.string`.
+
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
   semantics bring a lot of history and baggage that are not needed in Mojo and

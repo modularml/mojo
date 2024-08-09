@@ -23,7 +23,7 @@ from utils import StringRef, Span, StringSlice
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from .string import _atol
+from collections.string import _atol
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
