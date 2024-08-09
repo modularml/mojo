@@ -21,59 +21,59 @@ from testing import assert_equal
 
 fn main() raises:
     # Root directories
-    assert_equal("/", dirname("/"))
+    assert_equal(dirname("/"), "/")
 
     # Empty strings
-    assert_equal("", dirname(""))
+    assert_equal(dirname(""), "")
 
     # Current directory (matching behavior of python, doesn't resolve `..` etc.)
-    assert_equal("", dirname("."))
+    assert_equal(dirname("."), "")
 
     # Parent directory
-    assert_equal("", dirname(".."))
+    assert_equal(dirname(".."), "")
 
     # Absolute paths
-    assert_equal("/", dirname("/file"))
-    assert_equal("/dir", dirname("/dir/file"))
-    assert_equal("/dir/subdir", dirname("/dir/subdir/file"))
+    assert_equal(dirname("/file"), "/")
+    assert_equal(dirname("/dir/file"), "/dir")
+    assert_equal(dirname("/dir/subdir/file"), "/dir/subdir")
 
     # Relative paths
-    assert_equal("dir", dirname("dir/file"))
-    assert_equal("dir/subdir", dirname("dir/subdir/file"))
-    assert_equal("", dirname("file"))
+    assert_equal(dirname("dir/file"), "dir")
+    assert_equal(dirname("dir/subdir/file"), "dir/subdir")
+    assert_equal(dirname("file"), "")
 
     # Trailing slashes
-    assert_equal("/path/to", dirname("/path/to/"))
-    assert_equal("/path/to/dir", dirname("/path/to/dir/"))
+    assert_equal(dirname("/path/to/"), "/path/to")
+    assert_equal(dirname("/path/to/dir/"), "/path/to/dir")
 
     # Multiple slashes
-    assert_equal("/path/to", dirname("/path/to//file"))
-    assert_equal("/path", dirname("/path//to"))
+    assert_equal(dirname("/path/to//file"), "/path/to")
+    assert_equal(dirname("/path//to"), "/path")
 
     # Paths with spaces
-    assert_equal("/path to", dirname("/path to/file"))
-    assert_equal("/path to/dir", dirname("/path to/dir/file"))
+    assert_equal(dirname("/path to/file"), "/path to")
+    assert_equal(dirname("/path to/dir/file"), "/path to/dir")
 
     # Paths with special characters
-    assert_equal("/path-to", dirname("/path-to/file"))
-    assert_equal("/path_to/dir", dirname("/path_to/dir/file"))
+    assert_equal(dirname("/path-to/file"), "/path-to")
+    assert_equal(dirname("/path_to/dir/file"), "/path_to/dir")
 
     # Paths with dots
-    assert_equal("/path/./to", dirname("/path/./to/file"))
-    assert_equal("/path/../to", dirname("/path/../to/file"))
+    assert_equal(dirname("/path/./to/file"), "/path/./to")
+    assert_equal(dirname("/path/../to/file"), "/path/../to")
 
     # Paths with double dots
-    assert_equal("/path/..", dirname("/path/../file"))
-    assert_equal("/path/to/..", dirname("/path/to/../file"))
+    assert_equal(dirname("/path/../file"), "/path/..")
+    assert_equal(dirname("/path/to/../file"), "/path/to/..")
 
     # Root and relative mixed
-    assert_equal("/dir/.", dirname("/dir/./file"))
-    assert_equal("/dir/subdir/..", dirname("/dir/subdir/../file"))
+    assert_equal(dirname("/dir/./file"), "/dir/.")
+    assert_equal(dirname("/dir/subdir/../file"), "/dir/subdir/..")
 
     # Edge cases
-    assert_equal("/.", dirname("/./file"))
-    assert_equal("/..", dirname("/../file"))
+    assert_equal(dirname("/./file"), "/.")
+    assert_equal(dirname("/../file"), "/..")
 
     # Unix hidden files
-    assert_equal("/path/to", dirname("/path/to/.hiddenfile"))
-    assert_equal("/path/to/dir", dirname("/path/to/dir/.hiddenfile"))
+    assert_equal(dirname("/path/to/.hiddenfile"), "/path/to")
+    assert_equal(dirname("/path/to/dir/.hiddenfile"), "/path/to/dir")

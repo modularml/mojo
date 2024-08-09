@@ -160,6 +160,7 @@ struct SIMD[type: DType, size: Int](
     CeilDivable,
     CollectionElement,
     CollectionElementNew,
+    EqualityComparable,
     Floorable,
     Formattable,
     Hashable,
@@ -744,6 +745,26 @@ struct SIMD[type: DType, size: Int](
                 self.value, rhs.value
             )
 
+    # TODO there may be a better way to do this:
+    # the [overload_1: None = None] parameter is to give this overload lower precedence,
+    # while still conforming to EqualityComparable
+    @always_inline("nodebug")
+    fn __eq__[overload_1: None = None](self, rhs: Self) -> Bool:
+        """Compares two SIMD vectors using all-equal-to comparison.
+
+        This overload allows EqualityComparable conformance.
+
+        Parameters:
+            overload_1: Ignore this parameter, used to set the overload precedence.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if all lanes are equal, False otherwise.
+        """
+        return all(self == rhs)
+
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using not-equal comparison.
@@ -768,6 +789,26 @@ struct SIMD[type: DType, size: Int](
             return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
                 self.value, rhs.value
             )
+
+    # TODO there may be a better way to do this:
+    # the [overload_1: None = None] parameter is to give this overload lower precedence,
+    # while still conforming to EqualityComparable
+    @always_inline("nodebug")
+    fn __ne__[overload_1: None = None](self, rhs: Self) -> Bool:
+        """Compares two SIMD vectors using any-not-equal comparison.
+
+        This overload allows EqualityComparable conformance.
+
+        Parameters:
+            overload_1: Ignore this parameter, used to set the overload precedence.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if any lanes are not equal, False otherwise.
+        """
+        return any(self != rhs)
 
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Self._Mask:

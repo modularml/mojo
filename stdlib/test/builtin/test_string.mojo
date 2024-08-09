@@ -38,10 +38,10 @@ struct AString(Stringable):
 
 
 def test_stringable():
-    assert_equal("hello", str("hello"))
-    assert_equal("0", str(0))
-    assert_equal("AAA", str(StringRef("AAA")))
-    assert_equal("a string", str(AString()))
+    assert_equal(str("hello"), "hello")
+    assert_equal(str(0), "0")
+    assert_equal(str(StringRef("AAA")), "AAA")
+    assert_equal(str(AString()), "a string")
 
 
 def test_repr():
@@ -72,17 +72,17 @@ def test_constructors():
 
     # Construction from Int
     var s0 = str(0)
-    assert_equal("0", str(0))
-    assert_equal(1, len(s0))
+    assert_equal(str(0), "0")
+    assert_equal(len(s0), 1)
 
     var s1 = str(123)
-    assert_equal("123", str(123))
-    assert_equal(3, len(s1))
+    assert_equal(str(123), "123")
+    assert_equal(len(s1), 3)
 
     # Construction from StringLiteral
     var s2 = String("abc")
-    assert_equal("abc", str(s2))
-    assert_equal(3, len(s2))
+    assert_equal(str(s2), "abc")
+    assert_equal(len(s2), 3)
 
     # Construction from UnsafePointer
     var ptr = UnsafePointer[UInt8].alloc(4)
@@ -98,8 +98,8 @@ def test_copy():
     var s0 = String("find")
     var s1 = str(s0)
     s1._buffer[3] = ord("e")
-    assert_equal("find", s0)
-    assert_equal("fine", s1)
+    assert_equal(s0, "find")
+    assert_equal(s1, "fine")
 
 
 def test_equality_operators():
@@ -167,31 +167,31 @@ def test_add():
     var s1 = String("123")
     var s2 = String("abc")
     var s3 = s1 + s2
-    assert_equal("123abc", s3)
+    assert_equal(s3, "123abc")
 
     var s4 = String("x")
     var s5 = s4.join(1, 2, 3)
-    assert_equal("1x2x3", s5)
+    assert_equal(s5, "1x2x3")
 
     var s6 = s4.join(s1, s2)
-    assert_equal("123xabc", s6)
+    assert_equal(s6, "123xabc")
 
     var s7 = String()
-    assert_equal("abc", s2 + s7)
+    assert_equal(s2 + s7, "abc")
 
-    assert_equal("abcdef", s2 + "def")
-    assert_equal("123abc", "123" + s2)
+    assert_equal(s2 + "def", "abcdef")
+    assert_equal("123" + s2, "123abc")
 
     var s8 = String("abc is ")
     var s9 = AString()
-    assert_equal("abc is a string", str(s8) + str(s9))
+    assert_equal(str(s8) + str(s9), "abc is a string")
 
 
 def test_string_join():
     var sep = String(",")
     var s0 = String("abc")
     var s1 = sep.join(s0, s0, s0, s0)
-    assert_equal("abc,abc,abc,abc", s1)
+    assert_equal(s1, "abc,abc,abc,abc")
 
     assert_equal(sep.join(1, 2, 3), "1,2,3")
 
@@ -301,39 +301,39 @@ def test_ord():
 
 
 def test_chr():
-    assert_equal("A", chr(65))
-    assert_equal("a", chr(97))
-    assert_equal("!", chr(33))
-    assert_equal("α", chr(945))
-    assert_equal("➿", chr(10175))
-    assert_equal("🔥", chr(128293))
+    assert_equal(chr(65), "A")
+    assert_equal(chr(97), "a")
+    assert_equal(chr(33), "!")
+    assert_equal(chr(945), "α")
+    assert_equal(chr(10175), "➿")
+    assert_equal(chr(128293), "🔥")
 
 
 def test_string_indexing():
     var str = String("Hello Mojo!!")
 
-    assert_equal("H", str[0])
-    assert_equal("!", str[-1])
-    assert_equal("H", str[-len(str)])
-    assert_equal("llo Mojo!!", str[2:])
-    assert_equal("lo Mojo!", str[3:-1:1])
-    assert_equal("lo Moj", str[3:-3])
+    assert_equal(str[0], "H")
+    assert_equal(str[-1], "!")
+    assert_equal(str[-len(str)], "H")
+    assert_equal(str[2:], "llo Mojo!!")
+    assert_equal(str[3:-1:1], "lo Mojo!")
+    assert_equal(str[3:-3], "lo Moj")
 
-    assert_equal("!!ojoM olleH", str[::-1])
+    assert_equal(str[::-1], "!!ojoM olleH")
 
-    assert_equal("leH", str[2::-1])
+    assert_equal(str[2::-1], "leH")
 
-    assert_equal("!oo le", str[::-2])
+    assert_equal(str[::-2], "!oo le")
 
-    assert_equal("", str[:-1:-2])
-    assert_equal("", str[-50::-1])
-    assert_equal("Hello Mojo!!", str[-50::])
-    assert_equal("!!ojoM olleH", str[:-50:-1])
-    assert_equal("Hello Mojo!!", str[:50:])
-    assert_equal("H", str[::50])
-    assert_equal("!", str[::-50])
-    assert_equal("!", str[50::-50])
-    assert_equal("H", str[-50::50])
+    assert_equal(str[:-1:-2], "")
+    assert_equal(str[-50::-1], "")
+    assert_equal(str[-50::], "Hello Mojo!!")
+    assert_equal(str[:-50:-1], "!!ojoM olleH")
+    assert_equal(str[:50:], "Hello Mojo!!")
+    assert_equal(str[::50], "H")
+    assert_equal(str[::-50], "!")
+    assert_equal(str[50::-50], "!")
+    assert_equal(str[-50::50], "H")
 
 
 def test_atol():
@@ -500,7 +500,7 @@ def test_atof():
     assert_equal(1.0, atof(String("001.")))
     assert_equal(+5.0, atof(String(" +005.")))
     assert_equal(13.0, atof(String(" 013.f  ")))
-    assert_equal(-89, atof(String("-89")))
+    assert_equal(-89.0, atof(String("-89")))
     assert_equal(-0.3, atof(String(" -0.3")))
     assert_equal(-69e3, atof(String(" -69E+3  ")))
     assert_equal(123.2e1, atof(String(" 123.2E1  ")))
@@ -632,21 +632,21 @@ def test_count():
 def test_replace():
     # Replace empty
     var s1 = String("abc")
-    assert_equal("xaxbxc", s1.replace("", "x"))
-    assert_equal("->a->b->c", s1.replace("", "->"))
+    assert_equal(s1.replace("", "x"), "xaxbxc")
+    assert_equal(s1.replace("", "->"), "->a->b->c")
 
     var s2 = String("Hello Python")
-    assert_equal("Hello Mojo", s2.replace("Python", "Mojo"))
-    assert_equal("HELLo Python", s2.replace("Hell", "HELL"))
-    assert_equal("Hello Python", s2.replace("HELL", "xxx"))
-    assert_equal("HellP oython", s2.replace("o P", "P o"))
-    assert_equal("Hello Pything", s2.replace("thon", "thing"))
-    assert_equal("He||o Python", s2.replace("ll", "||"))
-    assert_equal("He--o Python", s2.replace("l", "-"))
-    assert_equal("He-x--x-o Python", s2.replace("l", "-x-"))
+    assert_equal(s2.replace("Python", "Mojo"), "Hello Mojo")
+    assert_equal(s2.replace("Hell", "HELL"), "HELLo Python")
+    assert_equal(s2.replace("HELL", "xxx"), "Hello Python")
+    assert_equal(s2.replace("o P", "P o"), "HellP oython")
+    assert_equal(s2.replace("thon", "thing"), "Hello Pything")
+    assert_equal(s2.replace("ll", "||"), "He||o Python")
+    assert_equal(s2.replace("l", "-"), "He--o Python")
+    assert_equal(s2.replace("l", "-x-"), "He-x--x-o Python")
 
     var s3 = String("a   complex  test case  with some  spaces")
-    assert_equal("a  complex test case with some spaces", s3.replace("  ", " "))
+    assert_equal(s3.replace("  ", " "), "a  complex test case with some spaces")
 
 
 def test_rfind():
@@ -1275,15 +1275,15 @@ def test_string_iter():
     for item in vs:
         idx += 1
         if idx == 0:
-            assert_equal("m", item)
+            assert_equal(str(item), "m")
         elif idx == 1:
-            assert_equal("o", item)
+            assert_equal(str(item), "o")
         elif idx == 2:
-            assert_equal("j", item)
+            assert_equal(str(item), "j")
         elif idx == 3:
-            assert_equal("o", item)
+            assert_equal(str(item), "o")
         elif idx == 4:
-            assert_equal("🔥", item)
+            assert_equal(str(item), "🔥")
     assert_equal(4, idx)
 
     var items = List[String](

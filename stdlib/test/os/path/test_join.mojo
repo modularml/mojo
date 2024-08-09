@@ -22,26 +22,26 @@ from testing import assert_equal
 
 fn main() raises:
     # TODO uncomment lines using Path when unpacking is supported
-    assert_equal("path/to/file", join("path", "to", "file"))
+    assert_equal(join("path", "to", "file"), "path/to/file")
     # assert_equal("path/to/file", join(Path("path"), Path("to"), Path("file")))
-    assert_equal("path/to/file", join("path", "to/file"))
+    assert_equal(join("path", "to/file"), "path/to/file")
     # assert_equal("path/to/file", join(Path("path"), Path("to/file")))
-    assert_equal("path/to/file", join("path/to", "file"))
+    assert_equal(join("path/to", "file"), "path/to/file")
     # assert_equal("path/to/file", join(Path("path/to"), Path("file")))
-    assert_equal("path/to/file", join("path/", "to/", "file"))
+    assert_equal(join("path/", "to/", "file"), "path/to/file")
 
-    assert_equal("path/", join("path", ""))
+    assert_equal(join("path", ""), "path/")
     # assert_equal("path/", join(Path("path"), Path("")))
-    assert_equal("path", join("path"))
+    assert_equal(join("path"), "path")
     # assert_equal("path", join(Path("path")))
-    assert_equal("", join(""))
-    assert_equal("path", join("", "path"))
+    assert_equal(join(""), "")
+    assert_equal(join("", "path"), "path")
 
-    assert_equal("/path/to/file", join("ignored", "/path/to", "file"))
+    assert_equal(join("ignored", "/path/to", "file"), "/path/to/file")
     # assert_equal("/path/to/file", join(Path("ignored"), Path("/path/to/file")))
     assert_equal(
-        "/absolute/path",
         join("ignored", "/ignored/absolute/path", "/absolute", "path"),
+        "/absolute/path",
     )
     # assert_equal(
     #     "/path/to/file",

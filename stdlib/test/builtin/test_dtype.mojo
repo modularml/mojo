@@ -23,8 +23,8 @@ fn test_equality() raises:
 
 
 fn test_stringable() raises:
-    assert_equal("float32", str(DType.float32))
-    assert_equal("int64", str(DType.int64))
+    assert_equal(str(DType.float32), "float32")
+    assert_equal(str(DType.int64), "int64")
 
 
 fn test_representable() raises:

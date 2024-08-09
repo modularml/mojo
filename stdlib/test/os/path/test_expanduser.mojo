@@ -58,13 +58,13 @@ fn main() raises:
     assert_equal(join(user_path, "folder/"), expanduser("~/folder/"))
 
     # Path without user home directory
-    assert_equal("/usr/bin", expanduser("/usr/bin"))
+    assert_equal(expanduser("/usr/bin"), "/usr/bin")
 
     # Relative path
-    assert_equal("../folder", expanduser("../folder"))
+    assert_equal(expanduser("../folder"), "../folder")
 
     # Empty string
-    assert_equal("", expanduser(""))
+    assert_equal(expanduser(""), "")
 
     # Path with multiple tildes
     assert_equal(join(user_path, "~folder"), expanduser("~/~folder"))
@@ -73,7 +73,7 @@ fn main() raises:
     set_home("")
     if os_is_windows():
         # Don't expand on windows if home isn't set
-        assert_equal("~/folder", expanduser("~/folder"))
+        assert_equal(expanduser("~/folder"), "~/folder")
     else:
         # Test fallback to `/etc/passwd` works on linux
         alias folder = "~/folder"
