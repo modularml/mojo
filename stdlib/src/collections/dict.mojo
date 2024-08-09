@@ -35,6 +35,7 @@ from builtin.value import StringableCollectionElement
 
 from .optional import Optional
 from bit import is_power_of_two
+from memory import memcpy, bitcast
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
@@ -83,7 +84,7 @@ struct _DictEntryIter[
         return self
 
     @always_inline
-    fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
+    fn __next__(inout self) -> Reference[DictEntry[K, V], dict_lifetime]:
         while True:
             var opt_entry_ref = Reference(self.src[]._entries[self.index])
 
@@ -284,30 +285,30 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[Int16]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[Int32]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
         else:
             var data = self.data.bitcast[Int64]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[Int16]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[Int32]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
         else:
             var data = self.data.bitcast[Int64]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
 
     fn __del__(owned self):
         self.data.free()
@@ -894,7 +895,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(self._reserved())
 
     fn setdefault(
-        ref [_]self: Self, key: K, owned default: V
+        inout self, key: K, owned default: V
     ) raises -> Reference[V, __lifetime_of(self)]:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 

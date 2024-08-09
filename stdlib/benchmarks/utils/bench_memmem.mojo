@@ -16,6 +16,7 @@
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
+from memory import memcmp
 
 from utils.stringref import _align_down, _memchr, _memmem
 
@@ -164,9 +165,7 @@ fn _memmem_baseline[
         haystack_len - needle_len + 1, bool_mask_width
     )
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = SIMD[size=bool_mask_width].load(
-            haystack, i
-        ) == first_needle
+        var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
             var offset = int(i + count_trailing_zeros(mask))

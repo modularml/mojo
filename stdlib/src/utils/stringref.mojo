@@ -18,6 +18,8 @@ from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
 from memory import UnsafePointer, memcmp
 from memory.memory import _memcmp_impl_unconstrained
+from utils import StringSlice
+from sys.ffi import C_char
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -114,7 +116,7 @@ struct StringRef(
         """
 
         var len = 0
-        while Scalar.load(ptr, len):
+        while ptr.load(len):
             len += 1
 
         self = StringRef(ptr, len)
@@ -132,7 +134,7 @@ struct StringRef(
         """
 
         var len = 0
-        while Scalar.load(ptr, len):
+        while ptr.load(len):
             len += 1
 
         self = StringRef(ptr, len)
@@ -603,7 +605,8 @@ struct StringRef(
         Returns:
           True if the self[start:end] is suffixed by the input suffix.
         """
-
+        if len(suffix) > len(self):
+            return False
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
         return StringRef(self.unsafe_ptr() + start, end - start).endswith(
@@ -629,9 +632,7 @@ fn _memchr[
     var vectorized_end = _align_down(len, bool_mask_width)
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = SIMD[size=bool_mask_width].load(
-            source, i
-        ) == first_needle
+        var bool_mask = source.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
             return source + int(i + count_trailing_zeros(mask))
@@ -667,9 +668,9 @@ fn _memmem[
     var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var first_block = SIMD[size=bool_mask_width].load(haystack, i)
-        var last_block = SIMD[size=bool_mask_width].load(
-            haystack, i + needle_len - 1
+        var first_block = haystack.load[width=bool_mask_width](i)
+        var last_block = haystack.load[width=bool_mask_width](
+            i + needle_len - 1
         )
 
         var eq_first = first_needle == first_block

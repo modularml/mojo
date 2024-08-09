@@ -15,8 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin.format_int import _try_write_int
-from builtin.simd import _format_scalar
+from sys import bitwidthof
 
 
 @lldb_formatter_wrapping_type
@@ -107,6 +106,15 @@ struct UInt(IntLike):
         return String.format_sequence(self)
 
     @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """Formats this integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write(UInt64(self))
+
     fn __repr__(self) -> String:
         """Convert this UInt to a string.
 
@@ -734,25 +742,6 @@ struct UInt(IntLike):
             The +self value.
         """
         return self
-
-    fn format_to(self, inout writer: Formatter):
-        """
-        Formats this integer to the provided formatter.
-
-        Args:
-            writer: The formatter to write to.
-        """
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            var err = _try_write_int(writer, UInt64(self))
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
-        else:
-            _format_scalar(writer, UInt64(self))
 
 
 fn _temp_uint_from_int(x: Int) -> UInt:

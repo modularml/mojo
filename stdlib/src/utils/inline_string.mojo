@@ -15,12 +15,14 @@
    avoids heap allocations for short strings.
 """
 
+from collections import InlineArray
+from os import abort
 from collections import Optional
 from sys import sizeof
 
 from memory import UnsafePointer, memcpy
 
-from utils import InlineArray, StringSlice, Variant
+from utils import StringSlice, Variant
 from utils._format import ToFormatter
 
 # ===----------------------------------------------------------------------===#

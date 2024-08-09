@@ -16,6 +16,30 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo now supports named result bindings. Named result bindings are useful for
+  directly emplacing function results into the output slot of a function. This
+  feature provides more flexibility and guarantees around emplacing the result
+  of a function compared to "guaranteed" NRVO. If a `@register_passable` result
+  is bound to a name, the result value is made accessible as a mutable
+  reference.
+
+  ```mojo
+  fn efficiently_return_string(b: Bool) -> String as output:
+      if b:
+          output = "emplaced!"
+          mutate(output)
+          return
+      return "regular return"
+  ```
+
+  If we used a temporary for `output` instead, we would need to move into the
+  result slot, which wouldn't work if the result type was non-movable.
+
+  In a function with a named result, `return` may be used with no operand to
+  signal an exit from the function, or it can be used normally to specify the
+  return value of the function. The compiler will error if the result is not
+  initialized on all normal exit paths from the function.
+
 - `String` class now have `rjust`, `ljust` and `center` methods to return
   a justified string based on width and fillchar.
   ([PR 3278#](https://github.com/modularml/mojo/pull/3278) by
@@ -58,12 +82,6 @@ what we publish.
   keyword argument of the `__setitem__`, e.g. turning `yourType[1, 2] = 3` into
   `yourType.__setitem__(1, 2, val=3)`.  This fixes
   [Issue #248](https://github.com/modularml/mojo/issues/248).
-
-- The pointer variants (`DTypePointer`, `UnsafePointer`, etc.) now have a new
-  `exclusive: Bool = False` parameter. Setting this parameter to true tells the
-  compiler that the user knows this pointer and all those derived from it have
-  exclusive access to the underlying memory allocation. The compiler is not
-  guaranteed to do anything with this information.
 
 - `Optional` values are now equality comparable with `==` and `!=` when their
   element type is equality comparable.
@@ -159,7 +177,8 @@ what we publish.
       c = MyStruct(x, x)  # Infers size=2 from 'self' type.
   ```
 
-- The `Reference` type (and many iterators) now use "inferred" parameters to
+- The `Reference` type (and many iterators) now use
+  [infer-only parameters](/mojo/manual/parameters/#infer-only-parameters) to
   represent the mutability of their lifetime, simplifying the interface.
 
 - `Dict` now implements `setdefault`, to get a value from the dictionary by
@@ -352,6 +371,20 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 ### 🦋 Changed
 
+- The set of automatically imported entities (types, aliases, functions) into user's
+  Mojo programs has been dramatically reduced.  Before, with the way the `builtin`
+  module was handled, all of the entities in the following modules would be automatically
+  included:
+
+  {'memory', 'sys', 'os', 'utils', 'python', 'bit', 'random', 'math',
+   'builtin', 'collections'}
+
+  Now, only the explicitly enumerated entities in `prelude/__init__.mojo` are
+  the ones automatically imported into user's Mojo programs.  This will break
+  a lot of user code as users will need to explicitly import what they're using
+  for cases previously commonly included before (such as `Optional`, `Variant`,
+  and so on).
+
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
   semantics bring a lot of history and baggage that are not needed in Mojo and
@@ -362,7 +395,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   It is now forbidden to convert a non-pointer-typed value derived from a
   Mojo-allocated pointer, such as an integer address, to a pointer-typed value.
   "Derived" means there is overlap in the bits of the non-pointer-typed value
-  with the original pointer value.
+  with the original pointer value. Accordingly, the `UnsafePointer` constructor
+  that took an `address` keyword argument has been removed.
 
   It is still possible to make this conversion in certain cases where it is
   absolutely necessary, such as interoperating with other languages like Python.
@@ -370,8 +404,88 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   non-pointer-typed value does not alias any Mojo-derived pointer and that any
   external function calls have arbitrary memory effects.
 
-- `await` on a coroutine now consumes it. This strengthens the invariant that
-  coroutines can only be awaited once.
+- `DTypePointer` , `LegacyPointer` and `Pointer` have been removed. Use
+  [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/) instead. For more
+  information on using pointers, see [Unsafe pointers](/mojo/manual/pointers) in
+  the Mojo Manual.
+
+  Functions that previously took a `DTypePointer` now take an
+  equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
+  `UnsafePointer` is:
+
+  ```mojo
+  DTypePointer[type] -> UnsafePointer[Scalar[type]]
+  ```
+
+  There could be places that you have code of the form:
+
+  ```mojo
+  fn f(ptr: DTypePointer):
+  ```
+
+  which is equivalent to `DTypePointer[*_]`. In this case you would have to add
+  an infer-only `type` parameter to the function:
+
+  ```mojo
+  fn f[type: DType, //](ptr: UnsafePointer[Scalar[type]]):
+  ```
+
+  because we can’t have an unbound parameter inside the struct.
+
+  There could also be places where you use
+  `DTypePointer[Scalar[DType.invalid/index]]`, and it would be natural to
+  change these to `UnsafePointer[NoneType/Int]`. But since these are not an
+  `UnsafePointer` that stores a `Scalar`, you might have to `rebind/bitcast` to
+  appropriate types.
+
+- The `DTypePointer` `load()`, `store()`, and `prefetch()` methods have been
+  moved to `SIMD` and now take an
+  `UnsafePointer` as an argument. Instead of using `ptr.load[width=4](offset)`
+  one should use `SIMD[size=4].load(ptr, offset)`. Note the default load width
+  before was 1, but the default size of `SIMD` is the size of the SIMD type. The
+  default store size is the size of the `SIMD` value to be stored.
+
+- `UnsafePointer` now supports `simd_strided_load()`, `simd_strided_store()`,
+  `gather()`, and `scatter()` when the underlying type is `Scalar[DType]`.
+
+- The global functions for working with `UnsafePointer` have transitioned to
+  being methods through the use of conditional conformances:
+
+  - `destroy_pointee(p)` => `p.destroy_pointee()`
+  - `move_from_pointee(p)` => `p.take_pointee()`
+  - `initialize_pointee_move(p, value)` => `p.init_pointee_move(value)`
+  - `initialize_pointee_copy(p, value)` => `p.init_pointee_copy(value)`
+  - `move_pointee(src=p1, dst=p2)` => `p.move_pointee_into(p2)`
+
+- The `UnsafePointer.offset()` method has been removed. Use
+  [pointer arithmetic](/mojo/manual/pointers#storing-multiple-values) instead.
+
+  ```mojo
+  new_ptr = ptr.offset(1)
+  ```
+
+  Becomes:
+
+  ```mojo
+  new_ptr = ptr + 1
+  ```
+
+- `UnsafePointer` has a new
+  `exclusive: Bool = False` parameter. Setting this parameter to true tells the
+  compiler that the user knows this pointer and all those derived from it have
+  exclusive access to the underlying memory allocation. The compiler is not
+  guaranteed to do anything with this information.
+
+- It is no longer possible to cast (implicitly or explicitly) from `Reference`
+  to `UnsafePointer`. Instead of `UnsafePointer(someRef)` please use the
+  `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
+  `UnsafePointer` gets the address of what the reference points to.
+
+- `sort` no longer takes `LegacyPointer`. The current API supports:
+  - `sort(list)` just plain list
+  - `sort[type, cmp_fn](list)` list with custom compare function
+  - `sort(ptr, len)` a pointer and length (can change to Span in future)
+  - `sort[type, cmp_fn](ptr, len)` above with custom compare
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
 
@@ -379,6 +493,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
     (was `UnsafePointer[Int8]`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
+
+- `await` on a coroutine now consumes it. This strengthens the invariant that
+  coroutines can only be awaited once.
 
 - `print()` now requires that its arguments conform to the `Formattable` trait.
   This enables efficient stream-based writing by default, avoiding unnecessary
@@ -439,24 +556,12 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   > If the above error is seen, ensure that all argument types implement
   > `Formattable`.
 
+- `debug_assert()` now also requires that its `message` argument conform to
+  `Formattable`.
+
 - The `StringRef` constructors from `DTypePointer.int8` have been changed to
   take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
   C APIs.
-
-- The global functions for working with `UnsafePointer` have transitioned to
-  being methods through the use of conditional conformances:
-
-  - `destroy_pointee(p)` => `p.destroy_pointee()`
-  - `move_from_pointee(p)` => `p.take_pointee()`
-  - `initialize_pointee_move(p, value)` => `p.init_pointee_move(value)`
-  - `initialize_pointee_copy(p, value)` => `p.init_pointee_copy(value)`
-  - `move_pointee(src=p1, dst=p2)` => `p.move_pointee_into(p2)`
-
-- `DTypePointer.load/store/prefetch` has been now moved to `SIMD`. Instead of
-  using `ptr.load[width=4](offset)` one should use `SIMD[size=4].load(ptr, offset)`.
-  Note the default load width before was 1, but the default size of `SIMD` is
-  the size of the SIMD type.
-  The default store size is the size of the `SIMD` value to be stored.
 
 - `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
   a constructor which accepts optional values. `Slice._has_end()` has also been
@@ -497,32 +602,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - The `time.now()` function has been deprecated. Please use `time.perf_counter`
   or `time.perf_counter_ns` instead.
 
-- `LegacyPointer.load/store` are now removed. It's use is replaced with
-  `__getitem__` or `__setitem__`.
-
-- `memcmp`, `memset` and `memset_zero` no longer take in `LegacyPointer`,
-  instead, use `UnsafePointer`.
-
 - A few bit functions have been renamed for clarity:
 - `countl_zero` -> `count_leading_zeros`
 - `countr_zero` -> `count_trailing_zeros`
-
-- `sort` no longer takes `LegacyPointer`. The current API supports:
-  - `sort(list)` just plain list
-  - `sort[type, cmp_fn](list)` list with custom compare function
-  - `sort(ptr, len)` a pointer and length (can change to Span in future)
-  - `sort[type, cmp_fn](ptr, len)` above with custom compare
-
-- `memcpy` with `LegacyPointer` has been removed. Please use the `UnsafePointer`
-  overload instead.
-
-- `LegacyPointer` and `Pointer` has been removed. Please use `UnsafePointer`
- instead.
-
-- `UnsafePointer` now supports `simd_strided_load/store`, `gather`, and `scatter`
-  when the underlying type is `Scalar[DType]`.
-
-- `SIMD.load/store` now supports `UnsafePointer` overloads.
 
 - Now that we have a `UInt` type, use this to represent the return type of hash.
   In general, hashes should be an unsigned integer, and can also lead to improved
@@ -537,52 +619,17 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
 
-- `DTypePointer` has been removed.
-  Please use [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/)
-  instead. Functions that previously took a `DTypePointer` now take an
-  equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
-  `UnsafePointer` is:
-
-  ```mojo
-  DTypePointer[type] -> UnsafePointer[Scalar[type]]
-  ```
-
-  There could be places that you have code of the form
-
-  ```mojo
-  fn f(ptr: DTypePointer):
-  ```
-
-  which is equivalent to `DTypePointer[*_]`. In this case you would have to add
-  a type parameter to the function:
-
-  ```mojo
-  fn f[type: DType, //](ptr: UnsafePointer[Scalar[type]]):
-  ```
-
-  because we can’t have an unbound struct inside the parameter.
-
-  There could also be places where you use `DTypePointer[Scalar[DType.invalid/index]]`,
-  and it would be natural to change it to `UnsafePointer[NoneType/Int]`. But
-  since they are not an `UnsafePointer` that stores a `Scalar`, you might have to
-  `rebind/bitcast` to appropriate types.
+- `SIMD.load/store` are moved to `UnsafePointer`.
 
 ### ❌ Removed
 
 - Support for the legacy `fn __init__(...) -> Self:` form has been removed from
   the compiler, please switch to using `fn __init__(inout self, ...):` instead.
 
-- It is no longer possible to cast (implicitly or explicitly) from `Reference`
-  to `UnsafePointer`. Instead of `UnsafePointer(someRef)` please use the
-  `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
-  `UnsafePointer` gets the address of what the reference points to.
-
 - Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the
   same thing.
 
 - Removed `StringLiteral.unsafe_uint8_ptr()` and `StringLiteral.as_uint8_ptr()`.
-
-- Removed `UnsafePointer.offset(offset:Int)`.
 
 - Removed `SIMD.splat(value: Scalar[type])`. Use the constructor for SIMD
   instead.
@@ -623,3 +670,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - [#3126](https://github.com/modularml/mojo/issues/3126) - [BUG] List doesn't
   work at compile time.
+
+- [#3237](https://github.com/modularml/mojo/issues/3237) - [BUG] Difference
+  between `__getitem__` and `[.]` operator.
+
+- [#3336](https://github.com/modularml/mojo/issues/3336) - Fix outdated
+  references to `let` in REPL documentation.

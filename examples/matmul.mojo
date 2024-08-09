@@ -22,8 +22,8 @@ from sys import info
 import benchmark
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from algorithm import parallelize, vectorize
-from memory import memset_zero
-from python import Python
+from memory import memset_zero, stack_allocation
+from python import Python, PythonObject
 
 alias M = 512  # rows of A and C
 alias N = 4096  # cols of B and C
@@ -73,10 +73,10 @@ struct Matrix[rows: Int, cols: Int]:
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
-        return SIMD[size=nelts].load(self.data, y * self.cols + x)
+        return self.data.load[width=nelts](y * self.cols + x)
 
     fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        SIMD[size=nelts].store(self.data, y * self.cols + x, val)
+        self.data.store[width=nelts](y * self.cols + x, val)
 
 
 def run_matmul_python() -> Float64:

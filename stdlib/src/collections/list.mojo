@@ -21,9 +21,8 @@ from collections import List
 
 
 from sys.intrinsics import _type_is_eq
-
+from os import abort
 from memory import Reference, UnsafePointer
-
 from utils import Span
 
 from .optional import Optional
@@ -126,17 +125,34 @@ struct List[T: CollectionElement](
         self.size = 0
         self.capacity = capacity
 
-    # TODO: Avoid copying elements in once owned varargs
-    # allow transfers.
-    fn __init__(inout self, *values: T):
+    fn __init__(inout self, owned *values: T):
         """Constructs a list from the given values.
 
         Args:
             values: The values to populate the list with.
         """
-        self = Self(capacity=len(values))
-        for value in values:
-            self.append(value[])
+        self = Self(variadic_list=values^)
+
+    fn __init__(inout self, *, owned variadic_list: VariadicListMem[T, _]):
+        """Constructs a list from the given values.
+
+        Args:
+            variadic_list: The values to populate the list with.
+        """
+        var length = len(variadic_list)
+
+        self = Self(capacity=length)
+
+        for i in range(length):
+            var src = UnsafePointer.address_of(variadic_list[i])
+            var dest = self.data + i
+
+            src.move_pointee_into(dest)
+
+        # Mark the elements as unowned to avoid del'ing uninitialized objects.
+        variadic_list._is_owned = False
+
+        self.size = length
 
     fn __init__(inout self, span: Span[T]):
         """Constructs a list from the a Span of values.

@@ -26,14 +26,18 @@ from sys import (
     simdwidthof,
     triple_is_nvidia_cuda,
 )
+from sys.info import _current_arch
+from sys._assembly import inlined_assembly
 
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
+from builtin.format_int import _try_write_int
+from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
-from utils import InlineArray, StringSlice
+from utils import StringSlice, StaticIntTuple, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -42,6 +46,7 @@ from utils.numerics import max_or_inf as _max_or_inf
 from utils.numerics import min_finite as _min_finite
 from utils.numerics import min_or_neg_inf as _min_or_neg_inf
 from utils.numerics import nan as _nan
+from sys import sizeof, alignof
 
 from .dtype import (
     _get_dtype_printf_format,
@@ -130,6 +135,15 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
     return triple_is_nvidia_cuda()
+
+
+@always_inline("nodebug")
+fn _is_sm_80() -> Bool:
+    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) in (
+        "sm_80",
+        "sm_86",
+        "sm_89",
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -511,6 +525,11 @@ struct SIMD[type: DType, size: Int](
             `self[i] + rhs[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return self.fma(1, rhs)
+
         return __mlir_op.`pop.add`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -525,6 +544,10 @@ struct SIMD[type: DType, size: Int](
             `self[i] - rhs[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return rhs.fma(-1, self)
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -544,6 +567,10 @@ struct SIMD[type: DType, size: Int](
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
@@ -1446,6 +1473,28 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if type == target:
             return rebind[SIMD[target, size]](self)
+        elif (
+            triple_is_nvidia_cuda()
+            and type is DType.float32
+            and target is DType.bfloat16
+            and size >= 2
+        ):
+            var res = SIMD[target, size]()
+
+            @parameter
+            for i in range(0, size, 2):
+                var bf16x2_as_uint32 = inlined_assembly[
+                    "cvt.rn.bf16x2.f32 $0, $1, $2;",
+                    UInt32,
+                    constraints="=r,f,f",
+                    has_side_effect=False,
+                ](rebind[Float32](self[i + 1]), rebind[Float32](self[i]))
+                var val = bitcast[target, 2](bf16x2_as_uint32)
+                res[i] = val[0]
+                res[i + 1] = val[1]
+
+            return res
+
         elif has_neon() and (
             type is DType.bfloat16 or target == DType.bfloat16
         ):
@@ -1475,7 +1524,7 @@ struct SIMD[type: DType, size: Int](
                 ]
             ](self.value)
 
-    @always_inline
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1488,7 +1537,7 @@ struct SIMD[type: DType, size: Int](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
-    @always_inline
+    @no_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1515,29 +1564,34 @@ struct SIMD[type: DType, size: Int](
 
             @parameter
             if triple_is_nvidia_cuda():
+                # FIXME(MSTDL-406):
+                #   The uses of `printf` below prints "out of band" with the
+                #   `Formatter` passed in, meaning this will only work if
+                #   `Formatter` is an unbuffered wrapper around printf (which
+                #   Formatter.stdout currently is by default).
+                #
+                #   This is a workaround to permit debug formatting of
+                #   floating-point values on GPU, where printing to stdout
+                #   is the only way the Formatter framework is currently
+                #   used.
 
                 @parameter
-                if (
-                    type is DType.float16
-                    or type is DType.bfloat16
-                    or type is DType.float32
-                ):
-                    # We need to cast the value to float64 to print it.
-                    _printf["%g"](element.cast[DType.float64]())
-                elif type.is_floating_point():
+                if type is DType.float64:
                     # get_dtype_printf_format hardcodes 17 digits of precision.
                     _printf["%g"](element)
+                elif type.is_floating_point():
+                    # We need to cast the value to float64 to print it, to avoid
+                    # an ABI mismatch.
+                    _printf["%g"](element.cast[DType.float64]())
+                elif type.is_integral():
+                    var err = _try_write_int(writer, element)
+                    if err:
+                        abort(
+                            "unreachable: unexpected write int failure"
+                            " condition: "
+                            + str(err.value())
+                        )
                 else:
-                    # FIXME(MSTDL-406):
-                    #   This prints "out of band" with the `Formatter` passed
-                    #   in, meaning this will only work if `Formatter` is an
-                    #   unbuffered wrapper around printf (which Formatter.stdout
-                    #   currently is by default).
-                    #
-                    #   This is a workaround to permit debug formatting of
-                    #   floating-point values on GPU, where printing to stdout
-                    #   is the only way the Formatter framework is currently
-                    #   used.
                     _printf[_get_dtype_printf_format[type]()](element)
             else:
 
@@ -1546,7 +1600,7 @@ struct SIMD[type: DType, size: Int](
                     alias float_format = "%." + _scientific_notation_digits[
                         type
                     ]() + "e"
-                    _format_scalar[type, float_format](writer, element)
+                    _format_scalar[float_format](writer, element)
                 else:
                     _format_scalar(writer, element)
 
@@ -1651,6 +1705,37 @@ struct SIMD[type: DType, size: Int](
             `self[i]*multiplier[i] + accumulator[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
+
+            @parameter
+            if size == 1:
+                return inlined_assembly[
+                    prefix + " $0, $1, $2, $3;",
+                    Self,
+                    constraints="=h,h,h,h",
+                    has_side_effect=False,
+                ](self, multiplier, accumulator)
+
+            var res = Self()
+
+            @parameter
+            for i in range(0, size, 2):
+                var val = inlined_assembly[
+                    prefix + "x2 $0, $1, $2, $3;",
+                    SIMD[type, 2],
+                    constraints="=r,r,r,r",
+                    has_side_effect=False,
+                ](
+                    self.slice[2, offset=i](),
+                    multiplier.slice[2, offset=i](),
+                    accumulator.slice[2, offset=i](),
+                )
+                res = res.insert[offset=i](val)
+            return res
+
         return __mlir_op.`pop.fma`(
             self.value, multiplier.value, accumulator.value
         )
@@ -2493,215 +2578,6 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
 
-    @staticmethod
-    @always_inline
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_]) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-            The offset must be integer.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-
-        Returns:
-            The loaded value.
-        """
-        return Self.load[alignment=alignment](ptr, int(0))
-
-    @staticmethod
-    @always_inline
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Scalar) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-            The offset must be integer.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        constrained[offset.type.is_integral(), "offset must be integer"]()
-        return Self.load[alignment=alignment](ptr, offset=int(offset))
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-
-        @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
-            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
-            # regardless of the alignment that is passed. This causes issues if
-            # this method is called on an unaligned pointer.
-            # TODO #37823 We can make this smarter when we add an `aligned`
-            # trait to the pointer class.
-            var v = SIMD[type, size]()
-
-            # intentionally don't unroll, otherwise the compiler vectorizes
-            for i in range(size):
-                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
-                    ptr.offset(int(offset) + i).address
-                )
-            return v
-
-        return __mlir_op.`pop.load`[alignment = alignment.value](
-            ptr.offset(offset).bitcast[SIMD[type, size]]().address
-        )
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: UInt) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        return Self.load[alignment=alignment](ptr, int(offset))
-
-    @staticmethod
-    @always_inline
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int, val: Self):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-            The offset must be integer.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        Self.store[alignment=alignment](ptr.offset(offset), val)
-
-    @staticmethod
-    @always_inline
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Scalar, val: Self):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        constrained[offset.type.is_integral(), "offset must be integer"]()
-        Self.store[alignment=alignment](ptr, int(offset), val)
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], val: Self):
-        """Stores a single element value.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            val: The value to store.
-        """
-        constrained[size > 0, "width must be a positive integer value"]()
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-        __mlir_op.`pop.store`[alignment = alignment.value](
-            val, ptr.bitcast[SIMD[type, size]]().address
-        )
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: UInt, val: Self):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        Self.store[alignment=alignment](ptr.offset(offset), val)
-
 
 # ===----------------------------------------------------------------------=== #
 # _pow
@@ -2974,12 +2850,10 @@ fn _simd_apply[
 
 
 # ===----------------------------------------------------------------------=== #
-# _format_scalar
-# ===----------------------------------------------------------------------=== #
 
 
 fn _format_scalar[
-    dtype: DType,
+    dtype: DType, //,
     float_format: StringLiteral = "%.17g",
 ](inout writer: Formatter, value: Scalar[dtype]):
     # Stack allocate enough bytes to store any formatted Scalar value of any
@@ -2996,12 +2870,11 @@ fn _format_scalar[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
-    )
+    var span = Span[UInt8](buf)[:wrote]
+
+    var str_slice = StringSlice(unsafe_from_utf8=span)
 
     writer.write_str(str_slice)
-    _ = buf^
 
 
 # ===----------------------------------------------------------------------=== #

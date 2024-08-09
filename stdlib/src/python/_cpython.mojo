@@ -11,16 +11,17 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from collections import InlineArray
 from os import getenv, setenv
 from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle
+from sys.ffi import DLHandle, C_char
 
 from memory import UnsafePointer
 
-from utils import InlineArray, StringRef
+from utils import StringRef
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256
@@ -261,7 +262,7 @@ struct CPython:
     fn _Py_REFCNT(inout self, ptr: PyObjectPtr) -> Int:
         if ptr._get_ptr_as_int() == 0:
             return -1
-        return int(Scalar.load(ptr.value))
+        return int(ptr.value.load())
 
     fn PyDict_New(inout self) -> PyObjectPtr:
         var r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()

@@ -32,6 +32,7 @@ from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 
+from utils import Span
 from utils.index import StaticIntTuple
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
@@ -267,7 +268,7 @@ fn sqrt[
 
 
 @always_inline
-fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
+fn _isqrt_nvvm(x: SIMD) -> __type_of(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
     ]()
@@ -284,7 +285,7 @@ fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn rsqrt(x: SIMD) -> __type_of(x):
+fn isqrt(x: SIMD) -> __type_of(x):
     """Performs elementwise reciprocal square root on a SIMD vector.
 
     Args:
@@ -300,9 +301,9 @@ fn rsqrt(x: SIMD) -> __type_of(x):
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
-            return _rsqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
+            return _isqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
 
-        return _rsqrt_nvvm(x)
+        return _isqrt_nvvm(x)
 
     return 1 / sqrt(x)
 
@@ -376,6 +377,24 @@ fn exp2[
         Vector containing $2^n$ computed elementwise, where n is an element in
         the input SIMD vector.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if type is DType.float16:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.f16", constraints="=h,h"
+            ](x)
+        elif type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.ftz.f32", constraints="=f,f"
+            ](x)
+
+    @parameter
+    if type not in (DType.float32, DType.float64):
+        return exp2(x.cast[DType.float32]()).cast[type]()
+
     alias integral_type = FPUtils[type].integral_type
 
     var xc = x.clamp(-126, 126)
@@ -566,11 +585,7 @@ fn exp[
             ](x * inv_lg2)
 
     @parameter
-    if (
-        not type is DType.float64
-        and type is not DType.float32
-        and sizeof[type]() < sizeof[DType.float32]()
-    ):
+    if type not in (DType.float32, DType.float64):
         return exp(x.cast[DType.float32]()).cast[type]()
 
     var min_val: SIMD[type, simd_width]
@@ -742,6 +757,22 @@ fn log(x: SIMD) -> __type_of(x):
     Returns:
         Vector containing result of performing natural log base E on x.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias ln2 = 0.69314718055966295651160180568695068359375
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return (
+                _call_ptx_intrinsic[
+                    instruction="lg2.approx.f32", constraints="=f,f"
+                ](x)
+                * ln2
+            )
+
     return _log_base[27](x)
 
 
@@ -760,6 +791,18 @@ fn log2(x: SIMD) -> __type_of(x):
     Returns:
         Vector containing result of performing log base 2 on x.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log2(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="lg2.approx.f32", constraints="=f,f"
+            ](x)
+
     return _log_base[2](x)
 
 
@@ -1052,9 +1095,9 @@ fn iota[
     alias simd_width = simdwidthof[type]()
     var vector_end = align_down(len, simd_width)
     for i in range(0, vector_end, simd_width):
-        SIMD.store(buff, i, iota[type, simd_width](i + offset))
+        buff.store(i, iota[type, simd_width](i + offset))
     for i in range(vector_end, len):
-        Scalar.store(buff, i, i + offset)
+        buff.store(i, i + offset)
 
 
 fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
@@ -1580,6 +1623,22 @@ fn log10(x: SIMD) -> __type_of(x):
     Returns:
         The `log10` of the input.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias log10_2 = 0.301029995663981195213738894724493027
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log10(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return (
+                _call_ptx_intrinsic[
+                    instruction="lg2.approx.f32", constraints="=f,f"
+                ](x)
+                * log10_2
+            )
+
     return _call_libm["log10"](x)
 
 

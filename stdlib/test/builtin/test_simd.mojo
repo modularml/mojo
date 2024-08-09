@@ -14,6 +14,7 @@
 
 from sys import has_neon
 
+from collections import InlineArray
 from builtin.simd import _modf
 from testing import (
     assert_almost_equal,
@@ -22,8 +23,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-
-from utils import unroll
+from utils import unroll, StaticIntTuple
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
@@ -140,7 +140,7 @@ def test_issue_1625():
     for i in range(size):
         ptr[i] = i
 
-    var x = SIMD[size = 2 * simd_width].load(ptr, 0)
+    var x = ptr.load[width = 2 * simd_width](0)
     var evens_and_odds = x.deinterleave()
 
     # FIXME (40568) should directly use the SIMD assert_equal
@@ -159,7 +159,7 @@ def test_issue_20421():
     var a = UnsafePointer[UInt8].alloc[alignment=64](16 * 64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[Int32]())
+    var av16 = a.offset(128 + 64 + 4).bitcast[Int32]().load[width=4]()
     assert_equal(
         av16,
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),

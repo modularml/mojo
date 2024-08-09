@@ -160,6 +160,17 @@ def test_list_variadic_constructor():
     assert_equal(4, len(l))
     assert_equal(8, l[3])
 
+    #
+    # Test variadic construct copying behavior
+    #
+
+    var l2 = List[CopyCounter](CopyCounter(), CopyCounter(), CopyCounter())
+
+    assert_equal(len(l2), 3)
+    assert_equal(l2[0].copy_count, 0)
+    assert_equal(l2[1].copy_count, 0)
+    assert_equal(l2[2].copy_count, 0)
+
 
 def test_list_resize():
     var l = List[Int](1)
