@@ -68,18 +68,6 @@ from builtin.repr import Representable, repr
 from builtin.reversed import ReversibleRange, reversed
 from builtin.sort import sort, partition
 from builtin.str import Stringable, StringableRaising, str
-from builtin.string import (
-    String,
-    ord,
-    chr,
-    ascii,
-    atol,
-    atof,
-    isdigit,
-    isupper,
-    islower,
-    isprintable,
-)
 from builtin.string_literal import StringLiteral
 from builtin.swap import swap
 from builtin.tuple import (
@@ -128,6 +116,18 @@ from builtin.simd import (
 from builtin.type_aliases import AnyTrivialRegType
 
 from collections import KeyElement, List
+from collections.string import (
+    String,
+    ord,
+    chr,
+    ascii,
+    atol,
+    atof,
+    isdigit,
+    isupper,
+    islower,
+    isprintable,
+)
 from memory import UnsafePointer, Reference, AddressSpace
 from utils import StringRef
 from utils._format import Formattable, Formatter

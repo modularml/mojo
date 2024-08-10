@@ -14,7 +14,7 @@
 
 # TODO: Replace %bare-mojo with %mojo
 # when  https://github.com/modularml/mojo/issues/2751 is fixed.
-from builtin.string import (
+from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
     _isspace,
