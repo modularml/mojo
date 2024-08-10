@@ -1415,6 +1415,39 @@ struct SIMD[type: DType, size: Int](
         if type.is_unsigned() or type is DType.bool:
             return self
         elif type.is_floating_point():
+
+            @parameter
+            if triple_is_nvidia_cuda():
+
+                @parameter
+                if type.is_half_float():
+                    alias prefix = "abs.bf16" if type is DType.bfloat16 else "abs.f16"
+
+                    @parameter
+                    if size == 1:
+                        return inlined_assembly[
+                            prefix + " $0, $1;",
+                            Self,
+                            constraints="=h,h",
+                            has_side_effect=False,
+                        ](self)
+
+                    var res = Self()
+
+                    @parameter
+                    for i in range(0, size, 2):
+                        var val = inlined_assembly[
+                            prefix + "x2 $0, $1;",
+                            SIMD[type, 2],
+                            constraints="=r,r",
+                            has_side_effect=False,
+                        ](self.slice[2, offset=i]())
+                        res = res.insert[offset=i](val)
+                    return res
+                return llvm_intrinsic["llvm.fabs", Self, has_side_effect=False](
+                    self
+                )
+
             alias integral_type = FPUtils[type].integral_type
             var m = self._float_to_bits[integral_type]()
             return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
