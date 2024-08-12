@@ -20,7 +20,6 @@ from utils import StringSlice
 ```
 """
 
-from bit import count_leading_zeros
 from utils import Span
 from collections.string import _isspace
 from collections import List
@@ -29,6 +28,29 @@ from sys import simdwidthof
 
 alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
+
+
+fn _count_leading_zeros(b: SIMD[DType.uint8, _], /) -> __type_of(b):
+    var res = __type_of(b)()
+
+    @parameter
+    for i in range(b.size):
+        var x = b[i]
+        if x == 0:
+            res[i] = bitwidthof[DType.uint8]()
+            continue
+        var n = Scalar[DType.uint8](0)
+        if (x & 0xF0) == 0:
+            n += 4
+            x <<= 4
+        if (x & 0xC0) == 0:
+            n += 2
+            x <<= 2
+        if (x & 0x80) == 0:
+            n += 1
+            x <<= 1
+        res[i] = n
+    return res
 
 
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
@@ -45,7 +67,7 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
         - 3 -> start of 3 byte long sequence.
         - 4 -> start of 4 byte long sequence.
     """
-    return count_leading_zeros(~(b & UInt8(0b1111_0000)))
+    return _count_leading_zeros(~(b & UInt8(0b1111_0000)))
 
 
 fn _validate_utf8_simd_slice[
