@@ -16,8 +16,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List, Optional
-from utils import InlineArray, StringSlice, StaticString
+from collections import List, Optional, InlineArray
+from utils import StringSlice, StaticString
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 

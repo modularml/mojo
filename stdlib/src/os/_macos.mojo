@@ -11,9 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from collections import InlineArray
 from time.time import _CTimeSpec
-
-from utils import InlineArray
 
 from .fstat import stat_result
 

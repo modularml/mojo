@@ -252,9 +252,20 @@ def test_offset():
         ptr[i] = i
     var x = UInt(3)
     var y = Int(4)
-    assert_equal(ptr[x], 3)
-    assert_equal(ptr[y], 4)
+    assert_equal(ptr.offset(x)[], 3)
+    assert_equal(ptr.offset(y)[], 4)
+
+    var ptr2 = UnsafePointer[Int].alloc(5)
+    var ptr3 = ptr2
+    ptr2 += UInt(3)
+    assert_equal(ptr2, ptr3.offset(3))
+    ptr2 -= UInt(5)
+    assert_equal(ptr2, ptr3.offset(-2))
+    assert_equal(ptr2 + UInt(1), ptr3.offset(-1))
+    assert_equal(ptr2 - UInt(4), ptr3.offset(-6))
+
     ptr.free()
+    ptr2.free()
 
 
 def test_load_and_store_simd():

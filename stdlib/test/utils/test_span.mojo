@@ -12,10 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from collections.list import List
+from collections import InlineArray, List
 from testing import assert_equal, assert_true
 
-from utils import InlineArray, Span
+from utils import Span
 
 
 def test_span_list_int():
