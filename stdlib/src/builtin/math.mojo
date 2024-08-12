@@ -444,6 +444,6 @@ fn round(number: FloatLiteral, ndigits: Int) -> FloatLiteral:
         ndigits: The number of digits to round to.
 
     Returns:
-        The rounded value of the object.
+        The rounded value of the object. Positive ndigits to the right of the decimal, negative ndigits to the left.
     """
     return number.__round__(ndigits)

@@ -371,6 +371,25 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 ### 🦋 Changed
 
+- The set of automatically imported entities (types, aliases, functions) into user's
+  Mojo programs has been dramatically reduced.  Before, with the way the `builtin`
+  module was handled, all of the entities in the following modules would be automatically
+  included:
+
+  {'memory', 'sys', 'os', 'utils', 'python', 'bit', 'random', 'math',
+   'builtin', 'collections'}
+
+  Now, only the explicitly enumerated entities in `prelude/__init__.mojo` are
+  the ones automatically imported into user's Mojo programs.  This will break
+  a lot of user code as users will need to explicitly import what they're using
+  for cases previously commonly included before (such as `Optional`, `Variant`,
+  and so on).
+
+- Some types from the `builtin` module have been moved to different modules for clarity
+  which is made possible now that we have a `prelude` module that can re-export symbols
+  from modules other than `builtin`.
+  - `builtin.string` has been moved to `collections.string`.
+
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
   semantics bring a lot of history and baggage that are not needed in Mojo and
@@ -656,3 +675,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - [#3126](https://github.com/modularml/mojo/issues/3126) - [BUG] List doesn't
   work at compile time.
+
+- [#3237](https://github.com/modularml/mojo/issues/3237) - [BUG] Difference
+  between `__getitem__` and `[.]` operator.
+
+- [#3336](https://github.com/modularml/mojo/issues/3336) - Fix outdated
+  references to `let` in REPL documentation.

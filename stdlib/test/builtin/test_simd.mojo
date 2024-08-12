@@ -14,6 +14,7 @@
 
 from sys import has_neon
 
+from collections import InlineArray
 from builtin.simd import _modf
 from testing import (
     assert_almost_equal,
@@ -22,7 +23,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticIntTuple, InlineArray
+from utils import unroll, StaticIntTuple
 from utils.numerics import isfinite, isinf, isnan, nan
 
 

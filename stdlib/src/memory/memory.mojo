@@ -370,7 +370,10 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and address_space == _GPUAddressSpace.SHARED:
+    if triple_is_nvidia_cuda() and address_space in (
+        _GPUAddressSpace.SHARED,
+        _GPUAddressSpace.PARAM,
+    ):
         return __mlir_op.`pop.global_alloc`[
             count = count.value,
             _type = UnsafePointer[type, address_space]._mlir_type,
