@@ -20,12 +20,11 @@ from collections import KeyElement
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from builtin.io import _snprintf
-from builtin.string import (
+from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
 
-from utils import InlineArray
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select

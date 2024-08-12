@@ -200,7 +200,7 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn offset[T: IntLike](self, idx: T) -> Self:
+    fn offset[T: IntLike, //](self, idx: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
 
         Parameters:
@@ -229,8 +229,11 @@ struct UnsafePointer[
         return (self + offset)[]
 
     @always_inline
-    fn __add__(self, offset: Int) -> Self:
+    fn __add__[T: IntLike, //](self, offset: T) -> Self:
         """Return a pointer at an offset from the current one.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -241,8 +244,11 @@ struct UnsafePointer[
         return self.offset(offset)
 
     @always_inline
-    fn __sub__(self, offset: Int) -> Self:
+    fn __sub__[T: IntLike, //](self, offset: T) -> Self:
         """Return a pointer at an offset from the current one.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -250,11 +256,14 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return self + (-offset)
+        return self + (-1 * Int(offset.__mlir_index__()))
 
     @always_inline
-    fn __iadd__(inout self, offset: Int):
+    fn __iadd__[T: IntLike, //](inout self, offset: T):
         """Add an offset to this pointer.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -262,8 +271,11 @@ struct UnsafePointer[
         self = self + offset
 
     @always_inline
-    fn __isub__(inout self, offset: Int):
+    fn __isub__[T: IntLike, //](inout self, offset: T):
         """Subtract an offset from this pointer.
+
+        Parameters:
+            T: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.
@@ -423,7 +435,29 @@ struct UnsafePointer[
         Returns:
             The loaded value.
         """
-        return self.load[width=width, alignment=alignment](int(0))
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
+
+        @parameter
+        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
+            # regardless of the alignment that is passed. This causes issues if
+            # this method is called on an unaligned pointer.
+            # TODO #37823 We can make this smarter when we add an `aligned`
+            # trait to the pointer class.
+            var v = SIMD[type, width]()
+
+            # intentionally don't unroll, otherwise the compiler vectorizes
+            for i in range(width):
+                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
+                    (self + i).address
+                )
+            return v
+
+        return __mlir_op.`pop.load`[alignment = alignment.value](
+            self.bitcast[SIMD[type, width]]().address
+        )
 
     @always_inline
     fn load[
@@ -454,23 +488,25 @@ struct UnsafePointer[
             The loaded value.
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
-        return self.load[width=width, alignment=alignment](int(offset))
+        return self.offset(int(offset)).load[width=width, alignment=alignment]()
 
     @always_inline("nodebug")
     fn load[
+        T: IntLike,
         type: DType, //,
         width: Int = 1,
         *,
         alignment: Int = alignof[
             Scalar[type]
         ]() if triple_is_nvidia_cuda() else 1,
-    ](self: UnsafePointer[Scalar[type], *_], offset: Int) -> SIMD[type, width]:
+    ](self: UnsafePointer[Scalar[type], *_], offset: T) -> SIMD[type, width]:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
 
         Parameters:
+            T: The type of offset, either `Int` or `UInt`.
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
             alignment: The minimal alignment of the address.
@@ -481,61 +517,11 @@ struct UnsafePointer[
         Returns:
             The loaded value.
         """
-
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-
-        @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
-            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
-            # regardless of the alignment that is passed. This causes issues if
-            # this method is called on an unaligned pointer.
-            # TODO #37823 We can make this smarter when we add an `aligned`
-            # trait to the pointer class.
-            var v = SIMD[type, width]()
-
-            # intentionally don't unroll, otherwise the compiler vectorizes
-            for i in range(width):
-                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
-                    self.offset(int(offset) + i).address
-                )
-            return v
-
-        return __mlir_op.`pop.load`[alignment = alignment.value](
-            self.offset(offset).bitcast[SIMD[type, width]]().address
-        )
-
-    @always_inline("nodebug")
-    fn load[
-        type: DType, //,
-        width: Int = 1,
-        *,
-        alignment: Int = alignof[
-            Scalar[type]
-        ]() if triple_is_nvidia_cuda() else 1,
-    ](self: UnsafePointer[Scalar[type], *_], offset: UInt) -> SIMD[type, width]:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            type: The data type of SIMD vector elements.
-            width: The size of the SIMD vector.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        return self.load[width=width, alignment=alignment](int(offset))
+        return self.offset(offset).load[width=width, alignment=alignment]()
 
     @always_inline
     fn store[
+        T: IntLike,
         type: DType, //,
         width: Int = 1,
         *,
@@ -544,7 +530,7 @@ struct UnsafePointer[
         ]() if triple_is_nvidia_cuda() else 1,
     ](
         self: UnsafePointer[Scalar[type], *_],
-        offset: Int,
+        offset: T,
         val: SIMD[type, width],
     ):
         """Stores a single element value at the given offset.
@@ -554,6 +540,7 @@ struct UnsafePointer[
             The offset must be integer.
 
         Parameters:
+            T: The type of offset, either `Int` or `UInt`.
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
             alignment: The minimal alignment of the address.
@@ -623,35 +610,6 @@ struct UnsafePointer[
         __mlir_op.`pop.store`[alignment = alignment.value](
             val, self.bitcast[SIMD[type, width]]().address
         )
-
-    @always_inline("nodebug")
-    fn store[
-        type: DType, //,
-        width: Int = 1,
-        *,
-        alignment: Int = alignof[
-            Scalar[type]
-        ]() if triple_is_nvidia_cuda() else 1,
-    ](
-        self: UnsafePointer[Scalar[type], *_],
-        offset: UInt,
-        val: SIMD[type, width],
-    ):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            type: The data type of SIMD vector elements.
-            width: The size of the SIMD vector.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        self.offset(offset).store[alignment=alignment](val)
 
     @always_inline("nodebug")
     fn simd_strided_load[
