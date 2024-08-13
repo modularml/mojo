@@ -278,19 +278,6 @@ struct StringLiteral(
         """
         return __mlir_op.`pop.string.size`(self.value)
 
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this StringLiteral in bytes.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return __mlir_op.`pop.string.size`(self.value)
-
     @always_inline("nodebug")
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
