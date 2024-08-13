@@ -919,6 +919,13 @@ def test_list_dtor():
     assert_equal(g_dtor_count, 1)
 
 
+def test_list_repr():
+    var l = List(1, 2, 3)
+    assert_equal(l.__repr__(), "[1, 2, 3]")
+    var empty = List[Int]()
+    assert_equal(empty.__repr__(), "[]")
+
+
 # ===-------------------------------------------------------------------===#
 # main
 # ===-------------------------------------------------------------------===#
@@ -956,3 +963,4 @@ def main():
     test_list_contains()
     test_indexing()
     test_list_dtor()
+    test_list_repr()
