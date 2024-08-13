@@ -262,7 +262,37 @@ trait Powable:
     Types that conform to `Powable` will work with the builtin `pow` function,
     which will return the same type as the inputs.
 
-    TODO: add example
+    For example:
+    ```mojo
+    @value
+    struct Rational(Powable):
+        var numerator: Float64
+        var denominator: Float64
+
+        fn __init__(inout self, numerator: Float64, denominator: Float64):
+            self.numerator = numerator
+            self.denominator = denominator
+
+        fn __pow__(self, exp: Self)  -> Self:
+            var exp_value = exp.numerator / exp.denominator
+            return Self(pow(self.numerator, exp_value), pow(self.denominator, exp_value))
+    ```
+
+    You can now use the ** operator to exponentiate objects
+    inside generic functions:
+
+    ```mojo
+    fn exponentiate[T: Powable](base: T, exp: T) -> T:
+        return base ** exp
+
+    var base = Rational(Float64(3.0), 5.0)
+    var exp = Rational(Float64(1.0), 2.0)
+    var res = exponentiate(base, exp)
+    ```
+
+    ```plaintext
+    raising to power
+    ```
     """
 
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
