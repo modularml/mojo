@@ -174,8 +174,16 @@ struct reader:
         Returns:
             The line at the given index.
         """
-        # TODO: Handle the quoting, doublequote, skipinitialspace and escapechar options
-        return self._lines[idx].split(self._dialect.delimiter)
+        var line: List[String] = self._lines[idx].split(self._dialect.delimiter)
+        for field_ref in line:
+            if (
+                len(field_ref[]) > 1
+                and field_ref[][0] == self._dialect.quotechar
+                and field_ref[][-1] == self._dialect.quotechar
+            ):
+                field_ref[] = field_ref[][1:-1]
+            # TODO: Handle the doublequote, skipinitialspace and escapechar options
+        return line
 
     fn lines_count(self: Self) -> Int:
         """
