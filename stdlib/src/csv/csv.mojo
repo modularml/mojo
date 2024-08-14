@@ -162,7 +162,7 @@ struct reader:
         self._dialect.validate()
 
         # TODO: Implement streaming to prevent loading the entire file into memory
-        self._lines = csvfile.read().split(self._dialect.lineterminator)
+        self._lines = csvfile.read().splitlines()
 
     fn get_line(self: Self, idx: Int) raises -> List[String]:
         """
