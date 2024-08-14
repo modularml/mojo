@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from testing import assert_equal, assert_false, assert_not_equal, assert_true
+from sys import bitwidthof
 
 
 def test_simple_uint():

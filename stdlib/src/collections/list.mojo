@@ -21,6 +21,7 @@ from collections import List
 
 
 from sys.intrinsics import _type_is_eq
+from sys import sizeof
 from os import abort
 from memory import Reference, UnsafePointer, memcpy
 from utils import Span

@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s -t
 
+from sys import simdwidthof
 from algorithm import elementwise
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from buffer import Buffer

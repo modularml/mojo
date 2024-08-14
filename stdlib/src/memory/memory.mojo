@@ -26,6 +26,7 @@ from sys import (
     sizeof,
     triple_is_nvidia_cuda,
     external_call,
+    simdwidthof,
 )
 
 from builtin.dtype import _integral_type_of

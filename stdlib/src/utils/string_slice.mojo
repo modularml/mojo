@@ -24,7 +24,7 @@ from utils import Span
 from collections.string import _isspace
 from collections import List
 from memory import memcmp
-from sys import simdwidthof
+from sys import simdwidthof, bitwidthof
 
 alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""

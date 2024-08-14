@@ -20,10 +20,16 @@ from math import floor
 """
 
 from collections import List
-from sys import llvm_intrinsic
 from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const
-from sys.info import bitwidthof, has_avx512f, simdwidthof, triple_is_nvidia_cuda
+from sys import (
+    llvm_intrinsic,
+    bitwidthof,
+    has_avx512f,
+    simdwidthof,
+    triple_is_nvidia_cuda,
+    sizeof,
+)
 
 from memory import UnsafePointer
 
