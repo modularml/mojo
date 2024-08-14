@@ -135,6 +135,3 @@ from utils._format import Formattable, Formatter
 # Private things
 from builtin._documentation import doc_private
 from utils._visualizers import lldb_formatter_wrapping_type
-
-# Load-bearing ones to remove
-from memory import bitcast
