@@ -1100,7 +1100,7 @@ fn iota[
         buff.store(i, i + offset)
 
 
-fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
+fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
@@ -1113,7 +1113,7 @@ fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
     iota(v.data, len(v), offset)
 
 
-fn iota(inout v: List[Int], offset: Int = 0):
+fn iota(inout v: List[Int, *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:
@@ -2056,7 +2056,7 @@ fn gcd(s: Span[Int], /) -> Int:
 
 
 @always_inline
-fn gcd(l: List[Int], /) -> Int:
+fn gcd(l: List[Int, *_], /) -> Int:
     """Computes the greatest common divisor of a list of integers.
 
     Args:
@@ -2128,7 +2128,7 @@ fn lcm(s: Span[Int], /) -> Int:
 
 
 @always_inline
-fn lcm(l: List[Int], /) -> Int:
+fn lcm(l: List[Int, *_], /) -> Int:
     """Computes the least common multiple of a list of integers.
 
     Args:
