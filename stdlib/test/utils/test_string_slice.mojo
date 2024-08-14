@@ -204,8 +204,8 @@ fn test_utf8_validation() raises:
      ظهرت نسخ جديدة ومختلفة من نص لوريم إيبسوم، أحياناً عن طريق
      الصدفة، وأحياناً عن عمد كإدخال بعض العبارات الفكاهية إليها.
     """
-    assert_true(_is_valid_utf8(text.unsafe_ptr(), text._byte_length()))
-    assert_true(_is_valid_utf8(text.unsafe_ptr(), text._byte_length()))
+    assert_true(_is_valid_utf8(text.unsafe_ptr(), text.byte_length()))
+    assert_true(_is_valid_utf8(text.unsafe_ptr(), text.byte_length()))
 
     var positive = List[List[UInt8]](
         List[UInt8](0x0),

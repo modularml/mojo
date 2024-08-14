@@ -690,6 +690,24 @@ def test_list_span():
     assert_equal(es[0], 1)
 
 
+def test_list_realloc_trivial_types():
+    a = List[Int, hint_trivial_type=True]()
+    for i in range(100):
+        a.append(i)
+
+    assert_equal(len(a), 100)
+    for i in range(100):
+        assert_equal(a[i], i)
+
+    b = List[Int8, hint_trivial_type=True]()
+    for i in range(100):
+        b.append(Int8(i))
+
+    assert_equal(len(b), 100)
+    for i in range(100):
+        assert_equal(b[i], Int8(i))
+
+
 def test_list_boolable():
     assert_true(List[Int](1))
     assert_false(List[Int]())
@@ -901,6 +919,13 @@ def test_list_dtor():
     assert_equal(g_dtor_count, 1)
 
 
+def test_list_repr():
+    var l = List(1, 2, 3)
+    assert_equal(l.__repr__(), "[1, 2, 3]")
+    var empty = List[Int]()
+    assert_equal(empty.__repr__(), "[]")
+
+
 # ===-------------------------------------------------------------------===#
 # main
 # ===-------------------------------------------------------------------===#
@@ -927,6 +952,7 @@ def main():
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
+    test_list_realloc_trivial_types()
     test_list_boolable()
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
@@ -937,3 +963,4 @@ def main():
     test_list_contains()
     test_indexing()
     test_list_dtor()
+    test_list_repr()

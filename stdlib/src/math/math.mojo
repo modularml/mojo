@@ -377,6 +377,24 @@ fn exp2[
         Vector containing $2^n$ computed elementwise, where n is an element in
         the input SIMD vector.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if type is DType.float16:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.f16", constraints="=h,h"
+            ](x)
+        elif type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.ftz.f32", constraints="=f,f"
+            ](x)
+
+    @parameter
+    if type not in (DType.float32, DType.float64):
+        return exp2(x.cast[DType.float32]()).cast[type]()
+
     alias integral_type = FPUtils[type].integral_type
 
     var xc = x.clamp(-126, 126)
@@ -739,6 +757,22 @@ fn log(x: SIMD) -> __type_of(x):
     Returns:
         Vector containing result of performing natural log base E on x.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias ln2 = 0.69314718055966295651160180568695068359375
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return (
+                _call_ptx_intrinsic[
+                    instruction="lg2.approx.f32", constraints="=f,f"
+                ](x)
+                * ln2
+            )
+
     return _log_base[27](x)
 
 
@@ -757,6 +791,18 @@ fn log2(x: SIMD) -> __type_of(x):
     Returns:
         Vector containing result of performing log base 2 on x.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log2(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="lg2.approx.f32", constraints="=f,f"
+            ](x)
+
     return _log_base[2](x)
 
 
@@ -1577,6 +1623,22 @@ fn log10(x: SIMD) -> __type_of(x):
     Returns:
         The `log10` of the input.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias log10_2 = 0.301029995663981195213738894724493027
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log10(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return (
+                _call_ptx_intrinsic[
+                    instruction="lg2.approx.f32", constraints="=f,f"
+                ](x)
+                * log10_2
+            )
+
     return _call_libm["log10"](x)
 
 

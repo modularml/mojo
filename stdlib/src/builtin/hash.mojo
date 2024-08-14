@@ -27,6 +27,7 @@ There are a few main tools in this module:
 
 import random
 from sys.ffi import _get_global
+from collections import InlineArray
 
 from builtin.dtype import _uint_type_of_width
 from memory import memcpy, memset_zero, stack_allocation

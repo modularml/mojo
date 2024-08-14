@@ -297,6 +297,16 @@ fn test_sort103() raises:
     for i in range(1, length):
         assert_false(list[i - 1] > list[i])
 
+    var list1 = List[Int](capacity=length)
+
+    for i in range(length):
+        list1.append(length - i - 1)
+
+    sort[stable=True](list1)
+
+    for i in range(1, length):
+        assert_false(list1[i - 1] > list1[i])
+
 
 fn test_sort_any_103() raises:
     alias length = 103
@@ -596,6 +606,49 @@ fn test_sort_empty_comparable_elements_list() raises:
     assert_true(len(person_list) == 0)
 
 
+@value
+struct IntPair:
+    var x: Int
+    var idx: Int
+
+
+def test_stable_sort_stress():
+    var lens = List[Int](3, 100, 117, 223, 500, 1000, 1500, 2000, 3000)
+    var random_seed = 0
+    seed(random_seed)
+
+    @parameter
+    fn test[
+        cmp_fn: fn (IntPair, IntPair) capturing -> Bool,
+        check_fn: fn (IntPair, IntPair) capturing -> Bool,
+    ](length: Int) raises:
+        var list = List[IntPair](capacity=length)
+        for i in range(length):
+            # make the range smaller so we can get more repeats
+            list.append(IntPair(int(random_si64(0, 100)), i))
+
+        sort[cmp_fn, stable=True](list)
+
+        for i in range(length - 1):
+            assert_true(check_fn(list[i], list[i + 1]))
+
+    # sort by only comparing the x value of the IntPair, then check the sort is
+    # stable by making sure that for the same x value, the idx field is sorted.
+    @parameter
+    @always_inline
+    fn _lt(lhs: IntPair, rhs: IntPair) -> Bool:
+        return lhs.x < rhs.x
+
+    @parameter
+    @always_inline
+    fn _lt_check(lhs: IntPair, rhs: IntPair) -> Bool:
+        return lhs.idx < rhs.idx if lhs.x == rhs.x else lhs.x < rhs.x
+
+    for i in range(len(lens)):
+        var length = lens[i]
+        test[_lt, _lt_check](length)
+
+
 def main():
     test_sort_small_3()
     test_sort_small_5()
@@ -613,6 +666,7 @@ def main():
     test_quick_sort_repeated_val()
 
     test_sort_stress()
+    test_stable_sort_stress()
 
     test_sort_custom()
 

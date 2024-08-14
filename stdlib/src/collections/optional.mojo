@@ -342,7 +342,7 @@ struct Optional[T: CollectionElement](
             A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
+        return self._value.unsafe_get[T]()[]
 
     fn take(inout self) -> T:
         """Move the value out of the Optional.

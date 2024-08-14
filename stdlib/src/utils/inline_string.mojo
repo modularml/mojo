@@ -15,6 +15,7 @@
    avoids heap allocations for short strings.
 """
 
+from collections import InlineArray
 from os import abort
 from collections import Optional
 from sys import sizeof

@@ -369,7 +369,35 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # "Mojo 'Mojo'"
   ```
 
+- `sort` now supports `stable` parameter. It can be called by
+
+  ```mojo
+  sort[cmp_fn, stable=True](list)
+  ```
+
+  The algorithm requires $$O(N)$$ auxiliary memory, if extra memory is failed to
+  allocate, the program will crash.
+
 ### 🦋 Changed
+
+- The set of automatically imported entities (types, aliases, functions) into user's
+  Mojo programs has been dramatically reduced.  Before, with the way the `builtin`
+  module was handled, all of the entities in the following modules would be automatically
+  included:
+
+  {'memory', 'sys', 'os', 'utils', 'python', 'bit', 'random', 'math',
+   'builtin', 'collections'}
+
+  Now, only the explicitly enumerated entities in `prelude/__init__.mojo` are
+  the ones automatically imported into user's Mojo programs.  This will break
+  a lot of user code as users will need to explicitly import what they're using
+  for cases previously commonly included before (such as `Optional`, `Variant`,
+  and so on).
+
+- Some types from the `builtin` module have been moved to different modules for clarity
+  which is made possible now that we have a `prelude` module that can re-export symbols
+  from modules other than `builtin`.
+  - `builtin.string` has been moved to `collections.string`.
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
@@ -606,6 +634,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `SIMD` construction from `Bool` has been restricted to `DType.bool` data type.
 
 - `SIMD.load/store` are moved to `UnsafePointer`.
+
+- `external_call` and `abort` are removed from prelude.
 
 ### ❌ Removed
 

@@ -19,7 +19,8 @@ from sys import PrefetchLocality
 ```
 """
 
-from sys import sizeof
+from .info import sizeof, triple_is_nvidia_cuda
+from ._assembly import inlined_assembly
 
 from memory import AddressSpace, UnsafePointer
 
@@ -1186,7 +1187,7 @@ struct PrefetchOptions:
 
 @always_inline("nodebug")
 fn prefetch[
-    params: PrefetchOptions, type: DType
+    type: DType, //, params: PrefetchOptions = PrefetchOptions()
 ](addr: UnsafePointer[Scalar[type], *_]):
     """Prefetches an instruction or data into cache before it is used.
 
@@ -1194,18 +1195,28 @@ fn prefetch[
     to prefetch instruction or data into cache before they are used.
 
     Parameters:
-      params: Configuration options for the prefect intrinsic.
       type: The DType of value stored in addr.
+      params: Configuration options for the prefect intrinsic.
 
     Args:
       addr: The data pointer to prefetch.
     """
-    llvm_intrinsic["llvm.prefetch", NoneType](
-        addr.bitcast[NoneType](),
-        params.rw,
-        params.locality,
-        params.cache,
-    )
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        inlined_assembly[
+            "prefetch.global.L2 [$0];",
+            NoneType,
+            constraints="l,~{memory}",
+            has_side_effect=True,
+        ](addr.bitcast[NoneType]())
+    else:
+        llvm_intrinsic["llvm.prefetch", NoneType](
+            addr.bitcast[NoneType](),
+            params.rw,
+            params.locality,
+            params.cache,
+        )
 
 
 # ===----------------------------------------------------------------------===#

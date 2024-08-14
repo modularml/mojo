@@ -55,7 +55,7 @@ fn _insertion_sort[
         # Find the placement of the value in the array, shifting as we try to
         # find the position. Throughout, we assume array[start:i] has already
         # been sorted.
-        while j > 0 and not cmp_fn(array[j - 1], value):
+        while j > 0 and cmp_fn(value, array[j - 1]):
             array[j] = array[j - 1]
             j -= 1
 
@@ -257,6 +257,105 @@ fn _quicksort[
 
 
 # ===----------------------------------------------------------------------===#
+# stable sort
+# ===----------------------------------------------------------------------===#
+
+
+fn merge[
+    type: CollectionElement,
+    lifetime: MutableLifetime, //,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](
+    span1: Span[type, lifetime],
+    span2: Span[type, lifetime],
+    result: Span[type, lifetime],
+):
+    """Merge span1 and span2 into result using the given cmp_fn. The function
+    will crash if result is not large enough to hold both span1 and span2.
+
+    Parameters:
+        type: Type of the spans.
+        lifetime: Lifetime of the spans.
+        cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
+
+    Args:
+        span1: The first span to be merged.
+        span2: The second span to be merged.
+        result: The output span.
+    """
+    var span1_size = len(span1)
+    var span2_size = len(span2)
+
+    debug_assert(
+        span1_size + span2_size <= len(result),
+        "The merge result does not fit in the span provided",
+    )
+    var i = 0
+    var j = 0
+    var k = 0
+    while i < span1_size:
+        if j == span2_size:
+            while i < span1_size:
+                result[k] = span1[i]
+                k += 1
+                i += 1
+            return
+        if cmp_fn(span2[j], span1[i]):
+            result[k] = span2[j]
+            j += 1
+        else:
+            result[k] = span1[i]
+            i += 1
+        k += 1
+
+    while j < span2_size:
+        result[k] = span2[j]
+        k += 1
+        j += 1
+
+
+fn _stable_sort_impl[
+    type: CollectionElement,
+    lifetime: MutableLifetime, //,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](span: Span[type, lifetime], temp_buff: Span[type, lifetime]):
+    var size = len(span)
+    if size <= 1:
+        return
+    var i = 0
+    var array = span.unsafe_ptr()
+    while i < size:
+        _insertion_sort[cmp_fn](
+            span[i : min(i + insertion_sort_threshold, size)]
+        )
+        i += insertion_sort_threshold
+    var merge_size = insertion_sort_threshold
+    while merge_size < size:
+        var j = 0
+        while j + merge_size < size:
+            var span1 = span[j : j + merge_size]
+            var span2 = span[j + merge_size : min(size, j + 2 * merge_size)]
+            merge[cmp_fn](span1, span2, temp_buff)
+            for i in range(merge_size + len(span2)):
+                span[j + i] = temp_buff[i]
+            j += 2 * merge_size
+        merge_size *= 2
+
+
+fn _stable_sort[
+    type: CollectionElement,
+    lifetime: MutableLifetime, //,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](span: Span[type, lifetime]):
+    var temp_buff = UnsafePointer[type].alloc(len(span))
+    var temp_buff_span = Span[type, lifetime](
+        unsafe_ptr=temp_buff, len=len(span)
+    )
+    _stable_sort_impl[cmp_fn](span, temp_buff_span)
+    temp_buff.free()
+
+
+# ===----------------------------------------------------------------------===#
 # partition
 # ===----------------------------------------------------------------------===#
 
@@ -401,6 +500,8 @@ fn _sort[
     type: CollectionElement,
     lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[type, lifetime]):
     if len(span) <= 5:
         _delegate_small_sort[cmp_fn](span)
@@ -408,6 +509,10 @@ fn _sort[
 
     if len(span) < insertion_sort_threshold:
         _insertion_sort[cmp_fn](span)
+        return
+
+    if stable:
+        _stable_sort[cmp_fn](span)
         return
 
     _quicksort[cmp_fn](span)
@@ -421,6 +526,8 @@ fn sort[
     type: CollectionElement,
     lifetime: MutableLifetime, //,
     cmp_fn: fn (type, type) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[type, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -429,6 +536,7 @@ fn sort[
         type: CollectionElement type of the underlying data.
         lifetime: Lifetime of span.
         cmp_fn: The comparison function.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -438,12 +546,14 @@ fn sort[
     fn _cmp_fn(lhs: _SortWrapper[type], rhs: _SortWrapper[type]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[_cmp_fn](span)
+    _sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     lifetime: MutableLifetime, //,
     cmp_fn: fn (Int, Int) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[Int, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -451,6 +561,7 @@ fn sort[
     Parameters:
         lifetime: Lifetime of span.
         cmp_fn: The comparison function.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -460,13 +571,15 @@ fn sort[
     fn _cmp_fn(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[_cmp_fn](span)
+    _sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     type: DType,
     lifetime: MutableLifetime, //,
     cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[Scalar[type], lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -475,6 +588,7 @@ fn sort[
         type: DType type of the underlying data.
         lifetime: Lifetime of span.
         cmp_fn: The comparison function.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -486,17 +600,20 @@ fn sort[
     ) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[_cmp_fn](span)
+    _sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     lifetime: MutableLifetime, //,
+    *,
+    stable: Bool = False,
 ](span: Span[Int, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
         lifetime: Lifetime of span.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -506,12 +623,14 @@ fn sort[
     fn _cmp_fn(lhs: Int, rhs: Int) -> Bool:
         return lhs < rhs
 
-    sort[_cmp_fn](span)
+    sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     type: DType,
     lifetime: MutableLifetime, //,
+    *,
+    stable: Bool = False,
 ](span: Span[Scalar[type], lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -519,6 +638,7 @@ fn sort[
     Parameters:
         type: CollectionElement type of the underlying data.
         lifetime: Lifetime of span.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -528,18 +648,21 @@ fn sort[
     fn _cmp_fn(lhs: Scalar[type], rhs: Scalar[type]) -> Bool:
         return lhs < rhs
 
-    sort[_cmp_fn](span)
+    sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     type: ComparableCollectionElement,
     lifetime: MutableLifetime, //,
+    *,
+    stable: Bool = False,
 ](span: Span[type, lifetime]):
     """Sort list of the order comparable elements in-place.
 
     Parameters:
         type: The order comparable collection element type.
         lifetime: Lifetime of span.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -549,7 +672,7 @@ fn sort[
     fn _cmp_fn(a: type, b: type) -> Bool:
         return a < b
 
-    sort[_cmp_fn](span)
+    sort[_cmp_fn, stable=stable](span)
 
 
 # ===----------------------------------------------------------------------===#

@@ -14,6 +14,7 @@
 
 from sys import has_neon
 
+from collections import InlineArray
 from builtin.simd import _modf
 from testing import (
     assert_almost_equal,

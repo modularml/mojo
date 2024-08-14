@@ -20,7 +20,13 @@ from memory import memcmp
 """
 
 
-from sys import alignof, llvm_intrinsic, sizeof, triple_is_nvidia_cuda
+from sys import (
+    alignof,
+    llvm_intrinsic,
+    sizeof,
+    triple_is_nvidia_cuda,
+    external_call,
+)
 
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
@@ -370,7 +376,10 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and address_space == _GPUAddressSpace.SHARED:
+    if triple_is_nvidia_cuda() and address_space in (
+        _GPUAddressSpace.SHARED,
+        _GPUAddressSpace.PARAM,
+    ):
         return __mlir_op.`pop.global_alloc`[
             count = count.value,
             _type = UnsafePointer[type, address_space]._mlir_type,

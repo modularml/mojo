@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from collections import InlineArray
 from testing import assert_equal, assert_false, assert_true
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from test_utils import ValueDestructorRecorder

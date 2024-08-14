@@ -23,7 +23,7 @@ from utils import StringRef, Span, StringSlice
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from .string import _atol
+from collections.string import _atol
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -268,19 +268,6 @@ struct StringLiteral(
 
     @always_inline
     fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this StringLiteral in bytes.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return __mlir_op.`pop.string.size`(self.value)
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
         """Get the string length in bytes.
 
         Returns:

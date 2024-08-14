@@ -14,7 +14,7 @@
 
 # TODO: Replace %bare-mojo with %mojo
 # when  https://github.com/modularml/mojo/issues/2751 is fixed.
-from builtin.string import (
+from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
     _isspace,
@@ -1260,15 +1260,14 @@ def test_string_iter():
         concat += v
     assert_equal(321, atol(concat))
 
-    # TODO: UnsafePointer does not have a store or __setitem__ method
-    # for v in vs:
-    #     v.unsafe_ptr().store(0, "1")
+    for v in vs:
+        v.unsafe_ptr()[] = ord("1")
 
-    # # Borrow immutably
-    # for v in vs:
-    #     concat += v
+    # Borrow immutably
+    for v in vs:
+        concat += v
 
-    # assert_equal(111, atol(concat))
+    assert_equal(321111, atol(concat))
 
     var idx = -1
     vs = String("mojo🔥")
