@@ -15,6 +15,7 @@
 # away.
 
 from sys import argv
+from os import abort
 
 
 # CHECK-LABEL: OK
