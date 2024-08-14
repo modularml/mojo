@@ -28,7 +28,7 @@ from collections.string import (
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
-from sys import triple_is_nvidia_cuda
+from sys import triple_is_nvidia_cuda, bitwidthof
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer

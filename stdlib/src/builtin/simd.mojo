@@ -25,8 +25,10 @@ from sys import (
     prefetch,
     simdwidthof,
     triple_is_nvidia_cuda,
+    bitwidthof,
 )
 from sys.info import _current_arch
+
 from sys._assembly import inlined_assembly
 from os import abort
 
