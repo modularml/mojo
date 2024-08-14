@@ -174,6 +174,7 @@ struct reader:
         Returns:
             The line at the given index.
         """
+        # TODO: Handle the quoting, doublequote, skipinitialspace and escapechar options
         return self._lines[idx].split(self._dialect.delimiter)
 
     fn lines_count(self: Self) -> Int:
