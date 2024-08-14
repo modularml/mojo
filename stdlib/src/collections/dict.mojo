@@ -527,10 +527,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The new dictionary.
         """
-        var dict = Dict[K, Optional[V]]()
-        for key in keys:
-            dict[key[]] = value
-        return dict
+        return Dict[K, Optional[V]].fromkeys(keys, value)
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing dictiontary.

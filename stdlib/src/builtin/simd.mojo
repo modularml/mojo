@@ -28,6 +28,7 @@ from sys import (
 )
 from sys.info import _current_arch
 from sys._assembly import inlined_assembly
+from os import abort
 
 from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable

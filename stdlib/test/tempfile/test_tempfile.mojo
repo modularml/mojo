@@ -14,7 +14,7 @@
 
 import os
 from collections import Dict, Optional
-from os.path import exists
+from os.path import exists, split
 from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory, gettempdir, mkdtemp
 
@@ -194,8 +194,7 @@ def test_named_temporary_file_deletion():
         assert_true(exists(file_path), "Failed to create file " + file_path)
         assert_true(file_name.startswith("my_prefix"))
         assert_true(file_name.endswith("my_suffix"))
-        # TODO use os.path.split when it exists
-        assert_equal(file_path[: -len(file_name) - 1], Path().__fspath__())
+        assert_equal(split(file_path)[0], Path().__fspath__())
     assert_false(exists(file_path), "Failed to delete file " + file_path)
 
     with NamedTemporaryFile(delete=False) as my_tmp_file:
