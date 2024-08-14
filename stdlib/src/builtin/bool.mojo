@@ -527,7 +527,7 @@ fn bool[T: Boolable, //](value: T) -> Bool:
 # TODO: Combine these into Iterators over Boolable elements
 
 
-fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
+fn any[T: BoolableCollectionElement](list: List[T, *_]) -> Bool:
     """Checks if **any** element in the list is truthy.
 
     Parameters:
@@ -584,7 +584,7 @@ fn any(value: SIMD) -> Bool:
 # TODO: Combine these into Iterators over Boolable elements
 
 
-fn all[T: BoolableCollectionElement](list: List[T]) -> Bool:
+fn all[T: BoolableCollectionElement](list: List[T, *_]) -> Bool:
     """Checks if **all** elements in the list are truthy.
 
     Parameters:

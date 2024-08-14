@@ -369,7 +369,7 @@ struct StringLiteral(
         """
         return StringRef(self).rfind(substr, start=start)
 
-    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
