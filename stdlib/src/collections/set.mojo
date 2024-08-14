@@ -74,7 +74,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
-    fn __init__(inout self, elements: List[T]):
+    fn __init__(inout self, elements: List[T, *_]):
         """Construct a set from a List of elements.
 
         Args:

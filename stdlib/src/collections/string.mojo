@@ -1274,7 +1274,7 @@ struct String(
         _ = is_first
         return result
 
-    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
