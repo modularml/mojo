@@ -128,7 +128,7 @@ struct reader:
         inout self: Self,
         csvfile: FileHandle,
         delimiter: String,
-        quotechar: String,
+        quotechar: String = '"',
         escapechar: String = "",
         doublequote: Bool = False,
         skipinitialspace: Bool = False,
