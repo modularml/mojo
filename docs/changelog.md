@@ -626,7 +626,7 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD.load/store` are moved to `UnsafePointer`.
 
-- `abort` is removed from prelude.
+- `external_call` and `abort` are removed from prelude.
 
 ### ❌ Removed
 
