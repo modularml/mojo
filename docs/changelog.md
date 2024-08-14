@@ -369,6 +369,15 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # "Mojo 'Mojo'"
   ```
 
+- `sort` now supports `stable` parameter. It can be called by
+
+  ```mojo
+  sort[cmp_fn, stable=True](list)
+  ```
+
+  The algorithm requires $$O(N)$$ auxiliary memory, if extra memory is failed to
+  allocate, the program will crash.
+
 ### 🦋 Changed
 
 - The set of automatically imported entities (types, aliases, functions) into user's
