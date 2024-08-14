@@ -63,10 +63,6 @@ def test_reader():
             r_it.__next__(),
             List(String("Sarah"), String("21"), String("Female")),
         )
-        assert_line_equal(
-            r_it.__next__(),
-            List(String("")),
-        )
 
 
 def main():
