@@ -32,7 +32,7 @@ with open("my_file.txt", "r") as f:
 """
 
 from os import PathLike
-from sys import external_call
+from sys import external_call, sizeof
 from utils import Span
 
 from memory import AddressSpace, UnsafePointer

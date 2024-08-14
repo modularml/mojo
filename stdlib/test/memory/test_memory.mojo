@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys import sizeof
+from sys import sizeof, simdwidthof
 
 from memory import (
     UnsafePointer,

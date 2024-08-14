@@ -20,6 +20,7 @@
 # CHECK: Benchmark results
 
 from random import rand
+from sys import simdwidthof
 
 from algorithm import vectorize
 from benchmark import (

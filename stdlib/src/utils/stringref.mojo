@@ -20,6 +20,7 @@ from memory import UnsafePointer, memcmp
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import C_char
+from sys import simdwidthof
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

@@ -27,6 +27,7 @@ There are a few main tools in this module:
 
 import random
 from sys.ffi import _get_global
+from sys import simdwidthof, bitwidthof
 from collections import InlineArray
 
 from builtin.dtype import _uint_type_of_width
