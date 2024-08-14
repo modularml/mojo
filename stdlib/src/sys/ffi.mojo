@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements a foreign functions interface (FFI)."""
 
+from os import abort
 from memory import UnsafePointer
 
 from utils import StringRef
