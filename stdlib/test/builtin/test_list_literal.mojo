@@ -15,13 +15,13 @@
 from testing import assert_equal, assert_true, assert_false
 
 
-fn test_list() raises:
+def test_list():
     assert_equal(len([1, 2.0, 3.14, [-1, -2]]), 4)
 
 
-fn test_variadic_list() raises:
+def test_variadic_list():
     @parameter
-    fn check_list(*nums: Int) raises:
+    def check_list(*nums: Int):
         assert_equal(nums[0], 5)
         assert_equal(nums[1], 8)
         assert_equal(nums[2], 6)
@@ -32,15 +32,9 @@ fn test_variadic_list() raises:
     check_list(5, 8, 6)
 
 
-fn test_repr_list() raises:
-    var l = List(1, 2, 3)
-    assert_equal(l.__repr__(), "[1, 2, 3]")
-    var empty = List[Int]()
-    assert_equal(empty.__repr__(), "[]")
-
-
-fn test_contains() raises:
-    # List
+def test_contains():
+    # Explicitly showing the difference in behavior in testing `List` vs. `ListLiteral`
+    # here.  There are additional tests for `List.__contains__` in the `test_list.mojo` file.
     var l = List[String]("Hello", ",", "World", "!")
     assert_true("Hello" in l)
     assert_true(l.__contains__(String(",")))
@@ -75,5 +69,4 @@ fn test_contains() raises:
 def main():
     test_list()
     test_variadic_list()
-    test_repr_list()
     test_contains()

@@ -139,5 +139,3 @@ from utils._visualizers import lldb_formatter_wrapping_type
 # Load-bearing ones to remove
 from sys import alignof, sizeof, bitwidthof, simdwidthof
 from memory import bitcast
-from os import abort
-from sys.ffi import external_call

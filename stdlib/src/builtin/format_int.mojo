@@ -16,6 +16,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from os import abort
 from collections import List, Optional, InlineArray
 from utils import StringSlice, StaticString
 

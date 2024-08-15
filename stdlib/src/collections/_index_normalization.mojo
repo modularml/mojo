@@ -14,6 +14,7 @@
 to data elements in arrays."""
 
 from sys import triple_is_nvidia_cuda
+from os import abort
 
 
 fn get_out_of_bounds_error_message[

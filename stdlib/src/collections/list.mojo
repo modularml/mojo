@@ -22,7 +22,7 @@ from collections import List
 
 from sys.intrinsics import _type_is_eq
 from os import abort
-from memory import Reference, UnsafePointer
+from memory import Reference, UnsafePointer, memcpy
 from utils import Span
 
 from .optional import Optional
@@ -36,6 +36,7 @@ from .optional import Optional
 struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
+    hint_trivial_type: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
@@ -44,11 +45,13 @@ struct _ListIter[
     Parameters:
         list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
+        hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
+            but it helps performance. Will go away in the future.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias list_type = List[T]
+    alias list_type = List[T, hint_trivial_type]
 
     var index: Int
     var src: Reference[Self.list_type, list_lifetime]
@@ -75,7 +78,7 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](
+struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     CollectionElement, CollectionElementNew, Sized, Boolable
 ):
     """The `List` type is a dynamically-allocated list.
@@ -85,6 +88,8 @@ struct List[T: CollectionElement](
 
     Parameters:
         T: The type of the elements.
+        hint_trivial_type: A hint to the compiler that the type T is trivial.
+            It's not mandatory, but if set, it allows some optimizations.
     """
 
     # Fields
@@ -339,7 +344,9 @@ struct List[T: CollectionElement](
         """
         self.extend(other^)
 
-    fn __iter__(ref [_]self: Self) -> _ListIter[T, __lifetime_of(self)]:
+    fn __iter__(
+        ref [_]self: Self,
+    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -349,7 +356,7 @@ struct List[T: CollectionElement](
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, __lifetime_of(self), False]:
+    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
@@ -458,8 +465,11 @@ struct List[T: CollectionElement](
     fn _realloc(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
-        for i in range(self.size):
-            (self.data + i).move_pointee_into(new_data + i)
+        _move_pointee_into_many_elements[hint_trivial_type](
+            dest=new_data,
+            src=self.data,
+            size=self.size,
+        )
 
         if self.data:
             self.data.free()
@@ -525,7 +535,7 @@ struct List[T: CollectionElement](
         for i in range(x - 1):
             self.extend(orig)
 
-    fn extend(inout self, owned other: List[T]):
+    fn extend(inout self, owned other: List[T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -881,3 +891,18 @@ struct List[T: CollectionElement](
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
+
+
+fn _move_pointee_into_many_elements[
+    T: CollectionElement, //, hint_trivial_type: Bool
+](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
+    @parameter
+    if hint_trivial_type:
+        memcpy(
+            dest=dest.bitcast[Int8](),
+            src=src.bitcast[Int8](),
+            count=size * sizeof[T](),
+        )
+    else:
+        for i in range(size):
+            (src + i).move_pointee_into(dest + i)
