@@ -21,6 +21,7 @@ from collections import Optional
 from sys import sizeof
 
 from memory import UnsafePointer, memcpy
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 from utils import StringSlice, Variant
 from utils._format import ToFormatter
@@ -321,7 +322,7 @@ struct _FixedString[CAP: Int](
     """
 
     # Fields
-    var buffer: InlineArray[UInt8, CAP]
+    var buffer: InlineArray[UnsafeMaybeUninitialized[UInt8], CAP]
     """The underlying storage for the fixed string."""
     var size: Int
     """The number of elements in the vector."""
@@ -332,7 +333,7 @@ struct _FixedString[CAP: Int](
 
     fn __init__(inout self):
         """Constructs a new empty string."""
-        self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
+        self.buffer = InlineArray[UnsafeMaybeUninitialized[UInt8], CAP]()
         self.size = 0
 
     fn __init__(inout self, *, other: Self):
@@ -358,10 +359,14 @@ struct _FixedString[CAP: Int](
                 + ")"
             )
 
-        self.buffer = InlineArray[UInt8, CAP]()
+        self.buffer = InlineArray[UnsafeMaybeUninitialized[UInt8], CAP]()
         self.size = len(literal)
 
-        memcpy(self.buffer.unsafe_ptr(), literal.unsafe_ptr(), len(literal))
+        memcpy(
+            self.buffer.unsafe_ptr().bitcast[UInt8](),
+            literal.unsafe_ptr(),
+            len(literal),
+        )
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
@@ -461,7 +466,7 @@ struct _FixedString[CAP: Int](
 
         # Append the bytes from `str_slice` at the end of the current string
         memcpy(
-            dest=self.buffer.unsafe_ptr() + len(self),
+            dest=self.buffer.unsafe_ptr().bitcast[UInt8]() + len(self),
             src=str_slice.unsafe_ptr(),
             count=str_slice.byte_length(),
         )
@@ -504,7 +509,7 @@ struct _FixedString[CAP: Int](
         Returns:
             The pointer to the underlying memory.
         """
-        return self.buffer.unsafe_ptr()
+        return self.buffer.unsafe_ptr().bitcast[UInt8]()
 
     @always_inline
     fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:

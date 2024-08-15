@@ -39,7 +39,6 @@ fn _inline_array_construction_checks[size: Int]():
     constrained[size > 0, "number of elements in `InlineArray` must be > 0"]()
 
 
-@value
 struct InlineArray[
     ElementType: CollectionElementNew,
     size: Int,
@@ -65,44 +64,6 @@ struct InlineArray[
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
-    fn __init__(inout self):
-        """This constructor will always cause a compile time error if used.
-        It is used to steer users away from uninitialized memory.
-        """
-        constrained[
-            False,
-            (
-                "Initialize with either a variadic list of arguments, a default"
-                " fill element or pass the keyword argument"
-                " 'unsafe_uninitialized'."
-            ),
-        ]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
-
-    @always_inline
-    fn __init__(inout self, *, unsafe_uninitialized: Bool):
-        """Create an InlineArray with uninitialized memory.
-
-        Note that this is highly unsafe and should be used with caution.
-
-        We recommend to use the `InlineList` instead if all the objects
-        are not available when creating the array.
-
-        If despite those workarounds, one still needs an uninitialized array,
-        it is possible with:
-
-        ```mojo
-        var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
-        ```
-
-        Args:
-            unsafe_uninitialized: A boolean to indicate if the array should be initialized.
-                Always set to `True` (it's not actually used inside the constructor).
-        """
-        _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
-
     fn __init__(
         inout self,
         *,
@@ -127,6 +88,48 @@ struct InlineArray[
             unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
                 self.unsafe_ptr() + i
             )
+
+    # The order of the fn __init__ methods is important.
+    # Otherwise a compiler bug appears with the message
+    # error: '__init__' expects 3 parameters, but 5 were specified
+    fn __init__[
+        ThisElementType: CollectionElementNew, //,
+    ](
+        inout self: InlineArray[
+            UnsafeMaybeUninitialized[ThisElementType],
+            Self.size,
+        ]
+    ):
+        """Contructs an `InlineArray` without initializing the elements.
+        Note that this is only possible when the element type is `UnsafeMaybeUninitialized`.
+        For example, the following code is valid:
+        ```mojo
+        var arr = InlineArray[UnsafeMaybeUninitialized[Int], 2]()
+        arr[0].write(10)
+        arr[1].write(20)
+        ```
+        But the following is invalid:
+        ```mojo
+        var arr = InlineArray[Int, 2]()
+        ```
+        Since uninitialized integers is undefined behavior.
+        Afterwards it's the responsibility of the user to handle `UnsafeMaybeUninitialized`
+        elements correctly since, as the name implies, they are unsafe.
+        For more information on the subject, see the `UnsafeMaybeUninitialized` documentation.
+
+        Parameters:
+            ThisElementType: The element type of the array (the one wrapped inside `UnsafeMaybeUninitialized`).
+        """
+        _inline_array_construction_checks[size]()
+        self._array = __mlir_op.`kgen.undef`[
+            _type = __mlir_type[
+                `!pop.array<`,
+                Self.size.value,
+                `, `,
+                UnsafeMaybeUninitialized[ThisElementType],
+                `>`,
+            ]
+        ]()
 
     @always_inline
     fn __init__(inout self, fill: Self.ElementType):
@@ -189,7 +192,7 @@ struct InlineArray[
             other: The value to copy.
         """
 
-        self = Self(unsafe_uninitialized=True)
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
@@ -204,6 +207,23 @@ struct InlineArray[
         """
 
         self = Self(other=other)
+
+    # We want to be explicit about lifecycle methods.
+    # @value makes it implicit but since we're low level
+    # here, it's better to be explicit about what a move means.
+    fn __moveinit__(inout self, owned other: Self):
+        """Move construct the array.
+
+        Args:
+            other: The array to move.
+        """
+
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        for idx in range(size):
+            (other.unsafe_ptr() + idx).move_pointee_into(
+                self.unsafe_ptr() + idx
+            )
 
     fn __del__(owned self):
         """Deallocate the array."""
