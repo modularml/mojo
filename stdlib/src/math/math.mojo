@@ -177,6 +177,19 @@ fn trunc[T: Truncable, //](value: T) -> T:
 
 
 @always_inline
+fn sqrt(x: IntLiteral) -> IntLiteral:
+    """Performs square root on an IntLiteral, rounded down if necessary. Negative values return themselves.
+
+    Args:
+        x: The IntLiteral value to perform square root on.
+
+    Returns:
+        The square root of x.
+    """
+    return x.__sqrt__()
+
+
+@always_inline
 fn sqrt(x: Int) -> Int:
     """Performs square root on an integer.
 

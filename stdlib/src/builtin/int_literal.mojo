@@ -248,6 +248,23 @@ struct IntLiteral(
     # TODO: implement __pow__
 
     @always_inline("nodebug")
+    fn __sqrt__(self) -> Self:
+        """Return the square root of `self`, rounded down if necessary. Negative values return themselves.
+
+        Returns:
+            The square root of `self`.
+        """
+        # TODO: Benchmark and improve. This is using a basic babylonian method.
+        if self < 2:
+            return self
+        var res: IntLiteral = self
+        var nex: IntLiteral = 1
+        while res > nex:
+            res = (res + nex) // 2
+            nex = self // res
+        return res
+
+    @always_inline("nodebug")
     fn __floordiv__(self, rhs: Self) -> Self:
         """Return `self // rhs`.
 

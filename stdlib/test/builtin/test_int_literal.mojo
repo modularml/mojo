@@ -147,6 +147,23 @@ def test_comparison():
     assert_false((5).__ge__(10))
 
 
+def test_sqrt():
+    assert_equal(IntLiteral.__sqrt__(-2), -2)
+    assert_equal(IntLiteral.__sqrt__(-1), -1)
+    assert_equal(IntLiteral.__sqrt__(0), 0)
+    assert_equal(IntLiteral.__sqrt__(1), 1)
+    assert_equal(IntLiteral.__sqrt__(2), 1)
+    assert_equal(IntLiteral.__sqrt__(3), 1)
+    assert_equal(IntLiteral.__sqrt__(4), 2)
+    assert_equal(IntLiteral.__sqrt__(5), 2)
+    assert_equal(IntLiteral.__sqrt__(8), 2)
+    assert_equal(IntLiteral.__sqrt__(9), 3)
+    assert_equal(IntLiteral.__sqrt__(15), 3)
+    assert_equal(IntLiteral.__sqrt__(16), 4)
+    assert_equal(IntLiteral.__sqrt__(99), 9)
+    assert_equal(IntLiteral.__sqrt__(100), 10)
+
+
 def main():
     test_add()
     test_sub()
@@ -162,3 +179,4 @@ def main():
     test_indexer()
     test_bool()
     test_comparison()
+    test_sqrt()
