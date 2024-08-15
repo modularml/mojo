@@ -212,6 +212,17 @@ def test_comparison():
     assert_false(FloatLiteral.__ge__(4.4, 10.4))
 
 
+def test_sqrt():
+    assert_almost_equal(
+        FloatLiteral.__sqrt__(-1.0), FloatLiteral.nan, equal_nan=True
+    )
+    assert_almost_equal(FloatLiteral.__sqrt__(0.0), 0.0)
+    assert_almost_equal(FloatLiteral.__sqrt__(0.25), 0.5)
+    assert_almost_equal(FloatLiteral.__sqrt__(1.0), 1.0)
+    assert_almost_equal(FloatLiteral.__sqrt__(2.0), 1.4142135623_7309504880)
+    assert_almost_equal(FloatLiteral.__sqrt__(4.0), 2.0)
+
+
 def main():
     test_ceil()
     test_floor()
@@ -226,3 +237,4 @@ def main():
     test_is_special_value()
     test_abs()
     test_comparison()
+    test_sqrt()

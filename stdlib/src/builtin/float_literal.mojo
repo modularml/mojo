@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from math.solver import newtons_method
 
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
@@ -324,6 +325,37 @@ struct FloatLiteral(
         elif ndigits < 0:
             result *= Self(multiplier)
         return result
+
+    @always_inline
+    fn __sqrt__(self) -> Self:
+        """Returns the square root of `self`.
+
+        Returns:
+            The square root of `self`.
+        """
+        if self == 0.0:
+            return 0.0
+        return 1.0 / self.__recip_sqrt__()
+
+    @always_inline
+    fn __recip_sqrt__(self) -> Self:
+        """Returns the reciprocal square root of `self`.
+
+        Returns:
+            The reciprocal square root of `self`.
+        """
+
+        @parameter
+        fn func(value: Self) -> Self:
+            return 1.0 / (value * value)
+
+        @parameter
+        fn deriv(value: Self) -> Self:
+            return -2.0 / (value * value * value)
+
+        return newtons_method[func, deriv, 8, 1e-8, 1e-8](
+            2.0 / (self + 1.0), self
+        )
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators

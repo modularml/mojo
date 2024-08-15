@@ -38,6 +38,7 @@ from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
 
 from .polynomial import polynomial_evaluate
+from .solver import newtons_method
 
 # ===----------------------------------------------------------------------=== #
 # floor
@@ -203,6 +204,19 @@ fn sqrt(x: Int) -> Int:
 
 
 @always_inline
+fn sqrt(x: FloatLiteral) -> FloatLiteral:
+    """Performs square root on a FloatLiteral.
+
+    Args:
+        x: The FloatLiteral value to perform square root on.
+
+    Returns:
+        The square root of x.
+    """
+    return x.__sqrt__()
+
+
+@always_inline
 fn _sqrt_nvvm(x: SIMD) -> __type_of(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
@@ -265,6 +279,19 @@ fn sqrt[
 # ===----------------------------------------------------------------------=== #
 # rsqrt
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn isqrt(x: FloatLiteral) -> FloatLiteral:
+    """Performs reciprocal square root on a FloatLiteral.
+
+    Args:
+        x: The FloatLiteral to perform reciprocal square root on.
+
+    Returns:
+        The reciprocal square root of x.
+    """
+    return x.__recip_sqrt__()
 
 
 @always_inline
