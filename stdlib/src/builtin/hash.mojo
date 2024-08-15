@@ -31,6 +31,7 @@ from collections import InlineArray
 
 from builtin.dtype import _uint_type_of_width
 from memory import memcpy, memset_zero, stack_allocation
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
