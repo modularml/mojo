@@ -94,6 +94,17 @@ def test_rfind():
     assert_equal(-1, "abc".rfind("abcd"))
 
 
+def test_replace():
+    assert_equal("".replace("", "hello world"), "")
+    assert_equal("hello world".replace("", "something"), "hello world")
+    assert_equal("hello world".replace("world", ""), "hello ")
+    assert_equal("hello world".replace("world", "mojo"), "hello mojo")
+    assert_equal(
+        "hello world hello world".replace("world", "mojo"),
+        "hello mojo hello mojo",
+    )
+
+
 def test_comparison_operators():
     # Test less than and greater than
     assert_true(StringLiteral.__lt__("abc", "def"))
@@ -184,6 +195,7 @@ def main():
     test_contains()
     test_find()
     test_rfind()
+    test_replace()
     test_comparison_operators()
     test_hash()
     test_intable()
