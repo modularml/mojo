@@ -90,6 +90,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
+    DefaultableCollectionElementNew,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,

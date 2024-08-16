@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Defines the `InlineArray` type.
+"""Implements InlineArray, a statically-sized uniform container.
 
 You can import these APIs from the `collections` package. For example:
 
@@ -23,8 +23,9 @@ from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
+
 # ===----------------------------------------------------------------------===#
-# Array
+# Inline Array
 # ===----------------------------------------------------------------------===#
 
 
@@ -36,7 +37,7 @@ fn _inline_array_construction_checks[size: Int]():
     Parameters:
       size: The number of elements.
     """
-    constrained[size > 0, "number of elements in `InlineArray` must be > 0"]()
+    constrained[size >= 0, "number of elements in `InlineArray` must be >= 0"]()
 
 
 @value
@@ -65,41 +66,76 @@ struct InlineArray[
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline
-    fn __init__(inout self):
-        """This constructor will always cause a compile time error if used.
-        It is used to steer users away from uninitialized memory.
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
         """
+        self.__init__[False]()
+
+        for idx in range(size):
+            var ptr = self.unsafe_ptr() + idx
+
+            ptr.init_pointee_explicit_copy(other[idx])
+
+    @always_inline
+    fn __init__[
+        _T: DefaultableCollectionElementNew
+    ](inout self: InlineArray[_T, size, run_destructors=run_destructors]):
+        """Create an InlineArray with elements initialized to their default values.
+
+        Parameters:
+            _T: A type conformaing to `Defaultable` and `CollectionElement`.
+        """
+        self.__init__(_T())
+
+    @deprecated(
+        "Initialize with either a variadic list of arguments,"
+        " a default fill element, or use `array.__init__[False]().`"
+    )
+    fn __init__[
+        _T: CollectionElementNew, overload_1: None = None
+    ](inout self: InlineArray[_T, size, run_destructors=run_destructors]):
+        self.__init__[False]()
         constrained[
             False,
             (
-                "Initialize with either a variadic list of arguments, a default"
-                " fill element or pass the keyword argument"
-                " 'unsafe_uninitialized'."
+                "Initialize with either a variadic list of arguments,"
+                " a default fill element, or set init_data to False."
             ),
         ]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
-    fn __init__(inout self, *, unsafe_uninitialized: Bool):
-        """Create an InlineArray with uninitialized memory.
+    fn __init__[init_data: Bool](inout self):
+        """Used to create an InlineArray with uninitialized memory by setting `init_data` to False.
 
-        Note that this is highly unsafe and should be used with caution.
+        Note that this is highly unsafe, and you should initialize the elements manually.
 
         We recommend to use the `InlineList` instead if all the objects
         are not available when creating the array.
 
-        If despite those workarounds, one still needs an uninitialized array,
-        it is possible with:
+        If you still need an uninitialized array, it is possible with:
 
         ```mojo
-        var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
+        var uninitialized_array: InlineArray[Int, 10]
+        uninitialized_array.__init__[False]()
+        # ... manually initialize elements here, or you will get undefined behaviour.
         ```
 
-        Args:
-            unsafe_uninitialized: A boolean to indicate if the array should be initialized.
-                Always set to `True` (it's not actually used inside the constructor).
+        Parameters:
+            init_data: A boolean to indicate if the array should be initialized.
         """
+
+        @parameter
+        if init_data:
+            constrained[
+                False,
+                (
+                    "Initialize with either a variadic list of arguments,"
+                    " a default fill element, or set init_data to False."
+                ),
+            ]()
         _inline_array_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
@@ -135,8 +171,7 @@ struct InlineArray[
         Args:
             fill: The element to fill each index.
         """
-        _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self.__init__[False]()
 
         @parameter
         for i in range(size):
@@ -166,8 +201,7 @@ struct InlineArray[
         """
 
         debug_assert(len(storage) == size, "Elements must be of length size")
-        _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self.__init__[False]()
 
         # Move each element into the array storage.
         @parameter
@@ -181,20 +215,6 @@ struct InlineArray[
 
         # Mark the elements as already destroyed.
         storage._is_owned = False
-
-    fn __init__(inout self, *, other: Self):
-        """Explicitly copy the provided value.
-
-        Args:
-            other: The value to copy.
-        """
-
-        self = Self(unsafe_uninitialized=True)
-
-        for idx in range(size):
-            var ptr = self.unsafe_ptr() + idx
-
-            ptr.init_pointee_explicit_copy(other[idx])
 
     fn __copyinit__(inout self, other: Self):
         """Copy construct the array.

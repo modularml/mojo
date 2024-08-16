@@ -209,6 +209,18 @@ trait CollectionElementNew(ExplicitlyCopyable, Movable):
     pass
 
 
+trait DefaultableCollectionElementNew(Defaultable, CollectionElementNew):
+    """The DefaultableCollectionElementNew trait denotes a trait composition
+    of the `Defaultable` and `CollectionElementNew` traits.
+
+    This is useful to have as a named entity since Mojo does not
+    currently support anonymous trait compositions to constrain
+    on `Defaultable & CollectionElementNew` in the parameter.
+    """
+
+    pass
+
+
 trait StringableCollectionElement(CollectionElement, Stringable):
     """The StringableCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `Stringable` traits.
