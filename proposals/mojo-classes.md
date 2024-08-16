@@ -282,7 +282,7 @@ Conceptually, `type` could be implemented as
 
 ```python
 class type:
-    def __init__(self, name, bases, namespace, **kwargs):
+    def __new__(self, name, bases, namespace, **kwargs):
         self.__name__ = name
         # See appendix for implementation. In ~all python code this does
         # resolve_bases is a no-op, but it supports inheriting from non-types.
@@ -302,7 +302,7 @@ class type:
 
     def mro(self):
         # See appendix for implementation of C3 mro
-        return [self] + c3_mro(self.__bases__)
+        return [self.__class__] + c3_mro(self.__bases__)
 
     @property
     def __dict__(self):
