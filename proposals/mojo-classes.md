@@ -142,7 +142,7 @@ what compatibility looks like, as well as a reference for an eventual implementa
 ## NOTE: Attribute accesses in this implementation are sometimes fudged
 ##       as direct access, when they couldn't be because of recursion.
 class object(metaclass=type):
-    def __new__(cls):
+    def __new__(cls, name, bases, namespace, **kwargs):
         # Can't be implemented in pure python
         # Allocates a new Python object with an empty __dict__, and __class__ = cls
 
