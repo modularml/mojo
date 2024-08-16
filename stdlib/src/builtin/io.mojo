@@ -401,3 +401,136 @@ fn print[
     if not triple_is_nvidia_cuda():
         if flush:
             _flush(file=file)
+
+
+# ===----------------------------------------------------------------------=== #
+#  stdin
+# ===----------------------------------------------------------------------=== #
+
+@value
+struct stdin:
+    """A read only file handle to the stdin stream."""
+
+    alias file_descriptor = 0
+    alias mode = "r"
+    var handle: UnsafePointer[NoneType]
+    """The file handle to the stdin stream."""
+
+    fn __init__(inout self):
+        """Creates a file handle to the stdin stream."""
+        var handle: UnsafePointer[NoneType]
+
+        @parameter
+        if os_is_windows():
+            handle = external_call["_fdopen", UnsafePointer[NoneType]](
+                _dup(Self.file_descriptor), Self.mode.unsafe_ptr()
+            )
+        else:
+            handle = external_call["fdopen", UnsafePointer[NoneType]](
+                _dup(Self.file_descriptor), Self.mode.unsafe_ptr()
+            )
+        self.handle = handle
+
+    fn readline(self) -> String:
+        """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
+        
+        Returns:
+            The line read from the stdin.
+        
+        Examples:
+
+        ```mojo
+        from builtin.io import stdin
+
+        fn main():
+            var line = stdin().readline()
+            print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+        Hello, World # Output from print
+        ```
+        
+        The program can also be run interactively by typing `Hello, World` and then `Enter` to input the terminating newline.
+        ```bash
+        mojo run my_program.mojo
+        Hello, World # User input via the terminal
+        Hello, World # Output from print
+        ```.
+        """
+        return self.read_until_delimiter("\n")
+
+    fn read_until_delimiter(self, delimiter: String) -> String:
+        """Reads an entire line from stdin, which is delimited by `delimiter`. 
+        Does not include the delimiter in the result.
+
+        Args:
+            delimiter: The delimiter to read until.
+        
+        Returns:
+            The line read from the stdin.
+        
+        Examples:
+
+        ```mojo
+        from builtin.io import stdin
+
+        fn main():
+            var line = stdin().read_until_delimiter(",")
+            print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+        Hello # Output from print
+        ```
+        
+        The program can also be run interactively by typing `Hello, World` and then `Enter` to input the terminating newline.
+        ```bash
+        mojo run my_program.mojo
+        Hello, World # User input via the terminal
+        Hello # Output from print
+        ```.
+        """
+        # getdelim will resize the buffer as needed.
+        var buffer = UnsafePointer[UInt8].alloc(1)
+        var bytes_read = external_call[
+            "getdelim",
+            Int,
+            UnsafePointer[UnsafePointer[UInt8]],
+            UnsafePointer[UInt32],
+            Int,
+            UnsafePointer[NoneType],
+        ](
+            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
+            UnsafePointer[UInt32].address_of(UInt32(1)),
+            ord(delimiter),
+            self.handle,
+        )
+        # Overwrite the delimiter with a null terminator.
+        buffer[bytes_read - 1] = 0
+        return String(buffer, bytes_read)
+
+    fn close(self):
+        _ = external_call["fclose", Int32](self.handle)
+
+    fn __del__(owned self):
+        self.close()
+
+    fn __enter__(self) -> Self:
+        return self
+
+    fn __exit__(self):
+        """Closes the file handle."""
+        self.close()
+
+
+fn input(prompt: String = "") -> String:
+    if prompt != "":
+        print(prompt, end="")
+    return stdin().readline()
