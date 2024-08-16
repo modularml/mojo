@@ -79,7 +79,7 @@ struct Dialect:
         """
         Validate the dialect.
         """
-        self._valid = _validate_dialect(self)
+        self._valid = _validate_reader_dialect(self)
 
 
 @value
@@ -210,7 +210,7 @@ struct reader:
 # ===------------------------------------------------------------------=== #
 
 
-fn _validate_dialect(dialect: Dialect) raises -> Bool:
+fn _validate_reader_dialect(dialect: Dialect) raises -> Bool:
     """
     Validate a dialect.
 
