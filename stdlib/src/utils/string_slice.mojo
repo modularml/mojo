@@ -75,7 +75,7 @@ fn _validate_utf8_simd_slice[
 
         @parameter
         if not remainder:
-            d = ptr.offset(idx).simd_strided_load[DType.uint8, width](1)
+            d = ptr.load[width=width](idx)
         else:
             debug_assert(iter_len > -1, "iter_len must be > -1")
             d = SIMD[DType.uint8, width](0)
