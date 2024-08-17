@@ -49,6 +49,7 @@
         "timonwong.shellcheck"
       ],
       "settings": {
+        "git.alwaysSignOff": true,
         "gitlens.showWelcomeOnInstall": false,
         "gitlens.showWhatsNewAfterUpgrades": false,
         "resmon.show.battery": false,
