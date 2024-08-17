@@ -313,7 +313,10 @@ struct NamedTemporaryFile:
             # python implementation expands the path,
             # but several functions are not yet implemented in mojo
             # i.e. abspath, normpath
-            self._file_handle = FileHandle(self.name, mode=mode)
+
+            # TODO(field sensitivity lifetimes), eliminate tmp.
+            var tmp = FileHandle(self.name, mode=mode)
+            self._file_handle = tmp^
             return
         except:
             raise Error("Failed to create temporary file")
