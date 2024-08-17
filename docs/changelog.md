@@ -638,6 +638,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `bitcast, sizeof, simdwidthof, bitwidthof, alignof, external_call` and `abort`
   are removed from prelude.
 
+- The `simd_strided_load()` and `simd_strided_store()` have been renamed to
+  `strided_load` and `strided_store` in `UnsafePointer`.
+
 ### ❌ Removed
 
 - Support for the legacy `fn __init__(...) -> Self:` form has been removed from
