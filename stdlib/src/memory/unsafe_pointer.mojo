@@ -215,10 +215,15 @@ struct UnsafePointer[
         return __mlir_op.`pop.offset`(self.address, idx.__mlir_index__())
 
     @always_inline
-    fn __getitem__(
-        self, offset: Int
-    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
+    fn __getitem__[
+        IntLike: IntLike, //
+    ](self, offset: IntLike) -> ref [
+        MutableStaticLifetime, address_space._value.value
+    ] T:
         """Return a reference to the underlying data, offset by the given index.
+
+        Parameters:
+            IntLike: The type of idx; either `Int` or `UInt`.
 
         Args:
             offset: The offset index.

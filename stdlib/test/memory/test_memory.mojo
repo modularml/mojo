@@ -474,7 +474,6 @@ def test_indexing():
     for i in range(4):
         ptr[i] = i
 
-    assert_equal(ptr[True], 1)
     assert_equal(ptr[int(2)], 2)
     assert_equal(ptr[1], 1)
 
