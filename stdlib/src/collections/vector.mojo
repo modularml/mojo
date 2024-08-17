@@ -20,6 +20,7 @@ from collections.vector import InlinedFixedVector
 """
 
 from memory import Reference, UnsafePointer
+from sys import sizeof
 
 from utils import StaticTuple
 

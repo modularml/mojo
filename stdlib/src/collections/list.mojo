@@ -21,6 +21,7 @@ from collections import List
 
 
 from sys.intrinsics import _type_is_eq
+from sys import sizeof
 from os import abort
 from memory import Reference, UnsafePointer, memcpy
 from utils import Span
@@ -220,7 +221,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     @always_inline
     fn __eq__[
         U: EqualityComparableCollectionElement, //
-    ](self: List[U], other: List[U]) -> Bool:
+    ](self: List[U, *_], other: List[U, *_]) -> Bool:
         """Checks if two lists are equal.
 
         Examples:
@@ -252,7 +253,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     @always_inline
     fn __ne__[
         U: EqualityComparableCollectionElement, //
-    ](self: List[U], other: List[U]) -> Bool:
+    ](self: List[U, *_], other: List[U, *_]) -> Bool:
         """Checks if two lists are not equal.
 
         Examples:
@@ -277,7 +278,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __contains__[
         U: EqualityComparableCollectionElement, //
-    ](self: List[U], value: U) -> Bool:
+    ](self: List[U, *_], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -385,7 +386,9 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return len(self) > 0
 
     @no_inline
-    fn __str__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
+    fn __str__[
+        U: RepresentableCollectionElement, //
+    ](self: List[U, *_]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -416,7 +419,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     @no_inline
     fn format_to[
         U: RepresentableCollectionElement, //
-    ](self: List[U], inout writer: Formatter):
+    ](self: List[U, *_], inout writer: Formatter):
         """Write `my_list.__str__()` to a `Formatter`.
 
         Parameters:
@@ -433,7 +436,9 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         writer.write("]")
 
     @no_inline
-    fn __repr__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
+    fn __repr__[
+        U: RepresentableCollectionElement, //
+    ](self: List[U, *_]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -676,7 +681,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn index[
         C: EqualityComparableCollectionElement, //
     ](
-        ref [_]self: List[C],
+        ref [_]self: List[C, *_],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -850,7 +855,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn count[
         T: EqualityComparableCollectionElement, //
-    ](self: List[T], value: T) -> Int:
+    ](self: List[T, *_], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.

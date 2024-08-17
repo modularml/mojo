@@ -14,7 +14,7 @@
 # RUN: %mojo %s | FileCheck %s
 
 from math import iota
-from sys import num_physical_cores
+from sys import num_physical_cores, simdwidthof
 
 import benchmark
 from algorithm import parallelize, vectorize

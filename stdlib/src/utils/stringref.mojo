@@ -16,10 +16,11 @@
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
-from memory import UnsafePointer, memcmp
+from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import C_char
+from sys import simdwidthof
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

@@ -499,7 +499,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = other._entries
 
     @staticmethod
-    fn fromkeys(keys: List[K], value: V) -> Self:
+    fn fromkeys(keys: List[K, *_], value: V) -> Self:
         """Create a new dictionary with keys from list and values set to value.
 
         Args:
@@ -516,7 +516,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     fn fromkeys(
-        keys: List[K], value: Optional[V] = None
+        keys: List[K, *_], value: Optional[V] = None
     ) -> Dict[K, Optional[V]]:
         """Create a new dictionary with keys from list and values set to value.
 

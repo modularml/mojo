@@ -13,6 +13,7 @@
 
 # RUN: %mojo %s -t
 
+from sys import simdwidthof
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width

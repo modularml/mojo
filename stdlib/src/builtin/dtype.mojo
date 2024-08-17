@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
-from sys import sizeof as _sizeof, bitwidthof, os_is_windows
+from sys import sizeof, bitwidthof, os_is_windows
 
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)

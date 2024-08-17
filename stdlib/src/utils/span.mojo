@@ -113,7 +113,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
-    fn __init__(inout self, ref [lifetime]list: List[T]):
+    fn __init__(inout self, ref [lifetime]list: List[T, *_]):
         """Construct a Span from a List.
 
         Args:

@@ -18,6 +18,7 @@
 from os.env import getenv
 from random import rand
 from sys import info
+from sys import simdwidthof
 
 import benchmark
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
