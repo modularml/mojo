@@ -37,6 +37,7 @@
         "eamodio.gitlens@11.7.0",
         "editorconfig.editorconfig",
         "exiasr.hadolint",
+        "GitHub.vscode-github-actions",
         "GitHub.vscode-pull-request-github",
         "mhutchie.git-graph",
         "modular-mojotools.vscode-mojo-nightly",
