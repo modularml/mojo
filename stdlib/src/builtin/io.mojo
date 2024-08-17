@@ -407,6 +407,7 @@ fn print[
 #  stdin
 # ===----------------------------------------------------------------------=== #
 
+
 @value
 struct stdin:
     """A read only file handle to the stdin stream."""
@@ -433,10 +434,10 @@ struct stdin:
 
     fn readline(self) -> String:
         """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
-        
+
         Returns:
             The line read from the stdin.
-        
+
         Examples:
 
         ```mojo
@@ -453,7 +454,7 @@ struct stdin:
         echo "Hello, World" | mojo run my_program.mojo
         Hello, World # Output from print
         ```
-        
+
         The program can also be run interactively by typing `Hello, World` and then `Enter` to input the terminating newline.
         ```bash
         mojo run my_program.mojo
@@ -464,15 +465,15 @@ struct stdin:
         return self.read_until_delimiter("\n")
 
     fn read_until_delimiter(self, delimiter: String) -> String:
-        """Reads an entire line from stdin, which is delimited by `delimiter`. 
+        """Reads an entire line from stdin, which is delimited by `delimiter`.
         Does not include the delimiter in the result.
 
         Args:
             delimiter: The delimiter to read until.
-        
+
         Returns:
             The line read from the stdin.
-        
+
         Examples:
 
         ```mojo
@@ -489,7 +490,7 @@ struct stdin:
         echo "Hello, World" | mojo run my_program.mojo
         Hello # Output from print
         ```
-        
+
         The program can also be run interactively by typing `Hello, World` and then `Enter` to input the terminating newline.
         ```bash
         mojo run my_program.mojo
