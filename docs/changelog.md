@@ -16,6 +16,12 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo now allows implicit definitions of variables within a `fn` in the same
+  way that has been allowed in a `def`.  The `var` keyword is still allowed and
+  still denotes the declaration of a new variable with a scope (in both `def`
+  and `fn`).  Relaxing this makes `fn` and `def` more similar, but they still
+  differ in other important ways.
+
 - Mojo now supports named result bindings. Named result bindings are useful for
   directly emplacing function results into the output slot of a function. This
   feature provides more flexibility and guarantees around emplacing the result
