@@ -80,6 +80,8 @@ RUN dpkgArch="$(dpkg --print-architecture)" \
   && pip install --no-cache-dir lit \
   ## Install pre-commit
   && pip install --no-cache-dir pre-commit \
+  ## Install entr
+  && apt-get -y install --no-install-recommends entr \
 ## Dev Container only
   ## Install hadolint
   && case "$dpkgArch" in \
