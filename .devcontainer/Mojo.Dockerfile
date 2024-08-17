@@ -164,19 +164,16 @@ ENV LANG=${LANG_OVERRIDE:-$LANG} \
 RUN if [ -n "$USE_ZSH_FOR_ROOT" ]; then \
     chsh -s /bin/zsh; \
   fi \
-  ## Update timezone if needed
-  && if [ "$TZ" != "Etc/UTC" ]; then \
-    echo "Setting TZ to $TZ"; \
-    ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime \
-      && echo "$TZ" > /etc/timezone; \
-  fi \
-  ## Add/Update locale if needed
+  ## Info about timezone
+  && echo "TZ is set to $TZ" \
+  ## Add/Update locale if requested
   && if [ "$LANG" != "en_US.UTF-8" ]; then \
     sed -i "s/# $LANG/$LANG/g" /etc/locale.gen; \
     locale-gen; \
-    echo "Setting LANG to $LANG"; \
-    update-locale --reset LANG="$LANG"; \
-  fi
+  fi \
+  && update-locale --reset LANG="$LANG" \
+  ## Info about locale
+  && echo "LANG is set to $LANG"
 
 ## Unset environment variable BUILD_DATE
 ENV BUILD_DATE=
