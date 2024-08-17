@@ -612,15 +612,15 @@ struct UnsafePointer[
         )
 
     @always_inline("nodebug")
-    fn simd_strided_load[
-        type: DType, width: Int, T: Intable
+    fn strided_load[
+        type: DType, T: Intable, //, width: Int
     ](self: UnsafePointer[Scalar[type], *_], stride: T) -> SIMD[type, width]:
         """Performs a strided load of the SIMD vector.
 
         Parameters:
             type: DType of returned SIMD value.
-            width: The SIMD width.
             T: The Intable type of the stride.
+            width: The SIMD width.
 
         Args:
             stride: The stride between loads.
@@ -628,20 +628,20 @@ struct UnsafePointer[
         Returns:
             A vector which is stride loaded.
         """
-        return strided_load[type, width](
-            self, int(stride), SIMD[DType.bool, width](1)
-        )
+        return strided_load(self, int(stride), SIMD[DType.bool, width](True))
 
     @always_inline("nodebug")
-    fn simd_strided_store[
-        type: DType, width: Int, T: Intable
+    fn strided_store[
+        type: DType,
+        T: Intable, //,
+        width: Int,
     ](self: UnsafePointer[Scalar[type], *_], val: SIMD[type, width], stride: T):
         """Performs a strided store of the SIMD vector.
 
         Parameters:
             type: DType of `val`, the SIMD value to store.
-            width: The SIMD width.
             T: The Intable type of the stride.
+            width: The SIMD width.
 
         Args:
             val: The SIMD value to store.
