@@ -1528,9 +1528,7 @@ struct SIMD[type: DType, size: Int](
                     constraints="=r,f,f",
                     has_side_effect=False,
                 ](rebind[Float32](self[i + 1]), rebind[Float32](self[i]))
-                var val = bitcast[target, 2](bf16x2_as_uint32)
-                res[i] = val[0]
-                res[i + 1] = val[1]
+                res = res.insert[offset=i](bitcast[target, 2](bf16x2_as_uint32))
 
             return res
 
