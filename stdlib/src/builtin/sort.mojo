@@ -210,14 +210,19 @@ fn _quicksort[
     var size = len(span)
     if size == 0:
         return
-    var stack = List[Span[type, lifetime]](
-        capacity=_estimate_initial_height(size)
-    )
-    stack.append(span)
+
+    # Work with an immutable span so we don't run into exclusivity problems with
+    # the List[Span].
+    var imm_span = span.get_immutable()
+    alias ImmSpan = __type_of(imm_span)
+
+    var stack = List[ImmSpan](capacity=_estimate_initial_height(size))
+    stack.append(imm_span)
     while len(stack) > 0:
-        var interval = stack.pop()
-        var ptr = interval.unsafe_ptr()
-        var len = len(interval)
+        var imm_interval = stack.pop()
+        var ptr = imm_interval.unsafe_ptr()
+        var len = len(imm_interval)
+        var interval = Span[type, lifetime](unsafe_ptr=ptr, len=len)
 
         if len <= 5:
             _delegate_small_sort[cmp_fn](interval)
@@ -237,9 +242,7 @@ fn _quicksort[
             var pivot = _quicksort_partition_left[cmp_fn](interval)
             if len > pivot + 2:
                 stack.append(
-                    Span[type, lifetime](
-                        unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1
-                    )
+                    ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
                 )
             continue
 
@@ -247,13 +250,11 @@ fn _quicksort[
 
         if len > pivot + 2:
             stack.append(
-                Span[type, lifetime](
-                    unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1
-                )
+                ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
             )
 
         if pivot > 1:
-            stack.append(Span[type, lifetime](unsafe_ptr=ptr, len=pivot))
+            stack.append(ImmSpan(unsafe_ptr=ptr, len=pivot))
 
 
 # ===----------------------------------------------------------------------===#
