@@ -26,12 +26,15 @@ what we publish.
   an invalid example:
 
   ```mojo
-  fn take_two_strings(a: String, inout b: String): b += a
+  fn take_two_strings(a: String, inout b: String):
+     # Mojo knows 'a' and 'b' cannot be the same string. 
+     b += a
 
   fn invalid_access():
     var my_string = String()
 
-    
+    # error: passing `my_string` inout is invalid since it is also passed
+    # borrowed.
     take_two_strings(my_string, my_string)
   ```
 
