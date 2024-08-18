@@ -37,6 +37,7 @@ from bit import count_trailing_zeros
 from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
+from sys.info import _current_arch
 
 from utils import Span
 from utils.index import StaticIntTuple
@@ -389,8 +390,25 @@ fn exp2[
 
         @parameter
         if type is DType.float16:
+
+            @parameter
+            if String(_current_arch()) == "sm_90a":
+                return _call_ptx_intrinsic[
+                    scalar_instruction="ex2.approx.f16",
+                    vector2_instruction="ex2.approx.f16x2",
+                    scalar_constraints="=h,h",
+                    vector_constraints="=r,r",
+                ](x)
+            else:
+                return _call_ptx_intrinsic[
+                    instruction="ex2.approx.f16", constraints="=h,h"
+                ](x)
+        elif type is DType.bfloat16 and String(_current_arch()) == "sm_90a":
             return _call_ptx_intrinsic[
-                instruction="ex2.approx.f16", constraints="=h,h"
+                scalar_instruction="ex2.approx.ftz.bf16",
+                vector2_instruction="ex2.approx.ftz.bf16x2",
+                scalar_constraints="=h,h",
+                vector_constraints="=r,r",
             ](x)
         elif type is DType.float32:
             return _call_ptx_intrinsic[
@@ -581,14 +599,8 @@ fn exp[
     if triple_is_nvidia_cuda():
 
         @parameter
-        if type is DType.float16:
-            return _call_ptx_intrinsic[
-                instruction="ex2.approx.f16", constraints="=h,h"
-            ](x * inv_lg2)
-        elif type is DType.float32:
-            return _call_ptx_intrinsic[
-                instruction="ex2.approx.ftz.f32", constraints="=f,f"
-            ](x * inv_lg2)
+        if type in (DType.float16, DType.float32):
+            return exp2(x * inv_lg2)
 
     @parameter
     if type not in (DType.float32, DType.float64):
@@ -1371,43 +1383,6 @@ fn atan2[
 # ===----------------------------------------------------------------------=== #
 # cos
 # ===----------------------------------------------------------------------=== #
-
-
-fn _call_ptx_intrinsic_scalar[
-    type: DType, //,
-    *,
-    instruction: StringLiteral,
-    constraints: StringLiteral,
-](arg: Scalar[type]) -> Scalar[type]:
-    return inlined_assembly[
-        instruction + " $0, $1;",
-        Scalar[type],
-        constraints=constraints,
-        has_side_effect=False,
-    ](arg).cast[type]()
-
-
-fn _call_ptx_intrinsic[
-    type: DType,
-    simd_width: Int, //,
-    *,
-    instruction: StringLiteral,
-    constraints: StringLiteral,
-](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    @parameter
-    if simd_width == 1:
-        return _call_ptx_intrinsic_scalar[
-            instruction=instruction, constraints=constraints
-        ](arg[0])
-
-    var res = SIMD[type, simd_width]()
-
-    @parameter
-    for i in range(simd_width):
-        res[i] = _call_ptx_intrinsic_scalar[
-            instruction=instruction, constraints=constraints
-        ](arg[i])
-    return res
 
 
 fn cos[
@@ -2378,5 +2353,73 @@ fn _call_libm_impl[
     @parameter
     for i in range(simd_width):
         res[i] = _external_call_const[libm_name, Scalar[result_type]](arg[i])
+
+    return res
+
+
+fn _call_ptx_intrinsic_scalar[
+    type: DType, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg: Scalar[type]) -> Scalar[type]:
+    return inlined_assembly[
+        instruction + " $0, $1;",
+        Scalar[type],
+        constraints=constraints,
+        has_side_effect=False,
+    ](arg).cast[type]()
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=instruction, constraints=constraints
+        ](arg[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(simd_width):
+        res[i] = _call_ptx_intrinsic_scalar[
+            instruction=instruction, constraints=constraints
+        ](arg[i])
+    return res
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    scalar_instruction: StringLiteral,
+    vector2_instruction: StringLiteral,
+    scalar_constraints: StringLiteral,
+    vector_constraints: StringLiteral,
+](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=scalar_instruction, constraints=scalar_constraints
+        ](arg[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(0, simd_width, 2):
+        res = res.insert[offset=i](
+            inlined_assembly[
+                vector2_instruction + " $0, $1;",
+                SIMD[type, 2],
+                constraints=vector_constraints,
+                has_side_effect=False,
+            ](arg).cast[type]()
+        )
 
     return res
