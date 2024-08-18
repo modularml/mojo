@@ -1787,10 +1787,6 @@ struct String(
             if not s.isspace():
                 break
             l_idx += 1
-        while l_idx < self.byte_length() and _isspace(
-            self._buffer.unsafe_get(l_idx)
-        ):
-            l_idx += 1
         return self[l_idx:]
 
     fn __hash__(self) -> UInt:
