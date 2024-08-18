@@ -1134,9 +1134,9 @@ def test_lstrip():
     assert_true(str4.lstrip("mis \n") == "ppimississippi")
 
     # Test the usage of alias with lstrip()
-    alias str5_alias = String("   mississippi").lstrip("mis")
+    alias str5_alias = String("   mississippi").lstrip()
     var str5 = str5_alias
-    assert_equal(str5, "mismississippi")
+    assert_equal(str5, "mississippi")
 
 
 def test_strip():
