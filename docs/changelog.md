@@ -16,6 +16,32 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo now diagnoses "argument exclusivity" violations due to aliasing
+  references.  Mojo requires references (including implicit references due to
+  borrowed/inout arguments) to be uniquely referenced (non-aliased) if mutable.
+  This is important for code safety, because it allows the compiler (and readers
+  of code) to understand where and when a value is mutated.  It is also useful
+  for performance optimization because it allows the compiler to know that
+  accesses through immutable references cannot change behind the scenes. Here is
+  an invalid example:
+
+  ```mojo
+  fn take_two_strings(a: String, inout b: String): b += a
+
+  fn invalid_access():
+    var my_string = String()
+
+    
+    take_two_strings(my_string, my_string)
+  ```
+
+  This is similar to [Swift exclusivity
+  checking](https://swift.org/blog/swift-5-exclusivity/) and the [Rust
+  language](https://doc.rust-lang.org/beta/book/ch04-02-references-and-borrowing.html)
+  sometimes known as "aliasing xor mutability". That said, the Mojo
+  implementation details are somewhat different because lifetimes are embedded
+  in types.
+
 - Mojo now allows implicit definitions of variables within a `fn` in the same
   way that has been allowed in a `def`.  The `var` keyword is still allowed and
   still denotes the declaration of a new variable with a scope (in both `def`
@@ -681,6 +707,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   ```mojo
   def foo(**kwargs): ...  # now works
   ```
+
+- [#1734](https://github.com/modularml/mojo/issues/1734) - Calling
+  `__copyinit__` on self causes crash.
 
 - [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
   `__setitem__` method is failing with a "must be mutable" error.
