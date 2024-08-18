@@ -1978,7 +1978,7 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.extract",
             SIMD[type, output_width],
             has_side_effect=False,
-        ](self, offset)
+        ](self, Int64(offset))
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
@@ -2024,7 +2024,7 @@ struct SIMD[type: DType, size: Int](
 
         return llvm_intrinsic[
             "llvm.vector.insert", Self, has_side_effect=False
-        ](self, value, offset)
+        ](self, value, Int64(offset))
 
     @always_inline("nodebug")
     fn join(self, other: Self) -> SIMD[type, 2 * size]:
