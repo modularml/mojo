@@ -171,7 +171,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.append(value[])
 
     fn __init__(
-        inout self: Self,
+        inout self,
         *,
         unsafe_pointer: UnsafePointer[T],
         size: Int,
@@ -883,6 +883,32 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             if elem[] == value:
                 count += 1
         return count
+
+    fn swap_elements(inout self, elt_idx_1: Int, elt_idx_2: Int):
+        """Swaps elements at the specified indexes if they are different.
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        my_list.swap_elements(0, 2)
+        print(my_list) # 3, 2, 1
+        ```
+
+        This is useful because `swap(my_list[i], my_list[j])` cannot be
+        supported by Mojo, because a mutable alias may be formed.
+
+        Args:
+            elt_idx_1: The index of one element.
+            elt_idx_2: The index of the other element.
+        """
+        debug_assert(
+            0 <= elt_idx_1 < len(self) and 0 <= elt_idx_2 < len(self),
+            (
+                "The indices provided to swap_elements must be within the range"
+                " [0, len(List)-1]"
+            ),
+        )
+        if elt_idx_1 != elt_idx_2:
+            swap((self.data + elt_idx_1)[], (self.data + elt_idx_2)[])
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[T]:
