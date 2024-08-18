@@ -1783,11 +1783,10 @@ struct String(
             A copy of the string with no leading whitespaces.
         """
         var l_idx = 0
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self:
-        #     if not s.isspace():
-        #         break
-        #     l_idx += 1
+        for s in self:
+            if not s.isspace():
+                break
+            l_idx += 1
         while l_idx < self.byte_length() and _isspace(
             self._buffer.unsafe_get(l_idx)
         ):
