@@ -44,20 +44,26 @@ fn _dup(fd: Int32) -> Int32:
         return external_call["dup", Int32](fd)
 
 
+alias stdin = _fdopen(0)
+
+
+# TODO(): move file descriptor `stream_id` to a parameter throughout stdlib
+# and implement aliases in `sys` e.g. `alias stdin = _fdopen[0]`
 @value
 @register_passable("trivial")
 struct _fdopen:
+    alias STDIN = 0
     alias STDOUT = 1
     alias STDERR = 2
     var handle: UnsafePointer[NoneType]
 
     fn __init__(inout self, stream_id: FileDescriptor):
-        """Creates a file handle to the stdout/stderr stream.
-
-        Args:
-            stream_id: The stream id
-        """
-        alias mode = "a"
+        """Creates a file handle to the stdout/stderr stream."""
+        var mode: String
+        if stream_id.value == self.STDIN:
+            mode = "r"
+        else:
+            mode = "a"
         var handle: UnsafePointer[NoneType]
 
         @parameter
@@ -69,14 +75,90 @@ struct _fdopen:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
+        _ = mode
         self.handle = handle
 
     fn __enter__(self) -> Self:
+        """Open the file handle for use within a context manager"""
         return self
 
     fn __exit__(self):
         """Closes the file handle."""
         _ = external_call["fclose", Int32](self.handle)
+
+    fn readline(self) -> String:
+        """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
+
+        Returns:
+            The line read from the stdin.
+
+        Examples:
+
+        ```mojo
+        from builtin.io import _fdopen
+
+        var line = _fdopen(0).readline()
+        print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+
+        # Output from print:
+        Hello, World
+        ```
+        .
+        """
+        return self.read_until_delimiter("\n")
+
+    fn read_until_delimiter(self, delimiter: String) -> String:
+        """Reads an entire line from a stream, up to the `delimiter`.
+        Does not include the delimiter in the result.
+
+        Args:
+            delimiter: The delimiter to read until.
+
+        Returns:
+            The text read from the stdin.
+
+        Examples:
+
+        ```mojo
+        from builtin.io import stdin
+
+        var line = _fdopen(0).read_until_delimiter(",")
+        print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+
+        # Output from print:
+        Hello
+        ```
+        """
+        # getdelim will resize the buffer as needed.
+        var buffer = UnsafePointer[UInt8].alloc(1)
+        var bytes_read = external_call[
+            "getdelim",
+            Int,
+            UnsafePointer[UnsafePointer[UInt8]],
+            UnsafePointer[UInt32],
+            Int,
+            UnsafePointer[NoneType],
+        ](
+            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
+            UnsafePointer[UInt32].address_of(UInt32(1)),
+            ord(delimiter),
+            self.handle,
+        )
+        # Overwrite the delimiter with a null terminator.
+        buffer[bytes_read - 1] = 0
+        return String(buffer, bytes_read)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -404,134 +486,29 @@ fn print[
 
 
 # ===----------------------------------------------------------------------=== #
-#  stdin
+#  input
 # ===----------------------------------------------------------------------=== #
 
 
-@value
-struct stdin:
-    """A read only file handle to the stdin stream."""
-
-    alias file_descriptor = 0
-    alias mode = "r"
-    var handle: UnsafePointer[NoneType]
-    """The file handle to the stdin stream."""
-
-    fn __init__(inout self):
-        """Creates a file handle to the stdin stream."""
-        var handle: UnsafePointer[NoneType]
-
-        @parameter
-        if os_is_windows():
-            handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(Self.file_descriptor), Self.mode.unsafe_ptr()
-            )
-        else:
-            handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(Self.file_descriptor), Self.mode.unsafe_ptr()
-            )
-        self.handle = handle
-
-    fn readline(self) -> String:
-        """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
-
-        Returns:
-            The line read from the stdin.
-
-        Examples:
-
-        ```mojo
-        from builtin.io import stdin
-
-        fn main():
-            var line = stdin().readline()
-            print(line)
-        ```
-
-        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
-
-        ```bash
-        echo "Hello, World" | mojo run my_program.mojo
-        Hello, World # Output from print
-        ```
-
-        The program can also be run interactively by typing `Hello, World` and then `Enter` to input the terminating newline.
-        ```bash
-        mojo run my_program.mojo
-        Hello, World # User input via the terminal
-        Hello, World # Output from print
-        ```.
-        """
-        return self.read_until_delimiter("\n")
-
-    fn read_until_delimiter(self, delimiter: String) -> String:
-        """Reads an entire line from stdin, which is delimited by `delimiter`.
-        Does not include the delimiter in the result.
-
-        Args:
-            delimiter: The delimiter to read until.
-
-        Returns:
-            The line read from the stdin.
-
-        Examples:
-
-        ```mojo
-        from builtin.io import stdin
-
-        fn main():
-            var line = stdin().read_until_delimiter(",")
-            print(line)
-        ```
-
-        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
-
-        ```bash
-        echo "Hello, World" | mojo run my_program.mojo
-        Hello # Output from print
-        ```
-
-        The program can also be run interactively by typing `Hello, World` and then `Enter` to input the terminating newline.
-        ```bash
-        mojo run my_program.mojo
-        Hello, World # User input via the terminal
-        Hello # Output from print
-        ```.
-        """
-        # getdelim will resize the buffer as needed.
-        var buffer = UnsafePointer[UInt8].alloc(1)
-        var bytes_read = external_call[
-            "getdelim",
-            Int,
-            UnsafePointer[UnsafePointer[UInt8]],
-            UnsafePointer[UInt32],
-            Int,
-            UnsafePointer[NoneType],
-        ](
-            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
-            UnsafePointer[UInt32].address_of(UInt32(1)),
-            ord(delimiter),
-            self.handle,
-        )
-        # Overwrite the delimiter with a null terminator.
-        buffer[bytes_read - 1] = 0
-        return String(buffer, bytes_read)
-
-    fn close(self):
-        _ = external_call["fclose", Int32](self.handle)
-
-    fn __del__(owned self):
-        self.close()
-
-    fn __enter__(self) -> Self:
-        return self
-
-    fn __exit__(self):
-        """Closes the file handle."""
-        self.close()
-
-
 fn input(prompt: String = "") -> String:
+    """Reads a line of input from the user.
+
+    Reads a line from standard input, converts it to a string, and returns that string.
+    If the prompt argument is present, it is written to standard output without a trailing newline.
+
+    Args:
+        prompt: An optional string to be printed before reading input.
+
+    Returns:
+        A string containing the line read from the user input.
+
+    Examples:
+    ```mojo
+    name = input("Enter your name: ")
+    print("Hello, " + name + "!")
+    ```
+    .
+    """
     if prompt != "":
         print(prompt, end="")
-    return stdin().readline()
+    return _fdopen(0).readline()
