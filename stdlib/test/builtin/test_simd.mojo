@@ -894,25 +894,11 @@ def test_shuffle_dynamic_size_32():
 
 
 def test_shuffle_dynamic_size_32_float():
-    var table_lookup = SIMD[DType.float64, 16](
-        0.0,
-        10.0,
-        20.0,
-        30.0,
-        40.0,
-        50.0,
-        60.0,
-        70.0,
-        80.0,
-        90.0,
-        100.0,
-        110.0,
-        120.0,
-        130.0,
-        140.0,
-        150.0,
-    )
     # fmt: off
+    var table_lookup = SIMD[DType.float64, 16](
+        0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0,
+        80.0, 90.0, 100.0, 110.0, 120.0, 130.0, 140.0, 150.0,
+    )
     var indices = SIMD[DType.uint8, 32](
         3 , 3 , 5 , 5 , 7 , 7 , 9 , 9 , 
         11, 11, 13, 13, 15, 15, 0 , 1 , 

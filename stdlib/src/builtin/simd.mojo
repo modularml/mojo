@@ -1958,7 +1958,7 @@ struct SIMD[type: DType, size: Int](
         3) The CPU supports SSE4 (meaning x86 architecture)
 
         If that's not the case, the function will fallback on a slower path,
-        which is a unrolled for loop.
+        which is an unrolled for loop.
 
         The pseudocode of this function is:
         ```mojo
