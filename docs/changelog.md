@@ -283,6 +283,16 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   #True 1.125 2
   ```
 
+- Added the builtin `input` function, which behaves the same as Python.
+  ([PR #3392](https://github.com/modularml/mojo/pull/3392) by [@thatstoasty](https://github.com/thatstoasty))
+
+  ```mojo
+  name = input("Enter your name: ")
+  print("Hello, " + name + "!")
+  ```
+
+  If the user enters "Mojo" it returns "Hello Mojo!"
+
 - Environment variable `MOJO_PYTHON` can be pointed to an executable to pin Mojo
   to a specific version:
 
