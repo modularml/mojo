@@ -264,19 +264,21 @@ fn _quicksort[
 
 fn merge[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    span_lifetime: ImmutableLifetime,
+    result_lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](
-    span1: Span[type, lifetime],
-    span2: Span[type, lifetime],
-    result: Span[type, lifetime],
+    span1: Span[type, span_lifetime],
+    span2: Span[type, span_lifetime],
+    result: Span[type, result_lifetime],
 ):
     """Merge span1 and span2 into result using the given cmp_fn. The function
     will crash if result is not large enough to hold both span1 and span2.
 
     Parameters:
         type: Type of the spans.
-        lifetime: Lifetime of the spans.
+        span_lifetime: Lifetime of the input spans.
+        result_lifetime: Lifetime of the result Span.
         cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
 
     Args:
@@ -317,9 +319,10 @@ fn merge[
 
 fn _stable_sort_impl[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    span_life: MutableLifetime,
+    tmp_life: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](span: Span[type, lifetime], temp_buff: Span[type, lifetime]):
+](span: Span[type, span_life], temp_buff: Span[type, tmp_life]):
     var size = len(span)
     if size <= 1:
         return
@@ -336,7 +339,9 @@ fn _stable_sort_impl[
         while j + merge_size < size:
             var span1 = span[j : j + merge_size]
             var span2 = span[j + merge_size : min(size, j + 2 * merge_size)]
-            merge[cmp_fn](span1, span2, temp_buff)
+            merge[cmp_fn](
+                span1.get_immutable(), span2.get_immutable(), temp_buff
+            )
             for i in range(merge_size + len(span2)):
                 span[j + i] = temp_buff[i]
             j += 2 * merge_size
@@ -349,7 +354,10 @@ fn _stable_sort[
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](span: Span[type, lifetime]):
     var temp_buff = UnsafePointer[type].alloc(len(span))
-    var temp_buff_span = Span[type, lifetime](
+    # FIXME: This is incorrect: it is passing uninitialized data into
+    # _stable_sort_impl which then assigns into it with =, which will break with
+    # non-trivial types.
+    var temp_buff_span = Span[type, __lifetime_of(temp_buff)](
         unsafe_ptr=temp_buff, len=len(span)
     )
     _stable_sort_impl[cmp_fn](span, temp_buff_span)
@@ -512,11 +520,11 @@ fn _sort[
         _insertion_sort[cmp_fn](span)
         return
 
+    @parameter
     if stable:
         _stable_sort[cmp_fn](span)
-        return
-
-    _quicksort[cmp_fn](span)
+    else:
+        _quicksort[cmp_fn](span)
 
 
 # TODO (MSTDL-766): The Int and Scalar[type] overload should be remove
