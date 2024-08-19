@@ -1937,6 +1937,87 @@ struct SIMD[type: DType, size: Int](
         """
         return self._shuffle_list[size, mask](other)
 
+    # Not an overload of shuffle because there is ambiguity
+    # with fn shuffle[*mask: Int](self, other: Self) -> Self:
+    @always_inline("nodebug")
+    fn dynamic_shuffle[
+        mask_size: Int, //
+    ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
+        """Shuffles (also called blend) the values of the current vector.
+
+        It's done using the specified mask (permutation). The mask
+        values must be within `len(self)`. If that's not the case,
+        the behavior is undefined.
+
+        The mask is not known at compile time, unlike the `shuffle` method.
+
+        Note that currently, this function is fast only if the following
+        conditions are met:
+        1) The SIMD vector `self` is of type uint8 and size 16
+        2) The mask is of size 16 or 32
+        3) The CPU supports SSE4 (meaning x86 architecture)
+
+        If that's not the case, the function will fallback on a slower path,
+        which is a unrolled for loop.
+
+        The pseudocode of this function is:
+        ```mojo
+        var result = SIMD[Self.type, mask_size]()
+        for i in range(0, mask_size):
+            result[i] = self[int(mask[i])]
+        ```
+
+        Parameters:
+            mask_size: The size of the mask.
+
+        Args:
+            mask: The mask to use. Contains the indices to use to shuffle.
+
+        Returns:
+            A new vector with the same length as the mask where the value at
+            position `i` is equal to `self[mask[i]]`.
+        """
+
+        @parameter
+        if sys.has_sse4() and Self.type == DType.uint8 and Self.size == 16:
+            # The compiler isn't smart enough yet. It complains about parameter mismatch
+            # because it cannot narrow them. Let's help it a bit and hope it
+            # understands this is a no-op. So far there wasn't any performance
+            # drop likely indicating that the compiler is doing the right thing.
+            # Everything commented with no-op should not generate any instruction.
+            var self_copy = self.slice[16, offset=0]().cast[
+                DType.uint8
+            ]()  # no-op
+
+            @parameter
+            if mask_size == 16:
+                var indices_copy = mask.slice[16, offset=0]()  # no-op
+                var self_copy = self.slice[16, offset=0]().cast[
+                    DType.uint8
+                ]()  # no-op
+                var result = _pshuf(self_copy, indices_copy)
+                return result.slice[mask_size, offset=0]().cast[
+                    Self.type
+                ]()  # no-op
+            elif sys.has_sse4() and mask_size == 32:
+                # We split it in two and call _pshuf twice.
+                var first_indices_batch = mask.slice[16, offset=0]()
+                var second_indices_batch = mask.slice[16, offset=16]()
+                var first_result = _pshuf(self_copy, first_indices_batch)
+                var second_result = _pshuf(self_copy, second_indices_batch)
+                var result = first_result.join(second_result)
+                return result.slice[mask_size, offset=0]().cast[
+                    Self.type
+                ]()  # no-op
+
+        # Slow path, ~3x slower than pshuf for size 16
+        var result = SIMD[Self.type, mask_size]()
+
+        @parameter
+        for i in range(0, mask_size):
+            result[i] = self[int(mask[i])]
+        return result
+
     @always_inline("nodebug")
     fn slice[
         output_width: Int, /, *, offset: Int = 0
@@ -2614,6 +2695,20 @@ struct SIMD[type: DType, size: Int](
         return llvm_intrinsic[
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
+
+
+fn _pshuf(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    """Shuffle operation using the SSSE3 `pshuf` instruction.
+
+    See https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_shuffle_epi8&ig_expand=6003
+    """
+    return sys.llvm_intrinsic[
+        "llvm.x86.ssse3.pshuf.b.128",
+        SIMD[DType.uint8, 16],
+        has_side_effect=False,
+    ](lookup_table, indices)
 
 
 # ===----------------------------------------------------------------------=== #
