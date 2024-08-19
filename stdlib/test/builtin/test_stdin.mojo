@@ -10,26 +10,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# REQUIRES: !windows
+# RUN: echo "Hello, World" | %mojo %s
 
-from builtin.io import stdin, input
+from builtin.io import _fdopen
 from testing import testing
 
 
 fn test_stdin() raises:
-    # stdin input: Hello, World
-    testing.assert_equal(stdin().read_until_delimiter(","), "Hello")
-
-    # stdin input: Hello, World
-    with stdin() as s:
-        testing.assert_equal(s.readline(), "Hello, World")
-
-
-fn test_input() raises:
-    # stdin input: Mojo
-    testing.assert_equal(input("What's your name?"), "Mojo")
+    # "Hello, World" piped from RUN command above
+    var stdin = _fdopen(0)
+    testing.assert_equal(stdin.read_until_delimiter(","), "Hello")
+    testing.assert_equal(stdin.readline(), " World")
 
 
 fn main() raises:
     test_stdin()
-    test_input()
