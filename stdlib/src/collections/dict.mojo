@@ -213,14 +213,15 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.key = other.key
         self.value = other.value
 
-    fn reap_value(owned self) -> V:
+    fn reap_value(owned self) -> V as result:
         """Take the value from an owned entry.
 
         Returns:
             The value of the entry.
         """
+        result = self.value^
         __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
-        return self.value^
+        return
 
 
 alias _EMPTY = -1
