@@ -426,11 +426,10 @@ struct UnsafePointer[
             Scalar[type]
         ]() if triple_is_nvidia_cuda() else 1,
     ](self: UnsafePointer[Scalar[type], *_]) -> SIMD[type, width]:
-        """Loads the value the pointer points to with the given offset.
+        """Loads the value the pointer points to.
 
         Constraints:
             The width and alignment must be positive integer values.
-            The offset must be integer.
 
         Parameters:
             type: The data type of SIMD vector.
@@ -440,6 +439,7 @@ struct UnsafePointer[
         Returns:
             The loaded value.
         """
+        constrained[width > 0, "width must be a positive integer value"]()
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
