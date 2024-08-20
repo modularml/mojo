@@ -23,6 +23,7 @@ from collections import List
 from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
+from collections._index_normalization import normalize_index
 from memory import Reference, UnsafePointer, memcpy
 from utils import Span
 
@@ -589,11 +590,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             The popped value.
         """
-        debug_assert(-len(self) <= i < len(self), "pop index out of range")
-
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += len(self)
+        var normalized_idx = normalize_index["List"](i, self)
 
         var ret_val = (self.data + normalized_idx).take_pointee()
         for j in range(normalized_idx + 1, self.size):
@@ -786,13 +783,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A reference to the element at the given index.
         """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-        if normalized_idx < 0:
-            normalized_idx += len(self)
+        var normalized_idx = normalize_index["List"](idx, self)
 
         return (self.data + normalized_idx)[]
 
