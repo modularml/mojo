@@ -4,7 +4,7 @@
     "dockerfile": "Mojo.Dockerfile",
     "args": {
       "MOJO_VERSION": "nightly",
-      "LLVM_VERSION": "17", // optional
+      // "LLVM_VERSION": "14", // Override LLVM version
       "MODULAR_TELEMETRY_ENABLE": "unset-to-keep-disabled",
       "MODULAR_TELEMETRY_LEVEL": "2", // Set to 0 to disable
       "MODULAR_CRASHREPORTING_ENABLE": "unset-to-keep-disabled",
