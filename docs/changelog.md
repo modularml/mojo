@@ -27,7 +27,7 @@ what we publish.
 
   ```mojo
   fn take_two_strings(a: String, inout b: String):
-     # Mojo knows 'a' and 'b' cannot be the same string. 
+     # Mojo knows 'a' and 'b' cannot be the same string.
      b += a
 
   fn invalid_access():
@@ -422,6 +422,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
   The algorithm requires $$O(N)$$ auxiliary memory, if extra memory is failed to
   allocate, the program will crash.
+
+- The `mojo test` command now accepts a `--filter` option that will narrow the
+  set of tests collected and executed. The filter string is a POSIX extended
+  regular expression.
 
 - `UnsafePointer` now has an `alignment` parameter to specify the static
   alignment of the pointer. Consequently, `UnsafePointer.alloc` no longer takes
