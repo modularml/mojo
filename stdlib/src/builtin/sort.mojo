@@ -275,6 +275,8 @@ fn merge[
     """Merge span1 and span2 into result using the given cmp_fn. The function
     will crash if result is not large enough to hold both span1 and span2.
 
+    Note that if result contains data previously, its destructor will not be called.
+
     Parameters:
         type: Type of the spans.
         span_lifetime: Lifetime of the input spans.
@@ -288,6 +290,7 @@ fn merge[
     """
     var span1_size = len(span1)
     var span2_size = len(span2)
+    var res_ptr = result.unsafe_ptr()
 
     debug_assert(
         span1_size + span2_size <= len(result),
@@ -299,20 +302,20 @@ fn merge[
     while i < span1_size:
         if j == span2_size:
             while i < span1_size:
-                result[k] = span1[i]
+                (res_ptr + k).init_pointee_copy(span1[i])
                 k += 1
                 i += 1
             return
         if cmp_fn(span2[j], span1[i]):
-            result[k] = span2[j]
+            (res_ptr + k).init_pointee_copy(span2[j])
             j += 1
         else:
-            result[k] = span1[i]
+            (res_ptr + k).init_pointee_copy(span1[i])
             i += 1
         k += 1
 
     while j < span2_size:
-        result[k] = span2[j]
+        (res_ptr + k).init_pointee_copy(span2[j])
         k += 1
         j += 1
 
@@ -354,9 +357,6 @@ fn _stable_sort[
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](span: Span[type, lifetime]):
     var temp_buff = UnsafePointer[type].alloc(len(span))
-    # FIXME: This is incorrect: it is passing uninitialized data into
-    # _stable_sort_impl which then assigns into it with =, which will break with
-    # non-trivial types.
     var temp_buff_span = Span[type, __lifetime_of(temp_buff)](
         unsafe_ptr=temp_buff, len=len(span)
     )
