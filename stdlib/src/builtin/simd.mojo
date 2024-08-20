@@ -1957,7 +1957,7 @@ struct SIMD[type: DType, size: Int](
         conditions are met:
         1) The SIMD vector `self` is of type uint8 and size 16
         2) The mask is of size 16 or 32
-        3) The CPU supports SSE4 (meaning x86 architecture)
+        3) The CPU supports SSE4 or NEON
 
         If that's not the case, the function will fallback on a slower path,
         which is an unrolled for loop.
@@ -1981,7 +1981,11 @@ struct SIMD[type: DType, size: Int](
         """
 
         @parameter
-        if sys.has_sse4() and Self.type == DType.uint8 and Self.size == 16:
+        if (
+            (sys.has_sse4() or sys.has_neon())
+            and Self.type == DType.uint8
+            and Self.size == 16
+        ):
             # The compiler isn't smart enough yet. It complains about parameter mismatch
             # because it cannot narrow them. Let's help it a bit and hope it
             # understands this is a no-op. So far there wasn't any performance
@@ -1997,16 +2001,20 @@ struct SIMD[type: DType, size: Int](
                 var self_copy = self.slice[16, offset=0]().cast[
                     DType.uint8
                 ]()  # no-op
-                var result = _pshuf(self_copy, indices_copy)
+                var result = _pshuf_or_tbl1(self_copy, indices_copy)
                 return result.slice[mask_size, offset=0]().cast[
                     Self.type
                 ]()  # no-op
             elif sys.has_sse4() and mask_size == 32:
-                # We split it in two and call _pshuf twice.
+                # We split it in two and call _pshuf_or_tbl1 twice.
                 var first_indices_batch = mask.slice[16, offset=0]()
                 var second_indices_batch = mask.slice[16, offset=16]()
-                var first_result = _pshuf(self_copy, first_indices_batch)
-                var second_result = _pshuf(self_copy, second_indices_batch)
+                var first_result = _pshuf_or_tbl1(
+                    self_copy, first_indices_batch
+                )
+                var second_result = _pshuf_or_tbl1(
+                    self_copy, second_indices_batch
+                )
                 var result = first_result.join(second_result)
                 return result.slice[mask_size, offset=0]().cast[
                     Self.type
@@ -2699,6 +2707,20 @@ struct SIMD[type: DType, size: Int](
         ](zero_simd, self, Int32(-shift))
 
 
+fn _pshuf_or_tbl1(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    @parameter
+    if sys.has_sse4():
+        return _pshuf(lookup_table, indices)
+    elif sys.has_neon():
+        return _tbl1(lookup_table, indices)
+    else:
+        constrained[False, "To call _pshuf_or_tbl1() you need sse4 or neon."]()
+        # Can never happen. TODO: Remove later when the compiler detects it.
+        return SIMD[DType.uint8, 16]()
+
+
 fn _pshuf(
     lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
 ) -> SIMD[DType.uint8, 16]:
@@ -2708,6 +2730,20 @@ fn _pshuf(
     """
     return sys.llvm_intrinsic[
         "llvm.x86.ssse3.pshuf.b.128",
+        SIMD[DType.uint8, 16],
+        has_side_effect=False,
+    ](lookup_table, indices)
+
+
+fn _tbl1(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    """Shuffle operation using the aarch64 `tbl1` instruction.
+
+    See https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/coding-for-neon---part-5-rearranging-vectors
+    """
+    return sys.llvm_intrinsic[
+        "llvm.aarch64.neon.tbl1",
         SIMD[DType.uint8, 16],
         has_side_effect=False,
     ](lookup_table, indices)
