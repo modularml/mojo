@@ -70,98 +70,259 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     return _count_leading_zeros(~(b & UInt8(0b1111_0000)))
 
 
-fn _validate_utf8_simd_slice[
-    width: Int, remainder: Bool = False
-](ptr: UnsafePointer[UInt8], length: Int, owned iter_len: Int) -> Int:
-    """Internal method to validate utf8, use _is_valid_utf8.
-
-    Parameters:
-        width: The width of the SIMD vector to build for validation.
-        remainder: Whether it is computing the remainder that doesn't fit in the
-            SIMD vector.
-
-    Args:
-        ptr: Pointer to the data.
-        length: The length of the items in the pointer.
-        iter_len: The amount of items to still iterate through.
-
-    Returns:
-        The new amount of items to iterate through that don't fit in the
-            specified width of SIMD vector. If -1 then it is invalid.
+@value
+struct _ProcessedUtfBytes[simd_size: Int]:
+    """Contains information about the previous chunk of UTF-8 bytes.
+    Notably necessary to verify continuation bytes.
     """
-    # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
-    # and benchmark the difference.
-    var idx = length - iter_len
-    while iter_len >= width or remainder:
-        var d: SIMD[DType.uint8, width]  # use a vector of the specified width
 
-        @parameter
-        if not remainder:
-            d = ptr.offset(idx).simd_strided_load[DType.uint8, width](1)
-        else:
-            debug_assert(iter_len > -1, "iter_len must be > -1")
-            d = SIMD[DType.uint8, width](0)
-            for i in range(iter_len):
-                d[i] = ptr[idx + i]
+    var raw_bytes: SIMD[DType.uint8, simd_size]
+    var high_nibbles: SIMD[DType.uint8, simd_size]
+    var carried_continuations: SIMD[DType.uint8, simd_size]
 
-        var is_ascii = d < 0b1000_0000
-        if is_ascii.reduce_and():  # skip all ASCII bytes
 
-            @parameter
-            if not remainder:
-                idx += width
-                iter_len -= width
-                continue
-            else:
-                return 0
-        elif is_ascii[0]:
-            for i in range(1, width):
-                if is_ascii[i]:
-                    continue
-                idx += i
-                iter_len -= i
-                break
-            continue
+fn _get_last_carried_continuation_check_vector[
+    simd_size: Int
+]() -> SIMD[DType.uint8, simd_size]:
+    """Returns a vector (9, 9, 9, 9, ... 9, 9, 9, 1)."""
+    result = SIMD[DType.uint8, simd_size](9)
+    result[simd_size - 1] = 1
+    return result
 
-        var byte_types = _utf8_byte_type(d)
-        var first_byte_type = byte_types[0]
 
-        # byte_type has to match against the amount of continuation bytes
-        alias Vec = SIMD[DType.uint8, 4]
-        alias n4_byte_types = Vec(4, 1, 1, 1)
-        alias n3_byte_types = Vec(3, 1, 1, 0)
-        alias n3_mask = Vec(0b111, 0b111, 0b111, 0)
-        alias n2_byte_types = Vec(2, 1, 0, 0)
-        alias n2_mask = Vec(0b111, 0b111, 0, 0)
-        var byte_types_4 = byte_types.slice[4]()
-        var valid_n4 = (byte_types_4 == n4_byte_types).reduce_and()
-        var valid_n3 = ((byte_types_4 & n3_mask) == n3_byte_types).reduce_and()
-        var valid_n2 = ((byte_types_4 & n2_mask) == n2_byte_types).reduce_and()
-        if not (valid_n4 or valid_n3 or valid_n2):
-            return -1
+@always_inline
+fn _mm_alignr_epi8[
+    simd_size: Int, //, count: Int
+](a: SIMD[DType.uint8, simd_size], b: SIMD[DType.uint8, simd_size]) -> SIMD[
+    DType.uint8, simd_size
+]:
+    """The equivalent of https://doc.rust-lang.org/core/arch/x86_64/fn._mm_alignr_epi8.html .
+    """
+    # This can be one instruction with ssse3. We can maybe force the compiler to use it.
+    var concatenated = a.join(b)
+    var shifted = concatenated.rotate_left[count]()
+    return shifted.slice[a.size, offset = a.size]()
 
-        # special unicode ranges
-        var b0 = d[0]
-        var b1 = d[1]
-        if first_byte_type == 2 and b0 < UInt8(0b1100_0010):
-            return -1
-        elif b0 == 0xE0 and not (UInt8(0xA0) <= b1 <= UInt8(0xBF)):
-            return -1
-        elif b0 == 0xED and not (UInt8(0x80) <= b1 <= UInt8(0x9F)):
-            return -1
-        elif b0 == 0xF0 and not (UInt8(0x90) <= b1 <= UInt8(0xBF)):
-            return -1
-        elif b0 == 0xF4 and not (UInt8(0x80) <= b1 <= UInt8(0x8F)):
-            return -1
 
-        # amount of bytes evaluated
-        idx += int(first_byte_type)
-        iter_len -= int(first_byte_type)
+@always_inline
+fn _subtract_with_saturation[
+    simd_size: Int, //, b: Int
+](a: SIMD[DType.uint8, simd_size]) -> SIMD[DType.uint8, simd_size]:
+    """The equivalent of https://doc.rust-lang.org/core/arch/x86_64/fn._mm_subs_epu8.html .
+    """
+    alias b_as_vector = SIMD[DType.uint8, simd_size](b)
+    return max(a, b_as_vector) - b_as_vector
 
-        @parameter
-        if remainder:
-            break
-    return iter_len
+
+@always_inline
+fn _count_nibbles[
+    simd_size: Int, //
+](
+    bytes: SIMD[DType.uint8, simd_size],
+    inout answer: _ProcessedUtfBytes[simd_size],
+):
+    answer.raw_bytes = bytes
+    answer.high_nibbles = bytes >> 4
+
+
+@always_inline
+fn _check_smaller_than_0xF4[
+    simd_size: Int, //
+](
+    current_bytes: SIMD[DType.uint8, simd_size],
+    inout has_error: SIMD[DType.bool, simd_size],
+):
+    var bigger_than_0xF4 = current_bytes > SIMD[DType.uint8, simd_size](0xF4)
+    has_error |= bigger_than_0xF4
+
+
+@always_inline
+fn _continuation_lengths[
+    simd_size: Int, //
+](high_nibbles: SIMD[DType.uint8, simd_size]) -> SIMD[DType.uint8, simd_size]:
+    # The idea is to end up with this pattern:
+    # Input:  0xxxxxxx, 110xxxxx, 10xxxxxx, 1110xxxx, 10xxxxxx, 10xxxxxx, 10xxxxxx, 1111xxxx,
+    # Output: 1       , 2,      , 0       , 3,      , 0       , 0       , 0       , 4
+
+    alias table_of_continuations = SIMD[DType.uint8, 16](
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,  # 0xxx (ASCII)
+        0,
+        0,
+        0,
+        0,  # 10xx (continuation)
+        2,
+        2,  # 110x
+        3,  # 1110
+        4,  # 1111, next should be 0 (not checked here)
+    )
+    # Use
+    return table_of_continuations.dynamic_shuffle(high_nibbles)
+
+
+@always_inline
+fn _carry_continuations[
+    simd_size: Int, //
+](
+    initial_lengths: SIMD[DType.uint8, simd_size],
+    previous_carries: SIMD[DType.uint8, simd_size],
+) -> SIMD[DType.uint8, simd_size]:
+    var right1 = _subtract_with_saturation[1](
+        _mm_alignr_epi8[simd_size - 1](initial_lengths, previous_carries)
+    )
+    # Input:           0xxxxxxx, 110xxxxx, 10xxxxxx, 1110xxxx, 10xxxxxx, 10xxxxxx, 10xxxxxx, 1111xxxx,
+    # initial_lengths: 1       , 2,      , 0       , 3,      , 0       , 0       , 0       , 4
+    # right1           ?       , 0       , 1       , 0       , 2,      , 0       , 0       , 0
+    var sum = initial_lengths + right1
+    # sum              ?       , 2       , 1       , 3       , 2,      , 0       , 0       , 4
+
+    var right2 = _subtract_with_saturation[2](
+        _mm_alignr_epi8[simd_size - 2](sum, previous_carries)
+    )
+    # right2           ?       , ?       , ?       , 0       , 0,      , 1       , 0       , 0
+    return sum + right2
+    # return           ?       , ?       , ?       , 3       , 2,      , 1       , 0       , 4
+
+
+@always_inline
+fn _check_continuations[
+    simd_size: Int, //
+](
+    initial_lengths: SIMD[DType.uint8, simd_size],
+    carries: SIMD[DType.uint8, simd_size],
+    inout has_error: SIMD[DType.bool, simd_size],
+):
+    var overunder = (initial_lengths < carries) == (
+        SIMD[DType.uint8, simd_size](0) < initial_lengths
+    )
+    has_error |= overunder
+
+
+@always_inline
+fn _check_first_continuation_max[
+    simd_size: Int, //
+](
+    # When 0b11101101 is found, next byte must be no larger than 0b10011111
+    # When 0b11110100 is found, next byte must be no larger than 0b10001111
+    # Next byte must be continuation, ie sign bit is set, so signed < is ok
+    current_bytes: SIMD[DType.uint8, simd_size],
+    off1_current_bytes: SIMD[DType.uint8, simd_size],
+    inout has_error: SIMD[DType.bool, simd_size],
+):
+    var bad_follow_ED = (
+        SIMD[DType.uint8, simd_size](0b10011111) < current_bytes
+    ) & (off1_current_bytes == SIMD[DType.uint8, simd_size](0b11101101))
+    var bad_follow_F4 = (
+        SIMD[DType.uint8, simd_size](0b10001111) < current_bytes
+    ) & (off1_current_bytes == SIMD[DType.uint8, simd_size](0b11110100))
+
+    has_error |= bad_follow_ED | bad_follow_F4
+
+
+@always_inline
+fn _check_overlong[
+    simd_size: Int, //
+](
+    current_bytes: SIMD[DType.uint8, simd_size],
+    off1_current_bytes: SIMD[DType.uint8, simd_size],
+    hibits: SIMD[DType.uint8, simd_size],
+    previous_hibits: SIMD[DType.uint8, simd_size],
+    inout has_error: SIMD[DType.bool, simd_size],
+):
+    """Map off1_hibits => error condition.
+
+    hibits     off1    cur
+    C       => < C2 && true
+    E       => < E1 && < A0
+    F       => < F1 && < 90
+    else      false && false
+    """
+    var off1_hibits = _mm_alignr_epi8[simd_size - 1](hibits, previous_hibits)
+    # fmt: off
+    alias table1 = SIMD[DType.uint8, 16](
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,  # 10xx => false
+        0xC2,
+        0x80,  # 110x
+        0xE1,  # 1110
+        0xF1,
+    )
+    var initial_mins = table1.dynamic_shuffle(off1_hibits).cast[DType.int8]()
+    var initial_under = off1_current_bytes.cast[DType.int8]() < initial_mins
+    alias table2 = SIMD[DType.uint8, 16](
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,
+        0x80,  # 10xx => False
+        127,
+        127,  # 110x => True
+        0xA0,  # 1110
+        0x90,
+    )
+    # fmt: on
+    var second_mins = table2.dynamic_shuffle(off1_hibits).cast[DType.int8]()
+    var second_under = current_bytes.cast[DType.int8]() < second_mins
+    has_error |= initial_under & second_under
+
+
+fn _check_utf8_bytes[
+    simd_size: Int
+](
+    current_bytes: SIMD[DType.uint8, simd_size],
+    previous: _ProcessedUtfBytes[simd_size],
+    inout has_error: SIMD[DType.bool, simd_size],
+) -> _ProcessedUtfBytes[simd_size]:
+    var pb = _ProcessedUtfBytes[simd_size](
+        SIMD[DType.uint8, simd_size](),
+        SIMD[DType.uint8, simd_size](),
+        SIMD[DType.uint8, simd_size](),
+    )
+    _count_nibbles(current_bytes, pb)
+    _check_smaller_than_0xF4(current_bytes, has_error)
+
+    var initial_lengths = _continuation_lengths(pb.high_nibbles)
+    pb.carried_continuations = _carry_continuations(
+        initial_lengths, previous.carried_continuations
+    )
+
+    _check_continuations(initial_lengths, pb.carried_continuations, has_error)
+    var off1_current_bytes = _mm_alignr_epi8[simd_size - 1](
+        pb.raw_bytes, previous.raw_bytes
+    )
+    _check_first_continuation_max(current_bytes, off1_current_bytes, has_error)
+    _check_overlong(
+        current_bytes,
+        off1_current_bytes,
+        pb.high_nibbles,
+        previous.high_nibbles,
+        has_error,
+    )
+
+    return pb
 
 
 fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
@@ -191,29 +352,34 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
     .
     """
+    alias simd_size = sys.simdbytewidth()
+    var i: Int = 0
+    var has_error = SIMD[DType.bool, simd_size]()
+    var previous = _ProcessedUtfBytes(
+        SIMD[DType.uint8, simd_size](),
+        SIMD[DType.uint8, simd_size](),
+        SIMD[DType.uint8, simd_size](),
+    )
+    while i + simd_size <= length:
+        var current_bytes = (ptr + i).load[width=simd_size]()
+        previous = _check_utf8_bytes(current_bytes, previous, has_error)
+        if has_error.reduce_or():
+            return False
+        i += simd_size
 
-    var iter_len = length
-    if iter_len >= 64 and simdwidthof[DType.uint8]() >= 64:
-        iter_len = _validate_utf8_simd_slice[64](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 32 and simdwidthof[DType.uint8]() >= 32:
-        iter_len = _validate_utf8_simd_slice[32](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 16 and simdwidthof[DType.uint8]() >= 16:
-        iter_len = _validate_utf8_simd_slice[16](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 8:
-        iter_len = _validate_utf8_simd_slice[8](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 4:
-        iter_len = _validate_utf8_simd_slice[4](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    return _validate_utf8_simd_slice[4, True](ptr, length, iter_len) == 0
+    # last incomplete chunk
+    if i != length:
+        var buffer = SIMD[DType.uint8, simd_size](0)
+        for j in range(i, length):
+            buffer[j - i] = (ptr + j)[]
+        previous = _check_utf8_bytes(buffer, previous, has_error)
+    else:
+        # Just check that the last carried_continuations is 1 or 0
+        alias base = _get_last_carried_continuation_check_vector[simd_size]()
+        var comparison = previous.carried_continuations > base
+        has_error |= comparison
+
+    return not has_error.reduce_or()
 
 
 fn _is_newline_start(
