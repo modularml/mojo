@@ -1953,8 +1953,7 @@ struct SIMD[type: DType, size: Int](
         Note that currently, this function is fast only if the following
         conditions are met:
         1) The SIMD vector `self` is of type uint8 and size 16
-        2) The mask is of size 16 or 32
-        3) The CPU supports SSE4 or NEON
+        2) The CPU supports SSE4 or NEON
 
         If that's not the case, the function will fallback on a slower path,
         which is an unrolled for loop.
@@ -2007,14 +2006,18 @@ struct SIMD[type: DType, size: Int](
                 return result.slice[mask_size]().cast[Self.type]()  # no-op
             elif mask_size > target_mask_size:
                 # We split it in two and call dynamic_shuffle twice.
-                var first_half_of_mask = mask.slice[16, offset=0]()
-                var second_half_of_mask = mask.slice[16, offset=16]()
+                var first_half_of_mask = mask.slice[mask_size // 2, offset=0]()
+                var second_half_of_mask = mask.slice[
+                    mask_size // 2, offset = mask_size // 2
+                ]()
 
                 var first_result = self.dynamic_shuffle(first_half_of_mask)
                 var second_result = self.dynamic_shuffle(second_half_of_mask)
 
                 var result = first_result.join(second_result)
-                return result.slice[mask_size]().cast[Self.type]()  # no-op
+                # The compiler doesn't understand that if divide by 2 and then multiply by 2,
+                # we get the same value. So we need to help it a bit.
+                return result.slice[mask_size]()  # no-op
 
         # Slow path, ~3x slower than pshuf for size 16
         var result = SIMD[Self.type, mask_size]()
