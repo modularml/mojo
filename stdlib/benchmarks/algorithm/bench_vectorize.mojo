@@ -71,8 +71,8 @@ fn test_vectorize[
     constrained[(N % simd_width) == 0]()
     # Create a mem of size N
     alias buffer_align = 64
-    var vector = UnsafePointer[Scalar[dtype]].alloc[alignment=buffer_align](N)
-    var result = UnsafePointer[Scalar[dtype]].alloc[alignment=buffer_align](N)
+    var vector = UnsafePointer[Scalar[dtype], alignment=buffer_align].alloc(N)
+    var result = UnsafePointer[Scalar[dtype], alignment=buffer_align].alloc(N)
 
     @always_inline
     @parameter

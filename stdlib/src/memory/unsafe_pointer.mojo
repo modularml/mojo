@@ -43,6 +43,7 @@ struct UnsafePointer[
     T: AnyType,
     address_space: AddressSpace = AddressSpace.GENERIC,
     exclusive: Bool = False,
+    alignment: Int = alignof[T]() if triple_is_nvidia_cuda() else 1,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -58,7 +59,12 @@ struct UnsafePointer[
         T: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
         exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
+        alignment: The minimum alignment of this pointer known statically.
     """
+
+    # ===-------------------------------------------------------------------===#
+    # Aliases
+    # ===-------------------------------------------------------------------===#
 
     # Fields
     alias _mlir_type = __mlir_type[
@@ -72,6 +78,10 @@ struct UnsafePointer[
     ]
 
     alias type = T
+
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
 
     """The underlying pointer type."""
     var address: Self._mlir_type
@@ -96,7 +106,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
-    fn __init__(inout self, other: UnsafePointer[T, address_space, _]):
+    fn __init__(inout self, other: UnsafePointer[T, address_space, *_]):
         """Exclusivity parameter cast a pointer.
 
         Args:
@@ -134,31 +144,8 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
-    fn alloc(count: Int, alignment: Int = alignof[T]()) -> Self:
+    fn alloc(count: Int) -> Self:
         """Allocate an array with specified or default alignment.
-
-        Args:
-            count: The number of elements in the array.
-            alignment: The alignment in bytes of the allocated memory.
-
-        Returns:
-            The pointer to the newly allocated array.
-        """
-        alias sizeof_t = sizeof[T]()
-
-        constrained[sizeof_t > 0, "size must be greater than zero"]()
-
-        return _malloc[T, address_space=address_space](
-            sizeof_t * count, alignment=alignment
-        )
-
-    @staticmethod
-    @always_inline
-    fn alloc[alignment: Int = alignof[T]()](count: Int) -> Self:
-        """Allocate an array with specified or default alignment.
-
-        Parameters:
-            alignment: The alignment in bytes of the allocated memory.
 
         Args:
             count: The number of elements in the array.
@@ -169,10 +156,9 @@ struct UnsafePointer[
         alias sizeof_t = sizeof[T]()
 
         constrained[sizeof_t > 0, "size must be greater than zero"]()
-        constrained[alignment > 0, "alignment must be greater than zero"]()
 
-        return _malloc[T, address_space=address_space](
-            sizeof_t * count, alignment=alignment
+        return _malloc[T, address_space=address_space, alignment=alignment](
+            sizeof_t * count
         )
 
     # ===-------------------------------------------------------------------===#
@@ -852,7 +838,7 @@ struct UnsafePointer[
         T: AnyType = Self.T,
         /,
         address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[T, address_space]:
+    ](self) -> UnsafePointer[T, address_space, alignment=alignment]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
@@ -864,7 +850,9 @@ struct UnsafePointer[
             as the original UnsafePointer.
         """
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[T, address_space]._mlir_type,
+            _type = UnsafePointer[
+                T, address_space, alignment=alignment
+            ]._mlir_type,
         ](self.address)
 
     @always_inline("nodebug")
@@ -872,7 +860,7 @@ struct UnsafePointer[
         T: DType,
         /,
         address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[Scalar[T], address_space]:
+    ](self) -> UnsafePointer[Scalar[T], address_space, alignment=alignment]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
@@ -884,11 +872,13 @@ struct UnsafePointer[
             as the original UnsafePointer.
         """
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[Scalar[T], address_space]._mlir_type,
+            _type = UnsafePointer[
+                Scalar[T], address_space, alignment=alignment
+            ]._mlir_type,
         ](self.address)
 
     @always_inline
-    fn destroy_pointee(self: UnsafePointer[_]):
+    fn destroy_pointee(self: UnsafePointer[T, alignment=alignment]):
         """Destroy the pointed-to value.
 
         The pointer must not be null, and the pointer memory location is assumed
