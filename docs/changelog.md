@@ -423,6 +423,15 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   The algorithm requires $$O(N)$$ auxiliary memory, if extra memory is failed to
   allocate, the program will crash.
 
+- `UnsafePointer` now has an `alignment` parameter to specify the static
+  alignment of the pointer. Consequently, `UnsafePointer.alloc` no longer takes
+  in an alignment parameter, and the alignment should be specified in the type.
+
+  ```mojo
+  UnsafePointer[type].alloc[alignment](x) # now becomes
+  UnsafePointer[type, alignment].alloc(x)
+  ```
+
 ### 🦋 Changed
 
 - The set of automatically imported entities (types, aliases, functions) into user's
