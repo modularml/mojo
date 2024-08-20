@@ -104,15 +104,10 @@ RUN find /files -type d -exec chmod 755 {} \; \
   && bash -c 'rm -rf /files/root/{.bashrc,.profile}' \
   && chmod 700 /files/root
 
-FROM docker.io/koalaman/shellcheck:stable as sci
-
 FROM mojo
 
 ## Copy files as late as possible to avoid cache busting
 COPY --from=files /files /
-
-## Copy shellcheck as late as possible to avoid cache busting
-COPY --from=sci --chown=root:root /bin/shellcheck /usr/local/bin
 
 ARG DEBIAN_FRONTEND=noninteractive
 

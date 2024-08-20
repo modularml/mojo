@@ -46,8 +46,7 @@
         "ms-python.python",
         "ms-toolsai.jupyter",
         "mutantdino.resourcemonitor",
-        "redhat.vscode-yaml",
-        "timonwong.shellcheck"
+        "redhat.vscode-yaml"
       ],
       "settings": {
         "git.alwaysSignOff": true,
