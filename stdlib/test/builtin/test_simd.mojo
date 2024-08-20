@@ -843,6 +843,18 @@ def test_shuffle():
     )
 
 
+def test_shuffle_dynamic_size_4():
+    var lookup_table = SIMD[DType.uint8, 16](
+        0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
+    )
+
+    indices = SIMD[DType.uint8, 4](3, 3, 5, 5)
+
+    result = lookup_table.dynamic_shuffle(indices)
+    expected_result = SIMD[DType.uint8, 4](30, 30, 50, 50)
+    assert_equal(result, expected_result)
+
+
 def test_shuffle_dynamic_size_8():
     var lookup_table = SIMD[DType.uint8, 16](
         0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
@@ -1774,6 +1786,7 @@ def main():
     test_rsub()
     test_shift()
     test_shuffle()
+    test_shuffle_dynamic_size_4()
     test_shuffle_dynamic_size_8()
     test_shuffle_dynamic_size_16()
     test_shuffle_dynamic_size_32()

@@ -1939,7 +1939,6 @@ struct SIMD[type: DType, size: Int](
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
-    @always_inline("nodebug")
     fn dynamic_shuffle[
         mask_size: Int, //
     ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
@@ -1984,39 +1983,38 @@ struct SIMD[type: DType, size: Int](
             and Self.type == DType.uint8
             and Self.size == 16
         ):
-            # The compiler isn't smart enough yet. It complains about parameter mismatch
-            # because it cannot narrow them. Let's help it a bit and hope it
-            # understands this is a no-op. So far there wasn't any performance
-            # drop likely indicating that the compiler is doing the right thing.
-            # Everything commented with no-op should not generate any instruction.
-            var self_copy = self.slice[16, offset=0]().cast[
-                DType.uint8
-            ]()  # no-op
+            # The instruction works with mask size of 16
+            alias target_mask_size = 16
 
+            # We know that simd sizes are powers of two, so we can use recursivity
+            # to iterate on the method until we reach the target size.
             @parameter
-            if mask_size == 16:
+            if mask_size < target_mask_size:
+                # Make a bigger mask and retry
+                var new_mask = mask.join(SIMD[DType.uint8, mask_size]())
+                return self.dynamic_shuffle(new_mask).slice[mask_size]()
+            elif mask_size == target_mask_size:
+                # The compiler isn't smart enough yet. It complains about parameter mismatch
+                # because it cannot narrow them. Let's help it a bit and hope it
+                # understands this is a no-op. So far there wasn't any performance
+                # drop likely indicating that the compiler is doing the right thing.
+                # Everything commented with no-op should not generate any instruction.
                 var indices_copy = mask.slice[16, offset=0]()  # no-op
                 var self_copy = self.slice[16, offset=0]().cast[
                     DType.uint8
                 ]()  # no-op
                 var result = _pshuf_or_tbl1(self_copy, indices_copy)
-                return result.slice[mask_size, offset=0]().cast[
-                    Self.type
-                ]()  # no-op
-            elif sys.has_sse4() and mask_size == 32:
-                # We split it in two and call _pshuf_or_tbl1 twice.
-                var first_indices_batch = mask.slice[16, offset=0]()
-                var second_indices_batch = mask.slice[16, offset=16]()
-                var first_result = _pshuf_or_tbl1(
-                    self_copy, first_indices_batch
-                )
-                var second_result = _pshuf_or_tbl1(
-                    self_copy, second_indices_batch
-                )
+                return result.slice[mask_size]().cast[Self.type]()  # no-op
+            elif mask_size > target_mask_size:
+                # We split it in two and call dynamic_shuffle twice.
+                var first_half_of_mask = mask.slice[16, offset=0]()
+                var second_half_of_mask = mask.slice[16, offset=16]()
+
+                var first_result = self.dynamic_shuffle(first_half_of_mask)
+                var second_result = self.dynamic_shuffle(second_half_of_mask)
+
                 var result = first_result.join(second_result)
-                return result.slice[mask_size, offset=0]().cast[
-                    Self.type
-                ]()  # no-op
+                return result.slice[mask_size]().cast[Self.type]()  # no-op
 
         # Slow path, ~3x slower than pshuf for size 16
         var result = SIMD[Self.type, mask_size]()
