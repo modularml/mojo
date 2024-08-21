@@ -1,0 +1,11 @@
+[project]
+name = "Mojo examples"
+version = "0.1.0"
+description = "A collection of Mojo code examples"
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
+platforms = ["osx-arm64","linux-64","linux-aarch64"]
+
+[dependencies]
+max = "*"
+python = ">=3.11,<3.12"
