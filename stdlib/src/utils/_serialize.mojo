@@ -73,7 +73,7 @@ fn _serialize[
     serialize_dtype: Bool = True,
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
-](ptr: UnsafePointer[Scalar[type], _], shape: List[Int]):
+](ptr: UnsafePointer[Scalar[type], _], shape: List[Int, *_]):
     var rank = len(shape)
     if rank == 0:
         if serialize_end_line:
