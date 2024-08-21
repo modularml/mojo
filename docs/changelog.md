@@ -427,6 +427,14 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   set of tests collected and executed. The filter string is a POSIX extended
   regular expression.
 
+- The `mojo test` command now supports using the same compilation options as
+  `mojo build`.
+
+- You can now debug unit tests using `mojo test` by passing the `--debug` flag.
+  Most debug flags are supported; run `mojo test --help` for a full listing.
+
+  Debugging doctests is not currently supported.
+
 - `UnsafePointer` now has an `alignment` parameter to specify the static
   alignment of the pointer. Consequently, `UnsafePointer.alloc` no longer takes
   in an alignment parameter, and the alignment should be specified in the type.
@@ -698,6 +706,12 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - The `simd_strided_load()` and `simd_strided_store()` have been renamed to
   `strided_load` and `strided_store` in `UnsafePointer`.
+
+- `mojo test` now uses the Mojo compiler for running unit tests. This will resolve
+  compilation issues that sometimes appeared, and will also improve overall test
+  times, since we will only compile unit tests once before executing all of them.
+
+  These changes do not apply to doctests, due to their different semantics.
 
 ### ❌ Removed
 
