@@ -26,6 +26,7 @@ from sys import (
     triple_is_nvidia_cuda,
     llvm_intrinsic,
 )
+from sys._assembly import inlined_assembly
 from math import floor
 
 from memory import UnsafePointer
@@ -196,6 +197,14 @@ fn perf_counter_ns() -> Int:
     Returns:
         The current time in ns.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        return int(
+            inlined_assembly[
+                "mov.u64 $0, %globaltimer;", UInt64, constraints="=l"
+            ]()
+        )
     return _monotonic_nanoseconds()
 
 

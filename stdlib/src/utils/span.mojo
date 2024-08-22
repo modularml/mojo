@@ -23,6 +23,7 @@ from utils import Span
 from collections import InlineArray
 from memory import Reference
 from sys.intrinsics import _type_is_eq
+from builtin.builtin_list import _lit_mut_cast
 
 
 @value
@@ -308,3 +309,14 @@ struct Span[
         """
         for element in self:
             element[] = value
+
+    fn get_immutable(self) -> Span[T, _lit_mut_cast[lifetime, False].result]:
+        """
+        Return an immutable version of this span.
+
+        Returns:
+            A span covering the same elements, but without mutability.
+        """
+        return Span[T, _lit_mut_cast[lifetime, False].result](
+            unsafe_ptr=self._data, len=self._len
+        )

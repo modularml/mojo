@@ -210,14 +210,19 @@ fn _quicksort[
     var size = len(span)
     if size == 0:
         return
-    var stack = List[Span[type, lifetime]](
-        capacity=_estimate_initial_height(size)
-    )
-    stack.append(span)
+
+    # Work with an immutable span so we don't run into exclusivity problems with
+    # the List[Span].
+    var imm_span = span.get_immutable()
+    alias ImmSpan = __type_of(imm_span)
+
+    var stack = List[ImmSpan](capacity=_estimate_initial_height(size))
+    stack.append(imm_span)
     while len(stack) > 0:
-        var interval = stack.pop()
-        var ptr = interval.unsafe_ptr()
-        var len = len(interval)
+        var imm_interval = stack.pop()
+        var ptr = imm_interval.unsafe_ptr()
+        var len = len(imm_interval)
+        var interval = Span[type, lifetime](unsafe_ptr=ptr, len=len)
 
         if len <= 5:
             _delegate_small_sort[cmp_fn](interval)
@@ -237,9 +242,7 @@ fn _quicksort[
             var pivot = _quicksort_partition_left[cmp_fn](interval)
             if len > pivot + 2:
                 stack.append(
-                    Span[type, lifetime](
-                        unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1
-                    )
+                    ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
                 )
             continue
 
@@ -247,13 +250,11 @@ fn _quicksort[
 
         if len > pivot + 2:
             stack.append(
-                Span[type, lifetime](
-                    unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1
-                )
+                ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
             )
 
         if pivot > 1:
-            stack.append(Span[type, lifetime](unsafe_ptr=ptr, len=pivot))
+            stack.append(ImmSpan(unsafe_ptr=ptr, len=pivot))
 
 
 # ===----------------------------------------------------------------------===#
@@ -263,19 +264,23 @@ fn _quicksort[
 
 fn merge[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    span_lifetime: ImmutableLifetime,
+    result_lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](
-    span1: Span[type, lifetime],
-    span2: Span[type, lifetime],
-    result: Span[type, lifetime],
+    span1: Span[type, span_lifetime],
+    span2: Span[type, span_lifetime],
+    result: Span[type, result_lifetime],
 ):
     """Merge span1 and span2 into result using the given cmp_fn. The function
     will crash if result is not large enough to hold both span1 and span2.
 
+    Note that if result contains data previously, its destructor will not be called.
+
     Parameters:
         type: Type of the spans.
-        lifetime: Lifetime of the spans.
+        span_lifetime: Lifetime of the input spans.
+        result_lifetime: Lifetime of the result Span.
         cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
 
     Args:
@@ -285,6 +290,7 @@ fn merge[
     """
     var span1_size = len(span1)
     var span2_size = len(span2)
+    var res_ptr = result.unsafe_ptr()
 
     debug_assert(
         span1_size + span2_size <= len(result),
@@ -296,29 +302,30 @@ fn merge[
     while i < span1_size:
         if j == span2_size:
             while i < span1_size:
-                result[k] = span1[i]
+                (res_ptr + k).init_pointee_copy(span1[i])
                 k += 1
                 i += 1
             return
         if cmp_fn(span2[j], span1[i]):
-            result[k] = span2[j]
+            (res_ptr + k).init_pointee_copy(span2[j])
             j += 1
         else:
-            result[k] = span1[i]
+            (res_ptr + k).init_pointee_copy(span1[i])
             i += 1
         k += 1
 
     while j < span2_size:
-        result[k] = span2[j]
+        (res_ptr + k).init_pointee_copy(span2[j])
         k += 1
         j += 1
 
 
 fn _stable_sort_impl[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    span_life: MutableLifetime,
+    tmp_life: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
-](span: Span[type, lifetime], temp_buff: Span[type, lifetime]):
+](span: Span[type, span_life], temp_buff: Span[type, tmp_life]):
     var size = len(span)
     if size <= 1:
         return
@@ -335,7 +342,9 @@ fn _stable_sort_impl[
         while j + merge_size < size:
             var span1 = span[j : j + merge_size]
             var span2 = span[j + merge_size : min(size, j + 2 * merge_size)]
-            merge[cmp_fn](span1, span2, temp_buff)
+            merge[cmp_fn](
+                span1.get_immutable(), span2.get_immutable(), temp_buff
+            )
             for i in range(merge_size + len(span2)):
                 span[j + i] = temp_buff[i]
             j += 2 * merge_size
@@ -348,7 +357,7 @@ fn _stable_sort[
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](span: Span[type, lifetime]):
     var temp_buff = UnsafePointer[type].alloc(len(span))
-    var temp_buff_span = Span[type, lifetime](
+    var temp_buff_span = Span[type, __lifetime_of(temp_buff)](
         unsafe_ptr=temp_buff, len=len(span)
     )
     _stable_sort_impl[cmp_fn](span, temp_buff_span)
@@ -511,11 +520,11 @@ fn _sort[
         _insertion_sort[cmp_fn](span)
         return
 
+    @parameter
     if stable:
         _stable_sort[cmp_fn](span)
-        return
-
-    _quicksort[cmp_fn](span)
+    else:
+        _quicksort[cmp_fn](span)
 
 
 # TODO (MSTDL-766): The Int and Scalar[type] overload should be remove
