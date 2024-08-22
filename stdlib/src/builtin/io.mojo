@@ -386,9 +386,10 @@ fn _put(x: DType, file: FileDescriptor = stdout):
     _put(str(x).as_string_slice(), file=file)
 
 
-# TODO: Constrain to `StringSlice[False, _]`
 @no_inline
-fn _put(x: StringSlice, file: FileDescriptor = stdout):
+fn _put[
+    lif: ImmutableLifetime, //
+](x: StringSlice[lif], file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = x.byte_length()
 
