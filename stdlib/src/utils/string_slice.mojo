@@ -119,28 +119,18 @@ fn _continuation_lengths[
     simd_size: Int, //
 ](high_nibbles: SIMD[DType.uint8, simd_size]) -> SIMD[DType.uint8, simd_size]:
     # The idea is to end up with this pattern:
-    # Input:  0xxxxxxx, 110xxxxx, 10xxxxxx, 1110xxxx, 10xxxxxx, 10xxxxxx, 10xxxxxx, 1111xxxx,
+    #                                                                     error here
+    # Input:  0xxxxxxx, 110xxxxx, 10xxxxxx, 1110xxxx, 10xxxxxx, 10xxxxxx, 10xxxxxx, 1111xxxx, ...
     # Output: 1       , 2,      , 0       , 3,      , 0       , 0       , 0       , 4
-
+    # fmt: off
     alias table_of_continuations = SIMD[DType.uint8, 16](
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,  # 0xxx (ASCII)
-        0,
-        0,
-        0,
-        0,  # 10xx (continuation)
-        2,
-        2,  # 110x
-        3,  # 1110
-        4,  # 1111, next should be 0 (not checked here)
+        1, 1, 1, 1, 1, 1, 1, 1,  # 0xxx (ASCII)
+        0, 0, 0, 0,              # 10xx (continuation)
+        2, 2,                    # 110x
+        3,                       # 1110
+        4,                       # 1111, next should be 0 (not checked here)
     )
-    # Use
+    # fmt: on
     return table_of_continuations.dynamic_shuffle(high_nibbles)
 
 
@@ -224,42 +214,20 @@ fn _check_overlong[
     var off1_hibits = _mm_alignr_epi8[simd_size - 1](hibits, previous_hibits)
     # fmt: off
     alias table1 = SIMD[DType.uint8, 16](
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,  # 10xx => false
-        0xC2,
-        0x80,  # 110x
-        0xE1,  # 1110
-        0xF1,
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, # 0xxx
+        0x80, 0x80,  # 10xx => false
+        0xC2, 0x80,  # 110x
+        0xE1,        # 1110
+        0xF1,        # 1111
     )
     var initial_mins = table1.dynamic_shuffle(off1_hibits).cast[DType.int8]()
     var initial_under = off1_current_bytes.cast[DType.int8]() < initial_mins
     alias table2 = SIMD[DType.uint8, 16](
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,
-        0x80,  # 10xx => False
-        127,
-        127,  # 110x => True
-        0xA0,  # 1110
-        0x90,
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+        0x80, 0x80, # 10xx => False
+        127, 127,   # 110x => True
+        0xA0,       # 1110
+        0x90,       # 1111
     )
     # fmt: on
     var second_mins = table2.dynamic_shuffle(off1_hibits).cast[DType.int8]()
@@ -332,6 +300,9 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
     .
     """
+    # Reference for this algorithm:
+    # https://arxiv.org/abs/2010.03090
+    # https://lemire.me/blog/2018/10/19/validating-utf-8-bytes-using-only-0-45-cycles-per-byte-avx-edition/
     alias simd_size = sys.simdbytewidth()
     var i: Int = 0
     var has_error = SIMD[DType.bool, simd_size]()
