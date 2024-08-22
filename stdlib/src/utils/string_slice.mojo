@@ -303,6 +303,8 @@ fn _check_utf8_bytes[
     return pb
 
 
+# no_inline adds a 10% speedup for some reason
+@no_inline
 fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     """Verify that the bytes are valid UTF-8.
 
