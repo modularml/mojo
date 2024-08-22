@@ -1979,6 +1979,7 @@ struct SIMD[type: DType, size: Int](
 
         @parameter
         if (
+            # TODO: Allow SSE3 when we have sys.has_sse3()
             (sys.has_sse4() or sys.has_neon())
             and Self.type == DType.uint8
             and Self.size == 16
@@ -2706,11 +2707,12 @@ fn _pshuf_or_tbl1(
     lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
 ) -> SIMD[DType.uint8, 16]:
     @parameter
-    if sys.has_sse4():
+    if sys.has_sse4():  # TODO: Allow SSE3 when we have sys.has_sse3()
         return _pshuf(lookup_table, indices)
     elif sys.has_neon():
         return _tbl1(lookup_table, indices)
     else:
+        # TODO: Change the error message when we allow SSE3
         constrained[False, "To call _pshuf_or_tbl1() you need sse4 or neon."]()
         # Can never happen. TODO: Remove later when the compiler detects it.
         return SIMD[DType.uint8, 16]()
