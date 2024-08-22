@@ -242,6 +242,9 @@ fn _check_utf8_bytes[
     previous: _ProcessedUtfBytes[simd_size],
     inout has_error: SIMD[DType.bool, simd_size],
 ) -> _ProcessedUtfBytes[simd_size]:
+    # No memory loads, just vectorized arithmetic.
+    # Each instruction counts there for performance.
+    # Benchmark every change. It's a very hot loop.
     var pb = _ProcessedUtfBytes[simd_size](
         SIMD[DType.uint8, simd_size](),
         SIMD[DType.uint8, simd_size](),
