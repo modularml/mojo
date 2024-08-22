@@ -1939,6 +1939,7 @@ struct SIMD[type: DType, size: Int](
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
+    @always_inline
     fn dynamic_shuffle[
         mask_size: Int, //
     ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
@@ -1989,21 +1990,16 @@ struct SIMD[type: DType, size: Int](
             # to iterate on the method until we reach the target size.
             @parameter
             if mask_size < target_mask_size:
-                # Make a bigger mask and retry
+                # Make a bigger mask (x2) and retry
                 var new_mask = mask.join(SIMD[DType.uint8, mask_size]())
                 return self.dynamic_shuffle(new_mask).slice[mask_size]()
             elif mask_size == target_mask_size:
                 # The compiler isn't smart enough yet. It complains about parameter mismatch
-                # because it cannot narrow them. Let's help it a bit and hope it
-                # understands this is a no-op. So far there wasn't any performance
-                # drop likely indicating that the compiler is doing the right thing.
-                # Everything commented with no-op should not generate any instruction.
-                var indices_copy = mask.slice[16, offset=0]()  # no-op
-                var self_copy = self.slice[16, offset=0]().cast[
-                    DType.uint8
-                ]()  # no-op
+                # because it cannot narrow them. Let's help it a bit.
+                var indices_copy = rebind[SIMD[DType.uint8, 16]](mask)
+                var self_copy = rebind[SIMD[DType.uint8, 16]](self)
                 var result = _pshuf_or_tbl1(self_copy, indices_copy)
-                return result.slice[mask_size]().cast[Self.type]()  # no-op
+                return rebind[SIMD[Self.type, mask_size]](result)
             elif mask_size > target_mask_size:
                 # We split it in two and call dynamic_shuffle twice.
                 var first_half_of_mask = mask.slice[mask_size // 2, offset=0]()
@@ -2017,7 +2013,7 @@ struct SIMD[type: DType, size: Int](
                 var result = first_result.join(second_result)
                 # The compiler doesn't understand that if divide by 2 and then multiply by 2,
                 # we get the same value. So we need to help it a bit.
-                return result.slice[mask_size]()  # no-op
+                return rebind[SIMD[Self.type, mask_size]](result)
 
         # Slow path, ~3x slower than pshuf for size 16
         var result = SIMD[Self.type, mask_size]()
