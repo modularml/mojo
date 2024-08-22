@@ -291,6 +291,102 @@ def test_find():
     )
 
 
+alias GOOD_SEQUENCES = List[String](
+    "a",
+    "\xc3\xb1",
+    "\xe2\x82\xa1",
+    "\xf0\x90\x8c\xbc",
+    "안녕하세요, 세상",
+    "\xc2\x80",
+    "\xf0\x90\x80\x80",
+    "\xee\x80\x80",
+    "very very very long string 🔥🔥🔥",
+)
+
+
+# TODO: later on, don't use String because
+# it will likely refuse non-utf8 data.
+alias BAD_SEQUENCES = List[String](
+    "\xc3\x28",  # continuation bytes does not start with 10xx
+    "\xa0\xa1",  # first byte is continuation byte
+    "\xe2\x28\xa1",  # second byte should be continuation byte
+    "\xe2\x82\x28",  # third byte should be continuation byte
+    "\xf0\x28\x8c\xbc",  # second byte should be continuation byte
+    "\xf0\x90\x28\xbc",  # third byte should be continuation byte
+    "\xf0\x28\x8c\x28",  # fourth byte should be continuation byte
+    "\xc0\x9f",  # overlong, could be just one byte
+    "\xf5\xff\xff\xff",  # missing continuation bytes
+    "\xed\xa0\x81",  # UTF-16 surrogate pair
+    "\xf8\x90\x80\x80\x80",  # 5 bytes is too long
+    "123456789012345\xed",  # Continuation bytes are missing
+    "123456789012345\xf1",  # Continuation bytes are missing
+    "123456789012345\xc2",  # Continuation bytes are missing
+    "\xC2\x7F",  # second byte is not continuation byte
+    "\xce",  # Continuation byte missing
+    "\xce\xba\xe1",  # two continuation bytes missing
+    "\xce\xba\xe1\xbd",  # One continuation byte missing
+    "\xce\xba\xe1\xbd\xb9\xcf",  # fifth byte should be continuation byte
+    "\xce\xba\xe1\xbd\xb9\xcf\x83\xce",  # missing continuation byte
+    "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce",  # missing continuation byte
+    "\xdf",  # missing continuation byte
+    "\xef\xbf",  # missing continuation byte
+)
+
+
+fn validate_utf8(slice: String) -> Bool:
+    return _is_valid_utf8(slice.unsafe_ptr(), slice.byte_length())
+
+
+def test_good_utf8_sequences():
+    for sequence in GOOD_SEQUENCES:
+        assert_true(validate_utf8(sequence[]))
+
+
+def test_bad_utf8_sequences():
+    for sequence in BAD_SEQUENCES:
+        assert_false(validate_utf8(sequence[]))
+
+
+def test_combinaison_good_utf8_sequences():
+    # any combinaison of good sequences should be good
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(i, len(GOOD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] + GOOD_SEQUENCES[j]
+            assert_true(validate_utf8(sequence))
+
+
+def test_combinaison_bad_utf8_sequences():
+    # any combinaison of bad sequences should be bad
+    for i in range(0, len(BAD_SEQUENCES)):
+        for j in range(i, len(BAD_SEQUENCES)):
+            var sequence = BAD_SEQUENCES[i] + BAD_SEQUENCES[j]
+            assert_false(validate_utf8(sequence))
+
+
+def test_combinaison_good_bad_utf8_sequences():
+    # any combinaison of good and bad sequences should be bad
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(0, len(BAD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] + BAD_SEQUENCES[j]
+            assert_false(validate_utf8(sequence))
+
+
+def test_combinaison_10_good_utf8_sequences():
+    # any 10 combinaison of good sequences should be good
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(i, len(GOOD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] * 10 + GOOD_SEQUENCES[j] * 10
+            assert_true(validate_utf8(sequence))
+
+
+def test_combinaison_10_good_10_bad_utf8_sequences():
+    # any 10 combinaison of good and bad sequences should be bad
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(0, len(BAD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] * 10 + BAD_SEQUENCES[j] * 10
+            assert_false(validate_utf8(sequence))
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
@@ -300,3 +396,10 @@ fn main() raises:
     test_slice_bool()
     test_utf8_validation()
     test_find()
+    test_good_utf8_sequences()
+    test_bad_utf8_sequences()
+    test_combinaison_good_utf8_sequences()
+    test_combinaison_bad_utf8_sequences()
+    test_combinaison_good_bad_utf8_sequences()
+    test_combinaison_10_good_utf8_sequences()
+    test_combinaison_10_good_10_bad_utf8_sequences()
