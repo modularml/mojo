@@ -16,6 +16,41 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo now diagnoses "argument exclusivity" violations due to aliasing
+  references.  Mojo requires references (including implicit references due to
+  borrowed/inout arguments) to be uniquely referenced (non-aliased) if mutable.
+  This is important for code safety, because it allows the compiler (and readers
+  of code) to understand where and when a value is mutated.  It is also useful
+  for performance optimization because it allows the compiler to know that
+  accesses through immutable references cannot change behind the scenes. Here is
+  an invalid example:
+
+  ```mojo
+  fn take_two_strings(a: String, inout b: String):
+     # Mojo knows 'a' and 'b' cannot be the same string.
+     b += a
+
+  fn invalid_access():
+    var my_string = String()
+
+    # error: passing `my_string` inout is invalid since it is also passed
+    # borrowed.
+    take_two_strings(my_string, my_string)
+  ```
+
+  This is similar to [Swift exclusivity
+  checking](https://swift.org/blog/swift-5-exclusivity/) and the [Rust
+  language](https://doc.rust-lang.org/beta/book/ch04-02-references-and-borrowing.html)
+  sometimes known as "aliasing xor mutability". That said, the Mojo
+  implementation details are somewhat different because lifetimes are embedded
+  in types.
+
+- Mojo now allows implicit definitions of variables within a `fn` in the same
+  way that has been allowed in a `def`.  The `var` keyword is still allowed and
+  still denotes the declaration of a new variable with a scope (in both `def`
+  and `fn`).  Relaxing this makes `fn` and `def` more similar, but they still
+  differ in other important ways.
+
 - Mojo now supports named result bindings. Named result bindings are useful for
   directly emplacing function results into the output slot of a function. This
   feature provides more flexibility and guarantees around emplacing the result
@@ -248,6 +283,16 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   #True 1.125 2
   ```
 
+- Added the builtin `input` function, which behaves the same as Python.
+  ([PR #3392](https://github.com/modularml/mojo/pull/3392) by [@thatstoasty](https://github.com/thatstoasty))
+
+  ```mojo
+  name = input("Enter your name: ")
+  print("Hello, " + name + "!")
+  ```
+
+  If the user enters "Mojo" it returns "Hello Mojo!"
+
 - Environment variable `MOJO_PYTHON` can be pointed to an executable to pin Mojo
   to a specific version:
 
@@ -377,6 +422,27 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
   The algorithm requires $$O(N)$$ auxiliary memory, if extra memory is failed to
   allocate, the program will crash.
+
+- The `mojo test` command now accepts a `--filter` option that will narrow the
+  set of tests collected and executed. The filter string is a POSIX extended
+  regular expression.
+
+- The `mojo test` command now supports using the same compilation options as
+  `mojo build`.
+
+- You can now debug unit tests using `mojo test` by passing the `--debug` flag.
+  Most debug flags are supported; run `mojo test --help` for a full listing.
+
+  Debugging doctests is not currently supported.
+
+- `UnsafePointer` now has an `alignment` parameter to specify the static
+  alignment of the pointer. Consequently, `UnsafePointer.alloc` no longer takes
+  in an alignment parameter, and the alignment should be specified in the type.
+
+  ```mojo
+  UnsafePointer[type].alloc[alignment](x) # now becomes
+  UnsafePointer[type, alignment].alloc(x)
+  ```
 
 ### 🦋 Changed
 
@@ -638,6 +704,15 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `bitcast, sizeof, simdwidthof, bitwidthof, alignof, external_call` and `abort`
   are removed from prelude.
 
+- The `simd_strided_load()` and `simd_strided_store()` have been renamed to
+  `strided_load` and `strided_store` in `UnsafePointer`.
+
+- `mojo test` now uses the Mojo compiler for running unit tests. This will resolve
+  compilation issues that sometimes appeared, and will also improve overall test
+  times, since we will only compile unit tests once before executing all of them.
+
+  These changes do not apply to doctests, due to their different semantics.
+
 ### ❌ Removed
 
 - Support for the legacy `fn __init__(...) -> Self:` form has been removed from
@@ -672,6 +747,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   ```mojo
   def foo(**kwargs): ...  # now works
   ```
+
+- [#1734](https://github.com/modularml/mojo/issues/1734) - Calling
+  `__copyinit__` on self causes crash.
 
 - [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
   `__setitem__` method is failing with a "must be mutable" error.

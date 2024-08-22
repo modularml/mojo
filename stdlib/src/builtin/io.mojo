@@ -46,9 +46,7 @@ fn _dup(fd: Int32) -> Int32:
 
 @value
 @register_passable("trivial")
-struct _fdopen:
-    alias STDOUT = 1
-    alias STDERR = 2
+struct _fdopen[mode: StringLiteral = "a"]:
     var handle: UnsafePointer[NoneType]
 
     fn __init__(inout self, stream_id: FileDescriptor):
@@ -57,26 +55,98 @@ struct _fdopen:
         Args:
             stream_id: The stream id
         """
-        alias mode = "a"
-        var handle: UnsafePointer[NoneType]
 
         @parameter
         if os_is_windows():
-            handle = external_call["_fdopen", UnsafePointer[NoneType]](
+            self.handle = external_call["_fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         else:
-            handle = external_call["fdopen", UnsafePointer[NoneType]](
+            self.handle = external_call["fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
-        self.handle = handle
 
     fn __enter__(self) -> Self:
+        """Open the file handle for use within a context manager"""
         return self
 
     fn __exit__(self):
         """Closes the file handle."""
         _ = external_call["fclose", Int32](self.handle)
+
+    fn readline(self) -> String:
+        """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
+
+        Returns:
+            The line read from the stdin.
+
+        Examples:
+
+        ```mojo
+        from builtin.io import _fdopen
+
+        var line = _fdopen["r"](0).readline()
+        print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+
+        # Output from print:
+        Hello, World
+        ```
+        .
+        """
+        return self.read_until_delimiter("\n")
+
+    fn read_until_delimiter(self, delimiter: String) -> String:
+        """Reads an entire line from a stream, up to the `delimiter`.
+        Does not include the delimiter in the result.
+
+        Args:
+            delimiter: The delimiter to read until.
+
+        Returns:
+            The text read from the stdin.
+
+        Examples:
+
+        ```mojo
+        from builtin.io import _fdopen
+
+        var line = _fdopen["r"](0).read_until_delimiter(",")
+        print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+
+        # Output from print:
+        Hello
+        ```
+        """
+        # getdelim will resize the buffer as needed.
+        var buffer = UnsafePointer[UInt8].alloc(1)
+        var bytes_read = external_call[
+            "getdelim",
+            Int,
+            UnsafePointer[UnsafePointer[UInt8]],
+            UnsafePointer[UInt32],
+            Int,
+            UnsafePointer[NoneType],
+        ](
+            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
+            UnsafePointer[UInt32].address_of(UInt32(1)),
+            ord(delimiter),
+            self.handle,
+        )
+        # Overwrite the delimiter with a null terminator.
+        buffer[bytes_read - 1] = 0
+        return String(buffer, bytes_read)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -401,3 +471,33 @@ fn print[
     if not triple_is_nvidia_cuda():
         if flush:
             _flush(file=file)
+
+
+# ===----------------------------------------------------------------------=== #
+#  input
+# ===----------------------------------------------------------------------=== #
+
+
+fn input(prompt: String = "") -> String:
+    """Reads a line of input from the user.
+
+    Reads a line from standard input, converts it to a string, and returns that string.
+    If the prompt argument is present, it is written to standard output without a trailing newline.
+
+    Args:
+        prompt: An optional string to be printed before reading input.
+
+    Returns:
+        A string containing the line read from the user input.
+
+    Examples:
+    ```mojo
+    name = input("Enter your name: ")
+    print("Hello", name)
+    ```
+
+    If the user enters "Mojo" it prints "Hello Mojo".
+    """
+    if prompt != "":
+        print(prompt, end="")
+    return _fdopen["r"](0).readline()

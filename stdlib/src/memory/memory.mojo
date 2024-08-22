@@ -406,8 +406,9 @@ fn _malloc[
     type: AnyType,
     /,
     *,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](size: Int, /, *, alignment: Int = -1) -> UnsafePointer[type, address_space]:
+](size: Int, /) -> UnsafePointer[type, address_space, alignment=alignment]:
     @parameter
     if triple_is_nvidia_cuda():
         constrained[

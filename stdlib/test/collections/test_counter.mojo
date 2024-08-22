@@ -387,6 +387,44 @@ def test_counter_setitem():
     assert_equal(c[3], 0)
 
 
+def test_neg():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = -2
+    c["c"] = 3
+
+    var neg = -c
+
+    assert_equal(neg["a"], 0)
+    assert_equal(neg["b"], 2)
+    assert_equal(neg["c"], 0)
+
+
+def test_or():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+
+    var c2 = Counter[String]()
+    c2["b"] = 3
+    c2["c"] = 4
+    c2["d"] = -1
+
+    var c3 = c1 | c2
+
+    assert_equal(c3["a"], 1)
+    assert_equal(c3["b"], 3)
+    assert_equal(c3["c"], 4)
+    assert_equal(c3["d"], 0)
+
+    c1 |= c2
+
+    assert_equal(c1["a"], 1)
+    assert_equal(c1["b"], 3)
+    assert_equal(c1["c"], 4)
+    assert_equal(c1["d"], 0)
+
+
 def test_pop():
     var counter = Counter[String]()
     counter["a"] = 1
@@ -440,6 +478,8 @@ def main():
     test_len()
     test_lt_le_gt_and_ge()
     test_most_common()
+    test_neg()
+    test_or()
     test_pop()
     test_popitem()
     test_substract()
