@@ -304,6 +304,8 @@ alias GOOD_SEQUENCES = List[String](
 )
 
 
+# TODO: later on, don't use String because
+# it will likely refuse non-utf8 data.
 alias BAD_SEQUENCES = List[String](
     "\xc3\x28",  # continuation bytes does not start with 10xx
     "\xa0\xa1",  # first byte is continuation byte
