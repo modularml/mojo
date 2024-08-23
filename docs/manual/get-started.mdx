@@ -8,57 +8,23 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import MaxInstall from '@site/src/components/MaxInstall';
 
-On this page, we'll show you how to create the classic "Hello
-world" starter program with Mojo, in three different ways. If you'd rather read
-how to write Mojo code beyond just printing text, see the [introduction to
-Mojo](/mojo/manual/basics).
+On this page, we'll show you how to create the classic "Hello world" starter
+program with Mojo. If you'd rather read how to write Mojo code, see the
+[introduction to Mojo](/mojo/manual/basics).
+
+By installing Mojo, you understand and agree to our [software
+license](https://www.modular.com/legal/max).
 
 ## 1. Create a new project
 
 To create a new Mojo project, we'll use [Magic](/magic)—a virtual environment
-manager and package manager (based on conda) that simplifies your development
-workflow. With just a couple commands, the `magic` command-line tool creates a
-new virtual environment that includes everything you need to get started with
-Mojo.
+manager and package manager based on conda.
 
-1. Install Magic on macOS and Ubuntu with this command:
+1. Install Magic on macOS or Ubuntu Linux with this command:
 
     <MaxInstall type="magic" />
 
-    Then run the appropriate `source` command for your terminal so that `magic`
-    is visible in your `PATH`:
-
-    <Tabs groupId="shell">
-      <TabItem value="bash" label="Bash">
-
-    ```sh
-    BASHRC=$( [ -f "$HOME/.bash_profile" ] && echo "$HOME/.bash_profile" || echo "$HOME/.bashrc" )
-    source "$BASHRC"
-    ```
-
-      </TabItem>
-      <TabItem value="zsh" label="ZSH">
-
-    ```sh
-    source ~/.zshrc
-    ```
-
-      </TabItem>
-      <TabItem value="fish" label="fish">
-
-    ```sh
-    source ~/.config/fish/config.fish
-    ```
-
-      </TabItem>
-      <TabItem value="tcsh" label="tcsh">
-
-    ```sh
-    source ~/.tcshrc
-    ```
-
-      </TabItem>
-    </Tabs>
+    Then run the `source` command printed in your terminal.
 
 2. Create a Mojo project called "hello-world":
 
