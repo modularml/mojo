@@ -190,14 +190,14 @@ fn test_utf8_validation() raises:
     Lorem Ipsum段落的纸张，从而广泛普及了它的使用。最近，计算机桌面出版软件
     למה אנו משתמשים בזה?
     זוהי עובדה מבוססת שדעתו של הקורא תהיה מוסחת על ידי טקטס קריא כאשר הוא יביט בפריסתו. המטרה בשימוש
-     ב- Lorem Ipsum הוא שיש לו פחות או יותר תפוצה של אותיות, בניגוד למלל ' יסוי 
+     ב- Lorem Ipsum הוא שיש לו פחות או יותר תפוצה של אותיות, בניגוד למלל ' יסוי
     יסוי  יסוי', ונותן חזות קריאה יותר.הרבה הוצאות מחשבים ועורכי דפי אינטרנט משתמשים כיום ב-
     Lorem Ipsum כטקסט ברירת המחדל שלהם, וחיפוש של 'lorem ipsum' יחשוף אתרים רבים בראשית
-    דרכם.גרסאות רבות נוצרו במהלך השנים, לעתים בשגגה 
-    Lorem Ipsum е едноставен модел на текст кој се користел во печатарската 
+    דרכם.גרסאות רבות נוצרו במהלך השנים, לעתים בשגגה
+    Lorem Ipsum е едноставен модел на текст кој се користел во печатарската
     индустрија.
     Lorem Ipsum - це текст-"риба", що використовується в друкарстві та дизайні.
-    Lorem Ipsum คือ เนื้อหาจำลองแบบเรียบๆ ที่ใช้กันในธุรกิจงานพิมพ์หรืองานเรียงพิมพ์ 
+    Lorem Ipsum คือ เนื้อหาจำลองแบบเรียบๆ ที่ใช้กันในธุรกิจงานพิมพ์หรืองานเรียงพิมพ์
     มันได้กลายมาเป็นเนื้อหาจำลองมาตรฐานของธุรกิจดังกล่าวมาตั้งแต่ศตวรรษที่
     Lorem ipsum" في أي محرك بحث ستظهر العديد
      من المواقع الحديثة العهد في نتائج البحث. على مدى السنين
@@ -291,6 +291,102 @@ def test_find():
     )
 
 
+alias GOOD_SEQUENCES = List[String](
+    "a",
+    "\xc3\xb1",
+    "\xe2\x82\xa1",
+    "\xf0\x90\x8c\xbc",
+    "안녕하세요, 세상",
+    "\xc2\x80",
+    "\xf0\x90\x80\x80",
+    "\xee\x80\x80",
+    "very very very long string 🔥🔥🔥",
+)
+
+
+# TODO: later on, don't use String because
+# it will likely refuse non-utf8 data.
+alias BAD_SEQUENCES = List[String](
+    "\xc3\x28",  # continuation bytes does not start with 10xx
+    "\xa0\xa1",  # first byte is continuation byte
+    "\xe2\x28\xa1",  # second byte should be continuation byte
+    "\xe2\x82\x28",  # third byte should be continuation byte
+    "\xf0\x28\x8c\xbc",  # second byte should be continuation byte
+    "\xf0\x90\x28\xbc",  # third byte should be continuation byte
+    "\xf0\x28\x8c\x28",  # fourth byte should be continuation byte
+    "\xc0\x9f",  # overlong, could be just one byte
+    "\xf5\xff\xff\xff",  # missing continuation bytes
+    "\xed\xa0\x81",  # UTF-16 surrogate pair
+    "\xf8\x90\x80\x80\x80",  # 5 bytes is too long
+    "123456789012345\xed",  # Continuation bytes are missing
+    "123456789012345\xf1",  # Continuation bytes are missing
+    "123456789012345\xc2",  # Continuation bytes are missing
+    "\xC2\x7F",  # second byte is not continuation byte
+    "\xce",  # Continuation byte missing
+    "\xce\xba\xe1",  # two continuation bytes missing
+    "\xce\xba\xe1\xbd",  # One continuation byte missing
+    "\xce\xba\xe1\xbd\xb9\xcf",  # fifth byte should be continuation byte
+    "\xce\xba\xe1\xbd\xb9\xcf\x83\xce",  # missing continuation byte
+    "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce",  # missing continuation byte
+    "\xdf",  # missing continuation byte
+    "\xef\xbf",  # missing continuation byte
+)
+
+
+fn validate_utf8(slice: String) -> Bool:
+    return _is_valid_utf8(slice.unsafe_ptr(), slice.byte_length())
+
+
+def test_good_utf8_sequences():
+    for sequence in GOOD_SEQUENCES:
+        assert_true(validate_utf8(sequence[]))
+
+
+def test_bad_utf8_sequences():
+    for sequence in BAD_SEQUENCES:
+        assert_false(validate_utf8(sequence[]))
+
+
+def test_combination_good_utf8_sequences():
+    # any combination of good sequences should be good
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(i, len(GOOD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] + GOOD_SEQUENCES[j]
+            assert_true(validate_utf8(sequence))
+
+
+def test_combination_bad_utf8_sequences():
+    # any combination of bad sequences should be bad
+    for i in range(0, len(BAD_SEQUENCES)):
+        for j in range(i, len(BAD_SEQUENCES)):
+            var sequence = BAD_SEQUENCES[i] + BAD_SEQUENCES[j]
+            assert_false(validate_utf8(sequence))
+
+
+def test_combination_good_bad_utf8_sequences():
+    # any combination of good and bad sequences should be bad
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(0, len(BAD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] + BAD_SEQUENCES[j]
+            assert_false(validate_utf8(sequence))
+
+
+def test_combination_10_good_utf8_sequences():
+    # any 10 combination of good sequences should be good
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(i, len(GOOD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] * 10 + GOOD_SEQUENCES[j] * 10
+            assert_true(validate_utf8(sequence))
+
+
+def test_combination_10_good_10_bad_utf8_sequences():
+    # any 10 combination of good and bad sequences should be bad
+    for i in range(0, len(GOOD_SEQUENCES)):
+        for j in range(0, len(BAD_SEQUENCES)):
+            var sequence = GOOD_SEQUENCES[i] * 10 + BAD_SEQUENCES[j] * 10
+            assert_false(validate_utf8(sequence))
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
@@ -300,3 +396,10 @@ fn main() raises:
     test_slice_bool()
     test_utf8_validation()
     test_find()
+    test_good_utf8_sequences()
+    test_bad_utf8_sequences()
+    test_combination_good_utf8_sequences()
+    test_combination_bad_utf8_sequences()
+    test_combination_good_bad_utf8_sequences()
+    test_combination_10_good_utf8_sequences()
+    test_combination_10_good_10_bad_utf8_sequences()
