@@ -91,26 +91,32 @@ fn _subtract_with_saturation[
 fn validate_chunk[
     simd_size: Int
 ](
-    currentBlock: SIMD[DType.uint8, simd_size],
-    inout prevInputBlock: SIMD[DType.uint8, simd_size],
+    current_block: SIMD[DType.uint8, simd_size],
+    previous_input_block: SIMD[DType.uint8, simd_size],
 ) -> SIMD[DType.uint8, simd_size]:
     alias v0f = SIMD[DType.uint8, simd_size](0x0F)
     alias v80 = SIMD[DType.uint8, simd_size](0x80)
     alias third_byte = 0b11100000 - 0x80
     alias fourth_byte = 0b11110000 - 0x80
-    var prev1 = extract_vector[simd_size - 1](prevInputBlock, currentBlock)
+    var prev1 = extract_vector[simd_size - 1](
+        previous_input_block, current_block
+    )
     var byte_1_high = shuf1.dynamic_shuffle(prev1 >> 4)
     var byte_1_low = shuf2.dynamic_shuffle(prev1 & v0f)
-    var byte_2_high = shuf3.dynamic_shuffle(currentBlock >> 4)
+    var byte_2_high = shuf3.dynamic_shuffle(current_block >> 4)
     var sc = byte_1_high & byte_1_low & byte_2_high
 
-    var prev2 = extract_vector[simd_size - 2](prevInputBlock, currentBlock)
-    var prev3 = extract_vector[simd_size - 3](prevInputBlock, currentBlock)
-    var isThirdByte = _subtract_with_saturation[third_byte](prev2)
-    var isFourthByte = _subtract_with_saturation[fourth_byte](prev3)
-    var must23 = isThirdByte | isFourthByte
-    var must23As80 = must23 & v80
-    return must23As80 ^ sc
+    var prev2 = extract_vector[simd_size - 2](
+        previous_input_block, current_block
+    )
+    var prev3 = extract_vector[simd_size - 3](
+        previous_input_block, current_block
+    )
+    var is_third_byte = _subtract_with_saturation[third_byte](prev2)
+    var is_fourth_byte = _subtract_with_saturation[fourth_byte](prev3)
+    var must23 = is_third_byte | is_fourth_byte
+    var must23_as_80 = must23 & v80
+    return must23_as_80 ^ sc
 
 
 fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
