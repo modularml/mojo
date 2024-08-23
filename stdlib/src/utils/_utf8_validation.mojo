@@ -11,7 +11,19 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Implement fast utf-8 validation using SIMD instructions."""
+"""Implement fast utf-8 validation using SIMD instructions.
+
+References for this algorithm:
+J. Keiser, D. Lemire, Validating UTF-8 In Less Than One Instruction Per Byte, 
+Software: Practice and Experience 51 (5), 2021
+https://arxiv.org/abs/2010.03090
+
+Blog post:
+https://lemire.me/blog/2018/10/19/validating-utf-8-bytes-using-only-0-45-cycles-per-byte-avx-edition/
+
+Code adapted from:
+https://github.com/simdutf/SimdUnicode/blob/main/src/UTF8.cs
+"""
 
 alias TOO_SHORT: UInt8 = 1 << 0
 alias TOO_LONG: UInt8 = 1 << 1
@@ -144,12 +156,7 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     U+10000..U+3FFFF   | F0         | ***90***..BF| 80..BF     | 80..BF      |
     U+40000..U+FFFFF   | F1..F3     | 80..BF      | 80..BF     | 80..BF      |
     U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
-    .
     """
-    # Reference for this algorithm:
-    # https://arxiv.org/abs/2010.03090
-    # https://lemire.me/blog/2018/10/19/validating-utf-8-bytes-using-only-0-45-cycles-per-byte-avx-edition/
-    # https://github.com/simdutf/SimdUnicode/blob/main/src/UTF8.cs
     alias simd_size = sys.simdbytewidth()
     var i: Int = 0
     var previous = SIMD[DType.uint8, simd_size]()
