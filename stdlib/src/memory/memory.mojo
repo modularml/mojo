@@ -309,7 +309,7 @@ fn memset[
 
 @always_inline
 fn memset_zero[
-    type: AnyType, address_space: AddressSpace
+    type: AnyType, address_space: AddressSpace, //
 ](ptr: UnsafePointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -322,6 +322,36 @@ fn memset_zero[
         count: Number of elements to fill (in elements, not bytes).
     """
     memset(ptr, 0, count)
+
+
+@always_inline
+fn memset_zero[
+    type: DType, address_space: AddressSpace, //, *, count: Int
+](ptr: UnsafePointer[Scalar[type], address_space]):
+    """Fills memory with zeros.
+
+    Parameters:
+        type: The element type.
+        address_space: The address space of the pointer.
+        count: Number of elements to fill (in elements, not bytes).
+
+    Args:
+        ptr: UnsafePointer to the beginning of the memory block to fill.
+    """
+    alias simd_width = simdwidthof[type]()
+    alias vector_end = _align_down(count, simd_width)
+
+    @parameter
+    if count > 128:
+        return memset_zero(ptr, count)
+
+    @parameter
+    for i in range(0, vector_end, simd_width):
+        ptr.store(i, SIMD[type, simd_width](0))
+
+    @parameter
+    for i in range(vector_end, count):
+        ptr.store(i, 0)
 
 
 # ===----------------------------------------------------------------------===#
