@@ -28,7 +28,7 @@ from sys import (
     external_call,
     simdwidthof,
 )
-
+from collections import Optional
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
 
@@ -390,6 +390,7 @@ fn stack_allocation[
     count: Int,
     type: AnyType,
     /,
+    name: Optional[StringLiteral] = None,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> UnsafePointer[type, address_space]:
@@ -399,6 +400,7 @@ fn stack_allocation[
     Parameters:
         count: Number of elements to allocate memory for.
         type: The data type of each element.
+        name: The name of the global variable (only honored in certain cases).
         alignment: Address alignment of the allocated data.
         address_space: The address space of the pointer.
 
@@ -411,7 +413,9 @@ fn stack_allocation[
         _GPUAddressSpace.SHARED,
         _GPUAddressSpace.PARAM,
     ):
+        alias global_name = name.value() if name else "_global_alloc"
         return __mlir_op.`pop.global_alloc`[
+            name = global_name.value,
             count = count.value,
             _type = UnsafePointer[type, address_space]._mlir_type,
             alignment = alignment.value,
