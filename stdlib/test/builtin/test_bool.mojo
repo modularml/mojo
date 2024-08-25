@@ -15,6 +15,10 @@
 from testing import assert_equal, assert_false, assert_true
 
 
+def test_default():
+    assert_equal(Bool(), False)
+
+
 def test_bool_cast_to_int():
     assert_equal(False.__int__(), 0)
     assert_equal(True.__int__(), 1)
@@ -146,6 +150,7 @@ def test_comparisons():
 
 
 def main():
+    test_default()
     test_bool_cast_to_int()
     test_bool_none()
     test_convert_from_implicitly_boolable()

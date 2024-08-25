@@ -293,10 +293,20 @@ def test_memset():
     assert_equal(buf0.load(0), 16843009)
     memset(buf0, -1, 2)
     assert_equal(buf0.load(0), -1)
+    buf0.free()
 
     var buf1 = UnsafePointer[Int8].alloc(2)
     memset(buf1, 5, 2)
     assert_equal(buf1.load(0), 5)
+    buf1.free()
+
+    var buf3 = UnsafePointer[Int32].alloc(2)
+    memset(buf3, 1, 2)
+    memset_zero[count=2](buf3)
+    assert_equal(buf3.load(0), 0)
+    assert_equal(buf3.load(1), 0)
+    buf3.free()
+
     _ = pair
 
 

@@ -190,14 +190,14 @@ fn test_utf8_validation() raises:
     Lorem Ipsum段落的纸张，从而广泛普及了它的使用。最近，计算机桌面出版软件
     למה אנו משתמשים בזה?
     זוהי עובדה מבוססת שדעתו של הקורא תהיה מוסחת על ידי טקטס קריא כאשר הוא יביט בפריסתו. המטרה בשימוש
-     ב- Lorem Ipsum הוא שיש לו פחות או יותר תפוצה של אותיות, בניגוד למלל ' יסוי 
+     ב- Lorem Ipsum הוא שיש לו פחות או יותר תפוצה של אותיות, בניגוד למלל ' יסוי
     יסוי  יסוי', ונותן חזות קריאה יותר.הרבה הוצאות מחשבים ועורכי דפי אינטרנט משתמשים כיום ב-
     Lorem Ipsum כטקסט ברירת המחדל שלהם, וחיפוש של 'lorem ipsum' יחשוף אתרים רבים בראשית
-    דרכם.גרסאות רבות נוצרו במהלך השנים, לעתים בשגגה 
-    Lorem Ipsum е едноставен модел на текст кој се користел во печатарската 
+    דרכם.גרסאות רבות נוצרו במהלך השנים, לעתים בשגגה
+    Lorem Ipsum е едноставен модел на текст кој се користел во печатарската
     индустрија.
     Lorem Ipsum - це текст-"риба", що використовується в друкарстві та дизайні.
-    Lorem Ipsum คือ เนื้อหาจำลองแบบเรียบๆ ที่ใช้กันในธุรกิจงานพิมพ์หรืองานเรียงพิมพ์ 
+    Lorem Ipsum คือ เนื้อหาจำลองแบบเรียบๆ ที่ใช้กันในธุรกิจงานพิมพ์หรืองานเรียงพิมพ์
     มันได้กลายมาเป็นเนื้อหาจำลองมาตรฐานของธุรกิจดังกล่าวมาตั้งแต่ศตวรรษที่
     Lorem ipsum" في أي محرك بحث ستظهر العديد
      من المواقع الحديثة العهد في نتائج البحث. على مدى السنين
@@ -347,40 +347,40 @@ def test_bad_utf8_sequences():
         assert_false(validate_utf8(sequence[]))
 
 
-def test_combinaison_good_utf8_sequences():
-    # any combinaison of good sequences should be good
+def test_combination_good_utf8_sequences():
+    # any combination of good sequences should be good
     for i in range(0, len(GOOD_SEQUENCES)):
         for j in range(i, len(GOOD_SEQUENCES)):
             var sequence = GOOD_SEQUENCES[i] + GOOD_SEQUENCES[j]
             assert_true(validate_utf8(sequence))
 
 
-def test_combinaison_bad_utf8_sequences():
-    # any combinaison of bad sequences should be bad
+def test_combination_bad_utf8_sequences():
+    # any combination of bad sequences should be bad
     for i in range(0, len(BAD_SEQUENCES)):
         for j in range(i, len(BAD_SEQUENCES)):
             var sequence = BAD_SEQUENCES[i] + BAD_SEQUENCES[j]
             assert_false(validate_utf8(sequence))
 
 
-def test_combinaison_good_bad_utf8_sequences():
-    # any combinaison of good and bad sequences should be bad
+def test_combination_good_bad_utf8_sequences():
+    # any combination of good and bad sequences should be bad
     for i in range(0, len(GOOD_SEQUENCES)):
         for j in range(0, len(BAD_SEQUENCES)):
             var sequence = GOOD_SEQUENCES[i] + BAD_SEQUENCES[j]
             assert_false(validate_utf8(sequence))
 
 
-def test_combinaison_10_good_utf8_sequences():
-    # any 10 combinaison of good sequences should be good
+def test_combination_10_good_utf8_sequences():
+    # any 10 combination of good sequences should be good
     for i in range(0, len(GOOD_SEQUENCES)):
         for j in range(i, len(GOOD_SEQUENCES)):
             var sequence = GOOD_SEQUENCES[i] * 10 + GOOD_SEQUENCES[j] * 10
             assert_true(validate_utf8(sequence))
 
 
-def test_combinaison_10_good_10_bad_utf8_sequences():
-    # any 10 combinaison of good and bad sequences should be bad
+def test_combination_10_good_10_bad_utf8_sequences():
+    # any 10 combination of good and bad sequences should be bad
     for i in range(0, len(GOOD_SEQUENCES)):
         for j in range(0, len(BAD_SEQUENCES)):
             var sequence = GOOD_SEQUENCES[i] * 10 + BAD_SEQUENCES[j] * 10
@@ -398,8 +398,8 @@ fn main() raises:
     test_find()
     test_good_utf8_sequences()
     test_bad_utf8_sequences()
-    test_combinaison_good_utf8_sequences()
-    test_combinaison_bad_utf8_sequences()
-    test_combinaison_good_bad_utf8_sequences()
-    test_combinaison_10_good_utf8_sequences()
-    test_combinaison_10_good_10_bad_utf8_sequences()
+    test_combination_good_utf8_sequences()
+    test_combination_bad_utf8_sequences()
+    test_combination_good_bad_utf8_sequences()
+    test_combination_10_good_utf8_sequences()
+    test_combination_10_good_10_bad_utf8_sequences()
