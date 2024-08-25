@@ -30,7 +30,7 @@ from builtin._location import __call_location, _SourceLocation
 
 
 @always_inline
-fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
+fn _assert_error[T: Stringable, //](msg: T, loc: _SourceLocation) -> String:
     return loc.prefix("AssertionError: " + str(msg))
 
 
@@ -95,7 +95,7 @@ trait Testable(EqualityComparable, Stringable):
 
 @always_inline
 fn assert_equal[
-    T: Testable
+    T: Testable, //
 ](
     lhs: T,
     rhs: T,
@@ -124,33 +124,7 @@ fn assert_equal[
         )
 
 
-# TODO: Remove the String and SIMD overloads once we have more powerful traits.
-@always_inline
-fn assert_equal(
-    lhs: String,
-    rhs: String,
-    msg: String = "",
-    *,
-    location: Optional[_SourceLocation] = None,
-) raises:
-    """Asserts that the input values are equal. If it is not then an Error
-    is raised.
-
-    Args:
-        lhs: The lhs of the equality.
-        rhs: The rhs of the equality.
-        msg: The message to be printed if the assertion fails.
-        location: The location of the error (default to the `__call_location`).
-
-    Raises:
-        An Error with the provided message if assert fails and `None` otherwise.
-    """
-    if lhs != rhs:
-        raise _assert_cmp_error["`left == right` comparison"](
-            lhs, rhs, msg=msg, loc=location.or_else(__call_location())
-        )
-
-
+# TODO: Remove the SIMD overloads once we have more powerful traits.
 @always_inline
 fn assert_equal[
     type: DType, size: Int
@@ -215,34 +189,8 @@ fn assert_not_equal[
 
 
 @always_inline
-fn assert_not_equal(
-    lhs: String,
-    rhs: String,
-    msg: String = "",
-    *,
-    location: Optional[_SourceLocation] = None,
-) raises:
-    """Asserts that the input values are not equal. If it is not then an
-    an Error is raised.
-
-    Args:
-        lhs: The lhs of the inequality.
-        rhs: The rhs of the inequality.
-        msg: The message to be printed if the assertion fails.
-        location: The location of the error (default to the `__call_location`).
-
-    Raises:
-        An Error with the provided message if assert fails and `None` otherwise.
-    """
-    if lhs == rhs:
-        raise _assert_cmp_error["`left != right` comparison"](
-            lhs, rhs, msg=msg, loc=location.or_else(__call_location())
-        )
-
-
-@always_inline
 fn assert_not_equal[
-    type: DType, size: Int
+    type: DType, size: Int, //
 ](
     lhs: SIMD[type, size],
     rhs: SIMD[type, size],
@@ -274,7 +222,7 @@ fn assert_not_equal[
 
 @always_inline
 fn assert_almost_equal[
-    type: DType, size: Int
+    type: DType, size: Int, //
 ](
     lhs: SIMD[type, size],
     rhs: SIMD[type, size],
