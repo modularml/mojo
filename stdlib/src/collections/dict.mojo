@@ -47,6 +47,13 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
     pass
 
 
+trait CachedKeyElement(KeyElement, CachedHashable):
+    """A trait composition for types which implement all requirements of
+    dictionary keys and CachedHashable."""
+
+    pass
+
+
 trait RepresentableKeyElement(KeyElement, Representable):
     """A trait composition for types which implement all requirements of
     dictionary keys and Stringable."""
@@ -361,8 +368,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     #
     # - Performance and size are heavily optimized for small dictionaries, but can
     #     scale to large dictionaries.
-    # - Insertion order is implicitly preserved. Once `__iter__` is implemented
-    #     it will return a deterministic order based on insertion.
+    # - Insertion order is implicitly preserved.
     # - To achieve this, elements are stored in a dense array. Inserting a new
     #     element will append it to the entry list, and then that index will be stored
     #     in the dict's index hash map. Removing an element updates that index to
@@ -750,6 +756,29 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return entry[].value().value
         raise "KeyError"
 
+    fn _find_ref(
+        ref [_]self: Self, inout key: CachedKeyElement
+    ) raises -> ref [__lifetime_of(self)] Self.V:
+        """Find a value in the dictionary by key.
+
+        Args:
+            key: The key to search for in the dictionary.
+
+        Returns:
+            An optional value containing a reference to the value if it is
+            present, otherwise an empty Optional.
+        """
+        var hash: UInt = cached_hash(key)
+        var found: Bool
+        var slot: Int
+        var index: Int
+        found, slot, index = self._find_index(hash, key)
+        if found:
+            var entry = Reference(self._entries[index])
+            debug_assert(entry[].__bool__(), "entry in index must be full")
+            return entry[].value().value
+        raise "KeyError"
+
     fn get(self, key: K) -> Optional[V]:
         """Get a value from the dictionary by key.
 
@@ -964,6 +993,24 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._next_index_slot(slot, perturb)
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
+        # Return (found, slot, index)
+        var slot = hash & (self._reserved() - 1)
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
+            var index = self._get_index(slot)
+            if index == Self.EMPTY:
+                return (False, slot, self._n_entries)
+            elif index == Self.REMOVED:
+                pass
+            else:
+                var entry = self._entries[index]
+                debug_assert(entry.__bool__(), "entry in index must be full")
+                if hash == entry.value().hash and key == entry.value().key:
+                    return (True, slot, index)
+            self._next_index_slot(slot, perturb)
+
+    # TODO: refactor code to reuse part of the _find_index method
+    fn _find_index(self, hash: Int, key: CachedKeyElement) -> (Bool, Int, Int):
         # Return (found, slot, index)
         var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))

@@ -95,6 +95,16 @@ trait Hashable:
         ...
 
 
+trait CachedHashable:
+    fn __cached_hash__(inout self: Self) -> UInt:
+        """Return a 64-bit hash of the type's data.
+
+        Returns:
+            A 64-bit integer hash of this instance's data.
+        """
+        ...
+
+
 fn hash[T: Hashable](hashable: T) -> UInt:
     """Hash a Hashable type using its underlying hash implementation.
 
@@ -108,6 +118,21 @@ fn hash[T: Hashable](hashable: T) -> UInt:
         A 64-bit integer hash based on the underlying implementation.
     """
     return hashable.__hash__()
+
+
+fn cached_hash[T: CachedHashable](inout hashable: T) -> UInt:
+    """Hash a Hashable type using its underlying hash implementation.
+
+    Parameters:
+        T: Any Hashable type.
+
+    Args:
+        hashable: The input data to hash.
+
+    Returns:
+        A 64-bit integer hash based on the underlying implementation.
+    """
+    return hashable.__cached_hash__()
 
 
 fn _djbx33a_init[type: DType, size: Int]() -> SIMD[type, size]:

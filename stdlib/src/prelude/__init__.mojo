@@ -35,7 +35,7 @@ from builtin.file import open, FileHandle
 from builtin.file_descriptor import FileDescriptor
 from builtin.float_literal import FloatLiteral
 from builtin.format_int import bin, hex, oct
-from builtin.hash import hash, Hashable
+from builtin.hash import cached_hash, hash, CachedHashable, Hashable
 from builtin.identifiable import Identifiable, StringableIdentifiable
 from builtin.int import (
     Int,

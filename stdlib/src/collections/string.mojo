@@ -680,6 +680,7 @@ struct String(
     Sized,
     Stringable,
     Representable,
+    CachedHashable,
     IntableRaising,
     KeyElement,
     Comparable,
@@ -694,6 +695,8 @@ struct String(
     alias _buffer_type = List[UInt8, hint_trivial_type=True]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
+    var _hash: Optional[Int]
+    """The cached hash value of the string."""
 
     """ Useful string aliases. """
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
@@ -741,11 +744,13 @@ struct String(
         self._buffer = Self._buffer_type(
             unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
         )
+        self._hash = None
 
     @always_inline
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+        self._hash = None
 
     fn __init__(inout self, *, other: Self):
         """Explicitly copy the provided value.
@@ -826,6 +831,7 @@ struct String(
             existing: The string to copy.
         """
         self._buffer = existing._buffer
+        self._hash = existing._hash
 
     @always_inline
     fn __moveinit__(inout self, owned existing: String):
@@ -835,6 +841,7 @@ struct String(
             existing: The string to move.
         """
         self._buffer = existing._buffer^
+        self._hash = existing._hash^
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
@@ -1789,7 +1796,23 @@ struct String(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
+        if self._hash:
+            return self._hash.value()
         return hash(self._strref_dangerous())
+
+    fn __cached_hash__(inout self) -> UInt:
+        """Hash the underlying buffer using builtin hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures. See the `hash`
+            builtin documentation for more details.
+        """
+        if self._hash:
+            return self._hash.value()
+        var h = hash(self._strref_dangerous())
+        self._hash = h
+        return h
 
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()
