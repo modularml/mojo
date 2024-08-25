@@ -748,6 +748,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   def foo(**kwargs): ...  # now works
   ```
 
+- Mojo now prints `ref` arguments and results in generated documentation
+  correctly.
+
 - [#1734](https://github.com/modularml/mojo/issues/1734) - Calling
   `__copyinit__` on self causes crash.
 
