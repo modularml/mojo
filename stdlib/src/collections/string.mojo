@@ -419,6 +419,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     var result: Float64 = 0.0
     var exponent: Int = 0
     var sign: Int = 1
+    var dec: Int = 0
 
     alias ord_0 = UInt8(ord("0"))
     alias ord_9 = UInt8(ord("9"))
@@ -492,13 +493,17 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     # apply shift
     # NOTE: Instead of `var result *= 10.0 ** exponent`, we calculate a positive
     # integer factor as shift and multiply or divide by it based on the shift
-    # direction. This allows for better precision.
+    # direction. This allows for better precision. Do this in a loop to ensure `shift` does not overflow.
     # TODO: investigate if there is a floating point arithmetic problem.
-    var shift: Int = 10 ** abs(exponent)
-    if exponent > 0:
-        result *= shift
-    if exponent < 0:
-        result /= shift
+    while exponent != 0:
+        var cur_exp: Int = min(abs(exponent), 18)
+        var shift: Int = 10**cur_exp
+        if exponent > 0:
+            result *= shift
+            exponent -= cur_exp
+        if exponent < 0:
+            result /= shift
+            exponent += cur_exp
     # apply sign
     return result * sign
 

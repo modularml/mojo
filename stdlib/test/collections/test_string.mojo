@@ -510,6 +510,17 @@ def test_atof():
     assert_equal(0.78, atof(String(" .78 ")))
     assert_equal(121234.0, atof(String(" 121234.  ")))
     assert_equal(985031234.0, atof(String(" 985031234.F  ")))
+    assert_equal(3.5e18, atof(String("3.5e18")))
+    assert_equal(3.5e19, atof(String("3.5e19")))
+    assert_equal(3.5e20, atof(String("3.5e20")))
+    assert_equal(3.5e21, atof(String("3.5e21")))
+
+    assert_equal(3.5e-15, atof(String("3.5e-15")))
+    assert_equal(3.5e-16, atof(String("3.5e-16")))
+    assert_equal(3.5e-17, atof(String("3.5e-17")))
+    assert_equal(3.5e-18, atof(String("3.5e-18")))
+    assert_equal(3.5e-19, atof(String("3.5e-19")))
+
     assert_equal(FloatLiteral.negative_zero, atof(String("-0")))
     assert_equal(FloatLiteral.nan, atof(String("  nan")))
     assert_equal(FloatLiteral.infinity, atof(String(" inf ")))
