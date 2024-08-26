@@ -642,45 +642,8 @@ struct UnsafePointer[
 
     @always_inline("nodebug")
     fn gather[
-        type: DType,
+        type: DType, //,
         *,
-        width: Int = 1,
-        alignment: Int = alignof[
-            SIMD[type, width]
-        ]() if triple_is_nvidia_cuda() else 1,
-    ](self: UnsafePointer[Scalar[type], *_], offset: SIMD[_, width]) -> SIMD[
-        type, width
-    ]:
-        """Gathers a SIMD vector from offsets of the current pointer.
-
-        This method loads from memory addresses calculated by appropriately
-        shifting the current pointer according to the `offset` SIMD vector.
-
-        Constraints:
-            The offset type must be an integral type.
-            The alignment must be a power of two integer value.
-
-        Parameters:
-            type: DType of the return SIMD.
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The SIMD vector of offsets to gather from.
-
-        Returns:
-            The SIMD vector containing the gathered values.
-        """
-        var mask = SIMD[DType.bool, width](True)
-        var default = SIMD[type, width]()
-        return self.gather[width=width, alignment=alignment](
-            offset, mask, default
-        )
-
-    @always_inline("nodebug")
-    fn gather[
-        *,
-        type: DType,
         width: Int = 1,
         alignment: Int = alignof[
             SIMD[type, width]
@@ -688,8 +651,8 @@ struct UnsafePointer[
     ](
         self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
-        mask: SIMD[DType.bool, width],
-        default: SIMD[type, width],
+        mask: SIMD[DType.bool, width] = True,
+        default: SIMD[type, width] = 0,
     ) -> SIMD[type, width]:
         """Gathers a SIMD vector from offsets of the current pointer.
 
@@ -736,8 +699,8 @@ struct UnsafePointer[
 
     @always_inline("nodebug")
     fn scatter[
+        type: DType, //,
         *,
-        type: DType,
         width: Int = 1,
         alignment: Int = alignof[
             SIMD[type, width]
@@ -746,45 +709,7 @@ struct UnsafePointer[
         self: UnsafePointer[Scalar[type], *_],
         offset: SIMD[_, width],
         val: SIMD[type, width],
-    ):
-        """Scatters a SIMD vector into offsets of the current pointer.
-
-        This method stores at memory addresses calculated by appropriately
-        shifting the current pointer according to the `offset` SIMD vector.
-
-        If the same offset is targeted multiple times, the values are stored
-        in the order they appear in the `val` SIMD vector, from the first to
-        the last element.
-
-        Constraints:
-            The offset type must be an integral type.
-            The alignment must be a power of two integer value.
-
-        Parameters:
-            type: DType of `value`, the result SIMD buffer.
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The SIMD vector of offsets to scatter into.
-            val: The SIMD vector containing the values to be scattered.
-        """
-        var mask = SIMD[DType.bool, width](True)
-        self.scatter[width=width, alignment=alignment](offset, val, mask)
-
-    @always_inline("nodebug")
-    fn scatter[
-        *,
-        type: DType,
-        width: Int = 1,
-        alignment: Int = alignof[
-            SIMD[type, width]
-        ]() if triple_is_nvidia_cuda() else 1,
-    ](
-        self: UnsafePointer[Scalar[type], *_],
-        offset: SIMD[_, width],
-        val: SIMD[type, width],
-        mask: SIMD[DType.bool, width],
+        mask: SIMD[DType.bool, width] = True,
     ):
         """Scatters a SIMD vector into offsets of the current pointer.
 
@@ -871,11 +796,7 @@ struct UnsafePointer[
             A new UnsafePointer object with the specified type and the same address,
             as the original UnsafePointer.
         """
-        return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[
-                Scalar[T], address_space, alignment=alignment
-            ]._mlir_type,
-        ](self.address)
+        return self.bitcast[Scalar[T], address_space]()
 
     @always_inline
     fn destroy_pointee(self: UnsafePointer[T, alignment=alignment]):
