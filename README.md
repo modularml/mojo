@@ -88,7 +88,10 @@ For more general questions or to chat with other Mojo developers, check out our
 
 ## License
 
-This repository and its contributions are licensed under the Apache License v2.0 with LLVM Exceptions (see the LLVM [License](https://llvm.org/LICENSE.txt)). MAX and Mojo usage and distribution are licensed under the [MAX & Mojo Community License](https://www.modular.com/legal/max-mojo-license).
+This repository and its contributions are licensed under the Apache License v2.0 
+with LLVM Exceptions (see the LLVM [License](https://llvm.org/LICENSE.txt)). 
+MAX and Mojo usage and distribution are licensed under the 
+[MAX & Mojo Community License](https://www.modular.com/legal/max-mojo-license).
 
 ## Thanks to our contributors
 
