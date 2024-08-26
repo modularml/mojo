@@ -101,6 +101,7 @@ trait ImplicitlyBoolable(Boolable):
 struct Bool(
     CollectionElementNew,
     ComparableCollectionElement,
+    Defaultable,
     ImplicitlyBoolable,
     Indexer,
     Intable,
@@ -112,6 +113,11 @@ struct Bool(
 
     var value: __mlir_type.i1
     """The underlying storage of the boolean value."""
+
+    @always_inline("nodebug")
+    fn __init__(inout self):
+        """Construct a default, `False` Bool."""
+        self = False
 
     @always_inline("nodebug")
     fn __init__(inout self, *, other: Self):
