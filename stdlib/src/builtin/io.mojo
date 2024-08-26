@@ -300,90 +300,12 @@ fn _float_repr[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
-fn _put(x: Int, file: FileDescriptor = stdout):
-    """Prints a scalar value.
-
-    Args:
-        x: The value to print.
-        file: The output stream.
-    """
-    _printf[_get_dtype_printf_format[DType.index]()](x, file=file)
-
-
-@no_inline
-fn _put_simd_scalar[type: DType](x: Scalar[type]):
-    """Prints a scalar value.
-
-    Parameters:
-        type: The DType of the value.
-
-    Args:
-        x: The value to print.
-    """
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if type is DType.bool:
-        _put["True"]() if x else _put["False"]()
-    elif type.is_integral():
-        _printf[format](x)
-    elif type.is_floating_point():
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            _printf[format](x.cast[DType.float64]())
-        else:
-            _put(str(x).as_string_slice())
-    else:
-        constrained[False, "invalid dtype"]()
-
-
-@no_inline
-fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
-    """Prints a scalar value.
-
-    Parameters:
-        type: The DType of the value.
-        simd_width: The SIMD width.
-
-    Args:
-        x: The value to print.
-    """
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if simd_width == 1:
-        _put_simd_scalar(x[0])
-    elif type.is_integral():
-        _put["["]()
-
-        @parameter
-        for i in range(simd_width):
-            _put_simd_scalar(x[i])
-            if i != simd_width - 1:
-                _put[", "]()
-        _put["]"]()
-    else:
-        _put(str(x).as_string_slice())
-
-
-@no_inline
-fn _put[x: StringLiteral](file: FileDescriptor = stdout):
-    _put(x.as_string_slice(), file=file)
-
-
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
     var str_slice = StringSlice[ImmutableStaticLifetime](
         unsafe_from_utf8_strref=strref
     )
 
     _put(str_slice, file=file)
-
-
-@no_inline
-fn _put(x: DType, file: FileDescriptor = stdout):
-    _put(str(x).as_string_slice(), file=file)
 
 
 @no_inline
