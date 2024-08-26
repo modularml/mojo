@@ -1940,7 +1940,7 @@ struct SIMD[type: DType, size: Int](
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
     @always_inline
-    fn dynamic_shuffle[
+    fn _dynamic_shuffle[
         mask_size: Int, //
     ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
         """Shuffles (also called blend) the values of the current vector.
@@ -1993,7 +1993,7 @@ struct SIMD[type: DType, size: Int](
             if mask_size < target_mask_size:
                 # Make a bigger mask (x2) and retry
                 var new_mask = mask.join(SIMD[DType.uint8, mask_size]())
-                return self.dynamic_shuffle(new_mask).slice[mask_size]()
+                return self._dynamic_shuffle(new_mask).slice[mask_size]()
             elif mask_size == target_mask_size:
                 # The compiler isn't smart enough yet. It complains about parameter mismatch
                 # because it cannot narrow them. Let's help it a bit.
@@ -2008,8 +2008,8 @@ struct SIMD[type: DType, size: Int](
                     mask_size // 2, offset = mask_size // 2
                 ]()
 
-                var first_result = self.dynamic_shuffle(first_half_of_mask)
-                var second_result = self.dynamic_shuffle(second_half_of_mask)
+                var first_result = self._dynamic_shuffle(first_half_of_mask)
+                var second_result = self._dynamic_shuffle(second_half_of_mask)
 
                 var result = first_result.join(second_result)
                 # The compiler doesn't understand that if divide by 2 and then multiply by 2,
