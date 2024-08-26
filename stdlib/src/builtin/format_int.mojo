@@ -305,7 +305,7 @@ fn _try_write_int[
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.write_str["-"]()
+        fmt.write_str("-")
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.

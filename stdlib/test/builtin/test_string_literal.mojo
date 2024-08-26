@@ -167,6 +167,15 @@ def test_layout():
     assert_equal(ptr[5], 0)  # Verify NUL terminated
 
 
+def test_lower_upper():
+    assert_equal("hello".lower(), "hello")
+    assert_equal("HELLO".lower(), "hello")
+    assert_equal("Hello".lower(), "hello")
+    assert_equal("hello".upper(), "HELLO")
+    assert_equal("HELLO".upper(), "HELLO")
+    assert_equal("Hello".upper(), "HELLO")
+
+
 def test_repr():
     # Usual cases
     assert_equal(StringLiteral.__repr__("hello"), "'hello'")
@@ -200,4 +209,5 @@ def main():
     test_hash()
     test_intable()
     test_layout()
+    test_lower_upper()
     test_repr()
