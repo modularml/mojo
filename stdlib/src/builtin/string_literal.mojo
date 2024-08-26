@@ -405,3 +405,23 @@ struct StringLiteral(
             result += str(e[])
 
         return result
+
+    fn lower(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to lowercase.
+
+        Returns:
+            A new string where cased letters have been converted to lowercase.
+        """
+
+        return str(self).lower()
+
+    fn upper(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to uppercase.
+
+        Returns:
+            A new string where cased letters have been converted to uppercase.
+        """
+
+        return str(self).upper()
