@@ -226,6 +226,16 @@ struct Span[
 
         return self._data
 
+    fn as_ref(self) -> Reference[T, lifetime]:
+        """
+        Gets a Reference to the first element of this slice.
+
+        Returns:
+            A Reference pointing at the first element of this slice.
+        """
+
+        return self._data[0]
+
     @always_inline
     fn copy_from[
         lifetime: MutableLifetime, //
