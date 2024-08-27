@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from .compare_utils import compare
 from .test_utils import libm_call
 from .types import (
     CopyCounter,
