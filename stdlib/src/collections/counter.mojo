@@ -10,7 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Defines the `Counter` type.
 
+You can import these APIs from the `collections` package. For example:
+
+```mojo
+from collections import Counter
+```
+"""
 from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
 from utils import Variant
 
