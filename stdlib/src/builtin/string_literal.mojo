@@ -406,6 +406,51 @@ struct StringLiteral(
 
         return result
 
+    fn join(self, *elems: Int) -> String:
+        """Joins the elements from the tuple using the current string literal as a
+        delimiter.
+
+        Args:
+            elems: The input tuple.
+
+        Returns:
+            The joined string.
+        """
+        if len(elems) == 0:
+            return ""
+        var curr = str(elems[0])
+        for i in range(1, len(elems)):
+            curr += self + str(elems[i])
+        return curr
+
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            Types: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        var result: String = ""
+        var is_first = True
+
+        @parameter
+        fn add_elt[T: Stringable](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(a)
+
+        elems.each[add_elt]()
+        _ = is_first
+        return result
+
     fn lower(self) -> String:
         """Returns a copy of the string literal with all cased characters
         converted to lowercase.

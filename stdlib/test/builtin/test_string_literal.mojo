@@ -149,6 +149,20 @@ def test_intable():
         _ = StringLiteral.__int__("hi")
 
 
+def test_join():
+    assert_equal("".join(), "")
+    assert_equal("".join("a", "b", "c"), "abc")
+    assert_equal(" ".join("a", "b", "c"), "a b c")
+    assert_equal(" ".join("a", "b", "c", ""), "a b c ")
+    assert_equal(" ".join("a", "b", "c", " "), "a b c  ")
+
+    var sep = ","
+    var s = String("abc")
+    assert_equal(sep.join(s, s, s, s), "abc,abc,abc,abc")
+    assert_equal(sep.join(1, 2, 3), "1,2,3")
+    assert_equal(sep.join(1, "abc", 3), "1,abc,3")
+
+
 def test_layout():
     # Test empty StringLiteral contents
     var empty = "".unsafe_ptr()
@@ -203,6 +217,7 @@ def main():
     test_bool()
     test_contains()
     test_find()
+    test_join()
     test_rfind()
     test_replace()
     test_comparison_operators()
