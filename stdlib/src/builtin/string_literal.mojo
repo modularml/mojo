@@ -369,6 +369,19 @@ struct StringLiteral(
         """
         return StringRef(self).rfind(substr, start=start)
 
+    fn replace(self, old: StringLiteral, new: StringLiteral) -> StringLiteral:
+        """Return a copy of the string with all occurrences of substring `old`
+        if replaced by `new`. This operation only works in the param domain.
+
+        Args:
+            old: The substring to replace.
+            new: The substring to replace with.
+
+        Returns:
+            The string where all occurrences of `old` are replaced with `new`.
+        """
+        return __mlir_op.`pop.string.replace`(self.value, old.value, new.value)
+
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -392,3 +405,23 @@ struct StringLiteral(
             result += str(e[])
 
         return result
+
+    fn lower(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to lowercase.
+
+        Returns:
+            A new string where cased letters have been converted to lowercase.
+        """
+
+        return str(self).lower()
+
+    fn upper(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to uppercase.
+
+        Returns:
+            A new string where cased letters have been converted to uppercase.
+        """
+
+        return str(self).upper()

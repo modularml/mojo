@@ -20,6 +20,7 @@ from utils import StringSlice
 ```
 """
 
+from bit import count_leading_zeros
 from utils import Span
 from collections.string import _isspace
 from collections import List
@@ -28,29 +29,6 @@ from sys import simdwidthof, bitwidthof
 
 alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
-
-
-fn _count_leading_zeros(b: SIMD[DType.uint8, _], /) -> __type_of(b):
-    var res = __type_of(b)()
-
-    @parameter
-    for i in range(b.size):
-        var x = b[i]
-        if x == 0:
-            res[i] = bitwidthof[DType.uint8]()
-            continue
-        var n = Scalar[DType.uint8](0)
-        if (x & 0xF0) == 0:
-            n += 4
-            x <<= 4
-        if (x & 0xC0) == 0:
-            n += 2
-            x <<= 2
-        if (x & 0x80) == 0:
-            n += 1
-            x <<= 1
-        res[i] = n
-    return res
 
 
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
@@ -67,7 +45,7 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
         - 3 -> start of 3 byte long sequence.
         - 4 -> start of 4 byte long sequence.
     """
-    return _count_leading_zeros(~(b & UInt8(0b1111_0000)))
+    return count_leading_zeros(~(b & UInt8(0b1111_0000)))
 
 
 fn _validate_utf8_simd_slice[
@@ -97,7 +75,7 @@ fn _validate_utf8_simd_slice[
 
         @parameter
         if not remainder:
-            d = ptr.offset(idx).simd_strided_load[DType.uint8, width](1)
+            d = ptr.load[width=width](idx)
         else:
             debug_assert(iter_len > -1, "iter_len must be > -1")
             d = SIMD[DType.uint8, width](0)
@@ -345,19 +323,15 @@ struct StringSlice[
     # Initializers
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self, literal: StringLiteral):
+    @always_inline
+    fn __init__(
+        inout self: StringSlice[ImmutableStaticLifetime], lit: StringLiteral
+    ):
         """Construct a new string slice from a string literal.
 
         Args:
-            literal: The literal to construct this string slice from.
+            lit: The literal to construct this string slice from.
         """
-
-        # Its not legal to try to mutate a StringLiteral. String literals are
-        # static data.
-        constrained[
-            not is_mutable, "cannot create mutable StringSlice of StringLiteral"
-        ]()
-
         # Since a StringLiteral has static lifetime, it will outlive
         # whatever arbitrary `lifetime` the user has specified they need this
         # slice to live for.
@@ -370,8 +344,8 @@ struct StringSlice[
         #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[lifetime](
-            unsafe_from_utf8_ptr=literal.unsafe_ptr(), len=literal.byte_length()
+        self = StringSlice[ImmutableStaticLifetime](
+            unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 
     @always_inline

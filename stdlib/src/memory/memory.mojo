@@ -28,7 +28,7 @@ from sys import (
     external_call,
     simdwidthof,
 )
-
+from collections import Optional
 from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
 
@@ -309,7 +309,7 @@ fn memset[
 
 @always_inline
 fn memset_zero[
-    type: AnyType, address_space: AddressSpace
+    type: AnyType, address_space: AddressSpace, //
 ](ptr: UnsafePointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -322,6 +322,36 @@ fn memset_zero[
         count: Number of elements to fill (in elements, not bytes).
     """
     memset(ptr, 0, count)
+
+
+@always_inline
+fn memset_zero[
+    type: DType, address_space: AddressSpace, //, *, count: Int
+](ptr: UnsafePointer[Scalar[type], address_space]):
+    """Fills memory with zeros.
+
+    Parameters:
+        type: The element type.
+        address_space: The address space of the pointer.
+        count: Number of elements to fill (in elements, not bytes).
+
+    Args:
+        ptr: UnsafePointer to the beginning of the memory block to fill.
+    """
+    alias simd_width = simdwidthof[type]()
+    alias vector_end = _align_down(count, simd_width)
+
+    @parameter
+    if count > 128:
+        return memset_zero(ptr, count)
+
+    @parameter
+    for i in range(0, vector_end, simd_width):
+        ptr.store(i, SIMD[type, simd_width](0))
+
+    @parameter
+    for i in range(vector_end, count):
+        ptr.store(i, 0)
 
 
 # ===----------------------------------------------------------------------===#
@@ -360,6 +390,7 @@ fn stack_allocation[
     count: Int,
     type: AnyType,
     /,
+    name: Optional[StringLiteral] = None,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> UnsafePointer[type, address_space]:
@@ -369,6 +400,7 @@ fn stack_allocation[
     Parameters:
         count: Number of elements to allocate memory for.
         type: The data type of each element.
+        name: The name of the global variable (only honored in certain cases).
         alignment: Address alignment of the allocated data.
         address_space: The address space of the pointer.
 
@@ -381,7 +413,9 @@ fn stack_allocation[
         _GPUAddressSpace.SHARED,
         _GPUAddressSpace.PARAM,
     ):
+        alias global_name = name.value() if name else "_global_alloc"
         return __mlir_op.`pop.global_alloc`[
+            name = global_name.value,
             count = count.value,
             _type = UnsafePointer[type, address_space]._mlir_type,
             alignment = alignment.value,
@@ -406,8 +440,9 @@ fn _malloc[
     type: AnyType,
     /,
     *,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](size: Int, /, *, alignment: Int = -1) -> UnsafePointer[type, address_space]:
+](size: Int, /) -> UnsafePointer[type, address_space, alignment=alignment]:
     @parameter
     if triple_is_nvidia_cuda():
         constrained[

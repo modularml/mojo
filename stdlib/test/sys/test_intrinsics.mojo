@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %mojo-no-debug %s
 
 from sys import (
     compressed_store,
@@ -97,7 +97,7 @@ fn test_strided_load() raises:
     for i in range(size):
         vector[i] = i
 
-    var s = strided_load[DType.float32, 4](vector, 4)
+    var s = strided_load[4](vector, 4)
     assert_equal(s, SIMD[DType.float32, 4](0, 4, 8, 12))
 
     vector.free()

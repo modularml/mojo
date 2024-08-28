@@ -72,10 +72,6 @@ struct _DictEntryIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias imm_dict_lifetime = __mlir_attr[
-        `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
-    ]
-
     var index: Int
     var seen: Int
     var src: Reference[Dict[K, V], dict_lifetime]

@@ -47,7 +47,7 @@ from builtin.int import (
     int,
 )
 from builtin.int_literal import IntLiteral
-from builtin.io import print
+from builtin.io import print, input
 from builtin.len import Sized, UIntSized, SizedRaising, len
 from builtin.math import (
     Absable,

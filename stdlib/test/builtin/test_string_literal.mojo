@@ -94,6 +94,17 @@ def test_rfind():
     assert_equal(-1, "abc".rfind("abcd"))
 
 
+def test_replace():
+    assert_equal("".replace("", "hello world"), "")
+    assert_equal("hello world".replace("", "something"), "hello world")
+    assert_equal("hello world".replace("world", ""), "hello ")
+    assert_equal("hello world".replace("world", "mojo"), "hello mojo")
+    assert_equal(
+        "hello world hello world".replace("world", "mojo"),
+        "hello mojo hello mojo",
+    )
+
+
 def test_comparison_operators():
     # Test less than and greater than
     assert_true(StringLiteral.__lt__("abc", "def"))
@@ -156,6 +167,15 @@ def test_layout():
     assert_equal(ptr[5], 0)  # Verify NUL terminated
 
 
+def test_lower_upper():
+    assert_equal("hello".lower(), "hello")
+    assert_equal("HELLO".lower(), "hello")
+    assert_equal("Hello".lower(), "hello")
+    assert_equal("hello".upper(), "HELLO")
+    assert_equal("HELLO".upper(), "HELLO")
+    assert_equal("Hello".upper(), "HELLO")
+
+
 def test_repr():
     # Usual cases
     assert_equal(StringLiteral.__repr__("hello"), "'hello'")
@@ -184,8 +204,10 @@ def main():
     test_contains()
     test_find()
     test_rfind()
+    test_replace()
     test_comparison_operators()
     test_hash()
     test_intable()
     test_layout()
+    test_lower_upper()
     test_repr()
