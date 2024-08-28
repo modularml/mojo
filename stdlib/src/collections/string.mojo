@@ -21,6 +21,7 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
+from builtin.hash import hash_string
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
@@ -1788,13 +1789,7 @@ struct String(
             A 64-bit hash value. This value is _not_ suitable for cryptographic
             uses. Its intended usage is for data structures.
         """
-        hash_value = 5381  # typical starting value for DJBX33A
-        for char in self:
-            hash_value = ((hash_value << 5) + hash_value) + ord(
-                char
-            )  # hash * 33 + ord(char)
-
-        return hash_value
+        return hash_string(self)
 
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()

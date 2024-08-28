@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys.ffi import C_char
 
+from builtin.hash import hash_string
 from memory import memcpy
 from collections import List
 from utils import StringRef, Span, StringSlice
@@ -245,14 +246,13 @@ struct StringLiteral(
         return self.__str__().__repr__()
 
     fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
+        """Hash a string using the DJBX33A hash algorithm.
 
         Returns:
             A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
+            uses. Its intended usage is for data structures.
         """
-        return hash(self.unsafe_ptr(), len(self))
+        return hash_string(self)
 
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.
