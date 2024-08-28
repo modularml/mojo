@@ -1782,14 +1782,19 @@ struct String(
         return self[l_idx:]
 
     fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
+        """Hash a string using the DJBX33A hash algorithm.
 
         Returns:
             A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
+            uses. Its intended usage is for data structures.
         """
-        return hash(self._strref_dangerous())
+        hash_value = 5381  # typical starting value for DJBX33A
+        for char in self:
+            hash_value = ((hash_value << 5) + hash_value) + ord(
+                char
+            )  # hash * 33 + ord(char)
+
+        return hash_value
 
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()
