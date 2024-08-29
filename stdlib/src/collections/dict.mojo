@@ -61,6 +61,9 @@ trait StringableKeyElement(KeyElement, Stringable, Sized):
     fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Get the string representation of the type at the given index.
 
+        Parameters:
+                IndexerType: The type of the index.
+
         Args:
             idx: The index of the element to get the string representation of.
 
@@ -68,6 +71,32 @@ trait StringableKeyElement(KeyElement, Stringable, Sized):
             The string representation of the element at the given index.
         """
         ...
+
+
+fn _hash_key[K: KeyElement](key: K) -> Int:
+    """Hash a key using the underlying hash function.
+
+    Args:
+        key: The key to hash.
+
+    Returns:
+        A 64-bit hash value. This value is _not_ suitable for cryptographic
+        uses. Its intended usage is for data structures.
+    """
+    return hash(key)
+
+
+fn _hash_key[K: StringableKeyElement](key: K) -> Int:
+    """Hash a key using a optimized hash algorithm for small string keys.
+
+    Args:
+        key: The key to hash.
+
+    Returns:
+        A 64-bit hash value. This value is _not_ suitable for cryptographic
+        uses. Its intended usage is for data structures.
+    """
+    return _hash_small_str(key)
 
 
 fn _hash_small_str[T: StringableKeyElement](s: T) -> UInt:
@@ -791,30 +820,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             An optional value containing a reference to the value if it is
             present, otherwise an empty Optional.
         """
-        var hash = hash(key)
-        var found: Bool
-        var slot: Int
-        var index: Int
-        found, slot, index = self._find_index(hash, key)
-        if found:
-            var entry = Reference(self._entries[index])
-            debug_assert(entry[].__bool__(), "entry in index must be full")
-            return entry[].value().value
-        raise "KeyError"
-
-    fn _find_ref[
-        K: StringableKeyElement
-    ](ref [_]self: Self, key: K) raises -> ref [__lifetime_of(self)] Self.V:
-        """Find a value in the dictionary by key.
-
-        Args:
-            key: The key to search for in the dictionary.
-
-        Returns:
-            An optional value containing a reference to the value if it is
-            present, otherwise an empty Optional.
-        """
-        var hash = _hash_small_str(key)
+        var hash = _hash_key(key)
         var found: Bool
         var slot: Int
         var index: Int
