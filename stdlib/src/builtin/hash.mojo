@@ -185,24 +185,6 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> UInt:
     return int(final_data)
 
 
-fn hash_string(s: String) -> UInt:
-    """Hash a string using the DJBX33A hash algorithm.
-
-    Args:
-        s: The string to hash.
-
-    Returns:
-        A 64-bit hash value. This value is _not_ suitable for cryptographic
-        uses. Its intended usage is for data structures.
-    """
-    hash_value = 5381  # typical starting value for DJBX33A
-    for char in s:
-        hash_value = ((hash_value << 5) + hash_value) + ord(
-            char
-        )  # hash * 33 + ord(char)
-    return hash_value
-
-
 fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
     """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
 

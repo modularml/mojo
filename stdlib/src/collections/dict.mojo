@@ -244,6 +244,9 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
     ](inout self, owned key: K, owned value: V):
         """Create an entry from a key and value, computing the hash.
 
+        Parameters:
+            K: The key type of the dict.
+
         Args:
             key: The key of the entry.
             value: The value of the entry.
