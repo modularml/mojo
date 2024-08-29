@@ -24,16 +24,8 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
-from utils import (
-    Span,
-    StaticIntTuple,
-    StringRef,
-    StringSlice,
-    Variant,
-    Formattable,
-    Formatter,
-)
-from utils.format import ToFormatter
+from utils import Span, StaticIntTuple, StringRef, StringSlice, Variant
+from utils._format import Formattable, Formatter, ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
