@@ -21,7 +21,6 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
-from builtin.hash import hash_string
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
@@ -679,7 +678,6 @@ fn isprintable(c: UInt8) -> Bool:
 
 struct String(
     Sized,
-    Stringable,
     Representable,
     IntableRaising,
     KeyElement,
@@ -1783,13 +1781,14 @@ struct String(
         return self[l_idx:]
 
     fn __hash__(self) -> UInt:
-        """Hash a string using the DJBX33A hash algorithm.
+        """Hash the underlying buffer using builtin hash.
 
         Returns:
             A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures.
+            uses. Its intended usage is for data structures. See the `hash`
+            builtin documentation for more details.
         """
-        return hash_string(self)
+        return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()

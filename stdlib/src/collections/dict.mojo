@@ -54,6 +54,42 @@ trait RepresentableKeyElement(KeyElement, Representable):
     pass
 
 
+trait StringableKeyElement(KeyElement, Stringable, Sized):
+    """A trait composition for types which implement all requirements of
+    dictionary keys, Stringable and Sized with indexed."""
+
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
+        """Get the string representation of the type at the given index.
+
+        Args:
+            idx: The index of the element to get the string representation of.
+
+        Returns:
+            The string representation of the element at the given index.
+        """
+        ...
+
+
+fn _hash_small_str[T: StringableKeyElement](s: T) -> UInt:
+    """Hash a small data using the DJBX33A hash algorithm.
+
+    When the data is small, the SIMD hash function is not as efficient as
+    the SIMD machinery has some overhead that is not worth it for small data.
+
+    Args:
+        s: The byte array to hash.
+
+    Returns:
+        A 64-bit hash value. This value is _not_ suitable for cryptographic
+        uses. Its intended usage is for data structures.
+    """
+    var hash = 5381  # typical starting value
+    for i in range(len(s)):
+        c = s[i]
+        hash = ((hash << 5) + hash) + ord(c)  # hash * 33 + ord(char)
+    return hash
+
+
 @value
 struct _DictEntryIter[
     dict_mutability: Bool, //,
@@ -200,6 +236,19 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
             value: The value of the entry.
         """
         self.hash = hash(key)
+        self.key = key^
+        self.value = value^
+
+    fn __init__[
+        K: StringableKeyElement
+    ](inout self, owned key: K, owned value: V):
+        """Create an entry from a key and value, computing the hash.
+
+        Args:
+            key: The key of the entry.
+            value: The value of the entry.
+        """
+        self.hash = _hash_small_str(key)
         self.key = key^
         self.value = value^
 
@@ -740,6 +789,29 @@ struct Dict[K: KeyElement, V: CollectionElement](
             present, otherwise an empty Optional.
         """
         var hash = hash(key)
+        var found: Bool
+        var slot: Int
+        var index: Int
+        found, slot, index = self._find_index(hash, key)
+        if found:
+            var entry = Reference(self._entries[index])
+            debug_assert(entry[].__bool__(), "entry in index must be full")
+            return entry[].value().value
+        raise "KeyError"
+
+    fn _find_ref[
+        K: StringableKeyElement
+    ](ref [_]self: Self, key: K) raises -> ref [__lifetime_of(self)] Self.V:
+        """Find a value in the dictionary by key.
+
+        Args:
+            key: The key to search for in the dictionary.
+
+        Returns:
+            An optional value containing a reference to the value if it is
+            present, otherwise an empty Optional.
+        """
+        var hash = _hash_small_str(key)
         var found: Bool
         var slot: Int
         var index: Int
