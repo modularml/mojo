@@ -444,6 +444,21 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   UnsafePointer[type, alignment].alloc(x)
   ```
 
+- The VS Code extension now supports a vendored MAX SDK for VS Code, which is
+  automatically downloaded by the extension and it's used for all Mojo features,
+  including the Mojo Language Server, the Mojo debugger, the Mojo formatter, and
+  more.
+
+- The Mojo debugger now hides the artificial function arguments `__result__` and
+  `__error__` created by the compiler for Mojo code.
+
+- The Mojo debugger now supports a `break-on-raise` command that indicated the
+  debugger to stop at any `raise` statements. A similar features has been added
+  to the debugger on VS Code.
+
+- A proxy has been added to the Mojo Language Server on VS Code that handles
+  crashes more gracefully.
+
 ### 🦋 Changed
 
 - The set of automatically imported entities (types, aliases, functions) into user's
@@ -713,6 +728,9 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
   These changes do not apply to doctests, due to their different semantics.
 
+- The `mojo debug --rpc` command has been renamed to `mojo debug --vscode`,
+  which is now able to manage multiple VS Code windows.
+
 ### ❌ Removed
 
 - Support for the legacy `fn __init__(...) -> Self:` form has been removed from
@@ -736,6 +754,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - Removed the `SIMD.min` and `SIMD.max` methods. Identical functionality is
   available using the builting `min` and `max` functions.
+
+- `Run Mojo File in Dedicated Terminal` action has been removed, and the
+  action `Run Mojo File` will always open a dedicated terminal for each mojo
+  file to guarantee a correct environment.
 
 ### 🛠️ Fixed
 
@@ -774,3 +796,8 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - [#3336](https://github.com/modularml/mojo/issues/3336) - Fix outdated
   references to `let` in REPL documentation.
+
+- The VS Code extension doesn't cache anymore the information of the selected
+  MAX SDK, which was causing issues upon changes in the SDK.
+
+- The Mojo debugger now stops showing spurious warnings when parsing closures.
