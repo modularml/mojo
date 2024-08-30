@@ -11,7 +11,9 @@ time. This is most often used to answer  questions like "how long did this take
 to run?" or for places where a timestamp that will only be compared to the same
 clock needs to be acquired cheaply, such as in a hot loop. They are also
 monotonic, meaning that they are unaffected by changes to system time such as
-leap seconds. They are widely supported,
+leap seconds. They are widely supported, with more recent architectures making
+their usage easier (ex: x86 requires lookup tables to get the frequency, ARM
+and RISC-V make you read a register).
 
 ### Why use Time Stamp Counters directly?
 
