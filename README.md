@@ -64,6 +64,9 @@ When you clone this repo, be sure you switch to the `nightly` branch, because
 the `main` branch is for stable releases and might not be compatible with
 nightly builds:
 
+This is Code To Install
+=======================
+
 ```bash
 git clone https://github.com/modularml/mojo.git
 ```
