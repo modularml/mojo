@@ -225,12 +225,15 @@ def test_indexing():
 
 def test_bool():
     var nullptr = UnsafePointer[Int]()
+    var nullptr_none: UnsafePointer[Int] = None
     var ptr = UnsafePointer[Int].alloc(1)
 
     assert_true(ptr.__bool__())
     assert_false(nullptr.__bool__())
+    assert_false(nullptr_none.__bool__())
     assert_true(ptr.__as_bool__())
     assert_false(nullptr.__as_bool__())
+    assert_false(nullptr_none.__as_bool__())
 
     ptr.free()
 

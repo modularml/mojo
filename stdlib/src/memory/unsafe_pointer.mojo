@@ -92,8 +92,12 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
-        """Create a null pointer."""
+    fn __init__(inout self, none: NoneType = None):
+        """Create a null pointer.
+
+        Args:
+            none: Implicit conversion from `None`.
+        """
         self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @always_inline
