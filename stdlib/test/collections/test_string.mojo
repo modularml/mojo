@@ -495,6 +495,8 @@ def test_atol_base_0():
         _ = atol("0of_", base=0)
 
 
+# TODO: Move those tests to
+# test_parsing_floats.mojo
 def test_atof():
     assert_equal(375.0, atof(String("375.f")))
     assert_equal(1.0, atof(String("001.")))
@@ -520,37 +522,63 @@ def test_atof():
         _ = atof(String(""))
 
     with assert_raises(
-        contains="String is not convertible to float: ' 123 asd'"
+        contains=(
+            "String is not convertible to float: ' 123 asd'. "
+            "The last character of '123 asd' should be a "
+            "digit or dot to convert it to a float."
+        )
     ):
         _ = atof(String(" 123 asd"))
 
     with assert_raises(
-        contains="String is not convertible to float: ' f.9123 '"
+        contains=(
+            "String is not convertible to float: ' f.9123 '. "
+            "The first character of 'f.9123' should be a "
+            "digit or dot to convert it to a float."
+        )
     ):
         _ = atof(String(" f.9123 "))
 
     with assert_raises(
-        contains="String is not convertible to float: ' 989343E-1A3 '"
+        contains=(
+            "String is not convertible to float: ' 989343E-1A3 '. "
+            "Invalid character(s) in the number: '989343E-1A3'"
+        )
     ):
         _ = atof(String(" 989343E-1A3 "))
 
     with assert_raises(
-        contains="String is not convertible to float: ' 124124124_2134124124 '"
+        contains=(
+            "String is not convertible to float: ' 124124124_2134124124 '. "
+            "Invalid character(s) in the number: '124124124_2134124124'"
+        )
     ):
         _ = atof(String(" 124124124_2134124124 "))
 
     with assert_raises(
-        contains="String is not convertible to float: ' 123.2E '"
+        contains=(
+            "String is not convertible to float: ' 123.2E '. "
+            "The last character of '123.2E' should be a digit "
+            "or dot to convert it to a float."
+        )
     ):
         _ = atof(String(" 123.2E "))
 
     with assert_raises(
-        contains="String is not convertible to float: ' --958.23 '"
+        contains=(
+            "String is not convertible to float: ' --958.23 '. "
+            "The first character of '-958.23' should be a digit "
+            "or dot to convert it to a float."
+        )
     ):
         _ = atof(String(" --958.23 "))
 
     with assert_raises(
-        contains="String is not convertible to float: ' ++94. '"
+        contains=(
+            "String is not convertible to float: ' ++94. '. "
+            "The first character of '+94.' should be "
+            "a digit or dot to convert it to a float."
+        )
     ):
         _ = atof(String(" ++94. "))
 

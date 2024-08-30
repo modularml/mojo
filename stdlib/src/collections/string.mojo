@@ -27,6 +27,7 @@ from python import PythonObject
 from utils import Span, StaticIntTuple, StringRef, StringSlice, Variant
 from utils._format import Formattable, Formatter, ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
+from ._parsing_numbers.parsing_floats import atof
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -402,123 +403,6 @@ fn atol(str: String, base: Int = 10) raises -> Int:
         An integer value that represents the string, or otherwise raises.
     """
     return _atol(str._strref_dangerous(), base)
-
-
-fn _atof_error(str_ref: StringRef) -> Error:
-    return Error("String is not convertible to float: '" + str(str_ref) + "'")
-
-
-fn _atof(str_ref: StringRef) raises -> Float64:
-    """Implementation of `atof` for StringRef inputs.
-
-    Please see its docstring for details.
-    """
-    if not str_ref:
-        raise _atof_error(str_ref)
-
-    var result: Float64 = 0.0
-    var exponent: Int = 0
-    var sign: Int = 1
-
-    alias ord_0 = UInt8(ord("0"))
-    alias ord_9 = UInt8(ord("9"))
-    alias ord_dot = UInt8(ord("."))
-    alias ord_plus = UInt8(ord("+"))
-    alias ord_minus = UInt8(ord("-"))
-    alias ord_f = UInt8(ord("f"))
-    alias ord_F = UInt8(ord("F"))
-    alias ord_e = UInt8(ord("e"))
-    alias ord_E = UInt8(ord("E"))
-
-    var start: Int = 0
-    var str_ref_strip = str_ref.strip()
-    var str_len = len(str_ref_strip)
-    var buff = str_ref_strip.unsafe_ptr()
-
-    # check sign, inf, nan
-    if buff[start] == ord_plus:
-        start += 1
-    elif buff[start] == ord_minus:
-        start += 1
-        sign = -1
-    if (str_len - start) >= 3:
-        if StringRef(buff + start, 3) == "nan":
-            return FloatLiteral.nan
-        if StringRef(buff + start, 3) == "inf":
-            return FloatLiteral.infinity * sign
-    # read before dot
-    for pos in range(start, str_len):
-        if ord_0 <= buff[pos] <= ord_9:
-            result = result * 10.0 + int(buff[pos] - ord_0)
-            start += 1
-        else:
-            break
-    # if dot -> read after dot
-    if buff[start] == ord_dot:
-        start += 1
-        for pos in range(start, str_len):
-            if ord_0 <= buff[pos] <= ord_9:
-                result = result * 10.0 + int(buff[pos] - ord_0)
-                exponent -= 1
-            else:
-                break
-            start += 1
-    # if e/E -> read scientific notation
-    if buff[start] == ord_e or buff[start] == ord_E:
-        start += 1
-        var sign: Int = 1
-        var shift: Int = 0
-        var has_number: Bool = False
-        for pos in range(start, str_len):
-            if buff[start] == ord_plus:
-                pass
-            elif buff[pos] == ord_minus:
-                sign = -1
-            elif ord_0 <= buff[start] <= ord_9:
-                has_number = True
-                shift = shift * 10 + int(buff[pos] - ord_0)
-            else:
-                break
-            start += 1
-        exponent += sign * shift
-        if not has_number:
-            raise _atof_error(str_ref)
-    # check for f/F at the end
-    if buff[start] == ord_f or buff[start] == ord_F:
-        start += 1
-    # check if string got fully parsed
-    if start != str_len:
-        raise _atof_error(str_ref)
-    # apply shift
-    # NOTE: Instead of `var result *= 10.0 ** exponent`, we calculate a positive
-    # integer factor as shift and multiply or divide by it based on the shift
-    # direction. This allows for better precision.
-    # TODO: investigate if there is a floating point arithmetic problem.
-    var shift: Int = 10 ** abs(exponent)
-    if exponent > 0:
-        result *= shift
-    if exponent < 0:
-        result /= shift
-    # apply sign
-    return result * sign
-
-
-fn atof(str: String) raises -> Float64:
-    """Parses the given string as a floating point and returns that value.
-
-    For example, `atof("2.25")` returns `2.25`.
-
-    Raises:
-        If the given string cannot be parsed as an floating point value, for
-        example in `atof("hi")`.
-
-    Args:
-        str: A string to be parsed as a floating point.
-
-    Returns:
-        An floating point value that represents the string, or otherwise raises.
-    """
-    return _atof(str._strref_dangerous())
 
 
 # ===----------------------------------------------------------------------=== #
