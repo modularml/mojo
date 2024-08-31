@@ -196,6 +196,25 @@ def test_repr():
     assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
 
 
+def test_strip():
+    assert_equal("".strip(), "")
+    assert_equal("  ".strip(), "")
+    assert_equal("  hello".strip(), "hello")
+    assert_equal("hello  ".strip(), "hello")
+    assert_equal("  hello  ".strip(), "hello")
+    assert_equal("  hello  world  ".strip(" "), "hello  world")
+    assert_equal("_wrap_hello world_wrap_".strip("_wrap_"), "hello world")
+    assert_equal("  hello  world  ".strip("  "), "hello  world")
+    assert_equal("  hello  world  ".lstrip(), "hello  world  ")
+    assert_equal("  hello  world  ".rstrip(), "  hello  world")
+    assert_equal(
+        "_wrap_hello world_wrap_".lstrip("_wrap_"), "hello world_wrap_"
+    )
+    assert_equal(
+        "_wrap_hello world_wrap_".rstrip("_wrap_"), "_wrap_hello world"
+    )
+
+
 def main():
     test_add()
     test_equality()
@@ -211,3 +230,4 @@ def main():
     test_layout()
     test_lower_upper()
     test_repr()
+    test_strip()
