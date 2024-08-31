@@ -30,3 +30,6 @@ what we publish.
 ### ❌ Removed
 
 ### 🛠️ Fixed
+
+- Lifetime tracking is now fully field sensitive, which means that the
+  uninitialized variable checker is more precise.
