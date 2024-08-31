@@ -16,6 +16,15 @@ what we publish.
 
 ### ⭐️ New
 
+- The VS Code Mojo Debugger now has a `buildArgs` JSON debug configuration
+  setting that can be used in conjunction with `mojoFile` to define the build
+  arguments when compiling the Mojo file.
+
+- The VS Code extension now supports a `Configure Build and Run Args` command
+  that helps set the build and run args for actions file `Run Mojo File` and
+  `Debug Mojo File`. A corresponding button appears in `Run and Debug` selector
+  in the top right corner of a Mojo File.
+
 ### 🦋 Changed
 
 ### ❌ Removed
