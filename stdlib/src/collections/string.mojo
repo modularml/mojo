@@ -2052,6 +2052,8 @@ struct String(
         Returns:
             True if all characters are digits else False.
         """
+        if not self:
+            return False
         for c in self:
             if not isdigit(ord(c)):
                 return False
