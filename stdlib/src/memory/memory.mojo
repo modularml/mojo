@@ -419,7 +419,6 @@ fn stack_allocation[
                 count = count.value,
                 _type = UnsafePointer[type, address_space]._mlir_type,
                 alignment = alignment.value,
-                address_space = address_space._value.value,
             ]()
         # MSTDL-797: The NVPTX backend requires that `alloca` instructions may
         # only have generic address spaces. When allocating LOCAL memory,
@@ -439,7 +438,6 @@ fn stack_allocation[
         count = count.value,
         _type = UnsafePointer[type, address_space]._mlir_type,
         alignment = alignment.value,
-        address_space = address_space._value.value,
     ]()
 
 
