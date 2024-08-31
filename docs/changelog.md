@@ -27,6 +27,10 @@ what we publish.
 
 ### 🦋 Changed
 
+- A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
+  specifies to the compiler that the resultant pointer is a distinct
+  identifiable object that does not alias any other memory in the local scope.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
