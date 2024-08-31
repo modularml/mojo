@@ -409,25 +409,38 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and address_space in (
-        _GPUAddressSpace.SHARED,
-        _GPUAddressSpace.PARAM,
-    ):
-        alias global_name = name.value() if name else "_global_alloc"
-        return __mlir_op.`pop.global_alloc`[
-            name = global_name.value,
-            count = count.value,
-            _type = UnsafePointer[type, address_space]._mlir_type,
-            alignment = alignment.value,
-            address_space = address_space._value.value,
-        ]()
-    else:
-        return __mlir_op.`pop.stack_allocation`[
-            count = count.value,
-            _type = UnsafePointer[type, address_space]._mlir_type,
-            alignment = alignment.value,
-            address_space = address_space._value.value,
-        ]()
+    if triple_is_nvidia_cuda():
+        # On NVGPU, SHARED and PARAM address spaces lower to global memory.
+        @parameter
+        if address_space in (_GPUAddressSpace.SHARED, _GPUAddressSpace.PARAM):
+            alias global_name = name.value() if name else "_global_alloc"
+            return __mlir_op.`pop.global_alloc`[
+                name = global_name.value,
+                count = count.value,
+                _type = UnsafePointer[type, address_space]._mlir_type,
+                alignment = alignment.value,
+                address_space = address_space._value.value,
+            ]()
+        # MSTDL-797: The NVPTX backend requires that `alloca` instructions may
+        # only have generic address spaces. When allocating LOCAL memory,
+        # addrspacecast the resulting pointer.
+        elif address_space == _GPUAddressSpace.LOCAL:
+            var generic_ptr = __mlir_op.`pop.stack_allocation`[
+                count = count.value,
+                _type = UnsafePointer[type]._mlir_type,
+                alignment = alignment.value,
+            ]()
+            return __mlir_op.`pop.pointer.bitcast`[
+                _type = UnsafePointer[type, address_space]._mlir_type
+            ](generic_ptr)
+
+    # Perofrm a stack allocation of the requested size, alignment, and type.
+    return __mlir_op.`pop.stack_allocation`[
+        count = count.value,
+        _type = UnsafePointer[type, address_space]._mlir_type,
+        alignment = alignment.value,
+        address_space = address_space._value.value,
+    ]()
 
 
 # ===----------------------------------------------------------------------===#
