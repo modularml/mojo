@@ -119,6 +119,8 @@ accepted. For example:
 
 - Changes that do not align with the published roadmap or the core principles of
   the standard library.
+- Changes to the math module until more thorough performance
+  benchmarking is available.
 - Code without tests—especially for core primitives.
 - Changes that break existing API or implicit behavior semantics.
 - Changes where the contributors’ favorite feature or system isn’t being used

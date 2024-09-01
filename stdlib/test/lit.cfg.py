@@ -79,10 +79,6 @@ else:
         base_mojo_command = "mojo"
     config.substitutions.insert(0, ("%mojo", base_mojo_command))
 
-    # Mojo without debug info.  Only use this for known tests that do not work
-    # with debug info enabled.
-    config.substitutions.insert(0, ("%mojo-no-debug", base_mojo_command))
-
     # Mojo without assertions.  Only use this for known tests that do not work
     # with assertions enabled.
     config.substitutions.insert(1, ("%bare-mojo", "mojo"))

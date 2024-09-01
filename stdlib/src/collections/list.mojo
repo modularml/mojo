@@ -467,6 +467,14 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # Methods
     # ===-------------------------------------------------------------------===#
 
+    fn bytecount(self) -> Int:
+        """Gets the bytecount of the List.
+
+        Returns:
+            The bytecount of the List.
+        """
+        return len(self) * sizeof[T]()
+
     fn _realloc(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 

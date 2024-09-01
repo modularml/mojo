@@ -1,7 +1,7 @@
 [project]
 name = "Mojo"
 authors = ["Modular <hello@modular.com>"]
-channels = ["conda-forge", "anaconda", "https://conda.cloudsmith.io/modular/max-nightly/"]
+channels = ["conda-forge", "https://conda.cloudsmith.io/modular/max-nightly/"]
 platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
 
 [tasks]
