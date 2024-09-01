@@ -142,6 +142,13 @@ def test_hash():
     assert_equal(StringLiteral.__hash__("b"), StringLiteral.__hash__("b"))
 
 
+def test_indexing():
+    var s = "hello"
+    assert_equal(s[False], "h")
+    assert_equal(s[int(1)], "e")
+    assert_equal(s[2], "l")
+
+
 def test_intable():
     assert_equal(StringLiteral.__int__("123"), 123)
 
@@ -263,6 +270,7 @@ def main():
     test_replace()
     test_comparison_operators()
     test_hash()
+    test_indexing()
     test_intable()
     test_isdigit()
     test_islower()

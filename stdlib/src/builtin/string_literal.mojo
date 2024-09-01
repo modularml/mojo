@@ -272,6 +272,20 @@ struct StringLiteral(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
+        """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
+
+        Args:
+            idx: The index value.
+
+        Returns:
+            A new string containing the character at the specified position.
+        """
+        return str(self)[idx]
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
