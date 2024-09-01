@@ -426,6 +426,16 @@ struct StringLiteral(
 
         return str(self).upper()
 
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string literal are digits.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        return str(self).isdigit()
+
     fn strip(self) -> String:
         """Return a copy of the string literal with leading and trailing whitespaces
         removed.

@@ -149,6 +149,14 @@ def test_intable():
         _ = StringLiteral.__int__("hi")
 
 
+def test_isdigit():
+    assert_true("123".isdigit())
+    assert_false("abc".isdigit())
+    assert_false("123abc".isdigit())
+    # TODO: Uncomment this when PR3439 is merged
+    # assert_false("".isdigit())
+
+
 def test_layout():
     # Test empty StringLiteral contents
     var empty = "".unsafe_ptr()
@@ -227,6 +235,7 @@ def main():
     test_comparison_operators()
     test_hash()
     test_intable()
+    test_isdigit()
     test_layout()
     test_lower_upper()
     test_repr()
