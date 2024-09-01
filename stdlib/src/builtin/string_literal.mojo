@@ -436,6 +436,30 @@ struct StringLiteral(
         """
         return str(self).isdigit()
 
+    fn isupper(self) -> Bool:
+        """Returns True if all cased characters in the string literal are
+        uppercase and there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all cased characters in the string literal are uppercase
+            and there is at least one cased character, False otherwise.
+        """
+        return str(self).isupper()
+
+    fn islower(self) -> Bool:
+        """Returns True if all cased characters in the string literal
+        are lowercase and there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all cased characters in the string literal are lowercase
+            and there is at least one cased character, False otherwise.
+        """
+        return str(self).islower()
+
     fn strip(self) -> String:
         """Return a copy of the string literal with leading and trailing whitespaces
         removed.

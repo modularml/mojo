@@ -157,6 +157,22 @@ def test_isdigit():
     # assert_false("".isdigit())
 
 
+def test_islower():
+    assert_true("hello".islower())
+    assert_false("Hello".islower())
+    assert_false("HELLO".islower())
+    assert_false("123".islower())
+    assert_false("".islower())
+
+
+def test_isupper():
+    assert_true("HELLO".isupper())
+    assert_false("Hello".isupper())
+    assert_false("hello".isupper())
+    assert_false("123".isupper())
+    assert_false("".isupper())
+
+
 def test_layout():
     # Test empty StringLiteral contents
     var empty = "".unsafe_ptr()
@@ -236,6 +252,8 @@ def main():
     test_hash()
     test_intable()
     test_isdigit()
+    test_islower()
+    test_isupper()
     test_layout()
     test_lower_upper()
     test_repr()
