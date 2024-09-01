@@ -138,7 +138,16 @@ fn test_issue_31111():
     _ = hash(Int(1))
 
 
+def test_hash_comptime():
+    alias hash_123 = hash("123")
+    assert_equal(hash_123, hash("123"))
+
+    alias hash_22 = hash(22)
+    assert_equal(hash_22, hash(22))
+
+
 def main():
     test_hash_byte_array()
     test_hash_simd()
     test_issue_31111()
+    test_hash_comptime()
