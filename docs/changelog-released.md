@@ -116,7 +116,7 @@ modular update mojo
   fn invalid_access():
     var my_string = String()
 
-    # error: passing `my_string` inout is invalid since it is also passed
+    # warning: passing `my_string` inout is invalid since it is also passed
     # borrowed.
     take_two_strings(my_string, my_string)
   ```
@@ -127,6 +127,9 @@ modular update mojo
   sometimes known as "aliasing xor mutability". That said, the Mojo
   implementation details are somewhat different because lifetimes are embedded
   in types.
+
+  This is a warning in the 24.5 release, but will be upgraded to an error in
+  subsequent releases.
 
 - Mojo now allows implicit definitions of variables within a `fn` in the same
   way that has been allowed in a `def`.  The `var` keyword is still allowed and
