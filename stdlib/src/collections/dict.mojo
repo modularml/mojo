@@ -270,7 +270,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
 
     fn __init__[
         K: StringableKeyElement
-    ](inout self, owned key: K, owned value: V):
+    ](inout self: DictEntry[K, V], owned key: K, owned value: V):
         """Create an entry from a key and value, computing the hash.
 
         Parameters:
