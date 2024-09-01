@@ -276,12 +276,17 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
 
 
 @always_inline("nodebug")
-fn _memset_llvm[
+fn _memset_impl[
     address_space: AddressSpace
 ](ptr: UnsafePointer[UInt8, address_space], value: UInt8, count: Int):
-    llvm_intrinsic["llvm.memset", NoneType](
-        ptr.address, value, count.value, False
-    )
+    alias simd_width = simdwidthof[UInt8]()
+    var vector_end = _align_down(count, simd_width)
+
+    for i in range(0, vector_end, simd_width):
+        ptr.store(i, SIMD[DType.uint8, simd_width](value))
+
+    for i in range(vector_end, count):
+        ptr.store(i, value)
 
 
 @always_inline
@@ -299,7 +304,7 @@ fn memset[
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_llvm(ptr.bitcast[UInt8](), value, count * sizeof[type]())
+    _memset_impl(ptr.bitcast[UInt8](), value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#
