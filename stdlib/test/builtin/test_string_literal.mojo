@@ -173,6 +173,19 @@ def test_isupper():
     assert_false("".isupper())
 
 
+def test_iter():
+    # Test iterating over a string
+    var s = "one"
+    var i = 0
+    for c in s:
+        if i == 0:
+            assert_equal(c, "o")
+        elif i == 1:
+            assert_equal(c, "n")
+        elif i == 2:
+            assert_equal(c, "e")
+
+
 def test_layout():
     # Test empty StringLiteral contents
     var empty = "".unsafe_ptr()

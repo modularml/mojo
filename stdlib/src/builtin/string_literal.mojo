@@ -23,7 +23,7 @@ from utils import StringRef, Span, StringSlice
 from utils._format import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from collections.string import _atol
+from collections.string import _atol, _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -261,6 +261,16 @@ struct StringLiteral(
           The file system path representation as a string.
         """
         return self.__str__()
+
+    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+        """Return an iterator over the string literal.
+
+        Returns:
+            An iterator over the string.
+        """
+        return _StringSliceIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
 
     # ===-------------------------------------------------------------------===#
     # Methods
