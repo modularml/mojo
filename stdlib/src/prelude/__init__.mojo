@@ -115,7 +115,7 @@ from builtin.simd import (
 )
 from builtin.type_aliases import AnyTrivialRegType
 
-from collections import KeyElement, List
+from collections import KeyElement, List, StringableKeyElement
 from collections.string import (
     String,
     ord,

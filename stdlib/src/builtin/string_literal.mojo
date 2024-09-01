@@ -38,10 +38,9 @@ struct StringLiteral(
     CollectionElementNew,
     Formattable,
     IntableRaising,
-    KeyElement,
-    Representable,
-    Sized,
     Stringable,
+    StringableKeyElement,
+    Representable,
 ):
     """This type represents a string literal.
 
@@ -261,6 +260,20 @@ struct StringLiteral(
           The file system path representation as a string.
         """
         return self.__str__()
+
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
+        """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
+
+        Args:
+            idx: The index value.
+
+        Returns:
+            A new string containing the character at the specified position.
+        """
+        return str(self)[idx]
 
     # ===-------------------------------------------------------------------===#
     # Methods

@@ -13,7 +13,7 @@
 """Implements the collections package."""
 
 from .counter import Counter
-from .dict import Dict, KeyElement
+from .dict import Dict, KeyElement, StringableKeyElement
 from .inline_array import InlineArray
 from .inline_list import InlineList
 from .list import List

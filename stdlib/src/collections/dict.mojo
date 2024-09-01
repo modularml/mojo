@@ -268,22 +268,6 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.key = key^
         self.value = value^
 
-    fn __init__[
-        K: StringableKeyElement
-    ](inout self: DictEntry[K, V], owned key: K, owned value: V):
-        """Create an entry from a key and value, computing the hash.
-
-        Parameters:
-            K: The key type of the dict.
-
-        Args:
-            key: The key of the entry.
-            value: The value of the entry.
-        """
-        self.hash = _hash_small_str(key)
-        self.key = key^
-        self.value = value^
-
     fn __init__(inout self, *, other: Self):
         """Copy an existing entry.
 
@@ -293,6 +277,18 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.hash = other.hash
         self.key = other.key
         self.value = other.value
+
+    fn __init__(inout self, owned key: K, owned value: V, key_hash: Int):
+        """Create an entry from a key and value, computing the hash.
+
+        Args:
+            key: The key of the entry.
+            value: The value of the entry.
+            key_hash: The hash of the key.
+        """
+        self.key = key^
+        self.value = value^
+        self.hash = key_hash
 
     fn reap_value(owned self) -> V:
         """Take the value from an owned entry.
@@ -655,6 +651,22 @@ struct Dict[K: KeyElement, V: CollectionElement](
             value: The data to store in the dictionary.
         """
         self._insert(key^, value^)
+
+    fn __setitem__[
+        K: StringableKeyElement
+    ](inout self: Dict[K, V], owned key: K, owned value: V):
+        """Set a value in the dictionary by key.
+
+        Parameters:
+            K: The type of the keys in the Dict. Must implement the
+               trait `StringableKeyElement`.
+
+        Args:
+            key: The key to associate with the specified value.
+            value: The data to store in the dictionary.
+        """
+        var hash = _hash_small_str(key)
+        self._insert_with_hash(key^, value^, hash)
 
     fn __contains__(self, key: K) -> Bool:
         """Check if a given key is in the dictionary or not.
@@ -1023,6 +1035,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._set_index(slot, index)
             self.size += 1
             self._n_entries += 1
+
+    fn _insert_with_hash(inout self, owned key: K, owned value: V, hash: Int):
+        self._insert(DictEntry[K, V](key^, value^, hash))
 
     fn _get_index(self, slot: Int) -> Int:
         return self._index.get_index(self._reserved(), slot)
