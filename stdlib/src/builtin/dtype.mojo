@@ -151,39 +151,39 @@ struct DType(
         """
 
         if self == DType.bool:
-            return writer.write_str["bool"]()
+            return writer.write_str("bool")
         if self == DType.int8:
-            return writer.write_str["int8"]()
+            return writer.write_str("int8")
         if self == DType.uint8:
-            return writer.write_str["uint8"]()
+            return writer.write_str("uint8")
         if self == DType.int16:
-            return writer.write_str["int16"]()
+            return writer.write_str("int16")
         if self == DType.uint16:
-            return writer.write_str["uint16"]()
+            return writer.write_str("uint16")
         if self == DType.int32:
-            return writer.write_str["int32"]()
+            return writer.write_str("int32")
         if self == DType.uint32:
-            return writer.write_str["uint32"]()
+            return writer.write_str("uint32")
         if self == DType.int64:
-            return writer.write_str["int64"]()
+            return writer.write_str("int64")
         if self == DType.uint64:
-            return writer.write_str["uint64"]()
+            return writer.write_str("uint64")
         if self == DType.index:
-            return writer.write_str["index"]()
+            return writer.write_str("index")
         if self == DType.bfloat16:
-            return writer.write_str["bfloat16"]()
+            return writer.write_str("bfloat16")
         if self == DType.float16:
-            return writer.write_str["float16"]()
+            return writer.write_str("float16")
         if self == DType.float32:
-            return writer.write_str["float32"]()
+            return writer.write_str("float32")
         if self == DType.tensor_float32:
-            return writer.write_str["tensor_float32"]()
+            return writer.write_str("tensor_float32")
         if self == DType.float64:
-            return writer.write_str["float64"]()
+            return writer.write_str("float64")
         if self == DType.invalid:
-            return writer.write_str["invalid"]()
+            return writer.write_str("invalid")
 
-        return writer.write_str["<<unknown>>"]()
+        return writer.write_str("<<unknown>>")
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:

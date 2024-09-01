@@ -111,20 +111,6 @@ struct Formatter:
     # Methods
     # ===------------------------------------------------------------------=== #
 
-    # TODO(cleanup):
-    #   Remove this overload by defining a working
-    #   `StringSlice.__init__(StringLiteral)` implicit conversion.
-    @always_inline
-    fn write_str[literal: StringLiteral](inout self):
-        """
-        Write a string literal to this formatter.
-
-        Parameters:
-            literal: The string literal to write.
-        """
-        alias slc = literal.as_string_slice()
-        self.write_str(slc)
-
     # TODO: Constrain to only require an immutable StringSlice[..]`
     @always_inline
     fn write_str(inout self, str_slice: StringSlice[_]):

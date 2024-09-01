@@ -1,0 +1,14 @@
+[project]
+name = "Mojo"
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.cloudsmith.io/modular/max-nightly/"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
+
+[tasks]
+tests ="./stdlib/scripts/run-tests.sh"
+examples = "./examples/run-examples.sh"
+benchmarks = { cmd = ["./stdlib/scripts/run-benchmarks.sh"], env = { MODULAR_MOJO_NIGHTLY_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo" } }
+
+[dependencies]
+python = ">=3.9,<3.13"
+max = "*"

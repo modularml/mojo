@@ -305,7 +305,7 @@ fn _try_write_int[
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.write_str["-"]()
+        fmt.write_str("-")
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.
@@ -348,7 +348,9 @@ fn _try_write_int[
     # earlier in the buffer as we write the more-significant digits.
     var offset = CAPACITY - 1
 
-    buf[offset] = 0  # Write NUL terminator at the end
+    buf.unsafe_ptr().offset(offset).init_pointee_copy(
+        0
+    )  # Write NUL terminator at the end
 
     # Position the offset to write the least-significant digit just before the
     # NUL terminator.
@@ -364,7 +366,9 @@ fn _try_write_int[
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset] = digit_chars_array[int(digit_value)]
+            buf.unsafe_ptr().offset(offset).init_pointee_copy(
+                digit_chars_array[int(digit_value)]
+            )
 
             # Position the offset to write the next digit.
             offset -= 1
