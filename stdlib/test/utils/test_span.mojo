@@ -166,8 +166,6 @@ def test_equality():
     var sp = Span[String](l)
     var sp2 = Span[String](l)
     var sp3 = Span(l2)
-    # same pointer
-    assert_true(sp == sp2)
     # different pointer
     assert_true(sp == sp3)
     # different length

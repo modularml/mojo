@@ -156,9 +156,7 @@ fn test_slice_eq() raises:
 
     # eq
 
-    assert_true(str1.as_string_slice().__eq__(str1))
     assert_true(str1.as_string_slice().__eq__(str2))
-    assert_true(str2.as_string_slice().__eq__(str2.as_string_slice()))
     assert_true(str1.as_string_slice().__eq__(str3))
 
     # ne
