@@ -73,32 +73,6 @@ trait StringableKeyElement(KeyElement, Stringable, Sized):
         ...
 
 
-fn _hash_key[K: KeyElement](key: K) -> Int:
-    """Hash a key using the underlying hash function.
-
-    Args:
-        key: The key to hash.
-
-    Returns:
-        A 64-bit hash value. This value is _not_ suitable for cryptographic
-        uses. Its intended usage is for data structures.
-    """
-    return hash(key)
-
-
-fn _hash_key[K: StringableKeyElement](key: K) -> Int:
-    """Hash a key using a optimized hash algorithm for small string keys.
-
-    Args:
-        key: The key to hash.
-
-    Returns:
-        A 64-bit hash value. This value is _not_ suitable for cryptographic
-        uses. Its intended usage is for data structures.
-    """
-    return _hash_small_str(key)
-
-
 fn _hash_small_str[T: StringableKeyElement](s: T) -> UInt:
     """Hash a small data using the DJBX33A hash algorithm.
 
@@ -819,6 +793,30 @@ struct Dict[K: KeyElement, V: CollectionElement](
         except:
             return None
 
+    fn _hash_key[K: KeyElement](self, key: K) -> Int:
+        """Hash a key using the underlying hash function.
+
+        Args:
+            key: The key to hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures.
+        """
+        return hash(key)
+
+    fn _hash_key[K: StringableKeyElement](self: Dict[K, V], key: K) -> Int:
+        """Hash a key using a optimized hash algorithm for small string keys.
+
+        Args:
+            key: The key to hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures.
+        """
+        return _hash_small_str(key)
+
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
@@ -832,7 +830,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             An optional value containing a reference to the value if it is
             present, otherwise an empty Optional.
         """
-        var hash = _hash_key(key)
+        var hash = self._hash_key(key)
         var found: Bool
         var slot: Int
         var index: Int
