@@ -283,6 +283,24 @@ def test_strip():
     )
 
 
+def test_rjust():
+    assert_equal("hello".rjust(4), "hello")
+    assert_equal("hello".rjust(8), "   hello")
+    assert_equal("hello".rjust(8, "*"), "***hello")
+
+
+def test_ljust():
+    assert_equal("hello".ljust(4), "hello")
+    assert_equal("hello".ljust(8), "hello   ")
+    assert_equal("hello".ljust(8, "*"), "hello***")
+
+
+def test_center():
+    assert_equal("hello".center(4), "hello")
+    assert_equal("hello".center(8), " hello  ")
+    assert_equal("hello".center(8, "*"), "*hello**")
+
+
 def main():
     test_add()
     test_equality()
@@ -302,6 +320,9 @@ def main():
     test_layout()
     test_lower_upper()
     test_repr()
+    test_rjust()
+    test_ljust()
+    test_center()
     test_startswith()
     test_endswith()
     test_strip()
