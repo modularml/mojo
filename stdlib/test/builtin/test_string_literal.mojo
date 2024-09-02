@@ -105,6 +105,30 @@ def test_replace():
     )
 
 
+def test_startswith():
+    var str = "Hello world"
+
+    assert_true(str.startswith("Hello"))
+    assert_false(str.startswith("Bye"))
+
+    assert_true(str.startswith("llo", 2))
+    assert_true(str.startswith("llo", 2, -1))
+    assert_false(str.startswith("llo", 2, 3))
+
+
+def test_endswith():
+    var str = "Hello world"
+
+    assert_true(str.endswith(""))
+    assert_true(str.endswith("world"))
+    assert_true(str.endswith("ld"))
+    assert_false(str.endswith("universe"))
+
+    assert_true(str.endswith("ld", 2))
+    assert_true(str.endswith("llo", 2, 5))
+    assert_false(str.endswith("llo", 2, 3))
+
+
 def test_comparison_operators():
     # Test less than and greater than
     assert_true(StringLiteral.__lt__("abc", "def"))
@@ -278,4 +302,6 @@ def main():
     test_layout()
     test_lower_upper()
     test_repr()
+    test_startswith()
+    test_endswith()
     test_strip()
