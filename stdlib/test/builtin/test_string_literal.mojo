@@ -315,6 +315,126 @@ def test_center():
     assert_equal("hello".center(8, "*"), "*hello**")
 
 
+def test_split():
+    var d = "hello world".split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello")
+    assert_true(d[1] == "world")
+    d = "hello \t\n\n\v\fworld".split("\n")
+    assert_true(len(d) == 3)
+    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+
+    # should split into empty strings between separators
+    d = "1,,,3".split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
+    d = "abababaaba".split("aba")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+
+    # should split into maxsplit + 1 items
+    d = "1,2,3".split(",", 0)
+    assert_true(len(d) == 1)
+    assert_true(d[0] == "1,2,3")
+    d = "1,2,3".split(",", 1)
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "1" and d[1] == "2,3")
+
+    assert_true(len("".split()) == 0)
+    assert_true(len(" ".split()) == 0)
+    assert_true(len("".split(" ")) == 1)
+    assert_true(len(" ".split(" ")) == 2)
+    assert_true(len("  ".split(" ")) == 3)
+    assert_true(len("   ".split(" ")) == 4)
+
+    with assert_raises():
+        _ = "".split("")
+
+    # Matches should be properly split in multiple case
+    var d2 = " "
+    var in2 = "modcon is coming soon"
+    var res2 = in2.split(d2)
+    assert_equal(len(res2), 4)
+    assert_equal(res2[0], "modcon")
+    assert_equal(res2[1], "is")
+    assert_equal(res2[2], "coming")
+    assert_equal(res2[3], "soon")
+
+    # No match from the delimiter
+    var d3 = "x"
+    var in3 = "hello world"
+    var res3 = in3.split(d3)
+    assert_equal(len(res3), 1)
+    assert_equal(res3[0], "hello world")
+
+    # Multiple character delimiter
+    var d4 = "ll"
+    var in4 = "hello"
+    var res4 = in4.split(d4)
+    assert_equal(len(res4), 2)
+    assert_equal(res4[0], "he")
+    assert_equal(res4[1], "o")
+
+
+def test_splitlines():
+    # Test with no line breaks
+    var in1 = "hello world"
+    var res1 = in1.splitlines()
+    assert_equal(len(res1), 1)
+    assert_equal(res1[0], "hello world")
+
+    # Test with \n line break
+    var in2 = "hello\nworld"
+    var res2 = in2.splitlines()
+    assert_equal(len(res2), 2)
+    assert_equal(res2[0], "hello")
+    assert_equal(res2[1], "world")
+
+    # Test with \r\n line break
+    var in3 = "hello\r\nworld"
+    var res3 = in3.splitlines()
+    assert_equal(len(res3), 2)
+    assert_equal(res3[0], "hello")
+    assert_equal(res3[1], "world")
+
+    # Test with \r line break
+    var in4 = "hello\rworld"
+    var res4 = in4.splitlines()
+    assert_equal(len(res4), 2)
+    assert_equal(res4[0], "hello")
+    assert_equal(res4[1], "world")
+
+    # Test with multiple different line breaks
+    var in5 = "hello\nworld\r\nmojo\rlanguage"
+    var res5 = in5.splitlines()
+    assert_equal(len(res5), 4)
+    assert_equal(res5[0], "hello")
+    assert_equal(res5[1], "world")
+    assert_equal(res5[2], "mojo")
+    assert_equal(res5[3], "language")
+
+    # Test with keepends=True
+    var res6 = in5.splitlines(keepends=True)
+    assert_equal(len(res6), 4)
+    assert_equal(res6[0], "hello\n")
+    assert_equal(res6[1], "world\r\n")
+    assert_equal(res6[2], "mojo\r")
+    assert_equal(res6[3], "language")
+
+    # Test with an empty string
+    var in7 = ""
+    var res7 = in7.splitlines()
+    assert_equal(len(res7), 0)
+
+    # test with keepends=True
+    var res10 = in8.splitlines(keepends=True)
+    assert_equal(len(res10), 4)
+    assert_equal(res10[0], "hello\v")
+    assert_equal(res10[1], "world\f")
+    assert_equal(res10[2], "mojo\x1c")
+    assert_equal(res10[3], "language\x1d")
+
+
 def main():
     test_add()
     test_equality()
@@ -341,3 +461,5 @@ def main():
     test_startswith()
     test_endswith()
     test_strip()
+    test_split()
+    test_splitlines()
