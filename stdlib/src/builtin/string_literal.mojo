@@ -430,6 +430,21 @@ struct StringLiteral(
 
         return result
 
+    fn count(self, substr: String) -> Int:
+        """Return the number of non-overlapping occurrences of substring
+        `substr` in the string literal.
+
+        If sub is empty, returns the number of empty strings between characters
+        which is the length of the string plus one.
+
+        Args:
+          substr: The substring to count.
+
+        Returns:
+          The number of occurrences of `substr`.
+        """
+        return str(self).count(substr)
+
     fn lower(self) -> String:
         """Returns a copy of the string literal with all cased characters
         converted to lowercase.

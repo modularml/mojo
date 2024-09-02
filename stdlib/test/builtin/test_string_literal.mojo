@@ -283,6 +283,20 @@ def test_strip():
     )
 
 
+def test_count():
+    var str = "Hello world"
+
+    assert_equal(12, str.count(""))
+    assert_equal(1, str.count("Hell"))
+    assert_equal(3, str.count("l"))
+    assert_equal(1, str.count("ll"))
+    assert_equal(1, str.count("ld"))
+    assert_equal(0, str.count("universe"))
+
+    assert_equal(String("aaaaa").count("a"), 5)
+    assert_equal(String("aaaaaa").count("aa"), 3)
+
+
 def test_rjust():
     assert_equal("hello".rjust(4), "hello")
     assert_equal("hello".rjust(8), "   hello")
@@ -311,6 +325,7 @@ def main():
     test_rfind()
     test_replace()
     test_comparison_operators()
+    test_count()
     test_hash()
     test_indexing()
     test_intable()
