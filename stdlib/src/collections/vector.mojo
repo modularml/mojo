@@ -128,7 +128,7 @@ struct InlinedFixedVector[
     @always_inline
     fn __init__(inout self, existing: Self):
         """
-        Copy constructor
+        Copy constructor.
 
         Args:
             existing: The `InlinedFixedVector` to copy.
@@ -146,7 +146,7 @@ struct InlinedFixedVector[
     @always_inline
     fn __moveinit__(inout self, owned existing: Self):
         """
-        Move constructor
+        Move constructor.
 
         Args:
             existing: The `InlinedFixedVector` to consume.
@@ -158,11 +158,10 @@ struct InlinedFixedVector[
 
         existing.dynamic_data = UnsafePointer[type]()
 
-
     @always_inline
     fn __del__(owned self):
         """
-        Destructor
+        Destructor.
         """
         if self.dynamic_data:
             self.dynamic_data.free()
