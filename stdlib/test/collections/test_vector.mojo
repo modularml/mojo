@@ -26,7 +26,7 @@ def test_inlined_fixed_vector_moves():
     v2[3] = 99
     v1[3] = 42
 
-    # plus one within the dynarry
+    # plus one within the dynarray
     v2[7] = 9999
     v1[7] = 4242
     v2 = v1^  # moves
