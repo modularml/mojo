@@ -73,9 +73,6 @@ def test_inlined_fixed_vector():
     vector.clear()
     assert_equal(0, len(vector))
 
-    # Free the memory since we manage it ourselves in `InlinedFixedVector` for now.
-    vector._del_old()
-
 
 def test_inlined_fixed_vector_with_default():
     var vector = InlinedFixedVector[Int](10)
@@ -105,8 +102,6 @@ def test_inlined_fixed_vector_with_default():
 
     vector.clear()
     assert_equal(0, len(vector))
-
-    vector._del_old()
 
 
 def test_indexing():
