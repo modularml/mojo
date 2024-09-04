@@ -65,8 +65,10 @@ struct _ArcInner[T: Movable]:
         self.payload = UnsafeMaybeUninitialized(value^)
 
     fn _destroy_value(inout self):
-        """Run the destructor for the payload, with the assumption
-        that it has not been run yet"""
+        """
+        Run the destructor for the payload,
+        with the assumption that it has not been run yet
+        """
         self.payload.assume_initialized_destroy()
 
     fn try_upgrade_weak(inout self) -> Bool:
@@ -75,7 +77,8 @@ struct _ArcInner[T: Movable]:
         one other strong ref exists s.t. the value in `payload` has not
         been destructed.
 
-        Returns True iff the strong ref count has been successfully incremented
+        Returns:
+            True iff the strong ref count has been successfully incremented
         """
 
         # Why the loop?
@@ -109,19 +112,33 @@ struct _ArcInner[T: Movable]:
         self.add_weak()
 
     fn add_weak(inout self):
+        """Atomically increment the weakref count"""
         _ = self.weak_refcount.fetch_add(1)
 
     fn drop_ref(inout self) -> Bool:
-        """Atomically decrement the refcount and return true if the result
-        hits zero."""
+        """
+        Atomically decrement the refcount and weakref count.
+        Returns:
+            True iff the backing allocation for `self`
+            should (must!) be deleted
+        """
         var last_strong = self.refcount.fetch_sub(1) == 1
 
         if last_strong:
             self._destroy_value()
 
+        # defer to drop_weak() for whether the backing
+        # mem should be dealloc'd
         return self.drop_weak()
 
     fn drop_weak(inout self) -> Bool:
+        """
+        Atomically decrement the weakref count, and return
+        true if the result hits zero
+        Returns:
+            True iff the backing allocation for `self`
+            should (must!) be deleted
+        """
         var last_any = self.weak_refcount.fetch_sub(1) == 1
 
         # if this is the last weak, and there
