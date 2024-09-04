@@ -887,7 +887,7 @@ fn gather[
         return _unsafe_aliasing_address_to_pointer[type](
             base[0]
         ).load() if mask else passthrough[0]
-    return llvm_intrinsic[
+    var result = llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ](
@@ -898,6 +898,8 @@ fn gather[
         mask,
         passthrough,
     )
+    _ = base
+    return result
 
 
 # ===----------------------------------------------------------------------===#
@@ -975,6 +977,7 @@ fn scatter[
         Int32(alignment),
         mask,
     )
+    _ = base
 
 
 # ===----------------------------------------------------------------------===#
