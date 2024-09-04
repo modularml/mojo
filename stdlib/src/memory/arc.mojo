@@ -131,7 +131,11 @@ struct _ArcInner[T: Movable]:
 
 @register_passable
 struct Weak[T: Movable](CollectionElement, CollectionElementNew):
-    """Todo docstr.
+    """A Weak[T] is used much like an Arc[T], except it does not
+    prevent the target instance of T from being deinitialized/deallocated.
+
+    This is useful for data structures like cyclic graphs and doubly linked lists,
+    such that users can easily avoid memory leaks.
 
     Parameters:
         T: The type of the value that this Weak may be upgraded into an Arc[T] of.
