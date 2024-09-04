@@ -612,7 +612,7 @@ fn inlined_assembly[
                 assembly = asm.value,
                 constraints = constraints.value,
                 hasSideEffects = __mlir_attr.unit,
-            ](arg0, arg1, arg2, arg3, arg3, arg5, arg6, arg7, arg8)
+            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
         else:
             return __mlir_op.`pop.inline_asm`[
                 _type=result_type,
