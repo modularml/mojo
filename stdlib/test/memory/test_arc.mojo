@@ -29,8 +29,10 @@ def test_basic():
 struct ObservableDel(CollectionElement):
     var target: UnsafePointer[Bool]
 
+    @no_inline
     fn touch(inout self):
-        pass
+        var b = self.target[]
+        print(b)
 
     fn __init__(inout self, *, other: Self):
         self = other
@@ -70,20 +72,25 @@ def test_deleter_not_called_until_no_references_explicit_copy():
 
 
 def test_weak_upgradeable_when_strong_live():
-    var deleted = False
-    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
-    var p2 = Arc(other=p)
-    _ = p^
-    assert_false(deleted)
+    var deleted = UnsafePointer[Bool].alloc(1)
+    deleted.init_pointee_explicit_copy(False)
+    var p = Arc(ObservableDel(deleted))
+    assert_false(deleted[])
 
     var w = p.downgrade()
-
     var s_o = w.upgrade()
     assert_true(s_o)
+    assert_false(deleted[])
 
+    var s = s_o.take()
     _ = p^
+    assert_false(deleted[])
 
-    # s_o.value()[].touch()
+    s[].touch()
+    _ = s^
+    assert_true(deleted[])
+
+    deleted.free()
 
     # put access of a strong after check so that the
     # strong doesn't drop before we can upgrade
@@ -92,21 +99,13 @@ def test_weak_upgradeable_when_strong_live():
 def test_weak_dies_when_strong_dies():
     var deleted = False
     var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
-    var p2 = Arc(other=p)
-    _ = p^
     assert_false(deleted)
 
     var w = p.downgrade()
 
-    assert_true(deleted)
+    _ = p^
 
     var s_o = w.upgrade()
+
+    assert_true(deleted)
     assert_false(s_o)
-
-
-def main():
-    test_basic()
-    test_deleter_not_called_until_no_references()
-    test_deleter_not_called_until_no_references_explicit_copy()
-    test_weak_upgradeable_when_strong_live()
-    # test_weak_dies_when_strong_dies()

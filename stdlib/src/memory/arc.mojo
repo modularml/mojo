@@ -53,10 +53,10 @@ from collections import Optional, OptionalReg
 
 
 struct _ArcInner[T: Movable]:
-    var payload: UnsafeMaybeUninitialized[T]
-
     var refcount: Atomic[DType.int64]
     var weak_refcount: Atomic[DType.int64]
+
+    var payload: UnsafeMaybeUninitialized[T]
 
     fn __init__(inout self, owned value: T):
         """Create an initialized instance of this with a refcount of 1."""
@@ -65,6 +65,8 @@ struct _ArcInner[T: Movable]:
         self.payload = UnsafeMaybeUninitialized(value^)
 
     fn _destroy_value(inout self):
+        """Run the destructor for the payload, with the assumption
+        that it has not been run yet"""
         self.payload.assume_initialized_destroy()
 
     fn try_upgrade_weak(inout self) -> Bool:
@@ -90,6 +92,7 @@ struct _ArcInner[T: Movable]:
             var success = self.refcount.compare_exchange_weak(
                 cur_count, cur_count + 1
             )
+
             # TODO: should this be marked `unlikely` once we have intrinsic for it?
             # This only occurs during races on `refcount` when the strong refs
             # have churn.
@@ -101,7 +104,9 @@ struct _ArcInner[T: Movable]:
     fn add_ref(inout self):
         """Atomically increment the refcount."""
         _ = self.refcount.fetch_add(1)
-        _ = self.weak_refcount.fetch_add(1)
+
+        # any strong is also, underneath, a weak
+        self.add_weak()
 
     fn add_weak(inout self):
         _ = self.weak_refcount.fetch_add(1)
@@ -110,21 +115,18 @@ struct _ArcInner[T: Movable]:
         """Atomically decrement the refcount and return true if the result
         hits zero."""
         var last_strong = self.refcount.fetch_sub(1) == 1
-        var last_any = self.weak_refcount.fetch_sub(1) == 1
 
         if last_strong:
             self._destroy_value()
 
-        # if this is the last strong, and there are
-        # no other weaks, then we can dealloc the inner
-        return last_any
+        return self.drop_weak()
 
     fn drop_weak(inout self) -> Bool:
-        var last_weak = self.weak_refcount.fetch_sub(1) == 1
+        var last_any = self.weak_refcount.fetch_sub(1) == 1
 
         # if this is the last weak, and there
         # are no other strongs, then we can dealloc the inner
-        return last_weak
+        return last_any
 
 
 @register_passable
@@ -163,7 +165,9 @@ struct Weak[T: Movable](CollectionElement, CollectionElementNew):
         """
         var should_del = self._inner[].drop_weak()
         if should_del:
+            (self._inner).destroy_pointee()
             self._inner.free()
+        self._inner = UnsafePointer[Self._inner_type]()
 
     fn __copyinit__(inout self, other: Self):
         """Implicit copy of Weak[T],
@@ -172,7 +176,8 @@ struct Weak[T: Movable](CollectionElement, CollectionElementNew):
         Args:
             other: The Weak[T] to (implicitly) copy.
         """
-        self = Self(other=other)
+        other._inner[].add_weak()
+        self._inner = other._inner
 
     fn upgrade(inout self) -> Optional[Arc[T]]:
         """Use this to turn a Weak[T] into an Arc[T].
@@ -186,6 +191,11 @@ struct Weak[T: Movable](CollectionElement, CollectionElementNew):
         """
         var success = self._inner[].try_upgrade_weak()
         if success:
+            # add weak in here, since the "hard part" of
+            # protecting a strong is done, and we
+            # don't have to "undo" anything if
+            # we couldn't acquire the strong
+            self._inner[].add_weak()
             return Optional[](Arc[](self._inner, ()))
         else:
             return Optional[Arc[T]]()
@@ -259,8 +269,11 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
 
         Decrement the ref count for the reference. If there are no more
         references, free its memory."""
-        if self._inner[].drop_ref():
+        var should_del = self._inner[].drop_ref()
+        if should_del:
+            (self._inner).destroy_pointee()
             self._inner.free()
+        self._inner = UnsafePointer[Self._inner_type]()
 
     # FIXME: The lifetime returned for this is currently self lifetime, which
     # keeps the Arc object alive as long as there are references into it.  That
