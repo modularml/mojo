@@ -29,6 +29,9 @@ def test_basic():
 struct ObservableDel(CollectionElement):
     var target: UnsafePointer[Bool]
 
+    fn touch(inout self):
+        pass
+
     fn __init__(inout self, *, other: Self):
         self = other
 
@@ -66,7 +69,44 @@ def test_deleter_not_called_until_no_references_explicit_copy():
     assert_true(deleted)
 
 
+def test_weak_upgradeable_when_strong_live():
+    var deleted = False
+    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
+    var p2 = Arc(other=p)
+    _ = p^
+    assert_false(deleted)
+
+    var w = p.downgrade()
+
+    var s_o = w.upgrade()
+    assert_true(s_o)
+
+    _ = p^
+
+    # s_o.value()[].touch()
+
+    # put access of a strong after check so that the
+    # strong doesn't drop before we can upgrade
+
+
+def test_weak_dies_when_strong_dies():
+    var deleted = False
+    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
+    var p2 = Arc(other=p)
+    _ = p^
+    assert_false(deleted)
+
+    var w = p.downgrade()
+
+    assert_true(deleted)
+
+    var s_o = w.upgrade()
+    assert_false(s_o)
+
+
 def main():
     test_basic()
     test_deleter_not_called_until_no_references()
     test_deleter_not_called_until_no_references_explicit_copy()
+    test_weak_upgradeable_when_strong_live()
+    # test_weak_dies_when_strong_dies()
