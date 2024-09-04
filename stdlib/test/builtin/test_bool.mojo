@@ -149,6 +149,11 @@ def test_comparisons():
     assert_true(True <= True)
 
 
+def test_float_conversion():
+    assert_equal((True).__float__(), 1.0)
+    assert_equal((False).__float__(), 0.0)
+
+
 def main():
     test_default()
     test_bool_cast_to_int()
@@ -160,3 +165,4 @@ def main():
     test_neg()
     test_indexer()
     test_comparisons()
+    test_float_conversion()
