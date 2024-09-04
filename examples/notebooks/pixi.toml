@@ -7,7 +7,7 @@ channels = ["conda-forge", "https://conda.cloudsmith.io/modular/max"]
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 
 [dependencies]
-python = ">=3.8,<3.12"
+python = ">=3.9,<3.13"
 max = "*"
 pip = ">=24.0,<25"
 jupyterlab = ">=4.2.5,<5"
