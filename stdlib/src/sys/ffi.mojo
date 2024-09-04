@@ -17,12 +17,59 @@ from memory import UnsafePointer
 
 from utils import StringRef
 
-from .info import os_is_linux, os_is_windows
+from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
 from .intrinsics import _mlirtype_is_eq
 from builtin.builtin_list import _LITRefPackHelper
 
 alias C_char = Int8
 """C `char` type."""
+
+alias C_int = Int32
+"""C `int` type.
+
+The C `int` type is typically a signed 32-bit integer on commonly used targets
+today.
+"""
+
+alias C_long = Scalar[_c_long_dtype()]
+"""C `long` type.
+
+The C `long` type is typically a signed 64-bit integer on macOS and Linux, and a
+32-bit integer on Windows."""
+
+alias C_long_long = Scalar[_c_long_long_dtype()]
+"""C `long long` type.
+
+The C `long long` type is typically a signed 64-bit integer on commonly used
+targets today."""
+
+
+fn _c_long_dtype() -> DType:
+    # https://en.wikipedia.org/wiki/64-bit_computing#64-bit_data_models
+
+    @parameter
+    if is_64bit() and (os_is_macos() or os_is_linux()):
+        # LP64
+        return DType.int64
+    elif is_64bit() and os_is_windows():
+        # LLP64
+        return DType.int32
+    else:
+        constrained[False, "size of C `long` is unknown on this target"]()
+        return abort[DType]()
+
+
+fn _c_long_long_dtype() -> DType:
+    # https://en.wikipedia.org/wiki/64-bit_computing#64-bit_data_models
+
+    @parameter
+    if is_64bit() and (os_is_macos() or os_is_linux() or os_is_windows()):
+        # On a 64-bit CPU, `long long` is *always* 64 bits in every OS's data
+        # model.
+        return DType.int64
+    else:
+        constrained[False, "size of C `long long` is unknown on this target"]()
+        return abort[DType]()
 
 
 struct RTLD:
