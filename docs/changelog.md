@@ -25,6 +25,19 @@ what we publish.
   `Debug Mojo File`. A corresponding button appears in `Run and Debug` selector
   in the top right corner of a Mojo File.
 
+- Add the `Floatable` and `FloatableRaising` traits to denote types that can
+  be converted to a `Float64` value using the builtin `float` function.
+  - Make `SIMD` and `FloatLiteral` conform to the `Floatable` trait.
+
+  ```mojo
+  fn foo[F: Floatable](v: F):
+    ...
+
+  var f = float(Int32(45))
+  ```
+  
+  ([PR #3163](https://github.com/modularml/mojo/pull/3163) by [@bgreni](https://github.com/bgreni))
+
 ### 🦋 Changed
 
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method

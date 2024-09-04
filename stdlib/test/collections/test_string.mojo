@@ -1580,6 +1580,15 @@ def test_center():
     assert_equal(String("hello").center(8, "*"), "*hello**")
 
 
+def test_float_conversion():
+    # This is basically just a wrapper around atof which is
+    # more throughouly tested above
+    assert_equal(String("4.5").__float__(), 4.5)
+    assert_equal(float(String("4.5")), 4.5)
+    with assert_raises():
+        _ = float(String("not a float"))
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1633,3 +1642,4 @@ def main():
     test_rjust()
     test_ljust()
     test_center()
+    test_float_conversion()

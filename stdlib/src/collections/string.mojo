@@ -687,6 +687,7 @@ struct String(
     Formattable,
     ToFormatter,
     CollectionElementNew,
+    FloatableRaising,
 ):
     """Represents a mutable string."""
 
@@ -1941,6 +1942,16 @@ struct String(
             An integer value that represents the string, or otherwise raises.
         """
         return atol(self)
+
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
 
     fn __mul__(self, n: Int) -> String:
         """Concatenates the string `n` times.

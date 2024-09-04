@@ -42,6 +42,7 @@ struct StringLiteral(
     Representable,
     Sized,
     Stringable,
+    FloatableRaising,
 ):
     """This type represents a string literal.
 
@@ -213,6 +214,16 @@ struct StringLiteral(
             An integer value that represents the string, or otherwise raises.
         """
         return _atol(self)
+
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
 
     @no_inline
     fn __str__(self) -> String:

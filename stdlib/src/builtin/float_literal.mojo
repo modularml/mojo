@@ -36,6 +36,7 @@ struct FloatLiteral(
     Roundable,
     Stringable,
     Truncable,
+    Floatable,
 ):
     """Mojo floating point literal type."""
 
@@ -147,6 +148,15 @@ struct FloatLiteral(
             The value as an integer.
         """
         return self.__int_literal__().__int__()
+
+    @always_inline("nodebug")
+    fn __float__(self) -> Float64:
+        """Converts the FloatLiteral to a concrete Float64.
+
+        Returns:
+            The Float value.
+        """
+        return Float64(self)
 
     # ===------------------------------------------------------------------===#
     # Unary Operators

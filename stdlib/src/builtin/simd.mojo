@@ -166,6 +166,7 @@ struct SIMD[type: DType, size: Int](
     CeilDivable,
     CollectionElement,
     CollectionElementNew,
+    Floatable,
     Floorable,
     Formattable,
     Hashable,
@@ -1344,6 +1345,21 @@ struct SIMD[type: DType, size: Int](
             return __mlir_op.`pop.cast`[
                 _type = __mlir_type.`!pop.scalar<index>`
             ](rebind[Scalar[type]](self).value)
+
+    @always_inline("nodebug")
+    fn __float__(self) -> Float64:
+        """Casts the value to a float.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            The value as a float.
+        """
+        constrained[size == 1, "expected a scalar type"]()
+        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](
+            rebind[Scalar[type]](self).value
+        )
 
     @no_inline
     fn __str__(self) -> String:
