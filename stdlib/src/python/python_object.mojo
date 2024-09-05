@@ -359,6 +359,18 @@ struct PythonObject(
         Python.throw_python_exception_if_error_state(cpython)
         return _PyIter(PythonObject(iter))
 
+    fn steal_data(owned self) -> PyObjectPtr:
+        """Take ownership of the underlying pointer from the Python object.
+
+        Returns:
+            The underlying data.
+        """
+        var ptr = self.py_object
+
+        self.py_object = PyObjectPtr()
+
+        return ptr
+
     fn __del__(owned self):
         """Destroy the object.
 
