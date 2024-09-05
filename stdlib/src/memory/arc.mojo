@@ -52,17 +52,37 @@ from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from collections import Optional, OptionalReg
 
 
-struct _ArcInner[T: Movable]:
+struct _ArcInner[T: Movable, EnableWeak: Bool = False]:
     var refcount: Atomic[DType.int64]
-    var weak_refcount: Atomic[DType.int64]
-
     var payload: UnsafeMaybeUninitialized[T]
+    
+    alias _weak_refcount_type = __mlir_type[
+        `!pop.array<`, Int(EnableWeak).value, `, `, Atomic[DType.int64], `>`
+    ]
+
+    var weak_refcount: Self._weak_refcount_type
 
     fn __init__(inout self, owned value: T):
         """Create an initialized instance of this with a refcount of 1."""
         self.refcount = 1
-        self.weak_refcount = 1
+        
+        @parameter
+        if EnableWeak:
+            var p = self._weakref_ptr()
+            p.init_pointee_explicit_copy(Atomic[DType.int64](1))
         self.payload = UnsafeMaybeUninitialized(value^)
+        
+    fn _weakref_ptr(inout self) -> UnsafePointer[Atomic[DType.int64]]:
+        constrained[EnableWeak, "can't get ptr, since there is no weakref to point to"]()
+
+        @parameter
+        if EnableWeak:
+            var ptr = __mlir_op.`pop.array.gep`(
+                UnsafePointer.address_of(self.weak_refcount).address,
+                Int(0).value
+            )
+        
+            return UnsafePointer(ptr)
 
     fn _destroy_value(inout self):
         """
@@ -87,33 +107,41 @@ struct _ArcInner[T: Movable]:
         # when we haven't shown to ourselves that we are one.
         # This loop does the equivalent of
         # `fetch_add_if_neq(add: 1, if_neq: 0)`
-        while True:
-            var cur_count = self.refcount.load()
-            if cur_count == 0:
-                return False
+        @parameter
+        if EnableWeak:
+            while True:
+                var cur_count = self.refcount.load()
+                if cur_count == 0:
+                    return False
 
-            var success = self.refcount.compare_exchange_weak(
-                cur_count, cur_count + 1
-            )
+                var success = self.refcount.compare_exchange_weak(
+                    cur_count, cur_count + 1
+                )
 
-            # TODO: should this be marked `unlikely` once we have intrinsic for it?
-            # This only occurs during races on `refcount` when the strong refs
-            # have churn.
-            if not success:
-                continue
+                # TODO: should this be marked `unlikely` once we have intrinsic for it?
+                # This only occurs during races on `refcount` when the strong refs
+                # have churn.
+                if not success:
+                    continue
 
-            return True
+                return True
+        else:
+            return False
 
     fn add_ref(inout self):
         """Atomically increment the refcount."""
         _ = self.refcount.fetch_add(1)
 
         # any strong is also, underneath, a weak
-        self.add_weak()
+        @parameter
+        if EnableWeak:
+            self.add_weak()
 
     fn add_weak(inout self):
         """Atomically increment the weakref count"""
-        _ = self.weak_refcount.fetch_add(1)
+        @parameter
+        if EnableWeak:
+            _ = self._weakref_ptr()[].fetch_add(1)
 
     fn drop_ref(inout self) -> Bool:
         """
@@ -129,7 +157,11 @@ struct _ArcInner[T: Movable]:
 
         # defer to drop_weak() for whether the backing
         # mem should be dealloc'd
-        return self.drop_weak()
+        @parameter
+        if EnableWeak:
+            return self.drop_weak()
+        else:
+            return last_strong
 
     fn drop_weak(inout self) -> Bool:
         """
@@ -139,11 +171,16 @@ struct _ArcInner[T: Movable]:
             True iff the backing allocation for `self`
             should (must!) be deleted
         """
-        var last_any = self.weak_refcount.fetch_sub(1) == 1
+        @parameter
+        if EnableWeak:
+            var last_any = self._weakref_ptr()[].fetch_sub(1) == 1
 
-        # if this is the last weak, and there
-        # are no other strongs, then we can dealloc the inner
-        return last_any
+            # if this is the last weak, and there
+            # are no other strongs, then we can dealloc the inner
+            return last_any
+        else:
+            #TODO: statically ensure unreachable?
+            return False
 
 
 @register_passable
@@ -161,7 +198,7 @@ struct Weak[T: Movable](CollectionElement, CollectionElementNew):
     alias _inner_type = _ArcInner[T]
     var _inner: UnsafePointer[Self._inner_type]
 
-    fn __init__(inout self, strong: Arc[T]):
+    fn __init__(inout self, strong: Arc[T, True]):
         """Allows creating a Weak[T] given an Arc[T].
 
         Args:
@@ -223,7 +260,7 @@ struct Weak[T: Movable](CollectionElement, CollectionElementNew):
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Arc[T: Movable, EnableWeak: Bool = False](CollectionElement, CollectionElementNew):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -327,7 +364,12 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             A Weak ref to the underlying data that will not prevent destruction
             if all Arc[T] to that data drop.
         """
-        return Weak[T](self)
+        constrained[EnableWeak, "A typical Arc[T] does not support downgrading." + 
+            "If you want to enable downgrading of this Arc[T], convert it to an Arc[T, EnableWeak = True]"]()
+        
+        @parameter
+        if EnableWeak:
+            return Weak[T](self)
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
