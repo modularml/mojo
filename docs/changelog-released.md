@@ -70,6 +70,8 @@ tool beyond the 24.5 release. You must now use [Magic](/magic/) or
 
 ### ✨ Highlights
 
+- Mojo now supports Python 3.12 interoperability.
+
 - The set of automatically imported entities (types, aliases, functions) into
   users' Mojo programs has been dramatically reduced. This can break existing
   user code as users will need to explicitly import what they're using for cases
@@ -632,6 +634,8 @@ tool beyond the 24.5 release. You must now use [Magic](/magic/) or
     what the reference points to.
 
 - Python interoperability changes:
+
+  - Mojo now supports Python 3.12 interoperability.
 
   - Creating a nested
     [`PythonObject`](/mojo/stdlib/python/python_object/PythonObject) from a list
