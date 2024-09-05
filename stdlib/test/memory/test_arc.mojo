@@ -110,6 +110,7 @@ def test_weak_dies_when_strong_dies():
     assert_true(deleted)
     assert_false(s_o)
 
+
 def main():
     test_basic()
     test_deleter_not_called_until_no_references()
