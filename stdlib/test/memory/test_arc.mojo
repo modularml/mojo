@@ -64,7 +64,7 @@ def test_deleter_not_called_until_no_references_explicit_copy():
     assert_false(deleted)
 
     var vec = List[Arc[ObservableDel]]()
-    vec.append(Arc(other=p2)^)
+    vec.append(Arc(other=p2))
     _ = p2^
     assert_false(deleted)
     _ = vec^
