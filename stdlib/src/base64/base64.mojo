@@ -23,6 +23,17 @@ from collections import List
 from sys import simdwidthof
 import bit
 
+# We make use of the following papers for the implementation, note that there
+# are some small differences.
+# Wojciech Muła, Daniel Lemire, Base64 encoding and decoding at almost the
+# speed of a memory copy, Software: Practice and Experience 50 (2), 2020.
+# https://arxiv.org/abs/1910.05109
+#
+# Wojciech Muła, Daniel Lemire, Faster Base64 Encoding and Decoding using AVX2
+# Instructions, ACM Transactions on the Web 12 (3), 2018.
+# https://arxiv.org/abs/1704.00605
+
+
 # ===----------------------------------------------------------------------===#
 # Utilities
 # ===----------------------------------------------------------------------===#
@@ -117,6 +128,63 @@ fn _repeat_until[
         return _repeat_until[target_size](vector.join(vector))
 
 
+@always_inline
+fn _move_first_group_of_6_bits[
+    simd_width: Int
+](shuffled_vector: SIMD[DType.uint8, simd_width]) -> __type_of(shuffled_vector):
+    alias mask_1 = _repeat_until[simd_width](
+        SIMD[DType.uint8, 4](0b11111100, 0, 0, 0)
+    )
+    var masked_1 = shuffled_vector & mask_1
+    return masked_1 >> 2
+
+
+@always_inline
+fn _move_second_group_of_6_bits[
+    simd_width: Int
+](shuffled_vector: SIMD[DType.uint8, simd_width]) -> __type_of(shuffled_vector):
+    alias mask_2 = _repeat_until[simd_width](
+        SIMD[DType.uint8, 4](0b00000011, 0b11110000, 0, 0)
+    )
+    var masked_2 = shuffled_vector & mask_2
+    var masked_2_as_uint16 = _bitcast[DType.uint16, 8](masked_2)
+    var rotated_2 = bit.rotate_bits_right[4](masked_2_as_uint16)
+    return _bitcast[DType.uint8, simd_width](rotated_2)
+
+
+@always_inline
+fn _move_third_group_of_6_bits[
+    simd_width: Int
+](shuffled_vector: SIMD[DType.uint8, simd_width]) -> __type_of(shuffled_vector):
+    alias mask_3 = _repeat_until[simd_width](
+        SIMD[DType.uint8, 4](
+            0,
+            0,
+            0b00001111,
+            0b11000000,
+        )
+    )
+    var masked_3 = shuffled_vector & mask_3
+    var masked_3_as_uint16 = _bitcast[DType.uint16, 8](masked_3)
+    var rotated_3 = bit.rotate_bits_left[2](masked_3_as_uint16)
+    return _bitcast[DType.uint8, simd_width](rotated_3)
+
+
+@always_inline
+fn _move_fourth_group_of_6_bits[
+    simd_width: Int
+](shuffled_vector: SIMD[DType.uint8, simd_width]) -> __type_of(shuffled_vector):
+    alias mask_4 = _repeat_until[simd_width](
+        SIMD[DType.uint8, 4](
+            0,
+            0,
+            0,
+            0b00111111,
+        )
+    )
+    return shuffled_vector & mask_4
+
+
 fn _to_b64_ascii(
     input_vector: SIMD[DType.uint8, simd_width]
 ) -> SIMD[DType.uint8, simd_width]:
@@ -129,44 +197,12 @@ fn _to_b64_ascii(
     var shuffled_vector = input_vector._dynamic_shuffle(shuffle_mask)
 
     # We have 4 different masks to extract each group of 6 bits from the 4 bytes
-    alias mask_1 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](0b11111100, 0, 0, 0)
+    var ready_to_encode_per_byte = (
+        _move_first_group_of_6_bits(shuffled_vector)
+        | _move_second_group_of_6_bits(shuffled_vector)
+        | _move_third_group_of_6_bits(shuffled_vector)
+        | _move_fourth_group_of_6_bits(shuffled_vector)
     )
-    var masked_1 = shuffled_vector & mask_1
-    var shifted_1 = masked_1 >> 2
-
-    alias mask_2 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](0b00000011, 0b11110000, 0, 0)
-    )
-    var masked_2 = shuffled_vector & mask_2
-    var masked_2_as_uint16 = _bitcast[DType.uint16, 8](masked_2)
-    var rotated_2 = bit.rotate_bits_right[4](masked_2_as_uint16)
-    var shifted_2 = _bitcast[DType.uint8, simd_width](rotated_2)
-
-    alias mask_3 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](
-            0,
-            0,
-            0b00001111,
-            0b11000000,
-        )
-    )
-    var masked_3 = shuffled_vector & mask_3
-    var masked_3_as_uint16 = _bitcast[DType.uint16, 8](masked_3)
-    var rotated_3 = bit.rotate_bits_left[2](masked_3_as_uint16)
-    var shifted_3 = _bitcast[DType.uint8, simd_width](rotated_3)
-
-    alias mask_4 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](
-            0,
-            0,
-            0,
-            0b00111111,
-        )
-    )
-    var shifted_4 = shuffled_vector & mask_4
-
-    var ready_to_encode_per_byte = shifted_1 | shifted_2 | shifted_3 | shifted_4
     # See the table above for the offsets, we try to go from 6-bits values to target indexes.
     var saturated = _subtract_with_saturation[51](ready_to_encode_per_byte)
 
