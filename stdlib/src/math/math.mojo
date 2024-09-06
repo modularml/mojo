@@ -1080,14 +1080,14 @@ fn iota[
         return offset
     elif type.is_integral():
         var step = llvm_intrinsic[
-            "llvm.experimental.stepvector",
+            "llvm.stepvector",
             SIMD[type, simd_width],
             has_side_effect=False,
         ]()
         return step + offset
     else:
         var it = llvm_intrinsic[
-            "llvm.experimental.stepvector",
+            "llvm.stepvector",
             SIMD[DType.index, simd_width],
             has_side_effect=False,
         ]()
