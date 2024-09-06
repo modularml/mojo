@@ -35,8 +35,12 @@ what we publish.
 
   var f = float(Int32(45))
   ```
-  
+
   ([PR #3163](https://github.com/modularml/mojo/pull/3163) by [@bgreni](https://github.com/bgreni))
+
+- Add `DLHandle.get_symbol()`, for getting a pointer to a symbol in a dynamic
+  library. This is more general purpose than the existing methods for getting
+  function pointers.
 
 ### 🦋 Changed
 
