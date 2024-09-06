@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from collections import InlineArray
-from os import getenv, setenv
+from os import getenv, setenv, abort
 from os.path import dirname
 from pathlib import Path
 from sys import external_call
@@ -402,14 +402,13 @@ struct PyModuleDef(Stringable, Representable, Formattable):
 
 struct CPython:
     var lib: DLHandle
-    var none_value: PyObjectPtr
     var dict_type: PyObjectPtr
     var logging_enabled: Bool
     var version: PythonVersion
     var total_ref_count: UnsafePointer[Int]
     var init_error: StringRef
 
-    fn __init__(inout self: CPython):
+    fn __init__(inout self):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
@@ -445,7 +444,6 @@ struct CPython:
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
-        self.none_value = PyObjectPtr()
         self.dict_type = PyObjectPtr()
         self.logging_enabled = logging_enabled
         if not self.init_error:
@@ -460,7 +458,6 @@ struct CPython:
 
     @staticmethod
     fn destroy(inout existing: CPython):
-        existing.Py_DecRef(existing.none_value)
         if existing.logging_enabled:
             print("CPython destroy")
             var remaining_refs = existing.total_ref_count.take_pointee()
@@ -494,23 +491,26 @@ struct CPython:
 
     fn Py_None(inout self) -> PyObjectPtr:
         """Get a None value, of type NoneType."""
-        if self.none_value.is_null():
-            var list_obj = self.PyList_New(0)
-            var tuple_obj = self.PyTuple_New(0)
-            var callable_obj = self.PyObject_GetAttrString(list_obj, "reverse")
-            self.none_value = self.PyObject_CallObject(callable_obj, tuple_obj)
-            self.Py_DecRef(tuple_obj)
-            self.Py_DecRef(callable_obj)
-            self.Py_DecRef(list_obj)
-        return self.none_value
+
+        # Get pointer to the immortal `None` PyObject struct instance.
+        # Note:
+        #   The name of this global is technical a private part of the
+        #   CPython API, but unfortunately the only stable ways to access it are
+        #   macros.
+        var ptr = self.lib.get_symbol[Int8](
+            "_Py_NoneStruct",
+        )
+
+        if not ptr:
+            abort("error: unable to get pointer to CPython `None` struct")
+
+        return PyObjectPtr(ptr)
 
     fn __del__(owned self):
         pass
 
     fn __copyinit__(inout self, existing: Self):
         self.lib = existing.lib
-        # None is a global variable
-        self.none_value = existing.none_value
         self.dict_type = existing.dict_type
         self.logging_enabled = existing.logging_enabled
         self.version = existing.version

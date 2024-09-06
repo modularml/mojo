@@ -69,6 +69,10 @@ struct Python:
     var impl: _PythonInterfaceImpl
     """The underlying implementation of Mojo's Python interface."""
 
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
     fn __init__(inout self):
         """Default constructor."""
         self.impl = _get_global_python_itf()

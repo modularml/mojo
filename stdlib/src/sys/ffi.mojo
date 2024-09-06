@@ -212,20 +212,13 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         Returns:
             A handle to the function.
         """
-        debug_assert(self.handle, "Dylib handle is null")
+        var opaque_function_ptr = self.get_symbol[NoneType](name)
 
-        @parameter
-        if not os_is_windows():
-            var opaque_function_ptr = external_call[
-                "dlsym", UnsafePointer[Int8]
-            ](self.handle.address, name)
-            var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
-                result_type
-            ]()[]
-            _ = opaque_function_ptr
-            return result
-        else:
-            return abort[result_type]("get_function isn't supported on windows")
+        var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
+            result_type
+        ]()[]
+        _ = opaque_function_ptr
+        return result
 
     @always_inline
     fn _get_function[
@@ -243,6 +236,50 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         """
 
         return self._get_function[result_type](func_name.unsafe_cstr_ptr())
+
+    fn get_symbol[
+        result_type: AnyType,
+    ](self, name: StringLiteral) -> UnsafePointer[result_type]:
+        """Returns a pointer to the symbol with the given name in the dynamic
+        library.
+
+        Parameters:
+            result_type: The type of the symbol to return.
+
+        Args:
+            name: The name of the symbol to get the handle for.
+
+        Returns:
+            A pointer to the symbol.
+        """
+        return self.get_symbol[result_type](name.unsafe_cstr_ptr())
+
+    fn get_symbol[
+        result_type: AnyType
+    ](self, name: UnsafePointer[Int8]) -> UnsafePointer[result_type]:
+        """Returns a pointer to the symbol with the given name in the dynamic
+        library.
+
+        Parameters:
+            result_type: The type of the symbol to return.
+
+        Args:
+            name: The name of the symbol to get the handle for.
+
+        Returns:
+            A pointer to the symbol.
+        """
+        debug_assert(self.handle, "Dylib handle is null")
+
+        @parameter
+        if not os_is_windows():
+            return external_call["dlsym", UnsafePointer[result_type]](
+                self.handle.address, name
+            )
+        else:
+            return abort[UnsafePointer[result_type]](
+                "get_symbol isn't supported on windows"
+            )
 
 
 # ===----------------------------------------------------------------------===#
