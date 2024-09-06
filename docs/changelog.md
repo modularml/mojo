@@ -42,6 +42,10 @@ what we publish.
   library. This is more general purpose than the existing methods for getting
   function pointers.
 
+- Introduce `TypedPythonObject` as a light-weight way to annotate `PythonObject`
+  values with static type information. This design will likely evolve and
+  chagne significantly.
+
 ### 🦋 Changed
 
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
