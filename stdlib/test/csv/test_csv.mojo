@@ -49,7 +49,11 @@ def test_reader():
     var csv_path = _dir_of_current_file() / "people.csv"
     with open(csv_path, "r") as csv_file:
         var r = reader(
-            csv_file, delimiter=",", quotechar='"', lineterminator="\n"
+            csv_file,
+            delimiter=",",
+            doublequote=True,
+            quotechar='"',
+            lineterminator="\n",
         )
         var r_it = r.__iter__()
         assert_line_equal(
@@ -63,6 +67,10 @@ def test_reader():
         assert_line_equal(
             r_it.__next__(),
             List(String("Sarah"), String("21"), String("Female")),
+        )
+        assert_line_equal(
+            r_it.__next__(),
+            List(String('Dwayne "The Rock"'), String("52"), String("Male")),
         )
 
 

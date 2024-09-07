@@ -182,7 +182,11 @@ struct reader:
                 and field_ref[][-1] == self._dialect.quotechar
             ):
                 field_ref[] = field_ref[][1:-1]
-            # TODO: Handle the doublequote, skipinitialspace and escapechar options
+            if self._dialect.doublequote:
+                field_ref[] = field_ref[].replace(
+                    self._dialect.quotechar * 2, self._dialect.quotechar
+                )
+            # TODO: Handle the skipinitialspace and escapechar options
         return line
 
     fn lines_count(self: Self) -> Int:
