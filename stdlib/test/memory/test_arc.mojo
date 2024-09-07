@@ -74,7 +74,7 @@ def test_deleter_not_called_until_no_references_explicit_copy():
 def test_weak_upgradeable_when_strong_live():
     var deleted = UnsafePointer[Bool].alloc(1)
     deleted.init_pointee_explicit_copy(False)
-    var p = Arc(ObservableDel(deleted))
+    var p = Arc[ObservableDel, enable_weak = True](ObservableDel(deleted))
     assert_false(deleted[])
 
     var w = p.downgrade()
@@ -98,7 +98,7 @@ def test_weak_upgradeable_when_strong_live():
 
 def test_weak_dies_when_strong_dies():
     var deleted = False
-    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
+    var p = Arc[ObservableDel, enable_weak = True](ObservableDel(UnsafePointer.address_of(deleted)))
     assert_false(deleted)
 
     var w = p.downgrade()
