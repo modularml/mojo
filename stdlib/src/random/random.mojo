@@ -24,6 +24,8 @@ from time import perf_counter_ns
 from collections import Optional
 
 from memory import UnsafePointer
+from math import floor
+import math
 
 
 fn _get_random_state() -> UnsafePointer[NoneType]:
@@ -59,9 +61,7 @@ fn random_float64(min: Float64 = 0, max: Float64 = 1) -> Float64:
     Returns:
         A random number from the specified range.
     """
-    return external_call["KGEN_CompilerRT_RandomDouble", Float64](
-        _get_random_state(), min, max
-    )
+    return external_call["KGEN_CompilerRT_RandomDouble", Float64](min, max)
 
 
 fn random_si64(min: Int64, max: Int64) -> Int64:
@@ -74,9 +74,7 @@ fn random_si64(min: Int64, max: Int64) -> Int64:
     Returns:
         A random number from the specified range.
     """
-    return external_call["KGEN_CompilerRT_RandomSInt64", Int64](
-        _get_random_state(), min, max
-    )
+    return external_call["KGEN_CompilerRT_RandomSInt64", Int64](min, max)
 
 
 fn random_ui64(min: UInt64, max: UInt64) -> UInt64:
@@ -89,9 +87,7 @@ fn random_ui64(min: UInt64, max: UInt64) -> UInt64:
     Returns:
         A random number from the specified range.
     """
-    return external_call["KGEN_CompilerRT_RandomUInt64", UInt64](
-        _get_random_state(), min, max
-    )
+    return external_call["KGEN_CompilerRT_RandomUInt64", UInt64](min, max)
 
 
 fn randint[
@@ -125,7 +121,7 @@ fn randint[
 fn rand[
     type: DType
 ](
-    ptr: UnsafePointer[Scalar[type]],
+    ptr: UnsafePointer[Scalar[type], *_],
     size: Int,
     /,
     *,
@@ -145,8 +141,6 @@ fn rand[
         max: The maximum value for random.
         int_scale: The scale for error checking (float type only).
     """
-    alias bitwidth = bitwidthof[type]()
-
     var scale_val = int_scale.or_else(-1)
 
     @parameter
@@ -155,12 +149,7 @@ fn rand[
             var scale_double: Float64 = (1 << scale_val)
             for i in range(size):
                 var rnd = random_float64(min, max)
-                ptr[i] = (
-                    (rnd * scale_double)
-                    .cast[DType.int64]()
-                    .cast[DType.float64]()
-                    / scale_double
-                ).cast[type]()
+                ptr[i] = (floor(rnd * scale_double) / scale_double).cast[type]()
         else:
             for i in range(size):
                 var rnd = random_float64(min, max)
@@ -169,38 +158,22 @@ fn rand[
         return
 
     @parameter
-    if type is DType.bool:
-        var min_: UInt64 = 0 if min < 0 else min.cast[DType.uint64]()
-        var max_: UInt64 = (1 << bitwidth) - 1
-        max_ = (
-            max.cast[DType.uint64]() if max.cast[DType.uint64]()
-            < max_ else max_
-        )
-        for i in range(size):
-            ptr[i] = random_ui64(min_, max_).cast[type]()
-        return
-
-    @parameter
     if type.is_signed():
-        var min_: Int64 = -(1 << (bitwidth - 1))
-        min_ = (
-            min.cast[DType.int64]() if min.cast[DType.int64]() > min_ else min_
+        var min_ = math.max(
+            Scalar[type].MIN.cast[DType.int64](), min.cast[DType.int64]()
         )
-        var max_: Int64 = (1 << (bitwidth - 1)) - 1
-        max_ = (
-            max.cast[DType.int64]() if max.cast[DType.int64]() < max_ else max_
+        var max_ = math.min(
+            max.cast[DType.int64](), Scalar[type].MAX.cast[DType.int64]()
         )
         for i in range(size):
             ptr[i] = random_si64(min_, max_).cast[type]()
         return
 
     @parameter
-    if type.is_unsigned():
-        var min_: UInt64 = 0 if min < 0 else min.cast[DType.uint64]()
-        var max_: UInt64 = (1 << bitwidth) - 1
-        max_ = (
-            max.cast[DType.uint64]() if max.cast[DType.uint64]()
-            < max_ else max_
+    if type is DType.bool or type.is_unsigned():
+        var min_ = math.max(0, min.cast[DType.uint64]())
+        var max_ = math.min(
+            max.cast[DType.uint64](), Scalar[type].MAX.cast[DType.uint64]()
         )
         for i in range(size):
             ptr[i] = random_ui64(min_, max_).cast[type]()
@@ -218,7 +191,7 @@ fn randn_float64(mean: Float64 = 0.0, variance: Float64 = 1.0) -> Float64:
         A random float64 sampled from Normal(mean, variance).
     """
     return external_call["KGEN_CompilerRT_NormalDouble", Float64](
-        _get_random_state(), mean, variance
+        mean, variance
     )
 
 
