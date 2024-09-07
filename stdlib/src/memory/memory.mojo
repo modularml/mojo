@@ -61,7 +61,7 @@ fn _memcmp_impl_unconstrained[
         return 0
 
     var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector",
+        "llvm.stepvector",
         SIMD[DType.uint8, simd_width],
         has_side_effect=False,
     ]()
