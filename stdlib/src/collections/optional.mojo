@@ -313,7 +313,7 @@ struct Optional[T: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -330,7 +330,7 @@ struct Optional[T: CollectionElement](
         return self.unsafe_value()
 
     @always_inline
-    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
