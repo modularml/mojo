@@ -44,7 +44,14 @@ what we publish.
 
 - Introduce `TypedPythonObject` as a light-weight way to annotate `PythonObject`
   values with static type information. This design will likely evolve and
-  chagne significantly.
+  change significantly.
+
+- The `__type_of(x)` and `__lifetime_of(x)` operators are much more general now:
+  they allow arbitrary expressions inside of them, allow referring to dynamic
+  values in parameter contexts, and even allow referring to raising functions
+  in non-raising contexts.  These operations never evaluate their expression, so
+  any side effects that occur in the expression are never evaluated at runtime,
+  eliminating concerns about `__type_of(expensive())` being a problem.
 
 ### 🦋 Changed
 
