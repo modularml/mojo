@@ -1,0 +1,13 @@
+[project]
+name = "Mojo notebooks"
+version = "1.0.0"
+description = "Environment for running JupyterLab"
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.cloudsmith.io/modular/max"]
+platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
+
+[dependencies]
+python = ">=3.9,<3.13"
+max = "*"
+pip = ">=24.0,<25"
+jupyterlab = ">=4.2.5,<5"

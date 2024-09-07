@@ -31,12 +31,20 @@ from .python import Python, _get_global_python_itf
 struct _PyIter(Sized):
     """A Python iterator."""
 
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
     var iterator: PythonObject
     """The iterator object that stores location."""
     var preparedNextItem: PythonObject
     """The next item to vend or zero if there are no items."""
     var isDone: Bool
     """Stores True if the iterator is pointing to the last item."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __copyinit__(inout self, existing: Self):
         """Copy another iterator.
@@ -70,6 +78,10 @@ struct _PyIter(Sized):
         self.isDone = True
         self.preparedNextItem = PythonObject(PyObjectPtr())
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     fn __next__(inout self: _PyIter) -> PythonObject:
         """Return the next item and update to point to subsequent item.
 
@@ -101,6 +113,67 @@ struct _PyIter(Sized):
 
 
 @register_passable
+struct TypedPythonObject[type_hint: StringLiteral]:
+    """A wrapper around `PythonObject` that indicates the type of the contained
+    object.
+
+    The PythonObject structure is entirely dynamically typed. This type provides
+    a weak layer of optional static typing.
+
+    Parameters:
+        type_hint: The type name hint indicating the static type of this
+            object.
+    """
+
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
+    var _obj: PythonObject
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    fn __init__(inout self, *, owned unsafe_unchecked_from: PythonObject):
+        """Construct a TypedPythonObject without any validation that the given
+        object is of the specified hinted type.
+
+        Args:
+            unsafe_unchecked_from: The PythonObject to construct from. This
+                will not be type checked.
+        """
+        self._obj = unsafe_unchecked_from^
+
+    fn __copyinit__(inout self, other: Self):
+        """Copy an instance of this type.
+
+        Args:
+            other: The value to copy.
+        """
+        self._obj = other._obj
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    # TODO:
+    #   This should have lifetime, or we should do this with a context
+    #   manager, to prevent use after ASAP destruction.
+    fn unsafe_as_py_object_ptr(inout self) -> PyObjectPtr:
+        """Get the underlying PyObject pointer.
+
+        Returns:
+            The underlying PyObject pointer.
+
+        Safety:
+            Use-after-free: The caller must take care that `self` outlives the
+            usage of the pointer returned by this function.
+        """
+        return self._obj.unsafe_as_py_object_ptr()
+
+
+@register_passable
 struct PythonObject(
     ImplicitlyBoolable,
     Indexer,
@@ -112,8 +185,16 @@ struct PythonObject(
 ):
     """A Python object."""
 
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
     var py_object: PyObjectPtr
     """A pointer to the underlying Python object."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Initialize the object with a `None` value."""
@@ -136,6 +217,24 @@ struct PythonObject(
             ptr: The `PyObjectPtr` to take ownership of.
         """
         self.py_object = ptr
+
+    fn __init__(inout self, owned typed_obj: TypedPythonObject[_]):
+        """Construct a PythonObject from a typed object, dropping the type hint
+        information.
+
+        This is a no-op at runtime. The only information that is lost is static
+        type information.
+
+        Args:
+            typed_obj: The typed python object to unwrap.
+        """
+
+        # Note: Mark `typed_obj` as destroyed so we can move out of its field.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(typed_obj)
+        )
+
+        self = typed_obj._obj^
 
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
@@ -345,6 +444,10 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         cpython.Py_IncRef(self.py_object)
 
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
     fn __iter__(self) raises -> _PyIter:
         """Iterate over the object.
 
@@ -358,6 +461,34 @@ struct PythonObject(
         var iter = cpython.PyObject_GetIter(self.py_object)
         Python.throw_python_exception_if_error_state(cpython)
         return _PyIter(PythonObject(iter))
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn unsafe_as_py_object_ptr(inout self) -> PyObjectPtr:
+        """Get the underlying PyObject pointer.
+
+        Returns:
+            The underlying PyObject pointer.
+
+        Safety:
+            Use-after-free: The caller must take care that `self` outlives the
+            usage of the pointer returned by this function.
+        """
+        return self.py_object
+
+    fn steal_data(owned self) -> PyObjectPtr:
+        """Take ownership of the underlying pointer from the Python object.
+
+        Returns:
+            The underlying data.
+        """
+        var ptr = self.py_object
+
+        self.py_object = PyObjectPtr()
+
+        return ptr
 
     fn __del__(owned self):
         """Destroy the object.

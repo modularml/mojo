@@ -10,37 +10,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# TODO(MSTDL-875): Fix and un-XFAIL this
+# XFAIL: asan && !system-darwin
 # RUN: %mojo %s
-from testing import assert_equal, assert_true
+
+from python import Python, PythonObject
+from testing import assert_equal
+from pathlib import _dir_of_current_file
 
 
-def test_copy_reference_explicitly():
-    var a = List[Int](1, 2, 3)
+def test_create_module():
+    var module_name = "test_module"
+    var module = Python.create_module(module_name)
 
-    var b = Reference(a)
-
-    var c = Reference(other=b)
-
-    c[][0] = 4
-    assert_equal(a[0], 4)
-    assert_equal(b[][0], 4)
-    assert_equal(c[][0], 4)
-
-
-def test_equality():
-    var a = List[Int](1, 2, 3)
-    var b = List[Int](4, 5, 6)
-
-    assert_true(Reference(a) != Reference(b))
-
-
-def test_str():
-    var a = Int(42)
-    var a_ref = Reference(a)
-    assert_true(str(a_ref).startswith("0x"))
+    # TODO: inspect properties about the module
+    # First though, let's see if we can even import it
+    # Python.add_to_path(str(_dir_of_current_file()))
+    # var imported_module = Python.import_module(module_name)
+    #
+    # _ = module_name
 
 
 def main():
-    test_copy_reference_explicitly()
-    test_equality()
-    test_str()
+    test_create_module()

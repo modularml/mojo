@@ -20,7 +20,7 @@ from python import Python
 """
 
 from collections import Dict
-from os.env import getenv
+from os import abort, getenv
 from sys import external_call, sizeof
 from sys.ffi import _get_global
 
@@ -28,8 +28,8 @@ from memory import UnsafePointer
 
 from utils import StringRef
 
-from ._cpython import CPython, Py_eval_input, Py_file_input
-from .python_object import PythonObject
+from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
+from .python_object import PythonObject, TypedPythonObject
 
 
 fn _init_global(ignored: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
@@ -68,6 +68,10 @@ struct Python:
 
     var impl: _PythonInterfaceImpl
     """The underlying implementation of Mojo's Python interface."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Default constructor."""
@@ -177,6 +181,11 @@ struct Python:
         var directory: PythonObject = dir_path
         _ = sys.path.append(directory)
 
+    # ===-------------------------------------------------------------------===#
+    # PythonObject "Module" Operations
+    # ===-------------------------------------------------------------------===#
+
+    # TODO(MSTDL-880): Change this to return `TypedPythonObject["Module"]`
     @staticmethod
     fn import_module(module: StringRef) raises -> PythonObject:
         """Imports a Python module.
@@ -206,6 +215,65 @@ struct Python:
         var module_maybe = cpython.PyImport_ImportModule(module)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)
+
+    @staticmethod
+    fn create_module(name: String) raises -> TypedPythonObject["Module"]:
+        """Creates a Python module using the provided name.
+
+        Inspired by https://github.com/pybind/pybind11/blob/a1d00916b26b187e583f3bce39cd59c3b0652c32/include/pybind11/pybind11.h#L1227
+
+        TODO: allow specifying a doc-string to attach to the module upon creation or lazily added?
+
+        Args:
+            name: The Python module name.
+
+        Returns:
+            The Python module.
+        """
+        # Initialize the global instance to the Python interpreter
+        # in case this is our first time.
+
+        var cpython = _get_global_python_itf().cpython()
+
+        # This will throw an error if there are any errors during initialization.
+        cpython.check_init_error()
+
+        var module = cpython.PyModule_Create(name)
+
+        # TODO: investigate when `PyModule_Create` can actually produce an error
+        # This is cargo copy-pasted from other methods in this file essentially.
+        Python.throw_python_exception_if_error_state(cpython)
+
+        return TypedPythonObject["Module"](
+            unsafe_unchecked_from=PythonObject(module)
+        )
+
+    @staticmethod
+    fn add_methods(
+        inout module: TypedPythonObject["Module"],
+        functions: UnsafePointer[PyMethodDef],
+    ) -> Int:
+        """Adds methods to a PyModule object.
+
+        Args:
+            module: The PyModule object.
+            functions: A null terminated pointer to function data.
+
+        Returns:
+            Status code indicating success or failure.
+        """
+        var cpython = _get_global_python_itf().cpython()
+
+        return cpython.PyModule_AddFunctions(
+            # Safety: `module` pointer lives long enough because its reference
+            #   argument.
+            module.unsafe_as_py_object_ptr(),
+            functions,
+        )
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @staticmethod
     fn dict() -> PythonObject:
