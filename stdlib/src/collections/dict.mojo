@@ -1189,9 +1189,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.__iter__()
-        return _DictKeyIter(_DictEntryIter(0, 0, self._dict))
+        return self._dict.keys()
 
     fn keys(
         ref [_]self: Self,
@@ -1201,9 +1199,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.keys()
-        return self.__iter__()
+        return self._dict.keys()
 
     fn values(
         ref [_]self: Self,
@@ -1213,9 +1209,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         Returns:
             An iterator of references to the dictionary values.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.values()
-        return _DictValueIter(_DictEntryIter(0, 0, self._dict))
+        return self._dict.values()
 
     fn items(
         ref [_]self: Self,
