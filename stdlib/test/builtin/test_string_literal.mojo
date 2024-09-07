@@ -435,6 +435,13 @@ def test_splitlines():
     assert_equal(res10[3], "language\x1d")
 
 
+def test_float_conversion():
+    assert_equal(("4.5").__float__(), 4.5)
+    assert_equal(float("4.5"), 4.5)
+    with assert_raises():
+        _ = ("not a float").__float__()
+
+
 def main():
     test_add()
     test_equality()
@@ -463,3 +470,4 @@ def main():
     test_strip()
     test_split()
     test_splitlines()
+    test_float_conversion()

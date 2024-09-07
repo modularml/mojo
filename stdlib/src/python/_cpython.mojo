@@ -12,12 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 from collections import InlineArray
-from os import getenv, setenv
+from os import getenv, setenv, abort
 from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, C_char
+from sys.ffi import DLHandle, C_char, C_int
 
 from memory import UnsafePointer
 
@@ -101,16 +101,314 @@ fn _py_finalize(lib: DLHandle):
     lib.get_function[fn () -> None]("Py_Finalize")()
 
 
+# Ref https://docs.python.org/3/c-api/structures.html#c.PyMethodDef
+@value
+struct PyMethodDef:
+    # ===-------------------------------------------------------------------===#
+    # Aliases
+    # ===-------------------------------------------------------------------===#
+
+    # Ref: https://docs.python.org/3/c-api/structures.html#c.PyCFunction
+    # TODO(MOCO-1138): This is a C ABI function pointer, not Mojo a function.
+    alias _PyCFunction_type = fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
+    var method_name: UnsafePointer[C_char]  # called ml_name in CPython
+
+    # TODO: Support keyword-argument only methods
+    # Pointer to the function to call
+    var method_impl: Self._PyCFunction_type
+
+    # Flags bits indicating how the call should be constructed.
+    # See https://docs.python.org/3/c-api/structures.html#c.PyMethodDef for the various calling conventions
+    var method_flags: C_int
+
+    # Points to the contents of the docstring for the module.
+    var method_docstring: UnsafePointer[C_char]
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    fn __init__(inout self):
+        """Constructs a zero initialized PyModuleDef.
+
+        This is suitable for use terminating an array of PyMethodDef values.
+        """
+        self.method_name = UnsafePointer[C_char]()
+        self.method_impl = _null_fn_ptr[Self._PyCFunction_type]()
+        self.method_flags = 0
+        self.method_docstring = UnsafePointer[C_char]()
+
+
+fn _null_fn_ptr[T: AnyTrivialRegType]() -> T:
+    return __mlir_op.`pop.pointer.bitcast`[_type=T](
+        __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`
+    )
+
+
+struct PyTypeObject:
+    # TODO(MSTDL-877):
+    #   Fill this out based on
+    #   https://docs.python.org/3/c-api/typeobj.html#pytypeobject-definition
+    pass
+
+
+@value
+struct PyObject(Stringable, Representable, Formattable):
+    var object_ref_count: Int
+    # FIXME: should we use `PyObjectPtr`?  I don't think so!
+    var object_type: UnsafePointer[PyTypeObject]
+    # var object_type: PyObjectPtr
+
+    fn __init__(inout self):
+        self.object_ref_count = 0
+        self.object_type = UnsafePointer[PyTypeObject]()
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Get the PyModuleDef_Base as a string.
+
+        Returns:
+            A string representation.
+        """
+
+        return String.format_sequence(self)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Get the `PyObject` as a string. Returns the same `String` as `__str__`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write("PyObject(")
+        writer.write("object_ref_count=", self.object_ref_count, ",")
+        writer.write("object_type=", self.object_type)
+        writer.write(")")
+
+
+# Ref: https://github.com/python/cpython/blob/833c58b81ebec84dc24ef0507f8c75fe723d9f66/Include/moduleobject.h#L39
+# Ref2: https://pyo3.rs/main/doc/pyo3/ffi/struct.pymoduledef_base
+# Mojo doesn't have macros, so we define it here for ease.
+# Note: `PyModuleDef_HEAD_INIT` defaults all of its members, see https://github.com/python/cpython/blob/833c58b81ebec84dc24ef0507f8c75fe723d9f66/Include/moduleobject.h#L60
+struct PyModuleDef_Base(Stringable, Representable, Formattable):
+    # The initial segment of every `PyObject` in CPython
+    var object_base: PyObject
+
+    # The function used to re-initialize the module.
+    # TODO(MOCO-1138): This is a C ABI function pointer, not Mojo a function.
+    alias _init_fn_type = fn () -> UnsafePointer[PyObject]
+    var init_fn: Self._init_fn_type
+
+    # The module's index into its interpreter's modules_by_index cache.
+    var index: Int
+
+    # A copy of the module's __dict__ after the first time it was loaded.
+    var dict_copy: UnsafePointer[PyObject]
+
+    # ===------------------------------------------------------------------=== #
+    # Life cycle methods
+    # ===------------------------------------------------------------------=== #
+
+    fn __init__(inout self):
+        self.object_base = PyObject()
+        self.init_fn = _null_fn_ptr[Self._init_fn_type]()
+        self.index = 0
+        self.dict_copy = UnsafePointer[PyObject]()
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.object_base = existing.object_base
+        self.init_fn = existing.init_fn
+        self.index = existing.index
+        self.dict_copy = existing.dict_copy
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Get the PyModuleDef_Base as a string.
+
+        Returns:
+            A string representation.
+        """
+
+        return String.format_sequence(self)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Get the PyMdouleDef_Base as a string. Returns the same `String` as `__str__`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write("PyModuleDef_Base(")
+        writer.write("object_base=", self.object_base, ",")
+        writer.write("init_fn=<unprintable>", ",")
+        writer.write("index=", self.index, ",")
+        writer.write("dict_copy=", self.dict_copy)
+        writer.write(")")
+
+
+# Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef_Slot
+@value
+struct PyModuleDef_Slot:
+    var slot: Int
+    var value: UnsafePointer[NoneType]
+
+
+# Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef
+struct PyModuleDef(Stringable, Representable, Formattable):
+    # The Python module definition structs that holds all of the information needed
+    # to create a module.  Typically, there is a 1:1 correspondence beteeen a `PyMethodDef`
+    # and a module.
+    var base: PyModuleDef_Base
+
+    # See https://docs.python.org/3/c-api/structures.html#c.PyMethodDef
+    var name: UnsafePointer[C_char]
+
+    # Points to the contents of the docstring for the module.
+    var docstring: UnsafePointer[C_char]
+
+    var size: Int
+
+    # A pointer to a table of module-level functions.  Can be null if there
+    # are no functions present.
+    var methods: UnsafePointer[PyMethodDef]
+
+    var slots: UnsafePointer[PyModuleDef_Slot]
+
+    # TODO(MOCO-1138): These are C ABI function pointers, not Mojo functions.
+    alias _visitproc_fn_type = fn (PyObjectPtr, UnsafePointer[NoneType]) -> Int
+    alias _traverse_fn_type = fn (
+        PyObjectPtr, Self._visitproc_fn_type, UnsafePointer[NoneType]
+    ) -> Int
+    var traverse_fn: Self._traverse_fn_type
+
+    alias _clear_fn_type = fn (PyObjectPtr) -> Int
+    var clear_fn: Self._clear_fn_type
+
+    alias _free_fn_type = fn (UnsafePointer[NoneType]) -> UnsafePointer[
+        NoneType
+    ]
+    var free_fn: Self._free_fn_type
+
+    fn __init__(inout self, name: String):
+        self.base = PyModuleDef_Base()
+        self.name = name.unsafe_cstr_ptr()
+        # self.docstring = UnsafePointer[C_char]()
+        self.docstring = UnsafePointer[C_char]()
+        # means that the module does not support sub-interpreters
+        self.size = -1
+        self.methods = UnsafePointer[PyMethodDef]()
+        self.slots = UnsafePointer[PyModuleDef_Slot]()
+
+        self.slots = UnsafePointer[PyModuleDef_Slot]()
+        self.traverse_fn = _null_fn_ptr[Self._traverse_fn_type]()
+        self.clear_fn = _null_fn_ptr[Self._clear_fn_type]()
+        self.free_fn = _null_fn_ptr[Self._free_fn_type]()
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.base = existing.base^
+        self.name = existing.name
+        self.docstring = existing.docstring
+        self.size = existing.size
+        self.methods = existing.methods
+        self.slots = existing.slots
+        self.traverse_fn = existing.traverse_fn
+        self.clear_fn = existing.clear_fn
+        self.free_fn = existing.free_fn
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Get the PyModuleDefe as a string.
+
+        Returns:
+            A string representation.
+        """
+
+        return String.format_sequence(self)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Get the PyMdouleDef as a string. Returns the same `String` as `__str__`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write("PyModuleDef(")
+        writer.write("base=", self.base, ",")
+        writer.write("name=", self.name, ",")
+        writer.write("docstring=", self.docstring, ",")
+        writer.write("size=", self.size, ",")
+        writer.write("methods=", self.methods, ",")
+        writer.write("slots=", self.slots, ",")
+        writer.write("traverse_fn=<unprintable>", ",")
+        writer.write("clear_fn=<unprintable>", ",")
+        writer.write("free_fn=<unprintable>")
+        writer.write(")")
+
+
 struct CPython:
     var lib: DLHandle
-    var none_value: PyObjectPtr
     var dict_type: PyObjectPtr
     var logging_enabled: Bool
     var version: PythonVersion
     var total_ref_count: UnsafePointer[Int]
     var init_error: StringRef
 
-    fn __init__(inout self: CPython):
+    fn __init__(inout self):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
@@ -146,7 +444,6 @@ struct CPython:
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
-        self.none_value = PyObjectPtr()
         self.dict_type = PyObjectPtr()
         self.logging_enabled = logging_enabled
         if not self.init_error:
@@ -161,7 +458,6 @@ struct CPython:
 
     @staticmethod
     fn destroy(inout existing: CPython):
-        existing.Py_DecRef(existing.none_value)
         if existing.logging_enabled:
             print("CPython destroy")
             var remaining_refs = existing.total_ref_count.take_pointee()
@@ -195,23 +491,26 @@ struct CPython:
 
     fn Py_None(inout self) -> PyObjectPtr:
         """Get a None value, of type NoneType."""
-        if self.none_value.is_null():
-            var list_obj = self.PyList_New(0)
-            var tuple_obj = self.PyTuple_New(0)
-            var callable_obj = self.PyObject_GetAttrString(list_obj, "reverse")
-            self.none_value = self.PyObject_CallObject(callable_obj, tuple_obj)
-            self.Py_DecRef(tuple_obj)
-            self.Py_DecRef(callable_obj)
-            self.Py_DecRef(list_obj)
-        return self.none_value
+
+        # Get pointer to the immortal `None` PyObject struct instance.
+        # Note:
+        #   The name of this global is technical a private part of the
+        #   CPython API, but unfortunately the only stable ways to access it are
+        #   macros.
+        var ptr = self.lib.get_symbol[Int8](
+            "_Py_NoneStruct",
+        )
+
+        if not ptr:
+            abort("error: unable to get pointer to CPython `None` struct")
+
+        return PyObjectPtr(ptr)
 
     fn __del__(owned self):
         pass
 
     fn __copyinit__(inout self, existing: Self):
         self.lib = existing.lib
-        # None is a global variable
-        self.none_value = existing.none_value
         self.dict_type = existing.dict_type
         self.logging_enabled = existing.logging_enabled
         self.version = existing.version
@@ -322,6 +621,43 @@ struct CPython:
             )
         self._inc_total_rc()
         return r
+
+    fn PyModule_Create(
+        inout self,
+        name: String,
+    ) -> PyObjectPtr:
+        # TODO: See https://docs.python.org/3/c-api/module.html#c.PyModule_Create
+        # and https://github.com/pybind/pybind11/blob/a1d00916b26b187e583f3bce39cd59c3b0652c32/include/pybind11/pybind11.h#L1326
+        # for what we want to do essentially here.
+        var module_def_ptr = UnsafePointer[PyModuleDef].alloc(1)
+        var module_def = PyModuleDef(name)
+        module_def_ptr.init_pointee_move(module_def^)
+
+        var create_module_fn = self.lib.get_function[
+            fn (UnsafePointer[PyModuleDef], Int) -> PyObjectPtr
+        ]("PyModule_Create2")
+
+        # TODO: set gil stuff
+        # Note: Python automatically calls https://docs.python.org/3/c-api/module.html#c.PyState_AddModule
+        # after the caller imports said module.
+
+        # TODO: it would be nice to programatically call a CPython API to get the value here
+        # but I think it's only defined via the `PYTHON_API_VERSION` macro that ships with Python.
+        # if this mismatches with the user's Python, then a `RuntimeWarning` is emitted according to the
+        # docs.
+        var module_api_version = 1013
+        return create_module_fn(module_def_ptr, module_api_version)
+
+    fn PyModule_AddFunctions(
+        inout self,
+        mod: PyObjectPtr,
+        functions: UnsafePointer[PyMethodDef],
+    ) -> Int:
+        var add_functions_fn = self.lib.get_function[
+            fn (PyObjectPtr, UnsafePointer[PyMethodDef]) -> Int
+        ]("PyModule_AddFunctions")
+
+        return add_functions_fn(mod, functions)
 
     fn PyRun_SimpleString(inout self, strref: StringRef) -> Bool:
         """Executes the given Python code.
