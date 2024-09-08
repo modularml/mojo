@@ -298,12 +298,6 @@ fn _shuffle_input_vector[
         return SIMD[DType.uint8, simd_width]()  # dummy, unreachable
 
 
-fn _print_vector_in_binary(vector: SIMD):
-    for i in range(len(vector)):
-        print(bin(vector[i]), end="")
-    print()
-
-
 fn _to_b64_ascii[
     simd_width: Int
 ](input_vector: SIMD[DType.uint8, simd_width]) -> SIMD[DType.uint8, simd_width]:
@@ -405,12 +399,9 @@ fn load_incomplete_simd[
 ](pointer: UnsafePointer[UInt8], nb_of_elements_to_load: Int) -> SIMD[
     DType.uint8, simd_width
 ]:
-    var tmp_buffer = InlineArray[UInt8, simd_width](0)
-    var tmp_buffer_pointer = tmp_buffer.unsafe_ptr()
+    var result = SIMD[DType.uint8, simd_width](0)
+    var tmp_buffer_pointer = UnsafePointer.address_of(result).bitcast[UInt8]()
     memcpy(dest=tmp_buffer_pointer, src=pointer, count=nb_of_elements_to_load)
-
-    var result = tmp_buffer_pointer.load[width=simd_width]()
-    _ = tmp_buffer  # We make it live long enough
     return result
 
 
@@ -418,15 +409,15 @@ fn store_incomplete_simd[
     simd_width: Int
 ](
     pointer: UnsafePointer[UInt8],
-    simd_vector: SIMD[DType.uint8, simd_width],
+    owned simd_vector: SIMD[DType.uint8, simd_width],
     nb_of_elements_to_store: Int,
 ):
-    var tmp_buffer = InlineArray[UInt8, simd_width](0)
-    var tmp_buffer_pointer = tmp_buffer.unsafe_ptr()
-    tmp_buffer_pointer.store(simd_vector)
+    var tmp_buffer_pointer = UnsafePointer.address_of(simd_vector).bitcast[
+        UInt8
+    ]()
 
     memcpy(dest=pointer, src=tmp_buffer_pointer, count=nb_of_elements_to_store)
-    _ = tmp_buffer  # We make it live long enough
+    _ = simd_vector  # We make it live long enough
 
 
 # TODO: Use Span instead of List as input when Span is easier to use
@@ -441,20 +432,21 @@ fn b64encode_with_buffers(
     var input_bytes_len = len(input_bytes)
 
     var input_index = 0
+
+    # Main loop
     while input_index + simd_width <= input_bytes_len:
         var start_of_input_chunk = input_bytes.unsafe_ptr() + input_index
 
-        # We don't want to read past the input buffer
         var input_vector = start_of_input_chunk.load[width=simd_width]()
 
         result_vector = _to_b64_ascii(input_vector)
 
-        # We write the result to the output buffer
         (result.unsafe_ptr() + len(result)).store(result_vector)
 
-        result.size += int(simd_width)
+        result.size += simd_width
         input_index += input_simd_width
 
+    # We handle the last 0, 1 or 2 chunks
     while input_index < input_bytes_len:
         var start_of_input_chunk = input_bytes.unsafe_ptr() + input_index
         var nb_of_elements_to_load = min(
@@ -466,7 +458,6 @@ fn b64encode_with_buffers(
             start_of_input_chunk,
             nb_of_elements_to_load=nb_of_elements_to_load,
         )
-        # _print_vector_in_binary(input_vector)
 
         result_vector = _to_b64_ascii(input_vector)
 
@@ -487,12 +478,10 @@ fn b64encode_with_buffers(
         ](
             nb_of_elements_to_load
         )
-        # var mask_store = _base64_simd_mask[simd_width](nb_of_elements_to_store)
-        # We write the result to the output buffer
         store_incomplete_simd(
             result.unsafe_ptr() + len(result),
             result_vector_with_equals,
             nb_of_elements_to_store,
         )
-        result.size += int(nb_of_elements_to_store)
+        result.size += nb_of_elements_to_store
         input_index += input_simd_width
