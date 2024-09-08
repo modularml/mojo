@@ -108,120 +108,18 @@ fn _bitcast[
     return result
 
 
+fn _get_simd_range_values[simd_width: Int]() -> SIMD[DType.uint8, simd_width]:
+    var a = SIMD[DType.uint8, simd_width](0)
+    for i in range(simd_width):
+        a[i] = i
+    return a
+
+
 fn _base64_simd_mask[
     simd_width: Int
 ](nb_value_to_load: Int) -> SIMD[DType.bool, simd_width]:
-    # Let's make this less verbose when Mojo is more flexible with compile-time programming
-    @parameter
-    if simd_width == 16:
-        return SIMD[DType.uint8, simd_width](
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-        ) < UInt8(nb_value_to_load)
-    elif simd_width == 32:
-        return SIMD[DType.uint8, simd_width](
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-            24,
-            25,
-            26,
-            27,
-            28,
-            29,
-            30,
-            31,
-        ) < UInt8(nb_value_to_load)
-    elif simd_width == 64:
-        return SIMD[DType.uint8, simd_width](
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-            24,
-            25,
-            26,
-            27,
-            28,
-            29,
-            30,
-            31,
-            32,
-            33,
-            34,
-            35,
-            36,
-            37,
-            38,
-            39,
-            40,
-            41,
-            42,
-            43,
-            44,
-            45,
-            46,
-            47,
-            48,
-            49,
-            50,
-            51,
-            52,
-            53,
-            54,
-            55,
-            56,
-            57,
-            58,
-            59,
-            60,
-            61,
-            62,
-            63,
-        ) < UInt8(nb_value_to_load)
-    else:
-        constrained[False, msg="simd_width must be 16, 32 or 64"]()
-        return SIMD[DType.bool, simd_width]()  # dummy, unreachable
+    alias mask = _get_simd_range_values[simd_width]()
+    return mask < UInt8(nb_value_to_load)
 
 
 fn _repeat_until[
@@ -479,81 +377,23 @@ fn _to_b64_ascii[
 fn _get_number_of_elements_to_store_from_number_of_elements_to_load[
     simd_width: Int
 ]() -> SIMD[DType.uint8, simd_width]:
-    # fmt: off
-    # We must use a temporary alias to make the compiler happy
+    """This is a lookup table to know how many bytes we need to store in the output buffer
+    for a given number of bytes to encode in base64.
 
-    @parameter
-    if simd_width == 4:
-        alias result = SIMD[DType.uint8, simd_width](
-            0, 
-            4, 4, 4
-        )
-        return result
-    elif simd_width == 8:
-        alias result = SIMD[DType.uint8, simd_width](
-            0,
-            4, 4, 4,
-            8, 8, 8, 
-            12
-        )
-        return result
-    elif simd_width == 16:
-        alias result = SIMD[DType.uint8, simd_width](
-            0, 
-            4, 4, 4, 
-            8, 8, 8, 
-            12, 12, 12, 
-            16, 16, 16,
-            20, 20, 20
-        )
-        return result
-    elif simd_width == 32:
-        alias result = SIMD[DType.uint8, simd_width](
-            0, 
-            4, 4, 4, 
-            8, 8, 8, 
-            12, 12, 12, 
-            16, 16, 16, 
-            20, 20, 20, 
-            24, 24, 24, 
-            28, 28, 28, 
-            32, 32, 32,
-            36, 36, 36,
-            40, 40, 40,
-            44,
-        )
-        return result
-    elif simd_width == 64:
-        alias result = SIMD[DType.uint8, simd_width](
-            0, 
-            4, 4, 4, 
-            8, 8, 8, 
-            12, 12, 12, 
-            16, 16, 16, 
-            20, 20, 20, 
-            24, 24, 24, 
-            28, 28, 28, 
-            32, 32, 32, 
-            36, 36, 36, 
-            40, 40, 40, 
-            44, 44, 44, 
-            48, 48, 48,
-            52, 52, 52,
-            56, 56, 56,
-            60, 60, 60,
-            64, 64, 64,
-            68, 68, 68,
-            72, 72, 72,
-            76, 76, 76,
-            80, 80, 80,
-            84, 84, 84,
-        )
-        return result
-    # fmt: on
+    This table lookup is smaller than the simd size, because we only use it for the last chunk.
+    """
+    var result = SIMD[DType.uint8, simd_width](0)
+    for i in range(1, simd_width):
+        # We have "i" bytes to encode in base64, how many bytes do
+        # we need to store in the output buffer? Including the '=' sign.
 
-    else:
-        constrained[False, msg="simd_width must be 4, 8, 16, 32 or 64"]()
-        return SIMD[DType.uint8, simd_width]() # dummy, unreachable
+        # ceil cannot be called at compile time
+        var group_of_3_bytes = i // 3
+        if i % 3 != 0:
+            group_of_3_bytes += 1
+
+        result[i] = group_of_3_bytes * 4
+    return result
 
 
 fn _get_number_of_non_equal_from_number_of_elements_to_load[
