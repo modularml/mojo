@@ -94,7 +94,7 @@ struct _ReaderIter[
 
     @always_inline
     fn __next__(inout self: Self) raises -> List[String]:
-        var line = self.reader_ref[].get_line(self.idx)
+        var line = self.reader_ref[].get_row(self.idx)
         self.idx += 1
         return line
 
@@ -164,7 +164,7 @@ struct reader:
         # TODO: Implement streaming to prevent loading the entire file into memory
         self._lines = csvfile.read().splitlines()
 
-    fn get_line(self: Self, idx: Int) raises -> List[String]:
+    fn get_row(self: Self, idx: Int) raises -> List[String]:
         """
         Returns an specific line in the CSV file.
 
@@ -174,20 +174,101 @@ struct reader:
         Returns:
             The line at the given index.
         """
-        var line: List[String] = self._lines[idx].split(self._dialect.delimiter)
-        for field_ref in line:
-            if (
-                len(field_ref[]) > 1
-                and field_ref[][0] == self._dialect.quotechar
-                and field_ref[][-1] == self._dialect.quotechar
-            ):
-                field_ref[] = field_ref[][1:-1]
-            if self._dialect.doublequote:
-                field_ref[] = field_ref[].replace(
-                    self._dialect.quotechar * 2, self._dialect.quotechar
-                )
-            # TODO: Handle the skipinitialspace and escapechar options
-        return line
+        var line_str = self._lines[idx]
+        var line_iter = line_str.__iter__()
+        var pos = 0
+
+        alias START_RECORD = 0
+        alias START_FIELD = 1
+        alias IN_FIELD = 2
+        alias IN_QUOTED_FIELD = 3
+        alias ESCAPED_CHAR = 4
+        alias ESCAPED_IN_QUOTED_FIELD = 5
+        alias END_FIELD = 6
+        alias END_RECORD = 7
+        alias QUOTE_IN_QUOTED_FIELD = 8
+
+        var row = List[String]()
+        var field: String = ""
+
+        var state = START_RECORD
+        var field_pos = 0
+        var unquoted = True
+
+        # TODO: This is spaghetti code mimicing the CPython implementation
+        #       We should refactor this to be more readable and maintainable
+        #       See parse_process_char() function in cpython/Modules/_csv.c
+
+        while pos < len(line_str):
+            var c = line_str[pos]
+
+            # TODO: Use match statement when supported by Mojo
+            if state == START_RECORD:
+                if c == "\n" or c == "\r":
+                    state = END_RECORD
+                else:
+                    state = START_FIELD
+                continue  # do not consume the character
+            elif state == START_FIELD:
+                if c == self._dialect.delimiter:
+                    # save empty field
+                    _save_field(row, field, unquoted, self._dialect)
+                elif c == self._dialect.quotechar:
+                    unquoted = False
+                    state = IN_QUOTED_FIELD
+                else:
+                    state = IN_FIELD
+                    continue  # do not consume the character
+            elif state == IN_FIELD:
+                if c == self._dialect.delimiter:
+                    state = END_FIELD
+                    continue
+                elif c == "\n" or c == "\r":
+                    state = END_RECORD
+                elif self._dialect.escapechar and c == self._dialect.escapechar:
+                    state = ESCAPED_CHAR
+                else:
+                    field += c  # save char in the field
+            elif state == IN_QUOTED_FIELD:
+                if c == self._dialect.quotechar:
+                    if self._dialect.doublequote:
+                        state = QUOTE_IN_QUOTED_FIELD
+                    else:  # end of quoted field
+                        state = IN_FIELD
+                elif c == self._dialect.escapechar:
+                    state = ESCAPED_IN_QUOTED_FIELD
+                else:
+                    field += c  # save char in the field
+            elif state == QUOTE_IN_QUOTED_FIELD:
+                # double-check with CPython implementation
+                if c == self._dialect.quotechar:
+                    field += c
+                    state = IN_QUOTED_FIELD
+                elif c == self._dialect.delimiter:
+                    _save_field(row, field, unquoted, self._dialect)
+                    field = ""
+                    unquoted = True
+                    state = START_FIELD
+            elif state == ESCAPED_CHAR:
+                state = IN_QUOTED_FIELD
+            elif state == ESCAPED_IN_QUOTED_FIELD:
+                state = IN_QUOTED_FIELD
+            elif state == END_FIELD:
+                _save_field(row, field, unquoted, self._dialect)
+                field = ""
+                unquoted = True
+                state = START_FIELD
+            elif state == END_RECORD:
+                if field_pos < len(line_str):
+                    row.append(line_str[field_pos:])
+                break
+            pos += 1
+
+        if field:
+            _save_field(row, field, unquoted, self._dialect)
+
+        # TODO: Handle the escapechar and skipinitialspace options
+        return row
 
     fn lines_count(self: Self) -> Int:
         """
@@ -254,3 +335,14 @@ fn _validate_reader_dialect(dialect: Dialect) raises -> Bool:
                 " from delimiter and quotechar"
             )
     return True
+
+
+fn _save_field(
+    inout row: List[String], field: String, unquoted: Bool, dialect: Dialect
+):
+    var final_field: String = field
+    if unquoted:
+        final_field = field[1:-1]
+    if dialect.doublequote:
+        final_field = field.replace(dialect.quotechar * 2, dialect.quotechar)
+    row.append(final_field)
