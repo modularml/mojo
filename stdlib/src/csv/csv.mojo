@@ -145,7 +145,7 @@ struct reader:
     @always_inline("nodebug")
     fn get_line(
         self: Self, idx: Int
-    ) raises -> ref [__lifetime_of(self._lines)] String:
+    ) raises -> ref [__lifetime_of(self)] String:
         """
         Returns an specific line in the CSV file.
 
@@ -174,12 +174,13 @@ struct reader:
         Returns:
             Iterator.
         """
-        return _ReaderIter[__lifetime_of(self)](reader=self, idx=0)
+        return _ReaderIter[__lifetime_of(self)](reader_ref=self, idx=0)
 
 
 # ===------------------------------------------------------------------=== #
 # Auxiliary structs and functions
 # ===------------------------------------------------------------------=== #
+
 
 alias START_RECORD = 0
 alias START_FIELD = 1
@@ -199,16 +200,18 @@ struct _ReaderIter[
 ](Sized):
     """Iterator for any random-access container"""
 
-    var reader: reader
-    var dialect: Dialect
+    var reader_ref: Reference[reader, reader_lifetime]
+    var dialect_ref: Reference[Dialect, reader_lifetime]
     var idx: Int
     var pos: Int
     var field_pos: Int
     var quoted: Bool
 
-    fn __init__(inout self, ref [_]reader: reader, idx: Int = 0):
-        self.reader = reader
-        self.dialect = reader._dialect
+    fn __init__(
+        inout self, reader_ref: Reference[reader, reader_lifetime], idx: Int = 0
+    ):
+        self.reader_ref = reader_ref
+        self.dialect_ref = reader_ref[]._dialect
         self.idx = idx
         self.pos = 0
         self.field_pos = 0
@@ -216,7 +219,7 @@ struct _ReaderIter[
 
     @always_inline
     fn __next__(inout self: Self) raises -> List[String]:
-        line = self.reader.get_line(self.idx)
+        line = self.reader_ref[].get_line(self.idx)
         row = self.get_row(line)
         self.idx += 1
         return row
@@ -224,17 +227,16 @@ struct _ReaderIter[
     fn __len__(self) -> Int:
         # This is the current way to imitate the StopIteration exception
         # TODO: Remove when the iterators are implemented and streaming is done
-        return self.reader.lines_count() - self.idx
+        return self.reader_ref[].lines_count() - self.idx
 
     fn get_row(inout self, ref [_]line: String) -> List[String]:
-        # fn get_row(inout self, ref [_]line: String) -> ref[__lifetime_of(self.reader_ref)] List[String]:
         var row = List[String]()
 
         # TODO: This is spaghetti code mimicing the CPython implementation
         #       We should refactor this to be more readable and maintainable
         #       See parse_process_char() function in cpython/Modules/_csv.c
         state = START_RECORD
-        dialect = self.dialect
+        dialect = self.dialect_ref[]
 
         self.pos = self.field_pos = 0
 
@@ -321,7 +323,7 @@ struct _ReaderIter[
             self.pos,
         ) if not self.quoted else (self.field_pos + 1, self.pos - 1)
         final_field = line[start_idx:end_idx]
-        dialect = self.dialect
+        dialect = self.dialect_ref[]
         quotechar = dialect.quotechar
         if dialect.doublequote:
             final_field = final_field.replace(quotechar * 2, quotechar)
