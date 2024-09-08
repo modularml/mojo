@@ -230,8 +230,6 @@ struct _ReaderIter[
         return self.reader_ref[].lines_count() - self.idx
 
     fn get_row(inout self, ref [_]line: String) -> List[String]:
-        var pos = 0
-
         var row = List[String]()
 
         # TODO: This is spaghetti code mimicing the CPython implementation
@@ -240,8 +238,10 @@ struct _ReaderIter[
         var state = START_RECORD
         var dialect = self.dialect_ref[]
 
-        while pos < len(line):
-            var c = self._get_char(line, pos)
+        self.pos = 0
+
+        while self.pos < len(line):
+            var c = self._get_char(line)
             # print('CHAR: ', c, ' STATE:', state, ' FIELD: ', self.field, ' POS: ', pos)
 
             # TODO: Use match statement when supported by Mojo
@@ -298,7 +298,7 @@ struct _ReaderIter[
                 state = START_FIELD
             elif state == END_RECORD:
                 break
-            pos += 1
+            self.pos += 1
 
         if self.field:
             self._save_field(row)
@@ -307,8 +307,8 @@ struct _ReaderIter[
         return row
 
     @always_inline("nodebug")
-    fn _get_char(self, line: String, pos: Int) -> String:
-        return line[pos]
+    fn _get_char(self, line: String) -> String:
+        return line[self.pos]
 
     @always_inline("nodebug")
     fn _add_to_field(inout self, c: String):
