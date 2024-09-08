@@ -373,21 +373,21 @@ fn _to_b64_ascii[
     return ready_to_encode_per_byte + offsets
 
 
-@always_inline
 fn _get_number_of_elements_to_store_from_number_of_elements_to_load[
     simd_width: Int
 ]() -> SIMD[DType.uint8, simd_width]:
     """This is a lookup table to know how many bytes we need to store in the output buffer
-    for a given number of bytes to encode in base64.
+    for a given number of bytes to encode in base64. Including the '=' sign.
 
     This table lookup is smaller than the simd size, because we only use it for the last chunk.
+    This should be called at compile time, otherwise it's quite slow.
     """
     var result = SIMD[DType.uint8, simd_width](0)
     for i in range(1, simd_width):
         # We have "i" bytes to encode in base64, how many bytes do
         # we need to store in the output buffer? Including the '=' sign.
 
-        # ceil cannot be called at compile time
+        # math.ceil cannot be called at compile time, this is a workaround
         var group_of_3_bytes = i // 3
         if i % 3 != 0:
             group_of_3_bytes += 1
@@ -399,154 +399,26 @@ fn _get_number_of_elements_to_store_from_number_of_elements_to_load[
 fn _get_number_of_non_equal_from_number_of_elements_to_load[
     simd_width: Int
 ]() -> SIMD[DType.uint8, simd_width]:
-    @parameter
-    if simd_width == 4:
-        alias result = SIMD[DType.uint8, simd_width](
-            0,
-            2,
-            3,
-            4,
-        )
-        return result
-    elif simd_width == 8:
-        alias result = SIMD[DType.uint8, simd_width](
-            0,
-            2,
-            3,
-            4,
-            6,
-            7,
-            8,
-            10,
-        )
-        return result
-    elif simd_width == 16:
-        alias result = SIMD[DType.uint8, simd_width](
-            0,
-            2,
-            3,
-            4,
-            6,
-            7,
-            8,
-            10,
-            11,
-            12,
-            14,
-            15,
-            16,
-            18,
-            19,
-            20,
-        )
-        return result
-    elif simd_width == 32:
-        alias result = SIMD[DType.uint8, simd_width](
-            0,
-            2,
-            3,
-            4,
-            6,
-            7,
-            8,
-            10,
-            11,
-            12,
-            14,
-            15,
-            16,
-            18,
-            19,
-            20,
-            22,
-            23,
-            24,
-            26,
-            27,
-            28,
-            30,
-            31,
-            32,
-            34,
-            35,
-            36,
-            38,
-            39,
-            40,
-            42,
-        )
-        return result
-    elif simd_width == 64:
-        alias result = SIMD[DType.uint8, simd_width](
-            0,
-            2,
-            3,
-            4,
-            6,
-            7,
-            8,
-            10,
-            11,
-            12,
-            14,
-            15,
-            16,
-            18,
-            19,
-            20,
-            22,
-            23,
-            24,
-            26,
-            27,
-            28,
-            30,
-            31,
-            32,
-            34,
-            35,
-            36,
-            38,
-            39,
-            40,
-            42,
-            43,
-            44,
-            46,
-            47,
-            48,
-            50,
-            51,
-            52,
-            54,
-            55,
-            56,
-            58,
-            59,
-            60,
-            62,
-            63,
-            64,
-            66,
-            67,
-            68,
-            70,
-            71,
-            72,
-            74,
-            75,
-            76,
-            78,
-            79,
-            80,
-            82,
-            83,
-            84,
-        )
-        return result
-    else:
-        constrained[False, msg="simd_width must be 4, 8, 16, 32 or 64"]()
-        return SIMD[DType.uint8, simd_width]()  # dummy, unreachable
+    """This is a lookup table to know how many bytes we need to store in the output buffer
+    for a given number of bytes to encode in base64. This is **not** including the '=' sign.
+
+    This table lookup is smaller than the simd size, because we only use it for the last chunk.
+    """
+    var result = SIMD[DType.uint8, simd_width]()
+    for i in range(simd_width):
+        # We have "i" bytes to encode in base64, how many bytes do
+        # we need to store in the output buffer? NOT including the '=' sign.
+        # We count the number of groups of 6 bits and we add 1 byte if there is an incomplete group.
+        var number_of_bits = i * 8
+        var complete_groups_of_6_bits = number_of_bits // 6
+        var incomplete_groups_of_6_bits: Int
+        if i * 8 % 6 == 0:
+            incomplete_groups_of_6_bits = 0
+        else:
+            incomplete_groups_of_6_bits = 1
+
+        result[i] = complete_groups_of_6_bits + incomplete_groups_of_6_bits
+    return result
 
 
 fn _print_vector_in_binary(vector: SIMD):
