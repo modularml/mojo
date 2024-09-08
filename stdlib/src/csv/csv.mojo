@@ -142,7 +142,10 @@ struct reader:
         # TODO: Implement streaming to prevent loading the entire file into memory
         self._lines = csvfile.read().splitlines()
 
-    fn get_row(self: Self, idx: Int) raises -> List[String]:
+    @always_inline("nodebug")
+    fn get_line(
+        self: Self, idx: Int
+    ) raises -> ref [__lifetime_of(self)] String:
         """
         Returns an specific line in the CSV file.
 
@@ -152,10 +155,7 @@ struct reader:
         Returns:
             The line at the given index.
         """
-        var line_str = self._lines[idx]
-
-        var line_parser = _CSVLineParser(line_str, self._dialect)
-        return line_parser.get_row()
+        return self._lines[idx]
 
     fn lines_count(self: Self) -> Int:
         """
@@ -192,24 +192,44 @@ alias END_FIELD = 6
 alias END_RECORD = 7
 alias QUOTE_IN_QUOTED_FIELD = 8
 
-# Refactor above spaghetti code
 
+@value
+struct _ReaderIter[
+    reader_mutability: Bool, //,
+    reader_lifetime: AnyLifetime[reader_mutability].type,
+](Sized):
+    """Iterator for any random-access container"""
 
-struct _CSVLineParser:
-    var line: String
-    var dialect: Dialect
+    var reader_ref: Reference[reader, reader_lifetime]
+    var dialect_ref: Reference[Dialect, reader_lifetime]
+    var idx: Int
     var field: String
     var pos: Int
     var quoted: Bool
 
-    def __init__(inout self, line: String, dialect: Dialect):
-        self.line = line
-        self.dialect = dialect
-        self.field = ""
+    fn __init__(
+        inout self, reader_ref: Reference[reader, reader_lifetime], idx: Int = 0
+    ):
+        self.reader_ref = reader_ref
+        self.dialect_ref = reader_ref[]._dialect
+        self.idx = idx
         self.pos = 0
+        self.field = String("")
         self.quoted = False
 
-    fn get_row(inout self) -> List[String]:
+    @always_inline
+    fn __next__(inout self: Self) raises -> List[String]:
+        var line = self.reader_ref[].get_line(self.idx)
+        var row = self.get_row(line)
+        self.idx += 1
+        return row
+
+    fn __len__(self) -> Int:
+        # This is the current way to imitate the StopIteration exception
+        # TODO: Remove when the iterators are implemented and streaming is done
+        return self.reader_ref[].lines_count() - self.idx
+
+    fn get_row(inout self, ref [_]line: String) -> List[String]:
         var pos = 0
 
         var row = List[String]()
@@ -218,9 +238,10 @@ struct _CSVLineParser:
         #       We should refactor this to be more readable and maintainable
         #       See parse_process_char() function in cpython/Modules/_csv.c
         var state = START_RECORD
+        var dialect = self.dialect_ref[]
 
-        while pos < len(self.line):
-            var c = self._get_char(pos)
+        while pos < len(line):
+            var c = self._get_char(line, pos)
             # print('CHAR: ', c, ' STATE:', state, ' FIELD: ', self.field, ' POS: ', pos)
 
             # TODO: Use match statement when supported by Mojo
@@ -231,41 +252,41 @@ struct _CSVLineParser:
                     state = START_FIELD
                 continue  # do not consume the character
             elif state == START_FIELD:
-                if c == self.dialect.delimiter:
+                if c == dialect.delimiter:
                     # save empty field
                     self._save_field(row)
-                elif c == self.dialect.quotechar:
+                elif c == dialect.quotechar:
                     self._mark_quote()
                     state = IN_QUOTED_FIELD
                 else:
                     state = IN_FIELD
                     continue  # do not consume the character
             elif state == IN_FIELD:
-                if c == self.dialect.delimiter:
+                if c == dialect.delimiter:
                     state = END_FIELD
                     continue
                 elif c == "\n" or c == "\r":
                     state = END_RECORD
-                elif self.dialect.escapechar and c == self.dialect.escapechar:
+                elif dialect.escapechar and c == dialect.escapechar:
                     state = ESCAPED_CHAR
                 else:
                     self._add_to_field(c)
             elif state == IN_QUOTED_FIELD:
-                if c == self.dialect.quotechar:
-                    if self.dialect.doublequote:
+                if c == dialect.quotechar:
+                    if dialect.doublequote:
                         state = QUOTE_IN_QUOTED_FIELD
                     else:  # end of quoted field
                         state = IN_FIELD
-                elif c == self.dialect.escapechar:
+                elif c == dialect.escapechar:
                     state = ESCAPED_IN_QUOTED_FIELD
                 else:
                     self._add_to_field(c)
             elif state == QUOTE_IN_QUOTED_FIELD:
                 # double-check with CPython implementation
-                if c == self.dialect.quotechar:
+                if c == dialect.quotechar:
                     self._add_to_field(c)
                     state = IN_QUOTED_FIELD
-                elif c == self.dialect.delimiter:
+                elif c == dialect.delimiter:
                     self._save_field(row)
                     state = START_FIELD
             elif state == ESCAPED_CHAR:
@@ -286,8 +307,8 @@ struct _CSVLineParser:
         return row
 
     @always_inline("nodebug")
-    fn _get_char(self, pos: Int) -> String:
-        return self.line[pos]
+    fn _get_char(self, line: String, pos: Int) -> String:
+        return line[pos]
 
     @always_inline("nodebug")
     fn _add_to_field(inout self, c: String):
@@ -298,36 +319,15 @@ struct _CSVLineParser:
         self.quoted = True
 
     fn _save_field(inout self, inout row: List[String]):
-        var final_field: String = self.field
-        var quotechar = self.dialect.quotechar
-        if self.dialect.doublequote:
+        var final_field: String = self.field^
+        var dialect = self.dialect_ref[]
+        var quotechar = dialect.quotechar
+        if dialect.doublequote:
             final_field = final_field.replace(quotechar * 2, quotechar)
         row.append(final_field)
         # reset values
         self.quoted = False
-        self.field = ""
-
-
-@value
-struct _ReaderIter[
-    reader_mutability: Bool, //,
-    reader_lifetime: AnyLifetime[reader_mutability].type,
-](Sized):
-    """Iterator for any random-access container"""
-
-    var reader_ref: Reference[reader, reader_lifetime]
-    var idx: Int
-
-    @always_inline
-    fn __next__(inout self: Self) raises -> List[String]:
-        var line = self.reader_ref[].get_row(self.idx)
-        self.idx += 1
-        return line
-
-    fn __len__(self) -> Int:
-        # This is the current way to imitate the StopIteration exception
-        # TODO: Remove when the iterators are implemented and streaming is done
-        return self.reader_ref[].lines_count() - self.idx
+        self.field = String("")
 
 
 fn _validate_reader_dialect(dialect: Dialect) raises -> Bool:
