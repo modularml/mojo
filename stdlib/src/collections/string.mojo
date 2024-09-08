@@ -1585,6 +1585,10 @@ struct String(
         .
         """
 
+        fn num_bytes(b: UInt8) -> Int:
+            var flipped = ~b
+            return int(count_leading_zeros(flipped) + (b >> 7))
+
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
@@ -1606,8 +1610,8 @@ struct String(
                 # if the last char is not whitespace
                 output.append(self[str_byte_len])
                 break
-            rhs = lhs + 1
-            for s in self[lhs + 1 :]:
+            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
+            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
                 if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 rhs += s.byte_length()
