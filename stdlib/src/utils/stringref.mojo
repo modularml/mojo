@@ -382,7 +382,7 @@ struct StringRef(
 
         # SAFETY:
         #   Safe because our use of this StringSlice does not outlive `self`.
-        var str_slice = StringSlice[ImmutableStaticLifetime](
+        var str_slice = StringSlice[ImmutableAnyLifetime](
             unsafe_from_utf8_strref=self
         )
 

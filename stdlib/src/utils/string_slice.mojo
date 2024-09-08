@@ -325,7 +325,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self: StringSlice[ImmutableStaticLifetime], lit: StringLiteral
+        inout self: StringSlice[ImmutableAnyLifetime], lit: StringLiteral
     ):
         """Construct a new string slice from a string literal.
 

@@ -314,7 +314,7 @@ struct StringLiteral(
         return self.unsafe_ptr().bitcast[C_char]()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[ImmutableStaticLifetime]:
+    fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
@@ -326,10 +326,10 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[ImmutableStaticLifetime](unsafe_from_utf8=bytes)
+        return StringSlice[ImmutableAnyLifetime](unsafe_from_utf8=bytes)
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, ImmutableStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, ImmutableAnyLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -339,7 +339,7 @@ struct StringLiteral(
 
         var ptr = self.unsafe_ptr()
 
-        return Span[UInt8, ImmutableStaticLifetime](
+        return Span[UInt8, ImmutableAnyLifetime](
             unsafe_ptr=ptr,
             len=self.byte_length(),
         )

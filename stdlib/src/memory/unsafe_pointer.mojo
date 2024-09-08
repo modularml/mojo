@@ -166,7 +166,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__(
         self,
-    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
+    ) -> ref [MutableAnyLifetime, address_space._value.value] T:
         """Return a reference to the underlying data.
 
         Returns:
@@ -174,9 +174,9 @@ struct UnsafePointer[
         """
 
         # We're unsafe, so we can have unsafe things. References we make have
-        # an immortal mutable lifetime, since we can't come up with a meaningful
-        # lifetime for them anyway.
-        alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
+        # an 'any' mutable lifetime, since UnsafePointer is allowed to alias
+        # anything.
+        alias _ref_type = Reference[T, MutableAnyLifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
                 UnsafePointer[T, address_space, False](self).address
@@ -202,7 +202,7 @@ struct UnsafePointer[
     fn __getitem__[
         IntLike: IntLike, //
     ](self, offset: IntLike) -> ref [
-        MutableStaticLifetime, address_space._value.value
+        MutableAnyLifetime, address_space._value.value
     ] T:
         """Return a reference to the underlying data, offset by the given index.
 

@@ -78,6 +78,8 @@ from builtin.type_aliases import (
     AnyTrivialRegType,
     ImmutableLifetime,
     MutableLifetime,
+    ImmutableAnyLifetime,
+    MutableAnyLifetime,
     ImmutableStaticLifetime,
     MutableStaticLifetime,
     LifetimeSet,

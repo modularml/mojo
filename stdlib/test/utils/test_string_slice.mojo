@@ -118,7 +118,7 @@ fn test_heap_string_from_string_slice() raises:
     alias string_lit: StringLiteral = "Hello"
 
     alias static_str: StringSlice[
-        ImmutableStaticLifetime
+        ImmutableAnyLifetime
     ] = string_lit.as_string_slice()
 
     alias heap_string = String(static_str)
@@ -133,11 +133,11 @@ fn test_slice_len() raises:
     alias str4: StringLiteral = "12"
     alias str5: StringLiteral = "1"
 
-    alias slice1: StringSlice[ImmutableStaticLifetime] = str1.as_string_slice()
-    alias slice2: StringSlice[ImmutableStaticLifetime] = str2.as_string_slice()
-    alias slice3: StringSlice[ImmutableStaticLifetime] = str3.as_string_slice()
-    alias slice4: StringSlice[ImmutableStaticLifetime] = str4.as_string_slice()
-    alias slice5: StringSlice[ImmutableStaticLifetime] = str5.as_string_slice()
+    alias slice1: StringSlice[ImmutableAnyLifetime] = str1.as_string_slice()
+    alias slice2: StringSlice[ImmutableAnyLifetime] = str2.as_string_slice()
+    alias slice3: StringSlice[ImmutableAnyLifetime] = str3.as_string_slice()
+    alias slice4: StringSlice[ImmutableAnyLifetime] = str4.as_string_slice()
+    alias slice5: StringSlice[ImmutableAnyLifetime] = str5.as_string_slice()
 
     assert_equal(5, len(slice1))
     assert_equal(4, len(slice2))
