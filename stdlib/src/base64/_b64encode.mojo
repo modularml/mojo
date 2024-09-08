@@ -23,8 +23,11 @@ Instructions, ACM Transactions on the Web 12 (3), 2018.
 https://arxiv.org/abs/1704.00605
 """
 
+from collections import InlineArray
+from memory import memcpy
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
-@always_inline
+
 fn _subtract_with_saturation[
     simd_size: Int, //, b: Int
 ](a: SIMD[DType.uint8, simd_size]) -> SIMD[DType.uint8, simd_size]:
@@ -50,7 +53,6 @@ alias TABLE_BASE64_OFFSETS = SIMD[DType.uint8, 16](
 )
 
 
-@always_inline
 fn _bitcast[
     new_dtype: DType, new_size: Int
 ](owned input: SIMD) -> SIMD[new_dtype, new_size]:
@@ -296,6 +298,12 @@ fn _shuffle_input_vector[
         return SIMD[DType.uint8, simd_width]()  # dummy, unreachable
 
 
+fn _print_vector_in_binary(vector: SIMD):
+    for i in range(len(vector)):
+        print(bin(vector[i]), end="")
+    print()
+
+
 fn _to_b64_ascii[
     simd_width: Int
 ](input_vector: SIMD[DType.uint8, simd_width]) -> SIMD[DType.uint8, simd_width]:
@@ -348,7 +356,6 @@ fn _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load[
     return result
 
 
-@always_inline
 fn _get_number_of_bytes_to_store_from_number_of_bytes_to_load[
     max_size: Int
 ](nb_of_elements_to_load: Int) -> Int:
@@ -365,6 +372,7 @@ fn _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equa
     for a given number of bytes to encode in base64. This is **not** including the '=' sign.
 
     This table lookup is smaller than the simd size, because we only use it for the last chunk.
+    This should be called at compile time, otherwise it's quite slow.
     """
     var result = SIMD[DType.uint8, simd_width]()
     for i in range(simd_width):
@@ -383,7 +391,6 @@ fn _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equa
     return result
 
 
-@always_inline
 fn _get_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equal_sign[
     max_size: Int
 ](nb_of_elements_to_load: Int) -> Int:
@@ -393,7 +400,37 @@ fn _get_number_of_bytes_to_store_from_number_of_bytes_to_load_without_equal_sign
     return int(table[nb_of_elements_to_load])
 
 
+fn load_incomplete_simd[
+    simd_width: Int
+](pointer: UnsafePointer[UInt8], nb_of_elements_to_load: Int) -> SIMD[
+    DType.uint8, simd_width
+]:
+    var tmp_buffer = InlineArray[UInt8, simd_width](0)
+    var tmp_buffer_pointer = tmp_buffer.unsafe_ptr()
+    memcpy(dest=tmp_buffer_pointer, src=pointer, count=nb_of_elements_to_load)
+
+    var result = tmp_buffer_pointer.load[width=simd_width]()
+    _ = tmp_buffer  # We make it live long enough
+    return result
+
+
+fn store_incomplete_simd[
+    simd_width: Int
+](
+    pointer: UnsafePointer[UInt8],
+    simd_vector: SIMD[DType.uint8, simd_width],
+    nb_of_elements_to_store: Int,
+):
+    var tmp_buffer = InlineArray[UInt8, simd_width](0)
+    var tmp_buffer_pointer = tmp_buffer.unsafe_ptr()
+    tmp_buffer_pointer.store(simd_vector)
+
+    memcpy(dest=pointer, src=tmp_buffer_pointer, count=nb_of_elements_to_store)
+    _ = tmp_buffer  # We make it live long enough
+
+
 # TODO: Use Span instead of List as input when Span is easier to use
+@no_inline
 fn b64encode_with_buffers(
     input_bytes: List[UInt8, _], inout result: List[UInt8, _]
 ):
@@ -423,14 +460,13 @@ fn b64encode_with_buffers(
         var nb_of_elements_to_load = min(
             input_simd_width, input_bytes_len - input_index
         )
-        var mask = _base64_simd_mask[simd_width](nb_of_elements_to_load)
 
         # We don't want to read past the input buffer
-        var input_vector = sys.intrinsics.masked_load[simd_width](
+        var input_vector = load_incomplete_simd[simd_width](
             start_of_input_chunk,
-            mask,
-            passthrough=SIMD[DType.uint8, simd_width](0),
+            nb_of_elements_to_load=nb_of_elements_to_load,
         )
+        # _print_vector_in_binary(input_vector)
 
         result_vector = _to_b64_ascii(input_vector)
 
@@ -451,12 +487,12 @@ fn b64encode_with_buffers(
         ](
             nb_of_elements_to_load
         )
-        var mask_store = _base64_simd_mask[simd_width](nb_of_elements_to_store)
+        # var mask_store = _base64_simd_mask[simd_width](nb_of_elements_to_store)
         # We write the result to the output buffer
-        sys.intrinsics.masked_store(
-            result_vector_with_equals,
+        store_incomplete_simd(
             result.unsafe_ptr() + len(result),
-            mask_store,
+            result_vector_with_equals,
+            nb_of_elements_to_store,
         )
         result.size += int(nb_of_elements_to_store)
         input_index += input_simd_width
