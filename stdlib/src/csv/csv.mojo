@@ -296,7 +296,6 @@ struct _CSVLineParser:
     @always_inline("nodebug")
     fn _mark_quote(inout self):
         self.quoted = True
-        print("MARK QUOTE. FIELD: ", self.field)
 
     fn _save_field(inout self, inout row: List[String]):
         var final_field: String = self.field
