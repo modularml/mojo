@@ -1587,7 +1587,7 @@ struct String(
 
         fn num_bytes(b: UInt8) -> Int:
             var flipped = ~b
-            return int(count_leading_zeros(flipped) + (b >> 7))
+            return int(count_leading_zeros(flipped) + (flipped >> 7))
 
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
