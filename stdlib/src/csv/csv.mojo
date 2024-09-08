@@ -19,7 +19,6 @@ alias QUOTE_STRINGS = 4
 alias QUOTE_NOTNULL = 5
 
 
-@value
 struct Dialect:
     """
     Describe a CSV dialect.
@@ -82,7 +81,6 @@ struct Dialect:
         self._valid = _validate_reader_dialect(self)
 
 
-@value
 struct reader:
     """
     CSV reader.
@@ -99,8 +97,10 @@ struct reader:
         ['1', '2', '3']
     """
 
-    var _dialect: Dialect
-    var _lines: List[String]
+    var dialect: Dialect
+    """The CSV dialect."""
+    var lines: List[String]
+    """The lines of the CSV file."""
 
     fn __init__(
         inout self: Self,
@@ -128,7 +128,7 @@ struct reader:
             lineterminator: The sequence used to terminate lines.
             quoting: The quoting mode.
         """
-        self._dialect = Dialect(
+        self.dialect = Dialect(
             delimiter=delimiter,
             quotechar=quotechar,
             escapechar=escapechar,
@@ -137,15 +137,15 @@ struct reader:
             lineterminator=lineterminator,
             quoting=quoting,
         )
-        self._dialect.validate()
+        self.dialect.validate()
 
         # TODO: Implement streaming to prevent loading the entire file into memory
-        self._lines = csvfile.read().splitlines()
+        self.lines = csvfile.read().splitlines()
 
     @always_inline("nodebug")
     fn get_line(
         self: Self, idx: Int
-    ) raises -> ref [__lifetime_of(self)] String:
+    ) raises -> ref [__lifetime_of(self.lines)] String:
         """
         Returns an specific line in the CSV file.
 
@@ -155,7 +155,7 @@ struct reader:
         Returns:
             The line at the given index.
         """
-        return self._lines[idx]
+        return self.lines[idx]
 
     fn lines_count(self: Self) -> Int:
         """
@@ -165,7 +165,7 @@ struct reader:
             The number of lines in the CSV file.
         """
         # TODO: This has no sense once we implement streaming
-        return len(self._lines)
+        return len(self.lines)
 
     fn __iter__(self: Self) raises -> _ReaderIter[__lifetime_of(self)]:
         """
@@ -174,13 +174,12 @@ struct reader:
         Returns:
             Iterator.
         """
-        return _ReaderIter[__lifetime_of(self)](reader_ref=self, idx=0)
+        return _ReaderIter[__lifetime_of(self)](reader=self, idx=0)
 
 
 # ===------------------------------------------------------------------=== #
 # Auxiliary structs and functions
 # ===------------------------------------------------------------------=== #
-
 
 alias START_RECORD = 0
 alias START_FIELD = 1
@@ -193,7 +192,6 @@ alias END_RECORD = 7
 alias QUOTE_IN_QUOTED_FIELD = 8
 
 
-@value
 struct _ReaderIter[
     reader_mutability: Bool, //,
     reader_lifetime: AnyLifetime[reader_mutability].type,
@@ -201,21 +199,27 @@ struct _ReaderIter[
     """Iterator for any random-access container"""
 
     var reader_ref: Reference[reader, reader_lifetime]
-    var dialect_ref: Reference[Dialect, reader_lifetime]
     var idx: Int
     var pos: Int
     var field_pos: Int
     var quoted: Bool
+    var quotechar: String
+    var delimiter: String
+    var doublequote: Bool
+    var escapechar: String
+    var quoting: Int
 
-    fn __init__(
-        inout self, reader_ref: Reference[reader, reader_lifetime], idx: Int = 0
-    ):
-        self.reader_ref = reader_ref
-        self.dialect_ref = reader_ref[]._dialect
+    fn __init__(inout self, ref [reader_lifetime]reader: reader, idx: Int = 0):
+        self.reader_ref = reader
         self.idx = idx
         self.pos = 0
         self.field_pos = 0
         self.quoted = False
+        self.quotechar = reader.dialect.quotechar
+        self.delimiter = reader.dialect.delimiter
+        self.doublequote = reader.dialect.doublequote
+        self.escapechar = reader.dialect.escapechar
+        self.quoting = reader.dialect.quoting
 
     @always_inline
     fn __next__(inout self: Self) raises -> List[String]:
@@ -236,9 +240,12 @@ struct _ReaderIter[
         #       We should refactor this to be more readable and maintainable
         #       See parse_process_char() function in cpython/Modules/_csv.c
         state = START_RECORD
-        dialect = self.dialect_ref[]
 
         self.pos = self.field_pos = 0
+        delimiter = self.delimiter
+        quotechar = self.quotechar
+        doublequote = self.doublequote
+        escapechar = self.escapechar
 
         while self.pos < len(line):
             var c = self._get_char(line)
@@ -253,43 +260,43 @@ struct _ReaderIter[
                 continue  # do not consume the character
             elif state == START_FIELD:
                 self.field_pos = self.pos
-                if c == dialect.delimiter:
+                if c == delimiter:
                     # save empty field
                     self._save_field(row, line)
-                elif c == dialect.quotechar:
+                elif c == quotechar:
                     self._mark_quote()
                     state = IN_QUOTED_FIELD
                 else:
                     state = IN_FIELD
                     continue  # do not consume the character
             elif state == IN_FIELD:
-                if c == dialect.delimiter:
+                if c == delimiter:
                     state = END_FIELD
                     continue
                 elif c == "\n" or c == "\r":
                     state = END_RECORD
-                elif dialect.escapechar and c == dialect.escapechar:
+                elif escapechar and c == escapechar:
                     state = ESCAPED_CHAR
                 else:
                     pass
                     # self._add_to_field(c)
             elif state == IN_QUOTED_FIELD:
-                if c == dialect.quotechar:
-                    if dialect.doublequote:
+                if c == quotechar:
+                    if doublequote:
                         state = QUOTE_IN_QUOTED_FIELD
                     else:  # end of quoted field
                         state = IN_FIELD
-                elif c == dialect.escapechar:
+                elif c == escapechar:
                     state = ESCAPED_IN_QUOTED_FIELD
                 else:
                     pass
                     # self._add_to_field(c)
             elif state == QUOTE_IN_QUOTED_FIELD:
                 # double-check with CPython implementation
-                if c == dialect.quotechar:
+                if c == quotechar:
                     # self._add_to_field(c)
                     state = IN_QUOTED_FIELD
-                elif c == dialect.delimiter:
+                elif c == delimiter:
                     self._save_field(row, line)
                     state = START_FIELD
             elif state == ESCAPED_CHAR:
@@ -323,9 +330,8 @@ struct _ReaderIter[
             self.pos,
         ) if not self.quoted else (self.field_pos + 1, self.pos - 1)
         final_field = line[start_idx:end_idx]
-        dialect = self.dialect_ref[]
-        quotechar = dialect.quotechar
-        if dialect.doublequote:
+        if self.doublequote:
+            quotechar = self.quotechar
             final_field = final_field.replace(quotechar * 2, quotechar)
         row.append(final_field)
         # reset values
