@@ -140,7 +140,9 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
-    fn alloc(count: Int) -> Self:
+    fn alloc(
+        count: Int,
+    ) -> UnsafePointer[type, AddressSpace.GENERIC, exclusive, alignment]:
         """Allocate an array with specified or default alignment.
 
         Args:
@@ -150,12 +152,8 @@ struct UnsafePointer[
             The pointer to the newly allocated array.
         """
         alias sizeof_t = sizeof[type]()
-
         constrained[sizeof_t > 0, "size must be greater than zero"]()
-
-        return _malloc[type, address_space=address_space, alignment=alignment](
-            sizeof_t * count
-        )
+        return _malloc[type, alignment=alignment](sizeof_t * count)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -766,7 +764,7 @@ struct UnsafePointer[
         scatter(val, base, mask, alignment)
 
     @always_inline
-    fn free(self):
+    fn free(self: UnsafePointer[_, AddressSpace.GENERIC, *_]):
         """Free the memory referenced by the pointer."""
         _free(self)
 
