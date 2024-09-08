@@ -203,8 +203,8 @@ struct _ReaderIter[
     var reader_ref: Reference[reader, reader_lifetime]
     var dialect_ref: Reference[Dialect, reader_lifetime]
     var idx: Int
-    var field: String
     var pos: Int
+    var field_pos: Int
     var quoted: Bool
 
     fn __init__(
@@ -214,13 +214,13 @@ struct _ReaderIter[
         self.dialect_ref = reader_ref[]._dialect
         self.idx = idx
         self.pos = 0
-        self.field = String("")
+        self.field_pos = 0
         self.quoted = False
 
     @always_inline
     fn __next__(inout self: Self) raises -> List[String]:
-        var line = self.reader_ref[].get_line(self.idx)
-        var row = self.get_row(line)
+        line = self.reader_ref[].get_line(self.idx)
+        row = self.get_row(line)
         self.idx += 1
         return row
 
@@ -235,10 +235,10 @@ struct _ReaderIter[
         # TODO: This is spaghetti code mimicing the CPython implementation
         #       We should refactor this to be more readable and maintainable
         #       See parse_process_char() function in cpython/Modules/_csv.c
-        var state = START_RECORD
-        var dialect = self.dialect_ref[]
+        state = START_RECORD
+        dialect = self.dialect_ref[]
 
-        self.pos = 0
+        self.pos = self.field_pos = 0
 
         while self.pos < len(line):
             var c = self._get_char(line)
@@ -252,9 +252,10 @@ struct _ReaderIter[
                     state = START_FIELD
                 continue  # do not consume the character
             elif state == START_FIELD:
+                self.field_pos = self.pos
                 if c == dialect.delimiter:
                     # save empty field
-                    self._save_field(row)
+                    self._save_field(row, line)
                 elif c == dialect.quotechar:
                     self._mark_quote()
                     state = IN_QUOTED_FIELD
@@ -270,7 +271,8 @@ struct _ReaderIter[
                 elif dialect.escapechar and c == dialect.escapechar:
                     state = ESCAPED_CHAR
                 else:
-                    self._add_to_field(c)
+                    pass
+                    # self._add_to_field(c)
             elif state == IN_QUOTED_FIELD:
                 if c == dialect.quotechar:
                     if dialect.doublequote:
@@ -280,28 +282,29 @@ struct _ReaderIter[
                 elif c == dialect.escapechar:
                     state = ESCAPED_IN_QUOTED_FIELD
                 else:
-                    self._add_to_field(c)
+                    pass
+                    # self._add_to_field(c)
             elif state == QUOTE_IN_QUOTED_FIELD:
                 # double-check with CPython implementation
                 if c == dialect.quotechar:
-                    self._add_to_field(c)
+                    # self._add_to_field(c)
                     state = IN_QUOTED_FIELD
                 elif c == dialect.delimiter:
-                    self._save_field(row)
+                    self._save_field(row, line)
                     state = START_FIELD
             elif state == ESCAPED_CHAR:
                 state = IN_QUOTED_FIELD
             elif state == ESCAPED_IN_QUOTED_FIELD:
                 state = IN_QUOTED_FIELD
             elif state == END_FIELD:
-                self._save_field(row)
+                self._save_field(row, line)
                 state = START_FIELD
             elif state == END_RECORD:
                 break
             self.pos += 1
 
-        if self.field:
-            self._save_field(row)
+        if self.field_pos < self.pos:
+            self._save_field(row, line)
 
         # TODO: Handle the escapechar and skipinitialspace options
         return row
@@ -311,23 +314,22 @@ struct _ReaderIter[
         return line[self.pos]
 
     @always_inline("nodebug")
-    fn _add_to_field(inout self, c: String):
-        self.field += c
-
-    @always_inline("nodebug")
     fn _mark_quote(inout self):
         self.quoted = True
 
-    fn _save_field(inout self, inout row: List[String]):
-        var final_field: String = self.field^
-        var dialect = self.dialect_ref[]
-        var quotechar = dialect.quotechar
+    fn _save_field(inout self, inout row: List[String], ref [_]line: String):
+        start_idx, end_idx = (
+            self.field_pos,
+            self.pos,
+        ) if not self.quoted else (self.field_pos + 1, self.pos - 1)
+        final_field = line[start_idx:end_idx]
+        dialect = self.dialect_ref[]
+        quotechar = dialect.quotechar
         if dialect.doublequote:
             final_field = final_field.replace(quotechar * 2, quotechar)
         row.append(final_field)
         # reset values
         self.quoted = False
-        self.field = String("")
 
 
 fn _validate_reader_dialect(dialect: Dialect) raises -> Bool:
