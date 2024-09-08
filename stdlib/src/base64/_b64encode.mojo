@@ -48,9 +48,18 @@ fn _subtract_with_saturation[
 | 63          | /           | 12           | -16                     |
 """
 alias UNUSED = 0
+# fmt: off
 alias TABLE_BASE64_OFFSETS = SIMD[DType.uint8, 16](
-    71, -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, -19, -16, 65, UNUSED, UNUSED
+    71,                                     # a ... z
+    -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, # 0 ... 9 
+    -19,                                    # +
+    -16,                                    # /
+    65,                                     # A ... Z
+    UNUSED, UNUSED
 )
+# fmt: on
+alias END_FIRST_RANGE = 25
+alias END_SECOND_RANGE = 51
 
 
 fn _bitcast[
@@ -171,128 +180,45 @@ fn _shuffle_input_vector[
             0, 1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 10, 11
         ]()
     elif simd_width == 32:
+        # fmt: off
         return input_vector.shuffle[
-            0,
-            1,
-            1,
-            2,
-            3,
-            4,
-            4,
-            5,
-            6,
-            7,
-            7,
-            8,
-            9,
-            10,
-            10,
-            11,
-            12,
-            13,
-            13,
-            14,
-            15,
-            16,
-            16,
-            17,
-            18,
-            19,
-            19,
-            20,
-            21,
-            22,
-            22,
-            23,
+            0, 1, 1, 2, 
+            3, 4, 4, 5,
+            6, 7, 7, 8, 
+            9, 10, 10, 11, 
+            12, 13, 13, 14, 
+            15, 16, 16, 17, 
+            18, 19, 19, 20, 
+            21, 22, 22, 23
         ]()
+        # fmt: on
     elif simd_width == 64:
+        # fmt: off
         return input_vector.shuffle[
-            0,
-            1,
-            1,
-            2,
-            3,
-            4,
-            4,
-            5,
-            6,
-            7,
-            7,
-            8,
-            9,
-            10,
-            10,
-            11,
-            12,
-            13,
-            13,
-            14,
-            15,
-            16,
-            16,
-            17,
-            18,
-            19,
-            19,
-            20,
-            21,
-            22,
-            22,
-            23,
-            24,
-            25,
-            25,
-            26,
-            27,
-            28,
-            28,
-            29,
-            30,
-            31,
-            31,
-            32,
-            33,
-            34,
-            34,
-            35,
-            36,
-            37,
-            37,
-            38,
-            39,
-            40,
-            40,
-            41,
-            42,
-            43,
-            43,
-            44,
-            45,
-            46,
-            46,
-            47,
-            48,
-            49,
-            49,
-            50,
-            51,
-            52,
-            52,
-            53,
-            54,
-            55,
-            55,
-            56,
-            57,
-            58,
-            58,
-            59,
-            60,
-            61,
-            61,
-            62,
+            0, 1, 1, 2, 
+            3, 4, 4, 5, 
+            6, 7, 7, 8, 
+            9, 10, 10, 11, 
+            12, 13, 13, 14, 
+            15, 16, 16, 17, 
+            18, 19, 19, 20, 
+            21, 22, 22, 23, 
+            24, 25, 25, 26, 
+            27, 28, 28, 29, 
+            30, 31, 31, 32, 
+            33, 34, 34, 35, 
+            36, 37, 37, 38, 
+            39, 40, 40, 41, 
+            42, 43, 43, 44, 
+            45, 46, 46, 47, 
+            48, 49, 49, 50, 
+            51, 52, 52, 53, 
+            54, 55, 55, 56, 
+            57, 58, 58, 59, 
+            60, 61, 61, 62, 
             63,
         ]()
+        # fmt: on
     else:
         constrained[False, msg="simd_width must be at most 64"]()
         return SIMD[DType.uint8, simd_width]()  # dummy, unreachable
@@ -315,12 +241,16 @@ fn _to_b64_ascii[
     )
 
     # See the table above for the offsets, we try to go from 6-bits values to target indexes.
-    var saturated = _subtract_with_saturation[51](ready_to_encode_per_byte)
+    # The two first ranges go to 0, the other ranges are just 1...12.
+    var saturated = _subtract_with_saturation[END_SECOND_RANGE](
+        ready_to_encode_per_byte
+    )
 
-    var mask_below_25 = ready_to_encode_per_byte <= 25
+    var mask_in_first_range = ready_to_encode_per_byte <= END_FIRST_RANGE
 
     # Now are have the target indexes
-    var indices = mask_below_25.select(constant_13, saturated)
+    # The first range goes to 13
+    var indices = mask_in_first_range.select(constant_13, saturated)
 
     var offsets = TABLE_BASE64_OFFSETS._dynamic_shuffle(indices)
 
