@@ -1662,6 +1662,12 @@ def test_comparison():
         test_dtype[DType.bfloat16]()
 
 
+def test_float_conversion():
+    assert_almost_equal(float(Int32(45)), 45.0)
+    assert_almost_equal(float(Float32(34.32)), 34.32)
+    assert_almost_equal(float(UInt64(36)), 36.0)
+
+
 def main():
     test_abs()
     test_add()
@@ -1709,4 +1715,5 @@ def main():
     test_split()
     test_contains()
     test_comparison()
+    test_float_conversion()
     # TODO: add tests for __and__, __or__, anc comparison operators

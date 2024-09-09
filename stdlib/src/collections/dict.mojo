@@ -119,7 +119,11 @@ struct _DictEntryIter[
         return self
 
     @always_inline
-    fn __next__(inout self) -> Reference[DictEntry[K, V], dict_lifetime]:
+    fn __next__(
+        inout self,
+    ) -> Reference[
+        DictEntry[K, V], __lifetime_of(self.src[]._entries[0].value())
+    ]:
         while True:
             var opt_entry_ref = Reference(self.src[]._entries[self.index])
 
@@ -162,7 +166,9 @@ struct _DictKeyIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> Reference[K, dict_lifetime]:
+    fn __next__(
+        inout self,
+    ) -> Reference[K, __lifetime_of(self.iter.__next__()[].key)]:
         return self.iter.__next__()[].key
 
     fn __len__(self) -> Int:
@@ -820,7 +826,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
-    ) raises -> ref [__lifetime_of(self)] Self.V:
+    ) raises -> ref [__lifetime_of(self._entries[0].value().value)] Self.V:
         """Find a value in the dictionary by key.
 
         Args:
@@ -989,7 +995,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn setdefault(
         inout self, key: K, owned default: V
-    ) raises -> Reference[V, __lifetime_of(self)]:
+    ) raises -> Reference[V, __lifetime_of(self._find_ref(key))]:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
         Args:
@@ -1277,9 +1283,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.__iter__()
-        return _DictKeyIter(_DictEntryIter(0, 0, self._dict))
+        return self._dict.keys()
 
     fn keys(
         ref [_]self: Self,
@@ -1289,9 +1293,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.keys()
-        return Self.__iter__(self)
+        return self._dict.keys()
 
     fn values(
         ref [_]self: Self,
@@ -1301,9 +1303,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         Returns:
             An iterator of references to the dictionary values.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.values()
-        return _DictValueIter(_DictEntryIter(0, 0, self._dict))
+        return self._dict.values()
 
     fn items(
         ref [_]self: Self,

@@ -132,21 +132,29 @@ def test_mod():
 
 
 def test_div_mod():
-    var t: Tuple[FloatLiteral, FloatLiteral] = FloatLiteral.__divmod__(4.5, 2.0)
-    assert_equal(t[0], 2.0)
-    assert_equal(t[1], 0.5)
+    alias t0 = FloatLiteral.__divmod__(4.5, 2.0)
+    alias q0 = t0[0]
+    alias r0 = t0[1]
+    assert_equal(q0, 2.0)
+    assert_equal(r0, 0.5)
 
-    t = FloatLiteral.__divmod__(-4.5, 2.0)
-    assert_equal(t[0], -3.0)
-    assert_equal(t[1], 1.5)
+    alias t1 = FloatLiteral.__divmod__(-4.5, 2.0)
+    alias q1 = t1[0]
+    alias r1 = t1[1]
+    assert_equal(q1, -3.0)
+    assert_equal(r1, 1.5)
 
-    t = FloatLiteral.__divmod__(4.5, -2.0)
-    assert_equal(t[0], -3.0)
-    assert_equal(t[1], -1.5)
+    alias t2 = FloatLiteral.__divmod__(4.5, -2.0)
+    alias q2 = t2[0]
+    alias r2 = t2[1]
+    assert_equal(q2, -3.0)
+    assert_equal(r2, -1.5)
 
-    t = FloatLiteral.__divmod__(6.0, 2.5)
-    assert_equal(t[0], 2.0)
-    assert_equal(t[1], 1.0)
+    alias t3 = FloatLiteral.__divmod__(6.0, 2.5)
+    alias q3 = t3[0]
+    alias r3 = t3[1]
+    assert_equal(q3, 2.0)
+    assert_equal(r3, 1.0)
 
 
 def test_int_conversion():
@@ -278,6 +286,11 @@ def test_comparison():
     assert_false(FloatLiteral.__ge__(nan, neg_zero))
 
 
+def test_float_conversion():
+    assert_equal((4.5).__float__(), 4.5)
+    assert_equal((0.0).__float__(), 0.0)
+
+
 def main():
     test_ceil()
     test_floor()
@@ -292,3 +305,4 @@ def main():
     test_is_special_value()
     test_abs()
     test_comparison()
+    test_float_conversion()
