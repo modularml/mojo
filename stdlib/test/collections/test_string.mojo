@@ -1553,6 +1553,7 @@ def test_isdigit():
     assert_true(isdigit(ord("1")))
     assert_false(isdigit(ord("g")))
 
+    assert_false(String("").isdigit())
     assert_true(String("123").isdigit())
     assert_false(String("asdg").isdigit())
     assert_false(String("123asdg").isdigit())
