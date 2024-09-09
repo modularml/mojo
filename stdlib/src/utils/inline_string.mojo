@@ -23,7 +23,7 @@ from sys import sizeof
 from memory import UnsafePointer, memcpy
 
 from utils import StringSlice, Variant
-from utils._format import ToFormatter
+from utils.format import ToFormatter
 
 # ===----------------------------------------------------------------------===#
 # InlineString

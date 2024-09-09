@@ -29,7 +29,7 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, StaticString, StringSlice
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle

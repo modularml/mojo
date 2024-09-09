@@ -20,7 +20,7 @@ from sys.ffi import C_char
 from memory import memcpy
 from collections import List
 from utils import StringRef, Span, StringSlice
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
 from collections.string import _atol

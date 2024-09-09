@@ -132,8 +132,7 @@ from collections.string import (
     isprintable,
 )
 from memory import UnsafePointer, Reference, AddressSpace
-from utils import StringRef
-from utils._format import Formattable, Formatter
+from utils import StringRef, Formattable, Formatter
 
 # Private things
 from builtin._documentation import doc_private

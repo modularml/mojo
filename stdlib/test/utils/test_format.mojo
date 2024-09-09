@@ -14,7 +14,7 @@
 
 from testing import assert_equal
 
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 from utils.inline_string import _FixedString
 
 
