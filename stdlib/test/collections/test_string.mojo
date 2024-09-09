@@ -804,6 +804,12 @@ def test_split():
         String("1,2,3,3,3").split("3", 2).__str__(), "['1,2,', ',', ',3']"
     )
 
+    var in5 = String("Hello 🔥!")
+    var res5 = in5.split()
+    assert_equal(len(res5), 2)
+    assert_equal(res5[0], "Hello")
+    assert_equal(res5[1], "🔥!")
+
 
 def test_splitlines():
     # Test with no line breaks
