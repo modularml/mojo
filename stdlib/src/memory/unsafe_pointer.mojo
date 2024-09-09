@@ -40,10 +40,10 @@ from memory.memory import _free, _malloc
 
 @register_passable("trivial")
 struct UnsafePointer[
-    T: AnyType,
+    type: AnyType,
     address_space: AddressSpace = AddressSpace.GENERIC,
     exclusive: Bool = False,
-    alignment: Int = alignof[T]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -56,7 +56,7 @@ struct UnsafePointer[
     """This is a pointer type that can point to any generic value that is movable.
 
     Parameters:
-        T: The type the pointer points to.
+        type: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
         exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
         alignment: The minimum alignment of this pointer known statically.
@@ -69,13 +69,11 @@ struct UnsafePointer[
     # Fields
     alias _mlir_type = __mlir_type[
         `!kgen.pointer<`,
-        T,
+        type,
         `, `,
         address_space._value.value,
         `>`,
     ]
-
-    alias type = T
 
     # ===-------------------------------------------------------------------===#
     # Fields
@@ -104,7 +102,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
-    fn __init__(inout self, other: UnsafePointer[T, address_space, *_]):
+    fn __init__(inout self, other: UnsafePointer[type, address_space, *_]):
         """Exclusivity parameter cast a pointer.
 
         Args:
@@ -129,7 +127,7 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(ref [_, address_space._value.value]arg: T) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: type) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -142,7 +140,9 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
-    fn alloc(count: Int) -> Self:
+    fn alloc(
+        count: Int,
+    ) -> UnsafePointer[type, AddressSpace.GENERIC, exclusive, alignment]:
         """Allocate an array with specified or default alignment.
 
         Args:
@@ -151,13 +151,9 @@ struct UnsafePointer[
         Returns:
             The pointer to the newly allocated array.
         """
-        alias sizeof_t = sizeof[T]()
-
+        alias sizeof_t = sizeof[type]()
         constrained[sizeof_t > 0, "size must be greater than zero"]()
-
-        return _malloc[T, address_space=address_space, alignment=alignment](
-            sizeof_t * count
-        )
+        return _malloc[type, alignment=alignment](sizeof_t * count)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -166,7 +162,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__(
         self,
-    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
+    ) -> ref [MutableAnyLifetime, address_space._value.value] type:
         """Return a reference to the underlying data.
 
         Returns:
@@ -174,12 +170,12 @@ struct UnsafePointer[
         """
 
         # We're unsafe, so we can have unsafe things. References we make have
-        # an immortal mutable lifetime, since we can't come up with a meaningful
-        # lifetime for them anyway.
-        alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
+        # an 'any' mutable lifetime, since UnsafePointer is allowed to alias
+        # anything.
+        alias _ref_type = Reference[type, MutableAnyLifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[T, address_space, False](self).address
+                UnsafePointer[type, address_space, False](self).address
             )
         )
 
@@ -202,8 +198,8 @@ struct UnsafePointer[
     fn __getitem__[
         IntLike: IntLike, //
     ](self, offset: IntLike) -> ref [
-        MutableStaticLifetime, address_space._value.value
-    ] T:
+        MutableAnyLifetime, address_space._value.value
+    ] type:
         """Return a reference to the underlying data, offset by the given index.
 
         Parameters:
@@ -402,7 +398,9 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn as_noalias_ptr(self) -> UnsafePointer[T, address_space, True, alignment]:
+    fn as_noalias_ptr(
+        self,
+    ) -> UnsafePointer[type, address_space, True, alignment]:
         """Cast the pointer to a new pointer that is known not to locally alias
         any other pointer. In other words, the pointer transitively does not
         alias any other memory value declared in the local function context.
@@ -766,13 +764,13 @@ struct UnsafePointer[
         scatter(val, base, mask, alignment)
 
     @always_inline
-    fn free(self):
+    fn free(self: UnsafePointer[_, AddressSpace.GENERIC, *_]):
         """Free the memory referenced by the pointer."""
         _free(self)
 
     @always_inline("nodebug")
     fn bitcast[
-        T: AnyType = Self.T,
+        T: AnyType = Self.type,
         /,
         address_space: AddressSpace = Self.address_space,
     ](self) -> UnsafePointer[T, address_space, alignment=alignment]:
@@ -811,11 +809,11 @@ struct UnsafePointer[
         return self.bitcast[Scalar[T], address_space]()
 
     @always_inline
-    fn destroy_pointee(self: UnsafePointer[T, alignment=alignment]):
+    fn destroy_pointee(self: UnsafePointer[type, alignment=alignment]):
         """Destroy the pointed-to value.
 
         The pointer must not be null, and the pointer memory location is assumed
-        to contain a valid initialized instance of `T`.  This is equivalent to
+        to contain a valid initialized instance of `type`.  This is equivalent to
         `_ = self.take_pointee()` but doesn't require `Movable` and is
         more efficient because it doesn't invoke `__moveinit__`.
 
