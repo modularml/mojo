@@ -301,7 +301,7 @@ fn _float_repr[
 
 
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableStaticLifetime](
+    var str_slice = StringSlice[ImmutableAnyLifetime](
         unsafe_from_utf8_strref=strref
     )
 
