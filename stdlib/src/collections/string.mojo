@@ -2060,13 +2060,16 @@ struct String(
         return res^
 
     fn isdigit(self) -> Bool:
-        """Returns True if all characters in the string are digits.
+        """A string is a digit string if all characters in the string are digits
+        and there is at least one character in the string.
 
         Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are digits else False.
+            True if all characters are digits and it's not empty else False.
         """
+        if not self:
+            return False
         for c in self:
             if not isdigit(ord(c)):
                 return False
