@@ -410,6 +410,7 @@ fn _is_eq(
 
 @always_inline("nodebug")
 fn _is_eol(ptr: UnsafePointer[UInt8]) -> Bool:
-    eol_ptr = "\n".unsafe_ptr()
-    eol2_ptr = "\r".unsafe_ptr()
-    return _is_eq(ptr, eol_ptr, 1) or _is_eq(ptr, eol2_ptr, 1)
+    alias nl = ord("\n")
+    alias cr = ord("\r")
+    var c = ptr[]
+    return c == nl or c == cr
