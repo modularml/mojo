@@ -24,7 +24,7 @@ from sys.intrinsics import _type_is_eq
 # ===----------------------------------------------------------------------===#
 
 
-struct ListLiteral[*Ts: Movable](Sized, Movable):
+struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
@@ -48,6 +48,15 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
             args: The init values.
         """
         self.storage = Tuple(storage=args^)
+
+    @always_inline("nodebug")
+    fn __copyinit__(inout self, existing: Self):
+        """Copy construct the tuple.
+
+        Args:
+            existing: The value to copy from.
+        """
+        self.storage = existing.storage
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move construct the list.
@@ -76,7 +85,7 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn get[i: Int, T: Movable](self) -> ref [__lifetime_of(self)] T:
+    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
         """Get a list element at the given index.
 
         Parameters:

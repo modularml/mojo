@@ -59,6 +59,8 @@ what we publish.
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
 
+- Restore implicit copyability of `Tuple` and `ListLiteral`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
