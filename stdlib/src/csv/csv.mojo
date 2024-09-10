@@ -289,8 +289,6 @@ struct _ReaderIter[
                     state = END_RECORD
                 elif _is_escapechar(curr_ptr):
                     state = ESCAPED_CHAR
-                else:
-                    pass
             elif state == IN_QUOTED_FIELD:
                 if _is_quotechar(curr_ptr):
                     if self.doublequote:
@@ -299,8 +297,6 @@ struct _ReaderIter[
                         state = IN_FIELD
                 elif _is_escapechar(curr_ptr):
                     state = ESCAPED_IN_QUOTED_FIELD
-                else:
-                    pass
             elif state == QUOTE_IN_QUOTED_FIELD:
                 # double-check with CPython implementation
                 if _is_quotechar(curr_ptr):
