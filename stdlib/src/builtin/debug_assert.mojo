@@ -18,12 +18,12 @@ These are Mojo built-ins, so you don't need to import them.
 
 from os import abort
 from sys import is_defined, triple_is_nvidia_cuda
-from sys._build import is_kernels_debug_build
+from sys._build import is_debug_build
 
 from builtin._location import __call_location, _SourceLocation
 
 # Print an error and fail.
-alias _ERROR_ON_ASSERT = is_kernels_debug_build() or is_defined[
+alias _ERROR_ON_ASSERT = is_debug_build() or is_defined[
     "MOJO_ENABLE_ASSERTIONS"
 ]()
 
