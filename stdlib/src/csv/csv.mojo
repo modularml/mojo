@@ -336,19 +336,23 @@ struct _ReaderIter[
         if self.eat_crnl:
             end_idx -= 1
 
-        # TODO: Not sure if there is a cleaner way to do it performance-wise
+        var src_ptr = self.content_ptr.offset(start_idx)
         var length = end_idx - start_idx
-        var buff = List[UInt8, hint_trivial_type=True]()
-        buff.resize(length + 1, 0)
+        var data_ptr = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
-            dest=buff.data, src=self.content_ptr.offset(start_idx), count=length
+            dest=data_ptr,
+            src=src_ptr,
+            count=length,
         )
-        var final_field = String(buff)
+        data_ptr[length] = 0  # null-terminate the string
+
+        var field = String(data_ptr)
 
         if self.doublequote:
             quotechar = self.quotechar
-            final_field = final_field.replace(quotechar * 2, quotechar)
-        row.append(final_field)
+            field = field.replace(quotechar * 2, quotechar)
+        row.append(field)
+
         # reset values
         self.quoted = False
 
