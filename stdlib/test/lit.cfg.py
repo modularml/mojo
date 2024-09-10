@@ -83,6 +83,10 @@ else:
     # with assertions enabled.
     config.substitutions.insert(1, ("%bare-mojo", "mojo"))
 
+    # NOTE: Right now this is the same as %mojo but we should start testing
+    # with debug info as well
+    config.substitutions.insert(0, ("%mojo-no-debug", base_mojo_command))
+
     # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the
     # open-source stdlib, we need to specify the paths to the just-built
     # `stdlib.mojopkg` and `test_utils.mojopkg`. Otherwise, without this, the

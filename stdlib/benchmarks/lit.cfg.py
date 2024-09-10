@@ -26,6 +26,7 @@ config.name = "Mojo Standard Library Benchmarks"
 config.suffixes = [".mojo"]
 
 config.substitutions.insert(0, ("%mojo", "mojo"))
+config.substitutions.insert(0, ("%mojo-no-debug", "mojo"))
 
 # Internal testing configuration.  This environment variable
 # is set by the internal `start-modular.sh` script.

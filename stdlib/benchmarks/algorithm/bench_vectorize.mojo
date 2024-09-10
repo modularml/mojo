@@ -16,7 +16,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-# RUN: %mojo %s -t | FileCheck %s
+# RUN: %mojo-no-debug %s -t | FileCheck %s
 # CHECK: Benchmark results
 
 from random import rand
