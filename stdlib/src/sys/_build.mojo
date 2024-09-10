@@ -22,33 +22,6 @@ fn _build_type() -> StringLiteral:
 
 
 @always_inline("nodebug")
-fn _kernels_build_type() -> StringLiteral:
-    constrained[
-        is_defined["KERNELS_BUILD_TYPE"](),
-        "the kernels build type must be defined",
-    ]()
-    return env_get_string["KERNELS_BUILD_TYPE"]()
-
-
-@always_inline("nodebug")
-fn is_kernels_debug_build() -> Bool:
-    """
-    Returns True if the build is in debug mode.
-
-    Returns:
-        Bool: True if the build is in debug mode and False otherwise.
-    """
-
-    @parameter
-    if is_defined["DEBUG"]():
-        return True
-    elif is_defined["KERNELS_BUILD_TYPE"]():
-        return _kernels_build_type() == "debug"
-    else:
-        return False
-
-
-@always_inline("nodebug")
 fn is_debug_build() -> Bool:
     """
     Returns True if the build is in debug mode.
