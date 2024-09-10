@@ -246,11 +246,6 @@ struct _ReaderIter[
         #       See parse_process_char() function in cpython/Modules/_csv.c
         var state = START_RECORD
 
-        var delimiter = self.delimiter
-        var quotechar = self.quotechar
-        var doublequote = self.doublequote
-        var escapechar = self.escapechar
-
         var line_ptr = line.unsafe_ptr()
         var line_len = line.byte_length()
         var delimiter_ptr = self.delimiter.unsafe_ptr()
@@ -313,7 +308,7 @@ struct _ReaderIter[
                     pass
             elif state == IN_QUOTED_FIELD:
                 if _is_quotechar(curr_ptr):
-                    if doublequote:
+                    if self.doublequote:
                         state = QUOTE_IN_QUOTED_FIELD
                     else:  # end of quoted field
                         state = IN_FIELD
