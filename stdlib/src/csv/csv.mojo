@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from memory import memcmp
+
 alias QUOTE_MINIMAL = 0
 alias QUOTE_ALL = 1
 alias QUOTE_NONNUMERIC = 2
@@ -140,7 +142,10 @@ struct reader:
         self.dialect.validate()
 
         # TODO: Implement streaming to prevent loading the entire file into memory
-        self.lines = csvfile.read().splitlines()
+        # TODO: Avoid a second loop over the file to split them and use the CPython implementation
+        # Approach before streaming: Read the entire file into memory and read using the self.pos
+        # getting rid of self.idx and self.lines as well as self.lines_count() and related data
+        self.lines = csvfile.read().split("\n")
 
     @always_inline("nodebug")
     fn get_line(
@@ -239,64 +244,88 @@ struct _ReaderIter[
         # TODO: This is spaghetti code mimicing the CPython implementation
         #       We should refactor this to be more readable and maintainable
         #       See parse_process_char() function in cpython/Modules/_csv.c
-        state = START_RECORD
+        var state = START_RECORD
+
+        var delimiter = self.delimiter
+        var quotechar = self.quotechar
+        var doublequote = self.doublequote
+        var escapechar = self.escapechar
+
+        var line_ptr = line.unsafe_ptr()
+        var line_len = line.byte_length()
+        var delimiter_ptr = self.delimiter.unsafe_ptr()
+        var delimiter_len = self.delimiter.byte_length()
+        var quotechar_ptr = self.quotechar.unsafe_ptr()
+        var quotechar_len = self.quotechar.byte_length()
+        var escapechar_ptr = self.escapechar.unsafe_ptr()
+        var escapechar_len = self.escapechar.byte_length()
+
+        @always_inline
+        fn _is_delimiter(ptr: UnsafePointer[UInt8]) -> Bool:
+            return _is_eq(ptr, delimiter_ptr, delimiter_len)
+
+        @always_inline
+        fn _is_quotechar(ptr: UnsafePointer[UInt8]) -> Bool:
+            return _is_eq(ptr, quotechar_ptr, quotechar_len)
+
+        @always_inline
+        fn _is_escapechar(ptr: UnsafePointer[UInt8]) -> Bool:
+            return escapechar_len and _is_eq(
+                ptr, escapechar_ptr, escapechar_len
+            )
 
         self.pos = self.field_pos = 0
-        delimiter = self.delimiter
-        quotechar = self.quotechar
-        doublequote = self.doublequote
-        escapechar = self.escapechar
 
-        while self.pos < len(line):
-            var c = self._get_char(line)
-            # print('CHAR: ', c, ' STATE:', state, ' FIELD: ', self.field, ' POS: ', pos)
+        while self.pos < line_len:
+            var curr_ptr = line_ptr.offset(self.pos)
+
+            # print(
+            #     "CHAR: ", line[self.pos], " STATE:", state, " POS: ", self.pos
+            # )
 
             # TODO: Use match statement when supported by Mojo
             if state == START_RECORD:
-                if c == "\n" or c == "\r":
+                if _is_eol(curr_ptr):
                     state = END_RECORD
                 else:
                     state = START_FIELD
                 continue  # do not consume the character
             elif state == START_FIELD:
                 self.field_pos = self.pos
-                if c == delimiter:
+                if _is_delimiter(curr_ptr):
                     # save empty field
                     self._save_field(row, line)
-                elif c == quotechar:
+                elif _is_quotechar(curr_ptr):
                     self._mark_quote()
                     state = IN_QUOTED_FIELD
                 else:
                     state = IN_FIELD
                     continue  # do not consume the character
             elif state == IN_FIELD:
-                if c == delimiter:
+                if _is_delimiter(curr_ptr):
                     state = END_FIELD
                     continue
-                elif c == "\n" or c == "\r":
+                elif _is_eol(curr_ptr):
                     state = END_RECORD
-                elif escapechar and c == escapechar:
+                elif _is_escapechar(curr_ptr):
                     state = ESCAPED_CHAR
                 else:
                     pass
-                    # self._add_to_field(c)
             elif state == IN_QUOTED_FIELD:
-                if c == quotechar:
+                if _is_quotechar(curr_ptr):
                     if doublequote:
                         state = QUOTE_IN_QUOTED_FIELD
                     else:  # end of quoted field
                         state = IN_FIELD
-                elif c == escapechar:
+                elif _is_escapechar(curr_ptr):
                     state = ESCAPED_IN_QUOTED_FIELD
                 else:
                     pass
-                    # self._add_to_field(c)
             elif state == QUOTE_IN_QUOTED_FIELD:
                 # double-check with CPython implementation
-                if c == quotechar:
-                    # self._add_to_field(c)
+                if _is_quotechar(curr_ptr):
                     state = IN_QUOTED_FIELD
-                elif c == delimiter:
+                elif _is_delimiter(curr_ptr):
                     self._save_field(row, line)
                     state = START_FIELD
             elif state == ESCAPED_CHAR:
@@ -308,6 +337,7 @@ struct _ReaderIter[
                 state = START_FIELD
             elif state == END_RECORD:
                 break
+
             self.pos += 1
 
         if self.field_pos < self.pos:
@@ -315,10 +345,6 @@ struct _ReaderIter[
 
         # TODO: Handle the escapechar and skipinitialspace options
         return row
-
-    @always_inline("nodebug")
-    fn _get_char(self, line: String) -> String:
-        return line[self.pos]
 
     @always_inline("nodebug")
     fn _mark_quote(inout self):
@@ -378,3 +404,17 @@ fn _validate_reader_dialect(dialect: Dialect) raises -> Bool:
                 " from delimiter and quotechar"
             )
     return True
+
+
+@always_inline("nodebug")
+fn _is_eq(
+    ptr1: UnsafePointer[UInt8], ptr2: UnsafePointer[UInt8], len: Int
+) -> Bool:
+    return memcmp(ptr1, ptr2, len) == 0
+
+
+@always_inline("nodebug")
+fn _is_eol(ptr: UnsafePointer[UInt8]) -> Bool:
+    eol_ptr = "\n".unsafe_ptr()
+    eol2_ptr = "\r".unsafe_ptr()
+    return _is_eq(ptr, eol_ptr, 1) or _is_eq(ptr, eol2_ptr, 1)
