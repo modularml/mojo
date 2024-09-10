@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import memcmp
+from memory import memcmp, memcpy
 
 alias QUOTE_MINIMAL = 0
 alias QUOTE_ALL = 1
@@ -87,7 +87,7 @@ struct reader:
     """
     CSV reader.
 
-    This class reads CSV files.
+    This struct reads CSV files.
 
     Example:
 
@@ -101,8 +101,8 @@ struct reader:
 
     var dialect: Dialect
     """The CSV dialect."""
-    var lines: List[String]
-    """The lines of the CSV file."""
+    var content: String
+    """The content of the CSV file."""
 
     fn __init__(
         inout self: Self,
@@ -142,35 +142,7 @@ struct reader:
         self.dialect.validate()
 
         # TODO: Implement streaming to prevent loading the entire file into memory
-        # TODO: Avoid a second loop over the file to split them and use the CPython implementation
-        # Approach before streaming: Read the entire file into memory and read using the self.pos
-        # getting rid of self.idx and self.lines as well as self.lines_count() and related data
-        self.lines = csvfile.read().split("\n")
-
-    @always_inline("nodebug")
-    fn get_line(
-        self: Self, idx: Int
-    ) raises -> ref [__lifetime_of(self.lines)] String:
-        """
-        Returns an specific line in the CSV file.
-
-        Args:
-            idx: The index of the line to return.
-
-        Returns:
-            The line at the given index.
-        """
-        return self.lines[idx]
-
-    fn lines_count(self: Self) -> Int:
-        """
-        Returns the number of lines in the CSV file.
-
-        Returns:
-            The number of lines in the CSV file.
-        """
-        # TODO: This has no sense once we implement streaming
-        return len(self.lines)
+        self.content = csvfile.read()
 
     fn __iter__(self: Self) raises -> _ReaderIter[__lifetime_of(self)]:
         """
@@ -179,7 +151,16 @@ struct reader:
         Returns:
             Iterator.
         """
-        return _ReaderIter[__lifetime_of(self)](reader=self, idx=0)
+        return _ReaderIter[__lifetime_of(self)](reader=self)
+
+    fn __len__(self: Self) -> Int:
+        """
+        Get the number of lines in the CSV file.
+
+        Returns:
+            The number of lines in the CSV file.
+        """
+        return len(self.content)
 
 
 # ===------------------------------------------------------------------=== #
@@ -204,7 +185,6 @@ struct _ReaderIter[
     """Iterator for any random-access container"""
 
     var reader_ref: Reference[reader, reader_lifetime]
-    var idx: Int
     var pos: Int
     var field_pos: Int
     var quoted: Bool
@@ -213,10 +193,12 @@ struct _ReaderIter[
     var doublequote: Bool
     var escapechar: String
     var quoting: Int
+    var eat_crnl: Bool
+    var content_ptr: UnsafePointer[UInt8]
+    var bytes_len: Int
 
-    fn __init__(inout self, ref [reader_lifetime]reader: reader, idx: Int = 0):
+    fn __init__(inout self, ref [reader_lifetime]reader: reader):
         self.reader_ref = reader
-        self.idx = idx
         self.pos = 0
         self.field_pos = 0
         self.quoted = False
@@ -225,20 +207,20 @@ struct _ReaderIter[
         self.doublequote = reader.dialect.doublequote
         self.escapechar = reader.dialect.escapechar
         self.quoting = reader.dialect.quoting
+        self.content_ptr = reader.content.unsafe_ptr()
+        self.bytes_len = len(reader)
+        self.eat_crnl = False
 
     @always_inline
     fn __next__(inout self: Self) raises -> List[String]:
-        line = self.reader_ref[].get_line(self.idx)
-        row = self.get_row(line)
-        self.idx += 1
-        return row
+        return self.next_row()
 
     fn __len__(self) -> Int:
         # This is the current way to imitate the StopIteration exception
         # TODO: Remove when the iterators are implemented and streaming is done
-        return self.reader_ref[].lines_count() - self.idx
+        return self.bytes_len - self.pos
 
-    fn get_row(inout self, ref [_]line: String) -> List[String]:
+    fn next_row(inout self) -> List[String]:
         var row = List[String]()
 
         # TODO: This is spaghetti code mimicing the CPython implementation
@@ -246,8 +228,7 @@ struct _ReaderIter[
         #       See parse_process_char() function in cpython/Modules/_csv.c
         var state = START_RECORD
 
-        var line_ptr = line.unsafe_ptr()
-        var line_len = line.byte_length()
+        var content_ptr = self.content_ptr
         var delimiter_ptr = self.delimiter.unsafe_ptr()
         var delimiter_len = self.delimiter.byte_length()
         var quotechar_ptr = self.quotechar.unsafe_ptr()
@@ -269,13 +250,17 @@ struct _ReaderIter[
                 ptr, escapechar_ptr, escapechar_len
             )
 
-        self.pos = self.field_pos = 0
+        if _is_eol(content_ptr.offset(self.pos)):
+            self.pos += 1
 
-        while self.pos < line_len:
-            var curr_ptr = line_ptr.offset(self.pos)
+        self.field_pos = self.pos
+        self.eat_crnl = False
+
+        while self.pos < self.bytes_len:
+            var curr_ptr = content_ptr.offset(self.pos)
 
             # print(
-            #     "CHAR: ", line[self.pos], " STATE:", state, " POS: ", self.pos
+            #     "CHAR: ", repr(chr(int(curr_ptr[]))), " STATE:", state, " POS: ", self.pos
             # )
 
             # TODO: Use match statement when supported by Mojo
@@ -289,7 +274,7 @@ struct _ReaderIter[
                 self.field_pos = self.pos
                 if _is_delimiter(curr_ptr):
                     # save empty field
-                    self._save_field(row, line)
+                    self._save_field(row)
                 elif _is_quotechar(curr_ptr):
                     self._mark_quote()
                     state = IN_QUOTED_FIELD
@@ -321,22 +306,24 @@ struct _ReaderIter[
                 if _is_quotechar(curr_ptr):
                     state = IN_QUOTED_FIELD
                 elif _is_delimiter(curr_ptr):
-                    self._save_field(row, line)
+                    self._save_field(row)
                     state = START_FIELD
             elif state == ESCAPED_CHAR:
                 state = IN_QUOTED_FIELD
             elif state == ESCAPED_IN_QUOTED_FIELD:
                 state = IN_QUOTED_FIELD
             elif state == END_FIELD:
-                self._save_field(row, line)
+                self._save_field(row)
                 state = START_FIELD
             elif state == END_RECORD:
+                self.eat_crnl = True
                 break
 
             self.pos += 1
 
         if self.field_pos < self.pos:
-            self._save_field(row, line)
+            self.eat_crnl = True
+            self._save_field(row)
 
         # TODO: Handle the escapechar and skipinitialspace options
         return row
@@ -345,12 +332,23 @@ struct _ReaderIter[
     fn _mark_quote(inout self):
         self.quoted = True
 
-    fn _save_field(inout self, inout row: List[String], ref [_]line: String):
+    fn _save_field(inout self, inout row: List[String]):
         start_idx, end_idx = (
             self.field_pos,
             self.pos,
         ) if not self.quoted else (self.field_pos + 1, self.pos - 1)
-        final_field = line[start_idx:end_idx]
+        if self.eat_crnl:
+            end_idx -= 1
+
+        # TODO: Not sure if there is a cleaner way to do it performance-wise
+        var length = end_idx - start_idx
+        var buff = List[UInt8, hint_trivial_type=True]()
+        buff.resize(length + 1, 0)
+        memcpy(
+            dest=buff.data, src=self.content_ptr.offset(start_idx), count=length
+        )
+        var final_field = String(buff)
+
         if self.doublequote:
             quotechar = self.quotechar
             final_field = final_field.replace(quotechar * 2, quotechar)
