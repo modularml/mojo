@@ -68,6 +68,10 @@ def test_reader():
             r_it.__next__(),
             List(String('Dwayne "The Rock"'), String("52"), String("Male")),
         )
+        assert_line_equal(
+            r_it.__next__(),
+            List(String("Martín"), String("43"), String("Male")),
+        )
 
 
 def main():
