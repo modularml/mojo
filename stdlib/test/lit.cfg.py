@@ -42,6 +42,10 @@ if has_not():
 # This makes the OS name available for `REQUIRE` directives, e.g., `# REQUIRE: darwin`.
 config.available_features.add(platform.system().lower())
 
+# test_utils does not contain tests, just source code
+# that we run `mojo package` on to be used by other tests
+config.excludes = ["test_utils"]
+
 # Internal testing configuration.  This environment variable
 # is set by the internal `start-modular.sh` script.
 if "_START_MODULAR_INCLUDED" in os.environ:
@@ -54,10 +58,6 @@ if "_START_MODULAR_INCLUDED" in os.environ:
     )
 # External, public Mojo testing configuration
 else:
-    # test_utils does not contain tests, just source code
-    # that we run `mojo package` on to be used by other tests
-    config.excludes = ["test_utils"]
-
     # test_source_root: The root path where tests are located.
     config.test_source_root = Path(__file__).parent.resolve()
 
