@@ -13,8 +13,6 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo %s
 
-from pathlib import _dir_of_current_file
-
 from python import Python, PythonObject
 from testing import assert_equal, assert_raises
 
@@ -28,7 +26,6 @@ fn test_python_exception_import() raises:
 
 fn test_python_exception_getattr() raises:
     try:
-        Python.add_to_path(str(_dir_of_current_file()))
         var my_module: PythonObject = Python.import_module("my_module")
         if my_module:
             var person = my_module.Person()
@@ -49,7 +46,6 @@ fn test_python_exception_call() raises:
     with assert_raises(
         contains="Can't instantiate abstract class AbstractPerson"
     ):
-        Python.add_to_path(str(_dir_of_current_file()))
         var my_module: PythonObject = Python.import_module("my_module")
         if my_module:
             var person = my_module.AbstractPerson()
