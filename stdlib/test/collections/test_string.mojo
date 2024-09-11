@@ -810,6 +810,15 @@ def test_split():
     assert_equal(res5[0], "Hello")
     assert_equal(res5[1], "🔥!")
 
+    var in6 = String("Лорем ипсум долор сит амет")
+    var res6 = in6.split(" ")
+    assert_equal(len(res6), 5)
+    assert_equal(res6[0], "Лорем")
+    assert_equal(res6[1], "ипсум")
+    assert_equal(res6[2], "долор")
+    assert_equal(res6[3], "сит")
+    assert_equal(res6[4], "амет")
+
 
 def test_splitlines():
     # Test with no line breaks
