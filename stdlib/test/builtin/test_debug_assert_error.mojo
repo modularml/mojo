@@ -15,7 +15,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not --crash %mojo -D KERNELS_BUILD_TYPE=debug %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: not --crash %bare-mojo -D BUILD_TYPE=debug %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 
 # CHECK-FAIL-LABEL: test_fail
