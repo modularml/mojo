@@ -16,7 +16,6 @@
 
 from python import Python, PythonObject
 from testing import assert_equal
-from pathlib import _dir_of_current_file
 
 
 def test_create_module():
@@ -25,7 +24,6 @@ def test_create_module():
 
     # TODO: inspect properties about the module
     # First though, let's see if we can even import it
-    # Python.add_to_path(str(_dir_of_current_file()))
     # var imported_module = Python.import_module(module_name)
     #
     # _ = module_name
