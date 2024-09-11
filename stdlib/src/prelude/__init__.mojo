@@ -135,5 +135,4 @@ from memory import UnsafePointer, Reference, AddressSpace
 from utils import StringRef, Formattable, Formatter
 
 # Private things
-from builtin._documentation import doc_private
 from utils._visualizers import lldb_formatter_wrapping_type
