@@ -504,9 +504,9 @@ class One:
 print(One()) # prints '1'
 ```
 
-Mojo currently supports this feature through the
-[`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait, so that
-`print()` works on all `Stringable` types. Similar support exists for the
+Mojo currently supports similar functionality through the
+[`Formattable`](/mojo/stdlib/utils/format/Formattable) trait, so that
+`print()` works on all `Formattable` types. Similar support exists for the
 [`int()`](/mojo/stdlib/builtin/int/int-function) and
 [`len()`](/mojo/stdlib/builtin/len/len) functions. We'll continue to
 add traits support to the standard library to enable common use cases like this.
