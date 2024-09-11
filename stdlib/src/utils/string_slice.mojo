@@ -636,7 +636,7 @@ struct StringSlice[
             characters of the slice starting at start.
         """
 
-        var self_len = len(self)
+        var self_len = self.byte_length()
 
         var abs_start: Int
         if start < 0:
@@ -677,7 +677,7 @@ struct StringSlice[
         if not substr:
             return 0
 
-        if len(self) < len(substr) + start:
+        if self.byte_length() < substr.byte_length() + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
@@ -686,9 +686,9 @@ struct StringSlice[
 
         var loc = stringref._memmem(
             haystack_str.unsafe_ptr(),
-            len(haystack_str),
+            haystack_str.byte_length(),
             substr.unsafe_ptr(),
-            len(substr),
+            substr.byte_length(),
         )
 
         if not loc:
