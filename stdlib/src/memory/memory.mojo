@@ -457,20 +457,17 @@ fn _malloc[
     /,
     *,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-](size: Int, /) -> UnsafePointer[type, address_space, alignment=alignment]:
+](size: Int, /) -> UnsafePointer[
+    type, AddressSpace.GENERIC, alignment=alignment
+]:
     @parameter
     if triple_is_nvidia_cuda():
-        constrained[
-            address_space is AddressSpace.GENERIC,
-            "address space must be generic",
-        ]()
-        return external_call["malloc", UnsafePointer[NoneType, address_space]](
-            size
-        ).bitcast[type]()
+        return external_call[
+            "malloc", UnsafePointer[NoneType, AddressSpace.GENERIC]
+        ](size).bitcast[type]()
     else:
         return __mlir_op.`pop.aligned_alloc`[
-            _type = UnsafePointer[type, address_space]._mlir_type
+            _type = UnsafePointer[type, AddressSpace.GENERIC]._mlir_type
         ](alignment.value, size.value)
 
 
@@ -480,13 +477,9 @@ fn _malloc[
 
 
 @always_inline
-fn _free(ptr: UnsafePointer):
+fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
     @parameter
     if triple_is_nvidia_cuda():
-        constrained[
-            ptr.address_space is AddressSpace.GENERIC,
-            "address space must be generic",
-        ]()
         external_call["free", NoneType](ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)

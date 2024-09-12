@@ -24,7 +24,7 @@ from sys.intrinsics import _type_is_eq
 # ===----------------------------------------------------------------------===#
 
 
-struct ListLiteral[*Ts: Movable](Sized, Movable):
+struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
@@ -48,6 +48,15 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
             args: The init values.
         """
         self.storage = Tuple(storage=args^)
+
+    @always_inline("nodebug")
+    fn __copyinit__(inout self, existing: Self):
+        """Copy construct the tuple.
+
+        Args:
+            existing: The value to copy from.
+        """
+        self.storage = existing.storage
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move construct the list.
@@ -76,7 +85,7 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn get[i: Int, T: Movable](self) -> ref [__lifetime_of(self)] T:
+    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
         """Get a list element at the given index.
 
         Parameters:
@@ -246,7 +255,7 @@ struct _VariadicListMemIter[
 # Helper to compute the union of two lifetimes:
 # TODO: parametric aliases would be nice.
 struct _lit_lifetime_union[
-    is_mutable: Bool,
+    is_mutable: Bool, //,
     a: AnyLifetime[is_mutable].type,
     b: AnyLifetime[is_mutable].type,
 ]:
@@ -415,7 +424,6 @@ struct VariadicListMem[
         self, idx: Int
     ) -> ref [
         _lit_lifetime_union[
-            elt_is_mutable,
             lifetime,
             # cast mutability of self to match the mutability of the element,
             # since that is what we want to use in the ultimate reference and

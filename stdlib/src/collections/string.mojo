@@ -25,8 +25,16 @@ from builtin.hash import hash_string
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
-from utils import Span, StaticIntTuple, StringRef, StringSlice, Variant
-from utils._format import Formattable, Formatter, ToFormatter
+from utils import (
+    Span,
+    StaticIntTuple,
+    StringRef,
+    StringSlice,
+    Variant,
+    Formattable,
+    Formatter,
+)
+from utils.format import ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
@@ -1586,6 +1594,10 @@ struct String(
         .
         """
 
+        fn num_bytes(b: UInt8) -> Int:
+            var flipped = ~b
+            return int(count_leading_zeros(flipped) + (flipped >> 7))
+
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
@@ -1607,8 +1619,8 @@ struct String(
                 # if the last char is not whitespace
                 output.append(self[str_byte_len])
                 break
-            rhs = lhs + 1
-            for s in self[lhs + 1 :]:
+            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
+            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
                 if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 rhs += s.byte_length()
@@ -2056,13 +2068,16 @@ struct String(
         return res^
 
     fn isdigit(self) -> Bool:
-        """Returns True if all characters in the string are digits.
+        """A string is a digit string if all characters in the string are digits
+        and there is at least one character in the string.
 
         Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are digits else False.
+            True if all characters are digits and it's not empty else False.
         """
+        if not self:
+            return False
         for c in self:
             if not isdigit(ord(c)):
                 return False

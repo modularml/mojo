@@ -18,7 +18,13 @@ These are Mojo built-ins, so you don't need to import them.
 
 @value
 @register_passable("trivial")
-struct NoneType(CollectionElement):
+struct NoneType(
+    CollectionElement,
+    CollectionElementNew,
+    Formattable,
+    Representable,
+    Stringable,
+):
     """Represents the absence of a value."""
 
     alias _mlir_type = __mlir_type.`!kgen.none`
@@ -26,10 +32,12 @@ struct NoneType(CollectionElement):
 
     var _value: Self._mlir_type
 
+    @always_inline
     fn __init__(inout self):
         """Construct an instance of the `None` type."""
         self._value = None
 
+    @always_inline
     fn __init__(inout self, *, other: Self):
         """Explicit copy constructor.
 
@@ -37,3 +45,30 @@ struct NoneType(CollectionElement):
             other: Another `NoneType` instance to copy.
         """
         self._value = None
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Returns the string representation of `None`.
+
+        Returns:
+            `"None"`.
+        """
+        return "None"
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Returns the string representation of `None`.
+
+        Returns:
+            `"None"`.
+        """
+        return "None"
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """Write `None` to a formatter stream.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        writer.write("None")
