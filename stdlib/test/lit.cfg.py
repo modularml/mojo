@@ -36,7 +36,7 @@ def has_not():
     return shutil.which("not") is not None
 
 
-if has_not():
+if has_not() or os.getenv("GITHUB_REPOSITORY"):
     config.available_features.add("has_not")
 
 # This makes the OS name available for `REQUIRE` directives, e.g., `# REQUIRES: darwin`.
