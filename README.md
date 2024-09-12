@@ -41,14 +41,8 @@ To learn more about Mojo, see the
 
 ### Latest Released
 
-To install the last released build of Mojo, you can install the MAX SDK
-or the standalone Mojo SDK:
-
-- [Get the MAX SDK](https://docs.modular.com/engine/get-started)
-- [Get the Mojo SDK](https://docs.modular.com/mojo/manual/get-started/)
-
-Then follow the docs to [write your first Mojo
-program](https://docs.modular.com/mojo/manual/get-started#2-run-code-in-the-repl).
+To install the last released build of Mojo, follow the guide to
+[Get started with Mojo](https://docs.modular.com/mojo/manual/get-started).
 
 ### Latest Nightly
 
@@ -56,13 +50,32 @@ The nightly Mojo builds are subject to breakage and provide an inside
 view of how the development of Mojo is progressing.  Use at your own risk
 and be patient!
 
-To get nightly builds, see the same instructions to [install the Mojo
-SDK](https://docs.modular.com/mojo/manual/get-started/#1-install-mojo), but use
-the command shown there to install `nightly/mojo`.
+To get nightly builds, see the same instructions to [Get started with
+Mojo](https://docs.modular.com/mojo/manual/get-started), but when you create
+your project, instead use the following `magic init` command to set the
+conda package channel to `max-nightly`:
 
-When you clone this repo, be sure you switch to the `nightly` branch, because
-the `main` branch is for stable releases and might not be compatible with
-nightly builds:
+```bash
+magic init hello-world-nightly --format mojoproject \
+  -c conda-forge -c https://conda.modular.com/max-nightly
+```
+
+Or, if you're [using conda](https://docs.modular.com/magic/conda), add the
+`https://conda.modular.com/max-nightly` channel to your `environment.yaml`
+file. For example:
+
+```yaml
+[project]
+name = "Mojo nightly example"
+channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
+
+[dependencies]
+max = "*"
+```
+
+And when you clone this repo, switch to the `nightly` branch because the `main`
+branch might not be compatible with nightly builds:
 
 ```bash
 git clone https://github.com/modularml/mojo.git
@@ -88,8 +101,10 @@ For more general questions or to chat with other Mojo developers, check out our
 
 ## License
 
-This repository is licensed under the Apache License v2.0 with LLVM Exceptions
-(see the LLVM [License](https://llvm.org/LICENSE.txt)).
+This repository and its contributions are licensed under the Apache License v2.0
+with LLVM Exceptions (see the LLVM [License](https://llvm.org/LICENSE.txt)).
+MAX and Mojo usage and distribution are licensed under the
+[MAX & Mojo Community License](https://www.modular.com/legal/max-mojo-license).
 
 ## Thanks to our contributors
 

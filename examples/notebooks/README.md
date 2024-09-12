@@ -29,9 +29,10 @@ notebooks. Especially if you're developing with Mojo on a remote system, using
 VS Code is ideal because it allows you to edit and interact with notebooks on
 the remote machine where you've installed Mojo.
 
-All you need is the Mojo SDK and the Jupyter VS Code extension:
+All you need is Mojo and the Jupyter VS Code extension:
 
-1. Install the [Mojo SDK](https://developer.modular.com/download).
+1. [Create a new Mojo
+project](https://docs.modular.com/mojo/manual/get-started#1-create-a-new-project).
 
 2. Install [Visual Studio Code](https://code.visualstudio.com/) and the
    [Jupyter
@@ -56,33 +57,40 @@ instructions don't support remote access to the JupyterLab). For more details
 about using JupyterLab, see the complete [JupyterLab installation
 guide](https://jupyterlab.readthedocs.io/en/latest/getting_started/installation.html).
 
-**Note:** You must run this setup on the same machine where you've installed
-the [Mojo SDK](https://developer.modular.com/download). However, syntax
-highlighting for Mojo code is not currently enabled in JupyterLab (coming soon).
+### 1. Launch JupyterLab
 
-1. Install JupyterLab:
+You can use either Magic or conda.
 
-    ```sh
-    python3 -m pip install jupyterlab
-    ```
+#### Using Magic
 
-2. Make sure the user-level `bin` is in your `$PATH`:
+If you have [`magic`](https://docs.modular.com/magic) you can run the following
+command to launch JupyterLab from this directory:
 
-    ```sh
-    export PATH="$HOME/.local/bin:$PATH"
-    ```
+```sh
+magic run jupyter lab
+```
 
-3. Launch JupyterLab:
+After a moment, it will open a browser window with JupterLab running.
 
-    ```sh
-    jupyter lab
-    ```
+#### Using conda
 
-4. When you open any of the `.ipynb` notebooks from this repository, JupyterLab
-   should automatically select the Mojo kernel (which was installed with the
-   Mojo SDK).
+Create a Conda environment, activate that enviroment, and install JupyterLab.
 
-   Now run some Mojo code!
+``` sh
+# Create a Conda environment if you don't have one
+conda create -n mojo-repo
+# Activate the environment
+conda env update -n mojo-repo -f environment.yml --prune
+# run JupyterLab
+conda run -n mojo-repo jupyter lab
+```
+
+After a moment, it will open a browser window with JupterLab running.
+
+### 2. Run the .ipynb notebooks
+
+The left nav bar should show all the notebooks in this directory.
+Open any `.ipynb` file and start running the code.
 
 ## Notes and tips
 

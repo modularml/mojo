@@ -152,10 +152,18 @@ struct MyStruct(Sized, Stringable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    # Basically anything that "backs" special syntax: [..], *, +, /, //, etc...
+    # Anything that "backs" special syntax: [..], *, +, /, //, etc...
 
     fn __getitem__
-    fn __getitem__
+    fn __setitem__
+
+    fn __getattr__
+    fn __setattr__
+
+    fn __iter__     # `for x in self`
+    fn __next__
+    fn __contains__ # `x in self`
+    fn __is__       # `x is self`
 
     fn __add__
     fn __iadd__

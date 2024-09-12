@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 
 
 fn main() raises:

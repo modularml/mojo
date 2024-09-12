@@ -29,7 +29,7 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, StaticString, StringSlice
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -129,24 +129,28 @@ struct _fdopen[mode: StringLiteral = "a"]:
         Hello
         ```
         """
-        # getdelim will resize the buffer as needed.
-        var buffer = UnsafePointer[UInt8].alloc(1)
+        # getdelim will allocate the buffer using malloc().
+        var buffer = UnsafePointer[UInt8]()
+        # ssize_t getdelim(char **restrict lineptr, size_t *restrict n,
+        #                  int delimiter, FILE *restrict stream);
         var bytes_read = external_call[
             "getdelim",
             Int,
             UnsafePointer[UnsafePointer[UInt8]],
-            UnsafePointer[UInt32],
+            UnsafePointer[UInt64],
             Int,
             UnsafePointer[NoneType],
         ](
-            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
-            UnsafePointer[UInt32].address_of(UInt32(1)),
+            UnsafePointer.address_of(buffer),
+            UnsafePointer.address_of(UInt64(0)),
             ord(delimiter),
             self.handle,
         )
-        # Overwrite the delimiter with a null terminator.
-        buffer[bytes_read - 1] = 0
-        return String(buffer, bytes_read)
+        # Copy the buffer (excluding the delimiter itself) into a Mojo String.
+        var s = String(StringRef(buffer, bytes_read - 1))
+        # Explicitly free the buffer using free() instead of the Mojo allocator.
+        external_call["free", NoneType](buffer.bitcast[NoneType]())
+        return s
 
 
 # ===----------------------------------------------------------------------=== #
@@ -301,7 +305,7 @@ fn _float_repr[
 
 
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableStaticLifetime](
+    var str_slice = StringSlice[ImmutableAnyLifetime](
         unsafe_from_utf8_strref=strref
     )
 
