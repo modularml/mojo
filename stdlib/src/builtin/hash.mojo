@@ -195,11 +195,16 @@ fn hash_string(s: String) -> UInt:
         A 64-bit hash value. This value is _not_ suitable for cryptographic
         uses. Its intended usage is for data structures.
     """
+    var char: String
+    l_idx = 0
     hash_value = 5381  # typical starting value for DJBX33A
-    for char in s:
+    # TODO (#933): should a for loop "for char in s" once llvm intrinsics can be used at comp time
+    while l_idx < s.byte_length():
+        char = s[l_idx]
         hash_value = ((hash_value << 5) + hash_value) + ord(
             char
         )  # hash * 33 + ord(char)
+        l_idx += 1
     return hash_value
 
 
