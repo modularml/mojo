@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: !windows
-# RUN: echo "Hello, World" | %mojo %s
+# RUN: echo "Hello, World" | %mojo-no-debug %s
 
 from builtin.io import _fdopen
 from testing import testing

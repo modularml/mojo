@@ -5,66 +5,19 @@ description: A history of significant Mojo changes.
 toc_max_heading_level: 2
 ---
 
-This is a running list of significant changes for the Mojo language and tools.
-It doesn't include all internal implementation changes.
+This is a list of changes to the Mojo language, standard library, and tools.
 
-## Update Mojo
+To check your current version, run `mojo --version`, and then [update Mojo with
+`magic`](/magic#update-max-and-mojo).
 
-If you don't have Mojo yet, see the [get started
-guide](/mojo/manual/get-started).
+:::caution Switch to Magic
 
-:::caution
-
-[Magic](/magic) is the preferred package manager and virtual environment manager
-for MAX and Mojo projects. [conda](/magic/conda) is supported as an alternative.
-
-The legacy [`modular`](/cli) CLI is now deprecated. We will not release any new
-`max` or `mojo` packages through the `modular` tool beyond the 24.5 release. You
-must now use [Magic](/magic) or [conda](/magic/conda) to install MAX and Mojo.
+The `modular` command-line tool is deprecated (see [how to uninstall
+it](/max/faq#if-you-installed-with-modular-deprecated-1)). We recommend that
+you now [manage your packages with `magic`](/magic), but you can also [use
+conda](/magic/conda).
 
 :::
-
-### Update Mojo in a Magic virtual environment
-
-The virtual environment for each Magic project has its own package versions.
-The Mojo programming language is distributed as part of the `max` package.
-Use the [`magic update`](/magic/commands#magic-update) within your project path
-to update the `max` package for that project to the latest release:
-
-```sh
-magic update max
-```
-
-See the [Magic](/magic) documentation for more information on managing Magic
-virtual environments.
-
-### Update Mojo in a conda virtual environment
-
-Each conda virtual environment has its own package versions.
-The Mojo programming language is distributed as part of the `max` package.
-Use the [`conda update`](https://docs.conda.io/projects/conda/en/latest/commands/update.html)
-command to update the version of the `max` package for an environment.
-For example, for an environment named `max-project`, run:
-
-```sh
-conda update -n max-project max
-```
-
-See the [conda](https://docs.conda.io/projects/conda/en/latest/index.html)
-documentation for more information on managing conda virtual environments.
-
-### Update Mojo using the `modular` CLI
-
-If you are still using the deprecated `modular` CLI, you can update Mojo to
-24.5 by running:
-
-```sh
-modular update mojo
-```
-
-We will not release any new `max` or `mojo` packages through the `modular`
-tool beyond the 24.5 release. You must now use [Magic](/magic/) or
-[conda](/magic/conda) to install MAX and Mojo.
 
 ## v24.5 (2024-09-10)
 
