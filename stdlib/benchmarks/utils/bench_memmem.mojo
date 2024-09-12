@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# RUN: %mojo %s -t
+# RUN: %mojo-no-debug %s -t
 
 from sys import simdwidthof
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run

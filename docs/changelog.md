@@ -53,11 +53,16 @@ what we publish.
   any side effects that occur in the expression are never evaluated at runtime,
   eliminating concerns about `__type_of(expensive())` being a problem.
 
+- The `rebind` standard library function now works with memory-only types in
+  addition to `@register_passable("trivial")` ones, without requiring a copy.
+
 ### 🦋 Changed
 
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
+
+- Restore implicit copyability of `Tuple` and `ListLiteral`.
 
 ### ❌ Removed
 
