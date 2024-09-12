@@ -427,6 +427,7 @@ def test_splitlines():
     assert_equal(len(res7), 0)
 
     # test with keepends=True
+    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
     var res10 = in8.splitlines(keepends=True)
     assert_equal(len(res10), 4)
     assert_equal(res10[0], "hello\v")
