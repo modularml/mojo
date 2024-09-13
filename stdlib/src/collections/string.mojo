@@ -1526,6 +1526,9 @@ struct String(
         Returns:
             A List of Strings containing the input split by the separator.
 
+        Raises:
+            If the separator is empty.
+
         Examples:
 
         ```mojo
@@ -1546,7 +1549,7 @@ struct String(
         var items = 0
         var sep_len = sep.byte_length()
         if sep_len == 0:
-            raise Error("ValueError: empty separator")
+            raise Error("Separator cannot be empty.")
         if str_byte_len < 0:
             output.append("")
 
