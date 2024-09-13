@@ -15,7 +15,7 @@
 You can import these APIs from the `collections` package. For example:
 
 ```mojo
-from collections.vector import InlinedFixedVector
+from collections import InlinedFixedVector
 ```
 """
 
