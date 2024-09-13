@@ -259,7 +259,8 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
     # 3. Copy the tail data (smaller than the SIMD register) into
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
-        var remaining = InlineArray[UInt8, stride](unsafe_uninitialized=True)
+        var remaining: InlineArray[UInt8, stride]
+        remaining.__init__[False]()
         var ptr = remaining.unsafe_ptr()
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0

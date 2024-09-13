@@ -332,7 +332,7 @@ struct _FixedString[CAP: Int](
 
     fn __init__(inout self):
         """Constructs a new empty string."""
-        self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
+        self.buffer.__init__[False]()
         self.size = 0
 
     fn __init__(inout self, *, other: Self):

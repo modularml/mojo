@@ -341,7 +341,8 @@ fn _try_write_int[
     # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64 + 1  # +1 for storing NUL terminator.
 
-    var buf = InlineArray[UInt8, CAPACITY](unsafe_uninitialized=True)
+    var buf: InlineArray[UInt8, CAPACITY]
+    buf.__init__[False]()
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
