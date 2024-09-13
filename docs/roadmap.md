@@ -210,7 +210,7 @@ We plan to expand traits support in future releases. Planned features include:
 - Support for a feature like Swift's extensions, allowing you to add a trait to
   a preexisting type.
 
-- Add support for conditional conformance.
+- Improve support for conditional conformance.
 
 ## Classes
 
