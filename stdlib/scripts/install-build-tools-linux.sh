@@ -28,6 +28,5 @@ sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-$LLVM_VERSION 1
 sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-$LLVM_VERSION 100
 sudo update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-$LLVM_VERSION 100
 sudo update-alternatives --install /usr/bin/FileCheck FileCheck /usr/bin/FileCheck-$LLVM_VERSION 100
-sudo update-alternatives --install /usr/bin/not not /usr/bin/not-$LLVM_VERSION 100
 
 python3 -m pip install lit
