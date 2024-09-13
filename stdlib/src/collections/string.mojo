@@ -1545,7 +1545,7 @@ struct String(
         var items = 0
         var sep_len = sep.byte_length()
         if sep_len == 0:
-            raise Error("Seperator cannot be empty.")
+            raise Error("Separator cannot be empty.")
         if str_byte_len < 0:
             output.append("")
 

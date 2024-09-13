@@ -819,7 +819,7 @@ def test_split():
     assert_equal(res6[3], "сит")
     assert_equal(res6[4], "амет")
 
-    with assert_raises(contains="Seperator cannot be empty."):
+    with assert_raises(contains="Separator cannot be empty."):
         _ = String("1, 2, 3").split("")
 
 
