@@ -459,7 +459,6 @@ struct StringLiteral(
             result += str(a)
 
         elems.each[add_elt]()
-        _ = is_first
         return result
 
     fn lower(self) -> String:
