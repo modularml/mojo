@@ -26,6 +26,22 @@ trait Formattable:
     """
     The `Formattable` trait describes a type that can be converted to a stream
     of UTF-8 encoded data by writing to a formatter object.
+
+    Examples:
+
+    Implement `Formattable` and `Stringable` for a type:
+
+    ```mojo
+    struct Point(Stringable, Formattable):
+        var x: Float64
+        var y: Float64
+
+        fn __str__(self) -> String:
+            return String.format_sequence(self)
+
+        fn format_to(self, inout writer: Formatter):
+            writer.write("(", self.x, ", ", self.y, ")")
+    ```
     """
 
     fn format_to(self, inout writer: Formatter):
@@ -74,11 +90,22 @@ struct Formatter:
     # ===------------------------------------------------------------------===#
 
     fn __init__[F: ToFormatter](inout self, inout output: F):
+        """Construct a new `Formatter` from a value implementing `ToFormatter`.
+
+        Parameters:
+            F: The type that supports being used to back a `Formatter`.
+
+        Args:
+            output: Value to accumulate or process output streamed to the `Formatter`.
+        """
         self = output._unsafe_to_formatter()
 
     fn __init__(inout self, *, fd: FileDescriptor):
         """
-        Constructs a formatter that writes to the given file descriptor.
+        Constructs a `Formatter` that writes to the given file descriptor.
+
+        Args:
+            fd: The file descriptor to write to.
         """
 
         @always_inline
@@ -97,33 +124,30 @@ struct Formatter:
         func: fn (UnsafePointer[NoneType], StringRef) -> None,
         arg: UnsafePointer[NoneType],
     ):
-        """
-        Constructs a formatter from any closure that accepts string refs.
+        """Constructs a formatter from any closure that accepts `StringRef`s.
+
+        This function should only be used by low-level types that wish to
+        accept streamed formatted data.
+
+        Args:
+            func: Raw closure function pointer.
+            arg: Opaque user data argument that is passed to the closure function pointer.
         """
         self._write_func = func
         self._write_func_arg = arg
 
     fn __moveinit__(inout self, owned other: Self):
+        """Move this value.
+
+        Args:
+            other: The value to move.
+        """
         self._write_func = other._write_func
         self._write_func_arg = other._write_func_arg
 
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
-
-    # TODO(cleanup):
-    #   Remove this overload by defining a working
-    #   `StringSlice.__init__(StringLiteral)` implicit conversion.
-    @always_inline
-    fn write_str[literal: StringLiteral](inout self):
-        """
-        Write a string literal to this formatter.
-
-        Parameters:
-            literal: The string literal to write.
-        """
-        alias slc = literal.as_string_slice()
-        self.write_str(slc)
 
     # TODO: Constrain to only require an immutable StringSlice[..]`
     @always_inline
@@ -145,6 +169,12 @@ struct Formatter:
 
     fn write[*Ts: Formattable](inout self: Formatter, *args: *Ts):
         """Write a sequence of formattable arguments to the provided formatter.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this formatter.
         """
 
         @parameter
@@ -178,6 +208,10 @@ struct Formatter:
     fn stdout() -> Self:
         """
         Constructs a formatter that writes directly to stdout.
+
+        Returns:
+            A formatter that writes provided data to the operating system
+            standard output stream.
         """
 
         @always_inline

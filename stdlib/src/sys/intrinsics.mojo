@@ -19,7 +19,9 @@ from sys import PrefetchLocality
 ```
 """
 
-from sys import sizeof
+from .info import sizeof, triple_is_nvidia_cuda
+from ._assembly import inlined_assembly
+import math
 
 from memory import AddressSpace, UnsafePointer
 
@@ -832,7 +834,7 @@ fn _unsafe_aliasing_address_to_pointer[
 
 @always_inline("nodebug")
 fn gather[
-    type: DType, size: Int
+    type: DType, size: Int, //
 ](
     owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
@@ -885,7 +887,7 @@ fn gather[
         return _unsafe_aliasing_address_to_pointer[type](
             base[0]
         ).load() if mask else passthrough[0]
-    return llvm_intrinsic[
+    var result = llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ](
@@ -896,6 +898,8 @@ fn gather[
         mask,
         passthrough,
     )
+    _ = base
+    return result
 
 
 # ===----------------------------------------------------------------------===#
@@ -905,7 +909,7 @@ fn gather[
 
 @always_inline("nodebug")
 fn scatter[
-    type: DType, size: Int
+    type: DType, size: Int, //
 ](
     value: SIMD[type, size],
     owned base: SIMD[DType.index, size],
@@ -973,6 +977,7 @@ fn scatter[
         Int32(alignment),
         mask,
     )
+    _ = base
 
 
 # ===----------------------------------------------------------------------===#
@@ -1186,7 +1191,7 @@ struct PrefetchOptions:
 
 @always_inline("nodebug")
 fn prefetch[
-    params: PrefetchOptions, type: DType
+    type: DType, //, params: PrefetchOptions = PrefetchOptions()
 ](addr: UnsafePointer[Scalar[type], *_]):
     """Prefetches an instruction or data into cache before it is used.
 
@@ -1194,18 +1199,28 @@ fn prefetch[
     to prefetch instruction or data into cache before they are used.
 
     Parameters:
-      params: Configuration options for the prefect intrinsic.
       type: The DType of value stored in addr.
+      params: Configuration options for the prefect intrinsic.
 
     Args:
       addr: The data pointer to prefetch.
     """
-    llvm_intrinsic["llvm.prefetch", NoneType](
-        addr.bitcast[NoneType](),
-        params.rw,
-        params.locality,
-        params.cache,
-    )
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        inlined_assembly[
+            "prefetch.global.L2 [$0];",
+            NoneType,
+            constraints="l,~{memory}",
+            has_side_effect=True,
+        ](addr.bitcast[NoneType]())
+    else:
+        llvm_intrinsic["llvm.prefetch", NoneType](
+            addr.bitcast[NoneType](),
+            params.rw,
+            params.locality,
+            params.cache,
+        )
 
 
 # ===----------------------------------------------------------------------===#
@@ -1343,7 +1358,7 @@ fn compressed_store[
 
 @always_inline("nodebug")
 fn strided_load[
-    type: DType, simd_width: Int
+    type: DType, //, simd_width: Int
 ](
     addr: UnsafePointer[Scalar[type], *_],
     stride: Int,
@@ -1369,15 +1384,11 @@ fn strided_load[
     if simd_width == 1:
         return addr.load() if mask else Scalar[type]()
 
-    alias IndexTy = SIMD[DType.index, simd_width]
-    var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector", IndexTy, has_side_effect=False
+    var offset = int(addr) + stride * sizeof[type]() * math.iota[
+        DType.index, simd_width
     ]()
-    var offset = IndexTy(int(addr)) + IndexTy(stride) * iota * IndexTy(
-        sizeof[type]()
-    )
     var passthrough = SIMD[type, simd_width]()
-    return gather[type, simd_width](offset, mask, passthrough)
+    return gather(offset, mask, passthrough)
 
 
 # ===----------------------------------------------------------------------===#
@@ -1387,7 +1398,7 @@ fn strided_load[
 
 @always_inline("nodebug")
 fn strided_store[
-    type: DType, simd_width: Int
+    type: DType, //, simd_width: Int
 ](
     value: SIMD[type, simd_width],
     addr: UnsafePointer[Scalar[type], *_],
@@ -1414,15 +1425,10 @@ fn strided_store[
             addr.store(value[0])
         return
 
-    alias IndexTy = SIMD[DType.index, simd_width]
-    var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector", IndexTy, has_side_effect=False
+    var offset = int(addr) + stride * sizeof[type]() * math.iota[
+        DType.index, simd_width
     ]()
-    var offset = IndexTy(int(addr)) + IndexTy(stride) * iota * IndexTy(
-        sizeof[type]()
-    )
-
-    scatter[type, simd_width](value, offset, mask)
+    scatter(value, offset, mask)
 
 
 # ===-------------------------------------------------------------------===#

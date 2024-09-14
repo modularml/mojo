@@ -25,18 +25,23 @@ from sys import (
     prefetch,
     simdwidthof,
     triple_is_nvidia_cuda,
+    bitwidthof,
 )
+from sys.info import _current_arch
 
 from sys._assembly import inlined_assembly
+from os import abort
 
 from bit import pop_count
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
 from builtin.format_int import _try_write_int
+from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
-from utils import InlineArray, StringSlice, StaticIntTuple, Span
+from utils import StringSlice, StaticIntTuple, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -53,7 +58,10 @@ from .dtype import (
     _scientific_notation_digits,
 )
 from .io import _printf, _snprintf_scalar
-from .string import _calc_format_buffer_size, _calc_initial_buffer_size
+from collections.string import (
+    _calc_format_buffer_size,
+    _calc_initial_buffer_size,
+)
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
@@ -136,6 +144,15 @@ fn _has_native_bf16_support() -> Bool:
     return triple_is_nvidia_cuda()
 
 
+@always_inline("nodebug")
+fn _is_sm_80() -> Bool:
+    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) in (
+        "sm_80",
+        "sm_86",
+        "sm_89",
+    )
+
+
 # ===----------------------------------------------------------------------=== #
 # SIMD
 # ===----------------------------------------------------------------------=== #
@@ -149,6 +166,8 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
+    CollectionElementNew,
+    Floatable,
     Floorable,
     Formattable,
     Hashable,
@@ -216,7 +235,7 @@ struct SIMD[type: DType, size: Int](
         Args:
             other: The value to copy.
         """
-        self = other
+        self.__copyinit__(other)
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
@@ -514,6 +533,11 @@ struct SIMD[type: DType, size: Int](
             `self[i] + rhs[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return self.fma(1, rhs)
+
         return __mlir_op.`pop.add`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -528,6 +552,10 @@ struct SIMD[type: DType, size: Int](
             `self[i] - rhs[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return rhs.fma(-1, self)
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -547,6 +575,10 @@ struct SIMD[type: DType, size: Int](
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
@@ -1315,6 +1347,21 @@ struct SIMD[type: DType, size: Int](
                 _type = __mlir_type.`!pop.scalar<index>`
             ](rebind[Scalar[type]](self).value)
 
+    @always_inline("nodebug")
+    fn __float__(self) -> Float64:
+        """Casts the value to a float.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            The value as a float.
+        """
+        constrained[size == 1, "expected a scalar type"]()
+        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](
+            rebind[Scalar[type]](self).value
+        )
+
     @no_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
@@ -1388,6 +1435,39 @@ struct SIMD[type: DType, size: Int](
         if type.is_unsigned() or type is DType.bool:
             return self
         elif type.is_floating_point():
+
+            @parameter
+            if triple_is_nvidia_cuda():
+
+                @parameter
+                if type.is_half_float():
+                    alias prefix = "abs.bf16" if type is DType.bfloat16 else "abs.f16"
+
+                    @parameter
+                    if size == 1:
+                        return inlined_assembly[
+                            prefix + " $0, $1;",
+                            Self,
+                            constraints="=h,h",
+                            has_side_effect=False,
+                        ](self)
+
+                    var res = Self()
+
+                    @parameter
+                    for i in range(0, size, 2):
+                        var val = inlined_assembly[
+                            prefix + "x2 $0, $1;",
+                            SIMD[type, 2],
+                            constraints="=r,r",
+                            has_side_effect=False,
+                        ](self.slice[2, offset=i]())
+                        res = res.insert[offset=i](val)
+                    return res
+                return llvm_intrinsic["llvm.fabs", Self, has_side_effect=False](
+                    self
+                )
+
             alias integral_type = FPUtils[type].integral_type
             var m = self._float_to_bits[integral_type]()
             return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
@@ -1465,9 +1545,7 @@ struct SIMD[type: DType, size: Int](
                     constraints="=r,f,f",
                     has_side_effect=False,
                 ](rebind[Float32](self[i + 1]), rebind[Float32](self[i]))
-                var val = bitcast[target, 2](bf16x2_as_uint32)
-                res[i] = val[0]
-                res[i + 1] = val[1]
+                res = res.insert[offset=i](bitcast[target, 2](bf16x2_as_uint32))
 
             return res
 
@@ -1529,14 +1607,14 @@ struct SIMD[type: DType, size: Int](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            writer.write_str["["]()
+            writer.write_str("[")
 
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                writer.write_str[", "]()
+                writer.write_str(", ")
 
             @parameter
             if triple_is_nvidia_cuda():
@@ -1583,7 +1661,7 @@ struct SIMD[type: DType, size: Int](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            writer.write_str["]"]()
+            writer.write_str("]")
 
     @always_inline
     fn _bits_to_float[dest_type: DType](self) -> SIMD[dest_type, size]:
@@ -1681,6 +1759,37 @@ struct SIMD[type: DType, size: Int](
             `self[i]*multiplier[i] + accumulator[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
+
+            @parameter
+            if size == 1:
+                return inlined_assembly[
+                    prefix + " $0, $1, $2, $3;",
+                    Self,
+                    constraints="=h,h,h,h",
+                    has_side_effect=False,
+                ](self, multiplier, accumulator)
+
+            var res = Self()
+
+            @parameter
+            for i in range(0, size, 2):
+                var val = inlined_assembly[
+                    prefix + "x2 $0, $1, $2, $3;",
+                    SIMD[type, 2],
+                    constraints="=r,r,r,r",
+                    has_side_effect=False,
+                ](
+                    self.slice[2, offset=i](),
+                    multiplier.slice[2, offset=i](),
+                    accumulator.slice[2, offset=i](),
+                )
+                res = res.insert[offset=i](val)
+            return res
+
         return __mlir_op.`pop.fma`(
             self.value, multiplier.value, accumulator.value
         )
@@ -1886,7 +1995,7 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.extract",
             SIMD[type, output_width],
             has_side_effect=False,
-        ](self, offset)
+        ](self, Int64(offset))
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
@@ -1932,7 +2041,7 @@ struct SIMD[type: DType, size: Int](
 
         return llvm_intrinsic[
             "llvm.vector.insert", Self, has_side_effect=False
-        ](self, value, offset)
+        ](self, value, Int64(offset))
 
     @always_inline("nodebug")
     fn join(self, other: Self) -> SIMD[type, 2 * size]:

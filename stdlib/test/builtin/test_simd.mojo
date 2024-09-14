@@ -14,6 +14,7 @@
 
 from sys import has_neon
 
+from collections import InlineArray
 from builtin.simd import _modf
 from testing import (
     assert_almost_equal,
@@ -22,7 +23,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticIntTuple, InlineArray
+from utils import unroll, StaticIntTuple
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
@@ -155,7 +156,7 @@ def test_issue_1625():
 
 
 def test_issue_20421():
-    var a = UnsafePointer[UInt8].alloc[alignment=64](16 * 64)
+    var a = UnsafePointer[UInt8, alignment=64].alloc(count=16 * 64)
     for i in range(16 * 64):
         a[i] = i & 255
     var av16 = a.offset(128 + 64 + 4).bitcast[Int32]().load[width=4]()
@@ -1661,6 +1662,12 @@ def test_comparison():
         test_dtype[DType.bfloat16]()
 
 
+def test_float_conversion():
+    assert_almost_equal(float(Int32(45)), 45.0)
+    assert_almost_equal(float(Float32(34.32)), 34.32)
+    assert_almost_equal(float(UInt64(36)), 36.0)
+
+
 def main():
     test_abs()
     test_add()
@@ -1708,4 +1715,5 @@ def main():
     test_split()
     test_contains()
     test_comparison()
+    test_float_conversion()
     # TODO: add tests for __and__, __or__, anc comparison operators

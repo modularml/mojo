@@ -151,12 +151,10 @@ def test_optional_equality():
     assert_true(o == 10)
     assert_true(o != 11)
     assert_true(o != n)
-    # TODO: Find a way to allow "o != None" again.
-    assert_true(o.__ne__(None))
+    assert_true(o != None)
     assert_true(n != 11)
     assert_true(n == n)
-    # TODO: Find a way to allow "o == None" again.
-    assert_true(n.__eq__(None))
+    assert_true(n == None)
 
 
 def main():

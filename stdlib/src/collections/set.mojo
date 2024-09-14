@@ -74,7 +74,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
-    fn __init__(inout self, elements: List[T]):
+    fn __init__(inout self, elements: List[T, *_]):
         """Construct a set from a List of elements.
 
         Args:
@@ -355,7 +355,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
+    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self._data)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
@@ -370,7 +370,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             t: The element to add to the set.
         """
-        self._data[Self.T(other=t)] = None
+        self._data[t] = None
 
     fn remove(inout self, t: T) raises:
         """Remove an element from the set.
@@ -399,9 +399,9 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         if not self:
             raise "Pop on empty set"
         var iter = self.__iter__()
-        var first = Self.T(other=iter.__next__()[])
+        var first = iter.__next__()[]
         self.remove(first)
-        return first^
+        return first
 
     fn union(self, other: Self) -> Self:
         """Set union.

@@ -37,7 +37,7 @@ from utils import Variant
 
 # TODO(27780): NoneType can't currently conform to traits
 @value
-struct _NoneType(CollectionElement):
+struct _NoneType(CollectionElement, CollectionElementNew):
     fn __init__(inout self, *, other: Self):
         pass
 
@@ -47,7 +47,9 @@ struct _NoneType(CollectionElement):
 # ===----------------------------------------------------------------------===#
 
 
-struct Optional[T: CollectionElement](CollectionElement, Boolable):
+struct Optional[T: CollectionElement](
+    CollectionElement, CollectionElementNew, Boolable
+):
     """A type modeling a value which may or may not be present.
 
     Optional values can be thought of as a type-safe nullable pattern.
@@ -311,7 +313,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -328,7 +330,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         return self.unsafe_value()
 
     @always_inline
-    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -340,7 +342,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
+        return self._value.unsafe_get[T]()[]
 
     fn take(inout self) -> T:
         """Move the value out of the Optional.
@@ -388,8 +390,8 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             The underlying value contained in the Optional or a default value.
         """
         if self.__bool__():
-            return Self.T(other=self._value[T])
-        return Self.T(other=default)
+            return self._value[T]
+        return default
 
 
 # ===----------------------------------------------------------------------===#

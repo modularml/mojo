@@ -21,7 +21,6 @@ from collections import InlineList
 
 from sys.intrinsics import _type_is_eq
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
-from utils import InlineArray
 
 
 # ===----------------------------------------------------------------------===#
@@ -30,7 +29,7 @@ from utils import InlineArray
 @value
 struct _InlineListIter[
     list_mutability: Bool, //,
-    T: CollectionElement,
+    T: CollectionElementNew,
     capacity: Int,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
@@ -55,7 +54,7 @@ struct _InlineListIter[
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_lifetime]:
+    ) -> Reference[T, __lifetime_of(self.src[][0])]:
         @parameter
         if forward:
             self.index += 1
@@ -73,7 +72,7 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -101,7 +100,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         """This constructor creates an empty InlineList."""
         self._array = InlineArray[
             UnsafeMaybeUninitialized[ElementType], capacity
-        ]()
+        ](unsafe_uninitialized=True)
         self._size = 0
 
     # TODO: Avoid copying elements in once owned varargs
@@ -130,7 +129,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
     @always_inline
     fn __getitem__(
         ref [_]self: Self, owned idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    ) -> ref [__lifetime_of(self._array)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -191,7 +190,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to find.
@@ -223,7 +222,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to count.

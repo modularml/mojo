@@ -27,12 +27,11 @@ There are a few main tools in this module:
 
 import random
 from sys.ffi import _get_global
+from sys import simdwidthof, bitwidthof
+from collections import InlineArray
 
 from builtin.dtype import _uint_type_of_width
-from memory import memcpy, memset_zero, stack_allocation
-
-# TODO remove this import once InlineArray is moved to collections
-from utils import InlineArray
+from memory import memcpy, memset_zero, stack_allocation, bitcast
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
@@ -260,8 +259,8 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
     # 3. Copy the tail data (smaller than the SIMD register) into
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
-        var remaining = InlineArray[UnsafeMaybeUninitialized[UInt8], stride]()
-        var ptr = remaining.unsafe_ptr().bitcast[UInt8]()
+        var remaining = InlineArray[UInt8, stride](unsafe_uninitialized=True)
+        var ptr = remaining.unsafe_ptr()
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
         var last_value = ptr.bitcast[Scalar[type]]().load[width=simd_width]()

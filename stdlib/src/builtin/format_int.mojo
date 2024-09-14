@@ -16,9 +16,9 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List, Optional
-from utils import InlineArray, StringSlice, StaticString
-from memory.maybe_uninitialized import UnsafeMaybeUninitialized
+from os import abort
+from collections import List, Optional, InlineArray
+from utils import StringSlice, StaticString
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -305,7 +305,7 @@ fn _try_write_int[
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.write_str["-"]()
+        fmt.write_str("-")
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.
@@ -321,7 +321,7 @@ fn _try_write_int[
         # Construct a null-terminated buffer of single-byte char.
         var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
 
-        var zero = StringSlice[ImmutableStaticLifetime](
+        var zero = StringSlice[ImmutableAnyLifetime](
             # TODO(MSTDL-720):
             #   Support printing non-null-terminated strings on GPU and switch
             #   back to this code without a workaround.
@@ -341,14 +341,16 @@ fn _try_write_int[
     # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64 + 1  # +1 for storing NUL terminator.
 
-    var buf = InlineArray[UnsafeMaybeUninitialized[UInt8], CAPACITY]()
+    var buf = InlineArray[UInt8, CAPACITY](unsafe_uninitialized=True)
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
     # earlier in the buffer as we write the more-significant digits.
     var offset = CAPACITY - 1
 
-    buf[offset].write(0)  # Write NUL terminator at the end
+    buf.unsafe_ptr().offset(offset).init_pointee_copy(
+        0
+    )  # Write NUL terminator at the end
 
     # Position the offset to write the least-significant digit just before the
     # NUL terminator.
@@ -364,7 +366,9 @@ fn _try_write_int[
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset].write(digit_chars_array[int(digit_value)])
+            buf.unsafe_ptr().offset(offset).init_pointee_copy(
+                digit_chars_array[int(digit_value)]
+            )
 
             # Position the offset to write the next digit.
             offset -= 1
@@ -402,7 +406,7 @@ fn _try_write_int[
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
     var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf_ptr.bitcast[UInt8](),
+        unsafe_from_utf8_ptr=buf_ptr,
         len=len,
     )
 

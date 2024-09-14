@@ -20,10 +20,16 @@ from math import floor
 """
 
 from collections import List
-from sys import llvm_intrinsic
 from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const
-from sys.info import bitwidthof, has_avx512f, simdwidthof, triple_is_nvidia_cuda
+from sys import (
+    llvm_intrinsic,
+    bitwidthof,
+    has_avx512f,
+    simdwidthof,
+    triple_is_nvidia_cuda,
+    sizeof,
+)
 
 from memory import UnsafePointer
 
@@ -31,6 +37,7 @@ from bit import count_trailing_zeros
 from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
+from sys.info import _current_arch
 
 from utils import Span
 from utils.index import StaticIntTuple
@@ -268,7 +275,7 @@ fn sqrt[
 
 
 @always_inline
-fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
+fn _isqrt_nvvm(x: SIMD) -> __type_of(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
     ]()
@@ -285,7 +292,7 @@ fn _rsqrt_nvvm(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn rsqrt(x: SIMD) -> __type_of(x):
+fn isqrt(x: SIMD) -> __type_of(x):
     """Performs elementwise reciprocal square root on a SIMD vector.
 
     Args:
@@ -301,9 +308,9 @@ fn rsqrt(x: SIMD) -> __type_of(x):
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
-            return _rsqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
+            return _isqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
 
-        return _rsqrt_nvvm(x)
+        return _isqrt_nvvm(x)
 
     return 1 / sqrt(x)
 
@@ -377,6 +384,41 @@ fn exp2[
         Vector containing $2^n$ computed elementwise, where n is an element in
         the input SIMD vector.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if type is DType.float16:
+
+            @parameter
+            if String(_current_arch()) == "sm_90a":
+                return _call_ptx_intrinsic[
+                    scalar_instruction="ex2.approx.f16",
+                    vector2_instruction="ex2.approx.f16x2",
+                    scalar_constraints="=h,h",
+                    vector_constraints="=r,r",
+                ](x)
+            else:
+                return _call_ptx_intrinsic[
+                    instruction="ex2.approx.f16", constraints="=h,h"
+                ](x)
+        elif type is DType.bfloat16 and String(_current_arch()) == "sm_90a":
+            return _call_ptx_intrinsic[
+                scalar_instruction="ex2.approx.ftz.bf16",
+                vector2_instruction="ex2.approx.ftz.bf16x2",
+                scalar_constraints="=h,h",
+                vector_constraints="=r,r",
+            ](x)
+        elif type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="ex2.approx.ftz.f32", constraints="=f,f"
+            ](x)
+
+    @parameter
+    if type not in (DType.float32, DType.float64):
+        return exp2(x.cast[DType.float32]()).cast[type]()
+
     alias integral_type = FPUtils[type].integral_type
 
     var xc = x.clamp(-126, 126)
@@ -557,21 +599,11 @@ fn exp[
     if triple_is_nvidia_cuda():
 
         @parameter
-        if type is DType.float16:
-            return _call_ptx_intrinsic[
-                instruction="ex2.approx.f16", constraints="=h,h"
-            ](x * inv_lg2)
-        elif type is DType.float32:
-            return _call_ptx_intrinsic[
-                instruction="ex2.approx.ftz.f32", constraints="=f,f"
-            ](x * inv_lg2)
+        if type in (DType.float16, DType.float32):
+            return exp2(x * inv_lg2)
 
     @parameter
-    if (
-        not type is DType.float64
-        and type is not DType.float32
-        and sizeof[type]() < sizeof[DType.float32]()
-    ):
+    if type not in (DType.float32, DType.float64):
         return exp(x.cast[DType.float32]()).cast[type]()
 
     var min_val: SIMD[type, simd_width]
@@ -743,6 +775,22 @@ fn log(x: SIMD) -> __type_of(x):
     Returns:
         Vector containing result of performing natural log base E on x.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias ln2 = 0.69314718055966295651160180568695068359375
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return (
+                _call_ptx_intrinsic[
+                    instruction="lg2.approx.f32", constraints="=f,f"
+                ](x)
+                * ln2
+            )
+
     return _log_base[27](x)
 
 
@@ -761,6 +809,18 @@ fn log2(x: SIMD) -> __type_of(x):
     Returns:
         Vector containing result of performing log base 2 on x.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log2(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return _call_ptx_intrinsic[
+                instruction="lg2.approx.f32", constraints="=f,f"
+            ](x)
+
     return _log_base[2](x)
 
 
@@ -1020,14 +1080,14 @@ fn iota[
         return offset
     elif type.is_integral():
         var step = llvm_intrinsic[
-            "llvm.experimental.stepvector",
+            "llvm.stepvector",
             SIMD[type, simd_width],
             has_side_effect=False,
         ]()
         return step + offset
     else:
         var it = llvm_intrinsic[
-            "llvm.experimental.stepvector",
+            "llvm.stepvector",
             SIMD[DType.index, simd_width],
             has_side_effect=False,
         ]()
@@ -1058,7 +1118,7 @@ fn iota[
         buff.store(i, i + offset)
 
 
-fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
+fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
@@ -1071,7 +1131,7 @@ fn iota[type: DType, //](inout v: List[Scalar[type]], offset: Int = 0):
     iota(v.data, len(v), offset)
 
 
-fn iota(inout v: List[Int], offset: Int = 0):
+fn iota(inout v: List[Int, *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:
@@ -1325,43 +1385,6 @@ fn atan2[
 # ===----------------------------------------------------------------------=== #
 
 
-fn _call_ptx_intrinsic_scalar[
-    type: DType, //,
-    *,
-    instruction: StringLiteral,
-    constraints: StringLiteral,
-](arg: Scalar[type]) -> Scalar[type]:
-    return inlined_assembly[
-        instruction + " $0, $1;",
-        Scalar[type],
-        constraints=constraints,
-        has_side_effect=False,
-    ](arg).cast[type]()
-
-
-fn _call_ptx_intrinsic[
-    type: DType,
-    simd_width: Int, //,
-    *,
-    instruction: StringLiteral,
-    constraints: StringLiteral,
-](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    @parameter
-    if simd_width == 1:
-        return _call_ptx_intrinsic_scalar[
-            instruction=instruction, constraints=constraints
-        ](arg[0])
-
-    var res = SIMD[type, simd_width]()
-
-    @parameter
-    for i in range(simd_width):
-        res[i] = _call_ptx_intrinsic_scalar[
-            instruction=instruction, constraints=constraints
-        ](arg[i])
-    return res
-
-
 fn cos[
     type: DType, simd_width: Int, //
 ](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
@@ -1581,6 +1604,22 @@ fn log10(x: SIMD) -> __type_of(x):
     Returns:
         The `log10` of the input.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias log10_2 = 0.301029995663981195213738894724493027
+
+        @parameter
+        if sizeof[x.type]() < sizeof[DType.float32]():
+            return log10(x.cast[DType.float32]()).cast[x.type]()
+        elif x.type is DType.float32:
+            return (
+                _call_ptx_intrinsic[
+                    instruction="lg2.approx.f32", constraints="=f,f"
+                ](x)
+                * log10_2
+            )
+
     return _call_libm["log10"](x)
 
 
@@ -1998,7 +2037,7 @@ fn gcd(s: Span[Int], /) -> Int:
 
 
 @always_inline
-fn gcd(l: List[Int], /) -> Int:
+fn gcd(l: List[Int, *_], /) -> Int:
     """Computes the greatest common divisor of a list of integers.
 
     Args:
@@ -2070,7 +2109,7 @@ fn lcm(s: Span[Int], /) -> Int:
 
 
 @always_inline
-fn lcm(l: List[Int], /) -> Int:
+fn lcm(l: List[Int, *_], /) -> Int:
     """Computes the least common multiple of a list of integers.
 
     Args:
@@ -2314,5 +2353,73 @@ fn _call_libm_impl[
     @parameter
     for i in range(simd_width):
         res[i] = _external_call_const[libm_name, Scalar[result_type]](arg[i])
+
+    return res
+
+
+fn _call_ptx_intrinsic_scalar[
+    type: DType, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg: Scalar[type]) -> Scalar[type]:
+    return inlined_assembly[
+        instruction + " $0, $1;",
+        Scalar[type],
+        constraints=constraints,
+        has_side_effect=False,
+    ](arg).cast[type]()
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=instruction, constraints=constraints
+        ](arg[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(simd_width):
+        res[i] = _call_ptx_intrinsic_scalar[
+            instruction=instruction, constraints=constraints
+        ](arg[i])
+    return res
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    scalar_instruction: StringLiteral,
+    vector2_instruction: StringLiteral,
+    scalar_constraints: StringLiteral,
+    vector_constraints: StringLiteral,
+](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=scalar_instruction, constraints=scalar_constraints
+        ](arg[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(0, simd_width, 2):
+        res = res.insert[offset=i](
+            inlined_assembly[
+                vector2_instruction + " $0, $1;",
+                SIMD[type, 2],
+                constraints=vector_constraints,
+                has_side_effect=False,
+            ](arg).cast[type]()
+        )
 
     return res

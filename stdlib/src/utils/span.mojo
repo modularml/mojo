@@ -20,9 +20,10 @@ from utils import Span
 ```
 """
 
-from . import InlineArray
+from collections import InlineArray
 from memory import Reference
 from sys.intrinsics import _type_is_eq
+from builtin.builtin_list import _lit_mut_cast
 
 
 @value
@@ -74,7 +75,7 @@ struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
     lifetime: AnyLifetime[is_mutable].type,
-](CollectionElement):
+](CollectionElementNew):
     """A non owning view of contiguous data.
 
     Parameters:
@@ -113,7 +114,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
-    fn __init__(inout self, ref [lifetime]list: List[T, _]):
+    fn __init__(inout self, ref [lifetime]list: List[T, *_]):
         """Construct a Span from a List.
 
         Args:
@@ -124,7 +125,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElement, size: Int, //
+        T2: CollectionElementNew, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -225,6 +226,16 @@ struct Span[
 
         return self._data
 
+    fn as_ref(self) -> Reference[T, lifetime]:
+        """
+        Gets a Reference to the first element of this slice.
+
+        Returns:
+            A Reference pointing at the first element of this slice.
+        """
+
+        return self._data[0]
+
     @always_inline
     fn copy_from[
         lifetime: MutableLifetime, //
@@ -240,7 +251,7 @@ struct Span[
         """
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
-            self[i] = Self.T(other=other[i])
+            self[i] = other[i]
 
     fn __bool__(self) -> Bool:
         """Check if a span is non-empty.
@@ -307,4 +318,15 @@ struct Span[
             value: The value to assign to each element.
         """
         for element in self:
-            element[] = Self.T(other=value)
+            element[] = value
+
+    fn get_immutable(self) -> Span[T, _lit_mut_cast[lifetime, False].result]:
+        """
+        Return an immutable version of this span.
+
+        Returns:
+            A span covering the same elements, but without mutability.
+        """
+        return Span[T, _lit_mut_cast[lifetime, False].result](
+            unsafe_ptr=self._data, len=self._len
+        )

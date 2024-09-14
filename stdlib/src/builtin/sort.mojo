@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import List
 from sys import bitwidthof
+from math import ceil
 
 from bit import count_leading_zeros
 from memory import UnsafePointer
@@ -26,18 +27,15 @@ from utils import Span
 # sort
 # ===----------------------------------------------------------------------===#
 
+alias insertion_sort_threshold = 32
 
+
+@value
 struct _SortWrapper[type: CollectionElement](CollectionElement):
     var data: type
 
-    fn __init__(inout self, owned data: type):
-        self.data = data^
-
     fn __init__(inout self, *, other: Self):
-        self.data = type(other=other.data)
-
-    fn __moveinit__(inout self, owned other: Self):
-        self.data = other.data^
+        self.data = other.data
 
 
 @always_inline
@@ -51,17 +49,17 @@ fn _insertion_sort[
     var size = len(span)
 
     for i in range(1, size):
-        var value = type(other=array[i])
+        var value = array[i]
         var j = i
 
         # Find the placement of the value in the array, shifting as we try to
         # find the position. Throughout, we assume array[start:i] has already
         # been sorted.
-        while j > 0 and not cmp_fn(type(other=array[j - 1]), type(other=value)):
-            array[j] = type(other=array[j - 1])
+        while j > 0 and cmp_fn(value, array[j - 1]):
+            array[j] = array[j - 1]
             j -= 1
 
-        array[j] = type(other=value)
+        array[j] = value
 
 
 # put everything thats "<" to the left of pivot
@@ -76,15 +74,13 @@ fn _quicksort_partition_right[
 
     var left = 1
     var right = size - 1
-    var pivot_value = type(other=array[0])
+    var pivot_value = array[0]
 
     while True:
         # no need for left < right since quick sort pick median of 3 as pivot
-        while cmp_fn(type(other=array[left]), type(other=pivot_value)):
+        while cmp_fn(array[left], pivot_value):
             left += 1
-        while left < right and not cmp_fn(
-            type(other=array[right]), type(other=pivot_value)
-        ):
+        while left < right and not cmp_fn(array[right], pivot_value):
             right -= 1
         if left >= right:
             var pivot_pos = left - 1
@@ -107,14 +103,12 @@ fn _quicksort_partition_left[
 
     var left = 1
     var right = size - 1
-    var pivot_value = type(other=array[0])
+    var pivot_value = array[0]
 
     while True:
-        while left < right and not cmp_fn(
-            type(other=pivot_value), type(other=array[left])
-        ):
+        while left < right and not cmp_fn(pivot_value, array[left]):
             left += 1
-        while cmp_fn(type(other=pivot_value), type(other=array[right])):
+        while cmp_fn(pivot_value, array[right]):
             right -= 1
         if left >= right:
             var pivot_pos = left - 1
@@ -136,11 +130,9 @@ fn _heap_sort_fix_down[
     var j = i * 2 + 1
     while j < size:  # has left child
         # if right child exist and has higher value, swap with right
-        if i * 2 + 2 < size and cmp_fn(
-            type(other=array[j]), type(other=array[i * 2 + 2])
-        ):
+        if i * 2 + 2 < size and cmp_fn(array[j], array[i * 2 + 2]):
             j = i * 2 + 2
-        if not cmp_fn(type(other=array[i]), type(other=array[j])):
+        if not cmp_fn(array[i], array[j]):
             return
         swap(array[j], array[i])
         i = j
@@ -171,7 +163,9 @@ fn _estimate_initial_height(size: Int) -> Int:
     var log2 = int(
         (bitwidthof[DType.index]() - 1) ^ count_leading_zeros(size | 1)
     )
-    return max(2, log2)
+    # The number 1.3 was chosen by experimenting the max stack size for random
+    # input. This also depends on insertion_sort_threshold
+    return max(2, int(ceil(1.3 * log2)))
 
 
 @always_inline
@@ -199,6 +193,13 @@ fn _delegate_small_sort[
         return
 
 
+# FIXME (MSTDL-808): Using _Pair over Span results in 1-3% improvement
+# @value
+# struct _Pair[type: AnyType]:
+#     var ptr: UnsafePointer[type]
+#     var len: Int
+
+
 @always_inline
 fn _quicksort[
     type: CollectionElement,
@@ -209,55 +210,158 @@ fn _quicksort[
     var size = len(span)
     if size == 0:
         return
-    var stack = List[Int](capacity=_estimate_initial_height(size))
-    stack.append(0)
-    stack.append(size)
-    while len(stack) > 0:
-        var end = stack.pop()
-        var start = stack.pop()
 
-        var len = end - start
+    # Work with an immutable span so we don't run into exclusivity problems with
+    # the List[Span].
+    var imm_span = span.get_immutable()
+    alias ImmSpan = __type_of(imm_span)
+
+    var stack = List[ImmSpan](capacity=_estimate_initial_height(size))
+    stack.append(imm_span)
+    while len(stack) > 0:
+        var imm_interval = stack.pop()
+        var ptr = imm_interval.unsafe_ptr()
+        var len = len(imm_interval)
+        var interval = Span[type, lifetime](unsafe_ptr=ptr, len=len)
 
         if len <= 5:
-            _delegate_small_sort[cmp_fn](
-                Span[type, lifetime](unsafe_ptr=array + start, len=len)
-            )
+            _delegate_small_sort[cmp_fn](interval)
             continue
 
-        if len < 32:
-            _insertion_sort[cmp_fn](
-                Span[type, lifetime](unsafe_ptr=array + start, len=len)
-            )
+        if len < insertion_sort_threshold:
+            _insertion_sort[cmp_fn](interval)
             continue
 
         # pick median of 3 as pivot
-        _sort3[type, cmp_fn](array, (start + end) >> 1, start, end - 1)
+        _sort3[type, cmp_fn](ptr, len >> 1, 0, len - 1)
 
-        # if array[start - 1] == pivot_value, then everything in between will
+        # if ptr[-1] == pivot_value, then everything in between will
         # be the same, so no need to recurse that interval
-        # already have array[start - 1] <= array[start]
-        if start > 0 and not cmp_fn(
-            type(other=array[start - 1]), type(other=array[start])
-        ):
-            var pivot = start + _quicksort_partition_left[cmp_fn](
-                Span[type, lifetime](unsafe_ptr=array + start, len=len)
-            )
-            if end > pivot + 2:
-                stack.append(pivot + 1)
-                stack.append(end)
+        # already have array[-1] <= array[0]
+        if ptr > array and not cmp_fn(ptr[-1], ptr[0]):
+            var pivot = _quicksort_partition_left[cmp_fn](interval)
+            if len > pivot + 2:
+                stack.append(
+                    ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
+                )
             continue
 
-        var pivot = start + _quicksort_partition_right[cmp_fn](
-            Span[type, lifetime](unsafe_ptr=array + start, len=len)
+        var pivot = _quicksort_partition_right[cmp_fn](interval)
+
+        if len > pivot + 2:
+            stack.append(
+                ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
+            )
+
+        if pivot > 1:
+            stack.append(ImmSpan(unsafe_ptr=ptr, len=pivot))
+
+
+# ===----------------------------------------------------------------------===#
+# stable sort
+# ===----------------------------------------------------------------------===#
+
+
+fn merge[
+    type: CollectionElement,
+    span_lifetime: ImmutableLifetime,
+    result_lifetime: MutableLifetime, //,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](
+    span1: Span[type, span_lifetime],
+    span2: Span[type, span_lifetime],
+    result: Span[type, result_lifetime],
+):
+    """Merge span1 and span2 into result using the given cmp_fn. The function
+    will crash if result is not large enough to hold both span1 and span2.
+
+    Note that if result contains data previously, its destructor will not be called.
+
+    Parameters:
+        type: Type of the spans.
+        span_lifetime: Lifetime of the input spans.
+        result_lifetime: Lifetime of the result Span.
+        cmp_fn: Comparison functor of (type, type) capturing -> Bool type.
+
+    Args:
+        span1: The first span to be merged.
+        span2: The second span to be merged.
+        result: The output span.
+    """
+    var span1_size = len(span1)
+    var span2_size = len(span2)
+    var res_ptr = result.unsafe_ptr()
+
+    debug_assert(
+        span1_size + span2_size <= len(result),
+        "The merge result does not fit in the span provided",
+    )
+    var i = 0
+    var j = 0
+    var k = 0
+    while i < span1_size:
+        if j == span2_size:
+            while i < span1_size:
+                (res_ptr + k).init_pointee_copy(span1[i])
+                k += 1
+                i += 1
+            return
+        if cmp_fn(span2[j], span1[i]):
+            (res_ptr + k).init_pointee_copy(span2[j])
+            j += 1
+        else:
+            (res_ptr + k).init_pointee_copy(span1[i])
+            i += 1
+        k += 1
+
+    while j < span2_size:
+        (res_ptr + k).init_pointee_copy(span2[j])
+        k += 1
+        j += 1
+
+
+fn _stable_sort_impl[
+    type: CollectionElement,
+    span_life: MutableLifetime,
+    tmp_life: MutableLifetime, //,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](span: Span[type, span_life], temp_buff: Span[type, tmp_life]):
+    var size = len(span)
+    if size <= 1:
+        return
+    var i = 0
+    var array = span.unsafe_ptr()
+    while i < size:
+        _insertion_sort[cmp_fn](
+            span[i : min(i + insertion_sort_threshold, size)]
         )
+        i += insertion_sort_threshold
+    var merge_size = insertion_sort_threshold
+    while merge_size < size:
+        var j = 0
+        while j + merge_size < size:
+            var span1 = span[j : j + merge_size]
+            var span2 = span[j + merge_size : min(size, j + 2 * merge_size)]
+            merge[cmp_fn](
+                span1.get_immutable(), span2.get_immutable(), temp_buff
+            )
+            for i in range(merge_size + len(span2)):
+                span[j + i] = temp_buff[i]
+            j += 2 * merge_size
+        merge_size *= 2
 
-        if end > pivot + 2:
-            stack.append(pivot + 1)
-            stack.append(end)
 
-        if pivot > start + 1:
-            stack.append(start)
-            stack.append(pivot)
+fn _stable_sort[
+    type: CollectionElement,
+    lifetime: MutableLifetime, //,
+    cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+](span: Span[type, lifetime]):
+    var temp_buff = UnsafePointer[type].alloc(len(span))
+    var temp_buff_span = Span[type, __lifetime_of(temp_buff)](
+        unsafe_ptr=temp_buff, len=len(span)
+    )
+    _stable_sort_impl[cmp_fn](span, temp_buff_span)
+    temp_buff.free()
 
 
 # ===----------------------------------------------------------------------===#
@@ -278,7 +382,7 @@ fn _partition[
     var array = span.unsafe_ptr()
     var pivot = size // 2
 
-    var pivot_value = type(other=array[pivot])
+    var pivot_value = array[pivot]
 
     var left = 0
     var right = size - 2
@@ -286,14 +390,14 @@ fn _partition[
     swap(array[pivot], array[size - 1])
 
     while left < right:
-        if cmp_fn(type(other=array[left]), type(other=pivot_value)):
+        if cmp_fn(array[left], pivot_value):
             left += 1
-        elif not cmp_fn(type(other=array[right]), type(other=pivot_value)):
+        elif not cmp_fn(array[right], pivot_value):
             right -= 1
         else:
             swap(array[left], array[right])
 
-    if cmp_fn(type(other=array[right]), type(other=pivot_value)):
+    if cmp_fn(array[right], pivot_value):
         right += 1
     swap(array[size - 1], array[right])
     return right
@@ -405,16 +509,22 @@ fn _sort[
     type: CollectionElement,
     lifetime: MutableLifetime, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[type, lifetime]):
     if len(span) <= 5:
         _delegate_small_sort[cmp_fn](span)
         return
 
-    if len(span) < 32:
+    if len(span) < insertion_sort_threshold:
         _insertion_sort[cmp_fn](span)
         return
 
-    _quicksort[cmp_fn](span)
+    @parameter
+    if stable:
+        _stable_sort[cmp_fn](span)
+    else:
+        _quicksort[cmp_fn](span)
 
 
 # TODO (MSTDL-766): The Int and Scalar[type] overload should be remove
@@ -425,6 +535,8 @@ fn sort[
     type: CollectionElement,
     lifetime: MutableLifetime, //,
     cmp_fn: fn (type, type) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[type, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -433,6 +545,7 @@ fn sort[
         type: CollectionElement type of the underlying data.
         lifetime: Lifetime of span.
         cmp_fn: The comparison function.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -442,12 +555,14 @@ fn sort[
     fn _cmp_fn(lhs: _SortWrapper[type], rhs: _SortWrapper[type]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[_cmp_fn](span)
+    _sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     lifetime: MutableLifetime, //,
     cmp_fn: fn (Int, Int) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[Int, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -455,6 +570,7 @@ fn sort[
     Parameters:
         lifetime: Lifetime of span.
         cmp_fn: The comparison function.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -464,13 +580,15 @@ fn sort[
     fn _cmp_fn(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[_cmp_fn](span)
+    _sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     type: DType,
     lifetime: MutableLifetime, //,
     cmp_fn: fn (Scalar[type], Scalar[type]) capturing -> Bool,
+    *,
+    stable: Bool = False,
 ](span: Span[Scalar[type], lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -479,6 +597,7 @@ fn sort[
         type: DType type of the underlying data.
         lifetime: Lifetime of span.
         cmp_fn: The comparison function.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -490,17 +609,20 @@ fn sort[
     ) -> Bool:
         return cmp_fn(lhs.data, rhs.data)
 
-    _sort[_cmp_fn](span)
+    _sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     lifetime: MutableLifetime, //,
+    *,
+    stable: Bool = False,
 ](span: Span[Int, lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
         lifetime: Lifetime of span.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -510,12 +632,14 @@ fn sort[
     fn _cmp_fn(lhs: Int, rhs: Int) -> Bool:
         return lhs < rhs
 
-    sort[_cmp_fn](span)
+    sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     type: DType,
     lifetime: MutableLifetime, //,
+    *,
+    stable: Bool = False,
 ](span: Span[Scalar[type], lifetime]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -523,6 +647,7 @@ fn sort[
     Parameters:
         type: CollectionElement type of the underlying data.
         lifetime: Lifetime of span.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -532,18 +657,21 @@ fn sort[
     fn _cmp_fn(lhs: Scalar[type], rhs: Scalar[type]) -> Bool:
         return lhs < rhs
 
-    sort[_cmp_fn](span)
+    sort[_cmp_fn, stable=stable](span)
 
 
 fn sort[
     type: ComparableCollectionElement,
     lifetime: MutableLifetime, //,
+    *,
+    stable: Bool = False,
 ](span: Span[type, lifetime]):
     """Sort list of the order comparable elements in-place.
 
     Parameters:
         type: The order comparable collection element type.
         lifetime: Lifetime of span.
+        stable: Whether the sort should be stable.
 
     Args:
         span: The span to be sorted.
@@ -553,7 +681,7 @@ fn sort[
     fn _cmp_fn(a: type, b: type) -> Bool:
         return a < b
 
-    sort[_cmp_fn](span)
+    sort[_cmp_fn, stable=stable](span)
 
 
 # ===----------------------------------------------------------------------===#
@@ -566,11 +694,11 @@ fn _sort2[
     type: CollectionElement,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](array: UnsafePointer[type], offset0: Int, offset1: Int):
-    var a = type(other=array[offset0])
-    var b = type(other=array[offset1])
-    if not cmp_fn(type(other=a), type(other=b)):
-        array[offset0] = type(other=b)
-        array[offset1] = type(other=a)
+    var a = array[offset0]
+    var b = array[offset1]
+    if not cmp_fn(a, b):
+        array[offset0] = b
+        array[offset1] = a
 
 
 @always_inline
@@ -588,18 +716,18 @@ fn _sort_partial_3[
     type: CollectionElement,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing -> Bool,
 ](array: UnsafePointer[type], offset0: Int, offset1: Int, offset2: Int):
-    var a = type(other=array[offset0])
-    var b = type(other=array[offset1])
-    var c = type(other=array[offset2])
-    var r = cmp_fn(type(other=c), type(other=a))
-    var t = type(other=c) if r else type(other=a)
+    var a = array[offset0]
+    var b = array[offset1]
+    var c = array[offset2]
+    var r = cmp_fn(c, a)
+    var t = c if r else a
     if r:
-        array[offset2] = type(other=a)
-    if cmp_fn(type(other=b), type(other=t)):
-        array[offset0] = type(other=b)
-        array[offset1] = type(other=t)
+        array[offset2] = a
+    if cmp_fn(b, t):
+        array[offset0] = b
+        array[offset1] = t
     elif r:
-        array[offset0] = type(other=t)
+        array[offset0] = t
 
 
 @always_inline

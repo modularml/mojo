@@ -24,8 +24,16 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
-from utils import Span, StaticIntTuple, StringRef, StringSlice, Variant
-from utils._format import Formattable, Formatter, ToFormatter
+from utils import (
+    Span,
+    StaticIntTuple,
+    StringRef,
+    StringSlice,
+    Variant,
+    Formattable,
+    Formatter,
+)
+from utils.format import ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
@@ -686,6 +694,8 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
+    CollectionElementNew,
+    FloatableRaising,
 ):
     """Represents a mutable string."""
 
@@ -816,14 +826,6 @@ struct String(
                 unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
             )
         )
-
-    fn __init__(inout self, obj: PythonObject):
-        """Creates a string from a python object.
-
-        Args:
-            obj: A python object.
-        """
-        self = str(obj)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
@@ -1281,7 +1283,7 @@ struct String(
         _ = is_first
         return result
 
-    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1591,6 +1593,10 @@ struct String(
         .
         """
 
+        fn num_bytes(b: UInt8) -> Int:
+            var flipped = ~b
+            return int(count_leading_zeros(flipped) + (flipped >> 7))
+
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
@@ -1612,8 +1618,8 @@ struct String(
                 # if the last char is not whitespace
                 output.append(self[str_byte_len])
                 break
-            rhs = lhs + 1
-            for s in self[lhs + 1 :]:
+            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
+            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
                 if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 rhs += s.byte_length()
@@ -1949,6 +1955,16 @@ struct String(
         """
         return atol(self)
 
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
+
     fn __mul__(self, n: Int) -> String:
         """Concatenates the string `n` times.
 
@@ -2052,13 +2068,16 @@ struct String(
         return res^
 
     fn isdigit(self) -> Bool:
-        """Returns True if all characters in the string are digits.
+        """A string is a digit string if all characters in the string are digits
+        and there is at least one character in the string.
 
         Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are digits else False.
+            True if all characters are digits and it's not empty else False.
         """
+        if not self:
+            return False
         for c in self:
             if not isdigit(ord(c)):
                 return False
@@ -2314,7 +2333,7 @@ trait StringRepresentable(Stringable, Representable):
 
 
 @value
-struct _FormatCurlyEntry(CollectionElement):
+struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     """
     Internally used by the `format()` method.
 

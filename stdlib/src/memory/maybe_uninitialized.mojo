@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import abort
+from builtin._documentation import doc_private
 
 
-struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElement):
+struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     """A memory location that may or may not be initialized.
 
     Note that the destructor is a no-op. If the memory was initialized, the caller

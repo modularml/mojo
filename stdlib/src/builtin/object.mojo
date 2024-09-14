@@ -28,7 +28,7 @@ from utils import StringRef, Variant
 
 
 @register_passable("trivial")
-struct _NoneMarker(CollectionElement):
+struct _NoneMarker(CollectionElementNew):
     """This is a trivial class to indicate that an object is `None`."""
 
     fn __init__(inout self, *, other: Self):
@@ -36,7 +36,7 @@ struct _NoneMarker(CollectionElement):
 
 
 @register_passable("trivial")
-struct _ImmutableString(CollectionElement):
+struct _ImmutableString(CollectionElement, CollectionElementNew):
     """Python strings are immutable. This class is marked as trivially register
     passable because its memory will be managed by `_ObjectImpl`. It is a
     pointer and integer pair. Memory will be dynamically allocated.
@@ -177,7 +177,7 @@ struct _RefCountedAttrsDictRef(CollectionElement):
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _, _]):
+    fn __init__(inout self, values: VariadicListMem[Attr, _]):
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
@@ -814,7 +814,7 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: Movable](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
         """Initializes the object from a list literal.
 
         Parameters:

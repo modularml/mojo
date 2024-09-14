@@ -17,9 +17,13 @@
 # RUN: %mojo -D DEBUG -debug-level full %s | FileCheck %s -check-prefix=CHECK-OK
 
 
-# CHECK-OK-LABEL: test_ok
-fn main():
-    print("== test_ok")
+def main():
+    test_debug_assert()
+
+
+# CHECK-OK-LABEL: test_debug_assert
+def test_debug_assert():
+    print("== test_debug_assert")
     debug_assert(True, "ok")
     debug_assert(3, Error("also ok"))
     # CHECK-OK: is reached
