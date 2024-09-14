@@ -82,7 +82,7 @@ struct _RefCountedList:
 
 
 @register_passable("trivial")
-struct _RefCountedListRef(CollectionElement):
+struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -170,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef(CollectionElement):
+struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -200,7 +200,7 @@ struct _RefCountedAttrsDictRef(CollectionElement):
 
 
 @register_passable("trivial")
-struct _Function(CollectionElement):
+struct _Function(CollectionElement, CollectionElementNew):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -252,6 +252,7 @@ struct _Function(CollectionElement):
 
 struct _ObjectImpl(
     CollectionElement,
+    CollectionElementNew,
     Stringable,
     Representable,
     Formattable,
