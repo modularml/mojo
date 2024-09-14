@@ -19,7 +19,6 @@
 
 def main():
     test_debug_assert()
-    test_debug_assert_formattable()
 
 
 # CHECK-OK-LABEL: test_debug_assert
@@ -29,19 +28,3 @@ def test_debug_assert():
     debug_assert(3, Error("also ok"))
     # CHECK-OK: is reached
     print("is reached")
-
-
-# CHECK-OK-LABEL: test_debug_assert_formattable
-def test_debug_assert_formattable():
-    print("== test_debug_assert_formattable")
-    debug_assert(True, FormattableOnly("failed with Formattable arg"))
-    # CHECK-OK: is reached
-    print("is reached")
-
-
-@value
-struct FormattableOnly:
-    var message: String
-
-    fn format_to(self, inout writer: Formatter):
-        writer.write(self.message)

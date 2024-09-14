@@ -33,6 +33,7 @@ from sys._assembly import inlined_assembly
 from os import abort
 
 from bit import pop_count
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd

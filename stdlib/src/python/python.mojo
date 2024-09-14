@@ -29,7 +29,7 @@ from memory import UnsafePointer
 from utils import StringRef
 
 from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
-from .python_object import PythonObject
+from .python_object import PythonObject, TypedPythonObject
 
 
 fn _init_global(ignored: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
@@ -68,6 +68,10 @@ struct Python:
 
     var impl: _PythonInterfaceImpl
     """The underlying implementation of Mojo's Python interface."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Default constructor."""
@@ -177,6 +181,11 @@ struct Python:
         var directory: PythonObject = dir_path
         _ = sys.path.append(directory)
 
+    # ===-------------------------------------------------------------------===#
+    # PythonObject "Module" Operations
+    # ===-------------------------------------------------------------------===#
+
+    # TODO(MSTDL-880): Change this to return `TypedPythonObject["Module"]`
     @staticmethod
     fn import_module(module: StringRef) raises -> PythonObject:
         """Imports a Python module.
@@ -208,7 +217,7 @@ struct Python:
         return PythonObject(module_maybe)
 
     @staticmethod
-    fn create_module(name: String) raises -> PythonObject:
+    fn create_module(name: String) raises -> TypedPythonObject["Module"]:
         """Creates a Python module using the provided name.
 
         Inspired by https://github.com/pybind/pybind11/blob/a1d00916b26b187e583f3bce39cd59c3b0652c32/include/pybind11/pybind11.h#L1227
@@ -235,11 +244,14 @@ struct Python:
         # This is cargo copy-pasted from other methods in this file essentially.
         Python.throw_python_exception_if_error_state(cpython)
 
-        return PythonObject(module)
+        return TypedPythonObject["Module"](
+            unsafe_unchecked_from=PythonObject(module)
+        )
 
     @staticmethod
     fn add_methods(
-        module: PythonObject, functions: UnsafePointer[PyMethodDef]
+        inout module: TypedPythonObject["Module"],
+        functions: UnsafePointer[PyMethodDef],
     ) -> Int:
         """Adds methods to a PyModule object.
 
@@ -252,7 +264,16 @@ struct Python:
         """
         var cpython = _get_global_python_itf().cpython()
 
-        return cpython.PyModule_AddFunctions(module.py_object, functions)
+        return cpython.PyModule_AddFunctions(
+            # Safety: `module` pointer lives long enough because its reference
+            #   argument.
+            module.unsafe_as_py_object_ptr(),
+            functions,
+        )
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @staticmethod
     fn dict() -> PythonObject:

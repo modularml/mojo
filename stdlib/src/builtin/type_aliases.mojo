@@ -24,17 +24,24 @@ alias ImmutableLifetime = __mlir_type.`!lit.lifetime<0>`
 alias MutableLifetime = __mlir_type.`!lit.lifetime<1>`
 """Mutable lifetime reference type."""
 
-alias ImmutableStaticLifetime = __mlir_attr.`#lit.lifetime<0>: !lit.lifetime<0>`
+alias ImmutableAnyLifetime = __mlir_attr.`#lit.any.lifetime<0>: !lit.lifetime<0>`
+"""The immutable lifetime that might access any memory value."""
+
+alias MutableAnyLifetime = __mlir_attr.`#lit.any.lifetime<1>: !lit.lifetime<1>`
+"""The mutable lifetime that might access any memory value."""
+
+# TODO: We don't have a "static" lifetime to use yet, so we use Any.
+alias ImmutableStaticLifetime = ImmutableAnyLifetime
 """The immutable lifetime that lasts for the entire duration of program execution."""
 
-alias MutableStaticLifetime = __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
+alias MutableStaticLifetime = MutableAnyLifetime
 """The mutable lifetime that lasts for the entire duration of program execution."""
 
 alias LifetimeSet = __mlir_type.`!lit.lifetime.set`
 """A set of lifetime parameters."""
 
 
-# Helper to build !lit.lifetime type.
+# Helper to build a value of !lit.lifetime type.
 # TODO: Should be a parametric alias.
 struct AnyLifetime[is_mutable: Bool]:
     """This represents a lifetime reference of potentially parametric type.

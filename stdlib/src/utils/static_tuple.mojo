@@ -70,23 +70,22 @@ fn _create_array[
     Returns:
         The array with values filled from the input list.
     """
-    debug_assert(size == len(lst), "mismatch in the number of elements")
 
     if len(lst) == 1:
         return __mlir_op.`pop.array.repeat`[
             _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
         ](lst[0])
 
-    else:
-        var array = __mlir_op.`kgen.undef`[
-            _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
-        ]()
+    debug_assert(size == len(lst), "mismatch in the number of elements")
+    var array = __mlir_op.`kgen.undef`[
+        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+    ]()
 
-        @parameter
-        for idx in range(size):
-            _set_array_elem[idx, size, type](lst[idx], array)
+    @parameter
+    for idx in range(size):
+        _set_array_elem[idx, size, type](lst[idx], array)
 
-        return array
+    return array
 
 
 # ===----------------------------------------------------------------------===#
