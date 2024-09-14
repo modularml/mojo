@@ -1285,33 +1285,6 @@ struct String(
         return result
 
     fn join[
-        T: FormattableCollectionElement
-    ](self, elems: List[T, *_]) -> String:
-        """Joins string elements using the current string as a delimiter.
-
-        Parameters:
-            T: The types of the elements.
-
-        Args:
-            elems: The input values.
-
-        Returns:
-            The joined string.
-        """
-        var result: String = ""
-        var formatter = result._unsafe_to_formatter()
-        var is_first = True
-
-        for e in elems:
-            if is_first:
-                is_first = False
-            else:
-                self.format_to(formatter)
-            e[].format_to(formatter)
-
-        return result
-
-    fn join[
         T: SizedStringableCollectionElement
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
