@@ -113,9 +113,9 @@ fn validate_chunk[
     var prev1 = extract_vector[simd_size - 1](
         previous_input_block, current_block
     )
-    var byte_1_high = shuf1.dynamic_shuffle(prev1 >> 4)
-    var byte_1_low = shuf2.dynamic_shuffle(prev1 & v0f)
-    var byte_2_high = shuf3.dynamic_shuffle(current_block >> 4)
+    var byte_1_high = shuf1._dynamic_shuffle(prev1 >> 4)
+    var byte_1_low = shuf2._dynamic_shuffle(prev1 & v0f)
+    var byte_2_high = shuf3._dynamic_shuffle(current_block >> 4)
     var sc = byte_1_high & byte_1_low & byte_2_high
 
     var prev2 = extract_vector[simd_size - 2](

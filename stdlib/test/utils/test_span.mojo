@@ -166,8 +166,6 @@ def test_equality():
     var sp = Span[String](l)
     var sp2 = Span[String](l)
     var sp3 = Span(l2)
-    # same pointer
-    assert_true(sp == sp2)
     # different pointer
     assert_true(sp == sp3)
     # different length
@@ -187,6 +185,16 @@ def test_fill():
         assert_equal(s[i], 2)
 
 
+def test_ref():
+    var l = InlineArray[Int, 3](1, 2, 3)
+    var s = Span[Int](array=l)
+    # Would be nice to just use `assert_equal` with `Reference`, but doesn't quite work yet
+    # even after `Reference` is `Stringable`.  So, just compare for pointer equality right now.
+    var p1 = UnsafePointer(__mlir_op.`lit.ref.to_pointer`(s.as_ref().value))
+    var p2 = l.unsafe_ptr()
+    assert_equal(p1, p2)
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -197,3 +205,4 @@ def main():
     test_equality()
     test_bool()
     test_fill()
+    test_ref()

@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.reference import Reference
+from memory import Reference
 ```
 """
 
@@ -272,7 +272,7 @@ struct Reference[
     type: AnyType,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](CollectionElementNew):
+](CollectionElementNew, Stringable):
     """Defines a non-nullable safe reference.
 
     Parameters:
@@ -358,3 +358,12 @@ struct Reference[
             True if the two pointers are not equal and False otherwise.
         """
         return not (self == rhs)
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Gets a string representation of the Reference.
+
+        Returns:
+            The string representation of the Reference.
+        """
+        return str(UnsafePointer(__mlir_op.`lit.ref.to_pointer`(self.value)))

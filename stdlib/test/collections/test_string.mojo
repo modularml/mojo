@@ -804,6 +804,24 @@ def test_split():
         String("1,2,3,3,3").split("3", 2).__str__(), "['1,2,', ',', ',3']"
     )
 
+    var in5 = String("Hello 🔥!")
+    var res5 = in5.split()
+    assert_equal(len(res5), 2)
+    assert_equal(res5[0], "Hello")
+    assert_equal(res5[1], "🔥!")
+
+    var in6 = String("Лорем ипсум долор сит амет")
+    var res6 = in6.split(" ")
+    assert_equal(len(res6), 5)
+    assert_equal(res6[0], "Лорем")
+    assert_equal(res6[1], "ипсум")
+    assert_equal(res6[2], "долор")
+    assert_equal(res6[3], "сит")
+    assert_equal(res6[4], "амет")
+
+    with assert_raises(contains="Separator cannot be empty."):
+        _ = String("1, 2, 3").split("")
+
 
 def test_splitlines():
     # Test with no line breaks
@@ -1547,6 +1565,7 @@ def test_isdigit():
     assert_true(isdigit(ord("1")))
     assert_false(isdigit(ord("g")))
 
+    assert_false(String("").isdigit())
     assert_true(String("123").isdigit())
     assert_false(String("asdg").isdigit())
     assert_false(String("123asdg").isdigit())
@@ -1578,6 +1597,15 @@ def test_center():
     assert_equal(String("hello").center(4), "hello")
     assert_equal(String("hello").center(8), " hello  ")
     assert_equal(String("hello").center(8, "*"), "*hello**")
+
+
+def test_float_conversion():
+    # This is basically just a wrapper around atof which is
+    # more throughouly tested above
+    assert_equal(String("4.5").__float__(), 4.5)
+    assert_equal(float(String("4.5")), 4.5)
+    with assert_raises():
+        _ = float(String("not a float"))
 
 
 def main():
@@ -1633,3 +1661,4 @@ def main():
     test_rjust()
     test_ljust()
     test_center()
+    test_float_conversion()

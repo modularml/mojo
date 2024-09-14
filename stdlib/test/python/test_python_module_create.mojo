@@ -10,17 +10,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-#
-# This file only tests the debug_assert function
-#
-# ===----------------------------------------------------------------------=== #
-# REQUIRES: has_not
-# RUN: not --crash %bare-mojo -D BUILD_TYPE=debug %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# TODO(MSTDL-875): Fix and un-XFAIL this
+# XFAIL: asan && !system-darwin
+# RUN: %mojo %s
+
+from python import Python, PythonObject
+from testing import assert_equal
 
 
-# CHECK-FAIL-LABEL: test_fail
-fn main():
-    print("== test_fail")
-    debug_assert(False, "fail")
-    # CHECK-FAIL-NOT: is never reached
-    print("is never reached")
+def test_create_module():
+    var module_name = "test_module"
+    var module = Python.create_module(module_name)
+
+    # TODO: inspect properties about the module
+    # First though, let's see if we can even import it
+    # var imported_module = Python.import_module(module_name)
+    #
+    # _ = module_name
+
+
+def main():
+    test_create_module()

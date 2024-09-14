@@ -20,7 +20,7 @@ from sys.ffi import C_char
 from memory import memcpy
 from collections import List
 from utils import StringRef, Span, StringSlice
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
 from collections.string import _atol
@@ -42,6 +42,7 @@ struct StringLiteral(
     Representable,
     Sized,
     Stringable,
+    FloatableRaising,
 ):
     """This type represents a string literal.
 
@@ -214,6 +215,16 @@ struct StringLiteral(
         """
         return _atol(self)
 
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
+
     @no_inline
     fn __str__(self) -> String:
         """Convert the string literal to a string.
@@ -303,7 +314,7 @@ struct StringLiteral(
         return self.unsafe_ptr().bitcast[C_char]()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[ImmutableStaticLifetime]:
+    fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
@@ -315,10 +326,10 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[ImmutableStaticLifetime](unsafe_from_utf8=bytes)
+        return StringSlice[ImmutableAnyLifetime](unsafe_from_utf8=bytes)
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, ImmutableStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, ImmutableAnyLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -328,7 +339,7 @@ struct StringLiteral(
 
         var ptr = self.unsafe_ptr()
 
-        return Span[UInt8, ImmutableStaticLifetime](
+        return Span[UInt8, ImmutableAnyLifetime](
             unsafe_ptr=ptr,
             len=self.byte_length(),
         )
@@ -405,3 +416,23 @@ struct StringLiteral(
             result += str(e[])
 
         return result
+
+    fn lower(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to lowercase.
+
+        Returns:
+            A new string where cased letters have been converted to lowercase.
+        """
+
+        return str(self).lower()
+
+    fn upper(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to uppercase.
+
+        Returns:
+            A new string where cased letters have been converted to uppercase.
+        """
+
+        return str(self).upper()

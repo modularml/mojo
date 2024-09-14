@@ -29,7 +29,7 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, StaticString, StringSlice
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -129,24 +129,28 @@ struct _fdopen[mode: StringLiteral = "a"]:
         Hello
         ```
         """
-        # getdelim will resize the buffer as needed.
-        var buffer = UnsafePointer[UInt8].alloc(1)
+        # getdelim will allocate the buffer using malloc().
+        var buffer = UnsafePointer[UInt8]()
+        # ssize_t getdelim(char **restrict lineptr, size_t *restrict n,
+        #                  int delimiter, FILE *restrict stream);
         var bytes_read = external_call[
             "getdelim",
             Int,
             UnsafePointer[UnsafePointer[UInt8]],
-            UnsafePointer[UInt32],
+            UnsafePointer[UInt64],
             Int,
             UnsafePointer[NoneType],
         ](
-            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
-            UnsafePointer[UInt32].address_of(UInt32(1)),
+            UnsafePointer.address_of(buffer),
+            UnsafePointer.address_of(UInt64(0)),
             ord(delimiter),
             self.handle,
         )
-        # Overwrite the delimiter with a null terminator.
-        buffer[bytes_read - 1] = 0
-        return String(buffer, bytes_read)
+        # Copy the buffer (excluding the delimiter itself) into a Mojo String.
+        var s = String(StringRef(buffer, bytes_read - 1))
+        # Explicitly free the buffer using free() instead of the Mojo allocator.
+        external_call["free", NoneType](buffer.bitcast[NoneType]())
+        return s
 
 
 # ===----------------------------------------------------------------------=== #
@@ -300,90 +304,12 @@ fn _float_repr[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
-fn _put(x: Int, file: FileDescriptor = stdout):
-    """Prints a scalar value.
-
-    Args:
-        x: The value to print.
-        file: The output stream.
-    """
-    _printf[_get_dtype_printf_format[DType.index]()](x, file=file)
-
-
-@no_inline
-fn _put_simd_scalar[type: DType](x: Scalar[type]):
-    """Prints a scalar value.
-
-    Parameters:
-        type: The DType of the value.
-
-    Args:
-        x: The value to print.
-    """
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if type is DType.bool:
-        _put["True"]() if x else _put["False"]()
-    elif type.is_integral():
-        _printf[format](x)
-    elif type.is_floating_point():
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            _printf[format](x.cast[DType.float64]())
-        else:
-            _put(str(x).as_string_slice())
-    else:
-        constrained[False, "invalid dtype"]()
-
-
-@no_inline
-fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
-    """Prints a scalar value.
-
-    Parameters:
-        type: The DType of the value.
-        simd_width: The SIMD width.
-
-    Args:
-        x: The value to print.
-    """
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if simd_width == 1:
-        _put_simd_scalar(x[0])
-    elif type.is_integral():
-        _put["["]()
-
-        @parameter
-        for i in range(simd_width):
-            _put_simd_scalar(x[i])
-            if i != simd_width - 1:
-                _put[", "]()
-        _put["]"]()
-    else:
-        _put(str(x).as_string_slice())
-
-
-@no_inline
-fn _put[x: StringLiteral](file: FileDescriptor = stdout):
-    _put(x.as_string_slice(), file=file)
-
-
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableStaticLifetime](
+    var str_slice = StringSlice[ImmutableAnyLifetime](
         unsafe_from_utf8_strref=strref
     )
 
     _put(str_slice, file=file)
-
-
-@no_inline
-fn _put(x: DType, file: FileDescriptor = stdout):
-    _put(str(x).as_string_slice(), file=file)
 
 
 @no_inline

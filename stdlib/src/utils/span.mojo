@@ -125,7 +125,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int, //
+        T2: CollectionElement, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -225,6 +225,16 @@ struct Span[
         """
 
         return self._data
+
+    fn as_ref(self) -> Reference[T, lifetime]:
+        """
+        Gets a Reference to the first element of this slice.
+
+        Returns:
+            A Reference pointing at the first element of this slice.
+        """
+
+        return self._data[0]
 
     @always_inline
     fn copy_from[

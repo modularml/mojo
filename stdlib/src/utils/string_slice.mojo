@@ -177,19 +177,15 @@ struct StringSlice[
     # Initializers
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self, literal: StringLiteral):
+    @always_inline
+    fn __init__(
+        inout self: StringSlice[ImmutableAnyLifetime], lit: StringLiteral
+    ):
         """Construct a new string slice from a string literal.
 
         Args:
-            literal: The literal to construct this string slice from.
+            lit: The literal to construct this string slice from.
         """
-
-        # Its not legal to try to mutate a StringLiteral. String literals are
-        # static data.
-        constrained[
-            not is_mutable, "cannot create mutable StringSlice of StringLiteral"
-        ]()
-
         # Since a StringLiteral has static lifetime, it will outlive
         # whatever arbitrary `lifetime` the user has specified they need this
         # slice to live for.
@@ -202,8 +198,8 @@ struct StringSlice[
         #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[lifetime](
-            unsafe_from_utf8_ptr=literal.unsafe_ptr(), len=literal.byte_length()
+        self = StringSlice[ImmutableStaticLifetime](
+            unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 
     @always_inline
@@ -494,7 +490,7 @@ struct StringSlice[
             characters of the slice starting at start.
         """
 
-        var self_len = len(self)
+        var self_len = self.byte_length()
 
         var abs_start: Int
         if start < 0:
@@ -535,7 +531,7 @@ struct StringSlice[
         if not substr:
             return 0
 
-        if len(self) < len(substr) + start:
+        if self.byte_length() < substr.byte_length() + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
@@ -544,9 +540,9 @@ struct StringSlice[
 
         var loc = stringref._memmem(
             haystack_str.unsafe_ptr(),
-            len(haystack_str),
+            haystack_str.byte_length(),
             substr.unsafe_ptr(),
-            len(substr),
+            substr.byte_length(),
         )
 
         if not loc:

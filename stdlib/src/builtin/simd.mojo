@@ -33,6 +33,7 @@ from sys._assembly import inlined_assembly
 from os import abort
 
 from bit import pop_count
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
@@ -166,6 +167,7 @@ struct SIMD[type: DType, size: Int](
     CeilDivable,
     CollectionElement,
     CollectionElementNew,
+    Floatable,
     Floorable,
     Formattable,
     Hashable,
@@ -1345,6 +1347,21 @@ struct SIMD[type: DType, size: Int](
                 _type = __mlir_type.`!pop.scalar<index>`
             ](rebind[Scalar[type]](self).value)
 
+    @always_inline("nodebug")
+    fn __float__(self) -> Float64:
+        """Casts the value to a float.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            The value as a float.
+        """
+        constrained[size == 1, "expected a scalar type"]()
+        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](
+            rebind[Scalar[type]](self).value
+        )
+
     @no_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
@@ -1590,14 +1607,14 @@ struct SIMD[type: DType, size: Int](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            writer.write_str["["]()
+            writer.write_str("[")
 
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                writer.write_str[", "]()
+                writer.write_str(", ")
 
             @parameter
             if triple_is_nvidia_cuda():
@@ -1644,7 +1661,7 @@ struct SIMD[type: DType, size: Int](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            writer.write_str["]"]()
+            writer.write_str("]")
 
     @always_inline
     fn _bits_to_float[dest_type: DType](self) -> SIMD[dest_type, size]:
@@ -1939,8 +1956,9 @@ struct SIMD[type: DType, size: Int](
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
+    # TODO: move to the utils directory - see https://github.com/modularml/mojo/issues/3477
     @always_inline
-    fn dynamic_shuffle[
+    fn _dynamic_shuffle[
         mask_size: Int, //
     ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
         """Shuffles (also called blend) the values of the current vector.
@@ -1993,7 +2011,7 @@ struct SIMD[type: DType, size: Int](
             if mask_size < target_mask_size:
                 # Make a bigger mask (x2) and retry
                 var new_mask = mask.join(SIMD[DType.uint8, mask_size]())
-                return self.dynamic_shuffle(new_mask).slice[mask_size]()
+                return self._dynamic_shuffle(new_mask).slice[mask_size]()
             elif mask_size == target_mask_size:
                 # The compiler isn't smart enough yet. It complains about parameter mismatch
                 # because it cannot narrow them. Let's help it a bit.
@@ -2008,8 +2026,8 @@ struct SIMD[type: DType, size: Int](
                     mask_size // 2, offset = mask_size // 2
                 ]()
 
-                var first_result = self.dynamic_shuffle(first_half_of_mask)
-                var second_result = self.dynamic_shuffle(second_half_of_mask)
+                var first_result = self._dynamic_shuffle(first_half_of_mask)
+                var second_result = self._dynamic_shuffle(second_half_of_mask)
 
                 var result = first_result.join(second_result)
                 # The compiler doesn't understand that if divide by 2 and then multiply by 2,

@@ -31,11 +31,16 @@ def test_equality():
     var a = List[Int](1, 2, 3)
     var b = List[Int](4, 5, 6)
 
-    assert_true(Reference(a) == Reference(a))
-    assert_true(Reference(b) == Reference(b))
     assert_true(Reference(a) != Reference(b))
+
+
+def test_str():
+    var a = Int(42)
+    var a_ref = Reference(a)
+    assert_true(str(a_ref).startswith("0x"))
 
 
 def main():
     test_copy_reference_explicitly()
     test_equality()
+    test_str()

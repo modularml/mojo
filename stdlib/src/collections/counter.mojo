@@ -10,7 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Defines the `Counter` type.
 
+You can import these APIs from the `collections` package. For example:
+
+```mojo
+from collections import Counter
+```
+"""
 from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
 from utils import Variant
 
@@ -114,7 +121,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data[value] = count
 
-    fn __iter__(self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
+    fn __iter__(self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self._data)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -474,7 +481,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.pop(value, default)
 
-    fn keys(ref [_]self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
+    fn keys(
+        ref [_]self: Self,
+    ) -> _DictKeyIter[V, Int, __lifetime_of(self._data)]:
         """Iterate over the Counter's keys as immutable references.
 
         Returns:
@@ -482,7 +491,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.keys()
 
-    fn values(ref [_]self: Self) -> _DictValueIter[V, Int, __lifetime_of(self)]:
+    fn values(
+        ref [_]self: Self,
+    ) -> _DictValueIter[V, Int, __lifetime_of(self._data)]:
         """Iterate over the Counter's values as references.
 
         Returns:
@@ -490,7 +501,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.values()
 
-    fn items(self: Self) -> _DictEntryIter[V, Int, __lifetime_of(self)]:
+    fn items(self: Self) -> _DictEntryIter[V, Int, __lifetime_of(self._data)]:
         """Iterate over the dict's entries as immutable references.
 
         Returns:

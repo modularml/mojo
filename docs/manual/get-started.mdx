@@ -29,7 +29,7 @@ manager and package manager based on conda.
 2. Create a Mojo project called "hello-world":
 
     ```sh
-    magic init hello-world --format mojo
+    magic init hello-world --format mojoproject
     ```
 
     This creates a directory named `hello-world` and installs the Mojo project
@@ -59,7 +59,7 @@ To install the latest nightly build, specify the `max-nightly` channel when you
 initialize your project:
 
 ```sh
-magic init hello-world-nightly --format mojo \
+magic init hello-world-nightly --format mojoproject \
   -c conda-forge -c https://conda.modular.com/max-nightly
 ```
 
@@ -236,7 +236,7 @@ cd hello-world
 ```
 
 ```sh
-magic add "max=*"
+magic add max
 ```
 
 ```sh

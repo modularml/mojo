@@ -34,6 +34,7 @@ from builtin.error import Error
 from builtin.file import open, FileHandle
 from builtin.file_descriptor import FileDescriptor
 from builtin.float_literal import FloatLiteral
+from builtin.floatable import Floatable, FloatableRaising, float
 from builtin.format_int import bin, hex, oct
 from builtin.hash import hash, Hashable
 from builtin.identifiable import Identifiable, StringableIdentifiable
@@ -77,6 +78,8 @@ from builtin.type_aliases import (
     AnyTrivialRegType,
     ImmutableLifetime,
     MutableLifetime,
+    ImmutableAnyLifetime,
+    MutableAnyLifetime,
     ImmutableStaticLifetime,
     MutableStaticLifetime,
     LifetimeSet,
@@ -129,9 +132,4 @@ from collections.string import (
     isprintable,
 )
 from memory import UnsafePointer, Reference, AddressSpace
-from utils import StringRef
-from utils._format import Formattable, Formatter
-
-# Private things
-from builtin._documentation import doc_private
-from utils._visualizers import lldb_formatter_wrapping_type
+from utils import StringRef, Formattable, Formatter
