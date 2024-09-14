@@ -690,9 +690,9 @@ def test_trailing_zeros():
     assert_dif_hashes(hashes1, 18)
 
 
-def assert_fill_factor(
-    words: List[String], num_buckets: Int, lower_bound: Float64
-):
+def assert_fill_factor[
+    label: String
+](words: List[String], num_buckets: Int, lower_bound: Float64):
     # A perfect hash function is when the number of buckets is equal to number of words
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
@@ -706,13 +706,16 @@ def assert_fill_factor(
 
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
-        fill_factor >= lower_bound, "Fill factor is " + str(fill_factor)
+        fill_factor >= lower_bound,
+        str("Fill factor for {} is {}, provided lower boound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
-def assert_fill_factor_old_hash(
-    words: List[String], num_buckets: Int, lower_bound: Float64
-):
+def assert_fill_factor_old_hash[
+    label: String
+](words: List[String], num_buckets: Int, lower_bound: Float64):
     # A perfect hash function is when the number of buckets is equal to number of words
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
@@ -727,8 +730,8 @@ def assert_fill_factor_old_hash(
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor is {}, provided lower boound was {}").format(
-            fill_factor, lower_bound
+        str("Fill factor for {} is {}, provided lower boound was {}").format(
+            label, fill_factor, lower_bound
         ),
     )
 
@@ -737,60 +740,60 @@ def test_fill_factor():
     var words = List[String]()
 
     words = gen_word_pairs[words_ar]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.86)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 13, 1.0)
+    assert_fill_factor["AR"](words, len(words), 0.63)
+    assert_fill_factor["AR"](words, len(words) // 2, 0.86)
+    assert_fill_factor["AR"](words, len(words) // 4, 0.98)
+    assert_fill_factor["AR"](words, len(words) // 13, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.62)
+    assert_fill_factor_old_hash["AR"](words, len(words), 0.62)
 
     words = gen_word_pairs[words_el]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.86)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 12, 1.0)
+    assert_fill_factor["EL"](words, len(words), 0.63)
+    assert_fill_factor["EL"](words, len(words) // 2, 0.86)
+    assert_fill_factor["EL"](words, len(words) // 4, 0.98)
+    assert_fill_factor["EL"](words, len(words) // 12, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.225)
+    assert_fill_factor_old_hash["EL"](words, len(words), 0.205)
 
     words = gen_word_pairs[words_en]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.85)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 14, 1.0)
+    assert_fill_factor["EN"](words, len(words), 0.63)
+    assert_fill_factor["EN"](words, len(words) // 2, 0.85)
+    assert_fill_factor["EN"](words, len(words) // 4, 0.98)
+    assert_fill_factor["EN"](words, len(words) // 14, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.24)
+    assert_fill_factor_old_hash["EN"](words, len(words), 0.04)
 
     words = gen_word_pairs[words_he]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.86)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 14, 1.0)
+    assert_fill_factor["HE"](words, len(words), 0.63)
+    assert_fill_factor["HE"](words, len(words) // 2, 0.86)
+    assert_fill_factor["HE"](words, len(words) // 4, 0.98)
+    assert_fill_factor["HE"](words, len(words) // 14, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.24)
+    assert_fill_factor_old_hash["HE"](words, len(words), 0.2)
 
     words = gen_word_pairs[words_lv]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.86)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 12, 1.0)
+    assert_fill_factor["LV"](words, len(words), 0.63)
+    assert_fill_factor["LV"](words, len(words) // 2, 0.86)
+    assert_fill_factor["LV"](words, len(words) // 4, 0.98)
+    assert_fill_factor["LV"](words, len(words) // 12, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.22)
+    assert_fill_factor_old_hash["LV"](words, len(words), 0.05)
 
     words = gen_word_pairs[words_pl]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.86)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 13, 1.0)
+    assert_fill_factor["PL"](words, len(words), 0.63)
+    assert_fill_factor["PL"](words, len(words) // 2, 0.86)
+    assert_fill_factor["PL"](words, len(words) // 4, 0.98)
+    assert_fill_factor["PL"](words, len(words) // 13, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.24)
+    assert_fill_factor_old_hash["PL"](words, len(words), 0.05)
 
     words = gen_word_pairs[words_ru]()
-    assert_fill_factor(words, len(words), 0.63)
-    assert_fill_factor(words, len(words) // 2, 0.86)
-    assert_fill_factor(words, len(words) // 4, 0.98)
-    assert_fill_factor(words, len(words) // 13, 1.0)
+    assert_fill_factor["RU"](words, len(words), 0.63)
+    assert_fill_factor["RU"](words, len(words) // 2, 0.86)
+    assert_fill_factor["RU"](words, len(words) // 4, 0.98)
+    assert_fill_factor["RU"](words, len(words) // 13, 1.0)
 
-    assert_fill_factor_old_hash(words, len(words), 0.219)
+    assert_fill_factor_old_hash["RU"](words, len(words), 0.18)
 
 
 def main():
