@@ -1284,7 +1284,9 @@ struct String(
         _ = is_first
         return result
 
-    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+    fn join[
+        T: FormattableCollectionElement
+    ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1297,14 +1299,15 @@ struct String(
             The joined string.
         """
         var result: String = ""
+        var formatter = result._unsafe_to_formatter()
         var is_first = True
 
         for e in elems:
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(e[])
+                self.format_to(formatter)
+            e[].format_to(formatter)
 
         return result
 
