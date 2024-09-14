@@ -93,6 +93,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
+    FormattableCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,

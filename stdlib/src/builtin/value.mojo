@@ -209,6 +209,18 @@ trait CollectionElementNew(ExplicitlyCopyable, Movable):
     pass
 
 
+trait FormattableCollectionElement(CollectionElement, Formattable):
+    """The StringableCollectionElement trait denotes a trait composition
+    of the `CollectionElement` and `Formattable` traits.
+
+    This is useful to have as a named entity since Mojo does not
+    currently support anonymous trait compositions to constrain
+    on `CollectionElement & Formattable` in the parameter.
+    """
+
+    pass
+
+
 trait StringableCollectionElement(CollectionElement, Stringable):
     """The StringableCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `Stringable` traits.
