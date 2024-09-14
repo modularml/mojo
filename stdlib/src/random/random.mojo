@@ -235,4 +235,4 @@ fn shuffle[T: CollectionElement, //](inout list: List[T]):
     """
     for i in reversed(range(len(list))):
         var j = int(random_ui64(0, i))
-        swap(list.unsafe_get(i), list.unsafe_get(j))
+        list.swap_elements(i, j)

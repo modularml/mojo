@@ -95,13 +95,13 @@ def test_shuffle():
     assert_equal(len(a), len(b))
     assert_true(a != b)
     for i in range(len(b)):
-        assert_true(a.__contains__(b[i]))
+        assert_true(b[i] in a)
 
     shuffle(d)
     assert_equal(len(c), len(d))
     assert_true(c != d)
     for i in range(len(d)):
-        assert_true(c.__contains__(d[i]))
+        assert_true(d[i] in c)
 
     var e = L_i(21)
     shuffle(e)
