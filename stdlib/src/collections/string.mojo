@@ -1328,6 +1328,9 @@ struct String(
         var len_self = self.byte_length()
         var n_elems = len(elems)
         var len_to_copy = 0
+        # Calculate the total length of the elements to copy
+        # to prevent alloc syscalls as we know the buffer size
+        # hugely improving the performance on large lists
         for e in elems:
             len_to_copy += len(e[])
         var capacity = len_self * (n_elems - 1) + len_to_copy
