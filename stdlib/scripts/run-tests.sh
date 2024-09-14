@@ -29,6 +29,7 @@ TEST_UTILS_PATH="${REPO_ROOT}/stdlib/test/test_utils"
 # uses the stdlib that's given in the nightly, and will fail compilation
 # if some breaking changes are made.
 export MODULAR_MOJO_NIGHTLY_IMPORT_PATH=$BUILD_DIR
+export MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH=$BUILD_DIR
 mojo package "${TEST_UTILS_PATH}" -o "${BUILD_DIR}/test_utils.mojopkg"
 
 TEST_PATH="${REPO_ROOT}/stdlib/test"
