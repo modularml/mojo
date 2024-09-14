@@ -23,7 +23,7 @@ alias ROT = 23
 @always_inline
 fn _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
     """A fast function to emulate a folded multiply of two 64 bit uints.
-    Used becuase we don't have UInt128 type.
+    Used because we don't have UInt128 type.
 
     Args:
         lhs: 64 bit uint.
