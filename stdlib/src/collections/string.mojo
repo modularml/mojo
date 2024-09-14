@@ -1255,7 +1255,7 @@ struct String(
             curr += self + str(elems[i])
         return curr
 
-    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+    fn join[*Types: Formattable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1269,15 +1269,16 @@ struct String(
         """
 
         var result: String = ""
+        var formatter = result._unsafe_to_formatter()
         var is_first = True
 
         @parameter
-        fn add_elt[T: Stringable](a: T):
+        fn add_elt[T: Formattable](a: T):
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(a)
+                self.format_to(formatter)
+            a.format_to(formatter)
 
         elems.each[add_elt]()
         _ = is_first
