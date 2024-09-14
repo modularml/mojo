@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.reference import Reference
+from memory import Reference
 ```
 """
 
