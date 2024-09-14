@@ -1311,6 +1311,39 @@ struct String(
 
         return result
 
+    fn join[
+        T: SizedStringableCollectionElement
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var len_self = self.byte_length()
+        var n_elems = len(elems)
+        var len_to_copy = 0
+        for e in elems:
+            len_to_copy += len(e[])
+        var capacity = len_self * (n_elems - 1) + len_to_copy
+        var buf = Self._buffer_type(capacity=capacity)
+        var i = 0
+        var is_first = True
+        while i < n_elems:
+            if is_first:
+                is_first = False
+            else:
+                buf.extend(self.as_bytes())
+            buf.extend(str(elems[i]).as_bytes())
+            i += 1
+        buf.append(0)
+        return String(buf^)
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.

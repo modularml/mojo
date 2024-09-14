@@ -94,6 +94,7 @@ from builtin.value import (
     CollectionElement,
     CollectionElementNew,
     FormattableCollectionElement,
+    SizedStringableCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
