@@ -1303,9 +1303,9 @@ struct String(
             return String("")
         var len_self = self.byte_length()
         var len_elems = 0
-        # Calculate the total length of the elements to copy
-        # to prevent alloc syscalls as we know the buffer size
-        # hugely improving the performance on large lists
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
         for e in elems:
             len_elems += len(e[])
         var capacity = len_self * (n_elems - 1) + len_elems
