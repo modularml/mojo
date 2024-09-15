@@ -1285,7 +1285,7 @@ struct String(
         return result
 
     fn join[
-        T: SizedStringableCollectionElement
+        T: SizedFormattableCollectionElement
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1318,7 +1318,7 @@ struct String(
                 is_first = False
             else:
                 buf.extend(self_bytes)
-            buf.extend(str(elems[i]).as_bytes())
+            buf.extend(String.format_sequence(elems[i]).as_bytes())
             i += 1
         buf.append(0)
         return String(buf^)
