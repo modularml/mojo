@@ -1298,8 +1298,10 @@ struct String(
         Returns:
             The joined string.
         """
-        var len_self = self.byte_length()
         var n_elems = len(elems)
+        if n_elems == 0:
+            return String("")
+        var len_self = self.byte_length()
         var len_elems = 0
         # Calculate the total length of the elements to copy
         # to prevent alloc syscalls as we know the buffer size
