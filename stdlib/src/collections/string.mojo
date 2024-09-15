@@ -1300,21 +1300,22 @@ struct String(
         """
         var len_self = self.byte_length()
         var n_elems = len(elems)
-        var len_to_copy = 0
+        var len_elems = 0
         # Calculate the total length of the elements to copy
         # to prevent alloc syscalls as we know the buffer size
         # hugely improving the performance on large lists
         for e in elems:
-            len_to_copy += len(e[])
-        var capacity = len_self * (n_elems - 1) + len_to_copy
+            len_elems += len(e[])
+        var capacity = len_self * (n_elems - 1) + len_elems
         var buf = Self._buffer_type(capacity=capacity)
         var i = 0
         var is_first = True
+        var self_bytes = self.as_bytes()
         while i < n_elems:
             if is_first:
                 is_first = False
             else:
-                buf.extend(self.as_bytes())
+                buf.extend(self_bytes)
             buf.extend(str(elems[i]).as_bytes())
             i += 1
         buf.append(0)
