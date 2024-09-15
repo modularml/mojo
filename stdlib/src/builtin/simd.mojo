@@ -33,6 +33,7 @@ from sys._assembly import inlined_assembly
 from os import abort
 
 from bit import pop_count
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
@@ -1953,6 +1954,94 @@ struct SIMD[type: DType, size: Int](
         """
         return self._shuffle_list[size, mask](other)
 
+    # Not an overload of shuffle because there is ambiguity
+    # with fn shuffle[*mask: Int](self, other: Self) -> Self:
+    # TODO: move closer to UTF-8 String validation code - see https://github.com/modularml/mojo/issues/3477
+    @always_inline
+    fn _dynamic_shuffle[
+        mask_size: Int, //
+    ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
+        """Shuffles (also called blend) the values of the current vector.
+
+        It's done using the specified mask (permutation). The mask
+        values must be within `len(self)`. If that's not the case,
+        the behavior is undefined.
+
+        The mask is not known at compile time, unlike the `shuffle` method.
+
+        Note that currently, this function is fast only if the following
+        conditions are met:
+        1) The SIMD vector `self` is of type uint8 and size 16
+        2) The CPU supports SSE4 or NEON
+
+        If that's not the case, the function will fallback on a slower path,
+        which is an unrolled for loop.
+
+        The pseudocode of this function is:
+        ```mojo
+        var result = SIMD[Self.type, mask_size]()
+        for i in range(0, mask_size):
+            result[i] = self[int(mask[i])]
+        ```
+
+        Parameters:
+            mask_size: The size of the mask.
+
+        Args:
+            mask: The mask to use. Contains the indices to use to shuffle.
+
+        Returns:
+            A new vector with the same length as the mask where the value at
+            position `i` is equal to `self[mask[i]]`.
+        """
+
+        @parameter
+        if (
+            # TODO: Allow SSE3 when we have sys.has_sse3()
+            (sys.has_sse4() or sys.has_neon())
+            and Self.type == DType.uint8
+            and Self.size == 16
+        ):
+            # The instruction works with mask size of 16
+            alias target_mask_size = 16
+
+            # We know that simd sizes are powers of two, so we can use recursivity
+            # to iterate on the method until we reach the target size.
+            @parameter
+            if mask_size < target_mask_size:
+                # Make a bigger mask (x2) and retry
+                var new_mask = mask.join(SIMD[DType.uint8, mask_size]())
+                return self._dynamic_shuffle(new_mask).slice[mask_size]()
+            elif mask_size == target_mask_size:
+                # The compiler isn't smart enough yet. It complains about parameter mismatch
+                # because it cannot narrow them. Let's help it a bit.
+                var indices_copy = rebind[SIMD[DType.uint8, 16]](mask)
+                var self_copy = rebind[SIMD[DType.uint8, 16]](self)
+                var result = _pshuf_or_tbl1(self_copy, indices_copy)
+                return rebind[SIMD[Self.type, mask_size]](result)
+            elif mask_size > target_mask_size:
+                # We split it in two and call dynamic_shuffle twice.
+                var first_half_of_mask = mask.slice[mask_size // 2, offset=0]()
+                var second_half_of_mask = mask.slice[
+                    mask_size // 2, offset = mask_size // 2
+                ]()
+
+                var first_result = self._dynamic_shuffle(first_half_of_mask)
+                var second_result = self._dynamic_shuffle(second_half_of_mask)
+
+                var result = first_result.join(second_result)
+                # The compiler doesn't understand that if divide by 2 and then multiply by 2,
+                # we get the same value. So we need to help it a bit.
+                return rebind[SIMD[Self.type, mask_size]](result)
+
+        # Slow path, ~3x slower than pshuf for size 16
+        var result = SIMD[Self.type, mask_size]()
+
+        @parameter
+        for i in range(0, mask_size):
+            result[i] = self[int(mask[i])]
+        return result
+
     @always_inline("nodebug")
     fn slice[
         output_width: Int, /, *, offset: Int = 0
@@ -2630,6 +2719,49 @@ struct SIMD[type: DType, size: Int](
         return llvm_intrinsic[
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
+
+
+fn _pshuf_or_tbl1(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    @parameter
+    if sys.has_sse4():  # TODO: Allow SSE3 when we have sys.has_sse3()
+        return _pshuf(lookup_table, indices)
+    elif sys.has_neon():
+        return _tbl1(lookup_table, indices)
+    else:
+        # TODO: Change the error message when we allow SSE3
+        constrained[False, "To call _pshuf_or_tbl1() you need sse4 or neon."]()
+        # Can never happen. TODO: Remove later when the compiler detects it.
+        return SIMD[DType.uint8, 16]()
+
+
+fn _pshuf(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    """Shuffle operation using the SSSE3 `pshuf` instruction.
+
+    See https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_shuffle_epi8&ig_expand=6003
+    """
+    return sys.llvm_intrinsic[
+        "llvm.x86.ssse3.pshuf.b.128",
+        SIMD[DType.uint8, 16],
+        has_side_effect=False,
+    ](lookup_table, indices)
+
+
+fn _tbl1(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    """Shuffle operation using the aarch64 `tbl1` instruction.
+
+    See https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/coding-for-neon---part-5-rearranging-vectors
+    """
+    return sys.llvm_intrinsic[
+        "llvm.aarch64.neon.tbl1",
+        SIMD[DType.uint8, 16],
+        has_side_effect=False,
+    ](lookup_table, indices)
 
 
 # ===----------------------------------------------------------------------=== #
