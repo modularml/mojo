@@ -251,6 +251,12 @@ def test_comptime():
     assert_equal(n, 5)
 
 
+def test_hash():
+    assert_not_equal(UInt.__hash__(123), UInt.__hash__(456))
+    assert_equal(UInt.__hash__(123), UInt.__hash__(123))
+    assert_equal(UInt.__hash__(456), UInt.__hash__(456))
+
+
 def main():
     test_simple_uint()
     test_uint_representation()
@@ -276,3 +282,4 @@ def main():
     test_pos()
     test_hash()
     test_comptime()
+    test_hash()
