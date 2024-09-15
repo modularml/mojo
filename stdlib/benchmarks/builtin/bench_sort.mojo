@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# RUN: %mojo %s -t
+# RUN: %mojo-no-debug %s -t
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
 from random import *
