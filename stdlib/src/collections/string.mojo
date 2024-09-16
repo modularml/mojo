@@ -1284,8 +1284,36 @@ struct String(
         _ = is_first
         return result
 
+    # TODO: this join is ambiguous for the compiler with the next one in list of strings
+    # So, when we try to join a list of strings it will fail with the following error:
+    # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
+    # disambiguate with an explicit cast"
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result
+
     fn join[
-        T: SizedFormattableCollectionElement
+        T: SizedStrSliceableCollectionElement
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1318,7 +1346,8 @@ struct String(
                 is_first = False
             else:
                 buf.extend(self_bytes)
-            buf.extend(String.format_sequence(elems[i]).as_bytes())
+            var e_slice = elems[i].as_string_slice()
+            buf.extend(e_slice.as_bytes_slice())
             i += 1
         buf.append(0)
         return String(buf^)

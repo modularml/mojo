@@ -93,7 +93,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
-    SizedFormattableCollectionElement,
+    SizedStrSliceableCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -133,4 +133,4 @@ from collections.string import (
     isprintable,
 )
 from memory import UnsafePointer, Reference, AddressSpace
-from utils import StringRef, Formattable, Formatter
+from utils import StringRef, Formattable, Formatter, StringSlice, StrSliceable

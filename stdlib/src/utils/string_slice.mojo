@@ -31,6 +31,20 @@ alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
 
 
+trait StrSliceable:
+    """
+    The `StrSliceable` trait denotes a type that can be returned as a byte slice.
+    """
+
+    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        ...
+
+
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
 

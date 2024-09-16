@@ -18,7 +18,7 @@ from .loop import unroll
 from .span import Span
 from .static_tuple import StaticTuple
 from .stringref import StringRef
-from .string_slice import StaticString, StringSlice
+from .string_slice import StaticString, StringSlice, StrSliceable
 from .variant import Variant
 from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
 from .format import Formatter, Formattable
