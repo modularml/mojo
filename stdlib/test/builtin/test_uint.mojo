@@ -269,7 +269,7 @@ def main():
     test_mod()
     test_divmod()
     test_abs()
-    test_string_conversion()
+    test_string_conversion()4
     test_int_representation()
     test_indexer()
     test_comparison()
