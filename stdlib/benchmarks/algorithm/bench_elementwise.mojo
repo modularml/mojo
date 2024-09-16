@@ -48,7 +48,7 @@ fn bench_elementwise[n: Int](inout b: Bencher) raises:
 
 
 fn main() raises:
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=10000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_elementwise[32]](BenchId("bench_elementwise_32"))
     m.bench_function[bench_elementwise[128]](BenchId("bench_elementwise_128"))
     m.bench_function[bench_elementwise[1024]](BenchId("bench_elementwise_1024"))

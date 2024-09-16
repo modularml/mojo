@@ -220,7 +220,7 @@ fn bench_find_optimized(inout b: Bencher) raises:
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=10000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_find_baseline](BenchId("find_baseline"))
     m.bench_function[bench_find_optimized](BenchId("find_optimized"))
     m.dump_report()

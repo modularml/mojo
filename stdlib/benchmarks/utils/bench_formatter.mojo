@@ -58,7 +58,7 @@ fn bench_formatter_simd[n: Int](inout b: Bencher) raises:
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=10000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_formatter_int[42]](BenchId("bench_formatter_int_42"))
     m.bench_function[bench_formatter_int[2**64]](
         BenchId("bench_formatter_int_2**64")
