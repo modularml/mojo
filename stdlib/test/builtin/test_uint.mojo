@@ -256,6 +256,13 @@ def test_hash():
     assert_equal(UInt.__hash__(123), UInt.__hash__(123))
     assert_equal(UInt.__hash__(456), UInt.__hash__(456))
 
+    
+def test_comptime():
+    alias a: UInt = 32
+    # Verify that count_trailing_zeros works at comptime.
+    alias n = count_trailing_zeros(a)
+    assert_equal(n, 5)
+
 
 def main():
     test_simple_uint()
@@ -283,3 +290,4 @@ def main():
     test_hash()
     test_comptime()
     test_hash()
+    test_comptime()
