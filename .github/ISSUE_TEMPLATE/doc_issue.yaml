@@ -12,6 +12,7 @@ body:
         Please add a title above and fill in the following fields so we can understand the problem.
 
   - type: input
+    id: url
     attributes:
       label: Where is the problem?
       description: Provide a link to the problematic page (with a heading anchor).
