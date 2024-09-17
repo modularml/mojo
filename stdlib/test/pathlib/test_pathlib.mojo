@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !windows
+# REQUIRES: !system-windows
 # RUN: %mojo  -D TEMP_FILE=%t %s
 
 import os

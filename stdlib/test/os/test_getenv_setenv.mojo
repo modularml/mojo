@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: linux || darwin
+# REQUIRES: system-linux || system-darwin
 # RUN: TEST_MYVAR=MyValue %mojo %s
 
 from os import getenv, setenv

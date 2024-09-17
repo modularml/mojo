@@ -14,7 +14,7 @@
 # This file is only run on macos targets.
 #
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: darwin
+# REQUIRES: system-darwin
 # RUN: %mojo %s
 
 

@@ -39,9 +39,6 @@ def has_not():
 if has_not() or os.getenv("GITHUB_REPOSITORY"):
     config.available_features.add("has_not")
 
-# This makes the OS name available for `REQUIRE` directives, e.g., `# REQUIRES: darwin`.
-config.available_features.add(platform.system().lower())
-
 # test_utils does not contain tests, just source code
 # that we run `mojo package` on to be used by other tests
 config.excludes = ["test_utils"]
