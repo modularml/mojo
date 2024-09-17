@@ -221,9 +221,7 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait SizedStrSliceableCollectionElement(
-    CollectionElement, StrSliceable, Sized
-):
+trait SizedByteableCollectionElement(CollectionElement, Byteable, Sized):
     """The SizedFormattableCollectionElement trait denotes a trait composition
     of the `CollectionElement`, `Formattable` and `Sized` traits.
 

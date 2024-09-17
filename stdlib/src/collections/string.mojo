@@ -21,6 +21,7 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
+from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
@@ -687,6 +688,7 @@ fn isprintable(c: UInt8) -> Bool:
 struct String(
     Sized,
     Stringable,
+    Byteable,
     Representable,
     IntableRaising,
     KeyElement,
@@ -1313,7 +1315,7 @@ struct String(
         return result
 
     fn join[
-        T: SizedStrSliceableCollectionElement
+        T: SizedByteableCollectionElement
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1346,8 +1348,8 @@ struct String(
                 is_first = False
             else:
                 buf.extend(self_bytes)
-            var e_slice = elems[i].as_string_slice()
-            buf.extend(e_slice.as_bytes_slice())
+            var e_slice = elems[i].as_bytes_slice()
+            buf.extend(e_slice)
             i += 1
         buf.append(0)
         return String(buf^)
