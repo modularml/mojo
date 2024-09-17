@@ -21,7 +21,6 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
-from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
