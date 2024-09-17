@@ -43,21 +43,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Download Modular installer
+      - name: Download Magic CLI
         run: |
-          curl -s https://get.modular.com | sh -
-
-      - name: Install nightly Mojo compiler
-        run: |
-          # The <auth_token> of "examples" is arbitrary but something
-          # needs to be provided.
-          modular auth examples
-          modular install nightly/mojo
-
-          # Put Mojo on the PATH
-          echo "MODULAR_HOME=$HOME/.modular" >> $GITHUB_ENV
-
-          echo "$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin" >> $GITHUB_PATH
+          curl -ssL https://magic.modular.com/cfba4c92-2390-4b86-93de-04b2f47114d5 | bash
+          # Add magic to PATH
+          echo "$HOME/.modular/bin" >> $GITHUB_PATH
 
       - name: Install build tools (Linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -73,5 +63,5 @@ jobs:
         env:
           MOJO_ENABLE_ASSERTIONS_IN_TESTS: ${{ matrix.mojo-enable-assertions }}
         run: |
-          ./stdlib/scripts/run-tests.sh
-          ./examples/run-examples.sh
+          magic run tests
+          magic run examples
