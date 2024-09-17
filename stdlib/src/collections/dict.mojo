@@ -799,7 +799,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         except:
             return None
 
-    fn _hash_key[K: KeyElement](self, key: K) -> Int:
+    fn _hash_key(self, key: K) -> Int:
         """Hash a key using the underlying hash function.
 
         Args:
