@@ -36,6 +36,8 @@ from utils import (
 from utils.format import ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
+from ._unicode import is_lowercase, is_uppercase, to_lowercase, to_uppercase
+
 # ===----------------------------------------------------------------------=== #
 # ord
 # ===----------------------------------------------------------------------=== #
@@ -75,7 +77,7 @@ fn ord(s: StringSlice) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s.unsafe_ptr().bitcast[UInt8]()
+    var p = s.unsafe_ptr()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(s.byte_length() == 1, "input string length must be 1")
@@ -751,12 +753,12 @@ struct String(
         Args:
             impl: The buffer.
         """
-        debug_assert(
-            impl[-1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
         # We make a backup because steal_data() will clear size and capacity.
         var size = impl.size
+        debug_assert(
+            impl[size - 1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
         var capacity = impl.capacity
         self._buffer = Self._buffer_type(
             unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
@@ -1846,43 +1848,26 @@ struct String(
         return String(res^)
 
     fn lower(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters
+        """Returns a copy of the string with all cased characters
         converted to lowercase.
 
         Returns:
             A new string where cased letters have been converted to lowercase.
         """
 
-        # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ascii_uppercase]()
+        # TODO: the _unicode module does not support locale sensitive conversions yet.
+        return to_lowercase(self)
 
     fn upper(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters
+        """Returns a copy of the string with all cased characters
         converted to uppercase.
 
         Returns:
             A new string where cased letters have been converted to uppercase.
         """
 
-        # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ascii_lowercase]()
-
-    fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
-        var copy: String = self
-
-        var char_ptr = copy.unsafe_ptr()
-
-        for i in range(self.byte_length()):
-            var char: UInt8 = char_ptr[i]
-            if check_case(char):
-                var lower = _toggle_ascii_case(char)
-                char_ptr[i] = lower
-
-        return copy
+        # TODO: the _unicode module does not support locale sensitive conversions yet.
+        return to_uppercase(self)
 
     fn startswith(self, prefix: String, start: Int = 0, end: Int = -1) -> Bool:
         """Checks if the string starts with the specified prefix between start
@@ -2112,44 +2097,25 @@ struct String(
                 return False
         return True
 
-    fn _isupper_islower[*, upper: Bool](self) -> Bool:
-        fn is_ascii_cased(c: UInt8) -> Bool:
-            return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
-
-        for c in self:
-            debug_assert(c.byte_length() == 1, "only implemented for ASCII")
-            if is_ascii_cased(ord(c)):
-
-                @parameter
-                if upper:
-                    return self == self.upper()
-                else:
-                    return self == self.lower()
-        return False
-
     fn isupper(self) -> Bool:
         """Returns True if all cased characters in the string are uppercase and
         there is at least one cased character.
-
-        Note that this currently only works with ASCII strings.
 
         Returns:
             True if all cased characters in the string are uppercase and there
             is at least one cased character, False otherwise.
         """
-        return self._isupper_islower[upper=True]()
+        return len(self) > 0 and is_uppercase(self)
 
     fn islower(self) -> Bool:
         """Returns True if all cased characters in the string are lowercase and
         there is at least one cased character.
 
-        Note that this currently only works with ASCII strings.
-
         Returns:
             True if all cased characters in the string are lowercase and there
             is at least one cased character, False otherwise.
         """
-        return self._isupper_islower[upper=False]()
+        return len(self) > 0 and is_lowercase(self)
 
     fn isprintable(self) -> Bool:
         """Returns True if all characters in the string are ASCII printable.

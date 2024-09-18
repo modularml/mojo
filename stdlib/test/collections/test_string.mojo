@@ -944,6 +944,8 @@ def test_isupper():
     assert_false(String("AsDG").isupper())
     assert_true(String("ABC123").isupper())
     assert_false(String("1!").isupper())
+    assert_true(String("É").isupper())
+    assert_false(String("é").isupper())
 
 
 def test_islower():
@@ -962,6 +964,8 @@ def test_islower():
     assert_false(String("asdFDg").islower())
     assert_true(String("abc123").islower())
     assert_false(String("1!").islower())
+    assert_true(String("é").islower())
+    assert_false(String("É").islower())
 
 
 def test_lower():
@@ -971,8 +975,8 @@ def test_lower():
 
     assert_equal(String("MOJO🔥").lower(), "mojo🔥")
 
-    # TODO(#26444): Non-ASCII not supported yet
-    assert_equal(String("É").lower(), "É")
+    assert_equal(String("É").lower(), "é")
+    assert_equal(String("é").lower(), "é")
 
 
 def test_upper():
@@ -982,8 +986,8 @@ def test_upper():
 
     assert_equal(String("mojo🔥").upper(), "MOJO🔥")
 
-    # TODO(#26444): Non-ASCII not supported yet
     assert_equal(String("É").upper(), "É")
+    assert_equal(String("é").upper(), "É")
 
 
 def test_isspace():
