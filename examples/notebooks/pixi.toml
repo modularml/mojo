@@ -3,7 +3,7 @@ name = "Mojo notebooks"
 version = "1.0.0"
 description = "Environment for running JupyterLab"
 authors = ["Modular <hello@modular.com>"]
-channels = ["conda-forge", "https://conda.cloudsmith.io/modular/max"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 
 [dependencies]
