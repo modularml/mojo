@@ -1195,13 +1195,13 @@ struct String(
         for s in self:
             use_dquote = use_dquote or (s == "'")
 
-            if s == '\\':
+            if s == "\\":
                 result += r"\\"
-            elif s == '\t':
+            elif s == "\t":
                 result += r"\t"
-            elif s == '\n':
+            elif s == "\n":
                 result += r"\n"
-            elif s == '\r':
+            elif s == "\r":
                 result += r"\r"
             else:
                 var codepoint = ord(s)
@@ -1209,11 +1209,11 @@ struct String(
                     result += s
                 elif codepoint < 0x10:
                     result += hex(codepoint, prefix=r"\x0")
-                elif codepoint < 0x20 or codepoint == 0x7f:
+                elif codepoint < 0x20 or codepoint == 0x7F:
                     result += hex(codepoint, prefix=r"\x")
-                else: # multi-byte character
+                else:  # multi-byte character
                     result += s
-        
+
         if use_dquote:
             return '"' + result + '"'
         else:

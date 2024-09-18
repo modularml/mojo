@@ -65,9 +65,9 @@ def test_repr():
     assert_equal(String.__repr__("\x7f"), r"'\x7f'")
 
     # Multi-byte characters
-    assert_equal(String.__repr__("Örnsköldsvik"), "'Örnsköldsvik'") # 2-byte
-    assert_equal(String.__repr__("你好!"), "'你好!'") # 3-byte
-    assert_equal(String.__repr__("hello 🔥!"), "'hello 🔥!'") # 4-byte
+    assert_equal(String.__repr__("Örnsköldsvik"), "'Örnsköldsvik'")  # 2-byte
+    assert_equal(String.__repr__("你好!"), "'你好!'")  # 3-byte
+    assert_equal(String.__repr__("hello 🔥!"), "'hello 🔥!'")  # 4-byte
 
 
 def test_constructors():
