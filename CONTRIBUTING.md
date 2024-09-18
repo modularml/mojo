@@ -272,13 +272,13 @@ magic init mojo-nightly --format mojoproject \
 ```
 
 If you're [using conda](https://docs.modular.com/magic/conda), add the
-`https://conda.modular.com/max-nightly` channel to your `environment.yaml`
+`https://conda.modular.com/max-nightly/` channel to your `environment.yaml`
 file. For example:
 
 ```yaml
 [project]
 name = "Mojo nightly example"
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 
 [dependencies]
