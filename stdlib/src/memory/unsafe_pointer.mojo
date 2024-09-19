@@ -277,7 +277,7 @@ struct UnsafePointer[
         Returns:
             The offset between the two pointers.
         """
-        return int(self) - int(other)
+        return (int(self) - int(other)) // sizeof[type]()
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
