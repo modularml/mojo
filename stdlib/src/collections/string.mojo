@@ -36,7 +36,12 @@ from utils import (
 from utils.format import ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
-from ._unicode import is_lowercase, is_uppercase, to_lowercase, to_uppercase
+from utils._unicode import (
+    is_lowercase,
+    is_uppercase,
+    to_lowercase,
+    to_uppercase,
+)
 
 # ===----------------------------------------------------------------------=== #
 # ord

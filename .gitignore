@@ -1,5 +1,7 @@
 # Build directory
 /build
+.magic
+install_id
 
 # Reference: https://github.com/github/gitignore/blob/main/Python.gitignore
 
