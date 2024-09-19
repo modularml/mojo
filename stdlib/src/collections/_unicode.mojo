@@ -212,7 +212,7 @@ fn to_uppercase(s: String) -> String:
         s: Input string.
 
     Returns:
-        A new string where cased letters have been converted to upercase.
+        A new string where cased letters have been converted to uppercase.
     """
     var input = s.unsafe_ptr()
     var capacity = (s.byte_length() >> 1) * 3 + 1
