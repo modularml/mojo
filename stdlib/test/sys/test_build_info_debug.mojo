@@ -10,18 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: is_debug
-# RUN: %mojo %s
+# RUN: %mojo -D BUILD_TYPE=debug %s
 
 from sys._build import is_debug_build, is_release_build
 
 from testing import assert_false, assert_true
 
 
-fn test_is_debug():
+def test_is_debug():
     assert_true(is_debug_build())
     assert_false(is_release_build())
 
 
-fn main():
+def main():
     test_is_debug()
