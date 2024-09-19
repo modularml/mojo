@@ -62,6 +62,11 @@ what we publish.
 
 ### 🦋 Changed
 
+- More things have been removed from the auto-exported set of entities in the `prelude`
+  module from the Mojo standard library.
+  - `StringRef` has been removed. Please explicitly import it via
+    `from utils import StringRef`.
+
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.

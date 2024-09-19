@@ -20,6 +20,8 @@ from sys import alignof, sizeof
 from memory import UnsafePointer, memcpy
 from memory.memory import _free
 
+from utils import StringRef
+
 # ===----------------------------------------------------------------------===#
 # Error
 # ===----------------------------------------------------------------------===#
