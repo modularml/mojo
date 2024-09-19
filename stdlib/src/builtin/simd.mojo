@@ -1956,7 +1956,7 @@ struct SIMD[type: DType, size: Int](
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
-    # TODO: move closer to UTF-8 String validation code - see https://github.com/modularml/mojo/issues/3477
+    # TODO: move to the utils directory - see https://github.com/modularml/mojo/issues/3477
     @always_inline
     fn _dynamic_shuffle[
         mask_size: Int, //
