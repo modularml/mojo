@@ -161,7 +161,7 @@ fn _write_rune(rune: UInt32, p: UnsafePointer[UInt8]) -> Int:
 
 
 fn to_lowercase(s: String) -> String:
-    """Returns a new string with all characters converted to upercase.
+    """Returns a new string with all characters converted to uppercase.
 
     Args:
         s: Input string.
