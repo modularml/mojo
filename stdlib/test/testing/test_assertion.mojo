@@ -28,6 +28,28 @@ from builtin._location import _SourceLocation
 from python import PythonObject
 
 
+def test_assert_messages():
+    try:
+        assert_true(False)
+    except e:
+        assert_true("test_assertion.mojo:33:20: AssertionError:" in str(e))
+
+    try:
+        assert_false(True)
+    except e:
+        assert_true("test_assertion.mojo:38:21: AssertionError:" in str(e))
+
+    try:
+        assert_equal(1, 0)
+    except e:
+        assert_true("test_assertion.mojo:43:21: AssertionError:" in str(e))
+
+    try:
+        assert_not_equal(0, 0)
+    except e:
+        assert_true("test_assertion.mojo:48:25: AssertionError:" in str(e))
+
+
 @value
 struct DummyStruct:
     var value: Int
@@ -64,26 +86,30 @@ def test_assert_equal_with_simd():
         assert_equal(SIMD[DType.uint8, 2](1, 1), SIMD[DType.uint8, 2](1, 2))
 
 
-def test_assert_messages():
-    try:
-        assert_true(False)
-    except e:
-        assert_true("test_assertion.mojo:69:20: AssertionError:" in str(e))
+def test_assert_equal_with_list():
+    assert_equal(
+        List(String("This"), String("is"), String("Mojo")),
+        List(String("This"), String("is"), String("Mojo")),
+    )
 
-    try:
-        assert_false(True)
-    except e:
-        assert_true("test_assertion.mojo:74:21: AssertionError:" in str(e))
+    with assert_raises():
+        assert_equal(
+            List(String("This"), String("is"), String("Mojo")),
+            List(String("This"), String("is"), String("mojo")),
+        )
 
-    try:
-        assert_equal(1, 0)
-    except e:
-        assert_true("test_assertion.mojo:79:21: AssertionError:" in str(e))
 
-    try:
-        assert_not_equal(0, 0)
-    except e:
-        assert_true("test_assertion.mojo:84:25: AssertionError:" in str(e))
+def test_assert_not_equal_with_list():
+    assert_not_equal(
+        List(3, 2, 1),
+        List(3, 1, 0),
+    )
+
+    with assert_raises():
+        assert_not_equal(
+            List(3, 2, 1),
+            List(3, 2, 1),
+        )
 
 
 def test_assert_almost_equal():
@@ -215,6 +241,8 @@ def main():
     test_assert_equal_is_generic()
     test_assert_not_equal_is_generic()
     test_assert_equal_with_simd()
+    test_assert_equal_with_list()
+    test_assert_not_equal_with_list()
     test_assert_messages()
     test_assert_almost_equal()
     test_assert_is()
