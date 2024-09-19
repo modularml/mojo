@@ -401,12 +401,20 @@ struct PyModuleDef(Stringable, Representable, Formattable):
 
 
 struct CPython:
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
     var lib: DLHandle
     var dict_type: PyObjectPtr
     var logging_enabled: Bool
     var version: PythonVersion
     var total_ref_count: UnsafePointer[Int]
     var init_error: StringRef
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
@@ -456,6 +464,17 @@ struct CPython:
         else:
             self.version = PythonVersion(0, 0, 0)
 
+    fn __del__(owned self):
+        pass
+
+    fn __copyinit__(inout self, existing: Self):
+        self.lib = existing.lib
+        self.dict_type = existing.dict_type
+        self.logging_enabled = existing.logging_enabled
+        self.version = existing.version
+        self.total_ref_count = existing.total_ref_count
+        self.init_error = existing.init_error
+
     @staticmethod
     fn destroy(inout existing: CPython):
         if existing.logging_enabled:
@@ -489,6 +508,10 @@ struct CPython:
             error += "\n    https://modul.ar/fix-python\n"
             raise error
 
+    # ===-------------------------------------------------------------------===#
+    # None
+    # ===-------------------------------------------------------------------===#
+
     fn Py_None(inout self) -> PyObjectPtr:
         """Get a None value, of type NoneType."""
 
@@ -506,16 +529,37 @@ struct CPython:
 
         return PyObjectPtr(ptr)
 
-    fn __del__(owned self):
-        pass
+    # ===-------------------------------------------------------------------===#
+    # Logging
+    # ===-------------------------------------------------------------------===#
 
-    fn __copyinit__(inout self, existing: Self):
-        self.lib = existing.lib
-        self.dict_type = existing.dict_type
-        self.logging_enabled = existing.logging_enabled
-        self.version = existing.version
-        self.total_ref_count = existing.total_ref_count
-        self.init_error = existing.init_error
+    @always_inline
+    fn log[*Ts: Formattable](self, *args: *Ts):
+        """If logging is enabled, print the given arguments as a log message.
+
+        Parameters:
+            Ts: The argument types.
+
+        Arguments:
+            args: The arguments to log.
+        """
+        if not self.logging_enabled:
+            return
+
+        # TODO(MOCO-358):
+        #   Once Mojo argument splatting is supported, this should just
+        #   be: `print(*args)`
+        @parameter
+        fn print_arg[T: Formattable](arg: T):
+            print(arg, sep="", end="", flush=False)
+
+        args.each[print_arg]()
+
+        print(flush=True)
+
+    # ===-------------------------------------------------------------------===#
+    # Reference count management
+    # ===-------------------------------------------------------------------===#
 
     fn _inc_total_rc(inout self):
         var v = self.total_ref_count.take_pointee()
@@ -526,18 +570,14 @@ struct CPython:
         self.total_ref_count.init_pointee_move(v - 1)
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
-        if self.logging_enabled:
-            print(
-                ptr._get_ptr_as_int(), " INCREF refcnt:", self._Py_REFCNT(ptr)
-            )
+        self.log(ptr._get_ptr_as_int(), " INCREF refcnt:", self._Py_REFCNT(ptr))
+
         self.lib.get_function[fn (PyObjectPtr) -> None]("Py_IncRef")(ptr)
         self._inc_total_rc()
 
     fn Py_DecRef(inout self, ptr: PyObjectPtr):
-        if self.logging_enabled:
-            print(
-                ptr._get_ptr_as_int(), " DECREF refcnt:", self._Py_REFCNT(ptr)
-            )
+        self.log(ptr._get_ptr_as_int(), " DECREF refcnt:", self._Py_REFCNT(ptr))
+
         self.lib.get_function[fn (PyObjectPtr) -> None]("Py_DecRef")(ptr)
         self._dec_total_rc()
 
@@ -565,12 +605,13 @@ struct CPython:
 
     fn PyDict_New(inout self) -> PyObjectPtr:
         var r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyDict_New, refcnt:",
-                self._Py_REFCNT(r),
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyDict_New, refcnt:",
+            self._Py_REFCNT(r),
+        )
+
         self._inc_total_rc()
         return r
 
@@ -580,13 +621,14 @@ struct CPython:
         var r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> Int32
         ](StringRef("PyDict_SetItem"))(dict_obj, key, value)
-        if self.logging_enabled:
-            print(
-                "PyDict_SetItem, key: ",
-                key._get_ptr_as_int(),
-                " value: ",
-                value._get_ptr_as_int(),
-            )
+
+        self.log(
+            "PyDict_SetItem, key: ",
+            key._get_ptr_as_int(),
+            " value: ",
+            value._get_ptr_as_int(),
+        )
+
         return int(r)
 
     fn PyDict_GetItemWithError(
@@ -595,8 +637,9 @@ struct CPython:
         var result = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
         ](StringRef("PyDict_GetItemWithError"))(dict_obj, key)
-        if self.logging_enabled:
-            print("PyDict_GetItemWithError, key: ", key._get_ptr_as_int())
+
+        self.log("PyDict_GetItemWithError, key: ", key._get_ptr_as_int())
+
         return result
 
     fn PyEval_GetBuiltins(inout self) -> PyObjectPtr:
@@ -611,14 +654,15 @@ struct CPython:
         var r = self.lib.get_function[fn (UnsafePointer[UInt8]) -> PyObjectPtr](
             "PyImport_ImportModule"
         )(name.data)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyImport_ImportModule, str:",
-                name,
-                ", refcnt:",
-                self._Py_REFCNT(r),
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyImport_ImportModule, str:",
+            name,
+            ", refcnt:",
+            self._Py_REFCNT(r),
+        )
+
         self._inc_total_rc()
         return r
 
@@ -690,16 +734,17 @@ struct CPython:
                 ) -> UnsafePointer[Int8]
             ]("PyRun_String")(strref.data, Int32(run_mode), globals, locals)
         )
-        if self.logging_enabled:
-            print(
-                result._get_ptr_as_int(),
-                " NEWREF PyRun_String, str:",
-                strref,
-                ", ptr: ",
-                result._get_ptr_as_int(),
-                ", refcnt:",
-                self._Py_REFCNT(result),
-            )
+
+        self.log(
+            result._get_ptr_as_int(),
+            " NEWREF PyRun_String, str:",
+            strref,
+            ", ptr: ",
+            result._get_ptr_as_int(),
+            ", refcnt:",
+            self._Py_REFCNT(result),
+        )
+
         self._inc_total_rc()
         return result
 
@@ -741,16 +786,17 @@ struct CPython:
         var r = self.lib.get_function[
             fn (PyObjectPtr, UnsafePointer[UInt8]) -> PyObjectPtr
         ]("PyObject_GetAttrString")(obj, name.data)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyObject_GetAttrString, str:",
-                name,
-                ", refcnt:",
-                self._Py_REFCNT(r),
-                ", parent obj:",
-                obj._get_ptr_as_int(),
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyObject_GetAttrString, str:",
+            name,
+            ", refcnt:",
+            self._Py_REFCNT(r),
+            ", parent obj:",
+            obj._get_ptr_as_int(),
+        )
+
         self._inc_total_rc()
         return r
 
@@ -760,17 +806,18 @@ struct CPython:
         var r = self.lib.get_function[
             fn (PyObjectPtr, UnsafePointer[UInt8], PyObjectPtr) -> Int
         ]("PyObject_SetAttrString")(obj, name.data, new_value)
-        if self.logging_enabled:
-            print(
-                "PyObject_SetAttrString str:",
-                name,
-                ", parent obj:",
-                obj._get_ptr_as_int(),
-                ", new value:",
-                new_value._get_ptr_as_int(),
-                " new value ref count: ",
-                self._Py_REFCNT(new_value),
-            )
+
+        self.log(
+            "PyObject_SetAttrString str:",
+            name,
+            ", parent obj:",
+            obj._get_ptr_as_int(),
+            ", new value:",
+            new_value._get_ptr_as_int(),
+            " new value ref count: ",
+            self._Py_REFCNT(new_value),
+        )
+
         return r
 
     fn PyObject_CallObject(
@@ -781,14 +828,15 @@ struct CPython:
         var r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
         ]("PyObject_CallObject")(callable_obj, args)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyObject_CallObject, refcnt:",
-                self._Py_REFCNT(r),
-                ", callable obj:",
-                callable_obj._get_ptr_as_int(),
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyObject_CallObject, refcnt:",
+            self._Py_REFCNT(r),
+            ", callable obj:",
+            callable_obj._get_ptr_as_int(),
+        )
+
         self._inc_total_rc()
         return r
 
@@ -801,14 +849,15 @@ struct CPython:
         var r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
         ]("PyObject_Call")(callable_obj, args, kwargs)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyObject_Call, refcnt:",
-                self._Py_REFCNT(r),
-                ", callable obj:",
-                callable_obj._get_ptr_as_int(),
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyObject_Call, refcnt:",
+            self._Py_REFCNT(r),
+            ", callable obj:",
+            callable_obj._get_ptr_as_int(),
+        )
+
         self._inc_total_rc()
         return r
 
@@ -841,14 +890,15 @@ struct CPython:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             StringRef("PyTuple_New")
         )(count)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyTuple_New, refcnt:",
-                self._Py_REFCNT(r),
-                ", tuple size:",
-                count,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyTuple_New, refcnt:",
+            self._Py_REFCNT(r),
+            ", tuple size:",
+            count,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -875,14 +925,15 @@ struct CPython:
         ](StringRef("PyUnicode_DecodeUTF8"))(
             strref.data, strref.length, "strict".unsafe_cstr_ptr()
         )
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyString_FromStringAndSize, refcnt:",
-                self._Py_REFCNT(r),
-                ", str:",
-                strref,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyString_FromStringAndSize, refcnt:",
+            self._Py_REFCNT(r),
+            ", str:",
+            strref,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -890,14 +941,15 @@ struct CPython:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             "PyLong_FromLong"
         )(value)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyLong_FromLong, refcnt:",
-                self._Py_REFCNT(r),
-                ", value:",
-                value,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyLong_FromLong, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -917,14 +969,15 @@ struct CPython:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             "PyBool_FromLong"
         )(value)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyBool_FromLong, refcnt:",
-                self._Py_REFCNT(r),
-                ", value:",
-                value,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyBool_FromLong, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -932,14 +985,15 @@ struct CPython:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr]("PyList_New")(
             length
         )
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyList_New, refcnt:",
-                self._Py_REFCNT(r),
-                ", list size:",
-                length,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyList_New, refcnt:",
+            self._Py_REFCNT(r),
+            ", list size:",
+            length,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -983,14 +1037,15 @@ struct CPython:
         var r = self.lib.get_function[fn (Float64) -> PyObjectPtr](
             "PyFloat_FromDouble"
         )(value)
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyFloat_FromDouble, refcnt:",
-                self._Py_REFCNT(r),
-                ", value:",
-                value,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyFloat_FromDouble, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -1004,14 +1059,15 @@ struct CPython:
         var r = self.lib.get_function[fn (Int8) -> PyObjectPtr](
             "PyBool_FromLong"
         )(Int8(long))
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyBool_FromLong, refcnt:",
-                self._Py_REFCNT(r),
-                ", value:",
-                value,
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyBool_FromLong, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
         self._inc_total_rc()
         return r
 
@@ -1048,12 +1104,13 @@ struct CPython:
             ) -> None
         ]("PyErr_Fetch")(type_ptr, value_ptr, traceback_ptr)
         var r = PyObjectPtr {value: value}
-        if self.logging_enabled:
-            print(
-                r._get_ptr_as_int(),
-                " NEWREF PyErr_Fetch, refcnt:",
-                self._Py_REFCNT(r),
-            )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyErr_Fetch, refcnt:",
+            self._Py_REFCNT(r),
+        )
+
         self._inc_total_rc()
         _ = type
         _ = value
@@ -1106,16 +1163,17 @@ struct CPython:
         var iter = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyObject_GetIter"
         )(traversablePyObject)
-        if self.logging_enabled:
-            print(
-                iter._get_ptr_as_int(),
-                " NEWREF PyObject_GetIter, refcnt:",
-                self._Py_REFCNT(iter),
-                "referencing ",
-                traversablePyObject._get_ptr_as_int(),
-                "refcnt of traversable: ",
-                self._Py_REFCNT(traversablePyObject),
-            )
+
+        self.log(
+            iter._get_ptr_as_int(),
+            " NEWREF PyObject_GetIter, refcnt:",
+            self._Py_REFCNT(iter),
+            "referencing ",
+            traversablePyObject._get_ptr_as_int(),
+            "refcnt of traversable: ",
+            self._Py_REFCNT(traversablePyObject),
+        )
+
         self._inc_total_rc()
         return iter
 
@@ -1123,16 +1181,17 @@ struct CPython:
         var next_obj = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyIter_Next"
         )(iterator)
-        if self.logging_enabled:
-            print(
-                next_obj._get_ptr_as_int(),
-                " NEWREF PyIter_Next from ",
-                iterator._get_ptr_as_int(),
-                ", refcnt(obj):",
-                self._Py_REFCNT(next_obj),
-                "refcnt(iter)",
-                self._Py_REFCNT(iterator),
-            )
+
+        self.log(
+            next_obj._get_ptr_as_int(),
+            " NEWREF PyIter_Next from ",
+            iterator._get_ptr_as_int(),
+            ", refcnt(obj):",
+            self._Py_REFCNT(next_obj),
+            "refcnt(iter)",
+            self._Py_REFCNT(iterator),
+        )
+
         if next_obj._get_ptr_as_int() != 0:
             self._inc_total_rc()
         return next_obj
@@ -1171,22 +1230,23 @@ struct CPython:
             key_ptr,
             value_ptr,
         )
-        if self.logging_enabled:
-            print(
-                dictionary._get_ptr_as_int(),
-                " NEWREF PyDict_Next",
-                dictionary._get_ptr_as_int(),
-                "refcnt:",
-                self._Py_REFCNT(dictionary),
-                " key: ",
-                PyObjectPtr {value: key}._get_ptr_as_int(),
-                ", refcnt(key):",
-                self._Py_REFCNT(key),
-                "value:",
-                PyObjectPtr {value: value}._get_ptr_as_int(),
-                "refcnt(value)",
-                self._Py_REFCNT(value),
-            )
+
+        self.log(
+            dictionary._get_ptr_as_int(),
+            " NEWREF PyDict_Next",
+            dictionary._get_ptr_as_int(),
+            "refcnt:",
+            self._Py_REFCNT(dictionary),
+            " key: ",
+            PyObjectPtr {value: key}._get_ptr_as_int(),
+            ", refcnt(key):",
+            self._Py_REFCNT(key),
+            "value:",
+            PyObjectPtr {value: value}._get_ptr_as_int(),
+            "refcnt(value)",
+            self._Py_REFCNT(value),
+        )
+
         _ = v
         return PyKeyValuePair {
             key: key,
