@@ -51,7 +51,7 @@ from memory import UnsafePointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:
-    var refcount: Atomic[DType.int64]
+    var refcount: Atomic[DType.uint64]
     var payload: T
 
     fn __init__(inout self, owned value: T):
@@ -163,7 +163,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         # TODO: consider removing this method.
         return UnsafePointer.address_of(self._inner[].payload)
 
-    fn count(self) -> Int64:
+    fn count(self) -> UInt64:
         """Count the amount of current references.
 
         Returns:
