@@ -267,6 +267,18 @@ struct UnsafePointer[
         """
         self = self - offset
 
+    @always_inline
+    fn __sub__(self, other: Self) -> Int:
+        """Return the difference between two pointers.
+
+        Args:
+            other: The other pointer.
+
+        Returns:
+            The offset between the two pointers.
+        """
+        return int(self) - int(other)
+
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are equal.
