@@ -68,10 +68,6 @@ struct _ArcInner[T: Movable]:
         hits zero."""
         return self.refcount.fetch_sub(1) == 1
 
-    fn count(self) -> Int64:
-        """Count the amount of current references."""
-        return self.refcount.load()
-
 
 @register_passable
 struct Arc[T: Movable](CollectionElement, CollectionElementNew):
@@ -173,4 +169,4 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         Returns:
             The current amount of references to the pointee.
         """
-        return self._inner[].count()
+        return self._inner[].refcount.load()
