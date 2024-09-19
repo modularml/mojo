@@ -26,6 +26,7 @@ config.name = "Mojo Standard Library Benchmarks"
 config.suffixes = [".mojo"]
 
 config.substitutions.insert(0, ("%mojo", "mojo"))
+config.substitutions.insert(0, ("%mojo-no-debug", "mojo"))
 
 # Internal testing configuration.  This environment variable
 # is set by the internal `start-modular.sh` script.
@@ -67,6 +68,9 @@ else:
     os.environ[
         "MODULAR_MOJO_NIGHTLY_IMPORT_PATH"
     ] = f"{build_root},{pre_built_packages_path}"
+    os.environ[
+        "MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"
+    ] = f"{build_root},{pre_built_packages_path}"
 
     # Pass through several environment variables
     # to the underlying subprocesses that run the tests.
@@ -75,6 +79,7 @@ else:
         [
             "MODULAR_HOME",
             "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
+            "MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH",
             "PATH",
         ]
     )

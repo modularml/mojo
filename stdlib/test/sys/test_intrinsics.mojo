@@ -20,7 +20,7 @@ from sys import (
     strided_store,
 )
 
-from memory import UnsafePointer
+from memory import UnsafePointer, memset_zero
 from testing import assert_equal
 
 alias F32x4 = SIMD[DType.float32, 4]
@@ -34,14 +34,14 @@ def test_compressed_store():
     memset_zero(vector, 5)
 
     compressed_store(iota_4, vector, iota_4 >= 2)
-    assert_equal(SIMD[size=4].load(vector, 0), F32x4(2.0, 3.0, 0.0, 0.0))
+    assert_equal(vector.load[width=4](0), F32x4(2.0, 3.0, 0.0, 0.0))
 
     # Just clear the buffer.
-    SIMD[size=4].store(vector, 0, 0)
+    vector.store[width=4](0, 0)
 
     var val = F32x4(0.0, 1.0, 3.0, 0.0)
     compressed_store(val, vector, val != 0)
-    assert_equal(SIMD[size=4].load(vector, 0), F32x4(1.0, 3.0, 0.0, 0.0))
+    assert_equal(vector.load[width=4](0), F32x4(1.0, 3.0, 0.0, 0.0))
     vector.free()
 
 
@@ -80,7 +80,7 @@ def test_masked_store():
     memset_zero(vector, 5)
 
     masked_store[4](iota_4, vector, iota_4 < 5)
-    assert_equal(SIMD[size=4].load(vector, 0), F32x4(0.0, 1.0, 2.0, 3.0))
+    assert_equal(vector.load[width=4](0), F32x4(0.0, 1.0, 2.0, 3.0))
 
     masked_store[8](iota_8, vector, iota_8 < 5)
     assert_equal(
@@ -97,7 +97,7 @@ fn test_strided_load() raises:
     for i in range(size):
         vector[i] = i
 
-    var s = strided_load[DType.float32, 4](vector, 4)
+    var s = strided_load[4](vector, 4)
     assert_equal(s, SIMD[DType.float32, 4](0, 4, 8, 12))
 
     vector.free()

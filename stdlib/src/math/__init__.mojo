@@ -64,7 +64,7 @@ from .math import (
     logb,
     modf,
     remainder,
-    rsqrt,
+    isqrt,
     scalb,
     sin,
     sinh,
@@ -75,4 +75,5 @@ from .math import (
     y0,
     y1,
     clamp,
+    recip,
 )

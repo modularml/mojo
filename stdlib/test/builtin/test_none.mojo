@@ -12,9 +12,26 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from testing import assert_equal
+
 
 def main():
+    test_str()
+    test_repr()
+    test_format_to()
     test_type_from_none()
+
+
+def test_str():
+    assert_equal(NoneType().__str__(), "None")
+
+
+def test_repr():
+    assert_equal(NoneType().__repr__(), "None")
+
+
+def test_format_to():
+    assert_equal(String.format_sequence(NoneType()), "None")
 
 
 struct FromNone:

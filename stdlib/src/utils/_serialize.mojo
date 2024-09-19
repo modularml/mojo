@@ -49,10 +49,10 @@ fn _serialize_elements_complete[
 ](ptr: UnsafePointer[Scalar[type], _], len: Int):
     if len == 0:
         return
-    serialize_fn(Scalar[type].load(ptr))
+    serialize_fn(ptr.load())
     for i in range(1, len):
         serialize_fn(", ")
-        serialize_fn(Scalar[type].load(ptr, i))
+        serialize_fn(ptr.load(i))
 
 
 fn _serialize_elements[
@@ -73,7 +73,7 @@ fn _serialize[
     serialize_dtype: Bool = True,
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
-](ptr: UnsafePointer[Scalar[type], _], shape: List[Int]):
+](ptr: UnsafePointer[Scalar[type], _], shape: List[Int, *_]):
     var rank = len(shape)
     if rank == 0:
         if serialize_end_line:

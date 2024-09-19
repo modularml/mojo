@@ -35,6 +35,7 @@ from builtin.value import StringableCollectionElement
 
 from .optional import Optional
 from bit import is_power_of_two
+from memory import memcpy, bitcast
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
@@ -71,10 +72,6 @@ struct _DictEntryIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias imm_dict_lifetime = __mlir_attr[
-        `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
-    ]
-
     var index: Int
     var seen: Int
     var src: Reference[Dict[K, V], dict_lifetime]
@@ -83,7 +80,11 @@ struct _DictEntryIter[
         return self
 
     @always_inline
-    fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
+    fn __next__(
+        inout self,
+    ) -> Reference[
+        DictEntry[K, V], __lifetime_of(self.src[]._entries[0].value())
+    ]:
         while True:
             var opt_entry_ref = Reference(self.src[]._entries[self.index])
 
@@ -126,7 +127,9 @@ struct _DictKeyIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> Reference[K, dict_lifetime]:
+    fn __next__(
+        inout self,
+    ) -> Reference[K, __lifetime_of(self.iter.__next__()[].key)]:
         return self.iter.__next__()[].key
 
     fn __len__(self) -> Int:
@@ -216,6 +219,15 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.key = other.key
         self.value = other.value
 
+    fn reap_value(owned self) -> V:
+        """Take the value from an owned entry.
+
+        Returns:
+            The value of the entry.
+        """
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        return self.value^
+
 
 alias _EMPTY = -1
 alias _REMOVED = -2
@@ -284,30 +296,30 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[Int16]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[Int32]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
         else:
             var data = self.data.bitcast[Int64]()
-            return int(Scalar.load(data, slot & (reserved - 1)))
+            return int(data.load(slot & (reserved - 1)))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[Int16]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[Int32]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
         else:
             var data = self.data.bitcast[Int64]()
-            return Scalar.store(data, slot & (reserved - 1), value)
+            return data.store(slot & (reserved - 1), value)
 
     fn __del__(owned self):
         self.data.free()
@@ -489,7 +501,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = other._entries
 
     @staticmethod
-    fn fromkeys(keys: List[K], value: V) -> Self:
+    fn fromkeys(keys: List[K, *_], value: V) -> Self:
         """Create a new dictionary with keys from list and values set to value.
 
         Args:
@@ -506,7 +518,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     fn fromkeys(
-        keys: List[K], value: Optional[V] = None
+        keys: List[K, *_], value: Optional[V] = None
     ) -> Dict[K, Optional[V]]:
         """Create a new dictionary with keys from list and values set to value.
 
@@ -517,10 +529,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The new dictionary.
         """
-        var dict = Dict[K, Optional[V]]()
-        for key in keys:
-            dict[key[]] = value
-        return dict
+        return Dict[K, Optional[V]].fromkeys(keys, value)
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing dictiontary.
@@ -726,7 +735,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
-    ) raises -> ref [__lifetime_of(self)] Self.V:
+    ) raises -> ref [__lifetime_of(self._entries[0].value().value)] Self.V:
         """Find a value in the dictionary by key.
 
         Args:
@@ -813,7 +822,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var entry_value = entry[].unsafe_take()
             entry[] = None
             self.size -= 1
-            return entry_value.value^
+            return entry_value^.reap_value()
         raise "KeyError"
 
     fn popitem(inout self) raises -> DictEntry[K, V]:
@@ -894,8 +903,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(self._reserved())
 
     fn setdefault(
-        ref [_]self: Self, key: K, owned default: V
-    ) raises -> Reference[V, __lifetime_of(self)]:
+        inout self, key: K, owned default: V
+    ) raises -> Reference[V, __lifetime_of(self._find_ref(key))]:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
         Args:
@@ -1174,43 +1183,37 @@ struct OwnedKwargsDict[V: CollectionElement](
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self)]:
+    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self._dict)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.__iter__()
-        return _DictKeyIter(_DictEntryIter(0, 0, self._dict))
+        return self._dict.keys()
 
     fn keys(
         ref [_]self: Self,
-    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self)]:
+    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self._dict)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.keys()
-        return Self.__iter__(self)
+        return self._dict.keys()
 
     fn values(
         ref [_]self: Self,
-    ) -> _DictValueIter[Self.key_type, V, __lifetime_of(self)]:
+    ) -> _DictValueIter[Self.key_type, V, __lifetime_of(self._dict)]:
         """Iterate over the keyword dict's values as references.
 
         Returns:
             An iterator of references to the dictionary values.
         """
-        # TODO(#36448): Use this instead of the current workaround
-        # return self._dict.values()
-        return _DictValueIter(_DictEntryIter(0, 0, self._dict))
+        return self._dict.values()
 
     fn items(
         ref [_]self: Self,
-    ) -> _DictEntryIter[Self.key_type, V, __lifetime_of(self)]:
+    ) -> _DictEntryIter[Self.key_type, V, __lifetime_of(self._dict)]:
         """Iterate over the keyword dictionary's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can

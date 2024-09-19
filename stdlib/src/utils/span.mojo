@@ -20,8 +20,10 @@ from utils import Span
 ```
 """
 
-from . import InlineArray
+from collections import InlineArray
+from memory import Reference
 from sys.intrinsics import _type_is_eq
+from builtin.builtin_list import _lit_mut_cast
 
 
 @value
@@ -112,7 +114,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
-    fn __init__(inout self, ref [lifetime]list: List[T]):
+    fn __init__(inout self, ref [lifetime]list: List[T, *_]):
         """Construct a Span from a List.
 
         Args:
@@ -123,7 +125,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int, //
+        T2: CollectionElement, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -224,6 +226,16 @@ struct Span[
 
         return self._data
 
+    fn as_ref(self) -> Reference[T, lifetime]:
+        """
+        Gets a Reference to the first element of this slice.
+
+        Returns:
+            A Reference pointing at the first element of this slice.
+        """
+
+        return self._data[0]
+
     @always_inline
     fn copy_from[
         lifetime: MutableLifetime, //
@@ -307,3 +319,14 @@ struct Span[
         """
         for element in self:
             element[] = value
+
+    fn get_immutable(self) -> Span[T, _lit_mut_cast[lifetime, False].result]:
+        """
+        Return an immutable version of this span.
+
+        Returns:
+            A span covering the same elements, but without mutability.
+        """
+        return Span[T, _lit_mut_cast[lifetime, False].result](
+            unsafe_ptr=self._data, len=self._len
+        )

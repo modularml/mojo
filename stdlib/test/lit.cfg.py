@@ -36,11 +36,12 @@ def has_not():
     return shutil.which("not") is not None
 
 
-if has_not():
+if has_not() or os.getenv("GITHUB_REPOSITORY"):
     config.available_features.add("has_not")
 
-# This makes the OS name available for `REQUIRE` directives, e.g., `# REQUIRE: darwin`.
-config.available_features.add(platform.system().lower())
+# test_utils does not contain tests, just source code
+# that we run `mojo package` on to be used by other tests
+config.excludes = ["test_utils"]
 
 # Internal testing configuration.  This environment variable
 # is set by the internal `start-modular.sh` script.
@@ -54,10 +55,6 @@ if "_START_MODULAR_INCLUDED" in os.environ:
     )
 # External, public Mojo testing configuration
 else:
-    # test_utils does not contain tests, just source code
-    # that we run `mojo package` on to be used by other tests
-    config.excludes = ["test_utils"]
-
     # test_source_root: The root path where tests are located.
     config.test_source_root = Path(__file__).parent.resolve()
 
@@ -83,6 +80,10 @@ else:
     # with assertions enabled.
     config.substitutions.insert(1, ("%bare-mojo", "mojo"))
 
+    # NOTE: Right now this is the same as %mojo but we should start testing
+    # with debug info as well
+    config.substitutions.insert(0, ("%mojo-no-debug", base_mojo_command))
+
     # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the
     # open-source stdlib, we need to specify the paths to the just-built
     # `stdlib.mojopkg` and `test_utils.mojopkg`. Otherwise, without this, the
@@ -91,6 +92,8 @@ else:
     # here to support both versions of the compiler.
     os.environ["MODULAR_MOJO_IMPORT_PATH"] = str(build_root)
     os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = str(build_root)
+    os.environ["MODULAR_MOJO_MAX_IMPORT_PATH"] = str(build_root)
+    os.environ["MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"] = str(build_root)
 
     # Pass through several environment variables
     # to the underlying subprocesses that run the tests.
@@ -100,5 +103,7 @@ else:
             "MODULAR_HOME",
             "MODULAR_MOJO_IMPORT_PATH",
             "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
+            "MODULAR_MOJO_MAX_IMPORT_PATH",
+            "MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH",
         ]
     )

@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s -t
+# RUN: %mojo-no-debug %s -t
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 
@@ -34,7 +34,7 @@ fn bench_stringify_small_integers(inout b: Bencher) raises:
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=100))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_stringify_small_integers](
         BenchId("bench_stringify_small_integers")
     )

@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !windows
+# REQUIRES: !system-windows
 # RUN: %mojo  -D TEMP_FILE=%t %s
 
 import os
 from pathlib import DIR_SEPARATOR, Path, cwd
-from sys import env_get_string
+from sys import env_get_string, os_is_windows
 
 from builtin._location import __source_location
 from testing import assert_equal, assert_false, assert_not_equal, assert_true

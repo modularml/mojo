@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s -t
+# RUN: %mojo-no-debug %s -t
 
 from math import *
 from random import *
@@ -80,7 +80,7 @@ fn bench_math3[
 # ===----------------------------------------------------------------------===#
 def main():
     seed()
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=100000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_math[sin]](BenchId("bench_math_sin"))
     m.bench_function[bench_math[cos]](BenchId("bench_math_cos"))
     m.bench_function[bench_math[tan]](BenchId("bench_math_tan"))

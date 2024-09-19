@@ -15,14 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin.format_int import _try_write_int
-from builtin.simd import _format_scalar
+from sys import bitwidthof
+from utils._visualizers import lldb_formatter_wrapping_type
+from builtin.hash import _hash_simd
 
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(Comparable, Formattable, Representable, Stringable):
+struct UInt(IntLike):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -107,6 +108,15 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         return String.format_sequence(self)
 
     @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """Formats this integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write(UInt64(self))
+
     fn __repr__(self) -> String:
         """Convert this UInt to a string.
 
@@ -120,6 +130,17 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
             The string representation of this UInt.
         """
         return "UInt(" + str(self) + ")"
+
+    fn __hash__(self) -> UInt:
+        """Hash the UInt using builtin hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures. See the `hash`
+            builtin documentation for more details.
+        """
+        # TODO(MOCO-636): switch to DType.index
+        return _hash_simd(Scalar[DType.uint64](self))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: UInt) -> Bool:
@@ -734,25 +755,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
             The +self value.
         """
         return self
-
-    fn format_to(self, inout writer: Formatter):
-        """
-        Formats this integer to the provided formatter.
-
-        Args:
-            writer: The formatter to write to.
-        """
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            var err = _try_write_int(writer, UInt64(self))
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
-        else:
-            _format_scalar(writer, UInt64(self))
 
 
 fn _temp_uint_from_int(x: Int) -> UInt:

@@ -29,7 +29,7 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, StaticString, StringSlice
-from utils._format import Formattable, Formatter
+from utils import Formattable, Formatter
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -46,9 +46,7 @@ fn _dup(fd: Int32) -> Int32:
 
 @value
 @register_passable("trivial")
-struct _fdopen:
-    alias STDOUT = 1
-    alias STDERR = 2
+struct _fdopen[mode: StringLiteral = "a"]:
     var handle: UnsafePointer[NoneType]
 
     fn __init__(inout self, stream_id: FileDescriptor):
@@ -57,26 +55,102 @@ struct _fdopen:
         Args:
             stream_id: The stream id
         """
-        alias mode = "a"
-        var handle: UnsafePointer[NoneType]
 
         @parameter
         if os_is_windows():
-            handle = external_call["_fdopen", UnsafePointer[NoneType]](
+            self.handle = external_call["_fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         else:
-            handle = external_call["fdopen", UnsafePointer[NoneType]](
+            self.handle = external_call["fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
-        self.handle = handle
 
     fn __enter__(self) -> Self:
+        """Open the file handle for use within a context manager"""
         return self
 
     fn __exit__(self):
         """Closes the file handle."""
         _ = external_call["fclose", Int32](self.handle)
+
+    fn readline(self) -> String:
+        """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
+
+        Returns:
+            The line read from the stdin.
+
+        Examples:
+
+        ```mojo
+        from builtin.io import _fdopen
+
+        var line = _fdopen["r"](0).readline()
+        print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+
+        # Output from print:
+        Hello, World
+        ```
+        .
+        """
+        return self.read_until_delimiter("\n")
+
+    fn read_until_delimiter(self, delimiter: String) -> String:
+        """Reads an entire line from a stream, up to the `delimiter`.
+        Does not include the delimiter in the result.
+
+        Args:
+            delimiter: The delimiter to read until.
+
+        Returns:
+            The text read from the stdin.
+
+        Examples:
+
+        ```mojo
+        from builtin.io import _fdopen
+
+        var line = _fdopen["r"](0).read_until_delimiter(",")
+        print(line)
+        ```
+
+        Assuming the above program is named `my_program.mojo`, feeding it `Hello, World` via stdin would output:
+
+        ```bash
+        echo "Hello, World" | mojo run my_program.mojo
+
+        # Output from print:
+        Hello
+        ```
+        """
+        # getdelim will allocate the buffer using malloc().
+        var buffer = UnsafePointer[UInt8]()
+        # ssize_t getdelim(char **restrict lineptr, size_t *restrict n,
+        #                  int delimiter, FILE *restrict stream);
+        var bytes_read = external_call[
+            "getdelim",
+            Int,
+            UnsafePointer[UnsafePointer[UInt8]],
+            UnsafePointer[UInt64],
+            Int,
+            UnsafePointer[NoneType],
+        ](
+            UnsafePointer.address_of(buffer),
+            UnsafePointer.address_of(UInt64(0)),
+            ord(delimiter),
+            self.handle,
+        )
+        # Copy the buffer (excluding the delimiter itself) into a Mojo String.
+        var s = String(StringRef(buffer, bytes_read - 1))
+        # Explicitly free the buffer using free() instead of the Mojo allocator.
+        external_call["free", NoneType](buffer.bitcast[NoneType]())
+        return s
 
 
 # ===----------------------------------------------------------------------=== #
@@ -230,81 +304,8 @@ fn _float_repr[
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
-fn _put(x: Int, file: FileDescriptor = stdout):
-    """Prints a scalar value.
-
-    Args:
-        x: The value to print.
-        file: The output stream.
-    """
-    _printf[_get_dtype_printf_format[DType.index]()](x, file=file)
-
-
-@no_inline
-fn _put_simd_scalar[type: DType](x: Scalar[type]):
-    """Prints a scalar value.
-
-    Parameters:
-        type: The DType of the value.
-
-    Args:
-        x: The value to print.
-    """
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if type is DType.bool:
-        _put["True"]() if x else _put["False"]()
-    elif type.is_integral():
-        _printf[format](x)
-    elif type.is_floating_point():
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            _printf[format](x.cast[DType.float64]())
-        else:
-            _put(str(x).as_string_slice())
-    else:
-        constrained[False, "invalid dtype"]()
-
-
-@no_inline
-fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
-    """Prints a scalar value.
-
-    Parameters:
-        type: The DType of the value.
-        simd_width: The SIMD width.
-
-    Args:
-        x: The value to print.
-    """
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if simd_width == 1:
-        _put_simd_scalar(x[0])
-    elif type.is_integral():
-        _put["["]()
-
-        @parameter
-        for i in range(simd_width):
-            _put_simd_scalar(x[i])
-            if i != simd_width - 1:
-                _put[", "]()
-        _put["]"]()
-    else:
-        _put(str(x).as_string_slice())
-
-
-@no_inline
-fn _put[x: StringLiteral](file: FileDescriptor = stdout):
-    _put(x.as_string_slice(), file=file)
-
-
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableStaticLifetime](
+    var str_slice = StringSlice[ImmutableAnyLifetime](
         unsafe_from_utf8_strref=strref
     )
 
@@ -312,13 +313,9 @@ fn _put(strref: StringRef, file: FileDescriptor = stdout):
 
 
 @no_inline
-fn _put(x: DType, file: FileDescriptor = stdout):
-    _put(str(x).as_string_slice(), file=file)
-
-
-# TODO: Constrain to `StringSlice[False, _]`
-@no_inline
-fn _put(x: StringSlice, file: FileDescriptor = stdout):
+fn _put[
+    lif: ImmutableLifetime, //
+](x: StringSlice[lif], file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = x.byte_length()
 
@@ -401,3 +398,33 @@ fn print[
     if not triple_is_nvidia_cuda():
         if flush:
             _flush(file=file)
+
+
+# ===----------------------------------------------------------------------=== #
+#  input
+# ===----------------------------------------------------------------------=== #
+
+
+fn input(prompt: String = "") -> String:
+    """Reads a line of input from the user.
+
+    Reads a line from standard input, converts it to a string, and returns that string.
+    If the prompt argument is present, it is written to standard output without a trailing newline.
+
+    Args:
+        prompt: An optional string to be printed before reading input.
+
+    Returns:
+        A string containing the line read from the user input.
+
+    Examples:
+    ```mojo
+    name = input("Enter your name: ")
+    print("Hello", name)
+    ```
+
+    If the user enters "Mojo" it prints "Hello Mojo".
+    """
+    if prompt != "":
+        print(prompt, end="")
+    return _fdopen["r"](0).readline()

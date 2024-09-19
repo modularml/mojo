@@ -19,7 +19,13 @@ from time import now
 ```
 """
 
-from sys import external_call, os_is_linux, os_is_windows, triple_is_nvidia_cuda
+from sys import (
+    external_call,
+    os_is_linux,
+    os_is_windows,
+    triple_is_nvidia_cuda,
+    llvm_intrinsic,
+)
 from sys._assembly import inlined_assembly
 from math import floor
 
@@ -191,6 +197,14 @@ fn perf_counter_ns() -> Int:
     Returns:
         The current time in ns.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        return int(
+            inlined_assembly[
+                "mov.u64 $0, %globaltimer;", UInt64, constraints="=l"
+            ]()
+        )
     return _monotonic_nanoseconds()
 
 
@@ -287,8 +301,8 @@ fn sleep(sec: Float64):
     @parameter
     if triple_is_nvidia_cuda():
         var nsec = sec * 1.0e9
-        inlined_assembly["nanosleep.u32 $0;", NoneType, constraints="r"](
-            nsec.cast[DType.uint32]()
+        llvm_intrinsic["llvm.nvvm.nanosleep", NoneType](
+            nsec.cast[DType.int32]()
         )
         return
 
@@ -312,6 +326,10 @@ fn sleep(sec: Int):
     Args:
         sec: The number of seconds to sleep for.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        return sleep(Float64(sec))
 
     @parameter
     if os_is_windows():

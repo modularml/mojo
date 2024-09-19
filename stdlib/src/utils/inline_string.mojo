@@ -15,13 +15,15 @@
    avoids heap allocations for short strings.
 """
 
+from collections import InlineArray
+from os import abort
 from collections import Optional
 from sys import sizeof
 
 from memory import UnsafePointer, memcpy
 
-from utils import InlineArray, StringSlice, Variant
-from utils._format import ToFormatter
+from utils import StringSlice, Variant
+from utils.format import ToFormatter
 
 # ===----------------------------------------------------------------------===#
 # InlineString
@@ -475,7 +477,7 @@ struct _FixedString[CAP: Int](
         fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
             var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
 
-            var str_slice = StringSlice[ImmutableStaticLifetime](
+            var str_slice = StringSlice[ImmutableAnyLifetime](
                 unsafe_from_utf8_strref=strref
             )
 

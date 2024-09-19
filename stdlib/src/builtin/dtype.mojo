@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
-from sys import sizeof as _sizeof
+from sys import sizeof, bitwidthof, os_is_windows
 
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
@@ -87,6 +87,50 @@ struct DType(
         """
         self = other
 
+    @staticmethod
+    fn _from_str(str: String) -> DType:
+        """Construct a DType from a string.
+
+        Args:
+            str: The name of the DType.
+        """
+        if str.startswith(String("DType.")):
+            return Self._from_str(str.removeprefix("DType."))
+        elif str == String("bool"):
+            return DType.bool
+        elif str == String("int8"):
+            return DType.int8
+        elif str == String("uint8"):
+            return DType.uint8
+        elif str == String("int16"):
+            return DType.int16
+        elif str == String("uint16"):
+            return DType.uint16
+        elif str == String("int32"):
+            return DType.int32
+        elif str == String("uint32"):
+            return DType.uint32
+        elif str == String("int64"):
+            return DType.int64
+        elif str == String("uint64"):
+            return DType.uint64
+        elif str == String("index"):
+            return DType.index
+        elif str == String("bfloat16"):
+            return DType.bfloat16
+        elif str == String("float16"):
+            return DType.float16
+        elif str == String("float32"):
+            return DType.float32
+        elif str == String("float64"):
+            return DType.float64
+        elif str == String("tensor_float32"):
+            return DType.tensor_float32
+        elif str == String("invalid"):
+            return DType.invalid
+        else:
+            return DType.invalid
+
     @no_inline
     fn __str__(self) -> String:
         """Gets the name of the DType.
@@ -107,39 +151,39 @@ struct DType(
         """
 
         if self == DType.bool:
-            return writer.write_str["bool"]()
+            return writer.write_str("bool")
         if self == DType.int8:
-            return writer.write_str["int8"]()
+            return writer.write_str("int8")
         if self == DType.uint8:
-            return writer.write_str["uint8"]()
+            return writer.write_str("uint8")
         if self == DType.int16:
-            return writer.write_str["int16"]()
+            return writer.write_str("int16")
         if self == DType.uint16:
-            return writer.write_str["uint16"]()
+            return writer.write_str("uint16")
         if self == DType.int32:
-            return writer.write_str["int32"]()
+            return writer.write_str("int32")
         if self == DType.uint32:
-            return writer.write_str["uint32"]()
+            return writer.write_str("uint32")
         if self == DType.int64:
-            return writer.write_str["int64"]()
+            return writer.write_str("int64")
         if self == DType.uint64:
-            return writer.write_str["uint64"]()
+            return writer.write_str("uint64")
         if self == DType.index:
-            return writer.write_str["index"]()
+            return writer.write_str("index")
         if self == DType.bfloat16:
-            return writer.write_str["bfloat16"]()
+            return writer.write_str("bfloat16")
         if self == DType.float16:
-            return writer.write_str["float16"]()
+            return writer.write_str("float16")
         if self == DType.float32:
-            return writer.write_str["float32"]()
+            return writer.write_str("float32")
         if self == DType.tensor_float32:
-            return writer.write_str["tensor_float32"]()
+            return writer.write_str("tensor_float32")
         if self == DType.float64:
-            return writer.write_str["float64"]()
+            return writer.write_str("float64")
         if self == DType.invalid:
-            return writer.write_str["invalid"]()
+            return writer.write_str("invalid")
 
-        return writer.write_str["<<unknown>>"]()
+        return writer.write_str("<<unknown>>")
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
@@ -549,6 +593,40 @@ fn _integral_type_of[type: DType]() -> DType:
         return DType.int64
 
     return type.invalid
+
+
+# ===-------------------------------------------------------------------===#
+# _unsigned_integral_type_of
+# ===-------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn _unsigned_integral_type_of[type: DType]() -> DType:
+    """Gets the unsigned integral type which has the same bitwidth as
+    the input type."""
+
+    @parameter
+    if type.is_integral():
+        return _uint_type_of_width[bitwidthof[type]()]()
+
+    @parameter
+    if type is DType.bfloat16 or type is DType.float16:
+        return DType.uint16
+
+    @parameter
+    if type is DType.float32 or type is DType.tensor_float32:
+        return DType.uint32
+
+    @parameter
+    if type is DType.float64:
+        return DType.uint64
+
+    return type.invalid
+
+
+# ===-------------------------------------------------------------------===#
+# _scientific_notation_digits
+# ===-------------------------------------------------------------------===#
 
 
 fn _scientific_notation_digits[type: DType]() -> StringLiteral:

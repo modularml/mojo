@@ -16,10 +16,11 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-# RUN: %mojo %s -t | FileCheck %s
+# RUN: %mojo-no-debug %s -t | FileCheck %s
 # CHECK: Benchmark results
 
 from random import rand
+from sys import simdwidthof
 
 from algorithm import vectorize
 from benchmark import (
@@ -33,7 +34,7 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory import UnsafePointer
+from memory import UnsafePointer, memset_zero
 
 
 @value
@@ -70,22 +71,18 @@ fn test_vectorize[
     constrained[(N % simd_width) == 0]()
     # Create a mem of size N
     alias buffer_align = 64
-    var vector = UnsafePointer[Scalar[dtype]].alloc[alignment=buffer_align](N)
-    var result = UnsafePointer[Scalar[dtype]].alloc[alignment=buffer_align](N)
+    var vector = UnsafePointer[Scalar[dtype], alignment=buffer_align].alloc(N)
+    var result = UnsafePointer[Scalar[dtype], alignment=buffer_align].alloc(N)
 
     @always_inline
     @parameter
     fn ld_vector[simd_width: Int](idx: Int):
-        SIMD[size=simd_width].store(
-            vector, idx + 1, SIMD[dtype, simd_width](idx)
-        )
+        vector.store(idx + 1, SIMD[dtype, simd_width](idx))
 
     @always_inline
     @parameter
     fn st_vector[simd_width: Int](idx: Int):
-        SIMD[size=simd_width].store(
-            result, idx, SIMD[size=simd_width].load(vector, idx)
-        )
+        result.store(idx, vector.load[width=simd_width](idx))
 
     @__copy_capture(vector)
     @always_inline
@@ -96,25 +93,15 @@ fn test_vectorize[
 
         @parameter
         if op == Op.add:
-            SIMD[size=simd_width].store(
-                vector, idx, SIMD[size=simd_width].load(vector, idx) + x
-            )
+            vector.store(idx, vector.load[width=simd_width](idx) + x)
         elif op == Op.sub:
-            SIMD[size=simd_width].store(
-                vector, idx, SIMD[size=simd_width].load(vector, idx) - x
-            )
+            vector.store(idx, vector.load[width=simd_width](idx) - x)
         elif op == Op.mul:
-            SIMD[size=simd_width].store(
-                vector, idx, SIMD[size=simd_width].load(vector, idx) * x
-            )
+            vector.store(idx, vector.load[width=simd_width](idx) * x)
         elif op == Op.div:
-            SIMD[size=simd_width].store(
-                vector, idx, SIMD[size=simd_width].load(vector, idx) / x
-            )
+            vector.store(idx, vector.load[width=simd_width](idx) / x)
         elif op == Op.fma:
-            SIMD[size=simd_width].store(
-                vector, idx, SIMD[size=simd_width].load(vector, idx) * x + y
-            )
+            vector.store(idx, vector.load[width=simd_width](idx) * x + y)
 
     @__copy_capture(vector)
     @always_inline
@@ -122,40 +109,35 @@ fn test_vectorize[
     fn arithmetic_vector[simd_width: Int](idx: Int):
         @parameter
         if op == Op.add:
-            SIMD[size=simd_width].store(
-                vector,
+            vector.store(
                 idx,
-                SIMD[size=simd_width].load(vector, idx)
-                + SIMD[size=simd_width].load(vector, idx),
+                vector.load[width=simd_width](idx)
+                + vector.load[width=simd_width](idx),
             )
         elif op == Op.sub:
-            SIMD[size=simd_width].store(
-                vector,
+            vector.store(
                 idx,
-                SIMD[size=simd_width].load(vector, idx)
-                - SIMD[size=simd_width].load(vector, idx),
+                vector.load[width=simd_width](idx)
+                - vector.load[width=simd_width](idx),
             )
         elif op == Op.mul:
-            SIMD[size=simd_width].store(
-                vector,
+            vector.store(
                 idx,
-                SIMD[size=simd_width].load(vector, idx)
-                * SIMD[size=simd_width].load(vector, idx),
+                vector.load[width=simd_width](idx)
+                * vector.load[width=simd_width](idx),
             )
         elif op == Op.div:
-            SIMD[size=simd_width].store(
-                vector,
+            vector.store(
                 idx,
-                SIMD[size=simd_width].load(vector, idx)
-                / SIMD[size=simd_width].load(vector, idx),
+                vector.load[width=simd_width](idx)
+                / vector.load[width=simd_width](idx),
             )
         elif op == Op.fma:
-            SIMD[size=simd_width].store(
-                vector,
+            vector.store(
                 idx,
-                SIMD[size=simd_width].load(vector, idx)
-                * SIMD[size=simd_width].load(vector, idx)
-                + SIMD[size=simd_width].load(vector, idx),
+                vector.load[width=simd_width](idx)
+                * vector.load[width=simd_width](idx)
+                + vector.load[width=simd_width](idx),
             )
 
     @always_inline
@@ -272,10 +254,9 @@ fn bench_compare():
     fn arg_size():
         @parameter
         fn closure[width: Int](i: Int):
-            SIMD.store(
-                p2,
+            p2.store(
                 i,
-                SIMD[size=width].load(p1, i) + SIMD[size=width].load(p2, i),
+                p1.load[width=width](i) + p2.load[width=width](i),
             )
 
         for i in range(its):
@@ -285,10 +266,9 @@ fn bench_compare():
     fn param_size():
         @parameter
         fn closure[width: Int](i: Int):
-            SIMD.store(
-                p2,
+            p2.store(
                 i,
-                SIMD[size=width].load(p1, i) + SIMD[size=width].load(p2, i),
+                p1.load[width=width](i) + p2.load[width=width](i),
             )
 
         for i in range(its):
@@ -298,10 +278,9 @@ fn bench_compare():
     fn arg_size_unroll():
         @parameter
         fn closure[width: Int](i: Int):
-            SIMD.store(
-                p2,
+            p2.store(
                 i,
-                SIMD[size=width].load(p1, i) + SIMD[size=width].load(p2, i),
+                p1.load[width=width](i) + p2.load[width=width](i),
             )
 
         for i in range(its):
@@ -311,29 +290,28 @@ fn bench_compare():
     fn param_size_unroll():
         @parameter
         fn closure[width: Int](i: Int):
-            SIMD.store(
-                p2,
+            p2.store(
                 i,
-                SIMD[size=width].load(p1, i) + SIMD[size=width].load(p2, i),
+                p1.load[width=width](i) + p2.load[width=width](i),
             )
 
         for i in range(its):
             vectorize[closure, width, size=size, unroll_factor=unroll_factor]()
 
     var arg = run[arg_size](max_runtime_secs=0.5).mean(unit)
-    print(SIMD[size=size].load(p2))
+    print(p2.load[width=width]())
     memset_zero(p2, size)
 
     var param = run[param_size](max_runtime_secs=0.5).mean(unit)
-    print(SIMD[size=size].load(p2))
+    print(p2.load[width=width]())
     memset_zero(p2, size)
 
     var arg_unroll = run[arg_size_unroll](max_runtime_secs=0.5).mean(unit)
-    print(SIMD[size=size].load(p2))
+    print(p2.load[width=width]())
     memset_zero(p2, size)
 
     var param_unroll = run[param_size_unroll](max_runtime_secs=0.5).mean(unit)
-    print(SIMD[size=size].load(p2))
+    print(p2.load[width=width]())
 
     print(
         "calculating",

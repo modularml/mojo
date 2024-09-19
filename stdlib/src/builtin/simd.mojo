@@ -25,15 +25,23 @@ from sys import (
     prefetch,
     simdwidthof,
     triple_is_nvidia_cuda,
+    bitwidthof,
 )
+from sys.info import _current_arch
+
+from sys._assembly import inlined_assembly
+from os import abort
 
 from bit import pop_count
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from builtin.hash import _hash_simd
+from builtin.format_int import _try_write_int
+from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
-from utils import InlineArray, StringSlice
+from utils import StringSlice, StaticIntTuple, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -42,6 +50,7 @@ from utils.numerics import max_or_inf as _max_or_inf
 from utils.numerics import min_finite as _min_finite
 from utils.numerics import min_or_neg_inf as _min_or_neg_inf
 from utils.numerics import nan as _nan
+from sys import sizeof, alignof
 
 from .dtype import (
     _get_dtype_printf_format,
@@ -49,7 +58,10 @@ from .dtype import (
     _scientific_notation_digits,
 )
 from .io import _printf, _snprintf_scalar
-from .string import _calc_format_buffer_size, _calc_initial_buffer_size
+from collections.string import (
+    _calc_format_buffer_size,
+    _calc_initial_buffer_size,
+)
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
@@ -132,6 +144,15 @@ fn _has_native_bf16_support() -> Bool:
     return triple_is_nvidia_cuda()
 
 
+@always_inline("nodebug")
+fn _is_sm_80() -> Bool:
+    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) in (
+        "sm_80",
+        "sm_86",
+        "sm_89",
+    )
+
+
 # ===----------------------------------------------------------------------=== #
 # SIMD
 # ===----------------------------------------------------------------------=== #
@@ -146,6 +167,7 @@ struct SIMD[type: DType, size: Int](
     CeilDivable,
     CollectionElement,
     CollectionElementNew,
+    Floatable,
     Floorable,
     Formattable,
     Hashable,
@@ -511,6 +533,11 @@ struct SIMD[type: DType, size: Int](
             `self[i] + rhs[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return self.fma(1, rhs)
+
         return __mlir_op.`pop.add`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -525,6 +552,10 @@ struct SIMD[type: DType, size: Int](
             `self[i] - rhs[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return rhs.fma(-1, self)
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -544,6 +575,10 @@ struct SIMD[type: DType, size: Int](
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
@@ -1312,6 +1347,21 @@ struct SIMD[type: DType, size: Int](
                 _type = __mlir_type.`!pop.scalar<index>`
             ](rebind[Scalar[type]](self).value)
 
+    @always_inline("nodebug")
+    fn __float__(self) -> Float64:
+        """Casts the value to a float.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            The value as a float.
+        """
+        constrained[size == 1, "expected a scalar type"]()
+        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](
+            rebind[Scalar[type]](self).value
+        )
+
     @no_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
@@ -1385,6 +1435,39 @@ struct SIMD[type: DType, size: Int](
         if type.is_unsigned() or type is DType.bool:
             return self
         elif type.is_floating_point():
+
+            @parameter
+            if triple_is_nvidia_cuda():
+
+                @parameter
+                if type.is_half_float():
+                    alias prefix = "abs.bf16" if type is DType.bfloat16 else "abs.f16"
+
+                    @parameter
+                    if size == 1:
+                        return inlined_assembly[
+                            prefix + " $0, $1;",
+                            Self,
+                            constraints="=h,h",
+                            has_side_effect=False,
+                        ](self)
+
+                    var res = Self()
+
+                    @parameter
+                    for i in range(0, size, 2):
+                        var val = inlined_assembly[
+                            prefix + "x2 $0, $1;",
+                            SIMD[type, 2],
+                            constraints="=r,r",
+                            has_side_effect=False,
+                        ](self.slice[2, offset=i]())
+                        res = res.insert[offset=i](val)
+                    return res
+                return llvm_intrinsic["llvm.fabs", Self, has_side_effect=False](
+                    self
+                )
+
             alias integral_type = FPUtils[type].integral_type
             var m = self._float_to_bits[integral_type]()
             return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
@@ -1446,6 +1529,26 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if type == target:
             return rebind[SIMD[target, size]](self)
+        elif (
+            triple_is_nvidia_cuda()
+            and type is DType.float32
+            and target is DType.bfloat16
+            and size >= 2
+        ):
+            var res = SIMD[target, size]()
+
+            @parameter
+            for i in range(0, size, 2):
+                var bf16x2_as_uint32 = inlined_assembly[
+                    "cvt.rn.bf16x2.f32 $0, $1, $2;",
+                    UInt32,
+                    constraints="=r,f,f",
+                    has_side_effect=False,
+                ](rebind[Float32](self[i + 1]), rebind[Float32](self[i]))
+                res = res.insert[offset=i](bitcast[target, 2](bf16x2_as_uint32))
+
+            return res
+
         elif has_neon() and (
             type is DType.bfloat16 or target == DType.bfloat16
         ):
@@ -1475,7 +1578,7 @@ struct SIMD[type: DType, size: Int](
                 ]
             ](self.value)
 
-    @always_inline
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1488,7 +1591,7 @@ struct SIMD[type: DType, size: Int](
     # This overload is required to keep SIMD compliant with the Formattable
     # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
     # fail to compile.
-    @always_inline
+    @no_inline
     fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
@@ -1504,40 +1607,45 @@ struct SIMD[type: DType, size: Int](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            writer.write_str["["]()
+            writer.write_str("[")
 
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                writer.write_str[", "]()
+                writer.write_str(", ")
 
             @parameter
             if triple_is_nvidia_cuda():
+                # FIXME(MSTDL-406):
+                #   The uses of `printf` below prints "out of band" with the
+                #   `Formatter` passed in, meaning this will only work if
+                #   `Formatter` is an unbuffered wrapper around printf (which
+                #   Formatter.stdout currently is by default).
+                #
+                #   This is a workaround to permit debug formatting of
+                #   floating-point values on GPU, where printing to stdout
+                #   is the only way the Formatter framework is currently
+                #   used.
 
                 @parameter
-                if (
-                    type is DType.float16
-                    or type is DType.bfloat16
-                    or type is DType.float32
-                ):
-                    # We need to cast the value to float64 to print it.
-                    _printf["%g"](element.cast[DType.float64]())
-                elif type.is_floating_point():
+                if type is DType.float64:
                     # get_dtype_printf_format hardcodes 17 digits of precision.
                     _printf["%g"](element)
+                elif type.is_floating_point():
+                    # We need to cast the value to float64 to print it, to avoid
+                    # an ABI mismatch.
+                    _printf["%g"](element.cast[DType.float64]())
+                elif type.is_integral():
+                    var err = _try_write_int(writer, element)
+                    if err:
+                        abort(
+                            "unreachable: unexpected write int failure"
+                            " condition: "
+                            + str(err.value())
+                        )
                 else:
-                    # FIXME(MSTDL-406):
-                    #   This prints "out of band" with the `Formatter` passed
-                    #   in, meaning this will only work if `Formatter` is an
-                    #   unbuffered wrapper around printf (which Formatter.stdout
-                    #   currently is by default).
-                    #
-                    #   This is a workaround to permit debug formatting of
-                    #   floating-point values on GPU, where printing to stdout
-                    #   is the only way the Formatter framework is currently
-                    #   used.
                     _printf[_get_dtype_printf_format[type]()](element)
             else:
 
@@ -1546,14 +1654,14 @@ struct SIMD[type: DType, size: Int](
                     alias float_format = "%." + _scientific_notation_digits[
                         type
                     ]() + "e"
-                    _format_scalar[type, float_format](writer, element)
+                    _format_scalar[float_format](writer, element)
                 else:
                     _format_scalar(writer, element)
 
         # Print a closing `]`.
         @parameter
         if size > 1:
-            writer.write_str["]"]()
+            writer.write_str("]")
 
     @always_inline
     fn _bits_to_float[dest_type: DType](self) -> SIMD[dest_type, size]:
@@ -1651,6 +1759,37 @@ struct SIMD[type: DType, size: Int](
             `self[i]*multiplier[i] + accumulator[i]`.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+
+        @parameter
+        if _is_sm_80() and type.is_half_float():
+            alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
+
+            @parameter
+            if size == 1:
+                return inlined_assembly[
+                    prefix + " $0, $1, $2, $3;",
+                    Self,
+                    constraints="=h,h,h,h",
+                    has_side_effect=False,
+                ](self, multiplier, accumulator)
+
+            var res = Self()
+
+            @parameter
+            for i in range(0, size, 2):
+                var val = inlined_assembly[
+                    prefix + "x2 $0, $1, $2, $3;",
+                    SIMD[type, 2],
+                    constraints="=r,r,r,r",
+                    has_side_effect=False,
+                ](
+                    self.slice[2, offset=i](),
+                    multiplier.slice[2, offset=i](),
+                    accumulator.slice[2, offset=i](),
+                )
+                res = res.insert[offset=i](val)
+            return res
+
         return __mlir_op.`pop.fma`(
             self.value, multiplier.value, accumulator.value
         )
@@ -1815,6 +1954,94 @@ struct SIMD[type: DType, size: Int](
         """
         return self._shuffle_list[size, mask](other)
 
+    # Not an overload of shuffle because there is ambiguity
+    # with fn shuffle[*mask: Int](self, other: Self) -> Self:
+    # TODO: move closer to UTF-8 String validation code - see https://github.com/modularml/mojo/issues/3477
+    @always_inline
+    fn _dynamic_shuffle[
+        mask_size: Int, //
+    ](self, mask: SIMD[DType.uint8, mask_size]) -> SIMD[Self.type, mask_size]:
+        """Shuffles (also called blend) the values of the current vector.
+
+        It's done using the specified mask (permutation). The mask
+        values must be within `len(self)`. If that's not the case,
+        the behavior is undefined.
+
+        The mask is not known at compile time, unlike the `shuffle` method.
+
+        Note that currently, this function is fast only if the following
+        conditions are met:
+        1) The SIMD vector `self` is of type uint8 and size 16
+        2) The CPU supports SSE4 or NEON
+
+        If that's not the case, the function will fallback on a slower path,
+        which is an unrolled for loop.
+
+        The pseudocode of this function is:
+        ```mojo
+        var result = SIMD[Self.type, mask_size]()
+        for i in range(0, mask_size):
+            result[i] = self[int(mask[i])]
+        ```
+
+        Parameters:
+            mask_size: The size of the mask.
+
+        Args:
+            mask: The mask to use. Contains the indices to use to shuffle.
+
+        Returns:
+            A new vector with the same length as the mask where the value at
+            position `i` is equal to `self[mask[i]]`.
+        """
+
+        @parameter
+        if (
+            # TODO: Allow SSE3 when we have sys.has_sse3()
+            (sys.has_sse4() or sys.has_neon())
+            and Self.type == DType.uint8
+            and Self.size == 16
+        ):
+            # The instruction works with mask size of 16
+            alias target_mask_size = 16
+
+            # We know that simd sizes are powers of two, so we can use recursivity
+            # to iterate on the method until we reach the target size.
+            @parameter
+            if mask_size < target_mask_size:
+                # Make a bigger mask (x2) and retry
+                var new_mask = mask.join(SIMD[DType.uint8, mask_size]())
+                return self._dynamic_shuffle(new_mask).slice[mask_size]()
+            elif mask_size == target_mask_size:
+                # The compiler isn't smart enough yet. It complains about parameter mismatch
+                # because it cannot narrow them. Let's help it a bit.
+                var indices_copy = rebind[SIMD[DType.uint8, 16]](mask)
+                var self_copy = rebind[SIMD[DType.uint8, 16]](self)
+                var result = _pshuf_or_tbl1(self_copy, indices_copy)
+                return rebind[SIMD[Self.type, mask_size]](result)
+            elif mask_size > target_mask_size:
+                # We split it in two and call dynamic_shuffle twice.
+                var first_half_of_mask = mask.slice[mask_size // 2, offset=0]()
+                var second_half_of_mask = mask.slice[
+                    mask_size // 2, offset = mask_size // 2
+                ]()
+
+                var first_result = self._dynamic_shuffle(first_half_of_mask)
+                var second_result = self._dynamic_shuffle(second_half_of_mask)
+
+                var result = first_result.join(second_result)
+                # The compiler doesn't understand that if divide by 2 and then multiply by 2,
+                # we get the same value. So we need to help it a bit.
+                return rebind[SIMD[Self.type, mask_size]](result)
+
+        # Slow path, ~3x slower than pshuf for size 16
+        var result = SIMD[Self.type, mask_size]()
+
+        @parameter
+        for i in range(0, mask_size):
+            result[i] = self[int(mask[i])]
+        return result
+
     @always_inline("nodebug")
     fn slice[
         output_width: Int, /, *, offset: Int = 0
@@ -1856,7 +2083,7 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.extract",
             SIMD[type, output_width],
             has_side_effect=False,
-        ](self, offset)
+        ](self, Int64(offset))
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
@@ -1902,7 +2129,7 @@ struct SIMD[type: DType, size: Int](
 
         return llvm_intrinsic[
             "llvm.vector.insert", Self, has_side_effect=False
-        ](self, value, offset)
+        ](self, value, Int64(offset))
 
     @always_inline("nodebug")
     fn join(self, other: Self) -> SIMD[type, 2 * size]:
@@ -2493,214 +2720,48 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
 
-    @staticmethod
-    @always_inline
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_]) -> Self:
-        """Loads the value the pointer points to with the given offset.
 
-        Constraints:
-            The width and alignment must be positive integer values.
-            The offset must be integer.
+fn _pshuf_or_tbl1(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    @parameter
+    if sys.has_sse4():  # TODO: Allow SSE3 when we have sys.has_sse3()
+        return _pshuf(lookup_table, indices)
+    elif sys.has_neon():
+        return _tbl1(lookup_table, indices)
+    else:
+        # TODO: Change the error message when we allow SSE3
+        constrained[False, "To call _pshuf_or_tbl1() you need sse4 or neon."]()
+        # Can never happen. TODO: Remove later when the compiler detects it.
+        return SIMD[DType.uint8, 16]()
 
-        Parameters:
-            alignment: The minimal alignment of the address.
 
-        Args:
-            ptr: The pointer to load from.
+fn _pshuf(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    """Shuffle operation using the SSSE3 `pshuf` instruction.
 
-        Returns:
-            The loaded value.
-        """
-        return Self.load[alignment=alignment](ptr, int(0))
+    See https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_shuffle_epi8&ig_expand=6003
+    """
+    return sys.llvm_intrinsic[
+        "llvm.x86.ssse3.pshuf.b.128",
+        SIMD[DType.uint8, 16],
+        has_side_effect=False,
+    ](lookup_table, indices)
 
-    @staticmethod
-    @always_inline
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Scalar) -> Self:
-        """Loads the value the pointer points to with the given offset.
 
-        Constraints:
-            The width and alignment must be positive integer values.
-            The offset must be integer.
+fn _tbl1(
+    lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
+) -> SIMD[DType.uint8, 16]:
+    """Shuffle operation using the aarch64 `tbl1` instruction.
 
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        constrained[offset.type.is_integral(), "offset must be integer"]()
-        return Self.load[alignment=alignment](ptr, offset=int(offset))
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-
-        @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
-            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
-            # regardless of the alignment that is passed. This causes issues if
-            # this method is called on an unaligned pointer.
-            # TODO #37823 We can make this smarter when we add an `aligned`
-            # trait to the pointer class.
-            var v = SIMD[type, size]()
-
-            # intentionally don't unroll, otherwise the compiler vectorizes
-            for i in range(size):
-                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
-                    ptr.offset(int(offset) + i).address
-                )
-            return v
-
-        return __mlir_op.`pop.load`[alignment = alignment.value](
-            ptr.offset(offset).bitcast[SIMD[type, size]]().address
-        )
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn load[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: UInt) -> Self:
-        """Loads the value the pointer points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to load from.
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        return Self.load[alignment=alignment](ptr, int(offset))
-
-    @staticmethod
-    @always_inline
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Int, val: Self):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-            The offset must be integer.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        Self.store[alignment=alignment](ptr.offset(offset), val)
-
-    @staticmethod
-    @always_inline
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: Scalar, val: Self):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        constrained[offset.type.is_integral(), "offset must be integer"]()
-        Self.store[alignment=alignment](ptr, int(offset), val)
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], val: Self):
-        """Stores a single element value.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            val: The value to store.
-        """
-        constrained[size > 0, "width must be a positive integer value"]()
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-        __mlir_op.`pop.store`[alignment = alignment.value](
-            val, ptr.bitcast[SIMD[type, size]]().address
-        )
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn store[
-        *,
-        alignment: Int = Self._default_alignment,
-    ](ptr: UnsafePointer[Scalar[type], *_], offset: UInt, val: Self):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            ptr: The pointer to store to.
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        Self.store[alignment=alignment](ptr.offset(offset), val)
+    See https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/coding-for-neon---part-5-rearranging-vectors
+    """
+    return sys.llvm_intrinsic[
+        "llvm.aarch64.neon.tbl1",
+        SIMD[DType.uint8, 16],
+        has_side_effect=False,
+    ](lookup_table, indices)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -2974,12 +3035,10 @@ fn _simd_apply[
 
 
 # ===----------------------------------------------------------------------=== #
-# _format_scalar
-# ===----------------------------------------------------------------------=== #
 
 
 fn _format_scalar[
-    dtype: DType,
+    dtype: DType, //,
     float_format: StringLiteral = "%.17g",
 ](inout writer: Formatter, value: Scalar[dtype]):
     # Stack allocate enough bytes to store any formatted Scalar value of any
@@ -2996,12 +3055,11 @@ fn _format_scalar[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
-    )
+    var span = Span[UInt8](buf)[:wrote]
+
+    var str_slice = StringSlice(unsafe_from_utf8=span)
 
     writer.write_str(str_slice)
-    _ = buf^
 
 
 # ===----------------------------------------------------------------------=== #

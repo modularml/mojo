@@ -17,11 +17,13 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys.ffi import C_char
 
-from utils import StringRef
-from utils._format import Formattable, Formatter
+from memory import memcpy
+from collections import List
+from utils import StringRef, Span, StringSlice
+from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from .string import _atol
+from collections.string import _atol
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -40,6 +42,7 @@ struct StringLiteral(
     Representable,
     Sized,
     Stringable,
+    FloatableRaising,
 ):
     """This type represents a string literal.
 
@@ -212,6 +215,16 @@ struct StringLiteral(
         """
         return _atol(self)
 
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
+
     @no_inline
     fn __str__(self) -> String:
         """Convert the string literal to a string.
@@ -276,19 +289,6 @@ struct StringLiteral(
         """
         return __mlir_op.`pop.string.size`(self.value)
 
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this StringLiteral in bytes.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return __mlir_op.`pop.string.size`(self.value)
-
     @always_inline("nodebug")
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
@@ -314,7 +314,7 @@ struct StringLiteral(
         return self.unsafe_ptr().bitcast[C_char]()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[ImmutableStaticLifetime]:
+    fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
@@ -326,10 +326,10 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[ImmutableStaticLifetime](unsafe_from_utf8=bytes)
+        return StringSlice[ImmutableAnyLifetime](unsafe_from_utf8=bytes)
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, ImmutableStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, ImmutableAnyLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -339,7 +339,7 @@ struct StringLiteral(
 
         var ptr = self.unsafe_ptr()
 
-        return Span[UInt8, ImmutableStaticLifetime](
+        return Span[UInt8, ImmutableAnyLifetime](
             unsafe_ptr=ptr,
             len=self.byte_length(),
         )
@@ -380,7 +380,20 @@ struct StringLiteral(
         """
         return StringRef(self).rfind(substr, start=start)
 
-    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+    fn replace(self, old: StringLiteral, new: StringLiteral) -> StringLiteral:
+        """Return a copy of the string with all occurrences of substring `old`
+        if replaced by `new`. This operation only works in the param domain.
+
+        Args:
+            old: The substring to replace.
+            new: The substring to replace with.
+
+        Returns:
+            The string where all occurrences of `old` are replaced with `new`.
+        """
+        return __mlir_op.`pop.string.replace`(self.value, old.value, new.value)
+
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -403,3 +416,23 @@ struct StringLiteral(
             result += str(e[])
 
         return result
+
+    fn lower(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to lowercase.
+
+        Returns:
+            A new string where cased letters have been converted to lowercase.
+        """
+
+        return str(self).lower()
+
+    fn upper(self) -> String:
+        """Returns a copy of the string literal with all cased characters
+        converted to uppercase.
+
+        Returns:
+            A new string where cased letters have been converted to uppercase.
+        """
+
+        return str(self).upper()

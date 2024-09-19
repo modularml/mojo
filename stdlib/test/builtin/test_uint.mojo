@@ -13,6 +13,8 @@
 # RUN: %mojo %s
 
 from testing import assert_equal, assert_false, assert_not_equal, assert_true
+from sys import bitwidthof
+from bit import count_trailing_zeros
 
 
 def test_simple_uint():
@@ -236,6 +238,19 @@ def test_pos():
     assert_equal(UInt(0).__pos__(), UInt(0))
 
 
+def test_hash():
+    assert_not_equal(UInt.__hash__(123), UInt.__hash__(456))
+    assert_equal(UInt.__hash__(123), UInt.__hash__(123))
+    assert_equal(UInt.__hash__(456), UInt.__hash__(456))
+
+
+def test_comptime():
+    alias a: UInt = 32
+    # Verify that count_trailing_zeros works at comptime.
+    alias n = count_trailing_zeros(a)
+    assert_equal(n, 5)
+
+
 def main():
     test_simple_uint()
     test_uint_representation()
@@ -259,3 +274,5 @@ def main():
     test_indexer()
     test_comparison()
     test_pos()
+    test_hash()
+    test_comptime()

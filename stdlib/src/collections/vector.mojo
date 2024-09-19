@@ -15,11 +15,12 @@
 You can import these APIs from the `collections` package. For example:
 
 ```mojo
-from collections.vector import InlinedFixedVector
+from collections import InlinedFixedVector
 ```
 """
 
-from memory import Reference, UnsafePointer
+from memory import Reference, UnsafePointer, memcpy
+from sys import sizeof
 
 from utils import StaticTuple
 
@@ -72,7 +73,7 @@ fn _calculate_fixed_vector_default_size[type: AnyTrivialRegType]() -> Int:
 struct InlinedFixedVector[
     type: AnyTrivialRegType,
     size: Int = _calculate_fixed_vector_default_size[type](),
-](Sized):
+](Sized, ExplicitlyCopyable):
     """A dynamically-allocated vector with small-vector optimization and a fixed
     maximum capacity.
 
@@ -124,37 +125,47 @@ struct InlinedFixedVector[
         self.current_size = 0
         self.capacity = capacity
 
-    # TODO: Probably don't want this to be implicitly no-op copyable when we
-    # have ownership.
     @always_inline
-    fn __copyinit__(inout self, existing: Self):
-        """Creates a shallow copy (doesn't copy the underlying elements).
+    fn __init__(inout self, existing: Self):
+        """
+        Copy constructor.
 
         Args:
             existing: The `InlinedFixedVector` to copy.
+        """
+        self.static_data = existing.static_data
+        self.dynamic_data = UnsafePointer[type]()
+        if existing.dynamic_data:
+            var ext_len = existing.capacity - size
+            self.dynamic_data = UnsafePointer[type].alloc(ext_len)
+            memcpy(self.dynamic_data, existing.dynamic_data, ext_len)
+
+        self.current_size = existing.current_size
+        self.capacity = existing.capacity
+
+    @always_inline
+    fn __moveinit__(inout self, owned existing: Self):
+        """
+        Move constructor.
+
+        Args:
+            existing: The `InlinedFixedVector` to consume.
         """
         self.static_data = existing.static_data
         self.dynamic_data = existing.dynamic_data
         self.current_size = existing.current_size
         self.capacity = existing.capacity
 
-    @always_inline
-    fn _del_old(self):
-        """Destroys the object."""
-        if self.capacity > Self.static_size:
-            self.dynamic_data.free()
+        existing.dynamic_data = UnsafePointer[type]()
 
     @always_inline
-    fn deepcopy(self) -> Self:
-        """Creates a deep copy of this vector.
-
-        Returns:
-            The created copy of this vector.
+    fn __del__(owned self):
         """
-        var res = Self(self.capacity)
-        for i in range(len(self)):
-            res.append(self[i])
-        return res
+        Destructor.
+        """
+        if self.dynamic_data:
+            self.dynamic_data.free()
+            self.dynamic_data = UnsafePointer[type]()
 
     @always_inline
     fn append(inout self, value: type):

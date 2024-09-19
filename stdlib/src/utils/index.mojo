@@ -21,7 +21,7 @@ from utils import StaticIntTuple
 """
 
 from builtin.io import _get_dtype_printf_format, _snprintf
-from builtin.string import _calc_initial_buffer_size
+from collections.string import _calc_initial_buffer_size
 
 from . import unroll
 from .static_tuple import StaticTuple

@@ -10,8 +10,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s -t
+# RUN: %mojo-no-debug %s -t
 
+from sys import simdwidthof
 from algorithm import elementwise
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from buffer import Buffer
@@ -47,7 +48,7 @@ fn bench_elementwise[n: Int](inout b: Bencher) raises:
 
 
 fn main() raises:
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=10000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_elementwise[32]](BenchId("bench_elementwise_32"))
     m.bench_function[bench_elementwise[128]](BenchId("bench_elementwise_128"))
     m.bench_function[bench_elementwise[1024]](BenchId("bench_elementwise_1024"))

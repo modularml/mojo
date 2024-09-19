@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import Set
+from collections import Set, List
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value
@@ -101,17 +101,24 @@ trait ImplicitlyBoolable(Boolable):
 struct Bool(
     CollectionElementNew,
     ComparableCollectionElement,
+    Defaultable,
     ImplicitlyBoolable,
     Indexer,
     Intable,
     Representable,
     Stringable,
     Formattable,
+    Floatable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
     var value: __mlir_type.i1
     """The underlying storage of the boolean value."""
+
+    @always_inline("nodebug")
+    fn __init__(inout self):
+        """Construct a default, `False` Bool."""
+        self = False
 
     @always_inline("nodebug")
     fn __init__(inout self, *, other: Self):
@@ -241,6 +248,15 @@ struct Bool(
             1 if the Bool is True, 0 otherwise.
         """
         return _select_register_value(self.value, Int(1), Int(0))
+
+    @always_inline("nodebug")
+    fn __float__(self) -> Float64:
+        """Convert this Bool to a float.
+
+        Returns:
+            1.0 if True else 0.0 otherwise.
+        """
+        return _select_register_value(self.value, Float64(1.0), Float64(0.0))
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:
@@ -527,7 +543,7 @@ fn bool[T: Boolable, //](value: T) -> Bool:
 # TODO: Combine these into Iterators over Boolable elements
 
 
-fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
+fn any[T: BoolableCollectionElement](list: List[T, *_]) -> Bool:
     """Checks if **any** element in the list is truthy.
 
     Parameters:
@@ -584,7 +600,7 @@ fn any(value: SIMD) -> Bool:
 # TODO: Combine these into Iterators over Boolable elements
 
 
-fn all[T: BoolableCollectionElement](list: List[T]) -> Bool:
+fn all[T: BoolableCollectionElement](list: List[T, *_]) -> Bool:
     """Checks if **all** elements in the list are truthy.
 
     Parameters:

@@ -177,7 +177,7 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _, _]):
+    fn __init__(inout self, values: VariadicListMem[Attr, _]):
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
@@ -815,7 +815,7 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: Movable](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
         """Initializes the object from a list literal.
 
         Parameters:

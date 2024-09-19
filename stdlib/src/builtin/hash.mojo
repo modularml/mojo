@@ -27,12 +27,11 @@ There are a few main tools in this module:
 
 import random
 from sys.ffi import _get_global
+from sys import simdwidthof, bitwidthof
+from collections import InlineArray
 
 from builtin.dtype import _uint_type_of_width
-from memory import memcpy, memset_zero, stack_allocation
-
-# TODO remove this import once InlineArray is moved to collections
-from utils import InlineArray
+from memory import memcpy, memset_zero, stack_allocation, bitcast
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
@@ -254,7 +253,7 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
     # 2. Compute the hash, but strided across the SIMD vector width.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        var update = SIMD[size=simd_width].load(simd_data, i * simd_width)
+        var update = simd_data.load[width=simd_width](i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
@@ -264,7 +263,7 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
         var ptr = remaining.unsafe_ptr()
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = SIMD[size=simd_width].load(ptr.bitcast[Scalar[type]]())
+        var last_value = ptr.bitcast[Scalar[type]]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
         _ = remaining  # We make sure the array lives long enough.
 

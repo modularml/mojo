@@ -210,7 +210,7 @@ We plan to expand traits support in future releases. Planned features include:
 - Support for a feature like Swift's extensions, allowing you to add a trait to
   a preexisting type.
 
-- Add support for conditional conformance.
+- Improve support for conditional conformance.
 
 ## Classes
 
@@ -343,44 +343,6 @@ These are "synchronous co-routines" -- functions with multiple suspend points.
 Although Mojo has support for async functions with `async fn` and `async def`,
 Mojo does not yet support the `async for` and `async with` statements.
 
-### The `rebind` builtin
-
-One of the consequences of Mojo not performing function instantiation in the
-parser like C++ is that Mojo cannot always figure out whether some parametric
-types are equal and complain about an invalid conversion. This typically occurs
-in static dispatch patterns, like:
-
-```mojo
-fn take_simd8(x: SIMD[DType.float32, 8]): pass
-
-fn generic_simd[nelts: Int](x: SIMD[DType.float32, nelts]):
-    @parameter
-    if nelts == 8:
-        take_simd8(x)
-```
-
-The parser will complain,
-
-```log
-error: invalid call to 'take_simd8': argument #0 cannot be converted from
-'SIMD[f32, nelts]' to 'SIMD[f32, 8]'
-        take_simd8(x)
-        ~~~~~~~~~~^~~
-```
-
-This is because the parser fully type-checks the function without instantiation,
-and the type of `x` is still `SIMD[f32, nelts]`, and not `SIMD[f32, 8]`, despite
-the static conditional. The remedy is to manually "rebind" the type of `x`,
-using the `rebind` builtin, which inserts a compile-time assert that the input
-and result types resolve to the same type after function instantiation.
-
-```mojo
-fn generic_simd[nelts: Int](x: SIMD[DType.float32, nelts]):
-    @parameter
-    if nelts == 8:
-        take_simd8(rebind[SIMD[DType.float32, 8]](x))
-```
-
 ### Scoping and mutability of statement variables
 
 Python programmers understand that local variables are implicitly declared and
@@ -504,9 +466,9 @@ class One:
 print(One()) # prints '1'
 ```
 
-Mojo currently supports this feature through the
-[`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait, so that
-`print()` works on all `Stringable` types. Similar support exists for the
+Mojo currently supports similar functionality through the
+[`Formattable`](/mojo/stdlib/utils/format/Formattable) trait, so that
+`print()` works on all `Formattable` types. Similar support exists for the
 [`int()`](/mojo/stdlib/builtin/int/int-function) and
 [`len()`](/mojo/stdlib/builtin/len/len) functions. We'll continue to
 add traits support to the standard library to enable common use cases like this.
@@ -636,7 +598,7 @@ print(type(i or s)) # prints <class 'int'>
 ```
 
 In Mojo, given the expression `(a or b)`, the compiler needs to statically
-determine a result type that the types of `a` and `b` can both be converted to.
+determine a result type that the types of `a` and `b` can both be **converted** to.
 
 For example, currently an `Int` can be implicitly converted to a `String`, but a
 `String` can't be implicitly converted to an `Int`. So given an integer value

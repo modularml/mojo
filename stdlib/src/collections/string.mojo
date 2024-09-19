@@ -15,16 +15,25 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import KeyElement, List
+from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
+from python import PythonObject
 
-from utils import Span, StaticIntTuple, StringRef, StringSlice
-from utils._format import Formattable, Formatter, ToFormatter
+from utils import (
+    Span,
+    StaticIntTuple,
+    StringRef,
+    StringSlice,
+    Variant,
+    Formattable,
+    Formatter,
+)
+from utils.format import ToFormatter
 from utils.string_slice import _utf8_byte_type, _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
@@ -136,11 +145,11 @@ fn chr(c: Int) -> String:
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    Scalar.store(p, ((c >> shift) & mask) | num_bytes_marker)
+    p.store[width=1](((c >> shift) & mask) | num_bytes_marker)
     for i in range(1, num_bytes):
         shift -= 6
-        Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
-    Scalar.store(p, num_bytes, 0)
+        p.store[width=1](i, ((c >> shift) & 0b00111111) | 0b10000000)
+    p.store[width=1](num_bytes, 0)
     return String(p.bitcast[UInt8](), num_bytes + 1)
 
 
@@ -193,7 +202,6 @@ fn _repr_ascii(c: UInt8) -> String:
             return hex(uc, prefix=r"\x")
 
 
-# TODO: This is currently the same as repr, should change with unicode strings
 @always_inline
 fn ascii(value: String) -> String:
     """Get the ASCII representation of the object.
@@ -204,7 +212,19 @@ fn ascii(value: String) -> String:
     Returns:
         A string containing the ASCII representation of the object.
     """
-    return value.__repr__()
+    alias ord_squote = ord("'")
+    var result = String()
+    var use_dquote = False
+
+    for idx in range(len(value._buffer) - 1):
+        var char = value._buffer[idx]
+        result += _repr_ascii(char)
+        use_dquote = use_dquote or (char == ord_squote)
+
+    if use_dquote:
+        return '"' + result + '"'
+    else:
+        return "'" + result + "'"
 
 
 # ===----------------------------------------------------------------------=== #
@@ -686,11 +706,12 @@ struct String(
     Formattable,
     ToFormatter,
     CollectionElementNew,
+    FloatableRaising,
 ):
     """Represents a mutable string."""
 
     # Fields
-    alias _buffer_type = List[UInt8]
+    alias _buffer_type = List[UInt8, hint_trivial_type=True]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -714,7 +735,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, owned impl: List[UInt8]):
+    fn __init__(inout self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
         The buffer must be terminated with a null byte:
@@ -734,7 +755,12 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        self._buffer = impl^
+        # We make a backup because steal_data() will clear size and capacity.
+        var size = impl.size
+        var capacity = impl.capacity
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
+        )
 
     @always_inline
     fn __init__(inout self):
@@ -811,14 +837,6 @@ struct String(
                 unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
             )
         )
-
-    fn __init__(inout self, obj: PythonObject):
-        """Creates a string from a python object.
-
-        Args:
-            obj: A python object.
-        """
-        self = str(obj)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
@@ -1172,14 +1190,29 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        alias ord_squote = ord("'")
         var result = String()
         var use_dquote = False
+        for s in self:
+            use_dquote = use_dquote or (s == "'")
 
-        for idx in range(len(self._buffer) - 1):
-            var char = self._buffer[idx]
-            result += _repr_ascii(char)
-            use_dquote = use_dquote or (char == ord_squote)
+            if s == "\\":
+                result += r"\\"
+            elif s == "\t":
+                result += r"\t"
+            elif s == "\n":
+                result += r"\n"
+            elif s == "\r":
+                result += r"\r"
+            else:
+                var codepoint = ord(s)
+                if isprintable(codepoint):
+                    result += s
+                elif codepoint < 0x10:
+                    result += hex(codepoint, prefix=r"\x0")
+                elif codepoint < 0x20 or codepoint == 0x7F:
+                    result += hex(codepoint, prefix=r"\x")
+                else:  # multi-byte character
+                    result += s
 
         if use_dquote:
             return '"' + result + '"'
@@ -1276,7 +1309,7 @@ struct String(
         _ = is_first
         return result
 
-    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1335,7 +1368,7 @@ struct String(
         """
         return self.unsafe_ptr().bitcast[C_char]()
 
-    fn as_bytes(self) -> List[UInt8]:
+    fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -1515,6 +1548,9 @@ struct String(
         Returns:
             A List of Strings containing the input split by the separator.
 
+        Raises:
+            If the separator is empty.
+
         Examples:
 
         ```mojo
@@ -1535,7 +1571,9 @@ struct String(
         var items = 0
         var sep_len = sep.byte_length()
         if sep_len == 0:
-            raise Error("ValueError: empty separator")
+            raise Error("Separator cannot be empty.")
+        if str_byte_len < 0:
+            output.append("")
 
         while lhs <= str_byte_len:
             rhs = self.find(sep, lhs)
@@ -1584,6 +1622,10 @@ struct String(
         .
         """
 
+        fn num_bytes(b: UInt8) -> Int:
+            var flipped = ~b
+            return int(count_leading_zeros(flipped) + (flipped >> 7))
+
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
@@ -1605,8 +1647,8 @@ struct String(
                 # if the last char is not whitespace
                 output.append(self[str_byte_len])
                 break
-            rhs = lhs + 1
-            for s in self[lhs + 1 :]:
+            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
+            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
                 if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 rhs += s.byte_length()
@@ -1662,7 +1704,7 @@ struct String(
         var old_len = old.byte_length()
         var new_len = new.byte_length()
 
-        var res = List[UInt8]()
+        var res = Self._buffer_type()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -1792,7 +1834,7 @@ struct String(
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = List[UInt8]()
+        var res = Self._buffer_type()
         var val_ptr = val.unsafe_ptr()
         var self_ptr = self.unsafe_ptr()
         res.reserve(val.byte_length() * self.byte_length() + 1)
@@ -1942,6 +1984,16 @@ struct String(
         """
         return atol(self)
 
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
+
     fn __mul__(self, n: Int) -> String:
         """Concatenates the string `n` times.
 
@@ -2045,13 +2097,16 @@ struct String(
         return res^
 
     fn isdigit(self) -> Bool:
-        """Returns True if all characters in the string are digits.
+        """A string is a digit string if all characters in the string are digits
+        and there is at least one character in the string.
 
         Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are digits else False.
+            True if all characters are digits and it's not empty else False.
         """
+        if not self:
+            return False
         for c in self:
             if not isdigit(ord(c)):
                 return False
@@ -2154,7 +2209,7 @@ struct String(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
         var fillbyte = fillchar.as_bytes_slice()[0]
-        var buffer = List[UInt8](capacity=width + 1)
+        var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
