@@ -581,6 +581,20 @@ struct CPython:
         self.lib.get_function[fn (PyObjectPtr) -> None]("Py_DecRef")(ptr)
         self._dec_total_rc()
 
+    # This function assumes a specific way PyObjectPtr is implemented, namely
+    # that the refcount has offset 0 in that structure. That generally doesn't
+    # have to always be the case - but often it is and it's convenient for
+    # debugging. We shouldn't rely on this function anywhere - its only purpose
+    # is debugging.
+    fn _Py_REFCNT(inout self, ptr: PyObjectPtr) -> Int:
+        if ptr._get_ptr_as_int() == 0:
+            return -1
+        return int(ptr.value.load())
+
+    # ===-------------------------------------------------------------------===#
+    # Python GIL and threading
+    # ===-------------------------------------------------------------------===#
+
     fn PyGILState_Ensure(inout self) -> Bool:
         return self.lib.get_function[fn () -> Bool]("PyGILState_Ensure")()
 
@@ -593,15 +607,9 @@ struct CPython:
     fn PyEval_RestoreThread(inout self, state: Int64):
         self.lib.get_function[fn (Int64) -> None]("PyEval_RestoreThread")(state)
 
-    # This function assumes a specific way PyObjectPtr is implemented, namely
-    # that the refcount has offset 0 in that structure. That generally doesn't
-    # have to always be the case - but often it is and it's convenient for
-    # debugging. We shouldn't rely on this function anywhere - its only purpose
-    # is debugging.
-    fn _Py_REFCNT(inout self, ptr: PyObjectPtr) -> Int:
-        if ptr._get_ptr_as_int() == 0:
-            return -1
-        return int(ptr.value.load())
+    # ===-------------------------------------------------------------------===#
+    # Python Dict operations
+    # ===-------------------------------------------------------------------===#
 
     fn PyDict_New(inout self) -> PyObjectPtr:
         var r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()
@@ -642,10 +650,69 @@ struct CPython:
 
         return result
 
-    fn PyEval_GetBuiltins(inout self) -> PyObjectPtr:
-        return self.lib.get_function[fn () -> PyObjectPtr](
-            "PyEval_GetBuiltins"
-        )()
+    fn PyDict_Check(inout self, maybe_dict: PyObjectPtr) -> Bool:
+        var my_type = self.PyObject_Type(maybe_dict)
+        var my_type_as_int = my_type._get_ptr_as_int()
+        var dict_type = self.PyDict_Type()
+        var result = my_type_as_int == dict_type._get_ptr_as_int()
+        self.Py_DecRef(my_type)
+        return result
+
+    fn PyDict_Type(inout self) -> PyObjectPtr:
+        if self.dict_type.is_null():
+            self.dict_type = self.lib.get_function[PyObjectPtr]("PyDict_Type")
+        return self.dict_type
+
+    fn PyDict_Next(
+        inout self, dictionary: PyObjectPtr, p: Int
+    ) -> PyKeyValuePair:
+        var key = UnsafePointer[Int8]()
+        var value = UnsafePointer[Int8]()
+        var v = p
+        var position = UnsafePointer[Int].address_of(v)
+        var value_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(value)
+        var key_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(key)
+        var result = self.lib.get_function[
+            fn (
+                PyObjectPtr,
+                UnsafePointer[Int],
+                UnsafePointer[UnsafePointer[Int8]],
+                UnsafePointer[UnsafePointer[Int8]],
+            ) -> Int
+        ]("PyDict_Next")(
+            dictionary,
+            position,
+            key_ptr,
+            value_ptr,
+        )
+
+        self.log(
+            dictionary._get_ptr_as_int(),
+            " NEWREF PyDict_Next",
+            dictionary._get_ptr_as_int(),
+            "refcnt:",
+            self._Py_REFCNT(dictionary),
+            " key: ",
+            PyObjectPtr {value: key}._get_ptr_as_int(),
+            ", refcnt(key):",
+            self._Py_REFCNT(key),
+            "value:",
+            PyObjectPtr {value: value}._get_ptr_as_int(),
+            "refcnt(value)",
+            self._Py_REFCNT(value),
+        )
+
+        _ = v
+        return PyKeyValuePair {
+            key: key,
+            value: value,
+            position: position.take_pointee(),
+            success: result == 1,
+        }
+
+    # ===-------------------------------------------------------------------===#
+    # Python Module operations
+    # ===-------------------------------------------------------------------===#
 
     fn PyImport_ImportModule(
         inout self,
@@ -665,6 +732,12 @@ struct CPython:
 
         self._inc_total_rc()
         return r
+
+    fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
+        var value = self.lib.get_function[
+            fn (UnsafePointer[UInt8]) -> UnsafePointer[Int8]
+        ]("PyImport_AddModule")(name.data)
+        return PyObjectPtr {value: value}
 
     fn PyModule_Create(
         inout self,
@@ -702,6 +775,16 @@ struct CPython:
         ]("PyModule_AddFunctions")
 
         return add_functions_fn(mod, functions)
+
+    fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
+        var value = self.lib.get_function[
+            fn (PyObjectPtr) -> UnsafePointer[Int8]
+        ]("PyModule_GetDict")(name.value)
+        return PyObjectPtr {value: value}
+
+    # ===-------------------------------------------------------------------===#
+    # Python Evaluation
+    # ===-------------------------------------------------------------------===#
 
     fn PyRun_SimpleString(inout self, strref: StringRef) -> Bool:
         """Executes the given Python code.
@@ -764,6 +847,11 @@ struct CPython:
         self._inc_total_rc()
         return result
 
+    fn PyEval_GetBuiltins(inout self) -> PyObjectPtr:
+        return self.lib.get_function[fn () -> PyObjectPtr](
+            "PyEval_GetBuiltins"
+        )()
+
     fn Py_CompileString(
         inout self,
         strref: StringRef,
@@ -777,6 +865,37 @@ struct CPython:
         ]("Py_CompileString")(strref.data, filename.data, Int32(compile_mode))
         self._inc_total_rc()
         return r
+
+    # ===-------------------------------------------------------------------===#
+    # Python Object operations
+    # ===-------------------------------------------------------------------===#
+
+    fn Py_Is(
+        inout self,
+        rhs: PyObjectPtr,
+        lhs: PyObjectPtr,
+    ) -> Bool:
+        if self.version.minor >= 10:
+            var r = self.lib.get_function[fn (PyObjectPtr, PyObjectPtr) -> Int](
+                "Py_Is"
+            )(rhs, lhs)
+            return r > 0
+        else:
+            return rhs == lhs
+
+    fn PyObject_Type(inout self, obj: PyObjectPtr) -> PyObjectPtr:
+        var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+            "PyObject_Type"
+        )
+        self._inc_total_rc()
+        return f(obj)
+
+    fn PyObject_Str(inout self, obj: PyObjectPtr) -> PyObjectPtr:
+        var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+            "PyObject_Str"
+        )
+        self._inc_total_rc()
+        return f(obj)
 
     fn PyObject_GetAttrString(
         inout self,
@@ -886,6 +1005,30 @@ struct CPython:
             self.lib.get_function[fn (PyObjectPtr) -> Int]("PyObject_Hash")(obj)
         )
 
+    fn PyObject_GetIter(
+        inout self, traversablePyObject: PyObjectPtr
+    ) -> PyObjectPtr:
+        var iter = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+            "PyObject_GetIter"
+        )(traversablePyObject)
+
+        self.log(
+            iter._get_ptr_as_int(),
+            " NEWREF PyObject_GetIter, refcnt:",
+            self._Py_REFCNT(iter),
+            "referencing ",
+            traversablePyObject._get_ptr_as_int(),
+            "refcnt of traversable: ",
+            self._Py_REFCNT(traversablePyObject),
+        )
+
+        self._inc_total_rc()
+        return iter
+
+    # ===-------------------------------------------------------------------===#
+    # Python Tuple operations
+    # ===-------------------------------------------------------------------===#
+
     fn PyTuple_New(inout self, count: Int) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             StringRef("PyTuple_New")
@@ -915,71 +1058,9 @@ struct CPython:
             StringRef("PyTuple_SetItem")
         )(tuple_obj, index, element)
 
-    fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
-        var r = self.lib.get_function[
-            fn (
-                UnsafePointer[UInt8],
-                Int,
-                UnsafePointer[C_char],
-            ) -> PyObjectPtr
-        ](StringRef("PyUnicode_DecodeUTF8"))(
-            strref.data, strref.length, "strict".unsafe_cstr_ptr()
-        )
-
-        self.log(
-            r._get_ptr_as_int(),
-            " NEWREF PyString_FromStringAndSize, refcnt:",
-            self._Py_REFCNT(r),
-            ", str:",
-            strref,
-        )
-
-        self._inc_total_rc()
-        return r
-
-    fn PyLong_FromLong(inout self, value: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
-            "PyLong_FromLong"
-        )(value)
-
-        self.log(
-            r._get_ptr_as_int(),
-            " NEWREF PyLong_FromLong, refcnt:",
-            self._Py_REFCNT(r),
-            ", value:",
-            value,
-        )
-
-        self._inc_total_rc()
-        return r
-
-    fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
-        var value = self.lib.get_function[
-            fn (PyObjectPtr) -> UnsafePointer[Int8]
-        ]("PyModule_GetDict")(name.value)
-        return PyObjectPtr {value: value}
-
-    fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
-        var value = self.lib.get_function[
-            fn (UnsafePointer[UInt8]) -> UnsafePointer[Int8]
-        ]("PyImport_AddModule")(name.data)
-        return PyObjectPtr {value: value}
-
-    fn PyBool_FromLong(inout self, value: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
-            "PyBool_FromLong"
-        )(value)
-
-        self.log(
-            r._get_ptr_as_int(),
-            " NEWREF PyBool_FromLong, refcnt:",
-            self._Py_REFCNT(r),
-            ", value:",
-            value,
-        )
-
-        self._inc_total_rc()
-        return r
+    # ===-------------------------------------------------------------------===#
+    # Python List operations
+    # ===-------------------------------------------------------------------===#
 
     fn PyList_New(inout self, length: Int) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr]("PyList_New")(
@@ -1013,6 +1094,42 @@ struct CPython:
         return self.lib.get_function[fn (PyObjectPtr, Int) -> PyObjectPtr](
             "PyList_GetItem"
         )(list_obj, index)
+
+    # ===-------------------------------------------------------------------===#
+    # Primitive type conversions
+    # ===-------------------------------------------------------------------===#
+
+    fn PyLong_FromLong(inout self, value: Int) -> PyObjectPtr:
+        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
+            "PyLong_FromLong"
+        )(value)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyLong_FromLong, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
+        self._inc_total_rc()
+        return r
+
+    fn PyBool_FromLong(inout self, value: Int) -> PyObjectPtr:
+        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
+            "PyBool_FromLong"
+        )(value)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyBool_FromLong, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
+        self._inc_total_rc()
+        return r
 
     fn toPython(inout self, litString: StringRef) -> PyObjectPtr:
         return self.PyString_FromStringAndSize(litString)
@@ -1071,11 +1188,37 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (
+                UnsafePointer[UInt8],
+                Int,
+                UnsafePointer[C_char],
+            ) -> PyObjectPtr
+        ](StringRef("PyUnicode_DecodeUTF8"))(
+            strref.data, strref.length, "strict".unsafe_cstr_ptr()
+        )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyString_FromStringAndSize, refcnt:",
+            self._Py_REFCNT(r),
+            ", str:",
+            strref,
+        )
+
+        self._inc_total_rc()
+        return r
+
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
             fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[C_char]
         ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
         return StringRef(result)
+
+    # ===-------------------------------------------------------------------===#
+    # Python Error operations
+    # ===-------------------------------------------------------------------===#
 
     fn PyErr_Clear(inout self):
         self.lib.get_function[fn () -> None]("PyErr_Clear")()
@@ -1117,66 +1260,6 @@ struct CPython:
         _ = traceback
         return r
 
-    fn Py_Is(
-        inout self,
-        rhs: PyObjectPtr,
-        lhs: PyObjectPtr,
-    ) -> Bool:
-        if self.version.minor >= 10:
-            var r = self.lib.get_function[fn (PyObjectPtr, PyObjectPtr) -> Int](
-                "Py_Is"
-            )(rhs, lhs)
-            return r > 0
-        else:
-            return rhs == lhs
-
-    fn PyDict_Check(inout self, maybe_dict: PyObjectPtr) -> Bool:
-        var my_type = self.PyObject_Type(maybe_dict)
-        var my_type_as_int = my_type._get_ptr_as_int()
-        var dict_type = self.PyDict_Type()
-        var result = my_type_as_int == dict_type._get_ptr_as_int()
-        self.Py_DecRef(my_type)
-        return result
-
-    fn PyDict_Type(inout self) -> PyObjectPtr:
-        if self.dict_type.is_null():
-            self.dict_type = self.lib.get_function[PyObjectPtr]("PyDict_Type")
-        return self.dict_type
-
-    fn PyObject_Type(inout self, obj: PyObjectPtr) -> PyObjectPtr:
-        var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
-            "PyObject_Type"
-        )
-        self._inc_total_rc()
-        return f(obj)
-
-    fn PyObject_Str(inout self, obj: PyObjectPtr) -> PyObjectPtr:
-        var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
-            "PyObject_Str"
-        )
-        self._inc_total_rc()
-        return f(obj)
-
-    fn PyObject_GetIter(
-        inout self, traversablePyObject: PyObjectPtr
-    ) -> PyObjectPtr:
-        var iter = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
-            "PyObject_GetIter"
-        )(traversablePyObject)
-
-        self.log(
-            iter._get_ptr_as_int(),
-            " NEWREF PyObject_GetIter, refcnt:",
-            self._Py_REFCNT(iter),
-            "referencing ",
-            traversablePyObject._get_ptr_as_int(),
-            "refcnt of traversable: ",
-            self._Py_REFCNT(traversablePyObject),
-        )
-
-        self._inc_total_rc()
-        return iter
-
     fn PyIter_Next(inout self, iterator: PyObjectPtr) -> PyObjectPtr:
         var next_obj = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyIter_Next"
@@ -1207,50 +1290,3 @@ struct CPython:
             fn (PyObjectPtr) -> Int
         ]("PySequence_Check")(obj)
         return follows_seq_protocol != 0
-
-    fn PyDict_Next(
-        inout self, dictionary: PyObjectPtr, p: Int
-    ) -> PyKeyValuePair:
-        var key = UnsafePointer[Int8]()
-        var value = UnsafePointer[Int8]()
-        var v = p
-        var position = UnsafePointer[Int].address_of(v)
-        var value_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(value)
-        var key_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(key)
-        var result = self.lib.get_function[
-            fn (
-                PyObjectPtr,
-                UnsafePointer[Int],
-                UnsafePointer[UnsafePointer[Int8]],
-                UnsafePointer[UnsafePointer[Int8]],
-            ) -> Int
-        ]("PyDict_Next")(
-            dictionary,
-            position,
-            key_ptr,
-            value_ptr,
-        )
-
-        self.log(
-            dictionary._get_ptr_as_int(),
-            " NEWREF PyDict_Next",
-            dictionary._get_ptr_as_int(),
-            "refcnt:",
-            self._Py_REFCNT(dictionary),
-            " key: ",
-            PyObjectPtr {value: key}._get_ptr_as_int(),
-            ", refcnt(key):",
-            self._Py_REFCNT(key),
-            "value:",
-            PyObjectPtr {value: value}._get_ptr_as_int(),
-            "refcnt(value)",
-            self._Py_REFCNT(value),
-        )
-
-        _ = v
-        return PyKeyValuePair {
-            key: key,
-            value: value,
-            position: position.take_pointee(),
-            success: result == 1,
-        }
