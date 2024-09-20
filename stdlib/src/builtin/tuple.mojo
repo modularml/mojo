@@ -221,3 +221,66 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
                     return True
 
         return False
+
+    @always_inline("nodebug")
+    fn _compare[
+        op: StringLiteral, *T: EqualityComparable
+    ](self, other: Tuple[*T]) -> Bool:
+        alias O_Type = __type_of(other)
+        alias o_len = O_Type.__len__()
+
+        @parameter
+        if Self.__len__() != o_len:
+            return False
+
+        @parameter
+        for i in range(o_len):
+            alias T1 = Self.element_types[i]
+            alias T2 = Self.element_types[i]  # O_Type.element_types[i]
+
+            @parameter
+            if op == "==":
+                if self.get[i, T1]() != other.get[i, T2]():
+                    return False
+            elif op == "!=":
+                if self.get[i, T1]() == other.get[i, T2]():
+                    return False
+            elif op == ">":
+                if self.get[i, T1]() <= other.get[i, T2]():
+                    return False
+            elif op == ">=":
+                if self.get[i, T1]() < other.get[i, T2]():
+                    return False
+            elif op == "<":
+                if self.get[i, T1]() >= other.get[i, T2]():
+                    return False
+            elif op == "<=":
+                if self.get[i, T1]() > other.get[i, T2]():
+                    return False
+            else:
+                constrained[False, "nonexistent op."]()
+        return True
+
+    @always_inline("nodebug")
+    fn __eq__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+        return self._compare["=="](other)
+
+    @always_inline("nodebug")
+    fn __ne__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+        return self._compare["!="](other)
+
+    @always_inline("nodebug")
+    fn __gt__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+        return self._compare[">"](other)
+
+    @always_inline("nodebug")
+    fn __ge__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+        return self._compare[">="](other)
+
+    @always_inline("nodebug")
+    fn __lt__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+        return self._compare["<"](other)
+
+    @always_inline("nodebug")
+    fn __le__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+        return self._compare["<="](other)
