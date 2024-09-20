@@ -282,6 +282,14 @@ def test_load_and_store_simd():
         assert_equal(ptr2[i], i // 4 * 4)
 
 
+def test_difference():
+    var ptr = UnsafePointer[Int].alloc(5)
+    var ptr2 = ptr + 2
+    assert_equal(ptr2 - ptr, 2)
+    assert_equal(ptr - ptr2, -2)
+    ptr.free()
+
+
 def main():
     test_address_of()
 
@@ -297,6 +305,7 @@ def main():
     test_unsafepointer_string()
     test_eq()
     test_comparisons()
+    test_difference()
 
     test_unsafepointer_address_space()
     test_indexing()
