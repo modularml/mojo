@@ -1340,7 +1340,7 @@ struct String(
         return result
 
     fn join[
-        T: SizedByteableCollectionElement
+        T: SizedByteableCollectionElement,
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1367,14 +1367,12 @@ struct String(
         var buf = Self._buffer_type(capacity=capacity)
         var i = 0
         var is_first = True
-        var self_bytes = self.as_bytes()
         while i < n_elems:
             if is_first:
                 is_first = False
             else:
-                buf.extend(self_bytes)
-            var e_slice = elems[i].as_bytes_slice()
-            buf.extend(e_slice)
+                buf.extend(self.as_bytes())
+            buf.extend(elems[i].as_bytes_slice())
             i += 1
         buf.append(0)
         return String(buf^)
