@@ -21,23 +21,23 @@ from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
 from .intrinsics import _mlirtype_is_eq
 from builtin.builtin_list import _LITRefPackHelper
 
-alias C_char = Int8
+alias c_char = Int8
 """C `char` type."""
 
-alias C_int = Int32
+alias c_int = Int32
 """C `int` type.
 
 The C `int` type is typically a signed 32-bit integer on commonly used targets
 today.
 """
 
-alias C_long = Scalar[_c_long_dtype()]
+alias c_long = Scalar[_c_long_dtype()]
 """C `long` type.
 
 The C `long` type is typically a signed 64-bit integer on macOS and Linux, and a
 32-bit integer on Windows."""
 
-alias C_long_long = Scalar[_c_long_long_dtype()]
+alias c_long_long = Scalar[_c_long_long_dtype()]
 """C `long long` type.
 
 The C `long long` type is typically a signed 64-bit integer on commonly used
@@ -199,7 +199,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
     @always_inline
     fn _get_function[
         result_type: AnyTrivialRegType
-    ](self, name: UnsafePointer[C_char]) -> result_type:
+    ](self, name: UnsafePointer[c_char]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 

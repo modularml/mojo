@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import C_char
+from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
@@ -327,7 +327,7 @@ struct StringLiteral(
         #   return type.
         return ptr.bitcast[UInt8]()
 
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.
@@ -335,7 +335,7 @@ struct StringLiteral(
         Returns:
             The pointer to the underlying memory.
         """
-        return self.unsafe_ptr().bitcast[C_char]()
+        return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
     fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
