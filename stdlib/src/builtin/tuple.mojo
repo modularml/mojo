@@ -19,9 +19,28 @@ from sys.intrinsics import _type_is_eq
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
+
 # ===----------------------------------------------------------------------===#
 # Tuple
 # ===----------------------------------------------------------------------===#
+trait _FullyComparable(CollectionElement):
+    fn __eq__(self, other: Self) -> Bool:
+        ...
+
+    fn __ne__(self, other: Self) -> Bool:
+        ...
+
+    fn __gt__(self, other: Self) -> Bool:
+        ...
+
+    fn __ge__(self, other: Self) -> Bool:
+        ...
+
+    fn __lt__(self, other: Self) -> Bool:
+        ...
+
+    fn __le__(self, other: Self) -> Bool:
+        ...
 
 
 @lldb_formatter_wrapping_type
@@ -224,63 +243,55 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn _compare[
-        op: StringLiteral, *T: EqualityComparable
-    ](self, other: Tuple[*T]) -> Bool:
-        alias O_Type = __type_of(other)
-        alias o_len = O_Type.__len__()
-
-        @parameter
-        if Self.__len__() != o_len:
-            return False
-
+        op: StringLiteral, *T: _FullyComparable
+    ](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         @parameter
         for i in range(o_len):
-            alias T1 = Self.element_types[i]
-            alias T2 = Self.element_types[i]  # O_Type.element_types[i]
+            alias T_i = Tuple[*T].element_types[i]
 
             @parameter
             if op == "==":
-                if self.get[i, T1]() != other.get[i, T2]():
+                if self.get[i, T_i]() != other.get[i, T_i]():
                     return False
             elif op == "!=":
-                if self.get[i, T1]() == other.get[i, T2]():
+                if self.get[i, T_i]() == other.get[i, T_i]():
                     return False
             elif op == ">":
-                if self.get[i, T1]() <= other.get[i, T2]():
+                if self.get[i, T_i]() <= other.get[i, T_i]():
                     return False
             elif op == ">=":
-                if self.get[i, T1]() < other.get[i, T2]():
+                if self.get[i, T_i]() < other.get[i, T_i]():
                     return False
             elif op == "<":
-                if self.get[i, T1]() >= other.get[i, T2]():
+                if self.get[i, T_i]() >= other.get[i, T_i]():
                     return False
             elif op == "<=":
-                if self.get[i, T1]() > other.get[i, T2]():
+                if self.get[i, T_i]() > other.get[i, T_i]():
                     return False
             else:
                 constrained[False, "nonexistent op."]()
         return True
 
     @always_inline("nodebug")
-    fn __eq__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+    fn __eq__[*T: _FullyComparable](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         return self._compare["=="](other)
 
     @always_inline("nodebug")
-    fn __ne__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+    fn __ne__[*T: _FullyComparable](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         return self._compare["!="](other)
 
     @always_inline("nodebug")
-    fn __gt__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+    fn __gt__[*T: _FullyComparable](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         return self._compare[">"](other)
 
     @always_inline("nodebug")
-    fn __ge__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+    fn __ge__[*T: _FullyComparable](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         return self._compare[">="](other)
 
     @always_inline("nodebug")
-    fn __lt__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+    fn __lt__[*T: _FullyComparable](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         return self._compare["<"](other)
 
     @always_inline("nodebug")
-    fn __le__[*T: EqualityComparable](self, other: Tuple[*T]) -> Bool:
+    fn __le__[*T: _FullyComparable](self: Tuple[*T], other: Tuple[*T]) -> Bool:
         return self._compare["<="](other)
