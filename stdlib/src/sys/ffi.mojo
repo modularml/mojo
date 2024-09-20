@@ -43,6 +43,12 @@ alias c_long_long = Scalar[_c_long_long_dtype()]
 The C `long long` type is typically a signed 64-bit integer on commonly used
 targets today."""
 
+alias c_size_t = UInt
+"""C `size_t` type."""
+
+alias c_ssize_t = Int
+"""C `ssize_t` type."""
+
 
 fn _c_long_dtype() -> DType:
     # https://en.wikipedia.org/wiki/64-bit_computing#64-bit_data_models
