@@ -118,7 +118,7 @@ struct PyMethodDef:
 
     var method_name: UnsafePointer[C_char]  # called ml_name in CPython
 
-    # TODO: Support keyword-argument only methods
+    # TODO(MSTDL-887): Support keyword-argument only methods
     # Pointer to the function to call
     var method_impl: Self._PyCFunction_type
 
@@ -142,6 +142,33 @@ struct PyMethodDef:
         self.method_impl = _null_fn_ptr[Self._PyCFunction_type]()
         self.method_flags = 0
         self.method_docstring = UnsafePointer[C_char]()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
+    @staticmethod
+    fn function[
+        func: fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr,
+        func_name: StringLiteral,
+        docstring: StringLiteral = "",
+    ]() -> Self:
+        # TODO(MSTDL-896):
+        #   Support a way to get the name of the function from its parameter
+        #   type, similar to `get_linkage_name()`?
+
+        alias METH_VARARGS = 0x1
+
+        return PyMethodDef(
+            func_name.unsafe_cstr_ptr(),
+            func,
+            METH_VARARGS,
+            docstring.unsafe_cstr_ptr(),
+        )
 
 
 fn _null_fn_ptr[T: AnyTrivialRegType]() -> T:
