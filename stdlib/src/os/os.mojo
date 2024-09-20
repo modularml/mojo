@@ -23,6 +23,7 @@ from collections import List, InlineArray
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda, external_call
 from sys.ffi import C_char
 
+from memory import UnsafePointer
 from utils import StringRef
 
 from .path import isdir, split

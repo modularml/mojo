@@ -25,6 +25,8 @@ Code adapted from:
 https://github.com/simdutf/SimdUnicode/blob/main/src/UTF8.cs
 """
 
+from memory import UnsafePointer
+
 alias TOO_SHORT: UInt8 = 1 << 0
 alias TOO_LONG: UInt8 = 1 << 1
 alias OVERLONG_3: UInt8 = 1 << 2

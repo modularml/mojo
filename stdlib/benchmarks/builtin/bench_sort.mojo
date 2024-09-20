@@ -14,6 +14,7 @@
 # RUN: %mojo-no-debug %s -t
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
+from memory import UnsafePointer
 from random import *
 from stdlib.builtin.sort import (
     sort,

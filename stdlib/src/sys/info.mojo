@@ -20,6 +20,7 @@ from sys import is_x86
 """
 
 from .ffi import _external_call_const, external_call
+from memory import UnsafePointer
 
 
 @always_inline("nodebug")

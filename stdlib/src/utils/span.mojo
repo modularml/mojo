@@ -21,7 +21,7 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Reference
+from memory import Reference, UnsafePointer
 from sys.intrinsics import _type_is_eq
 from builtin.builtin_list import _lit_mut_cast
 

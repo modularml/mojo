@@ -21,6 +21,7 @@ from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
 
+from memory import UnsafePointer
 from collections import Dict
 from utils import StringRef
 

@@ -20,7 +20,7 @@ from sys import os_is_windows, external_call
 from sys.ffi import C_char
 
 from builtin._location import __call_location, _SourceLocation
-from memory import stack_allocation
+from memory import stack_allocation, UnsafePointer
 
 from utils import StringRef
 

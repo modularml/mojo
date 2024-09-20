@@ -19,6 +19,7 @@ from collections.string import (
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+from memory import UnsafePointer
 from python import Python
 from testing import (
     assert_equal,

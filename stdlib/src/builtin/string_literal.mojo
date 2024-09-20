@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys.ffi import C_char
 
-from memory import memcpy
+from memory import memcpy, UnsafePointer
 from collections import List
 from utils import StringRef, Span, StringSlice
 from utils import Formattable, Formatter

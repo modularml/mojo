@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from sys.ffi import C_char
+from memory import UnsafePointer
 
 from testing import (
     assert_equal,

@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from sys import has_neon
+from memory import UnsafePointer
 
 from collections import InlineArray
 from builtin.simd import _modf
