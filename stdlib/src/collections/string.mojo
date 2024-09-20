@@ -1340,12 +1340,14 @@ struct String(
         return result
 
     fn join[
-        T: SizedByteableCollectionElement,
+        T: SizedByteableCollectionElement, //,
+        fast: Bool,  # TODO: We should need to add this param to prevent ambiguity
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
             T: The types of the elements.
+            fast: Whether if use the fast algorithm.
 
         Args:
             elems: The input values.
@@ -1371,7 +1373,7 @@ struct String(
             if is_first:
                 is_first = False
             else:
-                buf.extend(self.as_bytes())
+                buf.extend(self.as_bytes_slice())
             buf.extend(elems[i].as_bytes_slice())
             i += 1
         buf.append(0)

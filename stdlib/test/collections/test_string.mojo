@@ -214,8 +214,9 @@ def test_string_join():
     var s5 = String(",").join(List[UInt8](1))
     assert_equal(s5, "1")
 
-    var s6 = String(",").join(List[String]("1", "2", "3"))
-    assert_equal(s5, "1,2,3")
+    # TODO: Somehow we should not need to use [True] here.
+    var s6 = String(",").join[True](List[String]("1", "2", "3"))
+    assert_equal(s6, "1,2,3")
 
 
 def test_string_literal_join():
