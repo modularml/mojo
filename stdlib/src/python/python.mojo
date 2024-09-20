@@ -249,27 +249,53 @@ struct Python:
         )
 
     @staticmethod
-    fn add_methods(
+    fn add_functions(
+        inout module: TypedPythonObject["Module"],
+        owned functions: List[PyMethodDef],
+    ) raises:
+        """Adds functions to a PyModule object.
+
+        Args:
+            module: The PyModule object.
+            functions: List of function data.
+        """
+
+        # Write a zeroed entry at the end as a terminator.
+        functions.append(PyMethodDef())
+
+        # FIXME(MSTDL-910):
+        #   This is an intentional memory leak, because we don't store this
+        #   in a global variable (yet).
+        var ptr: UnsafePointer[PyMethodDef] = functions.steal_data()
+
+        return Self.unsafe_add_methods(module, ptr)
+
+    @staticmethod
+    fn unsafe_add_methods(
         inout module: TypedPythonObject["Module"],
         functions: UnsafePointer[PyMethodDef],
-    ) -> Int:
+    ) raises:
         """Adds methods to a PyModule object.
+
+        Safety:
+            The provided `functions` pointer must point to data that lives
+            for the duration of the associated Python interpreter session.
 
         Args:
             module: The PyModule object.
             functions: A null terminated pointer to function data.
-
-        Returns:
-            Status code indicating success or failure.
         """
         var cpython = _get_global_python_itf().cpython()
 
-        return cpython.PyModule_AddFunctions(
+        var result = cpython.PyModule_AddFunctions(
             # Safety: `module` pointer lives long enough because its reference
             #   argument.
             module.unsafe_as_py_object_ptr(),
             functions,
         )
+
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
 
     # ===-------------------------------------------------------------------===#
     # Methods
