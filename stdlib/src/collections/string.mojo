@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import C_char
+from sys.ffi import c_char
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -1358,7 +1358,7 @@ struct String(
         """
         return self._buffer.data
 
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be null, or NUL terminated.
@@ -1366,7 +1366,7 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        return self.unsafe_ptr().bitcast[C_char]()
+        return self.unsafe_ptr().bitcast[c_char]()
 
     fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in

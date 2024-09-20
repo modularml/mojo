@@ -17,7 +17,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, C_char, C_int
+from sys.ffi import DLHandle, c_char, c_int
 
 from memory import UnsafePointer
 
@@ -91,7 +91,7 @@ struct PythonVersion:
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:
-    var version_string = lib.get_function[fn () -> UnsafePointer[C_char]](
+    var version_string = lib.get_function[fn () -> UnsafePointer[c_char]](
         "Py_GetVersion"
     )()
     return StringRef(version_string)
@@ -116,7 +116,7 @@ struct PyMethodDef:
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    var method_name: UnsafePointer[C_char]  # called ml_name in CPython
+    var method_name: UnsafePointer[c_char]  # called ml_name in CPython
 
     # TODO(MSTDL-887): Support keyword-argument only methods
     # Pointer to the function to call
@@ -124,10 +124,10 @@ struct PyMethodDef:
 
     # Flags bits indicating how the call should be constructed.
     # See https://docs.python.org/3/c-api/structures.html#c.PyMethodDef for the various calling conventions
-    var method_flags: C_int
+    var method_flags: c_int
 
     # Points to the contents of the docstring for the module.
-    var method_docstring: UnsafePointer[C_char]
+    var method_docstring: UnsafePointer[c_char]
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -138,10 +138,10 @@ struct PyMethodDef:
 
         This is suitable for use terminating an array of PyMethodDef values.
         """
-        self.method_name = UnsafePointer[C_char]()
+        self.method_name = UnsafePointer[c_char]()
         self.method_impl = _null_fn_ptr[Self._PyCFunction_type]()
         self.method_flags = 0
-        self.method_docstring = UnsafePointer[C_char]()
+        self.method_docstring = UnsafePointer[c_char]()
 
     fn __init__(inout self, *, other: Self):
         """Explicitly construct a deep copy of the provided value.
@@ -325,10 +325,10 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     var base: PyModuleDef_Base
 
     # See https://docs.python.org/3/c-api/structures.html#c.PyMethodDef
-    var name: UnsafePointer[C_char]
+    var name: UnsafePointer[c_char]
 
     # Points to the contents of the docstring for the module.
-    var docstring: UnsafePointer[C_char]
+    var docstring: UnsafePointer[c_char]
 
     var size: Int
 
@@ -356,8 +356,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     fn __init__(inout self, name: String):
         self.base = PyModuleDef_Base()
         self.name = name.unsafe_cstr_ptr()
-        # self.docstring = UnsafePointer[C_char]()
-        self.docstring = UnsafePointer[C_char]()
+        self.docstring = UnsafePointer[c_char]()
         # means that the module does not support sub-interpreters
         self.size = -1
         self.methods = UnsafePointer[PyMethodDef]()
@@ -468,7 +467,7 @@ struct CPython:
         # and make this initialization a raising function.
         self.init_error = external_call[
             "KGEN_CompilerRT_Python_SetPythonPath",
-            UnsafePointer[C_char],
+            UnsafePointer[c_char],
         ]()
 
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
@@ -1220,7 +1219,7 @@ struct CPython:
             fn (
                 UnsafePointer[UInt8],
                 Int,
-                UnsafePointer[C_char],
+                UnsafePointer[c_char],
             ) -> PyObjectPtr
         ](StringRef("PyUnicode_DecodeUTF8"))(
             strref.data, strref.length, "strict".unsafe_cstr_ptr()
@@ -1239,7 +1238,7 @@ struct CPython:
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
-            fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[C_char]
+            fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[c_char]
         ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
         return StringRef(result)
 

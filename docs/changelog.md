@@ -75,6 +75,9 @@ what we publish.
 
 - Restore implicit copyability of `Tuple` and `ListLiteral`.
 
+- The aliases for C FFI have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long`
+  and so on.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
