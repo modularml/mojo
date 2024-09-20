@@ -19,7 +19,7 @@ from base64 import b64encode
 ```
 """
 
-from collections import List
+from collections import List, Optional
 from sys import simdwidthof
 
 # ===----------------------------------------------------------------------===#
@@ -28,11 +28,13 @@ from sys import simdwidthof
 
 
 @always_inline
-fn _ascii_to_value(char: String) -> Int:
+fn _ascii_to_value(char: String, specials: String) -> Int:
     """Converts an ASCII character to its integer value for base64 decoding.
 
     Args:
         char: A single character string.
+        specials: A length-2 string representing the non-alphanumeric characters used
+                  for encoded and decoding, "+/" for the default base64 alphabet.
 
     Returns:
         The integer value of the character for base64 decoding, or -1 if invalid.
@@ -47,12 +49,36 @@ fn _ascii_to_value(char: String) -> Int:
         return char_val - ord("a") + 26
     elif ord("0") <= char_val <= ord("9"):
         return char_val - ord("0") + 52
-    elif char == "+":
+    elif char == specials[0]:  # default +
         return 62
-    elif char == "/":
+    elif char == specials[1]:  # default /
         return 63
     else:
         return -1
+
+
+@always_inline
+fn _validate_altchars(altchars: Optional[String] = None) -> String:
+    if altchars is not None:
+        var ac = altchars.value()
+        debug_assert(
+            len(ac) == 2, "altchars should have exactly two ASCII characters"
+        )
+        return ac[0] + ac[1]
+    else:
+        return "+/"
+
+
+@always_inline
+fn _remove_whitespace(input: String) -> String:
+    alias whitespace = " \t\n\r"
+    var output = String()
+    for i in range(len(input)):
+        var c = input[i]
+        if c not in whitespace:
+            output += c
+
+    return output
 
 
 # ===----------------------------------------------------------------------===#
@@ -60,17 +86,22 @@ fn _ascii_to_value(char: String) -> Int:
 # ===----------------------------------------------------------------------===#
 
 
-fn b64encode(str: String) -> String:
+fn b64encode(str: String, altchars: Optional[String] = None) -> String:
     """Performs base64 encoding on the input string.
 
     Args:
       str: The input string.
+      altchars: Optional string of length 2 which specifies the alternative alphabet
+                used instead of the + and / characters.
 
     Returns:
       Base64 encoding of the input string.
     """
-    alias lookup = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    var b64chars = lookup.unsafe_ptr()
+    var lookup = String(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    )
+    lookup += _validate_altchars(altchars)
+    var b64chars = lookup._buffer  # TODO: Leaky abstraction!
 
     var length = str.byte_length()
     var out = String._buffer_type(capacity=length + 1)
@@ -112,45 +143,80 @@ fn b64encode(str: String) -> String:
 
 
 @always_inline
-fn b64decode(str: String) -> String:
+fn b64decode(
+    s: String, altchars: Optional[String] = None, validate: Bool = False
+) raises -> String:
     """Performs base64 decoding on the input string.
 
     Args:
-      str: A base64 encoded string.
+      s: A base64 encoded string.
+      altchars: Optional string of length 2 which specifies the alternative alphabet
+                used instead of the + and / characters.
+      validate: If `False` (the default), characters that are neither in the normal
+                base-64 alphabet nor the alternative alphabet are discarded prior to
+                the padding check. If validate is True, these non-alphabet characters
+                in the input will cause an Error to be raised.
 
     Returns:
       The decoded string.
     """
-    var n = str.byte_length()
-    debug_assert(n % 4 == 0, "Input length must be divisible by 4")
 
-    var p = String._buffer_type(capacity=n + 1)
+    # Base64 alphabet according to RFC 4648
+    var base64_alphabet = String(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    )
+    var specials = _validate_altchars(altchars)
+    base64_alphabet += specials
+
+    # Step 1: Remove ASCII whitespace from data
+    var encoded = _remove_whitespace(s)
+
+    # Step 3: Check for invalid characters
+    var valid_chars = base64_alphabet + "="
+    for char in encoded:
+        if char not in valid_chars:
+            if validate:
+                raise Error("Invalid character found: " + str(char))
+            else:
+                encoded = encoded.replace(char, "")
+
+    # Step 2: Validate padding and length
+    var length = encoded.byte_length()
+    print("byte length =", length)
+    if length % 4 != 0:
+        raise Error(
+            "After pruning whitespace and invalid chars, length of input "
+            + str(length)
+            + " is not divisible by 4."
+        )
+
+    var decoded = String._buffer_type(capacity=length + 1)
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
-    for i in range(0, n, 4):
-        var a = _ascii_to_value(str[i])
-        var b = _ascii_to_value(str[i + 1])
-        var c = _ascii_to_value(str[i + 2])
-        var d = _ascii_to_value(str[i + 3])
+    for i in range(0, length, 4):
+        var a = _ascii_to_value(encoded[i], specials)
+        var b = _ascii_to_value(encoded[i + 1], specials)
+        var c = _ascii_to_value(encoded[i + 2], specials)
+        var d = _ascii_to_value(encoded[i + 3], specials)
 
         debug_assert(
             a >= 0 and b >= 0 and c >= 0 and d >= 0,
             "Unexpected character encountered",
         )
 
-        p.append((a << 2) | (b >> 4))
-        if str[i + 2] == "=":
+        decoded.append((a << 2) | (b >> 4))
+        if encoded[i + 2] == "=":
             break
 
-        p.append(((b & 0x0F) << 4) | (c >> 2))
+        decoded.append(((b & 0x0F) << 4) | (c >> 2))
 
-        if str[i + 3] == "=":
+        if encoded[i + 3] == "=":
             break
 
-        p.append(((c & 0x03) << 6) | d)
+        decoded.append(((c & 0x03) << 6) | d)
 
-    p.append(0)
-    return p
+    decoded.append(0)
+    return decoded
 
 
 # ===----------------------------------------------------------------------===#

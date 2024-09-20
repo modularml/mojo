@@ -14,7 +14,7 @@
 
 from base64 import b16decode, b16encode, b64decode, b64encode
 
-from testing import assert_equal
+from testing import assert_equal, assert_raises
 
 
 def test_b64encode():
@@ -32,6 +32,10 @@ def test_b64encode():
     )
 
     assert_equal(b64encode("ABCDEFabcdef"), "QUJDREVGYWJjZGVm")
+
+    assert_equal(
+        b64encode("Hello 🔥!!!", altchars=String("-_")), "SGVsbG8g8J-UpSEhIQ=="
+    )
 
 
 def test_b64decode():
@@ -51,6 +55,42 @@ def test_b64decode():
     )
 
     assert_equal(b64decode("QUJDREVGYWJjZGVm"), "ABCDEFabcdef")
+
+    assert_equal(
+        b64decode("SGVsbG8gTW9qbyEhIQ==", validate=True), "Hello Mojo!!!"
+    )
+
+    assert_equal(b64decode("SGVs bG8g\nTW9qbyE\thIQ\r=="), "Hello Mojo!!!")
+
+    assert_equal(
+        b64decode("SGVs bG8g\nTW9qbyE\thIQ\r==", validate=True), "Hello Mojo!!!"
+    )
+
+    assert_equal(b64decode("", validate=True), "")
+
+    assert_equal(
+        b64decode("SGVsbG8g8J-UpSEhIQ==", altchars=String("-_")), "Hello 🔥!!!"
+    )
+
+    assert_equal(
+        b64decode("SGVsbG8g8J-UpSEhIQ==", altchars=String("-_"), validate=True),
+        "Hello 🔥!!!",
+    )
+
+    with assert_raises():
+        b64decode("SGVsbG8gTW9qbyEhIQ=", validate=True)  # Length 19
+
+    with assert_raises():
+        b64decode("SGVsbG8gTW9qbyEhIQ===", validate=True)  # Length 21
+
+    with assert_raises():
+        b64decode("SGVsbG8gd29ybGQ")  # Length 15
+
+    with assert_raises():
+        b64decode("SGVsbG8gd29ybGQ@")  # Length 15
+
+    with assert_raises():
+        b64decode("SGVsbG8gd29ybGQ@", validate=True)  # Invalid character
 
 
 def test_b16encode():
