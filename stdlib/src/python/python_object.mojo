@@ -485,7 +485,6 @@ struct PythonObject(
             The underlying data.
         """
         var ptr = self.py_object
-
         self.py_object = PyObjectPtr()
 
         return ptr
@@ -496,9 +495,13 @@ struct PythonObject(
         This decrements the underlying refcount of the pointed-to object.
         """
         var cpython = _get_global_python_itf().cpython()
+        # Acquire GIL such that __del__ can be called safely for cases where the
+        # PyObject is handled in non-python contexts.
+        var state = cpython.PyGILState_Ensure()
         if not self.py_object.is_null():
             cpython.Py_DecRef(self.py_object)
         self.py_object = PyObjectPtr()
+        cpython.PyGILState_Release(state)
 
     fn __getattr__(self, name: StringLiteral) raises -> PythonObject:
         """Return the value of the object attribute with the given name.
