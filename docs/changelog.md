@@ -57,6 +57,13 @@ what we publish.
   any side effects that occur in the expression are never evaluated at runtime,
   eliminating concerns about `__type_of(expensive())` being a problem.
 
+- Add `PythonObject.from_borrowed_ptr()`, to simplify the construction of
+  `PythonObject` values from CPython 'borrowed reference' pointers.
+
+  The existing `PythonObject.__init__(PyObjectPtr)` should continue to be used
+  for the more common case of constructing a `PythonObject` from a
+  'strong reference' pointer.
+
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 

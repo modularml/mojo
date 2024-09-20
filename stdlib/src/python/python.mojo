@@ -113,12 +113,13 @@ struct Python:
             `PythonObject` containing the result of the evaluation.
         """
         var cpython = _get_global_python_itf().cpython()
-        var module = PythonObject(cpython.PyImport_AddModule(name))
-        # PyImport_AddModule returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(module.py_object)
-        var dict_obj = PythonObject(cpython.PyModule_GetDict(module.py_object))
-        # PyModule_GetDict returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(dict_obj.py_object)
+        # PyImport_AddModule returns a borrowed reference.
+        var module = PythonObject.from_borrowed_ptr(
+            cpython.PyImport_AddModule(name)
+        )
+        var dict_obj = PythonObject.from_borrowed_ptr(
+            cpython.PyModule_GetDict(module.py_object)
+        )
         if file:
             # We compile the code as provided and execute in the module
             # context. Note that this may be an existing module if the provided
