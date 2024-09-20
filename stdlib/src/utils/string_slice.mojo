@@ -24,7 +24,7 @@ from bit import count_leading_zeros
 from utils import Span
 from collections.string import _isspace
 from collections import List
-from memory import memcmp
+from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
 alias StaticString = StringSlice[ImmutableStaticLifetime]

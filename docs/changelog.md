@@ -64,6 +64,8 @@ what we publish.
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
   module from the Mojo standard library.
+  - `UnsafePointer` has been removed. Please explicitly import it via
+    `from memory import UnsafePointer`.
   - `StringRef` has been removed. Please explicitly import it via
     `from utils import StringRef`.
 

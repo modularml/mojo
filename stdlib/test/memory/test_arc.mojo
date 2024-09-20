@@ -14,7 +14,7 @@
 
 from collections import List
 
-from memory import Arc
+from memory import Arc, UnsafePointer
 from testing import assert_equal, assert_false, assert_true
 
 
