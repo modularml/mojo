@@ -27,7 +27,7 @@ if [ -z "${MOJO_OVERRIDE_COMPILER_VERSION_CHECK:-}" ]; then
     echo "Mismatch in compiler versions! Cannot build the standard library."
     echo "Expected compiler version: ${EXPECTED_COMPILER_VERSION}"
     echo "Current installed compiler version: ${ACTUAL_COMPILER_VERSION}"
-    echo "Please run 'magic update' and 'magic shell' to get the latest compiler."
+    echo "Please run \`magic update && magic install\` to get the latest compiler."
     exit 1
   fi
 fi
