@@ -70,9 +70,9 @@ def test_repr_and_str():
     var l = [1, 2, 3]
     assert_equal(str(l), "[1, 2, 3]")
     assert_equal(repr(l), "[1, 2, 3]")
-    var l2 = [1, False, String("Mojo"), "is awesome"]
-    assert_equal(str(l2), "[1, False, 'Mojo', 'is awesome']")
-    assert_equal(repr(l2), "[1, False, 'Mojo', 'is awesome']")
+    var l2 = [1, False, String("Mojo"), "is awesome 🔥"]
+    assert_equal(str(l2), "[1, False, 'Mojo', 'is awesome 🔥']")
+    assert_equal(repr(l2), "[1, False, 'Mojo', 'is awesome 🔥']")
 
 
 def main():
