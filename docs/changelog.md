@@ -67,6 +67,19 @@ what we publish.
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- Autoparameterization of parameters is now supported. Specifying a parameter
+  type with unbound parameters causes them to be implicitly added to the
+  function signature as inferred parameters.
+
+  ```mojo
+  fn foo[value: SIMD[DType.int32, _]]():
+    pass
+
+  # Equivalent to
+  fn foo[size: Int, //, value: SIMD[DType.int32, size]]():
+    pass
+  ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
