@@ -117,20 +117,20 @@ struct ListLiteral[*Ts: CollectionElement](
         return self.__str__()
 
     @no_inline
-    fn format_to(self, inout writter: Formatter):
+    fn format_to(self, inout writer: Formatter):
         """Format the list literal.
 
         Args:
-            writter: The formatter to use.
+            writer: The formatter to use.
         """
-        writter.write("[")
+        writer.write("[")
 
         @parameter
         for i in range(len(VariadicList(Ts))):
             alias T = Ts[i]
             var s: String
             if i > 0:
-                writter.write(", ")
+                writer.write(", ")
 
             @parameter
             if _type_is_eq[T, PythonObject]():
@@ -150,8 +150,8 @@ struct ListLiteral[*Ts: CollectionElement](
                 constrained[
                     False, "cannot convert list literal element to string"
                 ]()
-            writter.write(s)
-        writter.write("]")
+            writer.write(s)
+        writer.write("]")
 
     # ===-------------------------------------------------------------------===#
     # Methods
