@@ -24,10 +24,10 @@ alias ImmutableLifetime = __mlir_type.`!lit.lifetime<0>`
 alias MutableLifetime = __mlir_type.`!lit.lifetime<1>`
 """Mutable lifetime reference type."""
 
-alias ImmutableAnyLifetime = __mlir_attr.`#lit.any.lifetime<0>: !lit.lifetime<0>`
+alias ImmutableAnyLifetime = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<0>`
 """The immutable lifetime that might access any memory value."""
 
-alias MutableAnyLifetime = __mlir_attr.`#lit.any.lifetime<1>: !lit.lifetime<1>`
+alias MutableAnyLifetime = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<1>`
 """The mutable lifetime that might access any memory value."""
 
 # TODO: We don't have a "static" lifetime to use yet, so we use Any.
