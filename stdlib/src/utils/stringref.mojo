@@ -19,7 +19,7 @@ from collections.string import _atol, _isspace
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
-from sys.ffi import C_char
+from sys.ffi import c_char
 from sys import simdwidthof
 
 # ===----------------------------------------------------------------------=== #
@@ -90,7 +90,7 @@ struct StringRef(
         self = StringRef(str.unsafe_ptr(), len(str))
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[C_char], len: Int):
+    fn __init__(inout self, ptr: UnsafePointer[c_char], len: Int):
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -123,7 +123,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[C_char]):
+    fn __init__(inout self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `UnsafePointer[UInt8]` instead
