@@ -24,7 +24,7 @@ https://arxiv.org/abs/1704.00605
 """
 
 from collections import InlineArray
-from memory import memcpy
+from memory import memcpy, bitcast, UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 
@@ -60,15 +60,6 @@ alias TABLE_BASE64_OFFSETS = SIMD[DType.uint8, 16](
 # fmt: on
 alias END_FIRST_RANGE = 25
 alias END_SECOND_RANGE = 51
-
-
-fn _bitcast[
-    new_dtype: DType, new_size: Int
-](owned input: SIMD) -> SIMD[new_dtype, new_size]:
-    var result = UnsafePointer.address_of(input).bitcast[
-        SIMD[new_dtype, new_size]
-    ]()[]
-    return result
 
 
 fn _get_simd_range_values[simd_width: Int]() -> SIMD[DType.uint8, simd_width]:
@@ -118,9 +109,9 @@ fn _move_second_group_of_6_bits[
         SIMD[DType.uint8, 4](0b00000011, 0b11110000, 0, 0)
     )
     var masked_2 = shuffled_vector & mask_2
-    var masked_2_as_uint16 = _bitcast[DType.uint16, simd_width // 2](masked_2)
+    var masked_2_as_uint16 = bitcast[DType.uint16, simd_width // 2](masked_2)
     var rotated_2 = bit.rotate_bits_right[4](masked_2_as_uint16)
-    var result = _bitcast[DType.uint8, simd_width](rotated_2)
+    var result = bitcast[DType.uint8, simd_width](rotated_2)
     return result
 
 
@@ -138,9 +129,9 @@ fn _move_third_group_of_6_bits[
         )
     )
     var masked_3 = shuffled_vector & mask_3
-    var masked_3_as_uint16 = _bitcast[DType.uint16, simd_width // 2](masked_3)
+    var masked_3_as_uint16 = bitcast[DType.uint16, simd_width // 2](masked_3)
     var rotated_3 = bit.rotate_bits_left[2](masked_3_as_uint16)
-    var result = _bitcast[DType.uint8, simd_width](rotated_3)
+    var result = bitcast[DType.uint8, simd_width](rotated_3)
     return result
 
 
