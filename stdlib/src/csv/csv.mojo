@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import memcmp, memcpy
+from memory import memcmp, memcpy, UnsafePointer
 
 alias QUOTE_MINIMAL = 0
 alias QUOTE_ALL = 1
