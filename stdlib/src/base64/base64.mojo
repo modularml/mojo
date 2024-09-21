@@ -168,10 +168,10 @@ fn b64decode(
     var specials = _validate_altchars(altchars)
     base64_alphabet += specials
 
-    # Step 1: Remove ASCII whitespace from data
+    # Remove ASCII whitespace from data
     var encoded = _remove_whitespace(s)
 
-    # Step 3: Check for invalid characters
+    # Check for invalid characters
     var valid_chars = base64_alphabet + "="
     for char in encoded:
         if char not in valid_chars:
@@ -180,7 +180,7 @@ fn b64decode(
             else:
                 encoded = encoded.replace(char, "")
 
-    # Step 2: Validate padding and length
+    # Validate padding and length
     var length = encoded.byte_length()
     print("byte length =", length)
     if length % 4 != 0:
