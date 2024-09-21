@@ -1306,7 +1306,6 @@ struct String(
             result += str(a)
 
         elems.each[add_elt]()
-        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
