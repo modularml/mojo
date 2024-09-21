@@ -29,6 +29,8 @@ from collections import InlineArray
 from testing import assert_equal
 import bit
 import random
+import memory
+from memory import UnsafePointer
 
 from .constants import (
     powers_of_10,
@@ -218,7 +220,7 @@ fn create_float64(m: UInt64, p: Int64) -> Float64:
         (p + 1023).cast[DType.uint64]() << 52
     )
 
-    return UnsafePointer.address_of(representation_as_int).bitcast[Float64]()[]
+    return memory.bitcast[DType.float64](representation_as_int)
 
 
 fn lemire_algorithm(owned w: UInt64, owned q: Int64) -> Float64:
