@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import C_char
+from sys.ffi import c_char
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -202,7 +202,6 @@ fn _repr_ascii(c: UInt8) -> String:
             return hex(uc, prefix=r"\x")
 
 
-# TODO: This is currently the same as repr, should change with unicode strings
 @always_inline
 fn ascii(value: String) -> String:
     """Get the ASCII representation of the object.
@@ -213,7 +212,19 @@ fn ascii(value: String) -> String:
     Returns:
         A string containing the ASCII representation of the object.
     """
-    return value.__repr__()
+    alias ord_squote = ord("'")
+    var result = String()
+    var use_dquote = False
+
+    for idx in range(len(value._buffer) - 1):
+        var char = value._buffer[idx]
+        result += _repr_ascii(char)
+        use_dquote = use_dquote or (char == ord_squote)
+
+    if use_dquote:
+        return '"' + result + '"'
+    else:
+        return "'" + result + "'"
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1179,14 +1190,29 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        alias ord_squote = ord("'")
         var result = String()
         var use_dquote = False
+        for s in self:
+            use_dquote = use_dquote or (s == "'")
 
-        for idx in range(len(self._buffer) - 1):
-            var char = self._buffer[idx]
-            result += _repr_ascii(char)
-            use_dquote = use_dquote or (char == ord_squote)
+            if s == "\\":
+                result += r"\\"
+            elif s == "\t":
+                result += r"\t"
+            elif s == "\n":
+                result += r"\n"
+            elif s == "\r":
+                result += r"\r"
+            else:
+                var codepoint = ord(s)
+                if isprintable(codepoint):
+                    result += s
+                elif codepoint < 0x10:
+                    result += hex(codepoint, prefix=r"\x0")
+                elif codepoint < 0x20 or codepoint == 0x7F:
+                    result += hex(codepoint, prefix=r"\x")
+                else:  # multi-byte character
+                    result += s
 
         if use_dquote:
             return '"' + result + '"'
@@ -1332,7 +1358,7 @@ struct String(
         """
         return self._buffer.data
 
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be null, or NUL terminated.
@@ -1340,7 +1366,7 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        return self.unsafe_ptr().bitcast[C_char]()
+        return self.unsafe_ptr().bitcast[c_char]()
 
     fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in
