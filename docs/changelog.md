@@ -67,6 +67,18 @@ what we publish.
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- Introduce `random.shuffle` for `List`.
+  ([PR #3327](https://github.com/modularml/mojo/pull/3327) by [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  from random import shuffle
+
+  var l = List[Int](1, 2, 3, 4, 5)
+  shuffle(l)
+  ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`

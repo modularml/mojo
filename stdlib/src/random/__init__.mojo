@@ -21,4 +21,5 @@ from .random import (
     random_si64,
     random_ui64,
     seed,
+    shuffle,
 )
