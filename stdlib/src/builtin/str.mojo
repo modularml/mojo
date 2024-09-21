@@ -176,3 +176,19 @@ fn str[T: StringableRaising](value: T) raises -> String:
         If there is an error when computing the string representation of the type.
     """
     return value.__str__()
+
+
+@no_inline
+fn str[T: RepresentableCollectionElement](value: List[T]) -> String:
+    """Get the string representation of a list of representable items.
+
+    Parameters:
+        T: The type conforming to RepresentableCollectionElement.
+
+    Args:
+        value: The list to get the string representation of.
+
+    Returns:
+        The string representation of the list.
+    """
+    return value.__str__()

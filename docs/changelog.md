@@ -16,14 +16,17 @@ what we publish.
 
 ### ⭐️ New
 
-- List literals with variadic items are now convertible and representables
-  as strings. This improves the ergonomics of the language, becoming more
-  familiar to Python developers.
+- List literals with variadic items and lists with representable items are now
+  convertible and representables as strings. This improves the ergonomics of
+  the language, becoming more familiar to Python developers.
 
   ```mojo
   l = [1, False, "Mojo is awesome 🔥"]
   print(l)
   # [1, False, 'Mojo is awesome 🔥']
+  l = List(1, 2, 3)
+  print(str(l))
+  # [1, 2, 3]
   ```
 
   ([PR #3521](https://github.com/modularml/mojo/pull/3521) by [@msaelices](https://github.com/msaelices))
