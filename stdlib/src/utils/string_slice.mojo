@@ -31,6 +31,39 @@ alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
 
 
+fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
+    return int((sizes < c).cast[DType.uint8]().reduce_add())
+
+
+fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
+    """Shift unicode to utf8 representation.
+
+    ### Unicode (represented as UInt32 BE) to UTF-8 conversion:
+    - 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa
+        - a
+    - 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb
+        - (a >> 6)  | 0b11000000, b         | 0b10000000
+    - 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc
+        - (a >> 12) | 0b11100000, (b >> 6)  | 0b10000000, c        | 0b10000000
+    - 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc
+    10dddddd
+        - (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000,
+        d | 0b10000000
+    """
+    if num_bytes == 1:
+        ptr[0] = UInt8(c)
+        return
+
+    var shift = 6 * (num_bytes - 1)
+    var mask = UInt8(0xFF) >> (num_bytes + 1)
+    var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
+    ptr[0] = ((c >> shift) & mask) | num_bytes_marker
+    for i in range(1, num_bytes):
+        shift -= 6
+        ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
+
+
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
 
