@@ -14,7 +14,7 @@
 
 from collections import List
 
-from memory import Arc
+from memory import Arc, UnsafePointer
 from testing import assert_equal, assert_false, assert_true
 
 
@@ -66,7 +66,19 @@ def test_deleter_not_called_until_no_references_explicit_copy():
     assert_true(deleted)
 
 
+def test_count():
+    var a = Arc(10)
+    var b = Arc(other=a)
+    var c = a
+    assert_equal(3, a.count())
+    _ = b^
+    assert_equal(2, a.count())
+    _ = c
+    assert_equal(1, a.count())
+
+
 def main():
     test_basic()
     test_deleter_not_called_until_no_references()
     test_deleter_not_called_until_no_references_explicit_copy()
+    test_count()

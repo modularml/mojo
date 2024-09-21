@@ -21,6 +21,7 @@ from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
 
+from memory import UnsafePointer
 from collections import Dict
 from utils import StringRef
 
@@ -209,7 +210,8 @@ struct PythonObject(
         self = other
 
     fn __init__(inout self, ptr: PyObjectPtr):
-        """Initialize the object with a `PyObjectPtr` value.
+        """Initialize this object from an owned reference-counted Python object
+        pointer.
 
         Ownership of the reference will be assumed by `PythonObject`.
 
@@ -217,6 +219,42 @@ struct PythonObject(
             ptr: The `PyObjectPtr` to take ownership of.
         """
         self.py_object = ptr
+
+    @staticmethod
+    fn from_borrowed_ptr(borrowed_ptr: PyObjectPtr) -> Self:
+        """Initialize this object from a borrowed reference-counted Python
+        object pointer.
+
+        The reference count of the pointee object will be incremented, and
+        ownership of the additional reference count will be assumed by the
+        initialized `PythonObject`.
+
+        The CPython API documentation indicates the ownership semantics of the
+        returned object on any function that returns a `PyObject*` value. The
+        two possible annotations are:
+
+        * "Return value: New reference."
+        * "Return value: Borrowed reference.
+
+        This function should be used to construct a `PythonObject` from the
+        pointer returned by 'Borrowed reference'-type objects.
+
+        Args:
+            borrowed_ptr: A borrowed reference counted pointer to a Python
+                object.
+
+        Returns:
+            An owned PythonObject pointer.
+        """
+        var cpython = _get_global_python_itf().cpython()
+
+        # SAFETY:
+        #   We were passed a Python 'borrowed reference', so for it to be
+        #   safe to store this reference, we must increment the reference
+        #   count to convert this to a 'strong reference'.
+        cpython.Py_IncRef(borrowed_ptr)
+
+        return PythonObject(borrowed_ptr)
 
     fn __init__(inout self, owned typed_obj: TypedPythonObject[_]):
         """Construct a PythonObject from a typed object, dropping the type hint
@@ -485,7 +523,6 @@ struct PythonObject(
             The underlying data.
         """
         var ptr = self.py_object
-
         self.py_object = PyObjectPtr()
 
         return ptr
@@ -496,9 +533,13 @@ struct PythonObject(
         This decrements the underlying refcount of the pointed-to object.
         """
         var cpython = _get_global_python_itf().cpython()
+        # Acquire GIL such that __del__ can be called safely for cases where the
+        # PyObject is handled in non-python contexts.
+        var state = cpython.PyGILState_Ensure()
         if not self.py_object.is_null():
             cpython.Py_DecRef(self.py_object)
         self.py_object = PyObjectPtr()
+        cpython.PyGILState_Release(state)
 
     fn __getattr__(self, name: StringLiteral) raises -> PythonObject:
         """Return the value of the object attribute with the given name.

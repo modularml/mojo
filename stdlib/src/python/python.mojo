@@ -113,12 +113,13 @@ struct Python:
             `PythonObject` containing the result of the evaluation.
         """
         var cpython = _get_global_python_itf().cpython()
-        var module = PythonObject(cpython.PyImport_AddModule(name))
-        # PyImport_AddModule returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(module.py_object)
-        var dict_obj = PythonObject(cpython.PyModule_GetDict(module.py_object))
-        # PyModule_GetDict returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(dict_obj.py_object)
+        # PyImport_AddModule returns a borrowed reference.
+        var module = PythonObject.from_borrowed_ptr(
+            cpython.PyImport_AddModule(name)
+        )
+        var dict_obj = PythonObject.from_borrowed_ptr(
+            cpython.PyModule_GetDict(module.py_object)
+        )
         if file:
             # We compile the code as provided and execute in the module
             # context. Note that this may be an existing module if the provided
@@ -249,27 +250,53 @@ struct Python:
         )
 
     @staticmethod
-    fn add_methods(
+    fn add_functions(
+        inout module: TypedPythonObject["Module"],
+        owned functions: List[PyMethodDef],
+    ) raises:
+        """Adds functions to a PyModule object.
+
+        Args:
+            module: The PyModule object.
+            functions: List of function data.
+        """
+
+        # Write a zeroed entry at the end as a terminator.
+        functions.append(PyMethodDef())
+
+        # FIXME(MSTDL-910):
+        #   This is an intentional memory leak, because we don't store this
+        #   in a global variable (yet).
+        var ptr: UnsafePointer[PyMethodDef] = functions.steal_data()
+
+        return Self.unsafe_add_methods(module, ptr)
+
+    @staticmethod
+    fn unsafe_add_methods(
         inout module: TypedPythonObject["Module"],
         functions: UnsafePointer[PyMethodDef],
-    ) -> Int:
+    ) raises:
         """Adds methods to a PyModule object.
+
+        Safety:
+            The provided `functions` pointer must point to data that lives
+            for the duration of the associated Python interpreter session.
 
         Args:
             module: The PyModule object.
             functions: A null terminated pointer to function data.
-
-        Returns:
-            Status code indicating success or failure.
         """
         var cpython = _get_global_python_itf().cpython()
 
-        return cpython.PyModule_AddFunctions(
+        var result = cpython.PyModule_AddFunctions(
             # Safety: `module` pointer lives long enough because its reference
             #   argument.
             module.unsafe_as_py_object_ptr(),
             functions,
         )
+
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
 
     # ===-------------------------------------------------------------------===#
     # Methods

@@ -14,6 +14,7 @@
 
 from sys.ffi import _get_global
 
+from memory import UnsafePointer
 from testing import assert_equal, assert_false, assert_true
 
 from utils import Variant

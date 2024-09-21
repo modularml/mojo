@@ -35,7 +35,7 @@ from builtin.value import StringableCollectionElement
 
 from .optional import Optional
 from bit import is_power_of_two
-from memory import memcpy, bitcast
+from memory import memcpy, bitcast, UnsafePointer
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
