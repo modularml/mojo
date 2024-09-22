@@ -93,9 +93,9 @@ def test_basic_del():
 
     assert_true(deleted)
 
-def test_into_inner():
+def test_take():
     var b = Boxed(1)
-    var v = b^.into_inner()
+    var v = b^.take()
     assert_equal(1, v)
 
 def test_moveinit():
@@ -114,5 +114,5 @@ def main():
     test_copying_constructor()
     test_basic_ref_mutate()
     test_basic_del()
-    test_into_inner()
+    test_take()
     test_moveinit()

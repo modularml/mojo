@@ -86,18 +86,21 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
 
     fn __del__(owned self: Boxed[T, AddressSpace.GENERIC]):
         """Destroy the Boxed[]."""
-        # check that inner is non-null to accomodate into_inner and other
+        # check that inner is non-null to accomodate take() and other
         # consuming end states
         if self._inner:
             (self._inner).destroy_pointee()
             self._inner.free()
             self._inner = UnsafePointer[T, AddressSpace.GENERIC]()
 
-    fn into_inner[T: Movable](owned self: Boxed[T, AddressSpace.GENERIC]) -> T:
+    fn unsafe_ptr(self) -> UnsafePointer[T, address_space]:
+        return self._inner
+
+    fn take[T: Movable](owned self: Boxed[T, AddressSpace.GENERIC]) -> T:
         """Move the value within the Boxed[] out of it, consuming the Boxed[] in the process.
 
         Parameters:
-            T: The type of the data backing this Boxed[]. `into_inner()` only exists for T: Movable
+            T: The type of the data backing this Boxed[]. `take()` only exists for T: Movable
                 since this consuming operation only makes sense for types that you want to avoid copying.
                 For types that are Copy or ExplicitlyCopy but are not Movable, you can copy them through
                 `__getitem__` as in `var v = some_box_var[]`.
