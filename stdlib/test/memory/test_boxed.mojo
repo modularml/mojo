@@ -15,6 +15,7 @@
 from testing import assert_equal, assert_false, assert_true
 from memory import Boxed, UnsafePointer
 
+
 @value
 struct ObservableDel(CollectionElement):
     var target: UnsafePointer[Bool]
@@ -24,6 +25,7 @@ struct ObservableDel(CollectionElement):
 
     fn __del__(owned self):
         self.target.init_pointee_move(True)
+
 
 struct OnlyCopyable:
     var value: Int
@@ -37,6 +39,7 @@ struct OnlyCopyable:
     fn __copyinit__(inout self, existing: Self):
         self.value = existing.value
 
+
 struct OnlyMovable:
     var value: Int
 
@@ -47,10 +50,10 @@ struct OnlyMovable:
         self.value = existing.value
 
 
-
 def test_basic_ref():
     var b = Boxed(1)
     assert_equal(1, b[])
+
 
 def test_box_copy_constructor():
     var b = Boxed(1)
@@ -59,13 +62,16 @@ def test_box_copy_constructor():
     assert_equal(1, b[])
     assert_equal(1, b2[])
 
+
 def test_copying_constructor():
-    var v = OnlyCopyable(1);
+    var v = OnlyCopyable(1)
     var b = Boxed(copy_value=v)
 
+
 def test_moving_constructor():
-    var v = OnlyMovable(1);
+    var v = OnlyMovable(1)
     var b = Boxed(v^)
+
 
 def test_basic_ref_mutate():
     var b = Boxed(1)
@@ -75,6 +81,7 @@ def test_basic_ref_mutate():
 
     assert_equal(2, b[])
 
+
 def test_multiple_refs():
     var b = Boxed(1)
 
@@ -83,20 +90,23 @@ def test_multiple_refs():
 
     assert_equal(2, borrow1 + borrow2)
 
+
 def test_basic_del():
     var deleted = False
     var b = Boxed(ObservableDel(UnsafePointer.address_of(deleted)))
 
     assert_false(deleted)
-    
+
     _ = b^
 
     assert_true(deleted)
+
 
 def test_take():
     var b = Boxed(1)
     var v = b^.take()
     assert_equal(1, v)
+
 
 def test_moveinit():
     var deleted = False
@@ -106,6 +116,7 @@ def test_moveinit():
     assert_false(deleted)
 
     _ = b2^
+
 
 def main():
     test_basic_ref()
