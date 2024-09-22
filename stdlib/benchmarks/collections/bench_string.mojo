@@ -51,7 +51,7 @@ fn make_string[
         var items = List[UInt8, hint_trivial_type=True](capacity=length + 1)
         for i in range(length):
             items[i] = random_si64(0, length).cast[DType.uint8]()
-        items.append(0)
+        items[length] = 0
         return String(items^)
 
 
