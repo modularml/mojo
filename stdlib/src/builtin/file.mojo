@@ -85,9 +85,6 @@ struct FileHandle:
         """
         self.__init__(path._strref_dangerous(), mode._strref_dangerous())
 
-        _ = path
-        _ = mode
-
     fn __init__(inout self, path: StringRef, mode: StringRef) raises:
         """Construct the FileHandle using the file path and string.
 
