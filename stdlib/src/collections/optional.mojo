@@ -405,7 +405,7 @@ struct Optional[T: CollectionElement](
         """
 
         if not self:
-            raise Error("ValueError")
+            raise Error("ValueError: take() on empty Optional")
         return self.unsafe_take()
 
 
