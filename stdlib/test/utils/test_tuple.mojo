@@ -14,6 +14,7 @@
 
 from testing import assert_equal, assert_false, assert_true
 
+from memory import UnsafePointer
 from utils import StaticIntTuple, StaticTuple
 from test_utils import ValueDestructorRecorder
 

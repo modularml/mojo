@@ -33,7 +33,7 @@ with open("my_file.txt", "r") as f:
 
 from os import PathLike
 from sys import external_call, sizeof
-from utils import Span
+from utils import Span, StringRef
 
 from memory import AddressSpace, UnsafePointer
 
@@ -84,9 +84,6 @@ struct FileHandle:
           mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         self.__init__(path._strref_dangerous(), mode._strref_dangerous())
-
-        _ = path
-        _ = mode
 
     fn __init__(inout self, path: StringRef, mode: StringRef) raises:
         """Construct the FileHandle using the file path and string.

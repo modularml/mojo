@@ -14,7 +14,7 @@
 
 from collections import List
 
-from memory import Arc
+from memory import Arc, UnsafePointer
 from testing import assert_equal, assert_false, assert_true
 
 
@@ -110,6 +110,16 @@ def test_weak_dies_when_strong_dies():
     assert_true(deleted)
     assert_false(s_o)
 
+def test_count():
+    var a = Arc(10)
+    var b = Arc(other=a)
+    var c = a
+    assert_equal(3, a.count())
+    _ = b^
+    assert_equal(2, a.count())
+    _ = c
+    assert_equal(1, a.count())
+
 
 def main():
     test_basic()
@@ -117,3 +127,4 @@ def main():
     test_deleter_not_called_until_no_references_explicit_copy()
     test_weak_upgradeable_when_strong_live()
     test_weak_dies_when_strong_dies()
+    test_count()

@@ -54,7 +54,7 @@ from collections import Optional, OptionalReg
 
 
 struct _ArcInner[T: Movable, enable_weak: Bool = False]:
-    var refcount: Atomic[DType.int64]
+    var refcount: Atomic[DType.uint64]
     var payload: UnsafeMaybeUninitialized[T]
     
     alias _weak_refcount_type = __mlir_type[
@@ -394,3 +394,11 @@ struct Arc[T: Movable, enable_weak: Bool = False](CollectionElement, CollectionE
         return UnsafePointer.address_of(
             self._inner[].payload.assume_initialized()
         )
+
+    fn count(self) -> UInt64:
+        """Count the amount of current references.
+
+        Returns:
+            The current amount of references to the pointee.
+        """
+        return self._inner[].refcount.load()

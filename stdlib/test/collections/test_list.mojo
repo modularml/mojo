@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import List
+from memory import UnsafePointer
 from sys.info import sizeof
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true

@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Dict, List
 from sys.intrinsics import _type_is_eq
 
-from memory import Arc, memcmp, memcpy
+from memory import Arc, memcmp, memcpy, UnsafePointer
 
 from utils import StringRef, Variant
 

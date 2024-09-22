@@ -10,8 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !windows
-# RUN: echo "Hello, World" | %mojo-no-debug %s
+# REQUIRES: !system-windows
+# RUN: echo "Hello, World" | %mojo %s
 
 from builtin.io import _fdopen
 from testing import testing
