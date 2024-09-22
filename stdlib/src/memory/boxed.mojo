@@ -117,7 +117,7 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
             self._inner = UnsafePointer[T, AddressSpace.GENERIC]()
 
     fn unsafe_ptr(self) -> UnsafePointer[T, address_space]:
-        """UNSAFE: returns the backing pointer for this Boxed[]
+        """UNSAFE: returns the backing pointer for this Boxed[].
 
         Returns:
             An UnsafePointer to the backing allocation for this Boxed[].
