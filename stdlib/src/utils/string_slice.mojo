@@ -31,6 +31,7 @@ alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
 
 
+@always_inline("nodebug")
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
     return int((sizes < c).cast[DType.uint8]().reduce_add())
@@ -64,6 +65,15 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
+@always_inline("nodebug")
+fn _utf8_first_byte_sequence_length(b: UInt8) -> Int:
+    """Get the length of the sequence starting with given byte. Do note that
+    this does not work correctly if given a continuation byte."""
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
+
+
+@always_inline("nodebug")
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
 

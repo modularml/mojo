@@ -39,6 +39,7 @@ from utils.string_slice import (
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
     _shift_unicode_to_utf8,
+    _utf8_first_byte_sequence_length,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -1555,7 +1556,8 @@ struct String(
         .
         """
         var output = List[String]()
-
+        # FIXME(#3526, #3246, #3295): this will fail any time that either
+        # indexing or find are changed out of sync to use unicode codepoints
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
@@ -1613,44 +1615,47 @@ struct String(
         .
         """
 
-        fn num_bytes(b: UInt8) -> Int:
-            var flipped = ~b
-            return int(count_leading_zeros(flipped) + (flipped >> 7))
-
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
+        var ptr = self.unsafe_ptr()
+        alias SelfSlice = StringSlice[__lifetime_of(self)]
+
+        @always_inline("nodebug")
+        fn build_slice(s_ptr: UnsafePointer[UInt8], length: Int) -> SelfSlice:
+            return SelfSlice(unsafe_from_utf8_ptr=s_ptr, len=length)
+
         while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            for s in self[lhs:]:
-                if not str(s).isspace():  # TODO: with StringSlice.isspace()
+            for s in build_slice(ptr + lhs, str_byte_len - lhs):
+                if not s.isspace():
                     break
                 lhs += s.byte_length()
             # if it went until the end of the String, then
             # it should be sliced up until the original
             # start of the whitespace which was already appended
-            if lhs - 1 == str_byte_len:
+            if lhs >= str_byte_len:
                 break
-            elif lhs == str_byte_len:
-                # if the last char is not whitespace
-                output.append(self[str_byte_len])
-                break
-            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
-            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
-                if str(s).isspace():  # TODO: with StringSlice.isspace()
+            var b_len = _utf8_first_byte_sequence_length(ptr[lhs])
+            rhs = lhs + b_len
+            for s in build_slice(ptr + rhs, str_byte_len - rhs):
+                if s.isspace():
                     break
                 rhs += s.byte_length()
+            if rhs == str_byte_len:
+                rhs += 1
 
             if maxsplit > -1:
                 if items == maxsplit:
-                    output.append(self[lhs:])
+                    var s = String(build_slice(ptr + lhs, str_byte_len - lhs))
+                    output.append(s^)
                     break
                 items += 1
 
-            output.append(self[lhs:rhs])
+            output.append(String(build_slice(ptr + lhs, rhs - lhs)))
             lhs = rhs
 
         return output

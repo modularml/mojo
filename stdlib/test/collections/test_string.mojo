@@ -745,6 +745,7 @@ def test_split():
     assert_true(d[0] == "1" and d[1] == "2,3")
 
     assert_true(len(String("").split()) == 0)
+    print(String(" ").split().__str__())
     assert_true(len(String(" ").split()) == 0)
     assert_true(len(String("").split(" ")) == 1)
     assert_true(len(String(" ").split(" ")) == 2)
