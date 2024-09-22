@@ -36,13 +36,16 @@ fn make_string[
 
     try:
         var f = open(cwd() / "data" / filename, "rb")
-        var items = f.read_bytes(length)
 
         @parameter
         if length > 0:
+            var items = f.read_bytes(length)
             for i in range(length - len(items)):
                 items.append(items[i])
-        return String(items^)
+            items.append(0)
+            return String(items^)
+        else:
+            return String(f.read_bytes())
     except:
         print("open file failed, reverting to random bytes")
         var d = List[UInt8, hint_trivial_type=True](capacity=length)
