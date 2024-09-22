@@ -13,7 +13,7 @@
 # RUN: %mojo-no-debug %s -t
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from random import random_si64
+from random import random_si64, seed
 from pathlib import cwd
 from collections import Optional
 from utils._utf8_validation import _is_valid_utf8
