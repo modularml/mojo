@@ -26,7 +26,7 @@ fn make_string[
     length: UInt = 0, filename: String = "UN charter EN.txt"
 ]() -> String:
     """Make a `String` made of items in the `./data` directory or random bytes
-    in case opening the file fails.
+    (ASCII value range) in case opening the file fails.
 
     Parameters:
         length: The length in bytes of the resulting `String`. If == 0 -> the
@@ -50,7 +50,7 @@ fn make_string[
         print("open file failed, reverting to random bytes")
         var items = List[UInt8, hint_trivial_type=True](capacity=length + 1)
         for i in range(length):
-            items[i] = random_si64(0, length).cast[DType.uint8]()
+            items[i] = random_si64(0, 0b0111_1111).cast[DType.uint8]()
         items[length] = 0
         return String(items^)
 
