@@ -15,7 +15,6 @@
 from random import *
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from math import ceil
 from pathlib import cwd
 from collections import Optional
 from utils._utf8_validation import _is_valid_utf8
