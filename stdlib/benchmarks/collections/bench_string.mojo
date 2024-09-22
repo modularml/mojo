@@ -48,10 +48,11 @@ fn make_string[
             return String(f.read_bytes())
     except:
         print("open file failed, reverting to random bytes")
-        var d = List[UInt8, hint_trivial_type=True](capacity=length)
+        var items = List[UInt8, hint_trivial_type=True](capacity=length + 1)
         for i in range(length):
-            d[i] = random_si64(0, length).cast[DType.uint8]()
-        return String(d^)
+            items[i] = random_si64(0, length).cast[DType.uint8]()
+        items.append(0)
+        return String(items^)
 
 
 # ===----------------------------------------------------------------------===#
