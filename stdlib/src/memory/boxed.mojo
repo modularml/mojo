@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 from memory import UnsafePointer, stack_allocation, memcpy
 
+
 struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
     """A safe, owning, smart pointer.
 
@@ -23,7 +24,9 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
 
     var _inner: UnsafePointer[T, address_space]
 
-    fn __init__[T: Movable](inout self: Boxed[T, AddressSpace.GENERIC], owned value: T):
+    fn __init__[
+        T: Movable
+    ](inout self: Boxed[T, AddressSpace.GENERIC], owned value: T):
         """Construct a new Boxed[] by moving the passed value into a new backing allocation.
 
         Parameters:
@@ -35,7 +38,9 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
         self._inner = UnsafePointer[T, AddressSpace.GENERIC].alloc(1)
         self._inner.init_pointee_move(value^)
 
-    fn __init__[T: ExplicitlyCopyable](inout self: Boxed[T, AddressSpace.GENERIC], *, copy_value: T):
+    fn __init__[
+        T: ExplicitlyCopyable
+    ](inout self: Boxed[T, AddressSpace.GENERIC], *, copy_value: T):
         """Construct a new Boxed[] by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
@@ -47,7 +52,13 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
         self._inner = UnsafePointer[T, address_space].alloc(1)
         self._inner.init_pointee_explicit_copy(copy_value)
 
-    fn __init__[T: ExplicitlyCopyable](inout self: Boxed[T, AddressSpace.GENERIC], *, copy_box: Boxed[T, AddressSpace.GENERIC]):
+    fn __init__[
+        T: ExplicitlyCopyable
+    ](
+        inout self: Boxed[T, AddressSpace.GENERIC],
+        *,
+        copy_box: Boxed[T, AddressSpace.GENERIC],
+    ):
         """Construct a new Boxed[] by explicitly copying the value from another Boxed[].
 
         Parameters:
@@ -67,7 +78,9 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
         self._inner = existing._inner
         existing._inner = UnsafePointer[T, address_space]()
 
-    fn __getitem__(ref [_, address_space._value.value] self) -> ref [__lifetime_of(self._inner), address_space._value.value] T:
+    fn __getitem__(
+        ref [_, address_space._value.value]self
+    ) -> ref [__lifetime_of(self._inner), address_space._value.value] T:
         """Returns a reference to the box's underlying data with parametric mutability.
 
         Returns:
@@ -80,7 +93,13 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
         # All of the magic happens above in the function signature
         var inner_not_null = self._inner.__bool__()
 
-        debug_assert(inner_not_null, "Box is horribly broken, and __getitem__ was called on a destroyed box")
+        debug_assert(
+            inner_not_null,
+            (
+                "Box is horribly broken, and __getitem__ was called on a"
+                " destroyed box"
+            ),
+        )
 
         return self._inner[]
 
@@ -94,6 +113,11 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
             self._inner = UnsafePointer[T, AddressSpace.GENERIC]()
 
     fn unsafe_ptr(self) -> UnsafePointer[T, address_space]:
+        """UNSAFE: returns the backing pointer for this Boxed[]
+
+        Returns:
+            An UnsafePointer to the backing allocation for this Boxed[].
+        """
         return self._inner
 
     fn take[T: Movable](owned self: Boxed[T, AddressSpace.GENERIC]) -> T:
