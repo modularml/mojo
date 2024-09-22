@@ -26,14 +26,20 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
     fn __init__[T: Movable](inout self: Boxed[T, AddressSpace.GENERIC], owned value: T):
         """Construct a new Boxed[] by moving the passed value into a new backing allocation.
 
+        Parameters:
+            T: The type of the data to store. It is restricted to `Movable` here to allow efficient move construction.
+
         Args:
             value: The value to move into the Boxed[].
         """
         self._inner = UnsafePointer[T, AddressSpace.GENERIC].alloc(1)
         self._inner.init_pointee_move(value^)
 
-    fn __init__[T: ExplicitlyCopyable, __:None=None](inout self: Boxed[T, AddressSpace.GENERIC], *, copy_value: T):
+    fn __init__[T: ExplicitlyCopyable](inout self: Boxed[T, AddressSpace.GENERIC], *, copy_value: T):
         """Construct a new Boxed[] by explicitly copying the passed value into a new backing allocation.
+
+        Parameters:
+            T: The type of the data to store.
 
         Args:
             copy_value: The value to explicitly copy into the Boxed[].
@@ -43,6 +49,9 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
 
     fn __init__[T: ExplicitlyCopyable](inout self: Boxed[T, AddressSpace.GENERIC], *, copy_box: Boxed[T, AddressSpace.GENERIC]):
         """Construct a new Boxed[] by explicitly copying the value from another Boxed[].
+
+        Parameters:
+            T: The type of the data to store.
 
         Args:
             copy_box: The Boxed[] to copy.
@@ -86,6 +95,12 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
 
     fn into_inner[T: Movable](owned self: Boxed[T, AddressSpace.GENERIC]) -> T:
         """Move the value within the Boxed[] out of it, consuming the Boxed[] in the process.
+
+        Parameters:
+            T: The type of the data backing this Boxed[]. `into_inner()` only exists for T: Movable
+                since this consuming operation only makes sense for types that you want to avoid copying.
+                For types that are Copy or ExplicitlyCopy but are not Movable, you can copy them through
+                `__getitem__` as in `var v = some_box_var[]`.
 
         Returns:
             The data that is (was) backing the Boxed[].
