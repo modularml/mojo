@@ -331,7 +331,7 @@ fn _try_write_int[
         )
         fmt.write_str(zero)
 
-        _ = zero_buf
+        _ = zero_buf^
 
         return None
 
