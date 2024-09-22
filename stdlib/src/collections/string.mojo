@@ -1556,8 +1556,6 @@ struct String(
         .
         """
         var output = List[String]()
-        # FIXME(#3526, #3246, #3295): this will fail any time that either
-        # indexing or find are changed out of sync to use unicode codepoints
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
@@ -1567,25 +1565,36 @@ struct String(
             raise Error("Separator cannot be empty.")
         if str_byte_len < 0:
             output.append("")
+        var ptr = self.unsafe_ptr()
+        alias SelfSlice = StringSlice[__lifetime_of(self)]
+
+        @always_inline("nodebug")
+        fn build_slice(s_ptr: UnsafePointer[UInt8], length: Int) -> SelfSlice:
+            return SelfSlice(unsafe_from_utf8_ptr=s_ptr, len=length)
 
         while lhs <= str_byte_len:
+            # FIXME(#3295): this will fail when find is changed to use unicode codepoints
             rhs = self.find(sep, lhs)
             if rhs == -1:
-                output.append(self[lhs:])
+                output.append(
+                    String(build_slice(ptr + lhs, str_byte_len - lhs + 1))
+                )
                 break
 
             if maxsplit > -1:
                 if items == maxsplit:
-                    output.append(self[lhs:])
+                    output.append(
+                        String(build_slice(ptr + lhs, str_byte_len - lhs + 1))
+                    )
                     break
                 items += 1
 
-            output.append(self[lhs:rhs])
+            output.append(String(build_slice(ptr + lhs, rhs - lhs)))
             lhs = rhs + sep_len
 
         if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
             output.append("")
-        return output
+        return output^
 
     fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
         """Split the string by every Whitespace separator.
@@ -1658,7 +1667,7 @@ struct String(
             output.append(String(build_slice(ptr + lhs, rhs - lhs)))
             lhs = rhs
 
-        return output
+        return output^
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
