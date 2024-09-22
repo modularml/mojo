@@ -12,9 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo-no-debug %s -t
 
-from random import *
-
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from random import random_si64
 from pathlib import cwd
 from collections import Optional
 from utils._utf8_validation import _is_valid_utf8
@@ -48,7 +47,7 @@ fn make_string[
         print("open file failed, reverting to random bytes")
         var d = List[UInt8, hint_trivial_type=True](capacity=length)
         for i in range(length):
-            d[i] = random.random_si64(0, length).cast[DType.uint8]()
+            d[i] = random_si64(0, length).cast[DType.uint8]()
         return String(d^)
 
 
