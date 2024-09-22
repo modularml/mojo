@@ -20,6 +20,10 @@ struct Boxed[T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC]:
     of the underlying data, and restricts access to it through the lifetime
     system such that no more than one mutable alias for the underlying data
     may exist. Consider Boxed[T] over UnsafePointer[T] where possible.
+
+    Parameters:
+        T: The type to be stored in the Boxed[].
+        address_space: The address space that the allocation behind this box resides in.
     """
 
     var _inner: UnsafePointer[T, address_space]
