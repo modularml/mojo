@@ -1576,16 +1576,14 @@ struct String(
             # FIXME(#3295): this will fail when find is changed to use unicode codepoints
             rhs = self.find(sep, lhs)
             if rhs == -1:
-                output.append(
-                    String(build_slice(ptr + lhs, str_byte_len - lhs + 1))
-                )
+                var s = String(build_slice(ptr + lhs, str_byte_len - lhs + 1))
+                output.append(s^)
                 break
 
             if maxsplit > -1:
                 if items == maxsplit:
-                    output.append(
-                        String(build_slice(ptr + lhs, str_byte_len - lhs + 1))
-                    )
+                    var s = build_slice(ptr + lhs, str_byte_len - lhs + 1)
+                    output.append(String(s^))
                     break
                 items += 1
 
