@@ -2036,19 +2036,23 @@ struct String(
         alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
         var s_len = self.byte_length()
-        var cap = s_len + num_pos_args * 2  # educated guess
+        var cap = s_len + len(entries) * 2  # educated guess
         var res = String(List[UInt8, hint_trivial_type=True](capacity=cap))
         var pos_in_self = 0
         var ptr = self.unsafe_ptr()
         alias `r` = UInt8(ord("r"))
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
+        @always_inline("nodebug")
+        fn _build_slice(s_ptr: UnsafePointer[UInt8], start: Int, end: Int) -> SelfSlice:
+            return SelfSlice(unsafe_from_utf8_ptr=s_ptr + start, len=end-start)
+
         var current_automatic_arg_index = 0
         for e in entries:
             debug_assert(
                 pos_in_self < s_len, "pos_in_self >= self.byte_length()"
             )
-            res += String(self._slice(pos_in_self, e[].first_curly))
+            res += String(_build_slice(self.unsafe_ptr(), pos_in_self, e[].first_curly))
 
             if e[].is_escaped_brace():
                 res += "}" if e[].field[Bool] else "{"
@@ -2078,7 +2082,7 @@ struct String(
             pos_in_self = e[].last_curly + 1
 
         if pos_in_self < s_len:
-            res += String(self._slice(pos_in_self, s_len))
+            res += String(_build_slice(self.unsafe_ptr(),pos_in_self, s_len))
 
         return res^
 
@@ -2201,25 +2205,6 @@ struct String(
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
         var result = String(buffer)
         return result^
-
-    @always_inline("nodebug")
-    fn _slice(
-        self, start_idx: Int, end_idx: Int
-    ) -> StringSlice[__lifetime_of(self)]:
-        """Construct a StringSlice from self, start index, and end index.
-        Highly unsafe operation with no bounds checks and no negative indexing.
-        """
-        debug_assert(
-            end_idx <= self.byte_length() - 1,
-            "end_idx is bigger than `self.byte_length() -1`",
-        )
-        debug_assert(
-            start_idx > -1, "start_idx < 0, there is no negative indexing"
-        )
-        return StringSlice[__lifetime_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start_idx,
-            len=end_idx - start_idx,
-        )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -2558,7 +2543,13 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         alias supported_conversion_flags = SIMD[DType.uint8, 2](
             ord("s"), ord("r")
         )
-        var field = String(format_src._slice(start_value + 1, i))
+        alias SelfSlice = StringSlice[__lifetime_of(self)]
+
+        @always_inline("nodebug")
+        fn _build_slice(s_ptr: UnsafePointer[UInt8], start: Int, end: Int) -> SelfSlice:
+            return SelfSlice(unsafe_from_utf8_ptr=s_ptr + start, len=end-start)
+
+        var field = String(_build_slice(format_src.unsafe_ptr(), start_value + 1, i))
         # FIXME(#3526): this will break once find works with unicode codepoints
         var exclamation_index = field.find("!")
 
@@ -2578,7 +2569,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 if field_b_len - new_idx > 1 or (
                     conversion_flag not in supported_conversion_flags
                 ):
-                    var f = String(field._slice(new_idx, field_b_len))
+                    var f = String(_build_slice(field.unsafe_ptr(), new_idx, field_b_len))
                     raise Error('Conversion flag "' + f + '" not recognised.')
                 self.conversion_flag = conversion_flag
             else:
