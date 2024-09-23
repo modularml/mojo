@@ -50,6 +50,12 @@ what we publish.
   values with static type information. This design will likely evolve and
   change significantly.
 
+  - Added `TypedPythonObject["Tuple].__getitem__` for accessing the elements of
+    a Python tuple.
+
+- Added `Python.unsafe_get_python_exception()`, as an efficient low-level
+  utility to get the Mojo `Error` equivalent of the current CPython error state.
+
 - The `__type_of(x)` and `__lifetime_of(x)` operators are much more general now:
   they allow arbitrary expressions inside of them, allow referring to dynamic
   values in parameter contexts, and even allow referring to raising functions
