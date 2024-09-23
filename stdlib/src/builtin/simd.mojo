@@ -1638,13 +1638,7 @@ struct SIMD[type: DType, size: Int](
                     # an ABI mismatch.
                     _printf["%g"](element.cast[DType.float64]())
                 elif type.is_integral():
-                    var err = _try_write_int(writer, element)
-                    if err:
-                        abort(
-                            "unreachable: unexpected write int failure"
-                            " condition: "
-                            + str(err.value())
-                        )
+                    _try_write_int(writer, element)
                 else:
                     _printf[_get_dtype_printf_format[type]()](element)
             else:

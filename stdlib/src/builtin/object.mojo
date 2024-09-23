@@ -591,9 +591,7 @@ struct _ObjectImpl(
             )
             return
         if self.is_func():
-            writer.write(
-                "Function at address " + hex(int(self.get_as_func().value))
-            )
+            writer.write("Function at address ", self.get_as_func().value)
             return
         if self.is_list():
             writer.write(String("["))
