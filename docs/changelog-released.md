@@ -7,8 +7,9 @@ toc_max_heading_level: 2
 
 This is a list of changes to the Mojo language, standard library, and tools.
 
-To check your current version, run `mojo --version`, and then [update Mojo with
-`magic`](/magic#update-max-and-mojo).
+To check your current version, run `mojo --version`. To update the version of
+Mojo for your project with the `magic` package manager, follow the instructions
+in [Update a package](/magic#update-a-package) to update the `max` package.
 
 :::caution Switch to Magic
 
@@ -19,9 +20,12 @@ conda](/magic/conda).
 
 :::
 
-## v24.5 (2024-09-10)
+## v24.5 (2024-09-13)
 
 ### ✨ Highlights
+
+Here's a brief summary of some of the major changes in this release, with more
+detailed information in the following sections:
 
 - Mojo now supports Python 3.12 interoperability.
 
@@ -30,12 +34,18 @@ conda](/magic/conda).
   user code as users will need to explicitly import what they're using for cases
   previously automatically included before.
 
+- [`print()`](/mojo/stdlib/builtin/io/print) now requires that its arguments
+  conform to the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait.
+  This enables efficient stream-based writing by default, avoiding unnecessary
+  intermediate String heap allocations.
+
+- The new builtin [`input()`](/mojo/stdlib/builtin/io/input) function prints an
+  optional prompt and reads a line from standard input, in the same way as
+  Python.
+
 - Mojo now allows implicit definitions of variables within a `fn` in the same
   way that has been allowed in a `def`. The `var` keyword is still allowed, but
   is now optional.
-
-- Mojo now supports "conditional conformances" where some methods on a struct
-  have additional trait requirements that the struct itself doesn't.
 
 - Mojo now diagnoses "argument exclusivity" violations due to aliasing
   references. Mojo requires references (including implicit references due to
@@ -43,19 +53,14 @@ conda](/magic/conda).
   mutable. This is a warning in the 24.5 release, but will be upgraded to an
   error in subsequent releases.
 
+- Mojo now supports "conditional conformances" where some methods on a struct
+  have additional trait requirements that the struct itself doesn't.
+
 - `DTypePointer`, `LegacyPointer`, and `Pointer` have been removed. Use
   [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) instead.
   Functions that previously took a `DTypePointer` now take an equivalent
   `UnsafePointer`. For more information on using pointers, see [Unsafe
   pointers](/mojo/manual/pointers) in the Mojo Manual.
-
-- [`print()`](/mojo/stdlib/builtin/io/print) now requires that its arguments
-  conform to the `Formattable` trait. This enables efficient stream-based
-  writing by default, avoiding unnecessary intermediate String heap allocations.
-
-- The new builtin [`input()`](/mojo/stdlib/builtin/io/input) function prints an
-  optional prompt and reads a line from standard input, in the same way as
-  Python.
 
 - There are many new standard library APIs, with new features for strings,
   collections, and interacting with the filesystem and environment. Changes are
@@ -72,7 +77,11 @@ conda](/magic/conda).
 
 ### Language changes
 
-#### ⭐️ New
+- Mojo now allows implicit definitions of variables within a `fn` in the same
+  way that has been allowed in a `def`.  The `var` keyword is still allowed and
+  still denotes the declaration of a new variable with a scope (in both `def`
+  and `fn`).  Relaxing this makes `fn` and `def` more similar, but they still
+  differ in other important ways.
 
 - Mojo now diagnoses "argument exclusivity" violations due to aliasing
   references. Mojo requires references (including implicit references due to
@@ -106,11 +115,56 @@ conda](/magic/conda).
   This is a warning in the 24.5 release, but will be upgraded to an error in
   subsequent releases.
 
-- Mojo now allows implicit definitions of variables within a `fn` in the same
-  way that has been allowed in a `def`.  The `var` keyword is still allowed and
-  still denotes the declaration of a new variable with a scope (in both `def`
-  and `fn`).  Relaxing this makes `fn` and `def` more similar, but they still
-  differ in other important ways.
+  :::note
+
+  Argument exclusivity is not enforced for register-passable types. They are
+  passed by copy, so they don't form aliases.
+
+  :::
+
+- Mojo now supports "conditional conformances" where some methods on a struct
+  have additional trait requirements that the struct itself doesn't. This is
+  expressed through an explicitly declared `self` type:
+
+  ```mojo
+  struct GenericThing[Type: AnyType]:  # Works with anything
+    # Sugar for 'fn normal_method[Type: AnyType](self: GenericThing[Type]):'
+    fn normal_method(self): ...
+
+    # Just redeclare the requirements with more specific types:
+    fn needs_move[Type: Movable](self: GenericThing[Type], owned val: Type):
+      var tmp = val^  # Ok to move 'val' since it is Movable
+      ...
+  fn usage_example():
+    var a = GenericThing[Int]()
+    a.normal_method() # Ok, Int conforms to AnyType
+    a.needs_move(42)  # Ok, Int is movable
+
+    var b = GenericThing[NonMovable]()
+    b.normal_method() # Ok, NonMovable conforms to AnyType
+
+      # error: argument type 'NonMovable' does not conform to trait 'Movable'
+    b.needs_move(NonMovable())
+  ```
+
+  Conditional conformance works with dunder methods and other things as well.
+
+- As a specific form of "conditional conformances", initializers in a struct
+  may indicate specific parameter bindings to use in the type of their `self`
+  argument. For example:
+
+  ```mojo
+  @value
+  struct MyStruct[size: Int]:
+      fn __init__(inout self: MyStruct[0]): pass
+      fn __init__(inout self: MyStruct[1], a: Int): pass
+      fn __init__(inout self: MyStruct[2], a: Int, b: Int): pass
+
+  def test(x: Int):
+      a = MyStruct()      # Infers size=0 from 'self' type.
+      b = MyStruct(x)     # Infers size=1 from 'self' type.
+      c = MyStruct(x, x)  # Infers size=2 from 'self' type.
+  ```
 
 - Mojo now supports named result bindings. Named result bindings are useful for
   directly emplacing function results into the output slot of a function. This
@@ -175,50 +229,6 @@ conda](/magic/conda).
       print(x) # no longer complains about 'x' being uninitialized
   ```
 
-- Mojo now supports "conditional conformances" where some methods on a struct
-  have additional trait requirements that the struct itself doesn't. This is
-  expressed through an explicitly declared `self` type:
-
-  ```mojo
-  struct GenericThing[Type: AnyType]:  # Works with anything
-    # Sugar for 'fn normal_method[Type: AnyType](self: GenericThing[Type]):'
-    fn normal_method(self): ...
-
-    # Just redeclare the requirements with more specific types:
-    fn needs_move[Type: Movable](self: GenericThing[Type], owned val: Type):
-      var tmp = val^  # Ok to move 'val' since it is Movable
-      ...
-  fn usage_example():
-    var a = GenericThing[Int]()
-    a.normal_method() # Ok, Int conforms to AnyType
-    a.needs_move(42)  # Ok, Int is movable
-
-    var b = GenericThing[NonMovable]()
-    b.normal_method() # Ok, NonMovable conforms to AnyType
-
-      # error: argument type 'NonMovable' does not conform to trait 'Movable'
-    b.needs_move(NonMovable())
-  ```
-
-  Conditional conformance works with dunder methods and other things as well.
-
-- As a specific form of "conditional conformances", initializers in a struct
-  may indicate specific parameter bindings to use in the type of their `self`
-  argument. For example:
-
-  ```mojo
-  @value
-  struct MyStruct[size: Int]:
-      fn __init__(inout self: MyStruct[0]): pass
-      fn __init__(inout self: MyStruct[1], a: Int): pass
-      fn __init__(inout self: MyStruct[2], a: Int, b: Int): pass
-
-  def test(x: Int):
-      a = MyStruct()      # Infers size=0 from 'self' type.
-      b = MyStruct(x)     # Infers size=1 from 'self' type.
-      c = MyStruct(x, x)  # Infers size=2 from 'self' type.
-  ```
-
 - `async` functions now support memory-only results (like `String`, `List`,
   etc.) and `raises`. Accordingly, both
   [`Coroutine`](/mojo/stdlib/builtin/coroutine/Coroutine) and
@@ -254,10 +264,8 @@ conda](/magic/conda).
   export MOJO_PYTHON="~/venv/bin/python"
   ```
 
-  `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
+  `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic `libpython`
   but no Python executable.
-
-#### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
@@ -326,12 +334,16 @@ conda](/magic/conda).
     print("Hello, " + name + "!")
     ```
 
-    If the user enters "Mojo" it returns "Hello Mojo!"
+    If the user enters "Mojo" it returns "Hello, Mojo!"
+
+    There is a known issue when running the `input()` function with JIT
+    compilation (see issue
+    [#3479](https://github.com/modularml/mojo/issues/3479)).
 
   - [`print()`](/mojo/stdlib/builtin/io/print) now requires that its arguments
-    conform to the `Formattable` trait. This enables efficient stream-based
-    writing by default, avoiding unnecessary intermediate String heap
-    allocations.
+    conform to the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait.
+    This enables efficient stream-based writing by default, avoiding unnecessary
+    intermediate String heap allocations.
 
     Previously, `print()` required types conform to
     [`Stringable`](/mojo/stdlib/builtin/str/Stringable). This meant that to
@@ -377,7 +389,7 @@ conda](/magic/conda).
 
     <!-- TODO(MOCO-891): Remove this warning when error is improved. -->
 
-    :::note TODO
+    :::note
 
     The error shown when passing a type that does not implement `Formattable` to
     `print()` is currently not entirely descriptive of the underlying cause:
@@ -463,13 +475,19 @@ conda](/magic/conda).
   - Added the
     [`unsafe_cstr_ptr()`](/mojo/stdlib/collections/string/String#unsafe_cstr_ptr)
     method to `String` and `StringLiteral`, which returns an
-    `UnsafePointer[C_char]` for convenient interoperability with C APIs.
+    `UnsafePointer[c_char]` for convenient interoperability with C APIs.
 
-  - Added the `byte_length()` method to `String`, `StringSlice`, and
-    `StringLiteral` and deprecated their private `_byte_length()` methods.
-    Added a warning to `String.__len__` method that it will return length in
-    Unicode codepoints in the future and `StringSlice.__len__()` now does return
-    the Unicode codepoints length.
+  - Added the `byte_length()` method to
+    [`String`](/mojo/stdlib/collections/string/String#byte_length),
+    [`StringSlice`](/mojo/stdlib/utils/string_slice/StringSlice#byte_length),
+    and
+    [`StringLiteral`](/mojo/stdlib/builtin/string_literal/StringLiteral#byte_length)
+    and deprecated their private `_byte_length()` methods. Added a warning to
+    the [`String.__len__()`](/mojo/stdlib/collections/string/String#__len__)
+    method that it will return the length in Unicode codepoints in the future
+    and
+    [`StringSlice.__len__()`](/mojo/stdlib/utils/string_slice/StringSlice#__len__)
+    now does return the Unicode codepoints length.
     ([PR #2960](https://github.com/modularml/mojo/pull/2960))
 
   - Added a new [`StaticString`](/mojo/stdlib/utils/string_slice/#aliases) type
@@ -482,10 +500,11 @@ conda](/magic/conda).
     initializer that accepts a `StringLiteral`.
 
   - The [`StringRef`](/mojo/stdlib/utils/stringref/StringRef) constructors from
-    `DTypePointer.int8` have been changed to take a `UnsafePointer[C_char]`,
+    `DTypePointer.int8` have been changed to take a `UnsafePointer[c_char]`,
     reflecting their use for compatibility with C APIs.
 
-  - Continued transition to `UnsafePointer` and unsigned byte type for strings:
+  - Continued the transition to `UnsafePointer` and unsigned byte type for
+    strings:
 
     - [`String.unsafe_ptr()`](/mojo/stdlib/collections/string/String#unsafe_ptr)
       now returns an `UnsafePointer[UInt8]` (was `UnsafePointer[Int8]`)
@@ -551,8 +570,9 @@ conda](/magic/conda).
     - `initialize_pointee_copy(p, value)` => [`p.init_pointee_copy(value)`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer#init_pointee_copy)
     - `move_pointee(src=p1, dst=p2)` => [`p.move_pointee_into(p2)`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer#move_pointee_into)
 
-  - The `UnsafePointer.offset()` method has been removed. Use
-    [pointer arithmetic](/mojo/manual/pointers#storing-multiple-values) instead.
+  - The `UnsafePointer.offset()` method is deprecated and will be removed in a
+    future release. Use [pointer
+    arithmetic](/mojo/manual/pointers#storing-multiple-values) instead.
 
     ```mojo
     new_ptr = ptr.offset(1)
@@ -670,12 +690,12 @@ conda](/magic/conda).
 - Filesystem and environment utilities:
 
   - [`Path.home()`](/mojo/stdlib/pathlib/path/Path#home) has been added to
-    return a path of the users home directory.
+    return a path of the user's home directory.
 
   - [`os.path.expanduser()`](/mojo/stdlib/os/path/path/expanduser) and
     [`pathlib.Path.exapanduser()`](/mojo/stdlib/pathlib/path/Path#expanduser)
     have been added to allow expanding a prefixed `~` in a `String` or `Path`
-    with the users home path:
+    with the user's home path:
 
     ```mojo
     import os
@@ -759,7 +779,7 @@ conda](/magic/conda).
   - [`NoneType`](/mojo/stdlib/builtin/none/NoneType) is now a normal standard
     library type, and not an alias for a raw MLIR type.
 
-    Function signatures spelled as `fn() -> NoneType` should transition to
+    Function signatures written as `fn() -> NoneType` should transition to
     being written as `fn() -> None`.
 
   - Mojo now has a [`UInt`](/mojo/stdlib/builtin/uint/UInt) type for modeling
@@ -773,7 +793,7 @@ conda](/magic/conda).
     hash. In general, hashes should be an unsigned integer, and can also lead to
     improved performance in certain cases.
 
-  - Added the [`C_char`](/mojo/stdlib/sys/ffi/#aliases) type alias in `sys.ffi`.
+  - Added the [`c_char`](/mojo/stdlib/sys/ffi/#aliases) type alias in `sys.ffi`.
 
   - [`sort()`](/mojo/stdlib/builtin/sort/sort) now supports a `stable`
     parameter. It can be called by

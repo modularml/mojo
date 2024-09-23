@@ -21,6 +21,7 @@ from collections import InlineArray
 
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
+from memory import UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 # ===----------------------------------------------------------------------===#
@@ -41,7 +42,7 @@ fn _inline_array_construction_checks[size: Int]():
 
 @value
 struct InlineArray[
-    ElementType: CollectionElementNew,
+    ElementType: CollectionElement,
     size: Int,
     *,
     run_destructors: Bool = False,
@@ -141,7 +142,7 @@ struct InlineArray[
         @parameter
         for i in range(size):
             var ptr = UnsafePointer.address_of(self.unsafe_get(i))
-            ptr.init_pointee_explicit_copy(fill)
+            ptr.init_pointee_copy(fill)
 
     @always_inline
     fn __init__(inout self, owned *elems: Self.ElementType):
@@ -194,7 +195,7 @@ struct InlineArray[
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
 
-            ptr.init_pointee_explicit_copy(other[idx])
+            ptr.init_pointee_copy(other[idx])
 
     fn __copyinit__(inout self, other: Self):
         """Copy construct the array.

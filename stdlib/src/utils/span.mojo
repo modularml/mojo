@@ -21,7 +21,7 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Reference
+from memory import Reference, UnsafePointer
 from sys.intrinsics import _type_is_eq
 from builtin.builtin_list import _lit_mut_cast
 
@@ -125,7 +125,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int, //
+        T2: CollectionElement, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 

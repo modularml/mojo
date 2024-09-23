@@ -115,7 +115,7 @@ fn bench_dict_large_lookup(inout b: Bencher) raises:
 # ===----------------------------------------------------------------------===#
 def main():
     seed()
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=100))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_dict_ctor](BenchId("bench_dict_ctor"))
     m.bench_function[bench_dict_small_insert](
         BenchId("bench_dict_small_insert")

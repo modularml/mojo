@@ -14,6 +14,7 @@
 # RUN: %mojo %s | FileCheck %s
 
 from math import iota
+from memory import UnsafePointer
 from sys import num_physical_cores, simdwidthof
 
 import benchmark
