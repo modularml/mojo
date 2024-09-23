@@ -109,6 +109,9 @@ what we publish.
 
 - The VS Code extension now allows selecting a default SDK when multiple are available.
 
+- `String.as_bytes_slice()` is renamed to `String.as_bytes_span()` since it
+  returns a `Span` and not a `StringSlice`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
