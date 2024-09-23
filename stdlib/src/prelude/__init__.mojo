@@ -83,7 +83,7 @@ from builtin.type_aliases import (
     ImmutableStaticLifetime,
     MutableStaticLifetime,
     LifetimeSet,
-    AnyLifetime,
+    Lifetime,
 )
 from builtin.uint import UInt
 from builtin.value import (
