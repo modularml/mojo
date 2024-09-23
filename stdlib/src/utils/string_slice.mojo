@@ -677,3 +677,44 @@ struct StringSlice[
             current_offset += eol_location + eol_length
 
         return output^
+
+    @always_inline("nodebug")
+    fn unsafe_slice(self, start_idx: UInt, end_idx: UInt) -> Self:
+        """Construct a `StringSlice` from self, start index, and end index (in
+        Unicode codepoints). Highly unsafe operation with no bounds checks and
+        no negative indexing.
+
+        Args:
+            start_idx: The starting index.
+            end_idx: The end index.
+
+        Returns:
+            The resulting `StringSlice`.
+        """
+        debug_assert(
+            end_idx < len(self),
+            "`end_idx` is bigger than `len(self) -1` in Unicode codepoints",
+        )
+        debug_assert(
+            start_idx < len(self),
+            "`start_idx` is bigger than `len(self) -1` in Unicode codepoints",
+        )
+        debug_assert(
+            start_idx <= end_idx, "`start_idx` is bigger than `end_idx`"
+        )
+        var ptr = self.unsafe_ptr()
+        var amnt = 0
+
+        for i in range(start_idx):
+            amnt += 1 if _utf8_byte_type(ptr[i]) == 1 else 0
+
+        var idx = 0
+        while idx < end_idx - start_idx:
+            if _utf8_byte_type(ptr[idx]) == 1:
+                amnt += 1
+                idx -= 1
+            idx += 1
+
+        return Self(
+            unsafe_from_utf8_ptr=ptr + start_idx, len=end_idx - start_idx + amnt
+        )

@@ -2207,6 +2207,54 @@ struct String(
         var result = String(buffer)
         return result^
 
+    @always_inline("nodebug")
+    fn unsafe_bytes_slice(
+        self, start_idx: UInt, end_idx: UInt
+    ) -> Span[__lifetime_of(self)]:
+        """Construct a `Span` from self, start index, and end index. Highly
+        unsafe operation with no bounds checks and no negative indexing.
+
+        Args:
+            start_idx: The starting index.
+            end_idx: The end index.
+
+        Returns:
+            The resulting `Span`.
+        """
+        return self.as_bytes_slice().unsafe_slice(start_idx, end_idx)
+
+    @always_inline("nodebug")
+    fn unsafe_string_slice(
+        self, start_idx: UInt, end_idx: UInt
+    ) -> StringSlice[__lifetime_of(self)]:
+        """Construct a `StringSlice` from self, start index, and end index (in
+        Unicode codepoints). Highly unsafe operation with no bounds checks and
+        no negative indexing.
+
+        Args:
+            start_idx: The starting index.
+            end_idx: The end index.
+
+        Returns:
+            The resulting `StringSlice`.
+        """
+        return self.as_string_slice().unsafe_slice(start_idx, end_idx)
+
+    @always_inline("nodebug")
+    fn unsafe_slice(self, start_idx: UInt, end_idx: UInt) -> Self:
+        """Construct a `String` from self, start index, and end index (in
+        Unicode codepoints). Highly unsafe operation with no bounds checks and
+        no negative indexing.
+
+        Args:
+            start_idx: The starting index.
+            end_idx: The end index.
+
+        Returns:
+            The resulting `String`.
+        """
+        return Self(self.unsafe_string_slice(start_idx, end_idx))
+
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

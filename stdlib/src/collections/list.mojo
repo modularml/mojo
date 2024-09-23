@@ -734,8 +734,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if stop_normalized < 0:
             stop_normalized += len(self)
 
-        start_normalized = _clip(start_normalized, 0, len(self))
-        stop_normalized = _clip(stop_normalized, 0, len(self))
+        start_normalized = max(0, min(start_normalized, len(self)))
+        stop_normalized = max(0, min(stop_normalized, len(self)))
 
         for i in range(start_normalized, stop_normalized):
             if self[i] == value:
@@ -927,9 +927,34 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         return self.data
 
+    fn unsafe_slice(owned self, start_idx: UInt, end_idx: UInt) -> Self:
+        """Construct a `List` from self, start index, and end index.
+        Highly unsafe operation with no bounds checks and no negative indexing.
 
-fn _clip(value: Int, start: Int, end: Int) -> Int:
-    return max(start, min(value, end))
+        Args:
+            start_idx: The starting index.
+            end_idx: The end index.
+
+        Returns:
+            The resulting `List`.
+        """
+        debug_assert(
+            end_idx < len(self),
+            "`end_idx` is bigger than `len(self) -1`",
+        )
+        debug_assert(
+            start_idx < len(self),
+            "`start_idx` is bigger than `len(self) -1`",
+        )
+        debug_assert(
+            start_idx <= end_idx,
+            "`start_idx` is bigger than `end_idx`",
+        )
+        return Self(
+            unsafe_pointer=self.unsafe_ptr() + start_idx,
+            size=end_idx - start_idx,
+            capacity=self.capacity,
+        )
 
 
 fn _move_pointee_into_many_elements[

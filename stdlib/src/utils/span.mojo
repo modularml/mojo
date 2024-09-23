@@ -330,3 +330,31 @@ struct Span[
         return Span[T, _lit_mut_cast[lifetime, False].result](
             unsafe_ptr=self._data, len=self._len
         )
+
+    @always_inline("nodebug")
+    fn unsafe_slice(self, start_idx: UInt, end_idx: UInt) -> Self:
+        """Construct a `Span` from self, start index, and end index. Highly
+        unsafe operation with no bounds checks and no negative indexing.
+
+        Args:
+            start_idx: The starting index.
+            end_idx: The end index.
+
+        Returns:
+            The resulting `Span`.
+        """
+        debug_assert(
+            end_idx < len(self),
+            "`end_idx` is bigger than `len(self) -1`",
+        )
+        debug_assert(
+            start_idx < len(self),
+            "`start_idx` is bigger than `len(self) -1`",
+        )
+        debug_assert(
+            start_idx <= end_idx,
+            "`start_idx` is bigger than `end_idx`",
+        )
+        return Self(
+            unsafe_ptr=self.unsafe_ptr() + start_idx, len=end_idx - start_idx
+        )
