@@ -56,14 +56,14 @@ trait RepresentableKeyElement(KeyElement, Representable):
 
 
 @always_inline("nodebug")
-fn _hash_small_str(s: String) -> UInt:
-    """Hash a small data using the DJBX33A hash algorithm.
+fn _hash_str(s: String) -> UInt:
+    """Hash a string using the DJBX33A hash algorithm.
 
-    When the data is small, the SIMD hash function is not as efficient as
-    the SIMD machinery has some overhead that is not worth it for small data.
+    When the string is small, the default SIMD hash function is not as efficient
+    as the SIMD machinery has some overhead that is not worth it for small data.
 
     Args:
-        s: The byte array to hash.
+        s: The string to hash.
 
     Returns:
         A 64-bit hash value. This value is _not_ suitable for cryptographic
@@ -89,7 +89,7 @@ fn _hash_key[K: KeyElement](key: K) -> Int:
 
     @parameter
     if _type_is_eq[K, String]() or _type_is_eq[K, StringLiteral]():
-        return _hash_small_str(rebind[String](key))
+        return _hash_str(rebind[String](key))
     return hash(key)
 
 
