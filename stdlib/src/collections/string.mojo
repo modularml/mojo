@@ -2044,15 +2044,21 @@ struct String(
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
-        fn _build_slice(s_ptr: UnsafePointer[UInt8], start: Int, end: Int) -> SelfSlice:
-            return SelfSlice(unsafe_from_utf8_ptr=s_ptr + start, len=end-start)
+        fn _build_slice(
+            s_ptr: UnsafePointer[UInt8], start: Int, end: Int
+        ) -> SelfSlice:
+            return SelfSlice(
+                unsafe_from_utf8_ptr=s_ptr + start, len=end - start
+            )
 
         var current_automatic_arg_index = 0
         for e in entries:
             debug_assert(
                 pos_in_self < s_len, "pos_in_self >= self.byte_length()"
             )
-            res += String(_build_slice(self.unsafe_ptr(), pos_in_self, e[].first_curly))
+            res += String(
+                _build_slice(self.unsafe_ptr(), pos_in_self, e[].first_curly)
+            )
 
             if e[].is_escaped_brace():
                 res += "}" if e[].field[Bool] else "{"
@@ -2082,7 +2088,7 @@ struct String(
             pos_in_self = e[].last_curly + 1
 
         if pos_in_self < s_len:
-            res += String(_build_slice(self.unsafe_ptr(),pos_in_self, s_len))
+            res += String(_build_slice(self.unsafe_ptr(), pos_in_self, s_len))
 
         return res^
 
@@ -2546,10 +2552,16 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
-        fn _build_slice(s_ptr: UnsafePointer[UInt8], start: Int, end: Int) -> SelfSlice:
-            return SelfSlice(unsafe_from_utf8_ptr=s_ptr + start, len=end-start)
+        fn _build_slice(
+            s_ptr: UnsafePointer[UInt8], start: Int, end: Int
+        ) -> SelfSlice:
+            return SelfSlice(
+                unsafe_from_utf8_ptr=s_ptr + start, len=end - start
+            )
 
-        var field = String(_build_slice(format_src.unsafe_ptr(), start_value + 1, i))
+        var field = String(
+            _build_slice(format_src.unsafe_ptr(), start_value + 1, i)
+        )
         # FIXME(#3526): this will break once find works with unicode codepoints
         var exclamation_index = field.find("!")
 
@@ -2569,7 +2581,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 if field_b_len - new_idx > 1 or (
                     conversion_flag not in supported_conversion_flags
                 ):
-                    var f = String(_build_slice(field.unsafe_ptr(), new_idx, field_b_len))
+                    var f = String(
+                        _build_slice(field.unsafe_ptr(), new_idx, field_b_len)
+                    )
                     raise Error('Conversion flag "' + f + '" not recognised.')
                 self.conversion_flag = conversion_flag
             else:

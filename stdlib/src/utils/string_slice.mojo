@@ -678,27 +678,3 @@ struct StringSlice[
 
         return output^
 
-    @always_inline("nodebug")
-    fn unsafe_slice(self, start_idx: UInt, end_idx: UInt) -> Self:
-        """Construct a `StringSlice` from self, start index, and end index.
-        Highly unsafe operation with no bounds checks and no negative indexing.
-
-        Args:
-            start_idx: The starting index.
-            end_idx: The end index.
-        
-        Returns:
-            The resulting `StringSlice`.
-        """
-        debug_assert(
-            end_idx < self.byte_length(),
-            "end_idx is bigger than `self.byte_length() -1`",
-        )
-        debug_assert(
-            start_idx < self.byte_length(),
-            "start_idx is bigger than `self.byte_length() -1`",
-        )
-        return Self(
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start_idx,
-            len=end_idx - start_idx,
-        )
