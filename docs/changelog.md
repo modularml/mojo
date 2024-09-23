@@ -98,6 +98,8 @@ what we publish.
 - The aliases for C FFI have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long`
   and so on.
 
+- The VS Code extension now allows selecting a default SDK when multiple are available.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -107,3 +109,5 @@ what we publish.
 
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
+
+- The VS Code extension now auto-updates its private copy of the MAX SDK.
