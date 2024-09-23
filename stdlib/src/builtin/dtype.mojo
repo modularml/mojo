@@ -437,7 +437,7 @@ struct DType(
 
     @always_inline
     fn dispatch_integral[
-        func: fn[type: DType] () capturing -> None
+        func: fn[type: DType] () capturing [_] -> None
     ](self) raises:
         """Dispatches an integral function corresponding to the current DType.
 
@@ -474,7 +474,7 @@ struct DType(
 
     @always_inline
     fn dispatch_floating[
-        func: fn[type: DType] () capturing -> None
+        func: fn[type: DType] () capturing [_] -> None
     ](self) raises:
         """Dispatches a floating-point function corresponding to the current DType.
 
@@ -498,7 +498,7 @@ struct DType(
 
     @always_inline
     fn _dispatch_bitwidth[
-        func: fn[type: DType] () capturing -> None,
+        func: fn[type: DType] () capturing [_] -> None,
     ](self) raises:
         """Dispatches a function corresponding to the current DType's bitwidth.
         This should only be used if func only depends on the bitwidth of the dtype,
@@ -525,7 +525,7 @@ struct DType(
 
     @always_inline
     fn _dispatch_custom[
-        func: fn[type: DType] () capturing -> None, *dtypes: DType
+        func: fn[type: DType] () capturing [_] -> None, *dtypes: DType
     ](self) raises:
         """Dispatches a function corresponding to current DType if it matches
         any type in the dtypes parameter.
@@ -552,7 +552,7 @@ struct DType(
 
     @always_inline
     fn dispatch_arithmetic[
-        func: fn[type: DType] () capturing -> None
+        func: fn[type: DType] () capturing [_] -> None
     ](self) raises:
         """Dispatches a function corresponding to the current DType.
 

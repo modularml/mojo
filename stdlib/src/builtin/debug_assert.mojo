@@ -33,7 +33,7 @@ alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
 
 @always_inline
 fn debug_assert[
-    func: fn () capturing -> Bool, message_type: Stringable
+    func: fn () capturing [_] -> Bool, message_type: Stringable
 ](message: message_type):
     """Asserts that the condition is true.
 

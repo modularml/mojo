@@ -194,7 +194,7 @@ fn test_vectorize[
 # TODO: move this function to a common module for benchmarking.
 @always_inline
 fn unroll_nested_call[
-    func: fn[List[Int]] () raises capturing -> None,
+    func: fn[List[Int]] () raises capturing [_] -> None,
     count: List[Int],  # TODO: a better datatype to use? e.g., Dim?
     loop_idx: Int = 0,
     index_prev: List[Int] = List[Int](),
