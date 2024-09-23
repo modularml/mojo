@@ -26,7 +26,6 @@ from collections.string import _isspace
 from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
-from bit import bit_reverse
 
 alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
