@@ -39,7 +39,7 @@ fn bench_elementwise[n: Int](inout b: Bencher) raises:
             vector[idx[0]] = 42
 
         elementwise[func, 1](Index(n))
-        elementwise[func=func, simd_width = simdwidthof[DType.index](), rank=1](
+        elementwise[func=func, simd_width = simdwidthof[DType.index]()](
             Index(n)
         )
 
@@ -48,7 +48,7 @@ fn bench_elementwise[n: Int](inout b: Bencher) raises:
 
 
 fn main() raises:
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=10000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_elementwise[32]](BenchId("bench_elementwise_32"))
     m.bench_function[bench_elementwise[128]](BenchId("bench_elementwise_128"))
     m.bench_function[bench_elementwise[1024]](BenchId("bench_elementwise_1024"))

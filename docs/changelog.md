@@ -57,16 +57,48 @@ what we publish.
   any side effects that occur in the expression are never evaluated at runtime,
   eliminating concerns about `__type_of(expensive())` being a problem.
 
+- Add `PythonObject.from_borrowed_ptr()`, to simplify the construction of
+  `PythonObject` values from CPython 'borrowed reference' pointers.
+
+  The existing `PythonObject.__init__(PyObjectPtr)` should continue to be used
+  for the more common case of constructing a `PythonObject` from a
+  'strong reference' pointer.
+
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- Autoparameterization of parameters is now supported. Specifying a parameter
+  type with unbound parameters causes them to be implicitly added to the
+  function signature as inferred parameters.
+
+  ```mojo
+  fn foo[value: SIMD[DType.int32, _]]():
+    pass
+
+  # Equivalent to
+  fn foo[size: Int, //, value: SIMD[DType.int32, size]]():
+    pass
+  ```
+
 ### 🦋 Changed
+
+- More things have been removed from the auto-exported set of entities in the `prelude`
+  module from the Mojo standard library.
+  - `UnsafePointer` has been removed. Please explicitly import it via
+    `from memory import UnsafePointer`.
+  - `StringRef` has been removed. Please explicitly import it via
+    `from utils import StringRef`.
 
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
 
 - Restore implicit copyability of `Tuple` and `ListLiteral`.
+
+- The aliases for C FFI have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long`
+  and so on.
+
+- The VS Code extension now allows selecting a default SDK when multiple are available.
 
 ### ❌ Removed
 
@@ -77,3 +109,5 @@ what we publish.
 
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
+
+- The VS Code extension now auto-updates its private copy of the MAX SDK.

@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements functionality to start a mojo execution."""
 
+from memory import UnsafePointer
 from sys import external_call
 from sys.ffi import _get_global
 

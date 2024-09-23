@@ -15,15 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import C_char
+from sys.ffi import c_char
 
-from memory import memcpy
+from memory import memcpy, UnsafePointer
 from collections import List
 from utils import StringRef, Span, StringSlice
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from collections.string import _atol
+from collections.string import _atol, _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -272,6 +272,16 @@ struct StringLiteral(
         """
         return self.__str__()
 
+    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+        """Return an iterator over the string literal.
+
+        Returns:
+            An iterator over the string.
+        """
+        return _StringSliceIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
     fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
 
@@ -316,7 +326,7 @@ struct StringLiteral(
         #   return type.
         return ptr.bitcast[UInt8]()
 
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.
@@ -324,7 +334,7 @@ struct StringLiteral(
         Returns:
             The pointer to the underlying memory.
         """
-        return self.unsafe_ptr().bitcast[C_char]()
+        return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
     fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
@@ -430,6 +440,88 @@ struct StringLiteral(
 
         return result
 
+    fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
+        """Split the string literal by a separator.
+
+        Args:
+            sep: The string to split on.
+            maxsplit: The maximum amount of items to split from String.
+                Defaults to unlimited.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting a space
+        _ = "hello world".split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = "hello,,world".split(",") # ["hello", "", "world"]
+        # Splitting with maxsplit
+        _ = "1,2,3".split(",", 1) # ['1', '2,3']
+        ```
+        .
+        """
+        return str(self).split(sep, maxsplit)
+
+    fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
+        """Split the string literal by every whitespace separator.
+
+        Args:
+            sep: None.
+            maxsplit: The maximum amount of items to split from string. Defaults
+                to unlimited.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = "      ".split() # []
+        _ = "".split() # []
+
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = "      hello    world     ".split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        _ = "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world".split()
+        # ["hello", "world"]
+        ```
+        .
+        """
+        return str(self).split(sep, maxsplit)
+
+    fn splitlines(self, keepends: Bool = False) -> List[String]:
+        """Split the string literal at line boundaries. This corresponds to Python's
+        [universal newlines](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+
+        Args:
+            keepends: If True, line breaks are kept in the resulting strings.
+
+        Returns:
+            A List of Strings containing the input split by line boundaries.
+        """
+        return self.as_string_slice().splitlines(keepends)
+
+    fn count(self, substr: String) -> Int:
+        """Return the number of non-overlapping occurrences of substring
+        `substr` in the string literal.
+
+        If sub is empty, returns the number of empty strings between characters
+        which is the length of the string plus one.
+
+        Args:
+          substr: The substring to count.
+
+        Returns:
+          The number of occurrences of `substr`.
+        """
+        return str(self).count(substr)
+
     fn lower(self) -> String:
         """Returns a copy of the string literal with all cased characters
         converted to lowercase.
@@ -449,3 +541,161 @@ struct StringLiteral(
         """
 
         return str(self).upper()
+
+    fn rjust(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string right justified in a string literal of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns right justified string, or self if width is not bigger than self length.
+        """
+        return str(self).rjust(width, fillchar)
+
+    fn ljust(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string left justified in a string literal of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns left justified string, or self if width is not bigger than self length.
+        """
+        return str(self).ljust(width, fillchar)
+
+    fn center(self, width: Int, fillchar: StringLiteral = " ") -> String:
+        """Returns the string center justified in a string literal of specified width.
+
+        Args:
+            width: The width of the field containing the string.
+            fillchar: Specifies the padding character.
+
+        Returns:
+            Returns center justified string, or self if width is not bigger than self length.
+        """
+        return str(self).center(width, fillchar)
+
+    fn startswith(self, prefix: String, start: Int = 0, end: Int = -1) -> Bool:
+        """Checks if the string literal starts with the specified prefix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          prefix: The prefix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is prefixed by the input prefix.
+        """
+        return str(self).startswith(prefix, start, end)
+
+    fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
+        """Checks if the string literal end with the specified suffix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          suffix: The suffix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is suffixed by the input suffix.
+        """
+        return str(self).endswith(suffix, start, end)
+
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string literal are digits.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        return str(self).isdigit()
+
+    fn isupper(self) -> Bool:
+        """Returns True if all cased characters in the string literal are
+        uppercase and there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all cased characters in the string literal are uppercase
+            and there is at least one cased character, False otherwise.
+        """
+        return str(self).isupper()
+
+    fn islower(self) -> Bool:
+        """Returns True if all cased characters in the string literal
+        are lowercase and there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all cased characters in the string literal are lowercase
+            and there is at least one cased character, False otherwise.
+        """
+        return str(self).islower()
+
+    fn strip(self) -> String:
+        """Return a copy of the string literal with leading and trailing whitespaces
+        removed.
+
+        Returns:
+            A string with no leading or trailing whitespaces.
+        """
+        return self.lstrip().rstrip()
+
+    fn strip(self, chars: String) -> String:
+        """Return a copy of the string literal with leading and trailing characters
+        removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A string with no leading or trailing characters.
+        """
+
+        return self.lstrip(chars).rstrip(chars)
+
+    fn rstrip(self, chars: String) -> String:
+        """Return a copy of the string literal with trailing characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A string with no trailing characters.
+        """
+        return str(self).rstrip(chars)
+
+    fn rstrip(self) -> String:
+        """Return a copy of the string with trailing whitespaces removed.
+
+        Returns:
+            A copy of the string with no trailing whitespaces.
+        """
+        return str(self).rstrip()
+
+    fn lstrip(self, chars: String) -> String:
+        """Return a copy of the string with leading characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A copy of the string with no leading characters.
+        """
+        return str(self).lstrip(chars)
+
+    fn lstrip(self) -> String:
+        """Return a copy of the string with leading whitespaces removed.
+
+        Returns:
+            A copy of the string with no leading whitespaces.
+        """
+        return str(self).lstrip()

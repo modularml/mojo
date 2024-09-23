@@ -131,5 +131,5 @@ from collections.string import (
     islower,
     isprintable,
 )
-from memory import UnsafePointer, Reference, AddressSpace
-from utils import StringRef, Formattable, Formatter
+from memory import Reference, AddressSpace
+from utils import Formattable, Formatter

@@ -17,10 +17,10 @@ import os
 from collections import List
 from os import PathLike, listdir, stat_result
 from sys import os_is_windows, external_call
-from sys.ffi import C_char
+from sys.ffi import c_char
 
 from builtin._location import __call_location, _SourceLocation
-from memory import stack_allocation
+from memory import stack_allocation, UnsafePointer
 
 from utils import StringRef
 
@@ -34,14 +34,14 @@ fn cwd() raises -> Path:
       The current directory.
     """
     alias MAX_CWD_BUFFER_SIZE = 1024
-    var buf = stack_allocation[MAX_CWD_BUFFER_SIZE, C_char]()
+    var buf = stack_allocation[MAX_CWD_BUFFER_SIZE, c_char]()
 
-    var res = external_call["getcwd", UnsafePointer[C_char]](
+    var res = external_call["getcwd", UnsafePointer[c_char]](
         buf, Int(MAX_CWD_BUFFER_SIZE)
     )
 
     # If we get a nullptr, then we raise an error.
-    if res == UnsafePointer[C_char]():
+    if res == UnsafePointer[c_char]():
         raise Error("unable to query the current directory")
 
     return String(StringRef(buf))
