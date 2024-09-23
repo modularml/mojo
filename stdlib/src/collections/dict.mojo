@@ -75,7 +75,7 @@ trait StringableKeyElement(KeyElement, Stringable, Sized):
 
 
 @always_inline("nodebug")
-fn _hash_small_str[T: StringableKeyElement](s: T) -> UInt:
+fn _hash_small_str(s: String) -> UInt:
     """Hash a small data using the DJBX33A hash algorithm.
 
     When the data is small, the SIMD hash function is not as efficient as
@@ -89,8 +89,7 @@ fn _hash_small_str[T: StringableKeyElement](s: T) -> UInt:
         uses. Its intended usage is for data structures.
     """
     var hash = 5381  # typical starting value
-    for i in range(len(s)):
-        c = s[i]
+    for c in s.as_string_slice():
         hash = ((hash << 5) + hash) + ord(c)  # hash * 33 + ord(char)
     return hash
 
