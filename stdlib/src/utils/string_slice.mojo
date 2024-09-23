@@ -69,6 +69,13 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
 fn _utf8_first_byte_sequence_length(b: UInt8) -> Int:
     """Get the length of the sequence starting with given byte. Do note that
     this does not work correctly if given a continuation byte."""
+    debug_assert(
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
+    )
     var flipped = ~b
     return int(count_leading_zeros(flipped) + (flipped >> 7))
 
