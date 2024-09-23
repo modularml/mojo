@@ -1484,6 +1484,7 @@ def test_format_conversion_flags():
     assert_equal(String("{} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{!s} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
+    assert_equal(String("{0!s} {0!r}").format(a, "Mojo2"), "Mojo 'Mojo'")
 
     var b = 21.1
     assert_true(
