@@ -355,8 +355,7 @@ struct StringSlice[
         Returns:
             The length in Unicode codepoints.
         """
-        var byte_length = self.byte_length()
-        return byte_length - _count_utf8_continuation_bytes(
+        return self.byte_length() - _count_utf8_continuation_bytes(
             self.as_bytes_slice()
         )
 
