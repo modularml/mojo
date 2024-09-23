@@ -650,13 +650,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             key: The key to associate with the specified value.
             value: The data to store in the dictionary.
         """
-
-        @parameter
-        if _type_is_eq[K, String]():
-            var hash = _hash_small_str(rebind[String](key))
-            self._insert_with_hash(key^, value^, hash)
-        else:
-            self._insert(key^, value^)
+        self._insert_with_hash(key, value, _hash_key(key))
 
     fn __contains__(self, key: K) -> Bool:
         """Check if a given key is in the dictionary or not.
@@ -1026,6 +1020,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self.size += 1
             self._n_entries += 1
 
+    @always_inline("nodebug")
     fn _insert_with_hash(inout self, owned key: K, owned value: V, hash: Int):
         self._insert(DictEntry[K, V](key^, value^, hash))
 
