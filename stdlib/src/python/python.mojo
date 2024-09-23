@@ -22,7 +22,7 @@ from python import Python
 from collections import Dict
 from os import abort, getenv
 from sys import external_call, sizeof
-from sys.ffi import _get_global
+from sys.ffi import _get_global, OpaquePointer
 
 from memory import UnsafePointer
 
@@ -32,13 +32,13 @@ from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
 from .python_object import PythonObject, TypedPythonObject
 
 
-fn _init_global(ignored: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
+fn _init_global(ignored: OpaquePointer) -> OpaquePointer:
     var ptr = UnsafePointer[CPython].alloc(1)
     ptr[] = CPython()
     return ptr.bitcast[NoneType]()
 
 
-fn _destroy_global(python: UnsafePointer[NoneType]):
+fn _destroy_global(python: OpaquePointer):
     var p = python.bitcast[CPython]()
     CPython.destroy(p[])
     python.free()
