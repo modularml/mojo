@@ -33,36 +33,43 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 
 fn _count_utf8_continuation_bytes(
     ptr: UnsafePointer[UInt8], num_bytes: Int
-) -> UInt:
-    alias size = simdwidthof[UInt8]()
-    var amnt: UInt = 0
+) -> Int:
+    alias size = simdwidthof[DType.uint8]()
+    var amnt: Int = 0
 
     @parameter
     @always_inline("nodebug")
-    fn count[w: Int](offset: Int) -> UInt:
-        var comp = ((ptr + offset).load[width=w]() & 0b1100_0000) == 0b1000_0000
+    fn count[w: Int](p: UnsafePointer[UInt8]) -> Int:
+        var vec = p.strided_load[DType.uint8, width=w](1)
+        var comp = (vec & 0b1100_0000) == 0b1000_0000
         return int(comp.cast[DType.uint8]().reduce_add())
 
-    for _ in range(num_bytes // size):
-        amnt += count[size](0)
+    for i in range(num_bytes // size):
+        amnt += count[size](ptr + i * size)
 
     @parameter
     if size > 32:
-        for _ in range((num_bytes % size) // 32):
-            amnt += count[32]((num_bytes // size) * size)
+        for i in range(num_bytes // 32):
+            amnt += count[32](ptr + (num_bytes // size) * size + i * 32)
 
     @parameter
     if size > 16:
-        for _ in range((num_bytes % 32) // 16):
-            amnt += count[16]((num_bytes // 32) * 32)
+        for i in range(num_bytes // 16):
+            amnt += count[16](ptr + (num_bytes // 32) * 32 + i * 16)
 
     @parameter
     if size > 8:
-        for _ in range((num_bytes % 16) // 8):
-            amnt += count[8]((num_bytes // 16) * 16)
+        for i in range(num_bytes // 8):
+            amnt += count[8](ptr + (num_bytes // 16) * 16 + i * 8)
 
+    print("size: ", size)
+    print(amnt)
+    print(num_bytes % 8)
     for i in range(num_bytes % 8):
-        amnt += count[1]((num_bytes // 8) * 8)
+        amnt += int(
+            (ptr[(num_bytes // 8) * 8 + i] & 0b1100_0000) == 0b1000_0000
+        )
+    print(amnt)
     return amnt
 
 
@@ -179,10 +186,9 @@ struct _StringSliceIter[
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        self.continuation_bytes = 0
-        for i in range(length):
-            if _utf8_byte_type(unsafe_pointer[i]) == 1:
-                self.continuation_bytes += 1
+        self.continuation_bytes = _count_utf8_continuation_bytes(
+            self.ptr, self.length
+        )
 
     fn __iter__(self) -> Self:
         return self

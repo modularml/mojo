@@ -16,6 +16,7 @@ from testing import assert_equal, assert_true, assert_false
 
 from utils import Span, StringSlice
 from utils._utf8_validation import _is_valid_utf8
+from utils.string_slice import _count_utf8_continuation_bytes
 
 
 fn test_string_literal_byte_span() raises:
@@ -383,6 +384,34 @@ def test_combination_10_good_10_bad_utf8_sequences():
             assert_false(validate_utf8(sequence))
 
 
+def test_count_utf8_continuation_bytes():
+    var a = List[UInt8](
+        0b1000_0000, 0b1000_0000, 0b1000_0000, 0b1000_0000, 0b1000_0000
+    )
+    assert_equal(5, _count_utf8_continuation_bytes(a.unsafe_ptr(), 5))
+    a = List[UInt8](
+        0b1100_0000, 0b1000_0000, 0b1100_0000, 0b1000_0000, 0b1100_0000
+    )
+    assert_equal(2, _count_utf8_continuation_bytes(a.unsafe_ptr(), 5))
+    a = List[UInt8](
+        0b0100_0000, 0b1000_0000, 0b0100_0000, 0b1000_0000, 0b0100_0000
+    )
+    assert_equal(2, _count_utf8_continuation_bytes(a.unsafe_ptr(), 5))
+    a = List[UInt8](
+        0b1100_0000, 0b1000_0000, 0b1100_0000, 0b1000_0000, 0b0100_0000
+    )
+    assert_equal(2, _count_utf8_continuation_bytes(a.unsafe_ptr(), 5))
+    a = List[UInt8](
+        0b1100_0000, 0b1000_0000, 0b0100_0000, 0b1100_0000, 0b1000_0000
+    )
+    assert_equal(2, _count_utf8_continuation_bytes(a.unsafe_ptr(), 5))
+    a = List[UInt8](
+        0b0100_0000, 0b1100_0000, 0b1000_0000, 0b1100_0000, 0b1000_0000
+    )
+    assert_equal(2, _count_utf8_continuation_bytes(a.unsafe_ptr(), 5))
+    _ = a
+
+
 fn main() raises:
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -399,3 +428,4 @@ fn main() raises:
     test_combination_good_bad_utf8_sequences()
     test_combination_10_good_utf8_sequences()
     test_combination_10_good_10_bad_utf8_sequences()
+    test_count_utf8_continuation_bytes()
