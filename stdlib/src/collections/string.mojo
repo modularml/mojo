@@ -688,9 +688,10 @@ fn isprintable(c: UInt8) -> Bool:
 
 struct String(
     Sized,
+    Stringable,
     Representable,
     IntableRaising,
-    StringableKeyElement,
+    KeyElement,
     Comparable,
     Boolable,
     Formattable,

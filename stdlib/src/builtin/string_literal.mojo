@@ -38,9 +38,10 @@ struct StringLiteral(
     CollectionElementNew,
     Formattable,
     IntableRaising,
-    Stringable,
-    StringableKeyElement,
+    KeyElement,
     Representable,
+    Sized,
+    Stringable,
     FloatableRaising,
 ):
     """This type represents a string literal.

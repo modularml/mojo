@@ -55,25 +55,6 @@ trait RepresentableKeyElement(KeyElement, Representable):
     pass
 
 
-trait StringableKeyElement(KeyElement, Stringable, Sized):
-    """A trait composition for types which implement all requirements of
-    dictionary keys, Stringable and Sized with indexed."""
-
-    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
-        """Get the string representation of the type at the given index.
-
-        Parameters:
-                IndexerType: The type of the index.
-
-        Args:
-            idx: The index of the element to get the string representation of.
-
-        Returns:
-            The string representation of the element at the given index.
-        """
-        ...
-
-
 @always_inline("nodebug")
 fn _hash_small_str(s: String) -> UInt:
     """Hash a small data using the DJBX33A hash algorithm.
