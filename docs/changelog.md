@@ -99,6 +99,9 @@ what we publish.
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
 
+- The `AnyLifetime` type (useful for declaring lifetime types as parameters) has
+  been renamed to `Lifetime`.
+
 - Restore implicit copyability of `Tuple` and `ListLiteral`.
 
 - The aliases for C FFI have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long`

@@ -43,7 +43,7 @@ alias LifetimeSet = __mlir_type.`!lit.lifetime.set`
 
 # Helper to build a value of !lit.lifetime type.
 # TODO: Should be a parametric alias.
-struct AnyLifetime[is_mutable: Bool]:
+struct Lifetime[is_mutable: Bool]:
     """This represents a lifetime reference of potentially parametric type.
     TODO: This should be replaced with a parametric type alias.
 
