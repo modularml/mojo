@@ -630,7 +630,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             key: The key to associate with the specified value.
             value: The data to store in the dictionary.
         """
-        self._insert_with_hash(key, value, _hash_key(key))
+        self._insert_with_hash(key^, value^, _hash_key(key))
 
     fn __contains__(self, key: K) -> Bool:
         """Check if a given key is in the dictionary or not.
