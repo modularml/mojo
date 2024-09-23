@@ -1154,14 +1154,13 @@ struct String(
         Returns:
             The string length, in bytes (for now).
         """
-        var unicode_length = self.byte_length()
 
         # TODO: everything uses this method assuming it's byte length
-        # for i in range(unicode_length):
-        #     if _utf8_byte_type(self._buffer[i]) == 1:
-        #         unicode_length -= 1
-
-        return unicode_length
+        # var byte_length = self.byte_length()
+        # return byte_length - _count_utf8_continuation_bytes(
+        #     self.unsafe_ptr(), byte_length
+        # )
+        return self.byte_length()
 
     @always_inline
     fn __str__(self) -> String:

@@ -26,9 +26,45 @@ from collections.string import _isspace
 from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
+from bit import bit_reverse
 
 alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
+
+
+fn _count_utf8_continuation_bytes(
+    ptr: UnsafePointer[UInt8], num_bytes: Int
+) -> UInt:
+    alias size = simdwidthof[UInt8]()
+    var amnt: UInt = 0
+
+    @parameter
+    @always_inline("nodebug")
+    fn count[w: Int](offset: Int) -> UInt:
+        var comp = ((ptr + offset).load[width=w]() & 0b1100_0000) == 0b1000_0000
+        return int(comp.cast[DType.uint8]().reduce_add())
+
+    for _ in range(num_bytes // size):
+        amnt += count[size](0)
+
+    @parameter
+    if size > 32:
+        for _ in range((num_bytes % size) // 32):
+            amnt += count[32]((num_bytes // size) * size)
+
+    @parameter
+    if size > 16:
+        for _ in range((num_bytes % 32) // 16):
+            amnt += count[16]((num_bytes // 32) * 32)
+
+    @parameter
+    if size > 8:
+        for _ in range((num_bytes % 16) // 8):
+            amnt += count[8]((num_bytes // 16) * 16)
+
+    for i in range(num_bytes % 8):
+        amnt += count[1]((num_bytes // 8) * 8)
+    return amnt
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
@@ -319,13 +355,10 @@ struct StringSlice[
         Returns:
             The length in Unicode codepoints.
         """
-        var unicode_length = self.byte_length()
-
-        for i in range(unicode_length):
-            if _utf8_byte_type(self._slice[i]) == 1:
-                unicode_length -= 1
-
-        return unicode_length
+        var byte_length = self.byte_length()
+        return byte_length - _count_utf8_continuation_bytes(
+            self.unsafe_ptr(), byte_length
+        )
 
     fn format_to(self, inout writer: Formatter):
         """
