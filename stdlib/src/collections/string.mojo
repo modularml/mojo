@@ -1569,25 +1569,25 @@ struct String(
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
-        fn build_slice(s_ptr: UnsafePointer[UInt8], length: Int) -> SelfSlice:
+        fn _build_slice(s_ptr: UnsafePointer[UInt8], length: Int) -> SelfSlice:
             return SelfSlice(unsafe_from_utf8_ptr=s_ptr, len=length)
 
         while lhs <= str_byte_len:
             # FIXME(#3295): this will fail when find is changed to use unicode codepoints
             rhs = self.find(sep, lhs)
             if rhs == -1:
-                var s = String(build_slice(ptr + lhs, str_byte_len - lhs + 1))
+                var s = String(_build_slice(ptr + lhs, str_byte_len - lhs + 1))
                 output.append(s^)
                 break
 
             if maxsplit > -1:
                 if items == maxsplit:
-                    var s = build_slice(ptr + lhs, str_byte_len - lhs + 1)
+                    var s = _build_slice(ptr + lhs, str_byte_len - lhs + 1)
                     output.append(String(s^))
                     break
                 items += 1
 
-            output.append(String(build_slice(ptr + lhs, rhs - lhs)))
+            output.append(String(_build_slice(ptr + lhs, rhs - lhs)))
             lhs = rhs + sep_len
 
         if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
@@ -1631,13 +1631,13 @@ struct String(
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
-        fn build_slice(s_ptr: UnsafePointer[UInt8], length: Int) -> SelfSlice:
+        fn _build_slice(s_ptr: UnsafePointer[UInt8], length: Int) -> SelfSlice:
             return SelfSlice(unsafe_from_utf8_ptr=s_ptr, len=length)
 
         while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            for s in build_slice(ptr + lhs, str_byte_len - lhs):
+            for s in _build_slice(ptr + lhs, str_byte_len - lhs):
                 if not s.isspace():
                     break
                 lhs += s.byte_length()
@@ -1648,7 +1648,7 @@ struct String(
                 break
             var b_len = _utf8_first_byte_sequence_length(ptr[lhs])
             rhs = lhs + b_len
-            for s in build_slice(ptr + rhs, str_byte_len - rhs):
+            for s in _build_slice(ptr + rhs, str_byte_len - rhs):
                 if s.isspace():
                     break
                 rhs += s.byte_length()
@@ -1657,12 +1657,12 @@ struct String(
 
             if maxsplit > -1:
                 if items == maxsplit:
-                    var s = String(build_slice(ptr + lhs, str_byte_len - lhs))
+                    var s = String(_build_slice(ptr + lhs, str_byte_len - lhs))
                     output.append(s^)
                     break
                 items += 1
 
-            output.append(String(build_slice(ptr + lhs, rhs - lhs)))
+            output.append(String(_build_slice(ptr + lhs, rhs - lhs)))
             lhs = rhs
 
         return output^
