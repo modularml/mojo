@@ -17,7 +17,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int
+from sys.ffi import DLHandle, c_char, c_int, OpaquePointer
 
 from memory import UnsafePointer
 
@@ -314,7 +314,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
 @value
 struct PyModuleDef_Slot:
     var slot: Int
-    var value: UnsafePointer[NoneType]
+    var value: OpaquePointer
 
 
 # Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef
@@ -339,18 +339,16 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     var slots: UnsafePointer[PyModuleDef_Slot]
 
     # TODO(MOCO-1138): These are C ABI function pointers, not Mojo functions.
-    alias _visitproc_fn_type = fn (PyObjectPtr, UnsafePointer[NoneType]) -> Int
+    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> Int
     alias _traverse_fn_type = fn (
-        PyObjectPtr, Self._visitproc_fn_type, UnsafePointer[NoneType]
+        PyObjectPtr, Self._visitproc_fn_type, OpaquePointer
     ) -> Int
     var traverse_fn: Self._traverse_fn_type
 
     alias _clear_fn_type = fn (PyObjectPtr) -> Int
     var clear_fn: Self._clear_fn_type
 
-    alias _free_fn_type = fn (UnsafePointer[NoneType]) -> UnsafePointer[
-        NoneType
-    ]
+    alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
     var free_fn: Self._free_fn_type
 
     fn __init__(inout self, name: String):
