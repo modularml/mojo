@@ -31,10 +31,10 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
 
 
-fn _count_utf8_continuation_bytes(
-    ptr: UnsafePointer[UInt8], num_bytes: Int
-) -> Int:
+fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
     alias size = simdwidthof[DType.uint8]()
+    var ptr = span.unsafe_ptr()
+    var num_bytes = len(span)
     var amnt: Int = 0
 
     @parameter
@@ -62,14 +62,9 @@ fn _count_utf8_continuation_bytes(
         for i in range(num_bytes // 8):
             amnt += count[8](ptr + (num_bytes // 16) * 16 + i * 8)
 
-    print("size: ", size)
-    print(amnt)
-    print(num_bytes % 8)
     for i in range(num_bytes % 8):
-        amnt += int(
-            (ptr[(num_bytes // 8) * 8 + i] & 0b1100_0000) == 0b1000_0000
-        )
-    print(amnt)
+        amnt += count[1](ptr + (num_bytes // 8) * 8 + i)
+    _ = span
     return amnt
 
 
@@ -187,7 +182,7 @@ struct _StringSliceIter[
         self.ptr = unsafe_pointer
         self.length = length
         self.continuation_bytes = _count_utf8_continuation_bytes(
-            self.ptr, self.length
+            Span[UInt8, lifetime](unsafe_ptr=self.ptr, len=self.length),
         )
 
     fn __iter__(self) -> Self:
@@ -362,7 +357,7 @@ struct StringSlice[
         """
         var byte_length = self.byte_length()
         return byte_length - _count_utf8_continuation_bytes(
-            self.unsafe_ptr(), byte_length
+            self.as_bytes_slice()
         )
 
     fn format_to(self, inout writer: Formatter):
