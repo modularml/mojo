@@ -2379,8 +2379,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     """The index of an closing brace around a substitution field."""
 
     var conversion_flag: UInt8
-    """Store the format specifier in binary (e.g., ord("r") for repr). It is
-    stored in binary because every [format specifier](\
+    """Store the format specifier in a byte (e.g., ord("r") for repr). It is
+    stored in a byte because every [format specifier](\
     https://docs.python.org/3/library/string.html#formatspec) is an ASCII
     character.
     """
@@ -2444,10 +2444,6 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var raised_manual_index = Optional[Int](None)
         var raised_automatic_index = Optional[Int](None)
         var raised_kwarg_field = Optional[String](None)
-        # `__str__` and `__repr__`
-        alias supported_conversion_flags = SIMD[DType.uint8, 2](
-            ord("s"), ord("r")
-        )
         alias `}` = UInt8(ord("}"))
         alias `{` = UInt8(ord("{"))
 
@@ -2492,73 +2488,18 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                     )
 
                     if i - start_value != 1:
-                        var field = String(
-                            format_src._slice(start_value + 1, i)
-                        )
-                        # FIXME(#3526): this will break once find works with unicode codepoints
-                        var exclamation_index = field.find("!")
-
-                        # TODO: Future implementation of format specifiers
-                        # When implementing format specifiers, modify this section to handle:
-                        # replacement_field ::= "{" [field_name] ["!" conversion] [":" format_spec] "}"
-                        # this will involve:
-                        # 1. finding a colon ':' after the conversion flag (if present)
-                        # 2. extracting the format_spec if a colon is found
-                        # 3. adjusting the field and conversion_flag parsing accordingly
-
-                        if exclamation_index != -1:
-                            field_b_len = i - (start_value + 1)
-                            var new_idx = exclamation_index + 1
-                            if new_idx < field_b_len:
-                                var conversion_flag = field._buffer.unsafe_get(
-                                    new_idx
-                                )
-                                if field_b_len - new_idx > 1 or (
-                                    conversion_flag
-                                    not in supported_conversion_flags
-                                ):
-                                    var f = String(
-                                        field._slice(new_idx, field_b_len)
-                                    )
-                                    raise Error(
-                                        'Conversion flag "'
-                                        + f
-                                        + '" not recognised.'
-                                    )
-                                current_entry.conversion_flag = conversion_flag
-                            else:
-                                raise "Empty conversion flag."
-
-                            field._buffer.resize(new_idx)
-                            field._buffer.unsafe_set(exclamation_index, 0)
-
-                        if field._buffer.unsafe_get(0) == 0:
-                            # an empty field, so it's automatic indexing
-                            if automatic_indexing_count >= len_pos_args:
-                                raised_automatic_index = (
-                                    automatic_indexing_count
-                                )
-                                break
-                            automatic_indexing_count += 1
-                        else:
-                            try:
-                                # field is a number for manual indexing:
-                                var number = int(field)
-                                current_entry.field = number
-                                if number >= len_pos_args or number < 0:
-                                    raised_manual_index = number
-                                    break
-                                manual_indexing_count += 1
-                            except e:
-                                debug_assert(
-                                    "not convertible to integer" in str(e),
-                                    "Not the expected error from atol",
-                                )
-                                # field is a keyword for **kwargs:
-                                current_entry.field = field
-                                raised_kwarg_field = field
-                                break
-
+                        if current_entry._handle_field_and_break(
+                            format_src,
+                            len_pos_args,
+                            i,
+                            start_value,
+                            automatic_indexing_count,
+                            raised_automatic_index,
+                            manual_indexing_count,
+                            raised_manual_index,
+                            raised_kwarg_field,
+                        ):
+                            break
                     else:
                         # automatic indexing
                         # current_entry.field is already None
@@ -2600,3 +2541,74 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             raise "there is a single curly { left unclosed or unescaped"
 
         return entries^
+
+    fn _handle_field_and_break(
+        inout self,
+        format_src: String,
+        len_pos_args: Int,
+        i: Int,
+        start_value: Int,
+        inout automatic_indexing_count: Int,
+        inout raised_automatic_index: Optional[Int],
+        inout manual_indexing_count: Int,
+        inout raised_manual_index: Optional[Int],
+        inout raised_kwarg_field: Optional[String],
+    ) raises -> Bool:
+        # `__str__` and `__repr__`
+        alias supported_conversion_flags = SIMD[DType.uint8, 2](
+            ord("s"), ord("r")
+        )
+        var field = String(format_src._slice(start_value + 1, i))
+        # FIXME(#3526): this will break once find works with unicode codepoints
+        var exclamation_index = field.find("!")
+
+        # TODO: Future implementation of format specifiers
+        # When implementing format specifiers, modify this section to handle:
+        # replacement_field ::= "{" [field_name] ["!" conversion] [":" format_spec] "}"
+        # this will involve:
+        # 1. finding a colon ':' after the conversion flag (if present)
+        # 2. extracting the format_spec if a colon is found
+        # 3. adjusting the field and conversion_flag parsing accordingly
+
+        if exclamation_index != -1:
+            field_b_len = i - (start_value + 1)
+            var new_idx = exclamation_index + 1
+            if new_idx < field_b_len:
+                var conversion_flag = field._buffer.unsafe_get(new_idx)
+                if field_b_len - new_idx > 1 or (
+                    conversion_flag not in supported_conversion_flags
+                ):
+                    var f = String(field._slice(new_idx, field_b_len))
+                    raise Error('Conversion flag "' + f + '" not recognised.')
+                self.conversion_flag = conversion_flag
+            else:
+                raise "Empty conversion flag."
+
+            field._buffer.resize(new_idx)
+            field._buffer.unsafe_set(exclamation_index, 0)
+
+        if field._buffer.unsafe_get(0) == 0:
+            # an empty field, so it's automatic indexing
+            if automatic_indexing_count >= len_pos_args:
+                raised_automatic_index = automatic_indexing_count
+                return True
+            automatic_indexing_count += 1
+        else:
+            try:
+                # field is a number for manual indexing:
+                var number = int(field)
+                self.field = number
+                if number >= len_pos_args or number < 0:
+                    raised_manual_index = number
+                    return True
+                manual_indexing_count += 1
+            except e:
+                debug_assert(
+                    "not convertible to integer" in str(e),
+                    "Not the expected error from atol",
+                )
+                # field is a keyword for **kwargs:
+                self.field = field
+                raised_kwarg_field = field
+                return True
+        return False
