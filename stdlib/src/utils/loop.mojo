@@ -30,7 +30,7 @@ from utils import unroll
 
 @always_inline
 fn unroll[
-    func: fn[idx0: Int, idx1: Int] () capturing -> None,
+    func: fn[idx0: Int, idx1: Int] () capturing [_] -> None,
     dim0: Int,
     dim1: Int,
 ]():
@@ -58,7 +58,7 @@ fn unroll[
 
 @always_inline
 fn unroll[
-    func: fn[idx0: Int, idx1: Int, idx2: Int] () capturing -> None,
+    func: fn[idx0: Int, idx1: Int, idx2: Int] () capturing [_] -> None,
     dim0: Int,
     dim1: Int,
     dim2: Int,
@@ -91,7 +91,7 @@ fn unroll[
 
 @always_inline
 fn unroll[
-    func: fn[idx: Int] () capturing -> None,
+    func: fn[idx: Int] () capturing [_] -> None,
     zero_starting_range: _ZeroStartingRange,
 ]():
     """Repeatedly evaluates a function `range` times.
@@ -109,7 +109,7 @@ fn unroll[
 
 @always_inline
 fn unroll[
-    func: fn[idx: Int] () raises capturing -> None,
+    func: fn[idx: Int] () raises capturing [_] -> None,
     zero_starting_range: _ZeroStartingRange,
 ]() raises:
     """Repeatedly evaluates a function `range` times.
@@ -130,7 +130,7 @@ fn unroll[
 # ===----------------------------------------------------------------------===#
 @always_inline
 fn unroll[
-    func: fn[idx: Int] () capturing -> None,
+    func: fn[idx: Int] () capturing [_] -> None,
     sequential_range: _SequentialRange,
 ]():
     """Repeatedly evaluates a function `range` times.
@@ -148,7 +148,7 @@ fn unroll[
 
 @always_inline
 fn unroll[
-    func: fn[idx: Int] () raises capturing -> None,
+    func: fn[idx: Int] () raises capturing [_] -> None,
     sequential_range: _SequentialRange,
 ]() raises:
     """Repeatedly evaluates a function `range` times.
@@ -169,7 +169,7 @@ fn unroll[
 # ===----------------------------------------------------------------------===#
 @always_inline
 fn unroll[
-    func: fn[idx: Int] () capturing -> None,
+    func: fn[idx: Int] () capturing [_] -> None,
     strided_range: _StridedRange,
 ]():
     """Repeatedly evaluates a function `range` times.
@@ -187,7 +187,7 @@ fn unroll[
 
 @always_inline
 fn unroll[
-    func: fn[idx: Int] () raises capturing -> None,
+    func: fn[idx: Int] () raises capturing [_] -> None,
     strided_range: _StridedRange,
 ]() raises:
     """Repeatedly evaluates a function `range` times.
