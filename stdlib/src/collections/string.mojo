@@ -2495,6 +2495,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                         var field = String(
                             format_src._slice(start_value + 1, i)
                         )
+                        # FIXME(#3526): this will break once find works with unicode codepoints
                         var exclamation_index = field.find("!")
 
                         # TODO: Future implementation of format specifiers
@@ -2507,20 +2508,18 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
                         if exclamation_index != -1:
                             field_b_len = i - (start_value + 1)
-                            if exclamation_index + 1 < field_b_len:
+                            var new_idx = exclamation_index + 1
+                            if new_idx < field_b_len:
                                 var conversion_flag = field._buffer.unsafe_get(
-                                    exclamation_index + 1
+                                    new_idx
                                 )
-                                if field_b_len - (exclamation_index + 1) > 1 or (
+                                if field_b_len - new_idx > 1 or (
                                     conversion_flag
                                     not in supported_conversion_flags
                                 ):
                                     var f = String(
-                                    field._slice(
-                                        exclamation_index + 1,
-                                        field_b_len,
+                                        field._slice(new_idx, field_b_len)
                                     )
-                                )
                                     raise Error(
                                         'Conversion flag "'
                                         + f
@@ -2530,7 +2529,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                             else:
                                 raise "Empty conversion flag."
 
-                            field._buffer.resize(exclamation_index + 1)
+                            field._buffer.resize(new_idx)
                             field._buffer.unsafe_set(exclamation_index, 0)
 
                         if field._buffer.unsafe_get(0) == 0:
