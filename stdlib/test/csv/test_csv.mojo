@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from csv import reader, Dialect
+from csv import Reader, Dialect
 from testing import assert_equal, assert_raises
 from pathlib import Path, _dir_of_current_file
 
@@ -48,7 +48,7 @@ def test_dialect():
 def test_reader():
     var csv_path = _dir_of_current_file() / "people.csv"
     with open(csv_path, "r") as csv_file:
-        var r = reader(
+        var r = Reader(
             csv_file,
             delimiter=",",
             doublequote=True,

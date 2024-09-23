@@ -32,4 +32,4 @@ Example:
     ['1', '2', '3']
 """
 
-from .csv import Dialect, reader
+from .csv import Dialect, Reader
