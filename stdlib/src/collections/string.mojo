@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
-from sys import bitwidthof, llvm_intrinsic, sizeof
+from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char
 
 from bit import count_leading_zeros
@@ -2009,7 +2009,7 @@ struct String(
         return String(buf^)
 
     fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
-        """Format a template with *args.
+        """Format a template with `*args`.
 
         Args:
             args: The substitution values.
@@ -2023,16 +2023,11 @@ struct String(
 
         Examples:
 
-        Manual indexing:
         ```mojo
-        var x = String("{0} {1} {0}").format("Mojo", 1.125)
-        print(x) #Mojo 1.125 Mojo
-        ```
-
-        Automatic indexing:
-        ```mojo
-        var x = String("{} {}").format(True, "hello world")
-        print(x) #True hello world
+        # Manual indexing:
+        print(String("{0} {1} {0}").format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print(String("{} {}").format(True, "hello world")) # True hello world
         ```
         .
         """
@@ -2439,7 +2434,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var raised_automatic_index = Optional[Int](None)
         var raised_kwarg_field = Optional[String](None)
         # `__str__` and `__repr__`
-        alias supported_conversion_flags = (String("s"),String("r"))
+        alias supported_conversion_flags = (String("s"), String("r"))
         alias `}` = UInt8(ord("}"))
         alias `{` = UInt8(ord("{"))
 
