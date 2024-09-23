@@ -2042,20 +2042,12 @@ struct String(
         var ptr = self.unsafe_ptr()
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
-        @always_inline("nodebug")
-        fn _build_slice(
-            s_ptr: UnsafePointer[UInt8], start_idx: Int, end_idx: Int
-        ) -> SelfSlice:
-            return SelfSlice(
-                unsafe_from_utf8_ptr=s_ptr + start_idx, len=end_idx - start_idx
-            )
-
         var current_automatic_arg_index = 0
         for e in entries:
             debug_assert(
                 pos_in_self < s_len, "pos_in_self >= self.byte_length()"
             )
-            res += String(_build_slice(ptr, pos_in_self, e[].first_curly))
+            res += String(self._slice(pos_in_self, e[].first_curly))
 
             if e[].is_escaped_brace():
                 res += "}" if e[].field[Bool] else "{"
@@ -2085,7 +2077,7 @@ struct String(
             pos_in_self = e[].last_curly + 1
 
         if pos_in_self < s_len:
-            res += String(_build_slice(ptr, pos_in_self, s_len))
+            res += String(self._slice(pos_in_self, s_len))
 
         return res^
 
@@ -2208,6 +2200,25 @@ struct String(
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
         var result = String(buffer)
         return result^
+
+    @always_inline("nodebug")
+    fn _slice(
+        self, start_idx: Int, end_idx: Int
+    ) -> StringSlice[__lifetime_of(self)]:
+        """Construct a StringSlice from self, start index, and end index.
+        Highly unsafe operation with no bounds checks and no negative indexing.
+        """
+        debug_assert(
+            end_idx <= self.byte_length() - 1,
+            "end_idx is bigger than `self.byte_length() -1`",
+        )
+        debug_assert(
+            start_idx > -1, "start_idx < 0, there is no negative indexing"
+        )
+        return StringSlice[__lifetime_of(self)](
+            unsafe_from_utf8_ptr=self.unsafe_ptr() + start_idx,
+            len=end_idx - start_idx,
+        )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -2443,15 +2454,6 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var skip_next = False
         var fmt_ptr = format_src.unsafe_ptr()
         var fmt_len = format_src.byte_length()
-        alias SelfSlice = StringSlice[__lifetime_of(format_src)]
-
-        @always_inline("nodebug")
-        fn _build_slice(
-            s_ptr: UnsafePointer[UInt8], start_idx: Int, end_idx: Int
-        ) -> SelfSlice:
-            return SelfSlice(
-                unsafe_from_utf8_ptr=s_ptr + start_idx, len=end_idx - start_idx
-            )
 
         for i in range(fmt_len):
             if skip_next:
@@ -2489,7 +2491,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
                     if i - start_value != 1:
                         var field = String(
-                            _build_slice(fmt_ptr, start_value + 1, i)
+                            format_src._slice(start_value + 1, i)
                         )
                         var exclamation_index = field.find("!")
 
@@ -2505,8 +2507,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                             field_b_len = i - (start_value + 1)
                             if exclamation_index + 1 < field_b_len:
                                 var conversion_flag = String(
-                                    _build_slice(
-                                        field.unsafe_ptr(),
+                                    field._slice(
                                         exclamation_index + 1,
                                         field_b_len,
                                     )
