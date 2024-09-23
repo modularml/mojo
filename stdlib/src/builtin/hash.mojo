@@ -265,7 +265,7 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
         memset_zero(ptr + r, stride - r)  # set the rest to 0
         var last_value = ptr.bitcast[Scalar[type]]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
-        _ = remaining  # We make sure the array lives long enough.
+        _ = remaining^  # We make sure the array lives long enough.
 
     # Now finally, hash the final SIMD vector state.
     return _hash_simd(hash_data)
