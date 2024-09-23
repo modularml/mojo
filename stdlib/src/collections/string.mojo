@@ -2040,6 +2040,7 @@ struct String(
         var res = String(List[UInt8, hint_trivial_type=True](capacity=cap))
         var pos_in_self = 0
         var ptr = self.unsafe_ptr()
+        alias `r` = UInt8(ord("r"))
         alias SelfSlice = StringSlice[__lifetime_of(self)]
 
         var current_automatic_arg_index = 0
@@ -2057,7 +2058,7 @@ struct String(
                 @parameter
                 for i in range(num_pos_args):
                     if i == e[].field[Int]:
-                        if e[].conversion_flag == "r":
+                        if e[].conversion_flag == `r`:
                             res += repr(args[i])
                         else:
                             res += str(args[i])
@@ -2067,7 +2068,7 @@ struct String(
                 @parameter
                 for i in range(num_pos_args):
                     if i == current_automatic_arg_index:
-                        if e[].conversion_flag == "r":
+                        if e[].conversion_flag == `r`:
                             res += repr(args[i])
                         else:
                             res += str(args[i])
@@ -2367,13 +2368,8 @@ trait StringRepresentable(Stringable, Representable):
 
 @value
 struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
-    """
-    Internally used by the `format()` method.
-
-    Specifically to structure fields.
-
-    Does not contain any substitution values.
-
+    """Internally used by the `format()` method. Specifically to structure
+    fields. Does not contain any substitution values.
     """
 
     var first_curly: Int
@@ -2382,8 +2378,12 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     var last_curly: Int
     """The index of an closing brace around a substitution field."""
 
-    var conversion_flag: String
-    """Store the format specifier (e.g., 'r' for repr)."""
+    var conversion_flag: UInt8
+    """Store the format specifier in binary (e.g., ord("r") for repr). It is
+    stored in binary because every [format specifier](\
+    https://docs.python.org/3/library/string.html#formatspec) is an ASCII
+    character.
+    """
 
     alias _FieldVariantType = Variant[
         String,  # kwargs indexing (`{field_name}`)
@@ -2445,7 +2445,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var raised_automatic_index = Optional[Int](None)
         var raised_kwarg_field = Optional[String](None)
         # `__str__` and `__repr__`
-        alias supported_conversion_flags = (String("s"), String("r"))
+        alias supported_conversion_flags = SIMD[DType.uint8, 2](
+            ord("s"), ord("r")
+        )
         alias `}` = UInt8(ord("}"))
         alias `{` = UInt8(ord("{"))
 
@@ -2468,7 +2470,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                             first_curly=start.value(),
                             last_curly=i,
                             field=False,
-                            conversion_flag="",
+                            conversion_flag=0,
                         )
                         entries.append(current_entry^)
                         start = None
@@ -2486,7 +2488,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                         first_curly=start_value,
                         last_curly=i,
                         field=NoneType(),
-                        conversion_flag="",
+                        conversion_flag=0,
                     )
 
                     if i - start_value != 1:
@@ -2506,17 +2508,24 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                         if exclamation_index != -1:
                             field_b_len = i - (start_value + 1)
                             if exclamation_index + 1 < field_b_len:
-                                var conversion_flag = String(
+                                var conversion_flag = field._buffer.unsafe_get(
+                                    exclamation_index + 1
+                                )
+                                if field_b_len - (exclamation_index + 1) > 1 or (
+                                    conversion_flag
+                                    not in supported_conversion_flags
+                                ):
+                                    var f = String(
                                     field._slice(
                                         exclamation_index + 1,
                                         field_b_len,
                                     )
                                 )
-                                if (
-                                    conversion_flag
-                                    not in supported_conversion_flags
-                                ):
-                                    raise 'Conversion flag "' + conversion_flag + '" not recognised.'
+                                    raise Error(
+                                        'Conversion flag "'
+                                        + f
+                                        + '" not recognised.'
+                                    )
                                 current_entry.conversion_flag = conversion_flag
                             else:
                                 raise "Empty conversion flag."
@@ -2568,7 +2577,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                                 first_curly=i,
                                 last_curly=i + 1,
                                 field=True,
-                                conversion_flag="",
+                                conversion_flag=0,
                             )
                             entries.append(current_entry^)
                             skip_next = True
