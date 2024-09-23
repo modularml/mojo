@@ -86,6 +86,30 @@ what we publish.
     pass
   ```
 
+- Function types now accept a lifetime set parameter. This parameter represents
+  the lifetimes of values captured by a parameter closure. The compiler
+  automatically tags parameter closures with the right set of lifetimes. This
+  enables lifetimes and parameter closures to correctly compose.
+
+  ```mojo
+  fn call_it[f: fn() capturing [_] -> None]():
+      f()
+
+  fn test():
+      var msg = String("hello world")
+
+      @parameter
+      fn say_hi():
+          print(msg)
+
+      call_it[say_hi]()
+      # no longer need to write `_ = msg^`!!
+  ```
+
+  Note that this only works for higher-order functions which have explicitly
+  added `[_]` as the capture lifetimes. By default, the compiler still assumes
+  a `capturing` closure does not reference any lifetimes. This will soon change.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
