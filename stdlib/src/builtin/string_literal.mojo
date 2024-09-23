@@ -277,13 +277,13 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantLifetime]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[StaticConstantLifetime](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -357,7 +357,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes_span(self) -> Span[UInt8, ImmutableAnyLifetime]:
+    fn as_bytes_span(self) -> Span[UInt8, StaticConstantLifetime]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 
@@ -365,7 +365,7 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, ImmutableAnyLifetime](
+        return Span[UInt8, StaticConstantLifetime](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
