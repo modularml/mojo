@@ -27,7 +27,7 @@ from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
-alias StaticString = StringSlice[ImmutableStaticLifetime]
+alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
 
 
@@ -212,7 +212,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self: StringSlice[ImmutableAnyLifetime], lit: StringLiteral
+        inout self: StringSlice[StaticConstantLifetime], lit: StringLiteral
     ):
         """Construct a new string slice from a string literal.
 
@@ -231,7 +231,7 @@ struct StringSlice[
         #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[ImmutableStaticLifetime](
+        self = StaticString(
             unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 

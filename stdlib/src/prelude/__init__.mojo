@@ -80,8 +80,7 @@ from builtin.type_aliases import (
     MutableLifetime,
     ImmutableAnyLifetime,
     MutableAnyLifetime,
-    ImmutableStaticLifetime,
-    MutableStaticLifetime,
+    StaticConstantLifetime,
     LifetimeSet,
     Lifetime,
 )

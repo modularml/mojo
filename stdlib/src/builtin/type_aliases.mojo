@@ -30,12 +30,13 @@ alias ImmutableAnyLifetime = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<0>`
 alias MutableAnyLifetime = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<1>`
 """The mutable lifetime that might access any memory value."""
 
-# TODO: We don't have a "static" lifetime to use yet, so we use Any.
-alias ImmutableStaticLifetime = ImmutableAnyLifetime
-"""The immutable lifetime that lasts for the entire duration of program execution."""
-
-alias MutableStaticLifetime = MutableAnyLifetime
-"""The mutable lifetime that lasts for the entire duration of program execution."""
+# Static constants are a named subset of the global lifetime.
+alias StaticConstantLifetime = __mlir_attr[
+    `#lit.lifetime.field<`,
+    `#lit.static.lifetime : !lit.lifetime<0>`,
+    `, "__constants__"> : !lit.lifetime<0>`,
+]
+"""A lifetime for strings and other always-immutable static constants."""
 
 alias LifetimeSet = __mlir_type.`!lit.lifetime.set`
 """A set of lifetime parameters."""
