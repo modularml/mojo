@@ -289,13 +289,13 @@ struct StringLiteral(
 
     fn __reversed__(
         ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), forward=False]:
+    ) -> _StringSliceIter[StaticConstantLifetime, forward=False]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[StaticConstantLifetime, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 

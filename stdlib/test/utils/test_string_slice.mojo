@@ -390,7 +390,7 @@ def test_count_utf8_continuation_bytes():
     alias b2 = UInt8(0b1100_0000)
     alias b3 = UInt8(0b1110_0000)
     alias b4 = UInt8(0b1111_0000)
-    var span = String(List[UInt8](c, c, c, c, c, 0)).as_bytes_slice()
+    var span = String(List[UInt8](c, c, c, c, c, 0)).as_bytes_span()
     var ptr = span.unsafe_ptr()
     assert_equal(5, _count_utf8_continuation_bytes(span))
     ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b2, c, b1
