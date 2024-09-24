@@ -270,7 +270,7 @@ struct AddressSpace(EqualityComparable):
 struct Reference[
     is_mutable: Bool, //,
     type: AnyType,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe reference.
