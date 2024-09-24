@@ -32,7 +32,6 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 
 
 fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
-    alias size = simdwidthof[DType.uint8]()
     var ptr = span.unsafe_ptr()
     var num_bytes = len(span)
     var amnt: Int = 0
@@ -40,30 +39,27 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
     @parameter
     @always_inline("nodebug")
     fn count[w: Int](p: UnsafePointer[UInt8]) -> Int:
-        var vec = p.strided_load[DType.uint8, width=w](1)
+        var vec = p.load[DType.uint8, width=w]()
         var comp = (vec & 0b1100_0000) == 0b1000_0000
         return int(comp.cast[DType.uint8]().reduce_add())
 
-    for i in range(num_bytes // size):
-        amnt += count[size](ptr + i * size)
+    alias sizes = (256, 128, 64, 32, 16, 8)
+    var processed = 0
 
     @parameter
-    if size > 32:
-        for i in range(num_bytes // 32):
-            amnt += count[32](ptr + (num_bytes // size) * size + i * 32)
+    for j in range(len(sizes)):
+        alias s = sizes.get[j, Int]()
 
-    @parameter
-    if size > 16:
-        for i in range(num_bytes // 16):
-            amnt += count[16](ptr + (num_bytes // 32) * 32 + i * 16)
+        @parameter
+        if simdwidthof[DType.uint8]() >= s:
+            var rest = num_bytes - processed
+            for _ in range(rest  // s):
+                amnt += count[s](ptr + processed)
+                processed += s
 
-    @parameter
-    if size > 8:
-        for i in range(num_bytes // 8):
-            amnt += count[8](ptr + (num_bytes // 16) * 16 + i * 8)
+    for i in range(num_bytes - processed):
+        amnt += int((ptr[processed + i] & 0b1100_0000) == 0b1000_0000)
 
-    for i in range(num_bytes % 8):
-        amnt += count[1](ptr + (num_bytes // 8) * 8 + i)
     _ = span
     return amnt
 
@@ -196,9 +192,10 @@ struct _StringSliceIter[
             var byte_len = 1
             if self.continuation_bytes > 0:
                 var byte_type = _utf8_byte_type(self.ptr[self.index])
+                debug_assert(byte_type != 1, "Iterator is indexing incorrectly")
                 if byte_type != 0:
                     byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
+                    self.continuation_bytes -= (byte_len - 1)
             self.index += byte_len
             return StringSlice[lifetime](
                 unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
@@ -208,12 +205,13 @@ struct _StringSliceIter[
             var byte_len = 1
             if self.continuation_bytes > 0:
                 var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
+                debug_assert(byte_type != 1, "Iterator is indexing incorrectly")
                 if byte_type != 0:
                     while byte_type == 1:
                         byte_len += 1
                         var b = self.ptr[self.index - byte_len]
                         byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
+                    self.continuation_bytes -= (byte_len - 1)
             self.index -= byte_len
             return StringSlice[lifetime](
                 unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
