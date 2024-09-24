@@ -22,7 +22,7 @@ from python import Python
 from collections import Dict
 from os import abort, getenv
 from sys import external_call, sizeof
-from sys.ffi import _get_global
+from sys.ffi import _get_global, OpaquePointer
 
 from memory import UnsafePointer
 
@@ -32,13 +32,13 @@ from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
 from .python_object import PythonObject, TypedPythonObject
 
 
-fn _init_global(ignored: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
+fn _init_global(ignored: OpaquePointer) -> OpaquePointer:
     var ptr = UnsafePointer[CPython].alloc(1)
     ptr[] = CPython()
     return ptr.bitcast[NoneType]()
 
 
-fn _destroy_global(python: UnsafePointer[NoneType]):
+fn _destroy_global(python: OpaquePointer):
     var p = python.bitcast[CPython]()
     CPython.destroy(p[])
     python.free()
@@ -341,9 +341,33 @@ struct Python:
             cpython: The cpython instance we wish to error check.
         """
         if cpython.PyErr_Occurred():
-            var error: Error = str(PythonObject(cpython.PyErr_Fetch()))
-            cpython.PyErr_Clear()
-            raise error
+            raise Python.unsafe_get_python_exception(cpython)
+
+    @staticmethod
+    fn unsafe_get_python_exception(inout cpython: CPython) -> Error:
+        """Get the `Error` object corresponding to the current CPython
+        interpreter error state.
+
+        Safety:
+            The caller MUST be sure that the CPython interpreter is in an error
+            state before calling this function.
+
+        This function will clear the CPython error.
+
+        Args:
+            cpython: The cpython instance we wish to error check.
+
+        Returns:
+            `Error` object describing the CPython error.
+        """
+        debug_assert(
+            cpython.PyErr_Occurred(),
+            "invalid unchecked conversion of Python error to Mojo error",
+        )
+
+        var error: Error = str(PythonObject(cpython.PyErr_Fetch()))
+        cpython.PyErr_Clear()
+        return error
 
     @staticmethod
     fn is_type(x: PythonObject, y: PythonObject) -> Bool:
