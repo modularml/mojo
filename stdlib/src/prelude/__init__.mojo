@@ -80,10 +80,9 @@ from builtin.type_aliases import (
     MutableLifetime,
     ImmutableAnyLifetime,
     MutableAnyLifetime,
-    ImmutableStaticLifetime,
-    MutableStaticLifetime,
+    StaticConstantLifetime,
     LifetimeSet,
-    AnyLifetime,
+    Lifetime,
 )
 from builtin.uint import UInt
 from builtin.value import (

@@ -30,7 +30,7 @@ from builtin.builtin_list import _lit_mut_cast
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -74,7 +74,7 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 

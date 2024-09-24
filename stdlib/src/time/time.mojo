@@ -235,7 +235,7 @@ fn now() -> Int:
 
 @always_inline
 @parameter
-fn _time_function_windows[func: fn () capturing -> None]() -> Int:
+fn _time_function_windows[func: fn () capturing [_] -> None]() -> Int:
     """Calculates elapsed time in Windows"""
 
     var ticks_per_sec: _WINDOWS_LARGE_INTEGER = 0
@@ -266,7 +266,7 @@ fn _time_function_windows[func: fn () capturing -> None]() -> Int:
 
 @always_inline
 @parameter
-fn time_function[func: fn () capturing -> None]() -> Int:
+fn time_function[func: fn () capturing [_] -> None]() -> Int:
     """Measures the time spent in the function.
 
     Parameters:
