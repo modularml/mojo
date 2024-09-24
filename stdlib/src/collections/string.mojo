@@ -2546,7 +2546,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                                 first_curly=i,
                                 last_curly=i + 1,
                                 field=True,
-                                conversion_flag=0,
+                                conversion_flag="",
                             )
                             entries.append(curren_entry^)
                             skip_next = True
