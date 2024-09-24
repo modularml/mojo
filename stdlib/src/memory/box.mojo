@@ -93,21 +93,12 @@ struct Box[T: AnyType]:
         # returned from UnsafePointer to be guarded behind the
         # aliasing guarantees of the lifetime system here.
         # All of the magic happens above in the function signature
-        var inner_not_null = self._inner.__bool__()
-
-        debug_assert(
-            inner_not_null,
-            (
-                "Box is horribly broken, and __getitem__ was called on a"
-                " destroyed box"
-            ),
-        )
 
         return self._inner[]
 
     fn __del__(owned self: Box[T]):
         """Destroy the Box[]."""
-        (self._inner).destroy_pointee()
+        self._inner.destroy_pointee()
         self._inner.free()
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
