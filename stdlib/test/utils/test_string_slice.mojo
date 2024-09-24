@@ -390,32 +390,32 @@ def test_count_utf8_continuation_bytes():
     alias b2 = UInt8(0b1100_0000)
     alias b3 = UInt8(0b1110_0000)
     alias b4 = UInt8(0b1111_0000)
-    var a = String(List[UInt8](c, c, c, c, c, 0))
-    var span = a.as_bytes_slice()
+    var span = String(List[UInt8](c, c, c, c, c, 0)).as_bytes_slice()
+    var ptr = span.unsafe_ptr()
     assert_equal(5, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b2, c, b2, c, b1
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b2, c, b1
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b2, c, b1, b2, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b1, b2, c
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b2, c, b2, c, b1
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b2, c, b1
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b2, c, b1, b2, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b1, b2, c
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b1, b2, c, b2, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b2, c, b2, c
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b3, c, c, b1, b1
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b3, c, c, b1, b1
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b1, b1, b3, c, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b1, b3, c, c
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b1, b3, c, c, b1
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b3, c, c, b1
     assert_equal(2, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b1, b4, c, c, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b4, c, c, c
     assert_equal(3, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b4, c, c, c, b1
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b4, c, c, c, b1
     assert_equal(3, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b3, c, c, b2, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b3, c, c, b2, c
     assert_equal(3, _count_utf8_continuation_bytes(span))
-    span[0], span[1], span[2], span[3], span[4] = b2, c, b3, c, c
+    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b3, c, c
     assert_equal(3, _count_utf8_continuation_bytes(span))
 
 
