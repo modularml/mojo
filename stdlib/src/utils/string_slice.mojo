@@ -677,4 +677,3 @@ struct StringSlice[
             current_offset += eol_location + eol_length
 
         return output^
-

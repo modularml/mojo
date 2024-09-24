@@ -2584,6 +2584,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                     var f = String(
                         _build_slice(field.unsafe_ptr(), new_idx, field_b_len)
                     )
+                    _ = field
                     raise Error('Conversion flag "' + f + '" not recognised.')
                 self.conversion_flag = conversion_flag
             else:
