@@ -110,6 +110,11 @@ what we publish.
   added `[_]` as the capture lifetimes. By default, the compiler still assumes
   a `capturing` closure does not reference any lifetimes. This will soon change.
 
+- The VS Code extension now has the `mojo.run.focusOnTerminalAfterLaunch`
+  setting, which controls whether to focus on the terminal used by the
+  `Mojo: Run Mojo File` command or on the editor after launch.
+  [Issue #3532](https://github.com/modularml/mojo/issues/3532).
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
