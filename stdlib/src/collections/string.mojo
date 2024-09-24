@@ -790,13 +790,13 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_slice())
+        var length: Int = len(str_slice.as_bytes_span())
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            src=str_slice.as_bytes_span().unsafe_ptr(),
             count=length,
         )
         self = Self(buffer^)
@@ -1380,7 +1380,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1405,7 +1405,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
 
     @always_inline
     fn byte_length(self) -> Int:
@@ -2199,7 +2199,7 @@ struct String(
         debug_assert(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
-        var fillbyte = fillchar.as_bytes_slice()[0]
+        var fillbyte = fillchar.as_bytes_span()[0]
         var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)
