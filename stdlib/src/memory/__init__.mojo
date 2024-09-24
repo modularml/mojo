@@ -13,7 +13,7 @@
 """Implements the memory package."""
 
 from .arc import Arc
-from .boxed import Boxed
+from .box import Box
 from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
 from .reference import AddressSpace, Reference
 from .unsafe import bitcast
