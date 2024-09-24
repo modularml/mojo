@@ -115,6 +115,11 @@ what we publish.
   `Mojo: Run Mojo File` command or on the editor after launch.
   [Issue #3532](https://github.com/modularml/mojo/issues/3532).
 
+- The VS Code extension now has the `mojo.SDK.additionalSDKs` setting, which
+  allows the user to provide a list of MAX SDKs that the extension can use when
+  determining a default SDK to use. The user can select the default SDK to use
+  with the `Mojo: Select the default MAX SDK` command.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
