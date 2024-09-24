@@ -347,6 +347,11 @@ struct StringSlice[
         """
         return len(self._slice) > 0
 
+    # This attribute informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__(self, rhs: StringSlice) -> Bool:
         """Verify if a string slice is equal to another string slice.
 
@@ -392,6 +397,7 @@ struct StringSlice[
         """
         return self == rhs.as_string_slice()
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline
     fn __ne__(self, rhs: StringSlice) -> Bool:
         """Verify if span is not equal to another string slice.
