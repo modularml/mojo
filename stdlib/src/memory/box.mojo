@@ -19,7 +19,7 @@ struct Box[T: AnyType]:
     This smart pointer is designed for cases where there is clear ownership
     of the underlying data, and restricts access to it through the lifetime
     system such that no more than one mutable alias for the underlying data
-    may exist. Consider Box[T] over UnsafePointer[T] where possible.
+    may exist.
 
     Parameters:
         T: The type to be stored in the Box[].
@@ -27,9 +27,7 @@ struct Box[T: AnyType]:
 
     var _inner: UnsafePointer[T, AddressSpace.GENERIC]
 
-    fn __init__[
-        T: Movable
-    ](inout self: Box[T], owned value: T):
+    fn __init__[T: Movable](inout self: Box[T], owned value: T):
         """Construct a new Box[] by moving the passed value into a new backing allocation.
 
         Parameters:
@@ -41,9 +39,7 @@ struct Box[T: AnyType]:
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_move(value^)
 
-    fn __init__[
-        T: ExplicitlyCopyable
-    ](inout self: Box[T], *, copy_value: T):
+    fn __init__[T: ExplicitlyCopyable](inout self: Box[T], *, copy_value: T):
         """Construct a new Box[] by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
@@ -55,13 +51,16 @@ struct Box[T: AnyType]:
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_explicit_copy(copy_value)
 
+    # TODO: disambiguation and other niceties
+    #    fn __init__[
+    #        T: Copyable
+    #    ](inout self: Box[T], value: T):
+    #        self._inner = UnsafePointer[T].alloc(1)
+    #        self._inner.init_pointee_copy(value)
+
     fn __init__[
         T: ExplicitlyCopyable
-    ](
-        inout self: Box[T],
-        *,
-        copy_box: Box[T],
-    ):
+    ](inout self: Box[T], *, copy_box: Box[T],):
         """Construct a new Box[] by explicitly copying the value from another Box[].
 
         Parameters:
@@ -108,12 +107,8 @@ struct Box[T: AnyType]:
 
     fn __del__(owned self: Box[T]):
         """Destroy the Box[]."""
-        # check that inner is non-null to accomodate take() and other
-        # consuming end states
-        if self._inner:
-            (self._inner).destroy_pointee()
-            self._inner.free()
-            self._inner = UnsafePointer[T]()
+        (self._inner).destroy_pointee()
+        self._inner.free()
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """UNSAFE: returns the backing pointer for this Box[].
@@ -137,6 +132,6 @@ struct Box[T: AnyType]:
         """
         var r = self._inner.take_pointee()
         self._inner.free()
-        self._inner = UnsafePointer[T]()
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
 
         return r^

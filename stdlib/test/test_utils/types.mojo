@@ -13,6 +13,17 @@
 from memory import UnsafePointer
 
 
+@value
+struct ObservableDel(CollectionElement):
+    var target: UnsafePointer[Bool]
+
+    fn __init__(inout self, *, other: Self):
+        self = other
+
+    fn __del__(owned self):
+        self.target.init_pointee_move(True)
+
+
 struct MoveOnly[T: Movable](Movable):
     """Utility for testing MoveOnly types.
 
@@ -49,6 +60,19 @@ struct ExplicitCopyOnly(ExplicitlyCopyable):
         self.copy_count = 0
 
     fn __init__(inout self, *, other: Self):
+        self.value = other.value
+        self.copy_count = other.copy_count + 1
+
+
+struct ImplicitCopyOnly(Copyable):
+    var value: Int
+    var copy_count: Int
+
+    fn __init__(inout self, value: Int):
+        self.value = value
+        self.copy_count = 0
+
+    fn __copyinit__(inout self, *, other: Self):
         self.value = other.value
         self.copy_count = other.copy_count + 1
 
