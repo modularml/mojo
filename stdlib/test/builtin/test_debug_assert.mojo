@@ -19,6 +19,7 @@
 
 def main():
     test_debug_assert()
+    test_debug_assert_multiple_args()
 
 
 # CHECK-OK-LABEL: test_debug_assert
@@ -26,5 +27,13 @@ def test_debug_assert():
     print("== test_debug_assert")
     debug_assert(True, "ok")
     debug_assert(3, Error("also ok"))
+    # CHECK-OK: is reached
+    print("is reached")
+
+
+# CHECK-OK-LABEL: test_debug_assert_multiple_args
+def test_debug_assert_multiple_args():
+    print("== test_debug_assert_multiple_args")
+    debug_assert(True, "passing mutliple args: ", 42, ", ", 4.2)
     # CHECK-OK: is reached
     print("is reached")
