@@ -53,7 +53,7 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
         @parameter
         if simdwidthof[DType.uint8]() >= s:
             var rest = num_bytes - processed
-            for _ in range(rest  // s):
+            for _ in range(rest // s):
                 amnt += count[s](ptr + processed)
                 processed += s
 
@@ -196,7 +196,7 @@ struct _StringSliceIter[
                 debug_assert(byte_type != 1, "Iterator is indexing incorrectly")
                 if byte_type != 0:
                     byte_len = int(byte_type)
-                    self.continuation_bytes -= (byte_len - 1)
+                    self.continuation_bytes -= byte_len - 1
             self.index += byte_len
             return StringSlice[lifetime](
                 unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
@@ -212,7 +212,7 @@ struct _StringSliceIter[
                         byte_len += 1
                         var b = self.ptr[self.index - byte_len]
                         byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= (byte_len - 1)
+                    self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
             return StringSlice[lifetime](
                 unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
