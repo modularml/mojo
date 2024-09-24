@@ -169,12 +169,15 @@ struct _StringSliceIter[
             )
 
     fn __len__(self) -> Int:
-
         @parameter
         if forward:
-            return self.length - self.index - _count_utf8_continuation_bytes(
-                Span[UInt8, ImmutableAnyLifetime](
-                    unsafe_ptr=self.ptr, len=self.index
+            return (
+                self.length
+                - self.index
+                - _count_utf8_continuation_bytes(
+                    Span[UInt8, ImmutableAnyLifetime](
+                        unsafe_ptr=self.ptr, len=self.index
+                    )
                 )
             )
         else:
