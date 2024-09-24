@@ -2033,8 +2033,13 @@ struct String(
         Args:
             args: The substitution values.
 
+        Parameters:
+            Ts: The types of the substitution values.
+              Are required to implement `Stringable`.
+
         Returns:
             The template with the given values substituted.
+
         """
         alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
@@ -2434,7 +2439,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var entries = List[Self]()
         var start = Optional[Int](None)
         var skip_next = False
-        for i in range(fmt_len):
+        for i in range(format_src.byte_length()):
             if skip_next:
                 skip_next = False
                 continue
@@ -2458,15 +2463,14 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 else:
                     start = i
                 continue
-            elif format_src[i] == "}":
+            if format_src[i] == "}":
                 if start:
                     var start_value = start.value()
                     var current_entry = Self(
                         first_curly=start_value,
                         last_curly=i,
                         field=NoneType(),
-                        conversion_flag=0,
-                        "",
+                        conversion_flag="",
                     )
 
                     if i - start_value != 1:
