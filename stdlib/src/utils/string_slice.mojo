@@ -425,7 +425,7 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[lifetime]:
+    fn __iter__(self) -> _StringSliceIter[lifetime]:
         """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
@@ -435,9 +435,7 @@ struct StringSlice[
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[lifetime, False]:
+    fn __reversed__(self) -> _StringSliceIter[lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
