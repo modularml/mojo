@@ -27,8 +27,41 @@ from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
-alias StaticString = StringSlice[ImmutableStaticLifetime]
+alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
+
+
+fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
+    return int((sizes < c).cast[DType.uint8]().reduce_add())
+
+
+fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
+    """Shift unicode to utf8 representation.
+
+    ### Unicode (represented as UInt32 BE) to UTF-8 conversion:
+    - 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa
+        - a
+    - 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb
+        - (a >> 6)  | 0b11000000, b         | 0b10000000
+    - 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc
+        - (a >> 12) | 0b11100000, (b >> 6)  | 0b10000000, c        | 0b10000000
+    - 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc
+    10dddddd
+        - (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000,
+        d | 0b10000000
+    """
+    if num_bytes == 1:
+        ptr[0] = UInt8(c)
+        return
+
+    var shift = 6 * (num_bytes - 1)
+    var mask = UInt8(0xFF) >> (num_bytes + 1)
+    var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
+    ptr[0] = ((c >> shift) & mask) | num_bytes_marker
+    for i in range(1, num_bytes):
+        shift -= 6
+        ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
@@ -89,7 +122,7 @@ fn _is_newline_start(
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for StringSlice
@@ -158,7 +191,7 @@ struct _StringSliceIter[
 
 struct StringSlice[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
 ](Stringable, Sized, Formattable):
     """
     A non-owning view to encoded string data.
@@ -179,7 +212,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self: StringSlice[ImmutableAnyLifetime], lit: StringLiteral
+        inout self: StringSlice[StaticConstantLifetime], lit: StringLiteral
     ):
         """Construct a new string slice from a string literal.
 
@@ -198,7 +231,7 @@ struct StringSlice[
         #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[ImmutableStaticLifetime](
+        self = StaticString(
             unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 
@@ -392,25 +425,25 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[lifetime]:
         """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[lifetime](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__(
         ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), False]:
+    ) -> _StringSliceIter[lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[lifetime, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -419,7 +452,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, lifetime]:
+    fn as_bytes_span(self) -> Span[UInt8, lifetime]:
         """Get the sequence of encoded bytes as a slice of the underlying string.
 
         Returns:
@@ -445,7 +478,7 @@ struct StringSlice[
             The length of this string slice in bytes.
         """
 
-        return len(self.as_bytes_slice())
+        return len(self.as_bytes_span())
 
     @always_inline
     @deprecated("use byte_length() instead")
@@ -456,7 +489,7 @@ struct StringSlice[
             The length of this string slice in bytes.
         """
 
-        return len(self.as_bytes_slice())
+        return len(self.as_bytes_span())
 
     fn _strref_dangerous(self) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.
