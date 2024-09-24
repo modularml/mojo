@@ -160,9 +160,8 @@ struct _StringSliceIter[
             )
         else:
             var byte_len = 1
-            while _utf8_byte_type(self.ptr[self.index - 1]) == 1:
+            while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
                 byte_len += 1
-                var b = self.ptr[self.index - byte_len]
             self.index -= byte_len
             return StringSlice[lifetime](
                 unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
