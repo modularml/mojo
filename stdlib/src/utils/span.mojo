@@ -263,7 +263,7 @@ struct Span[
 
     fn __eq__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
         Parameters:
@@ -292,7 +292,7 @@ struct Span[
     @always_inline
     fn __ne__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
         Parameters:
