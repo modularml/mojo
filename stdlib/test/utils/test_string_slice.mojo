@@ -18,9 +18,9 @@ from utils import Span, StringSlice
 from utils._utf8_validation import _is_valid_utf8
 
 
-fn test_string_literal_byte_slice() raises:
+fn test_string_literal_byte_span() raises:
     alias string: StringLiteral = "Hello"
-    alias slc = string.as_bytes_slice()
+    alias slc = string.as_bytes_span()
 
     assert_equal(len(slc), 5)
     assert_equal(slc[0], ord("H"))
@@ -30,9 +30,9 @@ fn test_string_literal_byte_slice() raises:
     assert_equal(slc[4], ord("o"))
 
 
-fn test_string_byte_slice() raises:
+fn test_string_byte_span() raises:
     var string = String("Hello")
-    var str_slice = string.as_bytes_slice()
+    var str_slice = string.as_bytes_span()
 
     assert_equal(len(str_slice), 5)
     assert_equal(str_slice[0], ord("H"))
@@ -117,9 +117,7 @@ fn test_string_byte_slice() raises:
 fn test_heap_string_from_string_slice() raises:
     alias string_lit: StringLiteral = "Hello"
 
-    alias static_str: StringSlice[
-        ImmutableAnyLifetime
-    ] = string_lit.as_string_slice()
+    alias static_str = string_lit.as_string_slice()
 
     alias heap_string = String(static_str)
 
@@ -133,11 +131,11 @@ fn test_slice_len() raises:
     alias str4: StringLiteral = "12"
     alias str5: StringLiteral = "1"
 
-    alias slice1: StringSlice[ImmutableAnyLifetime] = str1.as_string_slice()
-    alias slice2: StringSlice[ImmutableAnyLifetime] = str2.as_string_slice()
-    alias slice3: StringSlice[ImmutableAnyLifetime] = str3.as_string_slice()
-    alias slice4: StringSlice[ImmutableAnyLifetime] = str4.as_string_slice()
-    alias slice5: StringSlice[ImmutableAnyLifetime] = str5.as_string_slice()
+    alias slice1 = str1.as_string_slice()
+    alias slice2 = str2.as_string_slice()
+    alias slice3 = str3.as_string_slice()
+    alias slice4 = str4.as_string_slice()
+    alias slice5 = str5.as_string_slice()
 
     assert_equal(5, len(slice1))
     assert_equal(4, len(slice2))
@@ -386,8 +384,8 @@ def test_combination_10_good_10_bad_utf8_sequences():
 
 
 fn main() raises:
-    test_string_literal_byte_slice()
-    test_string_byte_slice()
+    test_string_literal_byte_span()
+    test_string_byte_span()
     test_heap_string_from_string_slice()
     test_slice_len()
     test_slice_eq()

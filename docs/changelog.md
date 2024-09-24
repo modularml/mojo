@@ -65,6 +65,12 @@ what we publish.
   values with static type information. This design will likely evolve and
   change significantly.
 
+  - Added `TypedPythonObject["Tuple].__getitem__` for accessing the elements of
+    a Python tuple.
+
+- Added `Python.unsafe_get_python_exception()`, as an efficient low-level
+  utility to get the Mojo `Error` equivalent of the current CPython error state.
+
 - The `__type_of(x)` and `__lifetime_of(x)` operators are much more general now:
   they allow arbitrary expressions inside of them, allow referring to dynamic
   values in parameter contexts, and even allow referring to raising functions
@@ -95,6 +101,40 @@ what we publish.
     pass
   ```
 
+- Function types now accept a lifetime set parameter. This parameter represents
+  the lifetimes of values captured by a parameter closure. The compiler
+  automatically tags parameter closures with the right set of lifetimes. This
+  enables lifetimes and parameter closures to correctly compose.
+
+  ```mojo
+  fn call_it[f: fn() capturing [_] -> None]():
+      f()
+
+  fn test():
+      var msg = String("hello world")
+
+      @parameter
+      fn say_hi():
+          print(msg)
+
+      call_it[say_hi]()
+      # no longer need to write `_ = msg^`!!
+  ```
+
+  Note that this only works for higher-order functions which have explicitly
+  added `[_]` as the capture lifetimes. By default, the compiler still assumes
+  a `capturing` closure does not reference any lifetimes. This will soon change.
+
+- The VS Code extension now has the `mojo.run.focusOnTerminalAfterLaunch`
+  setting, which controls whether to focus on the terminal used by the
+  `Mojo: Run Mojo File` command or on the editor after launch.
+  [Issue #3532](https://github.com/modularml/mojo/issues/3532).
+
+- The VS Code extension now has the `mojo.SDK.additionalSDKs` setting, which
+  allows the user to provide a list of MAX SDKs that the extension can use when
+  determining a default SDK to use. The user can select the default SDK to use
+  with the `Mojo: Select the default MAX SDK` command.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -108,10 +148,18 @@ what we publish.
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
 
+- The `AnyLifetime` type (useful for declaring lifetime types as parameters) has
+  been renamed to `Lifetime`.
+
 - Restore implicit copyability of `Tuple` and `ListLiteral`.
 
 - The aliases for C FFI have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long`
   and so on.
+
+- The VS Code extension now allows selecting a default SDK when multiple are available.
+
+- `String.as_bytes_slice()` is renamed to `String.as_bytes_span()` since it
+  returns a `Span` and not a `StringSlice`.
 
 ### ❌ Removed
 
@@ -122,3 +170,5 @@ what we publish.
 
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
+
+- The VS Code extension now auto-updates its private copy of the MAX SDK.

@@ -297,7 +297,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 struct _VariadicListMemIter[
     elt_is_mutable: Bool, //,
     elt_type: AnyType,
-    elt_lifetime: AnyLifetime[elt_is_mutable].type,
+    elt_lifetime: Lifetime[elt_is_mutable].type,
     list_lifetime: ImmutableLifetime,
 ]:
     """Iterator for VariadicListMem.
@@ -329,8 +329,8 @@ struct _VariadicListMemIter[
 # TODO: parametric aliases would be nice.
 struct _lit_lifetime_union[
     is_mutable: Bool, //,
-    a: AnyLifetime[is_mutable].type,
-    b: AnyLifetime[is_mutable].type,
+    a: Lifetime[is_mutable].type,
+    b: Lifetime[is_mutable].type,
 ]:
     alias result = __mlir_attr[
         `#lit.lifetime.union<`,
@@ -345,7 +345,7 @@ struct _lit_lifetime_union[
 
 struct _lit_mut_cast[
     is_mutable: Bool, //,
-    operand: AnyLifetime[is_mutable].type,
+    operand: Lifetime[is_mutable].type,
     result_mutable: Bool,
 ]:
     alias result = __mlir_attr[
@@ -360,7 +360,7 @@ struct _lit_mut_cast[
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
-    lifetime: AnyLifetime[elt_is_mutable].type,
+    lifetime: Lifetime[elt_is_mutable].type,
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes references to the elements in a
@@ -543,7 +543,7 @@ alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 @value
 struct _LITRefPackHelper[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     address_space: __mlir_type.index,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
@@ -613,7 +613,7 @@ struct _LITRefPackHelper[
 @register_passable
 struct VariadicPack[
     elt_is_mutable: __mlir_type.i1, //,
-    lifetime: AnyLifetime[Bool {value: elt_is_mutable}].type,
+    lifetime: Lifetime[Bool {value: elt_is_mutable}].type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
 ](Sized):
