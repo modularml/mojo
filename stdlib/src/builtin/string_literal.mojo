@@ -19,7 +19,7 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
-from utils import StringRef, Span, StringSlice
+from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
@@ -232,6 +232,10 @@ struct StringLiteral(
         Returns:
             A new string.
         """
+        # TODO(MOCO-1224): We should be able to reuse this, but we have to
+        # inline the string slice constructor to work around an elaborator
+        # memory leak.
+        # return self.as_string_slice()
         var string = String()
         var length = self.byte_length()
         var buffer = String._buffer_type()
@@ -273,13 +277,13 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantLifetime]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[StaticConstantLifetime](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -338,33 +342,31 @@ struct StringLiteral(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
+    fn as_string_slice(self) -> StaticString:
         """Returns a string slice of this static string literal.
 
         Returns:
             A string slice pointing to this static string literal.
         """
 
-        var bytes = self.as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[ImmutableAnyLifetime](unsafe_from_utf8=bytes)
+        return StaticString(
+            unsafe_from_utf8_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, ImmutableAnyLifetime]:
+    fn as_bytes_span(self) -> Span[UInt8, StaticConstantLifetime]:
         """
-        Returns a contiguous slice of the bytes owned by this string.
+        Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        var ptr = self.unsafe_ptr()
-
-        return Span[UInt8, ImmutableAnyLifetime](
-            unsafe_ptr=ptr,
+        return Span[UInt8, StaticConstantLifetime](
+            unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
 
