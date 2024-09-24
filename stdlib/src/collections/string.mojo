@@ -2036,7 +2036,7 @@ struct String(
         Returns:
             The template with the given values substituted.
         """
-        
+
         var res: String = ""
         alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
@@ -2464,7 +2464,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                         first_curly=start_value,
                         last_curly=i,
                         field=NoneType(),
-                        conversion_flag=0,""
+                        conversion_flag=0,
+                        "",
                     )
 
                     if i - start_value != 1:
