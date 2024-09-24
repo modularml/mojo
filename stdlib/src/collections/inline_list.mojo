@@ -250,5 +250,5 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             value: The value to append.
         """
         debug_assert(self._size < capacity, "List is full.")
-        self._array[self._size].write(value^)
+        self._array[self._size] = value^
         self._size += 1

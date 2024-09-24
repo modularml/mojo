@@ -25,16 +25,11 @@ def test_maybe_uninitialized():
     var destructor_counter = List[Int]()
 
     var a = UnsafeMaybeUninitialized[ValueDestructorRecorder]()
-    a.write(
-        ValueDestructorRecorder(
-            42, UnsafePointer.address_of(destructor_counter)
-        )
+    a = ValueDestructorRecorder(
+        42, UnsafePointer.address_of(destructor_counter)
     )
 
     assert_equal(a.assume_initialized().value, 42)
-    assert_equal(len(destructor_counter), 0)
-
-    assert_equal(a.unsafe_ptr()[].value, 42)
     assert_equal(len(destructor_counter), 0)
 
     a.assume_initialized_destroy()
@@ -57,7 +52,7 @@ struct ImpossibleToDestroy:
 
 def test_write_does_not_trigger_destructor():
     var a = UnsafeMaybeUninitialized[ImpossibleToDestroy]()
-    a.write(ImpossibleToDestroy(42))
+    a = ImpossibleToDestroy(42)
 
     # Using the initializer should not trigger the destructor too.
     var b = UnsafeMaybeUninitialized[ImpossibleToDestroy](
@@ -86,17 +81,17 @@ def test_maybe_uninitialized_move_from_pointer():
 
     var b = UnsafeMaybeUninitialized[MoveCounter[Int]]()
     # b is uninitialized here.
-    b.move_from(UnsafePointer.address_of(a))
+    b = UnsafePointer.address_of(a).take_pointee()
     _ = a^
 
     # a is uninitialized now. Thankfully, we're working with trivial types
-    assert_equal(b.assume_initialized().move_count, 1)
+    assert_equal(b.assume_initialized().move_count, 2)
     b.assume_initialized_destroy()
 
 
 def test_maybe_uninitialized_copy():
     var a = UnsafeMaybeUninitialized[CopyCounter]()
-    a.write(CopyCounter())
+    a = CopyCounter()
     assert_equal(a.assume_initialized().copy_count, 0)
 
     var b = UnsafeMaybeUninitialized[CopyCounter]()
