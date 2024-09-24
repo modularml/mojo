@@ -191,6 +191,7 @@ struct _StringSliceIter[
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
+                # TODO: use _utf8_first_byte_sequence_length() once #3528 is merged
                 var byte_type = _utf8_byte_type(self.ptr[self.index])
                 debug_assert(byte_type != 1, "Iterator is indexing incorrectly")
                 if byte_type != 0:
