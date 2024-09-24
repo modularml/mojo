@@ -221,13 +221,13 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait SizedByteableCollectionElement(CollectionElement, Byteable, Sized):
+trait SizedSpanableCollectionElement(CollectionElement, Spanable, Sized):
     """The SizedFormattableCollectionElement trait denotes a trait composition
-    of the `CollectionElement`, `Byteable` and `Sized` traits.
+    of the `CollectionElement`, `Spanable` and `Sized` traits.
 
     This is useful to have as a named entity since Mojo does not
     currently support anonymous trait compositions to constrain
-    on `CollectionElement & Byteable & Sized` in the parameter.
+    on `CollectionElement & Spanable & Sized` in the parameter.
     """
 
     pass

@@ -689,7 +689,7 @@ fn isprintable(c: UInt8) -> Bool:
 struct String(
     Sized,
     Stringable,
-    Byteable,
+    Spanable,
     Representable,
     IntableRaising,
     KeyElement,
@@ -1331,7 +1331,7 @@ struct String(
         return result
 
     fn join[
-        T: SizedByteableCollectionElement, //,
+        T: SizedSpanableCollectionElement, //,
         fast: Bool,  # TODO: We should need to add this param to prevent ambiguity
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
@@ -1364,8 +1364,8 @@ struct String(
             if is_first:
                 is_first = False
             else:
-                buf.extend(self.as_bytes_slice())
-            buf.extend(elems[i].as_bytes_slice())
+                buf.extend(self.as_bytes_span())
+            buf.extend(elems[i].as_bytes_span())
             i += 1
         buf.append(0)
         return String(buf^)

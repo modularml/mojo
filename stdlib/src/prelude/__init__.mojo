@@ -92,7 +92,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
-    SizedByteableCollectionElement,
+    SizedSpanableCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -132,4 +132,4 @@ from collections.string import (
     isprintable,
 )
 from memory import Reference, AddressSpace
-from utils import Byteable, Formattable, Formatter
+from utils import Spanable, Formattable, Formatter

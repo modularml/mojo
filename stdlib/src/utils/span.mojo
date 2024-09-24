@@ -26,12 +26,12 @@ from sys.intrinsics import _type_is_eq
 from builtin.builtin_list import _lit_mut_cast
 
 
-trait Byteable:
+trait Spanable:
     """
-    The `Byteable` trait denotes a type that can be returned as a immutable byte slice.
+    The `Spanable` trait denotes a type that can be returned as a immutable byte slice.
     """
 
-    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
