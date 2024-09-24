@@ -98,7 +98,7 @@ struct _DictEntryIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: AnyLifetime[dict_mutability].type,
+    dict_lifetime: Lifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
@@ -146,7 +146,7 @@ struct _DictKeyIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: AnyLifetime[dict_mutability].type,
+    dict_lifetime: Lifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
@@ -180,7 +180,7 @@ struct _DictValueIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: AnyLifetime[dict_mutability].type,
+    dict_lifetime: Lifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
