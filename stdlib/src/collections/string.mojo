@@ -24,6 +24,7 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
+from sys.intrinsics import _type_is_eq
 from utils import (
     Span,
     StaticIntTuple,
@@ -1302,10 +1303,6 @@ struct String(
         _ = is_first
         return result
 
-    # TODO: this join is ambiguous for the compiler with the next one in list of strings
-    # So, when we try to join a list of strings it will fail with the following error:
-    # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
-    # disambiguate with an explicit cast"
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1318,6 +1315,15 @@ struct String(
         Returns:
             The joined string.
         """
+
+        # TODO: the renaming of the following method from join to fast_join and
+        # the _type_is_eq() call is a hack needed to avoid the following error:
+        # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
+        # disambiguate with an explicit cast"
+        @parameter
+        if _type_is_eq[T, String]() or _type_is_eq[T, StringLiteral]():
+            return self.fast_join(rebind[List[String]](elems))
+
         var result: String = ""
         var is_first = True
 
@@ -1330,15 +1336,13 @@ struct String(
 
         return result
 
-    fn join[
+    fn fast_join[
         T: SizedSpanableCollectionElement, //,
-        fast: Bool,  # TODO: We should need to add this param to prevent ambiguity
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
             T: The types of the elements.
-            fast: Whether if use the fast algorithm.
 
         Args:
             elems: The input values.
