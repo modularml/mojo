@@ -794,10 +794,15 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A reference to the element at the given index.
         """
+
         var normalized_idx = idx
+
         debug_assert(
             -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
+            "index: ",
+            normalized_idx,
+            " is out of bounds for `List` of size: ",
+            self.size,
         )
         if normalized_idx < 0:
             normalized_idx += len(self)

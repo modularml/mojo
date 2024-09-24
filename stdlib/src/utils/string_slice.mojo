@@ -32,6 +32,9 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    debug_assert(
+        0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
+    )
     alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
     return int((sizes < c).cast[DType.uint8]().reduce_add())
 
