@@ -340,6 +340,9 @@ struct Span[
         """Finds the offset of the first occurrence of `subseq` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            D: The `DType` of the Scalar.
+
         Args:
             subseq: The sub sequence to find.
             start: The offset from which to find.
@@ -379,6 +382,9 @@ struct Span[
     ](self: Span[Scalar[D]], subseq: Span[Scalar[D]], start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `subseq` starting at
         `start`. If not found, returns -1.
+
+        Parameters:
+            D: The `DType` of the Scalar.
 
         Args:
             subseq: The sub sequence to find.
