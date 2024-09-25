@@ -37,13 +37,12 @@ def test_box_copy_constructor():
     assert_not_equal(b.unsafe_ptr(), b2.unsafe_ptr())
 
 
-# TODO:
-# def test_copying_constructor():
-#    var v = ImplicitCopyOnly(1)
-#    var b = Box(v)
-#
-#    assert_equal(b[].value, 1)
-#    assert_equal(b[].copy_count, 1) # this should only ever require one copy
+def test_copying_constructor():
+    var v = ImplicitCopyOnly(1)
+    var b = Box(v)
+
+    assert_equal(b[].value, 1)
+    assert_equal(b[].copy_count, 1) # this should only ever require one copy
 
 
 def test_explicitly_copying_constructor():
@@ -114,7 +113,7 @@ def main():
     test_basic_ref()
     test_box_copy_constructor()
     test_moving_constructor()
-    # TODO:    test_copying_constructor()
+    test_copying_constructor()
     test_explicitly_copying_constructor()
     test_basic_ref_mutate()
     test_basic_del()

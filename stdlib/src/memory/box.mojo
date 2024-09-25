@@ -51,12 +51,12 @@ struct Box[T: AnyType]:
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_explicit_copy(copy_value)
 
-    # TODO: disambiguation and other niceties
-    #    fn __init__[
-    #        T: Copyable
-    #    ](inout self: Box[T], value: T):
-    #        self._inner = UnsafePointer[T].alloc(1)
-    #        self._inner.init_pointee_copy(value)
+    fn __init__[
+        T: Copyable,
+        U: NoneType = None
+    ](inout self: Box[T], value: T):
+        self._inner = UnsafePointer[T].alloc(1)
+        self._inner.init_pointee_copy(value)
 
     fn __init__[
         T: ExplicitlyCopyable
