@@ -229,6 +229,25 @@ fn now() -> Int:
 
 
 # ===----------------------------------------------------------------------===#
+# monotonic
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn monotonic() -> Int:
+    """
+    Returns the current monotonic time time in nanoseconds. This function
+    queries the current platform's monotonic clock, making it useful for
+    measuring time differences, but the significance of the returned value
+    varies depending on the underlying implementation.
+
+    Returns:
+        The current time in ns.
+    """
+    return perf_counter_ns()
+
+
+# ===----------------------------------------------------------------------===#
 # time_function
 # ===----------------------------------------------------------------------===#
 
