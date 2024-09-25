@@ -57,6 +57,14 @@ struct DType(
     """Represents a signed integer type whose bitwidth is 64."""
     alias uint64 = DType(__mlir_attr.`#kgen.dtype.constant<ui64> : !kgen.dtype`)
     """Represents an unsigned integer type whose bitwidth is 64."""
+    alias float8e5m2 = DType(
+        __mlir_attr.`#kgen.dtype.constant<f8e5m2> : !kgen.dtype`
+    )
+    """Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+    alias float8e4m3 = DType(
+        __mlir_attr.`#kgen.dtype.constant<f8e4m3> : !kgen.dtype`
+    )
+    """Represents a FP8E4M3 floating point format whose bitwidth is 8."""
     alias bfloat16 = DType(
         __mlir_attr.`#kgen.dtype.constant<bf16> : !kgen.dtype`
     )
@@ -116,6 +124,10 @@ struct DType(
             return DType.uint64
         elif str == String("index"):
             return DType.index
+        elif str == String("float8e5m2"):
+            return DType.float8e5m2
+        elif str == String("float8e4m3"):
+            return DType.float8e4m3
         elif str == String("bfloat16"):
             return DType.bfloat16
         elif str == String("float16"):
@@ -170,6 +182,10 @@ struct DType(
             return writer.write_str("uint64")
         if self == DType.index:
             return writer.write_str("index")
+        if self == DType.float8e5m2:
+            return writer.write_str("float8e5m2")
+        if self == DType.float8e4m3:
+            return writer.write_str("float8e4m3")
         if self == DType.bfloat16:
             return writer.write_str("bfloat16")
         if self == DType.float16:
@@ -359,6 +375,17 @@ struct DType(
         )
 
     @always_inline("nodebug")
+    fn is_float8(self) -> Bool:
+        """Returns True if the type is a 8bit-precision floating point type,
+        e.g. either float8e5m2 or float8e4m3.
+
+        Returns:
+            True if the type is a 8bit-precision float, false otherwise.
+        """
+
+        return self in (DType.float8e5m2, DType.float8e4m3)
+
+    @always_inline("nodebug")
     fn is_half_float(self) -> Bool:
         """Returns True if the type is a half-precision floating point type,
         e.g. either fp16 or bf16.
@@ -410,6 +437,10 @@ struct DType(
             return sizeof[DType.bool]()
         if self == DType.index:
             return sizeof[DType.index]()
+        if self == DType.float8e5m2:
+            return sizeof[DType.float8e5m2]()
+        if self == DType.float8e4m3:
+            return sizeof[DType.float8e4m3]()
         if self == DType.bfloat16:
             return sizeof[DType.bfloat16]()
         if self == DType.float16:
@@ -581,7 +612,11 @@ fn _integral_type_of[type: DType]() -> DType:
         return type
 
     @parameter
-    if type is DType.bfloat16 or type is DType.float16:
+    if type.is_float8():
+        return DType.int8
+
+    @parameter
+    if type.is_half_float():
         return DType.int16
 
     @parameter
@@ -610,7 +645,11 @@ fn _unsigned_integral_type_of[type: DType]() -> DType:
         return _uint_type_of_width[bitwidthof[type]()]()
 
     @parameter
-    if type is DType.bfloat16 or type is DType.float16:
+    if type.is_float8():
+        return DType.uint8
+
+    @parameter
+    if type.is_half_float():
         return DType.uint16
 
     @parameter
@@ -636,7 +675,9 @@ fn _scientific_notation_digits[type: DType]() -> StringLiteral:
     constrained[type.is_floating_point(), "expected floating point type"]()
 
     @parameter
-    if type is DType.bfloat16 or type is DType.float16:
+    if type.is_float8():
+        return "2"
+    elif type.is_half_float():
         return "4"
     elif type is DType.float32 or type is DType.tensor_float32:
         return "8"

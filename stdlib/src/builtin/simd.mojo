@@ -27,7 +27,7 @@ from sys import (
     triple_is_nvidia_cuda,
     bitwidthof,
 )
-from sys.info import _current_arch, _is_sm_8x
+from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
 
 from sys._assembly import inlined_assembly
 from os import abort
@@ -117,8 +117,12 @@ fn _simd_construction_checks[type: DType, size: Int]():
     constrained[size > 0, "simd width must be > 0"]()
     constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
     constrained[
-        type is not DType.bfloat16 or not has_neon(),
+        not (type is DType.bfloat16 and has_neon()),
         "bf16 is not supported for ARM architectures",
+    ]()
+    constrained[
+        not (type.is_float8() and _has_native_f8_support()),
+        "f8 is not supported on non sm_90 architectures",
     ]()
 
 
@@ -142,6 +146,11 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
     return triple_is_nvidia_cuda()
+
+
+@always_inline("nodebug")
+fn _has_native_f8_support() -> Bool:
+    return _is_sm_9x()
 
 
 # ===----------------------------------------------------------------------=== #
