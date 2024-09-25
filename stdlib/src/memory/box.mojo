@@ -82,7 +82,7 @@ struct Box[T: AnyType]:
 
     fn __getitem__(
         ref [_, AddressSpace.GENERIC._value.value]self
-    ) -> ref [__lifetime_of(self._inner), AddressSpace.GENERIC._value.value] T:
+    ) -> ref [__lifetime_of(self), AddressSpace.GENERIC._value.value] T:
         """Returns a reference to the box's underlying data with parametric mutability.
 
         Returns:
