@@ -14,7 +14,7 @@
 """
 
 from collections.string import _atol, _isspace
-from memory import UnsafePointer, memcmp, bitcast
+from memory import UnsafePointer, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import c_char
@@ -22,8 +22,6 @@ from sys.ffi import c_char
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
-
-
 
 
 # ===----------------------------------------------------------------------===#
@@ -241,7 +239,12 @@ struct StringRef(
           True if the string contains the substring.
         """
         alias S = StringSlice[ImmutableAnyLifetime]
-        return S(unsafe_from_utf8_strref=self).find(S(unsafe_from_utf8_strref=substr)) != -1
+        return (
+            S(unsafe_from_utf8_strref=self).find(
+                S(unsafe_from_utf8_strref=substr)
+            )
+            != -1
+        )
 
     @always_inline
     fn __ne__(self, rhs: StringRef) -> Bool:
@@ -434,7 +437,9 @@ struct StringRef(
 
         while True:
             alias S = StringSlice[ImmutableAnyLifetime]
-            var pos = S(unsafe_from_utf8_strref=self).find(S(unsafe_from_utf8_strref=substr), offset)
+            var pos = S(unsafe_from_utf8_strref=self).find(
+                S(unsafe_from_utf8_strref=substr), offset
+            )
             if pos == -1:
                 break
             res += 1
@@ -540,10 +545,9 @@ struct StringRef(
             return False
         if end == -1:
             alias S = StringSlice[ImmutableAnyLifetime]
-            return S(
-                unsafe_from_utf8_strref=self
-            ).rfind(S(unsafe_from_utf8_strref=suffix), start) + len(suffix) == len(self)
+            return S(unsafe_from_utf8_strref=self).rfind(
+                S(unsafe_from_utf8_strref=suffix), start
+            ) + len(suffix) == len(self)
         return StringRef(self.unsafe_ptr() + start, end - start).endswith(
             suffix
         )
-

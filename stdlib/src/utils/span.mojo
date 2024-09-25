@@ -334,8 +334,9 @@ struct Span[
             unsafe_ptr=self._data, len=self._len
         )
 
-    fn find[D: DType, //, from_left: Bool = True](
-        self: Span[Scalar[D]], subseq: Span[Scalar[D]], start: Int = 0) -> Int:
+    fn find[
+        D: DType, //, from_left: Bool = True
+    ](self: Span[Scalar[D]], subseq: Span[Scalar[D]], start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `subseq` starting at
         `start`. If not found, returns -1.
 
@@ -349,6 +350,7 @@ struct Span[
         var _len = len(self)
 
         if not subseq:
+
             @parameter
             if from_left:
                 return 0
@@ -372,8 +374,9 @@ struct Span[
 
         return int(loc) - int(self.unsafe_ptr()) if loc else -1
 
-    fn rfind[D: DType, //](
-        self: Span[Scalar[D]], subseq: Span[Scalar[D]], start: Int = 0) -> Int:
+    fn rfind[
+        D: DType, //
+    ](self: Span[Scalar[D]], subseq: Span[Scalar[D]], start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `subseq` starting at
         `start`. If not found, returns -1.
 
@@ -391,10 +394,10 @@ struct Span[
 # Utilities
 # ===----------------------------------------------------------------------===#
 
+
 @always_inline
 fn _align_down(value: Int, alignment: Int) -> Int:
     return value._positive_div(alignment) * alignment
-
 
 
 @always_inline
@@ -425,8 +428,7 @@ fn _memchr[
 fn _memmem[
     type: DType
 ](
-    haystack_span: Span[Scalar[type]],
-    needle_span: Span[Scalar[type]]
+    haystack_span: Span[Scalar[type]], needle_span: Span[Scalar[type]]
 ) -> UnsafePointer[Scalar[type]]:
     var haystack = haystack_span.unsafe_ptr()
     var haystack_len = len(haystack_span)
@@ -495,8 +497,7 @@ fn _memrchr[
 fn _memrmem[
     type: DType
 ](
-    haystack_span: Span[Scalar[type]],
-    needle_span: Span[Scalar[type]]
+    haystack_span: Span[Scalar[type]], needle_span: Span[Scalar[type]]
 ) -> UnsafePointer[Scalar[type]]:
     var haystack = haystack_span.unsafe_ptr()
     var haystack_len = len(haystack_span)
