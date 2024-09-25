@@ -342,6 +342,8 @@ struct Span[
 
         Parameters:
             D: The `DType` of the Scalar.
+            from_left: Whether to search the first occurrence starting from the
+                left.
 
         Args:
             subseq: The sub sequence to find.
