@@ -27,7 +27,7 @@ from sys import (
     triple_is_nvidia_cuda,
     bitwidthof,
 )
-from sys.info import _current_arch
+from sys.info import _current_arch, _is_sm_8x
 
 from sys._assembly import inlined_assembly
 from os import abort
@@ -142,15 +142,6 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
     return triple_is_nvidia_cuda()
-
-
-@always_inline("nodebug")
-fn _is_sm_80() -> Bool:
-    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) in (
-        "sm_80",
-        "sm_86",
-        "sm_89",
-    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -535,7 +526,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if _is_sm_8x() and type.is_half_float():
             return self.fma(1, rhs)
 
         return __mlir_op.`pop.add`(self.value, rhs.value)
@@ -554,7 +545,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if _is_sm_8x() and type.is_half_float():
             return rhs.fma(-1, self)
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
@@ -577,7 +568,7 @@ struct SIMD[type: DType, size: Int](
             ]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if _is_sm_8x() and type.is_half_float():
             return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
@@ -1761,7 +1752,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if _is_sm_8x() and type.is_half_float():
             alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
 
             @parameter
