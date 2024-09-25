@@ -42,7 +42,7 @@ def test_copying_constructor():
     var b = Box(v)
 
     assert_equal(b[].value, 1)
-    assert_equal(b[].copy_count, 1) # this should only ever require one copy
+    assert_equal(b[].copy_count, 1)  # this should only ever require one copy
 
 
 def test_explicitly_copying_constructor():
