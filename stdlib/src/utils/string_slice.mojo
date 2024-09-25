@@ -39,8 +39,8 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
     var processed = 0
 
     @parameter
-    for j in range(len(sizes)):
-        alias s = sizes.get[j, Int]()
+    for i in range(len(sizes)):
+        alias s = sizes.get[i, Int]()
 
         @parameter
         if simdwidthof[DType.uint8]() >= s:
