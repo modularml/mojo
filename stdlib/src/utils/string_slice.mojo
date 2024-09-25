@@ -32,18 +32,10 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 
 
 fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
+    alias sizes = (256, 128, 64, 32, 16, 8)
     var ptr = span.unsafe_ptr()
     var num_bytes = len(span)
     var amnt: Int = 0
-
-    @parameter
-    @always_inline("nodebug")
-    fn count[w: Int](p: UnsafePointer[UInt8]) -> Int:
-        var vec = p.load[DType.uint8, width=w]()
-        var comp = (vec & 0b1100_0000) == 0b1000_0000
-        return int(comp.cast[DType.uint8]().reduce_add())
-
-    alias sizes = (256, 128, 64, 32, 16, 8)
     var processed = 0
 
     @parameter
@@ -54,7 +46,9 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
         if simdwidthof[DType.uint8]() >= s:
             var rest = num_bytes - processed
             for _ in range(rest // s):
-                amnt += count[s](ptr + processed)
+                var vec = (ptr + processed).load[DType.uint8, width=s]()
+                var comp = (vec & 0b1100_0000) == 0b1000_0000
+                amnt += int(comp.cast[DType.uint8]().reduce_add())
                 processed += s
 
     for i in range(num_bytes - processed):
@@ -191,9 +185,7 @@ struct _StringSliceIter[
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                # TODO: use _utf8_first_byte_sequence_length() once #3528 is merged
                 var byte_type = _utf8_byte_type(self.ptr[self.index])
-                debug_assert(byte_type != 1, "Iterator is indexing incorrectly")
                 if byte_type != 0:
                     byte_len = int(byte_type)
                     self.continuation_bytes -= byte_len - 1
@@ -206,7 +198,6 @@ struct _StringSliceIter[
             var byte_len = 1
             if self.continuation_bytes > 0:
                 var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                debug_assert(byte_type != 1, "Iterator is indexing incorrectly")
                 if byte_type != 0:
                     while byte_type == 1:
                         byte_len += 1
