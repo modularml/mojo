@@ -55,6 +55,14 @@ struct Box[T: AnyType]:
         T: Copyable,
         U: NoneType = None
     ](inout self: Box[T], value: T):
+        """Construct a new Box[] by copying the passed value into a new backing allocation.
+
+        Parameters:
+            T: The type of the data to store.
+
+        Args:
+            value: The value to copy into the Box[].
+        """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_copy(value)
 
