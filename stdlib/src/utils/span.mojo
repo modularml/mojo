@@ -378,6 +378,7 @@ struct Span[
 
         return int(loc) - int(self.unsafe_ptr()) if loc else -1
 
+    @always_inline
     fn rfind[
         D: DType, //
     ](self: Span[Scalar[D]], subseq: Span[Scalar[D]], start: Int = 0) -> Int:
