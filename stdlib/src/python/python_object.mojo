@@ -505,6 +505,15 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
+    fn __init__(inout self, slice: Slice):
+        """Initialize the object from a Mojo Slice.
+
+        Args:
+            slice: The dictionary value.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.toPython(slice)
+
     fn __init__(inout self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
 
@@ -712,6 +721,35 @@ struct PythonObject(
                 var arg_value = args[i].py_object
                 cpython.Py_IncRef(arg_value)
                 var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
+                if result != 0:
+                    raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(key_obj)
+        var result = cpython.PyObject_GetItem(self.py_object, key_obj)
+        cpython.Py_DecRef(key_obj)
+        Python.throw_python_exception_if_error_state(cpython)
+        return PythonObject(result)
+
+    fn __getitem__(self, *args: Slice) raises -> PythonObject:
+        """Return the sliced value for the given Slice or Slices.
+
+        Args:
+            args: The Slice or Slices to apply to this object.
+
+        Returns:
+            The sliced value corresponding to the given Slice(s) for this object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var size = len(args)
+        var key_obj: PyObjectPtr
+
+        if size == 1:
+            key_obj = cpython.PySlice_FromSlice(args[0])
+        else:
+            key_obj = cpython.PyTuple_New(size)
+            for i in range(size):
+                var slice_obj = cpython.PySlice_FromSlice(args[i])
+                var result = cpython.PyTuple_SetItem(key_obj, i, slice_obj)
                 if result != 0:
                     raise Error("internal error: PyTuple_SetItem failed")
 

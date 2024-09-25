@@ -1127,6 +1127,28 @@ struct CPython:
 
         return r
 
+    fn PySlice_New(
+        inout self, start: PyObjectPtr, stop: PyObjectPtr, step: PyObjectPtr
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PySlice_New")(start, stop, step)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PySlice_New, refcnt:",
+            self._Py_REFCNT(r),
+            ", start:",
+            start._get_ptr_as_int(),
+            ", stop:",
+            stop._get_ptr_as_int(),
+            ", step:",
+            step._get_ptr_as_int(),
+        )
+
+        self._inc_total_rc()
+        return r
+
     fn PyObject_CallObject(
         inout self,
         callable_obj: PyObjectPtr,
@@ -1337,6 +1359,9 @@ struct CPython:
     fn toPython(inout self, litBool: Bool) -> PyObjectPtr:
         return self.PyBool_FromLong(1 if litBool else 0)
 
+    fn toPython(inout self, slice: Slice) -> PyObjectPtr:
+        return self.PySlice_FromSlice(slice)
+
     fn PyLong_AsLong(inout self, py_object: PyObjectPtr) -> Int:
         return self.lib.get_function[fn (PyObjectPtr) -> Int]("PyLong_AsLong")(
             py_object
@@ -1406,6 +1431,37 @@ struct CPython:
 
         self._inc_total_rc()
         return r
+
+    fn PySlice_FromSlice(inout self, slice: Slice) -> PyObjectPtr:
+        # Convert Mojo Slice to Python slice parameters
+        # Note: Deliberately avoid using `span.indices()` here and instead pass
+        # the Slice parameters directly to Python. Python's C implementation
+        # already handles such conditions, allowing Python to apply its own slice
+        # handling.
+        var py_start = self.Py_None()
+        var py_stop = self.Py_None()
+        var py_step = self.PyLong_FromLong(slice.step)
+
+        if slice.start:
+            py_start = self.PyLong_FromLong(slice.start.value())
+        if slice.end:
+            py_stop = self.PyLong_FromLong(slice.end.value())
+
+        var py_slice = self.PySlice_New(py_start, py_stop, py_step)
+
+        if py_start != self.Py_None():
+            self.Py_DecRef(py_start)
+        if py_stop != self.Py_None():
+            self.Py_DecRef(py_stop)
+        self.Py_DecRef(py_step)
+
+        self.log(
+            py_slice._get_ptr_as_int(),
+            " NEWREF PySlice_New, refcnt:",
+            self._Py_REFCNT(py_slice),
+        )
+
+        return py_slice
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
