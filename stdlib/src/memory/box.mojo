@@ -56,6 +56,7 @@ struct Box[T: AnyType]:
 
         Parameters:
             T: The type of the data to store.
+            U: A dummy type parameter, to lower the selection priority of this ctor.
 
         Args:
             value: The value to copy into the Box[].
