@@ -70,7 +70,7 @@ else:
     # In the future, we can do other fancy things like with sanitizers
     # and build type.
     if bool(int(os.environ.get("MOJO_ENABLE_ASSERTIONS_IN_TESTS", 1))):
-        base_mojo_command = "mojo -D MOJO_ENABLE_ASSERTIONS"
+        base_mojo_command = "mojo -D ASSERT=all"
     else:
         print("Running tests with assertions disabled.")
         base_mojo_command = "mojo"
