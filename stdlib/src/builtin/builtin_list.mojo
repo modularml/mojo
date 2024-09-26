@@ -33,7 +33,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         Ts: The type of the elements.
     """
 
-    var storage: Tuple[Ts]
+    var storage: Tuple[*Ts]
     """The underlying storage for the list."""
 
     # ===-------------------------------------------------------------------===#

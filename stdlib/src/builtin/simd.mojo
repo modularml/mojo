@@ -1863,13 +1863,13 @@ struct SIMD[type: DType, size: Int](
 
             return array
 
-        alias length = variadic_len[mask]()
+        alias length = variadic_len[*mask]()
         constrained[
             output_size == length,
             "size of the mask must match the output SIMD size",
         ]()
         return __mlir_op.`pop.simd.shuffle`[
-            mask = _convert_variadic_to_pop_array[mask](),
+            mask = _convert_variadic_to_pop_array[*mask](),
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1922,7 +1922,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[mask](self)
+        return self._shuffle_list[*mask](self)
 
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -1940,7 +1940,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[mask](other)
+        return self._shuffle_list[*mask](other)
 
     @always_inline("nodebug")
     fn shuffle[mask: StaticIntTuple[size]](self) -> Self:
