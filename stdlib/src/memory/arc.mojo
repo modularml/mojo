@@ -129,7 +129,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         references, delete the object and free its memory."""
         if self._inner[].drop_ref():
             # Call inner destructor, then free the memory.
-            (self._inner).destroy_pointee()
+            self._inner.destroy_pointee()
             self._inner.free()
 
     # FIXME: The lifetime returned for this is currently self lifetime, which

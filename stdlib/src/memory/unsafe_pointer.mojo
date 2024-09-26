@@ -44,6 +44,7 @@ struct UnsafePointer[
     address_space: AddressSpace = AddressSpace.GENERIC,
     exclusive: Bool = False,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    lifetime: Lifetime[True].type = MutableAnyLifetime,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -60,6 +61,7 @@ struct UnsafePointer[
         address_space: The address space associated with the UnsafePointer allocated memory.
         exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
         alignment: The minimum alignment of this pointer known statically.
+        lifetime: The lifetime of the memory being addressed.
     """
 
     # ===-------------------------------------------------------------------===#
@@ -162,7 +164,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__(
         self,
-    ) -> ref [MutableAnyLifetime, address_space._value.value] type:
+    ) -> ref [lifetime, address_space._value.value] type:
         """Return a reference to the underlying data.
 
         Returns:
@@ -172,7 +174,7 @@ struct UnsafePointer[
         # We're unsafe, so we can have unsafe things. References we make have
         # an 'any' mutable lifetime, since UnsafePointer is allowed to alias
         # anything.
-        alias _ref_type = Reference[type, MutableAnyLifetime, address_space]
+        alias _ref_type = Reference[type, lifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
                 UnsafePointer[type, address_space, False](self).address
@@ -197,9 +199,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__[
         IntLike: IntLike, //
-    ](self, offset: IntLike) -> ref [
-        MutableAnyLifetime, address_space._value.value
-    ] type:
+    ](self, offset: IntLike) -> ref [lifetime, address_space._value.value] type:
         """Return a reference to the underlying data, offset by the given index.
 
         Parameters:
@@ -267,6 +267,11 @@ struct UnsafePointer[
         """
         self = self - offset
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are equal.
@@ -279,6 +284,7 @@ struct UnsafePointer[
         """
         return int(self) == int(rhs)
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are not equal.
@@ -291,6 +297,7 @@ struct UnsafePointer[
         """
         return not (self == rhs)
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower address than rhs.
@@ -303,6 +310,7 @@ struct UnsafePointer[
         """
         return int(self) < int(rhs)
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __le__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower than or equal
@@ -316,6 +324,7 @@ struct UnsafePointer[
         """
         return int(self) <= int(rhs)
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher address than rhs.
@@ -328,6 +337,7 @@ struct UnsafePointer[
         """
         return int(self) > int(rhs)
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __ge__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher than or equal

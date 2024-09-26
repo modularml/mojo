@@ -20,6 +20,36 @@ what we publish.
   enabling things like `count_leading_zeros` to work at compile time:
   [Issue #933](https://github.com/modularml/mojo/issues/933).
 
+- The destructor insertion logic in Mojo is now aware that types that take an
+  `AnyLifetime` as part of their signature could potentially access any live
+  value that destructor insertion is tracking, eliminating a significant
+  usability issue with unsafe APIs like `UnsafePointer`.  Consider a typical
+  example working with strings before this change:
+
+  ```mojo
+  var str = String(...)
+  var ptr = str.unsafe_ptr()
+  some_low_level_api(ptr)
+  _ = str^  # OLD HACK: Explicitly keep string alive until here!
+  ```
+
+  The `_ = str^` pattern was formerly required because the Mojo compiler has no
+  idea what "ptr" might reference.  As a consequence, it had no idea that
+  `some_low_level_api` might access `str` and therefore thought it was ok to
+  destroy the `String` before the call - this is why the explicit lifetime
+  extension was required.
+
+  Mojo now knows that `UnsafePointer` may access the `AnyLifetime` lifetime,
+  and now assumes that any API that uses that lifetime could use live values.
+  In this case, it assumes that `some_low_level_api` might access `str` and
+  because it might be using it, it cannot destroy `str` until after the call.
+  The consequence of this is that the old hack is no longer needed for these
+  cases!
+
+- The `UnsafePointer` type now has a `lifetime` parameter that can be used when
+  the `UnsafePointer` is known to point into some lifetime.  This lifetime is
+  propagated through the `ptr[]` indirection operation.
+
 - The VS Code Mojo Debugger now has a `buildArgs` JSON debug configuration
   setting that can be used in conjunction with `mojoFile` to define the build
   arguments when compiling the Mojo file.

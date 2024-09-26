@@ -48,10 +48,11 @@ def test_unsafepointer_of_move_only_type():
     assert_equal(actions_ptr[0][1], "__moveinit__", msg="emplace_value")
     assert_equal(ptr[0].value, 42)
 
-    var value = ptr.take_pointee()
-    assert_equal(len(actions_ptr[0]), 3)
-    assert_equal(actions_ptr[0][2], "__moveinit__")
-    assert_equal(value.value, 42)
+    if True:  # scope value
+        var value = ptr.take_pointee()
+        assert_equal(len(actions_ptr[0]), 3)
+        assert_equal(actions_ptr[0][2], "__moveinit__")
+        assert_equal(value.value, 42)
 
     ptr.free()
     assert_equal(len(actions_ptr[0]), 4)

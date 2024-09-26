@@ -50,7 +50,7 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @always_inline
 fn _memcmp_impl_unconstrained[
     type: DType
-](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
     alias simd_width = simdwidthof[type]()
     if count < simd_width:
         for i in range(count):
@@ -94,7 +94,7 @@ fn _memcmp_impl_unconstrained[
 @always_inline
 fn _memcmp_impl[
     type: DType
-](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
     constrained[type.is_integral(), "the input dtype must be integral"]()
     return _memcmp_impl_unconstrained(s1, s2, count)
 
