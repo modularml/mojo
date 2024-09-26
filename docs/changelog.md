@@ -186,4 +186,7 @@ what we publish.
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
 
+- [Issue #3544](https://github.com/modularml/mojo/issues/3544) - Potentially
+  mutable `ref` argument are not optimized as `noalias` by LLVM.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
