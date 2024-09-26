@@ -570,7 +570,7 @@ struct SIMD[type: DType, size: Int](
                 vector_constraints="=r,r,r",
             ](self, rhs)
         elif _is_sm_8x() and type.is_half_float():
-            return self.fma(-1, rhs)
+            return rhs.fma(-1, self)
 
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
