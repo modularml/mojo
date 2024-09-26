@@ -54,7 +54,6 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
     for i in range(num_bytes - processed):
         amnt += int((ptr[processed + i] & 0b1100_0000) == 0b1000_0000)
 
-    _ = span
     return amnt
 
 
