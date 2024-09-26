@@ -1116,9 +1116,8 @@ struct String(
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self)](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
+        alias S = _StringSliceIter[__lifetime_of(self)]
+        return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     fn __reversed__(self) -> _StringSliceIter[__lifetime_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
@@ -1126,9 +1125,8 @@ struct String(
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
+        alias S = _StringSliceIter[__lifetime_of(self), forward=False]
+        return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations

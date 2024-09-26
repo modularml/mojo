@@ -223,8 +223,7 @@ struct StringSlice[
     is_mutable: Bool, //,
     lifetime: Lifetime[is_mutable].type,
 ](Stringable, Sized, Formattable):
-    """
-    A non-owning view to encoded string data.
+    """A non-owning view to encoded string data.
 
     TODO:
     The underlying string data is guaranteed to be encoded using UTF-8.
@@ -267,8 +266,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(inout self, *, owned unsafe_from_utf8: Span[UInt8, lifetime]):
-        """
-        Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
+        """Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
 
         Safety:
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
@@ -280,9 +278,8 @@ struct StringSlice[
         self._slice = unsafe_from_utf8^
 
     fn __init__(inout self, *, unsafe_from_utf8_strref: StringRef):
-        """
-        Construct a new StringSlice from a StringRef pointing to UTF-8 encoded
-        bytes.
+        """Construct a new StringSlice from a StringRef pointing to UTF-8
+        encoded bytes.
 
         Safety:
             - `unsafe_from_utf8_strref` MUST point to data that is valid for
@@ -308,8 +305,7 @@ struct StringSlice[
         unsafe_from_utf8_ptr: UnsafePointer[UInt8],
         len: Int,
     ):
-        """
-        Construct a StringSlice from a pointer to a sequence of UTF-8 encoded
+        """Construct a StringSlice from a pointer to a sequence of UTF-8 encoded
         bytes and a length.
 
         Safety:
@@ -385,7 +381,8 @@ struct StringSlice[
             rhs: The string slice to compare against.
 
         Returns:
-            True if the string slices are equal in length and contain the same elements, False otherwise.
+            True if the string slices are equal in length and contain the same
+                elements, False otherwise.
         """
         if not self and not rhs:
             return True
@@ -407,7 +404,8 @@ struct StringSlice[
             rhs: The string to compare against.
 
         Returns:
-            True if the string slice is equal to the input string in length and contain the same bytes, False otherwise.
+            True if the string slice is equal to the input string in length and
+                contain the same bytes, False otherwise.
         """
         return self == rhs.as_string_slice()
 
@@ -419,7 +417,8 @@ struct StringSlice[
             rhs: The literal to compare against.
 
         Returns:
-            True if the string slice is equal to the input literal in length and contain the same bytes, False otherwise.
+            True if the string slice is equal to the input literal in length and
+                contain the same bytes, False otherwise.
         """
         return self == rhs.as_string_slice()
 
@@ -432,7 +431,8 @@ struct StringSlice[
             rhs: The string slice to compare against.
 
         Returns:
-            True if the string slices are not equal in length or contents, False otherwise.
+            True if the string slices are not equal in length or contents, False
+                otherwise.
         """
         return not self == rhs
 
@@ -444,7 +444,8 @@ struct StringSlice[
             rhs: The string slice to compare against.
 
         Returns:
-            True if the string and slice are not equal in length or contents, False otherwise.
+            True if the string and slice are not equal in length or contents,
+                False otherwise.
         """
         return not self == rhs
 
@@ -456,19 +457,20 @@ struct StringSlice[
             rhs: The string literal to compare against.
 
         Returns:
-            True if the slice is not equal to the literal in length or contents, False otherwise.
+            True if the slice is not equal to the literal in length or contents,
+                False otherwise.
         """
         return not self == rhs
 
     fn __iter__(self) -> _StringSliceIter[lifetime]:
-        """Iterate over elements of the string slice, returning immutable references.
+        """Iterate over elements of the string slice, returning immutable
+        references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[lifetime](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
+        alias S = _StringSliceIter[lifetime]
+        return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     fn __reversed__(self) -> _StringSliceIter[lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
@@ -476,9 +478,8 @@ struct StringSlice[
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[lifetime, forward=False](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
+        alias S = _StringSliceIter[lifetime, forward=False]
+        return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     # ===------------------------------------------------------------------===#
     # Methods
@@ -486,7 +487,7 @@ struct StringSlice[
 
     @always_inline
     fn as_bytes_span(self) -> Span[UInt8, lifetime]:
-        """Get the sequence of encoded bytes as a slice of the underlying string.
+        """Get the sequence of encoded bytes of the underlying string.
 
         Returns:
             A slice containing the underlying sequence of encoded bytes.
@@ -543,7 +544,8 @@ struct StringSlice[
         pass
 
     fn _from_start(self, start: Int) -> Self:
-        """Gets the `StringSlice` pointing to the substring after the specified slice start position.
+        """Gets the `StringSlice` pointing to the substring after the specified
+        slice start position.
 
         If start is negative, it is interpreted as the number of characters
         from the end of the string to start at.
