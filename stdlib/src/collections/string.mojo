@@ -1111,7 +1111,7 @@ struct String(
         )
 
     fn __iter__(self) -> _StringSliceIter[__lifetime_of(self)]:
-        """Iterate over elements of the string, returning immutable references.
+        """Iterate over the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.

@@ -463,8 +463,7 @@ struct StringSlice[
         return not self == rhs
 
     fn __iter__(self) -> _StringSliceIter[lifetime]:
-        """Iterate over elements of the string slice, returning immutable
-        references.
+        """Iterate over the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
