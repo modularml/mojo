@@ -31,10 +31,11 @@ alias _ERROR_ON_ASSERT = is_debug_build() or is_defined[
 alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
 
 
+# TODO(MOCO-358) Deduplicate and simplify when variadic unpacking is supported
 @always_inline
 fn debug_assert[
-    func: fn () capturing [_] -> Bool, message_type: Stringable
-](message: message_type):
+    func: fn () capturing [_] -> Bool, *Ts: Stringable
+](*messages: *Ts):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -48,19 +49,37 @@ fn debug_assert[
         func: The function to invoke to check if the assertion holds. Can be used
             if the function is side-effecting, in which case a debug_assert taking
             a Bool will evaluate the expression producing the Bool even in release mode.
-        message_type: A type conforming to `Stringable` for the message.
+        Ts: The element types conforming to `Stringable` for the message.
 
     Args:
-        message: The message before displaying it on failure.
+        messages: Arguments to convert to a `String` message.
     """
 
     @parameter
     if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
-        debug_assert(func(), message)
+        if func():
+            return
+
+        # Only allocate and build a formatted `String` on CPU
+        @parameter
+        if triple_is_nvidia_cuda():
+            _debug_assert_msg[is_warning=_WARN_ON_ASSERT]("", __call_location())
+        else:
+            message = String()
+
+            @parameter
+            fn build_message[i: Int, T: Stringable](value: T):
+                message += str(value)
+
+            messages.each_idx[build_message]()
+            _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
+                message, __call_location()
+            )
 
 
+# TODO(MOCO-358) Deduplicate and simplify when variadic unpacking is supported
 @always_inline
-fn debug_assert[message_type: Stringable](cond: Bool, message: message_type):
+fn debug_assert[*Ts: Stringable](cond: Bool, *messages: *Ts):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -71,20 +90,33 @@ fn debug_assert[message_type: Stringable](cond: Bool, message: message_type):
     for enabling assertions in the library.
 
     Parameters:
-        message_type: A type conforming to `Stringable` for the message.
+        Ts: The element types conforming to `Stringable` for the message.
 
     Args:
         cond: The bool value to assert.
-        message: The message before displaying it on failure.
+        messages: Arguments to convert to a `String` message.
     """
 
     @parameter
     if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
         if cond:
             return
-        _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
-            message, __call_location()
-        )
+
+        # Only allocate and build a formatted `String` on CPU
+        @parameter
+        if triple_is_nvidia_cuda():
+            _debug_assert_msg[is_warning=_WARN_ON_ASSERT]("", __call_location())
+        else:
+            message = String()
+
+            @parameter
+            fn build_message[i: Int, T: Stringable](value: T):
+                message += str(value)
+
+            messages.each_idx[build_message]()
+            _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
+                message, __call_location()
+            )
 
 
 @no_inline

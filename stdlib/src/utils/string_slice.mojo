@@ -33,6 +33,9 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 
 @always_inline("nodebug")
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    debug_assert(
+        0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
+    )
     alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
     return int((sizes < c).cast[DType.uint8]().reduce_add())
 
@@ -361,6 +364,11 @@ struct StringSlice[
         """
         return len(self._slice) > 0
 
+    # This attribute informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__(self, rhs: StringSlice) -> Bool:
         """Verify if a string slice is equal to another string slice.
 
@@ -406,6 +414,7 @@ struct StringSlice[
         """
         return self == rhs.as_string_slice()
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline
     fn __ne__(self, rhs: StringSlice) -> Bool:
         """Verify if span is not equal to another string slice.
@@ -442,7 +451,7 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[lifetime]:
+    fn __iter__(self) -> _StringSliceIter[lifetime]:
         """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
@@ -452,9 +461,7 @@ struct StringSlice[
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[lifetime, False]:
+    fn __reversed__(self) -> _StringSliceIter[lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:

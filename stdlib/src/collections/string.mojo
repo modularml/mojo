@@ -91,7 +91,7 @@ fn ord(s: StringSlice) -> Int:
         s.byte_length() == int(num_bytes), "input string must be one character"
     )
     debug_assert(
-        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte ", b1, " at index 0"
     )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -99,8 +99,7 @@ fn ord(s: StringSlice) -> Int:
     for i in range(1, num_bytes):
         p += 1
         debug_assert(
-            p[] >> 6 == 0b00000010,
-            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+            p[] >> 6 == 0b00000010, "invalid UTF-8 byte ", b1, " at index ", i
         )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
