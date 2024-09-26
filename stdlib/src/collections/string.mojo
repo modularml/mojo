@@ -1110,7 +1110,7 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
@@ -1120,9 +1120,7 @@ struct String(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), False]:
+    fn __reversed__(self) -> _StringSliceIter[__lifetime_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
