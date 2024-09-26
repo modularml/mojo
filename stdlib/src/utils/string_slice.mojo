@@ -347,7 +347,7 @@ struct StringSlice[
         """
         return len(self._slice) > 0
 
-    # This attribute informs the compiler that indirect address spaces are not
+    # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
     # TODO: replace with a safe model that checks the body of the method for
     # accesses to the lifetime.

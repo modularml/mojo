@@ -347,7 +347,6 @@ struct VariadicListMem[
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
         self.value = UnsafePointer.address_of(tmp).bitcast[Self._mlir_type]()[]
-        _ = tmp
         self._is_owned = False
 
     # Provide support for variadics of *owned* arguments.  The reference will
@@ -368,7 +367,6 @@ struct VariadicListMem[
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
         self.value = UnsafePointer.address_of(tmp).bitcast[Self._mlir_type]()[]
-        _ = tmp
         self._is_owned = True
 
     @always_inline
