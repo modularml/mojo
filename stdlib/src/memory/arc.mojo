@@ -45,32 +45,231 @@ print(Arc(String("ok"))[])
 """
 
 from os.atomic import Atomic
+from os import abort
 
 from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, stack_allocation
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
+from collections import Optional, OptionalReg
 
 
-struct _ArcInner[T: Movable]:
+struct _ArcInner[T: Movable, enable_weak: Bool = False]:
     var refcount: Atomic[DType.uint64]
-    var payload: T
+    var payload: UnsafeMaybeUninitialized[T]
+    
+    alias _weak_refcount_type = __mlir_type[
+        `!pop.array<`, Int(enable_weak).value, `, `, Atomic[DType.int64], `>`
+    ]
+
+    var weak_refcount: Self._weak_refcount_type
 
     fn __init__(inout self, owned value: T):
         """Create an initialized instance of this with a refcount of 1."""
         self.refcount = 1
-        self.payload = value^
+        self.payload = UnsafeMaybeUninitialized(value^)
+        self.weak_refcount = __mlir_op.`kgen.undef`[_type = Self._weak_refcount_type]()
+        
+        @parameter
+        if enable_weak:
+            var p = self._weakref_ptr()
+            p.init_pointee_explicit_copy(Atomic[DType.int64](1))
+
+        
+    fn _weakref_ptr(inout self) -> UnsafePointer[Atomic[DType.int64]]:
+        constrained[enable_weak, "can't get ptr, since there is no weakref to point to"]()
+
+        @parameter
+        if enable_weak:
+            var ptr = __mlir_op.`pop.array.gep`(
+                UnsafePointer.address_of(self.weak_refcount).address,
+                Int(0).value
+            )
+        
+            return UnsafePointer(ptr)
+        else:
+            constrained[False, "something is horribly broken, and _weakref_ptr is being called in an Arc with enable_weak = False"]()
+            return UnsafePointer[Atomic[DType.int64]]()
+
+    fn _destroy_value(inout self):
+        """
+        Run the destructor for the payload,
+        with the assumption that it has not been run yet
+        """
+        self.payload.assume_initialized_destroy()
+
+    fn try_upgrade_weak(inout self) -> Bool:
+        """
+        Attempts to add a new strong ref, requiring that at least
+        one other strong ref exists s.t. the value in `payload` has not
+        been destructed.
+
+        Returns:
+            True iff the strong ref count has been successfully incremented
+        """
+
+        # Why the loop?
+        # We want to ensure that we don't pretend
+        # to be a strong (and imply that payload is init'd)
+        # when we haven't shown to ourselves that we are one.
+        # This loop does the equivalent of
+        # `fetch_add_if_neq(add: 1, if_neq: 0)`
+        @parameter
+        if enable_weak:
+            while True:
+                var cur_count = self.refcount.load()
+                if cur_count == 0:
+                    return False
+
+                var success = self.refcount.compare_exchange_weak(
+                    cur_count, cur_count + 1
+                )
+
+                # TODO: should this be marked `unlikely` once we have intrinsic for it?
+                # This only occurs during races on `refcount` when the strong refs
+                # have churn.
+                if not success:
+                    continue
+
+                return True
+        else:
+            return False
 
     fn add_ref(inout self):
         """Atomically increment the refcount."""
         _ = self.refcount.fetch_add(1)
 
+        # any strong is also, underneath, a weak
+        @parameter
+        if enable_weak:
+            self.add_weak()
+
+    fn add_weak(inout self):
+        """Atomically increment the weakref count"""
+        @parameter
+        if enable_weak:
+            _ = self._weakref_ptr()[].fetch_add(1)
+
     fn drop_ref(inout self) -> Bool:
-        """Atomically decrement the refcount and return true if the result
-        hits zero."""
-        return self.refcount.fetch_sub(1) == 1
+        """
+        Atomically decrement the refcount and weakref count.
+        Returns:
+            True iff the backing allocation for `self`
+            should (must!) be deleted
+        """
+        var last_strong = self.refcount.fetch_sub(1) == 1
+
+        if last_strong:
+            self._destroy_value()
+
+        # defer to drop_weak() for whether the backing
+        # mem should be dealloc'd
+        @parameter
+        if enable_weak:
+            return self.drop_weak()
+        else:
+            return last_strong
+
+    fn drop_weak(inout self) -> Bool:
+        """
+        Atomically decrement the weakref count, and return
+        true if the result hits zero
+        Returns:
+            True iff the backing allocation for `self`
+            should (must!) be deleted
+        """
+        @parameter
+        if enable_weak:
+            var last_any = self._weakref_ptr()[].fetch_sub(1) == 1
+
+            # if this is the last weak, and there
+            # are no other strongs, then we can dealloc the inner
+            return last_any
+        else:
+            #TODO: statically ensure unreachable?
+            return False
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Weak[T: Movable, enable_weak: Bool = True](CollectionElement, CollectionElementNew):
+    """A Weak[T] is used much like an Arc[T], except it does not
+    prevent the target instance of T from being deinitialized/deallocated.
+
+    This is useful for data structures like cyclic graphs and doubly linked lists,
+    such that users can easily avoid memory leaks.
+
+    Parameters:
+        T: The type of the value that this Weak may be upgraded into an Arc[T] of.
+    """
+
+    alias _inner_type = _ArcInner[T]
+    var _inner: UnsafePointer[Self._inner_type]
+
+    fn __init__(inout self, strong: Arc[T, enable_weak]):
+        """Allows creating a Weak[T] given an Arc[T].
+
+        Args:
+            strong: The Arc[T] that we want a new Weak for the value of.
+        """
+        constrained[enable_weak, "Creating a Weak pointer from an `Arc[T, enable_weak = False]` is impossible." + 
+            "In order to create an Arc[T] that allows `downgrade()`, change the `enable_weak` type parameter to `True`."]()
+
+        strong._inner[].add_weak()
+        self._inner = strong._inner
+
+    fn __init__(inout self, other: Self):
+        """Copy constructor, produces a new Weak that is a copy of another Weak.
+
+        Args:
+            other: The other Weak[T] this should be a copy of.
+        """
+        other._inner[].add_weak()
+        self._inner = other._inner
+
+    @no_inline
+    fn __del__(owned self):
+        """Destructor for Weak[T], drops the weak ref and frees the backing
+        storage for the Inner iff this is the last reference of any sort to the inner.
+        """
+        var should_del = self._inner[].drop_weak()
+        if should_del:
+            (self._inner).destroy_pointee()
+            self._inner.free()
+        self._inner = UnsafePointer[Self._inner_type]()
+
+    fn __copyinit__(inout self, other: Self):
+        """Implicit copy of Weak[T],
+        simply delegates to the regular explicit copy constructor.
+
+        Args:
+            other: The Weak[T] to (implicitly) copy.
+        """
+        other._inner[].add_weak()
+        self._inner = other._inner
+
+    fn upgrade(inout self) -> Optional[Arc[T]]:
+        """Use this to turn a Weak[T] into an Arc[T].
+        This method is fallible because if all Arc[T] to a value
+        drop, then the value behind them is destroyed. Thus, there would
+        be no value that any Arc[T] that _could_ be constructed could point to.
+
+        Returns:
+            Some(Arc[T]) iff other Arc[T] exist that keep the value live,
+            otherwise returns None.
+        """
+        var success = self._inner[].try_upgrade_weak()
+        if success:
+            # add weak in here, since the "hard part" of
+            # protecting a strong is done, and we
+            # don't have to "undo" anything if
+            # we couldn't acquire the strong
+            self._inner[].add_weak()
+            return Optional[](Arc[](self._inner, ()))
+        else:
+            return Optional[Arc[T]]()
+
+
+@register_passable
+struct Arc[T: Movable, enable_weak: Bool = False](CollectionElement, CollectionElementNew):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -110,6 +309,16 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         other._inner[].add_ref()
         self._inner = other._inner
 
+    fn __init__(inout self, ptr: UnsafePointer[Self._inner_type], private: ()):
+        """Internal constructor, allows creating Arc[T] instances
+        within Weak.upgrade().
+
+        Args:
+            ptr: A pointer to a _pre-strong-incremented_ _ArcInner.
+            private: An attempt at indicating internal-ness of this constructor.
+        """
+        self._inner = ptr
+
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object.
 
@@ -126,11 +335,12 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         """Delete the smart pointer reference.
 
         Decrement the ref count for the reference. If there are no more
-        references, delete the object and free its memory."""
-        if self._inner[].drop_ref():
-            # Call inner destructor, then free the memory.
+        references, free its memory."""
+        var should_del = self._inner[].drop_ref()
+        if should_del:
             (self._inner).destroy_pointee()
             self._inner.free()
+        self._inner = UnsafePointer[Self._inner_type]()
 
     # FIXME: The lifetime returned for this is currently self lifetime, which
     # keeps the Arc object alive as long as there are references into it.  That
@@ -152,7 +362,27 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         Returns:
             A Reference to the managed value.
         """
-        return self._inner[].payload
+        return self._inner[].payload.assume_initialized()
+
+    fn downgrade(self) -> Weak[T, enable_weak]:
+        """
+        Take an Arc[T] and produce a Weak[T] from it without destroying
+        the originating Arc[T].
+
+        Returns:
+            A Weak ref to the underlying data that will not prevent destruction
+            if all Arc[T] to that data drop.
+        """
+        constrained[enable_weak, "A typical Arc[T] does not support downgrading." + 
+            "If you want to enable downgrading of this Arc[T], convert it to an Arc[T, enable_weak = True]"]()
+        
+        @parameter
+        if enable_weak:
+            return Weak[T, enable_weak](self)
+        else:
+            constrained[False, "A typical Arc[T] does not support downgrading." + 
+                "If you want to enable downgrading of this Arc[T], convert it to an Arc[T, enable_weak = True]"]()
+            return abort[Weak[T, enable_weak]]("unreachable")
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
@@ -161,7 +391,9 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             The UnsafePointer to the underlying memory.
         """
         # TODO: consider removing this method.
-        return UnsafePointer.address_of(self._inner[].payload)
+        return UnsafePointer.address_of(
+            self._inner[].payload.assume_initialized()
+        )
 
     fn count(self) -> UInt64:
         """Count the amount of current references.

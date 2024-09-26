@@ -24,7 +24,7 @@ from memory import UnsafePointer, bitcast
 from sys.info import triple_is_nvidia_cuda
 
 
-struct Atomic[type: DType]:
+struct Atomic[type: DType](ExplicitlyCopyable):
     """Represents a value with atomic operations.
 
     The class provides atomic `add` and `sub` methods for mutating the value.
@@ -48,6 +48,10 @@ struct Atomic[type: DType]:
             value: Initial value represented as `Scalar[type]` type.
         """
         self.value = value
+        
+    @always_inline
+    fn __init__(inout self, other: Atomic[type]):
+        self.value = other.value
 
     @always_inline
     fn load(inout self) -> Scalar[type]:
