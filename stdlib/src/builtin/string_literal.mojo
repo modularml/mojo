@@ -277,23 +277,23 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(self) -> _StringSliceIter[StaticConstantLifetime]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[StaticConstantLifetime](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(self) -> _StringSliceIter[__lifetime_of(self), False]:
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantLifetime, False]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[__lifetime_of(self), False](
+        return _StringSliceIter[StaticConstantLifetime, False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
