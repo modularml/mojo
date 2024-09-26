@@ -390,33 +390,25 @@ def test_count_utf8_continuation_bytes():
     alias b2 = UInt8(0b1100_0000)
     alias b3 = UInt8(0b1110_0000)
     alias b4 = UInt8(0b1111_0000)
-    var span = String(List[UInt8](c, c, c, c, c, 0)).as_bytes_span()
-    var ptr = span.unsafe_ptr()
-    assert_equal(5, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b2, c, b1
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b1, b2, c
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b2, c, b1
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b1, b2, c
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b2, c, b2, c
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b3, c, c, b1, b1
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b1, b3, c, c
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b3, c, c, b1
-    assert_equal(2, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b1, b4, c, c, c
-    assert_equal(3, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b4, c, c, c, b1
-    assert_equal(3, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b3, c, c, b2, c
-    assert_equal(3, _count_utf8_continuation_bytes(span))
-    ptr[0], ptr[1], ptr[2], ptr[3], ptr[4] = b2, c, b3, c, c
-    assert_equal(3, _count_utf8_continuation_bytes(span))
+
+    @parameter
+    fn test(amnt: Int, items: List[UInt8]) raises:
+        var span = Span[UInt8, ImmutableAnyLifetime](items)
+        assert_equal(amnt, _count_utf8_continuation_bytes(span))
+    
+    test(5, List[UInt8](c, c, c, c, c))
+    test(2, List[UInt8](b2, c, b2, c, b1))
+    test(2, List[UInt8](b2, c, b1, b2, c))
+    test(2, List[UInt8](b2, c, b2, c, b1))
+    test(2, List[UInt8](b2, c, b1, b2, c))
+    test(2, List[UInt8](b1, b2, c, b2, c))
+    test(2, List[UInt8](b3, c, c, b1, b1))
+    test(2, List[UInt8](b1, b1, b3, c, c))
+    test(2, List[UInt8](b1, b3, c, c, b1))
+    test(3, List[UInt8](b1, b4, c, c, c))
+    test(3, List[UInt8](b4, c, c, c, b1))
+    test(3, List[UInt8](b3, c, c, b2, c))
+    test(3, List[UInt8](b2, c, b3, c, c))
 
 
 fn main() raises:
