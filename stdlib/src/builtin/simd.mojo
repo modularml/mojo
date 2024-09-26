@@ -2743,16 +2743,17 @@ struct SIMD[type: DType, size: Int](
 
     fn reversed(self) -> Self:
         """Reverses the SIMD vector by indexes.
-        
+
         Returns:
             The by index reversed vector.
-        
+
         Examples:
         ```mojo
         print(SIMD[DType.uint8, 4](1, 2, 3, 4).reversed()) # [4, 3, 2, 1]
         ```
         .
         """
+
         fn build_idx() -> StaticIntTuple[size]:
             var values = StaticIntTuple[size]()
             var idx = 0
@@ -2762,7 +2763,7 @@ struct SIMD[type: DType, size: Int](
                 values[idx] = i
                 idx += 1
             return values
-        
+
         alias idx = build_idx()
         return self.shuffle[idx]()
 
