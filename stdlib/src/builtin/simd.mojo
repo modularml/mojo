@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 import math
+from math.math import _call_ptx_intrinsic
 from sys import (
     PrefetchOptions,
     _RegisterPackType,
@@ -535,7 +536,14 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_8x() and type.is_half_float():
+        if _is_sm_9x() and type is DType.bfloat16:
+            return _call_ptx_intrinsic[
+                scalar_instruction="add.rn.bf16",
+                vector2_instruction="add.rn.bf16x2",
+                scalar_constraints="=h,h,h",
+                vector_constraints="=r,r,r",
+            ](self, rhs)
+        elif _is_sm_8x() and type.is_half_float():
             return self.fma(1, rhs)
 
         return __mlir_op.`pop.add`(self.value, rhs.value)
@@ -554,8 +562,16 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_8x() and type.is_half_float():
-            return rhs.fma(-1, self)
+        if _is_sm_9x() and type is DType.bfloat16:
+            return _call_ptx_intrinsic[
+                scalar_instruction="sub.rn.bf16",
+                vector2_instruction="sub.rn.bf16x2",
+                scalar_constraints="=h,h,h",
+                vector_constraints="=r,r,r",
+            ](self, rhs)
+        elif _is_sm_8x() and type.is_half_float():
+            return self.fma(-1, rhs)
+
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -575,9 +591,14 @@ struct SIMD[type: DType, size: Int](
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
-
-        @parameter
-        if _is_sm_8x() and type.is_half_float():
+        elif _is_sm_9x() and type is DType.bfloat16:
+            return _call_ptx_intrinsic[
+                scalar_instruction="mul.rn.bf16",
+                vector2_instruction="mul.rn.bf16x2",
+                scalar_constraints="=h,h,h",
+                vector_constraints="=r,r,r",
+            ](self, rhs)
+        elif _is_sm_8x() and type.is_half_float():
             return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
@@ -1761,7 +1782,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_8x() and type.is_half_float():
+        if (_is_sm_8x() or _is_sm_9x()) and type.is_half_float():
             alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
 
             @parameter
