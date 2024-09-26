@@ -59,7 +59,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     fn __init__(
         inout self,
         *,
-        owned storage: VariadicPack[_, CollectionElement, element_types],
+        owned storage: VariadicPack[_, CollectionElement, *element_types],
     ):
         """Construct the tuple from a low-level internal representation.
 
