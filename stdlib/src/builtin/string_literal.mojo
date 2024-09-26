@@ -287,10 +287,10 @@ struct StringLiteral(
         return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     fn __reversed__(self) -> _StringSliceIter[StaticConstantLifetime, False]:
-        """Return a reversed iterator over the string literal.
+        """Iterate backwards over the string, returning immutable references.
 
         Returns:
-            An iterator over the string.
+            A reversed iterator of references to the string elements.
         """
         alias S = _StringSliceIter[StaticConstantLifetime, False]
         return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
