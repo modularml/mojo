@@ -2741,6 +2741,31 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
 
+    fn reversed(self) -> Self:
+        """Reverses the SIMD vector by indexes.
+        
+        Returns:
+            The by index reversed vector.
+        
+        Examples:
+        ```mojo
+        print(SIMD[DType.uint8, 4](1, 2, 3, 4).reversed()) # [4, 3, 2, 1]
+        ```
+        .
+        """
+        fn build_idx() -> StaticIntTuple[size]:
+            var values = StaticIntTuple[size]()
+            var idx = 0
+
+            @parameter
+            for i in range(size - 1, -1, -1):
+                values[idx] = i
+                idx += 1
+            return values
+        
+        alias idx = build_idx()
+        return self.shuffle[idx]()
+
 
 fn _pshuf_or_tbl1(
     lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]

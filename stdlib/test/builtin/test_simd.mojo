@@ -1777,6 +1777,21 @@ def test_float_conversion():
     assert_almost_equal(float(Float32(34.32)), 34.32)
     assert_almost_equal(float(UInt64(36)), 36.0)
 
+def test_reversed():
+    fn test[D: DType]() raises:
+        assert_equal(SIMD[D, 4](1, 2, 3, 4).reversed(), SIMD[D, 4](4, 3, 2, 1))
+    
+    test[DType.uint8]()
+    test[DType.uint16]()
+    test[DType.uint32]()
+    test[DType.uint64]()
+    test[DType.int8]()
+    test[DType.int16]()
+    test[DType.int32]()
+    test[DType.int64]()
+    test[DType.float16]()
+    test[DType.float32]()
+    test[DType.float64]()
 
 def main():
     test_abs()
@@ -1832,4 +1847,5 @@ def main():
     test_contains()
     test_comparison()
     test_float_conversion()
+    test_reversed()
     # TODO: add tests for __and__, __or__, anc comparison operators
