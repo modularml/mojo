@@ -178,7 +178,9 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
+    fn get[
+        i: Int, T: CollectionElement
+    ](ref [_]self) -> ref [__lifetime_of(self)] T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:
@@ -188,10 +190,12 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
+        return rebind[T](self[i])
 
     @always_inline("nodebug")
-    fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
+    fn __contains__[
+        T: EqualityComparableCollectionElement
+    ](self, value: T) -> Bool:
         """Return whether the tuple contains the specified value.
 
         For example:
@@ -217,8 +221,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
             @parameter
             if _type_is_eq[element_types[i], T]():
-                var elt_ptr = UnsafePointer.address_of(self[i]).bitcast[T]()
-                if elt_ptr[] == value:
+                if self.get[i, T]() == value:
                     return True
 
         return False
