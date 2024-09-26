@@ -10,17 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+#
+# This file only tests the debug_assert function
+#
+# ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not --crash mojo -D ASSERT=all %s 2>&1
-
-from testing import assert_equal
+# RUN: not --crash %bare-mojo -D ASSERT=all %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 
-def test_range_uint_bad_step_size():
-    # Ensure constructing a range with a "-1" step size (i.e. reverse range)
-    # with UInt is rejected and aborts now via `debug_assert` handler.
-    var r = range(UInt(0), UInt(10), UInt(Int(-1)))
-
-
-def main():
-    test_range_uint_bad_step_size()
+# CHECK-FAIL-LABEL: test_fail
+fn main():
+    print("== test_fail")
+    # CHECK-FAIL: formatted failure message: 2, 4
+    debug_assert(
+        False, "formatted failure message: ", 2, ", ", Scalar[DType.uint8](4)
+    )
+    # CHECK-FAIL-NOT: is never reached
+    print("is never reached")

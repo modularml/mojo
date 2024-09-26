@@ -14,14 +14,17 @@
 # This file only tests the debug_assert function
 #
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: has_not
-# RUN: not --crash %bare-mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s
+# RUN: %mojo %s | FileCheck %s -check-prefix=CHECK-OK
 
 
-# CHECK-LABEL: test_fail
-fn main():
-    print("== test_fail")
-    # CHECK: Assert Error: this fails
-    debug_assert(False, "this fails")
-    # CHECK-NOT: is never reached
-    print("is never reached")
+def main():
+    test_debug_assert_mode_all_true()
+
+
+# CHECK-OK-LABEL: test_debug_assert_mode_all_true
+def test_debug_assert_mode_all_true():
+    print("== test_debug_assert_mode_all_true")
+    debug_assert(True, "ok")
+    debug_assert[assert_mode="safe"](True, "ok")
+    # CHECK-OK: is reached
+    print("is reached")
