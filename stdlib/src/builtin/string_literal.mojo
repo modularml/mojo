@@ -278,10 +278,10 @@ struct StringLiteral(
         return self.__str__()
 
     fn __iter__(self) -> _StringSliceIter[StaticConstantLifetime]:
-        """Return an iterator over the string literal.
+        """Iterate over the string, returning immutable references.
 
         Returns:
-            An iterator over the string.
+            An iterator of references to the string elements.
         """
         alias S = _StringSliceIter[StaticConstantLifetime]
         return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
