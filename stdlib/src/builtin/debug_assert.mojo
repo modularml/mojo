@@ -31,10 +31,9 @@ alias _ERROR_ON_ASSERT = is_debug_build() or is_defined[
 alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
 
 
-# TODO(MOCO-358) Deduplicate and simplify when variadic unpacking is supported
 @always_inline
 fn debug_assert[
-    func: fn () capturing [_] -> Bool, *Ts: Stringable
+    func: fn () capturing [_] -> Bool, *Ts: Formattable
 ](*messages: *Ts):
     """Asserts that the condition is true.
 
@@ -60,26 +59,13 @@ fn debug_assert[
         if func():
             return
 
-        # Only allocate and build a formatted `String` on CPU
-        @parameter
-        if triple_is_nvidia_cuda():
-            _debug_assert_msg[is_warning=_WARN_ON_ASSERT]("", __call_location())
-        else:
-            message = String()
-
-            @parameter
-            fn build_message[i: Int, T: Stringable](value: T):
-                message += str(value)
-
-            messages.each_idx[build_message]()
-            _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
-                message, __call_location()
-            )
+        _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
+            messages, __call_location()
+        )
 
 
-# TODO(MOCO-358) Deduplicate and simplify when variadic unpacking is supported
 @always_inline
-fn debug_assert[*Ts: Stringable](cond: Bool, *messages: *Ts):
+fn debug_assert[*Ts: Formattable](cond: Bool, *messages: *Ts):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -101,28 +87,15 @@ fn debug_assert[*Ts: Stringable](cond: Bool, *messages: *Ts):
     if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
         if cond:
             return
-
-        # Only allocate and build a formatted `String` on CPU
-        @parameter
-        if triple_is_nvidia_cuda():
-            _debug_assert_msg[is_warning=_WARN_ON_ASSERT]("", __call_location())
-        else:
-            message = String()
-
-            @parameter
-            fn build_message[i: Int, T: Stringable](value: T):
-                message += str(value)
-
-            messages.each_idx[build_message]()
-            _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
-                message, __call_location()
-            )
+        _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
+            messages, __call_location()
+        )
 
 
 @no_inline
 fn _debug_assert_msg[
-    message_type: Stringable, //, *, is_warning: Bool = False
-](msg: message_type, loc: _SourceLocation):
+    is_warning: Bool = False
+](messages: VariadicPack[_, Formattable, *_], loc: _SourceLocation):
     """Aborts with (or prints) the given message and location.
 
     This function is intentionally marked as no_inline to reduce binary size.
@@ -142,9 +115,17 @@ fn _debug_assert_msg[
         else:
             abort()
     else:
+        var message = String()
+        var writer = message._unsafe_to_formatter()
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(writer)
+
+        messages.each[write_arg]()
 
         @parameter
         if is_warning:
-            print(loc.prefix("Assert Warning:"), str(msg))
+            print(loc.prefix("Assert Warning:"), message)
         else:
-            abort(loc.prefix("Assert Error: " + str(msg)))
+            abort(loc.prefix("Assert Error: " + message))
