@@ -287,7 +287,7 @@ struct StringLiteral(
         return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     fn __reversed__(self) -> _StringSliceIter[StaticConstantLifetime, False]:
-        """Return an iterator over the string literal.
+        """Return a reversed iterator over the string literal.
 
         Returns:
             An iterator over the string.
