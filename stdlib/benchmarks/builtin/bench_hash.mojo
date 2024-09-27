@@ -665,7 +665,7 @@ struct AHasher:
         self.extra_keys = U128(pi_key[2], pi_key[3])
 
     @always_inline
-    fn large_update(inout self, new_data: U128):
+    fn _large_update(inout self, new_data: U128):
         """Update the buffer value with new data.
 
         Args:
