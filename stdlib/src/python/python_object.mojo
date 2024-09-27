@@ -160,12 +160,21 @@ struct PythonObject(
 
     fn __init__(inout self, integer: Int):
         """Initialize the object with an integer value.
-
         Args:
             integer: The integer value.
         """
+        
         var cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.toPython(integer)
+
+    fn __init__(inout self, value: UInt64):
+        """Initialize the object with an large UInt64 value.
+
+        Args:
+            value:  The large Uint64 value.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyLong_FromLongLong(value)
 
     fn __init__(inout self, float: Float64):
         """Initialize the object with an floating-point value.

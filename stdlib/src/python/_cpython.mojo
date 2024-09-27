@@ -564,6 +564,20 @@ struct CPython:
             )
         self._inc_total_rc()
         return r
+    fn PyLong_FromLongLong(inout self, value: UInt64) -> PyObjectPtr:
+        var l = self.lib.get_function[fn (UInt64) -> PyObjectPtr](
+            "PyLong_FromLongLong"
+        )(value)
+        if self.logging_enabled:
+            print(
+                l._get_ptr_as_int(),
+                " NEWREF PyLong_FromLongLong, refcnt:",
+                self._Py_REFCNT(l),
+                ", value:",
+                value,
+            )
+        self._inc_total_rc()
+        return l
 
     fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
         var value = self.lib.get_function[
