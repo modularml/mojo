@@ -12,6 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 from memory import UnsafePointer
 
+# ===----------------------------------------------------------------------=== #
+# MoveOnly
+# ===----------------------------------------------------------------------=== #
+
 
 struct MoveOnly[T: Movable](Movable):
     """Utility for testing MoveOnly types.
@@ -40,6 +44,11 @@ struct MoveOnly[T: Movable](Movable):
         self.data = other.data^
 
 
+# ===----------------------------------------------------------------------=== #
+# ExplicitCopyOnly
+# ===----------------------------------------------------------------------=== #
+
+
 struct ExplicitCopyOnly(ExplicitlyCopyable):
     var value: Int
     var copy_count: Int
@@ -51,6 +60,11 @@ struct ExplicitCopyOnly(ExplicitlyCopyable):
     fn __init__(inout self, *, other: Self):
         self.value = other.value
         self.copy_count = other.copy_count + 1
+
+
+# ===----------------------------------------------------------------------=== #
+# CopyCounter
+# ===----------------------------------------------------------------------=== #
 
 
 struct CopyCounter(CollectionElement, ExplicitlyCopyable):
@@ -69,6 +83,11 @@ struct CopyCounter(CollectionElement, ExplicitlyCopyable):
 
     fn __copyinit__(inout self, existing: Self):
         self.copy_count = existing.copy_count + 1
+
+
+# ===----------------------------------------------------------------------=== #
+# MoveCounter
+# ===----------------------------------------------------------------------=== #
 
 
 struct MoveCounter[T: CollectionElementNew](
@@ -109,6 +128,11 @@ struct MoveCounter[T: CollectionElementNew](
         self.move_count = existing.move_count
 
 
+# ===----------------------------------------------------------------------=== #
+# ValueDestructorRecorder
+# ===----------------------------------------------------------------------=== #
+
+
 @value
 struct ValueDestructorRecorder(ExplicitlyCopyable):
     var value: Int
@@ -120,3 +144,19 @@ struct ValueDestructorRecorder(ExplicitlyCopyable):
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
+
+
+# ===----------------------------------------------------------------------=== #
+# ObservableDel
+# ===----------------------------------------------------------------------=== #
+
+
+@value
+struct ObservableDel(CollectionElement):
+    var target: UnsafePointer[Bool]
+
+    fn __init__(inout self, *, other: Self):
+        self = other
+
+    fn __del__(owned self):
+        self.target.init_pointee_move(True)

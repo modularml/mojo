@@ -18,4 +18,5 @@ from .types import (
     MoveCounter,
     MoveOnly,
     ValueDestructorRecorder,
+    ObservableDel,
 )
