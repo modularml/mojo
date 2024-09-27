@@ -175,5 +175,5 @@ fn hash[
     """
 
     var hasher = AHasher(key)
-    hasher.write(bytes, n)
+    hasher.update(bytes, n)
     return UInt(int(hasher.finish()))
