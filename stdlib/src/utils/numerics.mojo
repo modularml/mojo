@@ -64,7 +64,11 @@ struct FPUtils[
         """
 
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            return 3
+        elif type is DType.float8e5m2:
+            return 2
+        elif type is DType.float16:
             return 10
         elif type is DType.bfloat16:
             return 7
@@ -84,7 +88,11 @@ struct FPUtils[
         """
 
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            return 8
+        elif type is DType.float8e5m2:
+            return 16
+        elif type is DType.float16:
             return 16
         elif type is DType.float32 or type is DType.bfloat16:
             return 128
@@ -102,7 +110,11 @@ struct FPUtils[
         """
 
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            return 4
+        elif type is DType.float8e5m2:
+            return 5
+        elif type is DType.float16:
             return 5
         elif type is DType.float32 or type is DType.bfloat16:
             return 8
@@ -537,9 +549,12 @@ fn isnan[
     if not type.is_floating_point():
         return False
 
+    alias int_dtype = _integral_type_of[type]()
+
     @parameter
-    if type is DType.bfloat16:
-        alias int_dtype = _integral_type_of[type]()
+    if type is DType.float8e4m3:
+        return bitcast[int_dtype, simd_width](abs(val)) == 0x7F
+    elif type in (DType.float8e5m2, DType.bfloat16):
         alias x7FFF = SIMD[int_dtype, simd_width](0x7FFF)
         alias x7F80 = SIMD[int_dtype, simd_width](0x7F80)
         return bitcast[int_dtype, simd_width](val) & x7FFF > x7F80
