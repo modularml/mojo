@@ -63,6 +63,24 @@ struct ExplicitCopyOnly(ExplicitlyCopyable):
 
 
 # ===----------------------------------------------------------------------=== #
+# ImplicitCopyOnly
+# ===----------------------------------------------------------------------=== #
+
+
+struct ImplicitCopyOnly(Copyable):
+    var value: Int
+    var copy_count: Int
+
+    fn __init__(inout self, value: Int):
+        self.value = value
+        self.copy_count = 0
+
+    fn __copyinit__(inout self, *, other: Self):
+        self.value = other.value
+        self.copy_count = other.copy_count + 1
+
+
+# ===----------------------------------------------------------------------=== #
 # CopyCounter
 # ===----------------------------------------------------------------------=== #
 
