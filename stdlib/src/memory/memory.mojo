@@ -27,6 +27,7 @@ from sys import (
     triple_is_nvidia_cuda,
     external_call,
     simdwidthof,
+    _libc as libc,
 )
 from collections import Optional
 from builtin.dtype import _integral_type_of
@@ -438,6 +439,6 @@ fn _malloc[
 fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
     @parameter
     if triple_is_nvidia_cuda():
-        external_call["free", NoneType](ptr.bitcast[NoneType]())
+        libc.free(ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)
