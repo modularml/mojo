@@ -243,14 +243,7 @@ fn _debug_assert_msg(
         else:
             abort()
     else:
-        var message = String()
-        var writer = message._unsafe_to_formatter()
-
-        @parameter
-        fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
-
-        messages.each[write_arg]()
+        message = String.format_sequence(messages)
 
         @parameter
         if defined_mode == "warn":
