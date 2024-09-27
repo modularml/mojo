@@ -76,7 +76,7 @@ struct AHasher:
     var extra_keys: U128
 
     fn __init__(inout self, key: U256):
-        """Initialise the hasher with a key.
+        """Initialize the hasher with a key.
 
         Args:
             key: Modifier for the computaiton of final hash value.
