@@ -26,5 +26,6 @@ def test_debug_assert_mode_all_true():
     print("== test_debug_assert_mode_all_true")
     debug_assert(True, "ok")
     debug_assert[assert_mode="safe"](True, "ok")
+    debug_assert[assert_mode="safe", cpu_only=True](True, "ok")
     # CHECK-OK: is reached
     print("is reached")
