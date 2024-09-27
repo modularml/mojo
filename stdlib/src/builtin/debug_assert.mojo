@@ -23,10 +23,11 @@ from sys.param_env import env_get_string
 
 from builtin._location import __call_location, _SourceLocation
 
+alias defined_mode = env_get_string["ASSERT", "safe"]()
+
 
 @no_inline
-fn _assert_enabled[assert_mode: StringLiteral]() -> Bool:
-    alias defined_mode = env_get_string["ASSERT", "safe"]()
+fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
     constrained[
         defined_mode == "none"
         or defined_mode == "warn"
@@ -42,7 +43,7 @@ fn _assert_enabled[assert_mode: StringLiteral]() -> Bool:
     ]()
 
     @parameter
-    if defined_mode == "none":
+    if defined_mode == "none" or (triple_is_nvidia_cuda() and cpu_only):
         return False
     elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
         return True
@@ -54,6 +55,7 @@ fn _assert_enabled[assert_mode: StringLiteral]() -> Bool:
 fn debug_assert[
     cond: fn () capturing [_] -> Bool,
     assert_mode: StringLiteral = "none",
+    cpu_only: Bool = False,
     *Ts: Formattable,
 ](*messages: *Ts):
     """Asserts that the condition is true.
@@ -61,6 +63,7 @@ fn debug_assert[
     Parameters:
         cond: The function to invoke to check if the assertion holds.
         assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
         Ts: The element types conforming to `Formattable` for the message.
 
     Args:
@@ -117,11 +120,18 @@ fn debug_assert[
 
     debug_assert[check_name]("unexpected name")
     ```
+
+    If you need to allocate, and so don't want the assert to ever run on GPU,
+    you can set it to CPU only:
+
+    ```mojo
+    debug_assert[check_name, cpu_only=True]("unexpected name")
+    ```
     .
     """
 
     @parameter
-    if _assert_enabled[assert_mode]():
+    if _assert_enabled[assert_mode, cpu_only]():
         if cond():
             return
         _debug_assert_msg(messages, __call_location())
@@ -130,12 +140,14 @@ fn debug_assert[
 @always_inline
 fn debug_assert[
     assert_mode: StringLiteral = "none",
+    cpu_only: Bool = False,
     *Ts: Formattable,
 ](cond: Bool, *messages: *Ts):
     """Asserts that the condition is true.
 
     Parameters:
         assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
         Ts: The element types conforming to `Formattable` for the message.
 
     Args:
@@ -192,11 +204,18 @@ fn debug_assert[
 
     debug_assert[check_name]("unexpected name")
     ```
+
+    If you need to allocate, and so don't want the assert to ever run on GPU,
+    you can set it to CPU only:
+
+    ```mojo
+    debug_assert[check_name, cpu_only=True]("unexpected name")
+    ```
     .
     """
 
     @parameter
-    if _assert_enabled[assert_mode]():
+    if _assert_enabled[assert_mode, cpu_only]():
         if cond:
             return
         _debug_assert_msg(messages, __call_location())
@@ -214,7 +233,6 @@ fn _debug_assert_msg(
     an indirect recursion of @always_inline functions is possible (e.g. because
     abort's implementation could use debug_assert)
     """
-    alias defined_mode = env_get_string["ASSERT", "safe"]()
 
     @parameter
     if triple_is_nvidia_cuda():
