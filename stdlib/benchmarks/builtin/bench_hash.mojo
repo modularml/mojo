@@ -711,7 +711,7 @@ struct AHasher:
             else:
                 var a = data.bitcast[DType.uint64]().load()
                 var b = data.offset(length - 8).bitcast[DType.uint64]().load()
-                self.large_update(U128(a, b))
+                self._large_update(U128(a, b))
         else:
             var value = read_small(data, length)
             self.large_update(value)
