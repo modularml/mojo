@@ -68,7 +68,7 @@ def test_destructor():
     for index in range(capacity):
         inline_list.append(
             ValueDestructorRecorder(
-                index, UnsafePointer.address_of(destructor_counter)
+                index, int(UnsafePointer.address_of(destructor_counter))
             )
         )
 

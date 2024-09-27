@@ -106,7 +106,9 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](
+    Sized, CollectionElement
+):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:

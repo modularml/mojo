@@ -626,6 +626,15 @@ struct CountTuple[V: KeyElement](
         self._value = value
         self._count = count
 
+    fn __init__(inout self, *, other: Self):
+        """Explicit copy constructor of the CountTuple.
+
+        Args:
+            other: The `CountTuple` to copy.
+        """
+        self._value = V(other=other._value)
+        self._count = other._count
+
     fn __copyinit__(inout self, other: Self):
         """Create a new CountTuple by copying another CountTuple.
 
