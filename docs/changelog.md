@@ -150,6 +150,13 @@ what we publish.
   determining a default SDK to use. The user can select the default SDK to use
   with the `Mojo: Select the default MAX SDK` command.
 
+- Added a new [`Box`](/mojo/stdlib/memory/box/Box) type as a safe, single-owner,
+  non-nullable smart pointer with similar semantics to Rust's
+  [`Box<>`](https://doc.rust-lang.org/std/boxed/struct.Box.html) and C++'s
+  [`std::unique_ptr`](https://en.cppreference.com/w/cpp/memory/unique_ptr).
+
+  ([PR #3524](https://github.com/modularml/mojo/pull/3524) by [@szbergeron](https://github.com/szbergeron))
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`

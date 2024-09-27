@@ -15,8 +15,9 @@ from .test_utils import libm_call
 from .types import (
     CopyCounter,
     ExplicitCopyOnly,
+    ImplicitCopyOnly,
     MoveCounter,
     MoveOnly,
-    ValueDestructorRecorder,
     ObservableDel,
+    ValueDestructorRecorder,
 )
