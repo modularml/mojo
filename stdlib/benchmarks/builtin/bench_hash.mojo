@@ -687,7 +687,7 @@ struct AHasher:
         return (folded << rot) | (folded >> (64 - rot))
 
     @always_inline
-    fn write(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn update(inout self, data: UnsafePointer[UInt8], length: Int):
         """Consume provided data to update the internal buffer.
 
         Args:
