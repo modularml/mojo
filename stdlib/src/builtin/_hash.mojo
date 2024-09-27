@@ -13,6 +13,7 @@
 
 from bit import byte_swap
 from bit import rotate_bits_left
+from memory import UnsafePointer
 
 alias U256 = SIMD[DType.uint64, 4]
 alias U128 = SIMD[DType.uint64, 2]
@@ -175,5 +176,5 @@ fn hash[
     """
 
     var hasher = AHasher(key)
-    hasher.update(bytes, n)
+    hasher.write(bytes, n)
     return UInt(int(hasher.finish()))

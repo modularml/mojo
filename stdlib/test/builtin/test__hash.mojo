@@ -16,7 +16,7 @@ from bit import pop_count
 from builtin._hash import hash
 from builtin.hash import hash as old_hash
 from testing import assert_equal, assert_not_equal, assert_true
-from memory import memset_zero
+from memory import memset_zero, UnsafePointer
 from time import now
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
