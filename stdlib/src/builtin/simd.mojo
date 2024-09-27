@@ -123,7 +123,7 @@ fn _simd_construction_checks[type: DType, size: Int]():
     ]()
     constrained[
         not (type.is_float8() and _has_native_f8_support()),
-        "f8 is not supported on non sm_90 architectures",
+        "f8 is not supported on non sm_89 and sm_90 architectures",
     ]()
 
 
@@ -151,7 +151,7 @@ fn _has_native_bf16_support() -> Bool:
 
 @always_inline("nodebug")
 fn _has_native_f8_support() -> Bool:
-    return _is_sm_9x()
+    return _is_sm_9x() or triple_is_nvidia_cuda["sm_89"]()
 
 
 # ===----------------------------------------------------------------------=== #
