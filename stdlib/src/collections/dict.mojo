@@ -339,7 +339,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     The value type must implement the `CollectionElement` trait.
 
-    Usage:
+    Examples:
 
     ```mojo
     from collections import Dict
