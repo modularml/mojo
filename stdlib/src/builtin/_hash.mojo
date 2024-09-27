@@ -79,7 +79,7 @@ struct AHasher:
         """Initialize the hasher with a key.
 
         Args:
-            key: Modifier for the computaiton of final hash value.
+            key: Modifier for the computation of the final hash value.
         """
         var pi_key = key ^ U256(
             0x243F_6A88_85A3_08D3,
