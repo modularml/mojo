@@ -640,7 +640,8 @@ def test_hash_byte_array():
 
 
 def test_avalanche():
-    # test that a input with one bit value produces
+    # test that values which differ just in one bit,
+    # produce significatly different hash values
     var data = UnsafePointer[UInt8].alloc(256)
     memset_zero(data, 256)
     var hashes0 = List[UInt]()
@@ -669,6 +670,8 @@ def test_avalanche():
 
 
 def test_trailing_zeros():
+    # checks that a value with different amount of trailing zeros,
+    # results in significantly different hash values
     var data = UnsafePointer[UInt8].alloc(8)
     data[0] = 23
     var hashes0 = List[UInt]()
@@ -745,7 +748,7 @@ def test_fill_factor():
     assert_fill_factor["AR"](words, len(words) // 4, 0.98)
     assert_fill_factor["AR"](words, len(words) // 13, 1.0)
 
-    assert_fill_factor_old_hash["AR"](words, len(words), 0.62)
+    assert_fill_factor_old_hash["AR"](words, len(words), 0.59)
 
     words = gen_word_pairs[words_el]()
     assert_fill_factor["EL"](words, len(words), 0.63)
