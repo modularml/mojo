@@ -706,7 +706,7 @@ struct AHasher:
                     var block = data.offset(offset).bitcast[
                         DType.uint64
                     ]().load[width=2]()
-                    self.large_update(block)
+                    self._large_update(block)
                     offset += 16
             else:
                 var a = data.bitcast[DType.uint64]().load()
