@@ -122,7 +122,7 @@ fn _simd_construction_checks[type: DType, size: Int]():
         "bf16 is not supported for ARM architectures",
     ]()
     constrained[
-        not (type.is_float8() and _has_native_f8_support()),
+        not (type.is_float8() and not _has_native_f8_support()),
         "f8 is not supported on non sm_89 and sm_90 architectures",
     ]()
 
