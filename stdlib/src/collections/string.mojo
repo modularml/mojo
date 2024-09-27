@@ -879,6 +879,35 @@ struct String(
         .
         """
 
+        return Self.format_sequence(args)
+
+    @staticmethod
+    @no_inline
+    fn format_sequence(args: VariadicPack[_, Formattable, *_]) -> Self:
+        """
+        Construct a string directly from a variadic pack.
+
+        Args:
+            args: A VariadicPack of formattable arguments.
+
+        Returns:
+            A string formed by formatting the VariadicPack.
+
+        Examples:
+
+        ```mojo
+        fn variadic_pack_to_string[
+            *Ts: Formattable,
+        ](*args: *Ts) -> String:
+            return String.format_sequence(args)
+
+        string = variadic_pack_to_string(1, ", ", 2.0, ", ", "three")
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
+        ```
+        .
+        """
+
         var output = String()
         var writer = output._unsafe_to_formatter()
 
