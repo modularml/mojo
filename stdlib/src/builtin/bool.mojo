@@ -377,7 +377,7 @@ struct Bool(
             _type = __mlir_type.`!pop.scalar<bool>`,
             value = __mlir_attr.`#pop.simd<true> : !pop.scalar<bool>`,
         ]()
-        return __mlir_op.`pop.xor`(self._as_scalar_bool(), true)
+        return __mlir_op.`pop.simd.xor`(self._as_scalar_bool(), true)
 
     @always_inline("nodebug")
     fn __and__(self, rhs: Bool) -> Bool:
@@ -392,7 +392,7 @@ struct Bool(
         Returns:
             `self & rhs`.
         """
-        return __mlir_op.`pop.and`(
+        return __mlir_op.`pop.simd.and`(
             self._as_scalar_bool(), rhs._as_scalar_bool()
         )
 
@@ -430,7 +430,9 @@ struct Bool(
         Returns:
             `self | rhs`.
         """
-        return __mlir_op.`pop.or`(self._as_scalar_bool(), rhs._as_scalar_bool())
+        return __mlir_op.`pop.simd.or`(
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
 
     @always_inline("nodebug")
     fn __ior__(inout self, rhs: Bool):
@@ -466,7 +468,7 @@ struct Bool(
         Returns:
             `self ^ rhs`.
         """
-        return __mlir_op.`pop.xor`(
+        return __mlir_op.`pop.simd.xor`(
             self._as_scalar_bool(), rhs._as_scalar_bool()
         )
 
