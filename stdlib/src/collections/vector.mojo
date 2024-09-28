@@ -19,10 +19,10 @@ from collections import InlinedFixedVector
 ```
 """
 
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from memory import Reference, UnsafePointer, memcpy
+from collections import inline_array
 from sys import sizeof
-
-from utils import StaticTuple
 
 # ===----------------------------------------------------------------------===#
 # _VecIter
@@ -31,19 +31,21 @@ from utils import StaticTuple
 
 @value
 struct _VecIter[
-    type: AnyTrivialRegType,
-    vec_type: AnyType,
-    deref: fn (UnsafePointer[vec_type], Int) -> type,
+    mutability: Bool, //,
+    type: CollectionElement,
+    static_size: Int,
+    lifetime: Lifetime[mutability].type,
 ](Sized):
     """Iterator for any random-access container"""
 
     var i: Int
     var size: Int
-    var vec: UnsafePointer[vec_type]
+    var vec: Reference[InlinedFixedVector[type, static_size], lifetime]
 
-    fn __next__(inout self) -> type:
+    fn __next__(inout self) -> Reference[type, lifetime]:
+        # TODO: Return an autoderef
         self.i += 1
-        return deref(self.vec, self.i - 1)
+        return self.vec[][self.i - 1]
 
     fn __len__(self) -> Int:
         return self.size - self.i
@@ -55,7 +57,7 @@ struct _VecIter[
 
 
 @always_inline
-fn _calculate_fixed_vector_default_size[type: AnyTrivialRegType]() -> Int:
+fn _calculate_fixed_vector_default_size[type: CollectionElement]() -> Int:
     alias prefered_bytecount = 64
     alias sizeof_type = sizeof[type]()
 
@@ -71,9 +73,9 @@ fn _calculate_fixed_vector_default_size[type: AnyTrivialRegType]() -> Int:
 
 
 struct InlinedFixedVector[
-    type: AnyTrivialRegType,
+    type: CollectionElement,
     size: Int = _calculate_fixed_vector_default_size[type](),
-](Sized, ExplicitlyCopyable):
+](Sized, CollectionElement):
     """A dynamically-allocated vector with small-vector optimization and a fixed
     maximum capacity.
 
@@ -85,9 +87,8 @@ struct InlinedFixedVector[
     vector storage. Any remaining elements are stored in dynamically-allocated
     storage.
 
-    When it is deallocated, it frees its memory.
-
-    TODO: It should call its element destructors once we have traits.
+    The destructor of it's elements is called when the vector itself is destructed,
+    it then deallocate its memory to complete the cleanup.
 
     This data structure is useful for applications where the number of required
     elements is not known at compile time, but once known at runtime, is
@@ -99,7 +100,9 @@ struct InlinedFixedVector[
     """
 
     alias static_size: Int = size
-    alias static_data_type = StaticTuple[type, size]
+    alias static_data_type = InlineArray[
+        UnsafeMaybeUninitialized[type], size, run_destructors=False
+    ]
     var static_data: Self.static_data_type
     """The underlying static storage, used for small vectors."""
     var dynamic_data: UnsafePointer[type]
@@ -118,30 +121,48 @@ struct InlinedFixedVector[
         Args:
             capacity: The requested maximum capacity of the vector.
         """
-        self.static_data = Self.static_data_type()  # Undef initialization
+        debug_assert(capacity >= 0)
+        self.static_data = Self.static_data_type(unsafe_uninitialized=True)
         self.dynamic_data = UnsafePointer[type]()
         if capacity > Self.static_size:
-            self.dynamic_data = UnsafePointer[type].alloc(capacity - size)
+            self.dynamic_data = UnsafePointer[type].alloc(
+                capacity - Self.static_size
+            )
         self.current_size = 0
         self.capacity = capacity
 
     @always_inline
-    fn __init__(inout self, existing: Self):
+    fn __copyinit__(inout self, existing: Self):
         """
         Copy constructor.
 
         Args:
             existing: The `InlinedFixedVector` to copy.
         """
-        self.static_data = existing.static_data
-        self.dynamic_data = UnsafePointer[type]()
-        if existing.dynamic_data:
-            var ext_len = existing.capacity - size
-            self.dynamic_data = UnsafePointer[type].alloc(ext_len)
-            memcpy(self.dynamic_data, existing.dynamic_data, ext_len)
-
         self.current_size = existing.current_size
         self.capacity = existing.capacity
+        debug_assert(self.capacity >= 0)
+
+        self.static_data = Self.static_data_type(unsafe_uninitialized=True)
+        self.dynamic_data = UnsafePointer[type]()
+
+        if self.capacity > self.static_size:
+            debug_assert(existing.dynamic_data)
+            allocated = self.capacity - self.static_size
+            self.dynamic_data = UnsafePointer[type].alloc(allocated)
+
+        remaining_elements = existing.current_size
+        if remaining_elements > existing.static_size:
+            dyn_size = remaining_elements - self.static_size
+            for i in range(dyn_size):
+                self.dynamic_data.offset(i).init_pointee_copy(
+                    existing.dynamic_data.offset(i)[]
+                )
+            remaining_elements -= dyn_size
+
+        debug_assert(remaining_elements <= self.static_size)
+        for i in range(remaining_elements):
+            self.static_data.unsafe_ptr().offset(i)[].write(existing[i])
 
     @always_inline
     fn __moveinit__(inout self, owned existing: Self):
@@ -151,37 +172,58 @@ struct InlinedFixedVector[
         Args:
             existing: The `InlinedFixedVector` to consume.
         """
-        self.static_data = existing.static_data
+        self.static_data = Self.static_data_type(unsafe_uninitialized=True)
         self.dynamic_data = existing.dynamic_data
+        memcpy(
+            self.static_data.unsafe_ptr(),
+            existing.static_data.unsafe_ptr(),
+            existing.static_size,
+        )
         self.current_size = existing.current_size
         self.capacity = existing.capacity
 
         existing.dynamic_data = UnsafePointer[type]()
+        existing.current_size = 0
 
     @always_inline
     fn __del__(owned self):
         """
         Destructor.
         """
-        if self.dynamic_data:
-            self.dynamic_data.free()
-            self.dynamic_data = UnsafePointer[type]()
+        debug_assert(self.current_size <= self.capacity)
+        debug_assert(self.current_size >= 0)
+
+        if self.current_size > self.static_size:
+            dyn_elem = self.current_size - self.static_size
+            for i in range(dyn_elem):
+                self.dynamic_data.offset(i).destroy_pointee()
+            self.current_size -= dyn_elem
+
+        debug_assert(self.current_size <= self.static_size)
+        for idx in range(self.current_size):
+            (self.static_data[idx]).unsafe_ptr().destroy_pointee()
+
+        self.dynamic_data.free()
+        self.dynamic_data = UnsafePointer[type]()
 
     @always_inline
-    fn append(inout self, value: type):
+    fn append(inout self, owned value: type):
         """Appends a value to this vector.
 
         Args:
             value: The value to append.
         """
-        debug_assert(
-            self.current_size < self.capacity,
-            "index must be less than capacity",
-        )
+        debug_assert(self.current_size < self.capacity)
+        debug_assert(self.current_size >= 0)
+
         if self.current_size < Self.static_size:
-            self.static_data[self.current_size] = value
+            self.static_data[self.current_size].write(value^)
         else:
-            self.dynamic_data[self.current_size - Self.static_size] = value
+            debug_assert((self.current_size - self.static_size) >= 0)
+            (
+                self.dynamic_data + (self.current_size - Self.static_size)
+            ).init_pointee_move(value^)
+
         self.current_size += 1
 
     @always_inline
@@ -194,7 +236,7 @@ struct InlinedFixedVector[
         return self.current_size
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> type:
+    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] type:
         """Gets a vector element at the given index.
 
         Args:
@@ -203,7 +245,10 @@ struct InlinedFixedVector[
         Returns:
             The element at the given index.
         """
+
         var normalized_idx = idx
+        debug_assert(self.current_size <= self.capacity)
+        debug_assert(self.current_size >= 0)
         debug_assert(
             -self.current_size <= normalized_idx < self.current_size,
             "index must be within bounds",
@@ -212,48 +257,40 @@ struct InlinedFixedVector[
         if normalized_idx < 0:
             normalized_idx += len(self)
 
+        debug_assert(len(self) > normalized_idx >= 0)
+
         if normalized_idx < Self.static_size:
-            return self.static_data[normalized_idx]
+            return UnsafePointer.address_of(
+                self.static_data[normalized_idx].assume_initialized()
+            )[]
 
         return self.dynamic_data[normalized_idx - Self.static_size]
 
-    @always_inline
-    fn __setitem__(inout self, idx: Int, value: type):
-        """Sets a vector element at the given index.
-
-        Args:
-            idx: The index of the element.
-            value: The value to assign.
-        """
-        var normalized_idx = idx
-        debug_assert(
-            -self.current_size <= normalized_idx < self.current_size,
-            "index must be within bounds",
-        )
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
-        if normalized_idx < Self.static_size:
-            self.static_data[normalized_idx] = value
-        else:
-            self.dynamic_data[normalized_idx - Self.static_size] = value
-
     fn clear(inout self):
         """Clears the elements in the vector."""
+
+        debug_assert(self.current_size <= self.capacity)
+        debug_assert(self.current_size >= 0)
+
+        if self.current_size > self.static_size:
+            dyn_elem = self.current_size - self.static_size
+            for i in range(dyn_elem):
+                self.dynamic_data.offset(i).destroy_pointee()
+            self.current_size -= dyn_elem
+
+        debug_assert(self.current_size <= self.static_size)
+        for idx in range(self.current_size):
+            (self.static_data[idx]).unsafe_ptr().destroy_pointee()
+
         self.current_size = 0
 
-    @staticmethod
-    fn _deref_iter_impl(selfptr: UnsafePointer[Self], i: Int, /) -> type:
-        return selfptr[][i]
-
-    alias _iterator = _VecIter[type, Self, Self._deref_iter_impl]
-
-    fn __iter__(inout self) -> Self._iterator:
+    fn __iter__[
+        mutability: Bool, //, L: Lifetime[mutability].type
+    ](ref [L]self) -> _VecIter[type, size, L]:
         """Iterate over the vector.
 
         Returns:
             An iterator to the start of the vector.
         """
-        return Self._iterator(
-            0, self.current_size, UnsafePointer.address_of(self)
-        )
+        debug_assert(self.current_size <= self.capacity)
+        return _VecIter[type, size, L](0, self.current_size, self)
