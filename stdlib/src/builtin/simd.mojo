@@ -869,7 +869,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.and`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __xor__(self, rhs: Self) -> Self:
@@ -888,7 +888,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.xor`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.xor`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __or__(self, rhs: Self) -> Self:
@@ -907,7 +907,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.or`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.or`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __lshift__(self, rhs: Self) -> Self:
