@@ -1059,7 +1059,7 @@ Big themes for this release:
       var first: Int
       var second: Int
 
-      fn get_first_ref(inout self) -> ref[__lifetime_of(self)] Int:
+      fn get_first_ref(inout self) -> ref [self] Int:
           return self.first
 
   fn show_mutation():

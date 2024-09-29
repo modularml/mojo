@@ -85,7 +85,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
+    fn get[i: Int, T: CollectionElement](self) -> ref [self] T:
         """Get a list element at the given index.
 
         Parameters:

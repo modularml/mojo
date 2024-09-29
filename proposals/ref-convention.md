@@ -134,7 +134,7 @@ example:
 
 ```mojo
 fn __refitem__(ref [_] self, index: Int)
-    -> ref [__lifetime_of(self)] Self.ElementType:
+    -> ref [self] Self.ElementType:
 
 # Hopefully someday we'll have a Lifetime type:
 fn __refitem__(ref [_] self, index: Int)
@@ -174,7 +174,7 @@ becomes:
 
 ```mojo
 fn __getitem__(ref [_] self, index: Int)
-    -> ref [__lifetime_of(self)] Self.ElementType:
+    -> ref [self] Self.ElementType:
 ```
 
 Note: Neither `inout` nor `borrowed` are allowed in a result position. The

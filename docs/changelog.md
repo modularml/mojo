@@ -157,6 +157,17 @@ what we publish.
 
   ([PR #3524](https://github.com/modularml/mojo/pull/3524) by [@szbergeron](https://github.com/szbergeron))
 
+- `ref` argument and result specifiers now allow providing a memory value
+  directly in the lifetime specifier, rather than requiring the use of
+  `__lifetime_of`.  It is still fine to use `__lifetime_of` explicitly though,
+  and this is required when specifying lifetimes for parameters (e.g. to the
+  `Reference` type). For example, this is now valid without `__lifetime_of`:
+
+  ```mojo
+  fn return_ref(a: String) -> ref [a] String:
+      return a
+  ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
