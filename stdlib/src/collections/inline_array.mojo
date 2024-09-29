@@ -322,7 +322,7 @@ struct InlineArray[
     @always_inline
     fn __contains__[
         T: EqualityComparableCollectionElement, //
-    ](self, value: T) -> Bool:
+    ](self: InlineArray[T, size], value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo
@@ -341,16 +341,9 @@ struct InlineArray[
         Returns:
             True if the value is contained in the array, False otherwise.
         """
-        constrained[
-            _type_is_eq[T, Self.ElementType](),
-            "T must be equal to Self.ElementType",
-        ]()
 
         @parameter
         for i in range(size):
-            if (
-                rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
-                == value
-            ):
+            if self[i] == value:
                 return True
         return False
