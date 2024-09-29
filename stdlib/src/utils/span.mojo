@@ -42,6 +42,14 @@ trait Spanable:
         """
         ...
 
+    fn byte_length(self) -> Int:
+        """Returns the length of the byte slice.
+
+        Returns:
+            The length of the byte slice.
+        """
+        ...
+
 
 @value
 struct _SpanIter[

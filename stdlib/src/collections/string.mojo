@@ -1386,8 +1386,8 @@ struct String(
         # Calculate the total size of the elements to join beforehand
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
-        for e in elems:
-            len_elems += len(e[])
+        for e_ref in elems:
+            len_elems += e_ref[].byte_length()
         var capacity = len_self * (n_elems - 1) + len_elems
         var buf = Self._buffer_type(capacity=capacity)
         var i = 0
