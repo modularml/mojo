@@ -196,4 +196,7 @@ what we publish.
 - [Issue #3544](https://github.com/modularml/mojo/issues/3544) - Known
   mutable `ref` argument are not optimized as `noalias` by LLVM.
 
+- [Issue #3559](https://github.com/modularml/mojo/issues/3559) - VariadicPack
+  doesn't extend the lifetimes of the values it references.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
