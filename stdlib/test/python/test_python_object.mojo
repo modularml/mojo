@@ -16,9 +16,8 @@
 from collections import Dict
 from python import Python, PythonObject
 from testing import assert_equal, assert_false, assert_raises, assert_true
-
 from utils import StringRef
-
+import numpy as np
 
 def test_dunder_methods(inout python: Python):
     var a = PythonObject(34)
@@ -340,6 +339,18 @@ def test_is():
     assert_true(l1 is not l2)
 
 
+def test_large_UInt64():
+    var x: UInt64 = UInt64(0xFEDCBA0987654321)
+    var py_obj = PythonObject(x)
+    # Test if the object is initialized correctly
+    assert_true(not py_obj.py_object.is_null(), "PythonObject for large UInt64 is not initialized correctly")
+    ## use the numpy to get the uint64 value representation
+    var np_obj = np.uint64(x)   
+    assert_equal(py_obj, np_obj, "PythonObject for large UInt64 is not initialized correctly")
+
+
+
+
 def test_nested_object():
     var a = PythonObject([1, 2, 3])
     var b = PythonObject([4, 5, 6])
@@ -423,3 +434,4 @@ def main():
     test_dict()
     test_none()
     test_nested_object()
+    test_large_UInt64()

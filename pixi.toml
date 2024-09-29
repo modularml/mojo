@@ -14,3 +14,4 @@ benchmarks = { cmd = [
 [dependencies]
 python = ">=3.9,<3.13"
 max = "*"
+numpy = ">=1.26.4,<1.27"
