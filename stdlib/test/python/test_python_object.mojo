@@ -411,38 +411,46 @@ fn test_none() raises:
 
 fn test_getitem_raises() raises:
     var a = PythonObject(2)
-    with assert_raises(contains="'int' object has no attribute '__getitem__'"):
+    with assert_raises(contains="'int' object is not subscriptable"):
         _ = a[0]
+    with assert_raises(contains="'int' object is not subscriptable"):
+        _ = a[0, 0]
 
     var b = PythonObject(2.2)
-    with assert_raises(
-        contains="'float' object has no attribute '__getitem__'"
-    ):
+    with assert_raises(contains="'float' object is not subscriptable"):
         _ = b[0]
+    with assert_raises(contains="'float' object is not subscriptable"):
+        _ = b[0, 0]
 
     var c = PythonObject(True)
-    with assert_raises(contains="'bool' object has no attribute '__getitem__'"):
+    with assert_raises(contains="'bool' object is not subscriptable"):
         _ = c[0]
+    with assert_raises(contains="'bool' object is not subscriptable"):
+        _ = c[0, 0]
 
     var d = PythonObject(None)
-    with assert_raises(
-        contains="'NoneType' object has no attribute '__getitem__'"
-    ):
+    with assert_raises(contains="'NoneType' object is not subscriptable"):
         _ = d[0]
+    with assert_raises(contains="'NoneType' object is not subscriptable"):
+        _ = d[0, 0]
 
-    var with_get = Python.evaluate(
-        "type('WithGetItem', (), {'__getitem__': lambda self, key: f\"Key:"
-        ' {key}"})()'
+    with_get = Python.evaluate(
+        "type('WithGetItem', (), {'__getitem__': lambda self, key: f'Keys: {',"
+        " '.join(map(str, key))}' if isinstance(key, tuple) else f'Key:"
+        " {key}'})()"
     )
     assert_equal("Key: 0", str(with_get[0]))
+    assert_equal("Keys: 0, 0", str(with_get[0, 0]))
+    assert_equal("Keys: 0, 0, 0", str(with_get[0, 0, 0]))
 
     var without_get = Python.evaluate(
-        "type('WithOutGetItem', (), {'__str__': \"SomeString\"})()"
+        "type('WithOutGetItem', (), {'__str__': lambda self: \"SomeString\"})()"
     )
-    with assert_raises(
-        contains="'WithOutGetItem' object has no attribute '__getitem__'"
-    ):
+    with assert_raises(contains="'WithOutGetItem' object is not subscriptable"):
         _ = without_get[0]
+
+    with assert_raises(contains="'WithOutGetItem' object is not subscriptable"):
+        _ = without_get[0, 0]
 
     var with_get_exception = Python.evaluate(
         "type('WithGetItemException', (), {'__getitem__': lambda self, key: (_"
