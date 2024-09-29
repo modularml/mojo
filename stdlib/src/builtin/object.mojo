@@ -815,7 +815,7 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
