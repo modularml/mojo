@@ -1390,15 +1390,23 @@ struct String(
             len_elems += e_ref[].byte_length()
         var capacity = len_self * (n_elems - 1) + len_elems
         var buf = Self._buffer_type(capacity=capacity)
+        var self_ptr = self.unsafe_ptr()
+        var ptr = buf.unsafe_ptr()
+        var offset = 0
         var i = 0
         var is_first = True
         while i < n_elems:
             if is_first:
                 is_first = False
             else:
-                buf.extend(self.as_bytes_span())
-            buf.extend(elems[i].as_bytes_span())
+                memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
+                offset += len_self
+            var e = elems[i].as_bytes_span()
+            var e_len = len(e)
+            memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
+            offset += e_len
             i += 1
+        buf.size = capacity
         buf.append(0)
         return String(buf^)
 
