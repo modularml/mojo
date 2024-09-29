@@ -10,14 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+#
+# This file only tests the debug_assert function
+#
+# ===----------------------------------------------------------------------=== #
+# RUN: %mojo %s | FileCheck %s -check-prefix=CHECK-OK
 
-from .test_utils import libm_call
-from .types import (
-    CopyCounter,
-    ExplicitCopyOnly,
-    ImplicitCopyOnly,
-    MoveCounter,
-    MoveOnly,
-    ObservableDel,
-    ValueDestructorRecorder,
-)
+
+def main():
+    test_debug_assert_mode_all_true()
+
+
+# CHECK-OK-LABEL: test_debug_assert_mode_all_true
+def test_debug_assert_mode_all_true():
+    print("== test_debug_assert_mode_all_true")
+    debug_assert(True, "ok")
+    debug_assert[assert_mode="safe"](True, "ok")
+    debug_assert[assert_mode="safe", cpu_only=True](True, "ok")
+    # CHECK-OK: is reached
+    print("is reached")

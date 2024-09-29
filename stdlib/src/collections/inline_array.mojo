@@ -222,9 +222,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -240,7 +238,7 @@ struct InlineArray[
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int,
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
+    ](ref [_]self: Self) -> ref [self] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -277,9 +275,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
