@@ -785,7 +785,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+    fn __getitem__(ref [_]self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -810,9 +810,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.T:
+    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it
