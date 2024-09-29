@@ -215,7 +215,7 @@ struct Variant[*Ts: CollectionElement](
         if not self.isa[T]():
             abort("get: wrong variant type")
 
-        return self.unsafe_get[T]()[]
+        return self.unsafe_get[T]()
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -366,7 +366,7 @@ struct Variant[*Ts: CollectionElement](
 
     fn unsafe_get[
         T: CollectionElement
-    ](ref [_]self: Self) -> Reference[T, __lifetime_of(self)]:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
