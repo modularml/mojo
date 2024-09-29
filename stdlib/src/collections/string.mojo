@@ -1344,7 +1344,7 @@ struct String(
             The joined string.
         """
 
-        # TODO: the renaming of the following method from join to fast_join and
+        # TODO(#3403): the renaming of the following method from join to fast_join and
         # the _type_is_eq() call is a hack needed to avoid the following error:
         # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
         # disambiguate with an explicit cast"
