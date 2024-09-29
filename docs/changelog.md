@@ -103,6 +103,10 @@ what we publish.
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- The `Dict.__getitem__` method now returns a reference instead of a copy of
+  the value (or raises).  This improves the performance of common code that
+  uses `Dict` by allowing borrows from the `Dict` elements.
+
 - Autoparameterization of parameters is now supported. Specifying a parameter
   type with unbound parameters causes them to be implicitly added to the
   function signature as inferred parameters.
