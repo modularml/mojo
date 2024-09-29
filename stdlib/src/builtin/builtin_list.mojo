@@ -38,7 +38,7 @@ struct ListLiteral[*Ts: CollectionElement](
         Ts: The type of the elements.
     """
 
-    var storage: Tuple[Ts]
+    var storage: Tuple[*Ts]
     """The underlying storage for the list."""
 
     # ===-------------------------------------------------------------------===#
@@ -158,7 +158,7 @@ struct ListLiteral[*Ts: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
+    fn get[i: Int, T: CollectionElement](self) -> ref [self] T:
         """Get a list element at the given index.
 
         Parameters:
@@ -420,7 +420,6 @@ struct VariadicListMem[
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
         self.value = UnsafePointer.address_of(tmp).bitcast[Self._mlir_type]()[]
-        _ = tmp
         self._is_owned = False
 
     # Provide support for variadics of *owned* arguments.  The reference will
@@ -441,7 +440,6 @@ struct VariadicListMem[
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
         self.value = UnsafePointer.address_of(tmp).bitcast[Self._mlir_type]()[]
-        _ = tmp
         self._is_owned = True
 
     @always_inline

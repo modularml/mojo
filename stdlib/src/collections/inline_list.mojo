@@ -129,7 +129,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     @always_inline
     fn __getitem__(
         ref [_]self: Self, owned idx: Int
-    ) -> ref [__lifetime_of(self._array)] Self.ElementType:
+    ) -> ref [self._array] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
