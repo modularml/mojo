@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.reference import Reference
+from memory import Reference
 ```
 """
 
@@ -270,7 +270,7 @@ struct AddressSpace(EqualityComparable):
 struct Reference[
     is_mutable: Bool, //,
     type: AnyType,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe reference.
@@ -333,6 +333,11 @@ struct Reference[
         """
         return __get_litref_as_mvalue(self.value)
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __eq__(self, rhs: Reference[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are equal.
@@ -347,6 +352,7 @@ struct Reference[
             __mlir_op.`lit.ref.to_pointer`(self.value)
         ) == UnsafePointer(__mlir_op.`lit.ref.to_pointer`(rhs.value))
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
     fn __ne__(self, rhs: Reference[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are not equal.

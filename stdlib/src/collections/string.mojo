@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import C_char
+from sys.ffi import c_char
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -34,7 +34,12 @@ from utils import (
     Formatter,
 )
 from utils.format import ToFormatter
-from utils.string_slice import _utf8_byte_type, _StringSliceIter
+from utils.string_slice import (
+    _utf8_byte_type,
+    _StringSliceIter,
+    _unicode_codepoint_utf8_byte_length,
+    _shift_unicode_to_utf8,
+)
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -85,7 +90,7 @@ fn ord(s: StringSlice) -> Int:
         s.byte_length() == int(num_bytes), "input string must be one character"
     )
     debug_assert(
-        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte ", b1, " at index 0"
     )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -93,8 +98,7 @@ fn ord(s: StringSlice) -> Int:
     for i in range(1, num_bytes):
         p += 1
         debug_assert(
-            p[] >> 6 == 0b00000010,
-            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+            p[] >> 6 == 0b00000010, "invalid UTF-8 byte ", b1, " at index ", i
         )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
@@ -107,50 +111,36 @@ fn ord(s: StringSlice) -> Int:
 
 
 fn chr(c: Int) -> String:
-    """Returns a string based on the given Unicode code point.
-
-    Returns the string representing a character whose code point is the integer
-    `c`. For example, `chr(97)` returns the string `"a"`. This is the inverse of
-    the `ord()` function.
+    """Returns a String based on the given Unicode code point. This is the
+    inverse of the `ord()` function.
 
     Args:
         c: An integer that represents a code point.
 
     Returns:
         A string containing a single character based on the given code point.
+
+    Examples:
+    ```mojo
+    print(chr(97)) # "a"
+    print(chr(8364)) # "€"
+    ```
+    .
     """
-    # Unicode (represented as UInt32 BE) to UTF-8 conversion :
-    # 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa                                a
-    # 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb                       a >> 6  | 0b11000000, b       | 0b10000000
-    # 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc              a >> 12 | 0b11100000, b >> 6  | 0b10000000, c      | 0b10000000
-    # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd     a >> 18 | 0b11110000, b >> 12 | 0b10000000, c >> 6 | 0b10000000, d | 0b10000000
 
-    if (c >> 7) == 0:  # This is 1 byte ASCII char
-        return _chr_ascii(c)
+    if c < 0b1000_0000:  # 1 byte ASCII char
+        return String(String._buffer_type(c, 0))
 
-    @always_inline
-    fn _utf8_len(val: Int) -> Int:
-        debug_assert(
-            0 <= val <= 0x10FFFF, "Value is not a valid Unicode code point"
-        )
-        alias sizes = SIMD[DType.int32, 4](
-            0, 0b1111_111, 0b1111_1111_111, 0b1111_1111_1111_1111
-        )
-        var values = SIMD[DType.int32, 4](val)
-        var mask = values > sizes
-        return int(mask.cast[DType.uint8]().reduce_add())
-
-    var num_bytes = _utf8_len(c)
+    var num_bytes = _unicode_codepoint_utf8_byte_length(c)
     var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
-    var shift = 6 * (num_bytes - 1)
-    var mask = UInt8(0xFF) >> (num_bytes + 1)
-    var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    p.store[width=1](((c >> shift) & mask) | num_bytes_marker)
-    for i in range(1, num_bytes):
-        shift -= 6
-        p.store[width=1](i, ((c >> shift) & 0b00111111) | 0b10000000)
-    p.store[width=1](num_bytes, 0)
-    return String(p.bitcast[UInt8](), num_bytes + 1)
+    _shift_unicode_to_utf8(p, c, num_bytes)
+    # TODO: decide whether to use replacement char (�) or raise ValueError
+    # if not _is_valid_utf8(p, num_bytes):
+    #     debug_assert(False, "Invalid Unicode code point")
+    #     p.free()
+    #     return chr(0xFFFD)
+    p[num_bytes] = 0
+    return String(ptr=p, len=num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -202,7 +192,6 @@ fn _repr_ascii(c: UInt8) -> String:
             return hex(uc, prefix=r"\x")
 
 
-# TODO: This is currently the same as repr, should change with unicode strings
 @always_inline
 fn ascii(value: String) -> String:
     """Get the ASCII representation of the object.
@@ -213,7 +202,19 @@ fn ascii(value: String) -> String:
     Returns:
         A string containing the ASCII representation of the object.
     """
-    return value.__repr__()
+    alias ord_squote = ord("'")
+    var result = String()
+    var use_dquote = False
+
+    for idx in range(len(value._buffer) - 1):
+        var char = value._buffer[idx]
+        result += _repr_ascii(char)
+        use_dquote = use_dquote or (char == ord_squote)
+
+    if use_dquote:
+        return '"' + result + '"'
+    else:
+        return "'" + result + "'"
 
 
 # ===----------------------------------------------------------------------=== #
@@ -695,6 +696,7 @@ struct String(
     Formattable,
     ToFormatter,
     CollectionElementNew,
+    FloatableRaising,
 ):
     """Represents a mutable string."""
 
@@ -787,13 +789,13 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_slice())
+        var length: Int = len(str_slice.as_bytes_span())
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            src=str_slice.as_bytes_span().unsafe_ptr(),
             count=length,
         )
         self = Self(buffer^)
@@ -871,6 +873,35 @@ struct String(
         ```mojo
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
         print(string) # "1, 2.0, three"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
+        ```
+        .
+        """
+
+        return Self.format_sequence(args)
+
+    @staticmethod
+    @no_inline
+    fn format_sequence(args: VariadicPack[_, Formattable, *_]) -> Self:
+        """
+        Construct a string directly from a variadic pack.
+
+        Args:
+            args: A VariadicPack of formattable arguments.
+
+        Returns:
+            A string formed by formatting the VariadicPack.
+
+        Examples:
+
+        ```mojo
+        fn variadic_pack_to_string[
+            *Ts: Formattable,
+        ](*args: *Ts) -> String:
+            return String.format_sequence(args)
+
+        string = variadic_pack_to_string(1, ", ", 2.0, ", ", "three")
         %# from testing import assert_equal
         %# assert_equal(string, "1, 2.0, three")
         ```
@@ -1178,14 +1209,29 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        alias ord_squote = ord("'")
         var result = String()
         var use_dquote = False
+        for s in self:
+            use_dquote = use_dquote or (s == "'")
 
-        for idx in range(len(self._buffer) - 1):
-            var char = self._buffer[idx]
-            result += _repr_ascii(char)
-            use_dquote = use_dquote or (char == ord_squote)
+            if s == "\\":
+                result += r"\\"
+            elif s == "\t":
+                result += r"\t"
+            elif s == "\n":
+                result += r"\n"
+            elif s == "\r":
+                result += r"\r"
+            else:
+                var codepoint = ord(s)
+                if isprintable(codepoint):
+                    result += s
+                elif codepoint < 0x10:
+                    result += hex(codepoint, prefix=r"\x0")
+                elif codepoint < 0x20 or codepoint == 0x7F:
+                    result += hex(codepoint, prefix=r"\x")
+                else:  # multi-byte character
+                    result += s
 
         if use_dquote:
             return '"' + result + '"'
@@ -1331,7 +1377,7 @@ struct String(
         """
         return self._buffer.data
 
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be null, or NUL terminated.
@@ -1339,7 +1385,7 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        return self.unsafe_ptr().bitcast[C_char]()
+        return self.unsafe_ptr().bitcast[c_char]()
 
     fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1362,7 +1408,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1387,7 +1433,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
 
     @always_inline
     fn byte_length(self) -> Int:
@@ -1521,6 +1567,9 @@ struct String(
         Returns:
             A List of Strings containing the input split by the separator.
 
+        Raises:
+            If the separator is empty.
+
         Examples:
 
         ```mojo
@@ -1541,7 +1590,7 @@ struct String(
         var items = 0
         var sep_len = sep.byte_length()
         if sep_len == 0:
-            raise Error("ValueError: empty separator")
+            raise Error("Separator cannot be empty.")
         if str_byte_len < 0:
             output.append("")
 
@@ -1592,6 +1641,10 @@ struct String(
         .
         """
 
+        fn num_bytes(b: UInt8) -> Int:
+            var flipped = ~b
+            return int(count_leading_zeros(flipped) + (flipped >> 7))
+
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
@@ -1613,8 +1666,8 @@ struct String(
                 # if the last char is not whitespace
                 output.append(self[str_byte_len])
                 break
-            rhs = lhs + 1
-            for s in self[lhs + 1 :]:
+            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
+            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
                 if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 rhs += s.byte_length()
@@ -1950,6 +2003,16 @@ struct String(
         """
         return atol(self)
 
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value.
+
+        If the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return atof(self)
+
     fn __mul__(self, n: Int) -> String:
         """Concatenates the string `n` times.
 
@@ -2053,13 +2116,16 @@ struct String(
         return res^
 
     fn isdigit(self) -> Bool:
-        """Returns True if all characters in the string are digits.
+        """A string is a digit string if all characters in the string are digits
+        and there is at least one character in the string.
 
         Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are digits else False.
+            True if all characters are digits and it's not empty else False.
         """
+        if not self:
+            return False
         for c in self:
             if not isdigit(ord(c)):
                 return False
@@ -2161,7 +2227,7 @@ struct String(
         debug_assert(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
-        var fillbyte = fillchar.as_bytes_slice()[0]
+        var fillbyte = fillchar.as_bytes_span()[0]
         var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)

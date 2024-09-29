@@ -15,11 +15,21 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
+<<<<<<<< HEAD:stdlib/test/builtin/test_debug_assert_mojo_enable_assertions.mojo
+# RUN: not --crash %bare-mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s
+========
 # RUN: not mojo %s 2>&1 | FileCheck %s
+>>>>>>>> origin/nightly:stdlib/test/builtin/test_uint_error.mojo
 
 
 fn main():
+<<<<<<<< HEAD:stdlib/test/builtin/test_debug_assert_mojo_enable_assertions.mojo
+    print("== test_fail")
+    # CHECK: Assert Error: this fails
+    debug_assert(False, "this fails")
+========
     # CHECK: integer value -1 is negative, but is being converted to an unsigned type
     print(UInt(-1))
+>>>>>>>> origin/nightly:stdlib/test/builtin/test_uint_error.mojo
     # CHECK-NOT: is never reached
     print("is never reached")

@@ -27,6 +27,7 @@ from sys import (
     triple_is_nvidia_cuda,
     external_call,
     simdwidthof,
+    _libc as libc,
 )
 from collections import Optional
 from builtin.dtype import _integral_type_of
@@ -50,7 +51,7 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @always_inline
 fn _memcmp_impl_unconstrained[
     type: DType
-](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
     alias simd_width = simdwidthof[type]()
     if count < simd_width:
         for i in range(count):
@@ -61,7 +62,7 @@ fn _memcmp_impl_unconstrained[
         return 0
 
     var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector",
+        "llvm.stepvector",
         SIMD[DType.uint8, simd_width],
         has_side_effect=False,
     ]()
@@ -94,7 +95,7 @@ fn _memcmp_impl_unconstrained[
 @always_inline
 fn _memcmp_impl[
     type: DType
-](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
     constrained[type.is_integral(), "the input dtype must be integral"]()
     return _memcmp_impl_unconstrained(s1, s2, count)
 
@@ -142,62 +143,7 @@ fn memcmp[
 
 
 @always_inline
-fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
-    """Copies a memory area.
-
-    Parameters:
-        count: The number of elements to copy (not bytes!).
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-    """
-    alias n = count * sizeof[dest.type]()
-
-    var dest_data = dest.bitcast[Int8]()
-    var src_data = src.bitcast[Int8]()
-
-    @parameter
-    if n < 5:
-
-        @parameter
-        for i in range(n):
-            dest_data[i] = src_data[i]
-        return
-
-    @parameter
-    if n <= 16:
-
-        @parameter
-        if n >= 8:
-            var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
-            dest_data.offset(n - ui64_size).bitcast[
-                Int64
-            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
-            return
-
-        var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
-        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
-            n - ui32_size
-        ).bitcast[Int32]()[0]
-        return
-
-    var dest_ptr = dest_data.bitcast[Int8]()
-    var src_ptr = src_data.bitcast[Int8]()
-
-    # Copy in 32-byte chunks.
-    alias chunk_size = 32
-    alias vector_end = _align_down(n, chunk_size)
-    for i in range(0, vector_end, chunk_size):
-        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
-    for i in range(vector_end, n):
-        dest_ptr.store(i, src_ptr.load(i))
-
-
-@always_inline
-fn memcpy(
+fn _memcpy_impl(
     dest_data: UnsafePointer[Int8, *_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
@@ -258,8 +204,17 @@ fn memcpy(
 
 
 @always_inline
-fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
+fn memcpy[
+    T: AnyType
+](
+    dest: UnsafePointer[T, AddressSpace.GENERIC, *_],
+    src: UnsafePointer[T, AddressSpace.GENERIC, *_],
+    count: Int,
+):
     """Copies a memory area.
+
+    Parameters:
+        T: The element type.
 
     Args:
         dest: The destination pointer.
@@ -267,7 +222,11 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy.
     """
     var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
+    _memcpy_impl(
+        dest.bitcast[Int8, lifetime=MutableAnyLifetime](),
+        src.bitcast[Int8, lifetime=MutableAnyLifetime](),
+        n,
+    )
 
 
 # ===----------------------------------------------------------------------===#
@@ -276,12 +235,17 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
 
 
 @always_inline("nodebug")
-fn _memset_llvm[
+fn _memset_impl[
     address_space: AddressSpace
 ](ptr: UnsafePointer[UInt8, address_space], value: UInt8, count: Int):
-    llvm_intrinsic["llvm.memset", NoneType](
-        ptr.address, value, count.value, False
-    )
+    alias simd_width = simdwidthof[UInt8]()
+    var vector_end = _align_down(count, simd_width)
+
+    for i in range(0, vector_end, simd_width):
+        ptr.store(i, SIMD[DType.uint8, simd_width](value))
+
+    for i in range(vector_end, count):
+        ptr.store(i, value)
 
 
 @always_inline
@@ -299,7 +263,7 @@ fn memset[
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_llvm(ptr.bitcast[UInt8](), value, count * sizeof[type]())
+    _memset_impl(ptr.bitcast[UInt8](), value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#
@@ -409,25 +373,36 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and address_space in (
-        _GPUAddressSpace.SHARED,
-        _GPUAddressSpace.PARAM,
-    ):
-        alias global_name = name.value() if name else "_global_alloc"
-        return __mlir_op.`pop.global_alloc`[
-            name = global_name.value,
-            count = count.value,
-            _type = UnsafePointer[type, address_space]._mlir_type,
-            alignment = alignment.value,
-            address_space = address_space._value.value,
-        ]()
-    else:
-        return __mlir_op.`pop.stack_allocation`[
-            count = count.value,
-            _type = UnsafePointer[type, address_space]._mlir_type,
-            alignment = alignment.value,
-            address_space = address_space._value.value,
-        ]()
+    if triple_is_nvidia_cuda():
+        # On NVGPU, SHARED and PARAM address spaces lower to global memory.
+        @parameter
+        if address_space in (_GPUAddressSpace.SHARED, _GPUAddressSpace.PARAM):
+            alias global_name = name.value() if name else "_global_alloc"
+            return __mlir_op.`pop.global_alloc`[
+                name = global_name.value,
+                count = count.value,
+                _type = UnsafePointer[type, address_space]._mlir_type,
+                alignment = alignment.value,
+            ]()
+        # MSTDL-797: The NVPTX backend requires that `alloca` instructions may
+        # only have generic address spaces. When allocating LOCAL memory,
+        # addrspacecast the resulting pointer.
+        elif address_space == _GPUAddressSpace.LOCAL:
+            var generic_ptr = __mlir_op.`pop.stack_allocation`[
+                count = count.value,
+                _type = UnsafePointer[type]._mlir_type,
+                alignment = alignment.value,
+            ]()
+            return __mlir_op.`pop.pointer.bitcast`[
+                _type = UnsafePointer[type, address_space]._mlir_type
+            ](generic_ptr)
+
+    # Perofrm a stack allocation of the requested size, alignment, and type.
+    return __mlir_op.`pop.stack_allocation`[
+        count = count.value,
+        _type = UnsafePointer[type, address_space]._mlir_type,
+        alignment = alignment.value,
+    ]()
 
 
 # ===----------------------------------------------------------------------===#
@@ -441,20 +416,17 @@ fn _malloc[
     /,
     *,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-](size: Int, /) -> UnsafePointer[type, address_space, alignment=alignment]:
+](size: Int, /) -> UnsafePointer[
+    type, AddressSpace.GENERIC, alignment=alignment
+]:
     @parameter
     if triple_is_nvidia_cuda():
-        constrained[
-            address_space is AddressSpace.GENERIC,
-            "address space must be generic",
-        ]()
-        return external_call["malloc", UnsafePointer[NoneType, address_space]](
-            size
-        ).bitcast[type]()
+        return external_call[
+            "malloc", UnsafePointer[NoneType, AddressSpace.GENERIC]
+        ](size).bitcast[type]()
     else:
         return __mlir_op.`pop.aligned_alloc`[
-            _type = UnsafePointer[type, address_space]._mlir_type
+            _type = UnsafePointer[type, AddressSpace.GENERIC]._mlir_type
         ](alignment.value, size.value)
 
 
@@ -464,13 +436,9 @@ fn _malloc[
 
 
 @always_inline
-fn _free(ptr: UnsafePointer):
+fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
     @parameter
     if triple_is_nvidia_cuda():
-        constrained[
-            ptr.address_space is AddressSpace.GENERIC,
-            "address space must be generic",
-        ]()
-        external_call["free", NoneType](ptr.bitcast[NoneType]())
+        libc.free(ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)

@@ -18,6 +18,23 @@ from test_utils import MoveCounter
 from testing import assert_equal
 
 
+def test_inlined_fixed_vector_moves():
+    var v1 = InlinedFixedVector[Int, 5](10)
+    var v2 = InlinedFixedVector[Int, 5](10)
+
+    # do one within the smallvec
+    v2[3] = 99
+    v1[3] = 42
+
+    # plus one within the dynarray
+    v2[7] = 9999
+    v1[7] = 4242
+    v2 = v1^  # moves
+
+    assert_equal(v2[3], 42)
+    assert_equal(v2[7], 4242)
+
+
 def test_inlined_fixed_vector():
     var vector = InlinedFixedVector[Int, 5](10)
 
@@ -73,9 +90,6 @@ def test_inlined_fixed_vector():
     vector.clear()
     assert_equal(0, len(vector))
 
-    # Free the memory since we manage it ourselves in `InlinedFixedVector` for now.
-    vector._del_old()
-
 
 def test_inlined_fixed_vector_with_default():
     var vector = InlinedFixedVector[Int](10)
@@ -105,8 +119,6 @@ def test_inlined_fixed_vector_with_default():
 
     vector.clear()
     assert_equal(0, len(vector))
-
-    vector._del_old()
 
 
 def test_indexing():

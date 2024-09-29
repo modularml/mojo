@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from memory import UnsafePointer
+
 
 trait _HashableWithHasher:
     fn __hash__[H: _Hasher](self, inout hasher: H):

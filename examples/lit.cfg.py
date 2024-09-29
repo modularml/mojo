@@ -28,7 +28,7 @@ config.suffixes = [".mojo", ".🔥"]
 config.excludes = [
     # No RUN: directive, just bare examples
     "hello_interop.mojo",
-    "matmul.mojo"
+    "matmul.mojo",
 ]
 
 # Have the examples run in the build directory.
@@ -45,12 +45,26 @@ config.test_source_root = Path(__file__).parent.resolve()
 # Substitute %mojo for just `mojo` itself.
 config.substitutions.insert(0, ("%mojo", "mojo"))
 
+pre_built_packages_path = os.environ.get(
+    "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
+    Path(os.environ["MODULAR_HOME"])
+    / "pkg"
+    / "packages.modular.com_nightly_mojo"
+    / "lib"
+    / "mojo",
+)
+
+os.environ[
+    "MODULAR_MOJO_NIGHTLY_IMPORT_PATH"
+] = f"{build_root},{pre_built_packages_path}"
+
 # Pass through several environment variables
 # to the underlying subprocesses that run the tests.
 lit.llvm.initialize(lit_config, config)
 lit.llvm.llvm_config.with_system_environment(
     [
         "MODULAR_HOME",
+        "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
         "PATH",
     ]
 )

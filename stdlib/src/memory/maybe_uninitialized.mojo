@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import abort
+from builtin._documentation import doc_private
 
 
 struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
@@ -211,7 +212,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     @always_inline
     fn assume_initialized(
         ref [_]self: Self,
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    ) -> ref [self] Self.ElementType:
         """Returns a reference to the internal value.
 
         Calling this method assumes that the memory is initialized.

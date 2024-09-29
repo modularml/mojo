@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import InlineArray, List
+from memory import UnsafePointer
 from testing import assert_equal, assert_true
 
 from utils import Span

@@ -21,7 +21,7 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Reference
+from memory import Reference, UnsafePointer
 from sys.intrinsics import _type_is_eq
 from builtin.builtin_list import _lit_mut_cast
 
@@ -30,7 +30,7 @@ from builtin.builtin_list import _lit_mut_cast
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -74,7 +74,7 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
@@ -125,7 +125,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int, //
+        T2: CollectionElement, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -261,9 +261,14 @@ struct Span[
         """
         return len(self) > 0
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
         Parameters:
@@ -292,7 +297,7 @@ struct Span[
     @always_inline
     fn __ne__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
         Parameters:

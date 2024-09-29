@@ -31,7 +31,7 @@ from sys import simdwidthof, bitwidthof
 from collections import InlineArray
 
 from builtin.dtype import _uint_type_of_width
-from memory import memcpy, memset_zero, stack_allocation, bitcast
+from memory import memcpy, memset_zero, stack_allocation, bitcast, UnsafePointer
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
@@ -265,7 +265,6 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
         memset_zero(ptr + r, stride - r)  # set the rest to 0
         var last_value = ptr.bitcast[Scalar[type]]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
-        _ = remaining  # We make sure the array lives long enough.
 
     # Now finally, hash the final SIMD vector state.
     return _hash_simd(hash_data)

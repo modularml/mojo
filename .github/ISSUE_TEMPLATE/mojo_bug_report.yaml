@@ -16,6 +16,12 @@ body:
     attributes:
       label: Bug description
       description: Describe the bug you encountered and what you expected to happen.
+      value: |
+        ### Actual behavior
+        <!-- Add a clear and concise description of what actually happened. -->
+
+        ### Expected behavior
+        <!-- Add a clear and concise description of what you expected to happen. -->
     validations:
       required: true
 
@@ -25,7 +31,7 @@ body:
       label: Steps to reproduce
       description: Provide the specific steps to reproduce the issue.
       value: |
-        - Include relevant code snippet or link to code that did not work as expected.
+        - Provide a relevant code snippet or a link to the code that did not work as expected.
         - If applicable, add screenshots to help explain the problem.
         - If using the Playground, name the pre-existing notebook that failed and the steps that led to failure.
         - Include anything else that might help us debug the issue.
@@ -38,7 +44,6 @@ body:
       label: System information
       description: What version of Mojo are you using?
       value: |
-        - What OS did you do install Mojo on ?
-        - Provide version information for Mojo by pasting the output of `mojo -v`
-        - Provide Modular CLI version by pasting the output of `modular -v`
-      render: shell
+        - What OS did you install Mojo on?
+        - Provide version information for Mojo by pasting the output of `mojo -v`.
+        - Provide the Modular CLI version by pasting the output of `modular -v`.

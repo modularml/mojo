@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from sys import has_neon
+from memory import UnsafePointer
 
 from collections import InlineArray
 from builtin.simd import _modf
@@ -843,6 +844,115 @@ def test_shuffle():
     )
 
 
+def test_shuffle_dynamic_size_4_uint8():
+    var lookup_table = SIMD[DType.uint8, 16](
+        0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
+    )
+
+    indices = SIMD[DType.uint8, 4](3, 3, 5, 5)
+
+    result = lookup_table._dynamic_shuffle(indices)
+    expected_result = SIMD[DType.uint8, 4](30, 30, 50, 50)
+    assert_equal(result, expected_result)
+
+
+def test_shuffle_dynamic_size_8_uint8():
+    var lookup_table = SIMD[DType.uint8, 16](
+        0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
+    )
+
+    # Let's use size 8
+    indices = SIMD[DType.uint8, 8](3, 3, 5, 5, 7, 7, 9, 0)
+
+    result = lookup_table._dynamic_shuffle(indices)
+    expected_result = SIMD[DType.uint8, 8](30, 30, 50, 50, 70, 70, 90, 0)
+    assert_equal(result, expected_result)
+
+
+def test_shuffle_dynamic_size_16_uint8():
+    var lookup_table = SIMD[DType.uint8, 16](
+        0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
+    )
+    var indices = SIMD[DType.uint8, 16](
+        3, 3, 5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15, 0, 1
+    )
+    result = lookup_table._dynamic_shuffle(indices)
+    expected_result = SIMD[DType.uint8, 16](
+        30, 30, 50, 50, 70, 70, 90, 90, 110, 110, 130, 130, 150, 150, 0, 10
+    )
+    assert_equal(result, expected_result)
+
+
+def test_shuffle_dynamic_size_32_uint8():
+    var table_lookup = SIMD[DType.uint8, 16](
+        0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
+    )
+    # fmt: off
+    var indices = SIMD[DType.uint8, 32](
+        3 , 3 , 5 , 5 , 7 , 7 , 9 , 9 ,
+        11, 11, 13, 13, 15, 15, 0 , 1 ,
+        0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 ,
+        8 , 9 , 10, 11, 12, 13, 14, 15,
+    )
+    result = table_lookup._dynamic_shuffle(indices)
+
+    expected_result = SIMD[DType.uint8, 32](
+        30 , 30 , 50 , 50 , 70 , 70 , 90 , 90 ,
+        110, 110, 130, 130, 150, 150, 0  , 10 ,
+        0  , 10 , 20 , 30 , 40 , 50 , 60 , 70 ,
+        80 , 90 , 100, 110, 120, 130, 140, 150,
+    )
+    # fmt: on
+    assert_equal(result, expected_result)
+
+
+def test_shuffle_dynamic_size_64_uint8():
+    var table_lookup = SIMD[DType.uint8, 16](
+        0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150
+    )
+    # fmt: off
+    var indices = SIMD[DType.uint8, 32](
+        3 , 3 , 5 , 5 , 7 , 7 , 9 , 9 ,
+        11, 11, 13, 13, 15, 15, 0 , 1 ,
+        0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 ,
+        8 , 9 , 10, 11, 12, 13, 14, 15,
+    )
+    result = table_lookup._dynamic_shuffle(indices.join(indices))
+
+    expected_result = SIMD[DType.uint8, 32](
+        30 , 30 , 50 , 50 , 70 , 70 , 90 , 90 ,
+        110, 110, 130, 130, 150, 150, 0  , 10 ,
+        0  , 10 , 20 , 30 , 40 , 50 , 60 , 70 ,
+        80 , 90 , 100, 110, 120, 130, 140, 150,
+    )
+    # fmt: on
+    assert_equal(result, expected_result.join(expected_result))
+
+
+def test_shuffle_dynamic_size_32_float():
+    # fmt: off
+    var table_lookup = SIMD[DType.float64, 16](
+        0.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0,
+        80.0, 90.0, 100.0, 110.0, 120.0, 130.0, 140.0, 150.0,
+    )
+    var indices = SIMD[DType.uint8, 32](
+        3 , 3 , 5 , 5 , 7 , 7 , 9 , 9 ,
+        11, 11, 13, 13, 15, 15, 0 , 1 ,
+        0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 ,
+        8 , 9 , 10, 11, 12, 13, 14, 15,
+    )
+    result = table_lookup._dynamic_shuffle(indices)
+
+    expected_result = SIMD[DType.float64, 32](
+        30. , 30. , 50. , 50. , 70. , 70. , 90. , 90. ,
+        110., 110., 130., 130., 150., 150., 0.  , 10. ,
+        0.  , 10. , 20. , 30. , 40. , 50. , 60. , 70. ,
+        80. , 90. , 100., 110., 120., 130., 140., 150.,
+    )
+    # fmt: on
+    assert_equal(result, expected_result)
+
+
 def test_insert():
     assert_equal(Int32(3).insert(Int32(4)), 4)
 
@@ -1662,6 +1772,12 @@ def test_comparison():
         test_dtype[DType.bfloat16]()
 
 
+def test_float_conversion():
+    assert_almost_equal(float(Int32(45)), 45.0)
+    assert_almost_equal(float(Float32(34.32)), 34.32)
+    assert_almost_equal(float(UInt64(36)), 36.0)
+
+
 def main():
     test_abs()
     test_add()
@@ -1700,6 +1816,12 @@ def main():
     test_rsub()
     test_shift()
     test_shuffle()
+    test_shuffle_dynamic_size_4_uint8()
+    test_shuffle_dynamic_size_8_uint8()
+    test_shuffle_dynamic_size_16_uint8()
+    test_shuffle_dynamic_size_32_uint8()
+    test_shuffle_dynamic_size_64_uint8()
+    test_shuffle_dynamic_size_32_float()
     test_simd_variadic()
     test_sub()
     test_trunc()
@@ -1709,4 +1831,5 @@ def main():
     test_split()
     test_contains()
     test_comparison()
+    test_float_conversion()
     # TODO: add tests for __and__, __or__, anc comparison operators

@@ -100,7 +100,7 @@ detailed information in the following sections:
   fn invalid_access():
     var my_string = String()
 
-    # error: passing `my_string` inout is invalid since it is also passed
+    # warning: passing `my_string` inout is invalid since it is also passed
     # borrowed.
     take_two_strings(my_string, my_string)
   ```
@@ -336,6 +336,10 @@ detailed information in the following sections:
 
     If the user enters "Mojo" it returns "Hello, Mojo!"
 
+    There is a known issue when running the `input()` function with JIT
+    compilation (see issue
+    [#3479](https://github.com/modularml/mojo/issues/3479)).
+
   - [`print()`](/mojo/stdlib/builtin/io/print) now requires that its arguments
     conform to the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait.
     This enables efficient stream-based writing by default, avoiding unnecessary
@@ -471,7 +475,7 @@ detailed information in the following sections:
   - Added the
     [`unsafe_cstr_ptr()`](/mojo/stdlib/collections/string/String#unsafe_cstr_ptr)
     method to `String` and `StringLiteral`, which returns an
-    `UnsafePointer[C_char]` for convenient interoperability with C APIs.
+    `UnsafePointer[c_char]` for convenient interoperability with C APIs.
 
   - Added the `byte_length()` method to
     [`String`](/mojo/stdlib/collections/string/String#byte_length),
@@ -496,7 +500,7 @@ detailed information in the following sections:
     initializer that accepts a `StringLiteral`.
 
   - The [`StringRef`](/mojo/stdlib/utils/stringref/StringRef) constructors from
-    `DTypePointer.int8` have been changed to take a `UnsafePointer[C_char]`,
+    `DTypePointer.int8` have been changed to take a `UnsafePointer[c_char]`,
     reflecting their use for compatibility with C APIs.
 
   - Continued the transition to `UnsafePointer` and unsigned byte type for
@@ -789,7 +793,7 @@ detailed information in the following sections:
     hash. In general, hashes should be an unsigned integer, and can also lead to
     improved performance in certain cases.
 
-  - Added the [`C_char`](/mojo/stdlib/sys/ffi/#aliases) type alias in `sys.ffi`.
+  - Added the [`c_char`](/mojo/stdlib/sys/ffi/#aliases) type alias in `sys.ffi`.
 
   - [`sort()`](/mojo/stdlib/builtin/sort/sort) now supports a `stable`
     parameter. It can be called by
@@ -1055,7 +1059,7 @@ Big themes for this release:
       var first: Int
       var second: Int
 
-      fn get_first_ref(inout self) -> ref[__lifetime_of(self)] Int:
+      fn get_first_ref(inout self) -> ref [self] Int:
           return self.first
 
   fn show_mutation():

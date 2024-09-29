@@ -14,7 +14,9 @@
 
 from sys.ffi import _get_global
 
+from memory import UnsafePointer
 from testing import assert_equal, assert_false, assert_true
+from test_utils import ObservableDel
 
 from utils import Variant
 
@@ -138,17 +140,6 @@ def test_move():
     assert_equal(v2[TestCounter].moved, 2)
     # test that we didn't call the other moveinit too!
     assert_no_poison()
-
-
-@value
-struct ObservableDel(CollectionElement):
-    var target: UnsafePointer[Bool]
-
-    fn __init__(inout self, *, other: Self):
-        self = other
-
-    fn __del__(owned self):
-        self.target.init_pointee_move(True)
 
 
 def test_del():

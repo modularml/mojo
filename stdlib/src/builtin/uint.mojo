@@ -16,6 +16,8 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from sys import bitwidthof
+from utils._visualizers import lldb_formatter_wrapping_type
+from builtin.hash import _hash_simd
 
 
 @lldb_formatter_wrapping_type
@@ -128,6 +130,17 @@ struct UInt(IntLike):
             The string representation of this UInt.
         """
         return "UInt(" + str(self) + ")"
+
+    fn __hash__(self) -> UInt:
+        """Hash the UInt using builtin hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures. See the `hash`
+            builtin documentation for more details.
+        """
+        # TODO(MOCO-636): switch to DType.index
+        return _hash_simd(Scalar[DType.uint64](self))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: UInt) -> Bool:

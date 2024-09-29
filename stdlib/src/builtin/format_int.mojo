@@ -321,7 +321,7 @@ fn _try_write_int[
         # Construct a null-terminated buffer of single-byte char.
         var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
 
-        var zero = StringSlice[ImmutableStaticLifetime](
+        var zero = StringSlice[ImmutableAnyLifetime](
             # TODO(MSTDL-720):
             #   Support printing non-null-terminated strings on GPU and switch
             #   back to this code without a workaround.
@@ -330,8 +330,6 @@ fn _try_write_int[
             len=1,
         )
         fmt.write_str(zero)
-
-        _ = zero_buf
 
         return None
 
@@ -360,7 +358,7 @@ fn _try_write_int[
     var remaining_int = value
 
     @parameter
-    fn process_digits[get_digit_value: fn () capturing -> Scalar[type]]():
+    fn process_digits[get_digit_value: fn () capturing [_] -> Scalar[type]]():
         while remaining_int:
             var digit_value = get_digit_value()
 
@@ -411,6 +409,5 @@ fn _try_write_int[
     )
 
     fmt.write_str(str_slice)
-    _ = buf^
 
     return None

@@ -1,0 +1,26 @@
+repos:
+  - repo: local
+    hooks:
+      - id: mojo-format
+        name: mojo-format
+        entry: mojo format
+        language: system
+        files: '\.(mojo|🔥|py)$'
+        stages: [commit]
+      - id: check-docstrings
+        name: check-docstrings
+        entry: python3 ./stdlib/scripts/check-docstrings.py
+        language: system
+        pass_filenames: false
+        stages: [commit]
+      - id: check-license
+        name: check-license
+        entry: mojo stdlib/scripts/check-licenses.mojo
+        language: system
+        files: '\.(mojo|🔥|py)$'
+        stages: [commit]
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.40.0
+    hooks:
+    - id: markdownlint
+      args: ['--config', 'stdlib/scripts/.markdownlint.yaml', '--fix']

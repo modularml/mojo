@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Dict, List
 from sys.intrinsics import _type_is_eq
 
-from memory import Arc, memcmp, memcpy
+from memory import Arc, memcmp, memcpy, UnsafePointer
 
 from utils import StringRef, Variant
 
@@ -815,7 +815,7 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: Movable](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initializes the object from a list literal.
 
         Parameters:

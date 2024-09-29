@@ -18,10 +18,11 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import (
     bitwidthof,
     external_call,
-    os_is_windows,
     stdout,
     triple_is_nvidia_cuda,
+    _libc as libc,
 )
+from sys._libc import dup, fclose, fdopen, fflush
 
 from builtin.builtin_list import _LITRefPackHelper
 from builtin.dtype import _get_dtype_printf_format
@@ -36,14 +37,6 @@ from utils import Formattable, Formatter
 # ===----------------------------------------------------------------------=== #
 
 
-fn _dup(fd: Int32) -> Int32:
-    @parameter
-    if os_is_windows():
-        return external_call["_dup", Int32](fd)
-    else:
-        return external_call["dup", Int32](fd)
-
-
 @value
 @register_passable("trivial")
 struct _fdopen[mode: StringLiteral = "a"]:
@@ -56,15 +49,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
             stream_id: The stream id
         """
 
-        @parameter
-        if os_is_windows():
-            self.handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_cstr_ptr()
-            )
-        else:
-            self.handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_cstr_ptr()
-            )
+        self.handle = fdopen(dup(stream_id.value), mode.unsafe_cstr_ptr())
 
     fn __enter__(self) -> Self:
         """Open the file handle for use within a context manager"""
@@ -72,7 +57,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
 
     fn __exit__(self):
         """Closes the file handle."""
-        _ = external_call["fclose", Int32](self.handle)
+        _ = fclose(self.handle)
 
     fn readline(self) -> String:
         """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
@@ -129,24 +114,28 @@ struct _fdopen[mode: StringLiteral = "a"]:
         Hello
         ```
         """
-        # getdelim will resize the buffer as needed.
-        var buffer = UnsafePointer[UInt8].alloc(1)
+        # getdelim will allocate the buffer using malloc().
+        var buffer = UnsafePointer[UInt8]()
+        # ssize_t getdelim(char **restrict lineptr, size_t *restrict n,
+        #                  int delimiter, FILE *restrict stream);
         var bytes_read = external_call[
             "getdelim",
             Int,
             UnsafePointer[UnsafePointer[UInt8]],
-            UnsafePointer[UInt32],
+            UnsafePointer[UInt64],
             Int,
             UnsafePointer[NoneType],
         ](
-            UnsafePointer[UnsafePointer[UInt8]].address_of(buffer),
-            UnsafePointer[UInt32].address_of(UInt32(1)),
+            UnsafePointer.address_of(buffer),
+            UnsafePointer.address_of(UInt64(0)),
             ord(delimiter),
             self.handle,
         )
-        # Overwrite the delimiter with a null terminator.
-        buffer[bytes_read - 1] = 0
-        return String(buffer, bytes_read)
+        # Copy the buffer (excluding the delimiter itself) into a Mojo String.
+        var s = String(StringRef(buffer, bytes_read - 1))
+        # Explicitly free the buffer using free() instead of the Mojo allocator.
+        libc.free(buffer.bitcast[NoneType]())
+        return s
 
 
 # ===----------------------------------------------------------------------=== #
@@ -157,7 +146,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
 @no_inline
 fn _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
-        _ = external_call["fflush", Int32](fd.handle)
+        _ = fflush(fd.handle)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -179,7 +168,6 @@ fn _printf[
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), Reference(loaded_pack)
         )
-        _ = loaded_pack
     else:
         with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
@@ -301,7 +289,7 @@ fn _float_repr[
 
 
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableStaticLifetime](
+    var str_slice = StringSlice[ImmutableAnyLifetime](
         unsafe_from_utf8_strref=strref
     )
 
@@ -328,7 +316,6 @@ fn _put[
         _ = external_call["vprintf", Int32](
             x.unsafe_ptr(), arg_ptr.bitcast[UnsafePointer[NoneType]]()
         )
-        _ = tmp
     else:
         alias MAX_STR_LEN = 0x1000_0000
 

@@ -1,0 +1,28 @@
+name: Check PR target branch
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-pr-target:
+    name: Check PR target branch
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Fail if not targeting nightly branch
+      if: ${{ github.base_ref != 'nightly' }}
+      run: |
+        echo "PRs must be targeted to merge to the nightly branch!"
+        echo "PR is currently targeting: \"${{ github.base_ref }}\""
+        exit 1

@@ -1080,14 +1080,14 @@ fn iota[
         return offset
     elif type.is_integral():
         var step = llvm_intrinsic[
-            "llvm.experimental.stepvector",
+            "llvm.stepvector",
             SIMD[type, simd_width],
             has_side_effect=False,
         ]()
         return step + offset
     else:
         var it = llvm_intrinsic[
-            "llvm.experimental.stepvector",
+            "llvm.stepvector",
             SIMD[DType.index, simd_width],
             has_side_effect=False,
         ]()
@@ -2368,7 +2368,21 @@ fn _call_ptx_intrinsic_scalar[
         Scalar[type],
         constraints=constraints,
         has_side_effect=False,
-    ](arg).cast[type]()
+    ](arg)
+
+
+fn _call_ptx_intrinsic_scalar[
+    type: DType, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg0: Scalar[type], arg1: Scalar[type]) -> Scalar[type]:
+    return inlined_assembly[
+        instruction + " $0, $1, $2;",
+        Scalar[type],
+        constraints=constraints,
+        has_side_effect=False,
+    ](arg0, arg1)
 
 
 fn _call_ptx_intrinsic[
@@ -2419,7 +2433,40 @@ fn _call_ptx_intrinsic[
                 SIMD[type, 2],
                 constraints=vector_constraints,
                 has_side_effect=False,
-            ](arg).cast[type]()
+            ](arg.slice[2, offset=i]())
+        )
+
+    return res
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    scalar_instruction: StringLiteral,
+    vector2_instruction: StringLiteral,
+    scalar_constraints: StringLiteral,
+    vector_constraints: StringLiteral,
+](arg0: SIMD[type, simd_width], arg1: SIMD[type, simd_width]) -> SIMD[
+    type, simd_width
+]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=scalar_instruction, constraints=scalar_constraints
+        ](arg0[0], arg1[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(0, simd_width, 2):
+        res = res.insert[offset=i](
+            inlined_assembly[
+                vector2_instruction + " $0, $1; $2;",
+                SIMD[type, 2],
+                constraints=vector_constraints,
+                has_side_effect=False,
+            ](arg0.slice[2, offset=i](), arg1.slice[2, offset=i]())
         )
 
     return res

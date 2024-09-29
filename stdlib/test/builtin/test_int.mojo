@@ -227,6 +227,10 @@ def test_comparison():
     assert_false(Int(5).__ge__(Int(10)))
 
 
+def test_float_conversion():
+    assert_equal(float(Int(45)), Float64(45))
+
+
 def main():
     test_properties()
     test_add()
@@ -248,3 +252,4 @@ def main():
     test_decimal_digit_count()
     test_comparison()
     test_int_uint()
+    test_float_conversion()

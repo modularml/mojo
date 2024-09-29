@@ -1,0 +1,53 @@
+name: Check PR title
+
+on:
+  pull_request:
+    # By default, a workflow only runs when a pull_request's activity type is opened, synchronize, or reopened. We
+    # explicitly override here so that PR titles are re-linted when the PR text content is edited.
+    #
+    # Possible values: https://help.github.com/en/actions/reference/events-that-trigger-workflows#pull-request-event-pull_request
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+jobs:
+  check-pr-title:
+    name: Check PR title format
+
+    permissions:
+      pull-requests: write
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: morrisoncole/pr-lint-action@51f3cfabaf5d46f94e54524214e45685f0401b2a
+        if: github.actor != 'dependabot[bot]'
+        with:
+          title-regex: "^(Revert \")?(\\[\\S.*\\]\\s?)+\\s+[a-zA-Z`].*"
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          on-failed-regex-fail-action: true
+          on-failed-regex-create-review: true
+          on-failed-regex-request-changes: true
+          on-failed-regex-comment:
+            "The PR title does not conform to the '[\\<Project\\>] Title' format.
+            Please update the PR title.
+            \n\n
+            Typical [\\<Project\\>] values include:
+            \n\n
+            * `[stdlib]` — indicates a change to the Mojo standard library code\n
+            * `[docs]` — indicates a change to the documentation
+            \n\n
+            It's okay to include multiple labels on a PR that
+            affect multiple areas of work.
+            \n\n
+            Thank you for contributing to Mojo!🔥
+            \n\n
+            <small>
+            You can also use a tool like www.regex101.com to see why your PR
+            title fails to conform. Use
+            ```
+            %regex%
+            ```
+            as the regex to test and ```${{ github.event.pull_request.title }}```
+            as the test string.</small>"
+          on-succeeded-regex-dismiss-review-comment:
+            "All good now, thanks!🫸🫷"

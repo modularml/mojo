@@ -89,7 +89,7 @@ run all the tests automatically.
 ./stdlib/scripts/run-tests.sh
 ```
 
-Note that tests are run with `-D MOJO_ENABLE_ASSERTIONS`.
+Note that tests are run with `-D ASSERT=all`.
 
 If you wish to run the unit tests that are in a specific test file, you can do
 so with

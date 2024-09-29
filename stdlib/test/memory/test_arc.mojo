@@ -14,8 +14,9 @@
 
 from collections import List
 
-from memory import Arc
+from memory import Arc, UnsafePointer
 from testing import assert_equal, assert_false, assert_true
+from test_utils import ObservableDel
 
 
 def test_basic():
@@ -23,17 +24,6 @@ def test_basic():
     var p2 = p
     p2[] = 3
     assert_equal(3, p[])
-
-
-@value
-struct ObservableDel(CollectionElement):
-    var target: UnsafePointer[Bool]
-
-    fn __init__(inout self, *, other: Self):
-        self = other
-
-    fn __del__(owned self):
-        self.target.init_pointee_move(True)
 
 
 def test_deleter_not_called_until_no_references():
@@ -66,7 +56,19 @@ def test_deleter_not_called_until_no_references_explicit_copy():
     assert_true(deleted)
 
 
+def test_count():
+    var a = Arc(10)
+    var b = Arc(other=a)
+    var c = a
+    assert_equal(3, a.count())
+    _ = b^
+    assert_equal(2, a.count())
+    _ = c
+    assert_equal(1, a.count())
+
+
 def main():
     test_basic()
     test_deleter_not_called_until_no_references()
     test_deleter_not_called_until_no_references_explicit_copy()
+    test_count()

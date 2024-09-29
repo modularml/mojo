@@ -19,6 +19,7 @@ from collections.string import (
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+from memory import UnsafePointer
 from python import Python
 from testing import (
     assert_equal,
@@ -45,11 +46,14 @@ def test_stringable():
 
 
 def test_repr():
-    # Usual cases
+    # Standard single-byte characters
     assert_equal(String.__repr__("hello"), "'hello'")
     assert_equal(String.__repr__(str(0)), "'0'")
+    assert_equal(String.__repr__("A"), "'A'")
+    assert_equal(String.__repr__(" "), "' '")
+    assert_equal(String.__repr__("~"), "'~'")
 
-    # Escape cases
+    # Special single-byte characters
     assert_equal(String.__repr__("\0"), r"'\x00'")
     assert_equal(String.__repr__("\x06"), r"'\x06'")
     assert_equal(String.__repr__("\x09"), r"'\t'")
@@ -57,12 +61,14 @@ def test_repr():
     assert_equal(String.__repr__("\x0d"), r"'\r'")
     assert_equal(String.__repr__("\x0e"), r"'\x0e'")
     assert_equal(String.__repr__("\x1f"), r"'\x1f'")
-    assert_equal(String.__repr__(" "), "' '")
     assert_equal(String.__repr__("'"), '"\'"')
-    assert_equal(String.__repr__("A"), "'A'")
     assert_equal(String.__repr__("\\"), r"'\\'")
-    assert_equal(String.__repr__("~"), "'~'")
     assert_equal(String.__repr__("\x7f"), r"'\x7f'")
+
+    # Multi-byte characters
+    assert_equal(String.__repr__("Örnsköldsvik"), "'Örnsköldsvik'")  # 2-byte
+    assert_equal(String.__repr__("你好!"), "'你好!'")  # 3-byte
+    assert_equal(String.__repr__("hello 🔥!"), "'hello 🔥!'")  # 4-byte
 
 
 def test_constructors():
@@ -803,6 +809,24 @@ def test_split():
     assert_equal(
         String("1,2,3,3,3").split("3", 2).__str__(), "['1,2,', ',', ',3']"
     )
+
+    var in5 = String("Hello 🔥!")
+    var res5 = in5.split()
+    assert_equal(len(res5), 2)
+    assert_equal(res5[0], "Hello")
+    assert_equal(res5[1], "🔥!")
+
+    var in6 = String("Лорем ипсум долор сит амет")
+    var res6 = in6.split(" ")
+    assert_equal(len(res6), 5)
+    assert_equal(res6[0], "Лорем")
+    assert_equal(res6[1], "ипсум")
+    assert_equal(res6[2], "долор")
+    assert_equal(res6[3], "сит")
+    assert_equal(res6[4], "амет")
+
+    with assert_raises(contains="Separator cannot be empty."):
+        _ = String("1, 2, 3").split("")
 
 
 def test_splitlines():
@@ -1547,6 +1571,7 @@ def test_isdigit():
     assert_true(isdigit(ord("1")))
     assert_false(isdigit(ord("g")))
 
+    assert_false(String("").isdigit())
     assert_true(String("123").isdigit())
     assert_false(String("asdg").isdigit())
     assert_false(String("123asdg").isdigit())
@@ -1578,6 +1603,15 @@ def test_center():
     assert_equal(String("hello").center(4), "hello")
     assert_equal(String("hello").center(8), " hello  ")
     assert_equal(String("hello").center(8, "*"), "*hello**")
+
+
+def test_float_conversion():
+    # This is basically just a wrapper around atof which is
+    # more throughouly tested above
+    assert_equal(String("4.5").__float__(), 4.5)
+    assert_equal(float(String("4.5")), 4.5)
+    with assert_raises():
+        _ = float(String("not a float"))
 
 
 def main():
@@ -1633,3 +1667,4 @@ def main():
     test_rjust()
     test_ljust()
     test_center()
+    test_float_conversion()
