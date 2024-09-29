@@ -338,17 +338,14 @@ def test_is():
     assert_false(l1 is l2)
     assert_true(l1 is not l2)
 
-
 def test_large_UInt64():
-    var x: UInt64 = UInt64(0xFEDCBA0987654321)
+    var x = 0xFEDCBA0987654321
     var py_obj = PythonObject(x)
     # Test if the object is initialized correctly
     assert_true(not py_obj.py_object.is_null(), "PythonObject for large UInt64 is not initialized correctly")
     ## use the numpy to get the uint64 value representation
     var np_obj = np.uint64(x)   
     assert_equal(py_obj, np_obj, "PythonObject for large UInt64 is not initialized correctly")
-
-
 
 
 def test_nested_object():
