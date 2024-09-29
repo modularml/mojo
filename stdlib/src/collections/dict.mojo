@@ -735,7 +735,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
-    ) raises -> ref [__lifetime_of(self._entries[0].value().value)] Self.V:
+    ) raises -> ref [self._entries[0].value().value] Self.V:
         """Find a value in the dictionary by key.
 
         Args:

@@ -155,7 +155,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] element_types[idx.value]:
+    ](ref [_]self: Self) -> ref [self] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -178,7 +178,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
+    fn get[i: Int, T: CollectionElement](self) -> ref [self] T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:

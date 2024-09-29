@@ -194,9 +194,7 @@ struct Variant[*Ts: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __getitem__[
-        T: CollectionElement
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn __getitem__[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -232,7 +230,7 @@ struct Variant[*Ts: CollectionElement](
         return discr_ptr
 
     @always_inline("nodebug")
-    fn _get_discr(ref [_]self: Self) -> ref [__lifetime_of(self)] UInt8:
+    fn _get_discr(ref [_]self: Self) -> ref [self] UInt8:
         var ptr = UnsafePointer.address_of(self._impl).address
         var discr_ptr = __mlir_op.`pop.variant.discr_gep`[
             _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
