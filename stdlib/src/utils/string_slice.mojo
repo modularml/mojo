@@ -46,7 +46,7 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
         if simdwidthof[DType.uint8]() >= s:
             var rest = num_bytes - processed
             for _ in range(rest // s):
-                var vec = (ptr + processed).load[DType.uint8, width=s]()
+                var vec = (ptr + processed).load[s]()
                 var comp = (vec & 0b1100_0000) == 0b1000_0000
                 amnt += int(comp.cast[DType.uint8]().reduce_add())
                 processed += s
