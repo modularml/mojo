@@ -2084,8 +2084,12 @@ struct String(
             debug_assert(
                 pos_in_self < s_len, "pos_in_self >= self.byte_length()"
             )
-            res += String(
-                _build_slice(self.unsafe_ptr(), pos_in_self, e[].first_curly)
+            res += (
+                String(  # FIXME(#3577): remove String constructor once it lands
+                    _build_slice(
+                        self.unsafe_ptr(), pos_in_self, e[].first_curly
+                    )
+                )
             )
 
             if e[].is_escaped_brace():
@@ -2116,7 +2120,9 @@ struct String(
             pos_in_self = e[].last_curly + 1
 
         if pos_in_self < s_len:
-            res += String(_build_slice(self.unsafe_ptr(), pos_in_self, s_len))
+            res += String(
+                _build_slice(self.unsafe_ptr(), pos_in_self, s_len)
+            )  # FIXME(#3577): remove String constructor once it lands
 
         return res^
 
@@ -2587,9 +2593,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 unsafe_from_utf8_ptr=s_ptr + start, len=end - start
             )
 
-        var field = String(
-            _build_slice(format_src.unsafe_ptr(), start_value + 1, i)
-        )
+        var field = _build_slice(format_src.unsafe_ptr(), start_value + 1, i)
+        var field_b_len = i - (start_value + 1)
         # FIXME(#3526): this will break once find works with unicode codepoints
         var exclamation_index = field.find("!")
 
@@ -2602,26 +2607,23 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         # 3. adjusting the field and conversion_flag parsing accordingly
 
         if exclamation_index != -1:
-            field_b_len = i - (start_value + 1)
             var new_idx = exclamation_index + 1
             if new_idx < field_b_len:
-                var conversion_flag = field._buffer.unsafe_get(new_idx)
+                var f_ptr = field.unsafe_ptr()
+                var conversion_flag = f_ptr[new_idx]
                 if field_b_len - new_idx > 1 or (
                     conversion_flag not in supported_conversion_flags
                 ):
-                    var f = String(
-                        _build_slice(field.unsafe_ptr(), new_idx, field_b_len)
-                    )
-                    _ = field
+                    var f = String(_build_slice(f_ptr, new_idx, field_b_len))
+                    _ = field^
                     raise Error('Conversion flag "' + f + '" not recognised.')
                 self.conversion_flag = conversion_flag
             else:
                 raise "Empty conversion flag."
 
-            field._buffer.resize(new_idx)
-            field._buffer.unsafe_set(exclamation_index, 0)
+            field = _build_slice(field.unsafe_ptr(), 0, exclamation_index)
 
-        if field._buffer.unsafe_get(0) == 0:
+        if field.byte_length() == 0:
             # an empty field, so it's automatic indexing
             if automatic_indexing_count >= len_pos_args:
                 raised_automatic_index = automatic_indexing_count
@@ -2642,7 +2644,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                     "Not the expected error from atol",
                 )
                 # field is a keyword for **kwargs:
-                self.field = field
-                raised_kwarg_field = field
+                var f = str(field)
+                self.field = f
+                raised_kwarg_field = f
                 return True
         return False

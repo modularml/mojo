@@ -22,7 +22,7 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils import Span
-from collections.string import _isspace
+from collections.string import _isspace, _atol, _atof
 from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
@@ -453,6 +453,24 @@ struct StringSlice[
         return _StringSliceIter[lifetime, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
+
+    fn __int__(self) raises -> Int:
+        """Parses the given string as a base-10 integer and returns that value.
+        If the string cannot be parsed as an int, an error is raised.
+
+        Returns:
+            An integer value that represents the string, or otherwise raises.
+        """
+        return _atol(self._strref_dangerous())
+
+    fn __float__(self) raises -> Float64:
+        """Parses the string as a float point number and returns that value. If
+        the string cannot be parsed as a float, an error is raised.
+
+        Returns:
+            A float value that represents the string, or otherwise raises.
+        """
+        return _atof(self._strref_dangerous())
 
     # ===------------------------------------------------------------------===#
     # Methods
