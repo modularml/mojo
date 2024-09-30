@@ -19,6 +19,8 @@ from sys import external_call
 from sys.arg import argv
 from sys.ffi import DLHandle, c_char, c_int, OpaquePointer
 
+from python.python import _get_global_python_itf
+
 from memory import UnsafePointer
 
 from utils import StringRef
@@ -70,6 +72,44 @@ fn create_wrapper_function[
         return result
 
     return wrapper
+
+
+# Wrap a `raises` function
+fn create_wrapper_function[
+    user_func: fn (
+        PythonObject, TypedPythonObject["Tuple"]
+    ) raises -> PythonObject
+]() -> PyCFunction:
+    fn wrapper(
+        py_self: PythonObject, args: TypedPythonObject["Tuple"]
+    ) -> PythonObject:
+        var cpython = _get_global_python_itf().cpython()
+
+        var state = cpython.PyGILState_Ensure()
+
+        try:
+            var result = user_func(py_self, args)
+            return result
+        except e:
+            # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
+            var error_type = cpython.get_error_global("PyExc_Exception")
+
+            cpython.PyErr_SetString(
+                error_type,
+                e.unsafe_cstr_ptr(),
+            )
+
+            # Return a NULL `PyObject*`.
+            return PythonObject(PyObjectPtr())
+        finally:
+            cpython.PyGILState_Release(state)
+
+    # TODO:
+    #   Does this lead to multiple levels of indirect function calls for
+    #   `raises` functions? Could we fix that by marking `wrapper` here as
+    #   `@always_inline`?
+    # Call the non-`raises` overload of `create_wrapper_function`.
+    return create_wrapper_function[wrapper]()
 
 
 # ===-----------------------------------------------------------------------===#
@@ -1343,6 +1383,55 @@ struct CPython:
         _ = value
         _ = traceback
         return r
+
+    fn PyErr_SetNone(
+        inout self,
+        type: PyObjectPtr,
+    ):
+        var func = self.lib.get_function[fn (PyObjectPtr) -> None](
+            "PyErr_SetNone"
+        )
+
+        return func(type)
+
+    fn PyErr_SetString(
+        inout self,
+        type: PyObjectPtr,
+        message: UnsafePointer[c_char],
+    ):
+        self.lib.get_function[fn (PyObjectPtr, UnsafePointer[c_char]) -> None](
+            "PyErr_SetString"
+        )(type, message)
+
+    # ===-------------------------------------------------------------------===#
+    # Python Error types
+    # ===-------------------------------------------------------------------===#
+
+    fn get_error_global(
+        inout self,
+        global_name: StringLiteral,
+    ) -> PyObjectPtr:
+        """Get a Python borrowed reference to the specified global exception object.
+        """
+
+        # Get pointer to the immortal `global_name` PyObject struct
+        # instance.
+        var ptr: UnsafePointer[PyObjectPtr] = self.lib.get_symbol[PyObjectPtr](
+            global_name
+        )
+
+        if not ptr:
+            abort(
+                "error: unable to get pointer to CPython `"
+                + global_name
+                + "` global"
+            )
+
+        return ptr[]
+
+    # ===-------------------------------------------------------------------===#
+    # Python Iterator operations
+    # ===-------------------------------------------------------------------===#
 
     fn PyIter_Next(inout self, iterator: PyObjectPtr) -> PyObjectPtr:
         var next_obj = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
