@@ -20,6 +20,7 @@ from memory import (
     memcpy,
     memset,
     memset_zero,
+    stack_allocation,
 )
 from testing import (
     assert_almost_equal,
@@ -274,40 +275,39 @@ def test_memcmp_extensive():
 
 def test_memset():
     var pair = Pair(1, 2)
-
     var ptr = UnsafePointer.address_of(pair)
-    memset_zero(ptr, 1)
-
+    memset(ptr.bitcast[Int](), 0, 1)
     assert_equal(pair.lo, 0)
-    assert_equal(pair.hi, 0)
+    assert_equal(pair.hi, 2)
 
     pair.lo = 1
-    pair.hi = 2
     memset_zero(ptr, 1)
-
     assert_equal(pair.lo, 0)
     assert_equal(pair.hi, 0)
-
-    var buf0 = UnsafePointer[Int32].alloc(2)
-    memset(buf0, 1, 2)
-    assert_equal(buf0.load(0), 16843009)
-    memset(buf0, -1, 2)
-    assert_equal(buf0.load(0), -1)
-    buf0.free()
-
-    var buf1 = UnsafePointer[Int8].alloc(2)
-    memset(buf1, 5, 2)
-    assert_equal(buf1.load(0), 5)
-    buf1.free()
-
-    var buf3 = UnsafePointer[Int32].alloc(2)
-    memset(buf3, 1, 2)
-    memset_zero[count=2](buf3)
-    assert_equal(buf3.load(0), 0)
-    assert_equal(buf3.load(1), 0)
-    buf3.free()
-
     _ = pair
+
+    fn test_type[D: DType]() raises:
+        var buf1 = stack_allocation[2, Scalar[D]]()
+        memset(buf1, 5, 2)
+        assert_equal(buf1.load(0), 5)
+        assert_equal(buf1.load(1), 5)
+        var buf2 = UnsafePointer[Scalar[D]].alloc(2)
+        memset(buf2, 5, 2)
+        assert_equal(buf2.load(0), 5)
+        assert_equal(buf2.load(1), 5)
+        buf2.free()
+
+    test_type[DType.uint8]()
+    test_type[DType.uint16]()
+    test_type[DType.uint32]()
+    test_type[DType.uint64]()
+    test_type[DType.int8]()
+    test_type[DType.int16]()
+    test_type[DType.int32]()
+    test_type[DType.int64]()
+    test_type[DType.float16]()
+    test_type[DType.float32]()
+    test_type[DType.float64]()
 
 
 def test_pointer_string():

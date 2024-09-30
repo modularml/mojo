@@ -295,7 +295,7 @@ fn memset_zero[
         ptr: UnsafePointer to the beginning of the memory block to fill.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_impl(ptr.bitcast[DType.uint8](), UInt8(0), count)
+    _memset_impl(ptr.bitcast[DType.uint8](), UInt8(0), count * sizeof[type]())
 
 
 @always_inline
