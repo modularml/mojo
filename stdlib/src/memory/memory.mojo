@@ -270,7 +270,7 @@ fn memset[type: Copyable](ptr: UnsafePointer[type], value: type, count: Int):
     if dt is not DType.invalid:
         var p = ptr.bitcast[Scalar[dt]]()
         _memset_impl[dt](p, rebind[Scalar[dt]](value), count)
-    # FIXME: `elif _is_trivial_reg_type(type): ...` bitcast to uint8 and do op
+    # FIXME: `elif _is_trivial_reg_type(type): ...` bitcast to a DType of bitwidth[type]() and do op
     else:
         for i in range(count):
             (ptr + i).init_pointee_copy(value)
