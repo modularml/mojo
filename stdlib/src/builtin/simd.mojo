@@ -2759,7 +2759,7 @@ struct SIMD[type: DType, size: Int](
             var idx = 0
 
             @parameter
-            for i in range(size - 1, -1, -1):
+            for i in reversed(range(size)):
                 values[idx] = i
                 idx += 1
             return values
