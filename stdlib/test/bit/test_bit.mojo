@@ -447,10 +447,14 @@ def test_rotate_bits_int():
     assert_equal(rotate_bits_left[0](104), 104)
     assert_equal(rotate_bits_left[2](104), 416)
     assert_equal(rotate_bits_left[-2](104), 26)
+    assert_equal(rotate_bits_left[8](104), 26624)
+    assert_equal(rotate_bits_left[-8](104), 7493989779944505344)
 
     assert_equal(rotate_bits_right[0](104), 104)
     assert_equal(rotate_bits_right[2](104), 26)
     assert_equal(rotate_bits_right[-2](104), 416)
+    assert_equal(rotate_bits_right[8](104), 7493989779944505344)
+    assert_equal(rotate_bits_right[-8](104), 26624)
 
 
 def test_rotate_bits_simd():
