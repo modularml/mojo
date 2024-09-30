@@ -437,7 +437,7 @@ fn test_getitem_raises() raises:
     assert_equal("Key: 0", str(with_get[0]))
 
     var without_get = Python.evaluate(
-        "type('WithOutGetItem', (), {'__str__': \"SomeString\"})()"
+        "type('WithOutGetItem', (), {'__str__': lambda self: \"SomeString\"})()"
     )
     with assert_raises(
         contains="'WithOutGetItem' object has no attribute '__getitem__'"
