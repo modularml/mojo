@@ -409,6 +409,50 @@ fn test_none() raises:
     assert_true(n is None)
 
 
+fn test_getitem_raises() raises:
+    var a = PythonObject(2)
+    with assert_raises(contains="'int' object has no attribute '__getitem__'"):
+        _ = a[0]
+
+    var b = PythonObject(2.2)
+    with assert_raises(
+        contains="'float' object has no attribute '__getitem__'"
+    ):
+        _ = b[0]
+
+    var c = PythonObject(True)
+    with assert_raises(contains="'bool' object has no attribute '__getitem__'"):
+        _ = c[0]
+
+    var d = PythonObject(None)
+    with assert_raises(
+        contains="'NoneType' object has no attribute '__getitem__'"
+    ):
+        _ = d[0]
+
+    var with_get = Python.evaluate(
+        "type('WithGetItem', (), {'__getitem__': lambda self, key: f\"Key:"
+        ' {key}"})()'
+    )
+    assert_equal("Key: 0", str(with_get[0]))
+
+    var without_get = Python.evaluate(
+        "type('WithOutGetItem', (), {'__str__': \"SomeString\"})()"
+    )
+    with assert_raises(
+        contains="'WithOutGetItem' object has no attribute '__getitem__'"
+    ):
+        _ = without_get[0]
+
+    var with_get_exception = Python.evaluate(
+        "type('WithGetItemException', (), {'__getitem__': lambda self, key: (_"
+        ' for _ in ()).throw(ValueError("Custom error")),})()'
+    )
+
+    with assert_raises(contains="Custom error"):
+        _ = with_get_exception[1]
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -423,3 +467,4 @@ def main():
     test_dict()
     test_none()
     test_nested_object()
+    test_getitem_raises()
