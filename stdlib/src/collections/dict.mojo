@@ -339,7 +339,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     The value type must implement the `CollectionElement` trait.
 
-    Usage:
+    Examples:
 
     ```mojo
     from collections import Dict
@@ -557,8 +557,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    # TODO(MSTDL-452): rename to __getitem__ returning a reference
-    fn __getitem__(self, key: K) raises -> V:
+    fn __getitem__(
+        self, key: K
+    ) raises -> ref [self._entries[0].value().value] Self.V:
         """Retrieve a value out of the dictionary.
 
         Args:
@@ -735,7 +736,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
-    ) raises -> ref [__lifetime_of(self._entries[0].value().value)] Self.V:
+    ) raises -> ref [self._entries[0].value().value] Self.V:
         """Find a value in the dictionary by key.
 
         Args:

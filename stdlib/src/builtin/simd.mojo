@@ -122,8 +122,8 @@ fn _simd_construction_checks[type: DType, size: Int]():
         "bf16 is not supported for ARM architectures",
     ]()
     constrained[
-        not (type.is_float8() and _has_native_f8_support()),
-        "f8 is not supported on non sm_90 architectures",
+        not (type.is_float8() and not _has_native_f8_support()),
+        "f8 is not supported on non sm_89 and sm_90 architectures",
     ]()
 
 
@@ -151,7 +151,7 @@ fn _has_native_bf16_support() -> Bool:
 
 @always_inline("nodebug")
 fn _has_native_f8_support() -> Bool:
-    return _is_sm_9x()
+    return _is_sm_9x() or triple_is_nvidia_cuda["sm_89"]()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -570,7 +570,7 @@ struct SIMD[type: DType, size: Int](
                 vector_constraints="=r,r,r",
             ](self, rhs)
         elif _is_sm_8x() and type.is_half_float():
-            return self.fma(-1, rhs)
+            return rhs.fma(-1, self)
 
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
@@ -869,7 +869,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.and`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __xor__(self, rhs: Self) -> Self:
@@ -888,7 +888,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.xor`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.xor`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __or__(self, rhs: Self) -> Self:
@@ -907,7 +907,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.or`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.or`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __lshift__(self, rhs: Self) -> Self:
@@ -1863,13 +1863,13 @@ struct SIMD[type: DType, size: Int](
 
             return array
 
-        alias length = variadic_len[mask]()
+        alias length = variadic_len[*mask]()
         constrained[
             output_size == length,
             "size of the mask must match the output SIMD size",
         ]()
         return __mlir_op.`pop.simd.shuffle`[
-            mask = _convert_variadic_to_pop_array[mask](),
+            mask = _convert_variadic_to_pop_array[*mask](),
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1922,7 +1922,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[mask](self)
+        return self._shuffle_list[*mask](self)
 
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -1940,7 +1940,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[mask](other)
+        return self._shuffle_list[*mask](other)
 
     @always_inline("nodebug")
     fn shuffle[mask: StaticIntTuple[size]](self) -> Self:

@@ -103,6 +103,10 @@ what we publish.
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- The `Dict.__getitem__` method now returns a reference instead of a copy of
+  the value (or raises).  This improves the performance of common code that
+  uses `Dict` by allowing borrows from the `Dict` elements.
+
 - Autoparameterization of parameters is now supported. Specifying a parameter
   type with unbound parameters causes them to be implicitly added to the
   function signature as inferred parameters.
@@ -150,6 +154,24 @@ what we publish.
   determining a default SDK to use. The user can select the default SDK to use
   with the `Mojo: Select the default MAX SDK` command.
 
+- Added a new [`Box`](/mojo/stdlib/memory/box/Box) type as a safe, single-owner,
+  non-nullable smart pointer with similar semantics to Rust's
+  [`Box<>`](https://doc.rust-lang.org/std/boxed/struct.Box.html) and C++'s
+  [`std::unique_ptr`](https://en.cppreference.com/w/cpp/memory/unique_ptr).
+
+  ([PR #3524](https://github.com/modularml/mojo/pull/3524) by [@szbergeron](https://github.com/szbergeron))
+
+- `ref` argument and result specifiers now allow providing a memory value
+  directly in the lifetime specifier, rather than requiring the use of
+  `__lifetime_of`.  It is still fine to use `__lifetime_of` explicitly though,
+  and this is required when specifying lifetimes for parameters (e.g. to the
+  `Reference` type). For example, this is now valid without `__lifetime_of`:
+
+  ```mojo
+  fn return_ref(a: String) -> ref [a] String:
+      return a
+  ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -185,5 +207,11 @@ what we publish.
 
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
+
+- [Issue #3544](https://github.com/modularml/mojo/issues/3544) - Known
+  mutable `ref` argument are not optimized as `noalias` by LLVM.
+
+- [Issue #3559](https://github.com/modularml/mojo/issues/3559) - VariadicPack
+  doesn't extend the lifetimes of the values it references.
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.

@@ -129,7 +129,15 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(ref [_, address_space._value.value]arg: type) -> Self:
+    fn address_of(
+        ref [_, address_space._value.value]arg: type
+    ) -> UnsafePointer[
+        type,
+        address_space,
+        False,
+        1,
+        # TODO: Propagate lifetime of the argument.
+    ] as result:
         """Gets the address of the argument.
 
         Args:
@@ -138,7 +146,9 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
+        return __type_of(result)(
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg))
+        )
 
     @staticmethod
     @always_inline
@@ -171,13 +181,13 @@ struct UnsafePointer[
             A reference to the value.
         """
 
-        # We're unsafe, so we can have unsafe things. References we make have
-        # an 'any' mutable lifetime, since UnsafePointer is allowed to alias
-        # anything.
+        # We're unsafe, so we can have unsafe things.
         alias _ref_type = Reference[type, lifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[type, address_space, False](self).address
+                UnsafePointer[type, address_space, False, alignment, lifetime](
+                    self
+                ).address
             )
         )
 
@@ -410,7 +420,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn as_noalias_ptr(
         self,
-    ) -> UnsafePointer[type, address_space, True, alignment]:
+    ) -> UnsafePointer[type, address_space, True, alignment, lifetime]:
         """Cast the pointer to a new pointer that is known not to locally alias
         any other pointer. In other words, the pointer transitively does not
         alias any other memory value declared in the local function context.
@@ -783,12 +793,16 @@ struct UnsafePointer[
         T: AnyType = Self.type,
         /,
         address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[T, address_space, alignment=alignment]:
+        lifetime: Lifetime[True].type = Self.lifetime,
+    ](self) -> UnsafePointer[
+        T, address_space, Self.exclusive, alignment, lifetime
+    ]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             T: The target type.
             address_space: The address space of the result.
+            lifetime: Lifetime of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
@@ -805,12 +819,16 @@ struct UnsafePointer[
         T: DType,
         /,
         address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[Scalar[T], address_space, alignment=alignment]:
+        lifetime: Lifetime[True].type = Self.lifetime,
+    ](self) -> UnsafePointer[
+        Scalar[T], address_space, Self.exclusive, alignment, lifetime
+    ]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             T: The target type.
             address_space: The address space of the result.
+            lifetime: Lifetime of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
@@ -819,7 +837,7 @@ struct UnsafePointer[
         return self.bitcast[Scalar[T], address_space]()
 
     @always_inline
-    fn destroy_pointee(self: UnsafePointer[type, alignment=alignment]):
+    fn destroy_pointee(self: UnsafePointer[type, AddressSpace.GENERIC, *_]):
         """Destroy the pointed-to value.
 
         The pointer must not be null, and the pointer memory location is assumed
@@ -833,7 +851,7 @@ struct UnsafePointer[
     @always_inline
     fn take_pointee[
         T: Movable, //,
-    ](self: UnsafePointer[T]) -> T:
+    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_]) -> T:
         """Move the value at the pointer out, leaving it uninitialized.
 
         The pointer must not be null, and the pointer memory location is assumed
@@ -856,7 +874,7 @@ struct UnsafePointer[
     @always_inline
     fn init_pointee_move[
         T: Movable, //,
-    ](self: UnsafePointer[T], owned value: T):
+    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_], owned value: T):
         """Emplace a new value into the pointer location, moving from `value`.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -878,7 +896,7 @@ struct UnsafePointer[
     @always_inline
     fn init_pointee_copy[
         T: Copyable, //,
-    ](self: UnsafePointer[T], value: T):
+    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_], value: T):
         """Emplace a copy of `value` into the pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -900,7 +918,7 @@ struct UnsafePointer[
     @always_inline
     fn init_pointee_explicit_copy[
         T: ExplicitlyCopyable, //
-    ](self: UnsafePointer[T], value: T):
+    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_], value: T):
         """Emplace a copy of `value` into this pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -923,7 +941,10 @@ struct UnsafePointer[
     @always_inline
     fn move_pointee_into[
         T: Movable, //,
-    ](self: UnsafePointer[T], dst: UnsafePointer[T]):
+    ](
+        self: UnsafePointer[T, AddressSpace.GENERIC, *_],
+        dst: UnsafePointer[T, AddressSpace.GENERIC, *_],
+    ):
         """Moves the value `self` points to into the memory location pointed to by
         `dst`.
 

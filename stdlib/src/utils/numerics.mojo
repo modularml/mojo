@@ -64,7 +64,11 @@ struct FPUtils[
         """
 
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            return 3
+        elif type is DType.float8e5m2:
+            return 2
+        elif type is DType.float16:
             return 10
         elif type is DType.bfloat16:
             return 7
@@ -84,7 +88,11 @@ struct FPUtils[
         """
 
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            return 8
+        elif type is DType.float8e5m2:
+            return 16
+        elif type is DType.float16:
             return 16
         elif type is DType.float32 or type is DType.bfloat16:
             return 128
@@ -102,7 +110,11 @@ struct FPUtils[
         """
 
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            return 4
+        elif type is DType.float8e5m2:
+            return 5
+        elif type is DType.float16:
             return 5
         elif type is DType.float32 or type is DType.bfloat16:
             return 8
@@ -531,15 +543,23 @@ fn isnan[
         True if val is NaN and False otherwise.
     """
 
-    constrained[not type.is_float8(), "fp8 type is not currently supported"]()
-
     @parameter
     if not type.is_floating_point():
         return False
 
+    alias int_dtype = _integral_type_of[type]()
+
     @parameter
-    if type is DType.bfloat16:
-        alias int_dtype = _integral_type_of[type]()
+    if type is DType.float8e4m3:
+        return (bitcast[int_dtype, simd_width](val) & 0x7F) == 0x7F
+    elif type is DType.float8e5m2:
+        # For the float8e5m2 type NaN is limited to 0x7F and 0xFF values.
+        # 7D, 7E, 7F are positive NaNs; FD, FE, FF are negative NaNs.
+        return (bitcast[int_dtype, simd_width](val) & 0x7F) > 0x7C
+    elif type is DType.float16:
+        var ival = bitcast[int_dtype, simd_width](val)
+        return (ival & 0x7C00) == 0x7C00 and (ival & 0x03FF) != 0
+    elif type is DType.bfloat16:
         alias x7FFF = SIMD[int_dtype, simd_width](0x7FFF)
         alias x7F80 = SIMD[int_dtype, simd_width](0x7F80)
         return bitcast[int_dtype, simd_width](val) & x7FFF > x7F80
@@ -854,6 +874,11 @@ fn isinf[
     @parameter
     if not type.is_floating_point():
         return False
+
+    elif type is DType.float8e5m2:
+        # For the float8e5m2 both 7C and FC are infinity.
+        alias int_dtype = _integral_type_of[type]()
+        return (bitcast[int_dtype, simd_width](val) & 0x7F) == 0x7C
 
     alias negative_infinity_test: UInt32 = 0x0004
     alias positive_infinity_test: UInt32 = 0x0200
