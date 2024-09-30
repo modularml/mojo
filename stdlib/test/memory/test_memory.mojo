@@ -36,11 +36,48 @@ alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`
 
 
+trait _Pair:
+    fn __init__(inout self, lo: Int, hi: Int):
+        ...
+
+    fn low(self) -> Int:
+        ...
+
+    fn high(self) -> Int:
+        ...
+
+
 @value
 @register_passable("trivial")
 struct Pair:
     var lo: Int
     var hi: Int
+
+    fn __init__(inout self, lo: Int, hi: Int):
+        self.lo = lo
+        self.hi = hi
+
+    fn low(self) -> Int:
+        return self.lo
+
+    fn high(self) -> Int:
+        return self.hi
+
+
+@value
+struct PairNonTrivial:
+    var lo: Int
+    var hi: Int
+
+    fn __init__(inout self, lo: Int, hi: Int):
+        self.lo = lo
+        self.hi = hi
+
+    fn low(self) -> Int:
+        return self.lo
+
+    fn high(self) -> Int:
+        return self.hi
 
 
 def test_memcpy():
@@ -274,19 +311,23 @@ def test_memcmp_extensive():
 
 
 def test_memset():
-    var pair = Pair(1, 2)
-    var ptr = UnsafePointer.address_of(pair)
-    memset(ptr.bitcast[Int](), 0, 1)
-    assert_equal(pair.lo, 0)
-    assert_equal(pair.hi, 2)
+    fn test_pair[T: _Pair]() raises:
+        var pair = T(1, 2)
+        var ptr = UnsafePointer.address_of(pair)
+        memset(ptr.bitcast[Int](), 0, 1)
+        assert_equal(pair.low(), 0)
+        assert_equal(pair.high(), 2)
 
-    pair.lo = 1
-    memset_zero(ptr, 1)
-    assert_equal(pair.lo, 0)
-    assert_equal(pair.hi, 0)
-    _ = pair
+        pair = T(1, 2)
+        memset_zero(ptr, 1)
+        assert_equal(pair.low(), 0)
+        assert_equal(pair.high(), 0)
+        _ = pair^
 
-    fn test_type[D: DType]() raises:
+    test_pair[Pair]()
+    test_pair[PairNonTrivial]()
+
+    fn test_dtype[D: DType]() raises:
         var buf1 = stack_allocation[2, Scalar[D]]()
         memset(buf1, 5, 2)
         assert_equal(buf1.load(0), 5)
@@ -297,17 +338,17 @@ def test_memset():
         assert_equal(buf2.load(1), 5)
         buf2.free()
 
-    test_type[DType.uint8]()
-    test_type[DType.uint16]()
-    test_type[DType.uint32]()
-    test_type[DType.uint64]()
-    test_type[DType.int8]()
-    test_type[DType.int16]()
-    test_type[DType.int32]()
-    test_type[DType.int64]()
-    test_type[DType.float16]()
-    test_type[DType.float32]()
-    test_type[DType.float64]()
+    test_dtype[DType.uint8]()
+    test_dtype[DType.uint16]()
+    test_dtype[DType.uint32]()
+    test_dtype[DType.uint64]()
+    test_dtype[DType.int8]()
+    test_dtype[DType.int16]()
+    test_dtype[DType.int32]()
+    test_dtype[DType.int64]()
+    test_dtype[DType.float16]()
+    test_dtype[DType.float32]()
+    test_dtype[DType.float64]()
 
 
 def test_pointer_string():
