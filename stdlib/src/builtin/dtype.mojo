@@ -603,34 +603,7 @@ struct DType(
     # ===----------------------------------------------------------------------===#
 
     @staticmethod
-    fn is_scalar[T: AnyType]() -> Bool:
-        """Whether the given Type is a Scalar of a DType.
-
-        Returns:
-            The result.
-        """
-        return (
-            _type_is_eq[T, Scalar[DType.bool]]()
-            or _type_is_eq[T, Scalar[DType.int8]]()
-            or _type_is_eq[T, Scalar[DType.uint8]]()
-            or _type_is_eq[T, Scalar[DType.int16]]()
-            or _type_is_eq[T, Scalar[DType.uint16]]()
-            or _type_is_eq[T, Scalar[DType.int32]]()
-            or _type_is_eq[T, Scalar[DType.uint32]]()
-            or _type_is_eq[T, Scalar[DType.int64]]()
-            or _type_is_eq[T, Scalar[DType.uint64]]()
-            or _type_is_eq[T, Scalar[DType.index]]()
-            or _type_is_eq[T, Scalar[DType.float8e5m2]]()
-            or _type_is_eq[T, Scalar[DType.float8e4m3]]()
-            or _type_is_eq[T, Scalar[DType.bfloat16]]()
-            or _type_is_eq[T, Scalar[DType.float16]]()
-            or _type_is_eq[T, Scalar[DType.float32]]()
-            or _type_is_eq[T, Scalar[DType.tensor_float32]]()
-            or _type_is_eq[T, Scalar[DType.float64]]()
-        )
-
-    @staticmethod
-    fn get_dtype[T: AnyType, size: Int = 1]() -> Optional[DType]:
+    fn get_dtype[T: AnyType, size: Int = 1]() -> DType:
         """Get the `DType` if the given Type is a `SIMD[_, size]` of a `DType`.
 
         Parameters:
@@ -638,7 +611,7 @@ struct DType(
             size: The SIMD size to compare against.
 
         Returns:
-            The result.
+            The `DType` if matched, otherwise `DType.invalid`.
         """
 
         if _type_is_eq[T, SIMD[DType.bool, size]]():
@@ -676,7 +649,19 @@ struct DType(
         elif _type_is_eq[T, SIMD[DType.float64, size]]():
             return DType.float64
         else:
-            return None
+            return DType.invalid
+
+    @staticmethod
+    fn is_scalar[T: AnyType]() -> Bool:
+        """Whether the given Type is a Scalar of a DType.
+
+        Parameters:
+            T: AnyType.
+
+        Returns:
+            The result.
+        """
+        return Self.get_dtype[T]() is not DType.invalid
 
 
 # ===-------------------------------------------------------------------===#

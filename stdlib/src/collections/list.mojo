@@ -640,16 +640,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.resize(new_size)
         else:
             self.reserve(new_size)
-            alias dt = DType.get_dtype[T]()
-            var s_ptr = self.unsafe_ptr()
-
-            @parameter
-            if dt:
-                alias s = Scalar[dt.value()]
-                memset(s_ptr, rebind[s](value), new_size - self.size)
-            else:
-                for i in range(self.size, new_size):
-                    (s_ptr + i).init_pointee_copy(value)
+            memset(self.data + self.size, value, new_size - self.size)
             self.size = new_size
 
     fn resize(inout self, new_size: Int):

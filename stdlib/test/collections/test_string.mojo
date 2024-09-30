@@ -199,7 +199,7 @@ def test_add_string_slice():
     assert_equal("123abc", s1 + s2)
     assert_equal("abc123", s2 + s1)
     s1 += s2
-    assert_equal("123abc", s1 + s2)
+    assert_equal("123abcabc", s1 + s2)
 
 
 def test_string_join():

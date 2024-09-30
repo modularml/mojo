@@ -236,43 +236,44 @@ fn memcpy[
 
 @always_inline("nodebug")
 fn _memset_impl[
-    address_space: AddressSpace, value_type: DType = DType.uint8
+    type: DType, address_space: AddressSpace
 ](
-    ptr: UnsafePointer[Scalar[value_type], address_space],
-    value: Scalar[value_type],
+    ptr: UnsafePointer[Scalar[type], address_space],
+    value: Scalar[type],
     count: Int,
 ):
-    alias simd_width = simdwidthof[Scalar[value_type]]()
+    alias simd_width = simdwidthof[Scalar[type]]()
     var vector_end = _align_down(count, simd_width)
 
     for i in range(0, vector_end, simd_width):
-        ptr.store[](i, SIMD[value_type, simd_width](value))
+        ptr.store(i, SIMD[type, simd_width](value))
 
     for i in range(vector_end, count):
         ptr.store(i, value)
 
 
 @always_inline
-fn memset[
-    type: AnyType, address_space: AddressSpace, value_type: DType = DType.uint8
-](
-    ptr: UnsafePointer[type, address_space],
-    value: Scalar[value_type],
-    count: Int,
-):
+fn memset[type: Copyable](ptr: UnsafePointer[type], value: type, count: Int):
     """Fills memory with the given value.
 
     Parameters:
         type: The element dtype.
-        address_space: The address space of the pointer.
-        value_type: The DType of the Scalar value.
 
     Args:
         ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_impl(ptr.bitcast[value_type](), value, count * sizeof[type]())
+    alias dt = DType.get_dtype[type]()
+
+    @parameter
+    if dt is not DType.invalid:
+        _memset_impl[dt](
+            ptr.bitcast[Scalar[dt]](), rebind[Scalar[dt]](value), count
+        )
+    else:
+        for i in range(count):
+            (ptr + i).init_pointee_copy(value)
 
 
 # ===----------------------------------------------------------------------===#
@@ -294,7 +295,7 @@ fn memset_zero[
         ptr: UnsafePointer to the beginning of the memory block to fill.
         count: Number of elements to fill (in elements, not bytes).
     """
-    memset(ptr, 0, count)
+    _memset_impl(ptr.bitcast[DType.uint8](), UInt8(0), count)
 
 
 @always_inline
