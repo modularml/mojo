@@ -2084,12 +2084,9 @@ struct String(
             debug_assert(
                 pos_in_self < s_len, "pos_in_self >= self.byte_length()"
             )
-            res += (
-                String(  # FIXME(#3577): remove String constructor once it lands
-                    _build_slice(
-                        self.unsafe_ptr(), pos_in_self, e[].first_curly
-                    )
-                )
+            # FIXME(#3577): remove String constructor once it lands
+            res += String(
+                _build_slice(self.unsafe_ptr(), pos_in_self, e[].first_curly)
             )
 
             if e[].is_escaped_brace():
@@ -2120,9 +2117,8 @@ struct String(
             pos_in_self = e[].last_curly + 1
 
         if pos_in_self < s_len:
-            res += String(
-                _build_slice(self.unsafe_ptr(), pos_in_self, s_len)
-            )  # FIXME(#3577): remove String constructor once it lands
+            # FIXME(#3577): remove String constructor once it lands
+            res += String(_build_slice(self.unsafe_ptr(), pos_in_self, s_len))
 
         return res^
 
