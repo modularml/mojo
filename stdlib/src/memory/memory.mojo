@@ -236,13 +236,17 @@ fn memcpy[
 
 @always_inline("nodebug")
 fn _memset_impl[
-    address_space: AddressSpace
-](ptr: UnsafePointer[UInt8, address_space], value: UInt8, count: Int):
-    alias simd_width = simdwidthof[UInt8]()
+    address_space: AddressSpace, value_type: DType = DType.uint8
+](
+    ptr: UnsafePointer[Scalar[value_type], address_space],
+    value: Scalar[value_type],
+    count: Int,
+):
+    alias simd_width = simdwidthof[Scalar[value_type]]()
     var vector_end = _align_down(count, simd_width)
 
     for i in range(0, vector_end, simd_width):
-        ptr.store(i, SIMD[DType.uint8, simd_width](value))
+        ptr.store[](i, SIMD[value_type, simd_width](value))
 
     for i in range(vector_end, count):
         ptr.store(i, value)
@@ -250,20 +254,25 @@ fn _memset_impl[
 
 @always_inline
 fn memset[
-    type: AnyType, address_space: AddressSpace
-](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
+    type: AnyType, address_space: AddressSpace, value_type: DType = DType.uint8
+](
+    ptr: UnsafePointer[type, address_space],
+    value: Scalar[value_type],
+    count: Int,
+):
     """Fills memory with the given value.
 
     Parameters:
         type: The element dtype.
         address_space: The address space of the pointer.
+        value_type: The DType of the Scalar value.
 
     Args:
         ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_impl(ptr.bitcast[UInt8](), value, count * sizeof[type]())
+    _memset_impl(ptr.bitcast[value_type](), value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#

@@ -23,7 +23,7 @@ from collections import List
 from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
-from memory import Reference, UnsafePointer, memcpy
+from memory import Reference, UnsafePointer, memcpy, memset
 from utils import Span
 
 from .optional import Optional
@@ -640,8 +640,16 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.resize(new_size)
         else:
             self.reserve(new_size)
-            for i in range(self.size, new_size):
-                (self.data + i).init_pointee_copy(value)
+            alias dt = DType.get_dtype[T]()
+            var s_ptr = self.unsafe_ptr()
+
+            @parameter
+            if dt:
+                alias s = Scalar[dt.value()]
+                memset(s_ptr, rebind[s](value), new_size - self.size)
+            else:
+                for i in range(self.size, new_size):
+                    (s_ptr + i).init_pointee_copy(value)
             self.size = new_size
 
     fn resize(inout self, new_size: Int):
