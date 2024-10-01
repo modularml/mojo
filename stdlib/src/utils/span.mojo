@@ -55,10 +55,10 @@ struct _SpanIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[self.index - 1]
+            return Reference.address_of(self.src[self.index - 1])
         else:
             self.index -= 1
-            return self.src[self.index]
+            return Reference.address_of(self.src[self.index])
 
     @always_inline
     fn __len__(self) -> Int:
@@ -230,7 +230,7 @@ struct Span[
             A Reference pointing at the first element of this slice.
         """
 
-        return self._data[0]
+        return Reference[T, lifetime].address_of(self._data[0])
 
     @always_inline
     fn copy_from[

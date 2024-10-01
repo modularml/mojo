@@ -292,7 +292,7 @@ struct Reference[
         `>`,
     ]
 
-    var value: Self._mlir_type
+    var _value: Self._mlir_type
     """The underlying MLIR reference."""
 
     # ===------------------------------------------------------------------===#
@@ -300,15 +300,28 @@ struct Reference[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(
-        inout self, ref [lifetime, address_space._value.value]value: type
-    ):
+    fn __init__(inout self, *, _mlir_value: Self._mlir_type):
+        """Constructs a Reference from its MLIR prepresentation.
+
+        Args:
+             _mlir_value: The MLIR representation reference.
+        """
+        self._value = _mlir_value
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn address_of(
+        ref [lifetime, address_space._value.value]value: type
+    ) -> Self:
         """Constructs a Reference from a value reference.
 
         Args:
             value: The value reference.
+
+        Returns:
+            The result Reference.
         """
-        self.value = __get_mvalue_as_litref(value)
+        return Reference(_mlir_value=__get_mvalue_as_litref(value))
 
     fn __init__(inout self, *, other: Self):
         """Constructs a copy from another Reference.
@@ -318,7 +331,7 @@ struct Reference[
         Args:
             other: The `Reference` to copy.
         """
-        self.value = other.value
+        self._value = other._value
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
@@ -331,7 +344,7 @@ struct Reference[
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return __get_litref_as_mvalue(self.value)
+        return __get_litref_as_mvalue(self._value)
 
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
@@ -348,9 +361,9 @@ struct Reference[
         Returns:
             True if the two pointers are equal and False otherwise.
         """
-        return UnsafePointer(
-            __mlir_op.`lit.ref.to_pointer`(self.value)
-        ) == UnsafePointer(__mlir_op.`lit.ref.to_pointer`(rhs.value))
+        return UnsafePointer.address_of(self[]) == UnsafePointer.address_of(
+            rhs[]
+        )
 
     @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
@@ -372,4 +385,4 @@ struct Reference[
         Returns:
             The string representation of the Reference.
         """
-        return str(UnsafePointer(__mlir_op.`lit.ref.to_pointer`(self.value)))
+        return str(UnsafePointer.address_of(self[]))

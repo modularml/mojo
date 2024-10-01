@@ -45,5 +45,7 @@ fn argv() -> VariadicList[StringRef]:
         The list of command line arguments provided when mojo was invoked.
     """
     var result = VariadicList[StringRef]("")
-    external_call["KGEN_CompilerRT_GetArgV", NoneType](Reference(result))
+    external_call["KGEN_CompilerRT_GetArgV", NoneType](
+        Reference.address_of(result)
+    )
     return result

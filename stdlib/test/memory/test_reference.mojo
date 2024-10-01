@@ -17,8 +17,7 @@ from testing import assert_equal, assert_true
 def test_copy_reference_explicitly():
     var a = List[Int](1, 2, 3)
 
-    var b = Reference(a)
-
+    var b = Reference.address_of(a)
     var c = Reference(other=b)
 
     c[][0] = 4
@@ -31,14 +30,14 @@ def test_equality():
     var a = List[Int](1, 2, 3)
     var b = List[Int](4, 5, 6)
 
-    assert_true(Reference(a) == Reference(a))
-    assert_true(Reference(b) == Reference(b))
-    assert_true(Reference(a) != Reference(b))
+    assert_true(Reference.address_of(a) == Reference.address_of(a))
+    assert_true(Reference.address_of(b) == Reference.address_of(b))
+    assert_true(Reference.address_of(a) != Reference.address_of(b))
 
 
 def test_str():
     var a = Int(42)
-    var a_ref = Reference(a)
+    var a_ref = Reference.address_of(a)
     assert_true(str(a_ref).startswith("0x"))
 
 

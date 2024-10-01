@@ -191,11 +191,7 @@ def test_fill():
 def test_ref():
     var l = InlineArray[Int, 3](1, 2, 3)
     var s = Span[Int](array=l)
-    # Would be nice to just use `assert_equal` with `Reference`, but doesn't quite work yet
-    # even after `Reference` is `Stringable`.  So, just compare for pointer equality right now.
-    var p1 = UnsafePointer(__mlir_op.`lit.ref.to_pointer`(s.as_ref().value))
-    var p2 = l.unsafe_ptr()
-    assert_equal(p1, p2)
+    assert_true(s.as_ref() == Reference.address_of(l.unsafe_ptr()[]))
 
 
 def main():

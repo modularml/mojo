@@ -580,9 +580,9 @@ fn test_dict_setdefault() raises:
     var some_dict = Dict[String, Int]()
     some_dict["key1"] = 1
     some_dict["key2"] = 2
-    assert_equal(some_dict.setdefault("key1", 0)[], 1)
-    assert_equal(some_dict.setdefault("key2", 0)[], 2)
-    assert_equal(some_dict.setdefault("not_key", 0)[], 0)
+    assert_equal(some_dict.setdefault("key1", 0), 1)
+    assert_equal(some_dict.setdefault("key2", 0), 2)
+    assert_equal(some_dict.setdefault("not_key", 0), 0)
     assert_equal(some_dict["not_key"], 0)
 
     # Check that there is no copy of the default value, so it's performant
