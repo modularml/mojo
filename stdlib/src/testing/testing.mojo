@@ -16,6 +16,18 @@ You can import these APIs from the `testing` package. For example:
 
 ```mojo
 from testing import assert_true
+
+def main():
+    x = 1
+    y = 2
+    try:
+        assert_true(x==1)
+        assert_true(y==2)
+        assert_true((x+y)==3)
+        print("All assertions succeeded")
+    except e:
+        print("At least one assertion failed:")
+        print(e)
 ```
 """
 from collections import Optional

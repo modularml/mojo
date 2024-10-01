@@ -17,6 +17,16 @@ You can import these APIs from the `sys` package. For example:
 
 ```mojo
 from sys import argv
+def main():
+    arguments = argv()
+    print(
+        arguments[0], #app.mojo
+        arguments[1]  #Hello world!
+    )
+    for arg in arguments:
+        print(arg)
+# If the program is app.mojo:
+# mojo run app.mojo "Hello world!"
 ```
 """
 
