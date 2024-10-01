@@ -435,9 +435,11 @@ fn test_getitem_raises() raises:
         _ = d[0, 0]
 
     with_get = Python.evaluate(
-        "type('WithGetItem', (), {'__getitem__': lambda self, key: f'Keys: {',"
-        " '.join(map(str, key))}' if isinstance(key, tuple) else f'Key:"
-        " {key}'})()"
+        """type('WithGetItem', (), {
+            '__getitem__': lambda self, key: 
+                'Keys: {0}'.format(", ".join(map(str, key))) if isinstance(key, tuple) 
+                else 'Key: {0}'.format(key)
+         })()"""
     )
     assert_equal("Key: 0", str(with_get[0]))
     assert_equal("Keys: 0, 0", str(with_get[0, 0]))
