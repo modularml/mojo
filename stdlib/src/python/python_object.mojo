@@ -416,7 +416,7 @@ struct PythonObject(
         self.py_object = cpython.toPython(string._strref_dangerous())
         string._strref_keepalive()
 
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
 
         Parameters:
@@ -458,7 +458,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
-    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:
@@ -697,8 +697,8 @@ struct PythonObject(
         Returns:
             The value corresponding to the given key for this object.
         """
-        var size = len(args)
         var cpython = _get_global_python_itf().cpython()
+        var size = len(args)
         var tuple_obj = cpython.PyTuple_New(size)
         for i in range(size):
             var arg_value = args[i].py_object
@@ -710,6 +710,9 @@ struct PythonObject(
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, "__getitem__"
         )
+        if callable_obj.is_null():
+            cpython.Py_DecRef(tuple_obj)
+            Python.throw_python_exception_if_error_state(cpython)
         var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
         cpython.Py_DecRef(callable_obj)
         cpython.Py_DecRef(tuple_obj)

@@ -331,8 +331,6 @@ fn _try_write_int[
         )
         fmt.write_str(zero)
 
-        _ = zero_buf^
-
         return None
 
     # Create a buffer to store the formatted value
@@ -411,6 +409,5 @@ fn _try_write_int[
     )
 
     fmt.write_str(str_slice)
-    _ = buf^
 
     return None

@@ -20,6 +20,36 @@ what we publish.
   enabling things like `count_leading_zeros` to work at compile time:
   [Issue #933](https://github.com/modularml/mojo/issues/933).
 
+- The destructor insertion logic in Mojo is now aware that types that take an
+  `AnyLifetime` as part of their signature could potentially access any live
+  value that destructor insertion is tracking, eliminating a significant
+  usability issue with unsafe APIs like `UnsafePointer`.  Consider a typical
+  example working with strings before this change:
+
+  ```mojo
+  var str = String(...)
+  var ptr = str.unsafe_ptr()
+  some_low_level_api(ptr)
+  _ = str^  # OLD HACK: Explicitly keep string alive until here!
+  ```
+
+  The `_ = str^` pattern was formerly required because the Mojo compiler has no
+  idea what "ptr" might reference.  As a consequence, it had no idea that
+  `some_low_level_api` might access `str` and therefore thought it was ok to
+  destroy the `String` before the call - this is why the explicit lifetime
+  extension was required.
+
+  Mojo now knows that `UnsafePointer` may access the `AnyLifetime` lifetime,
+  and now assumes that any API that uses that lifetime could use live values.
+  In this case, it assumes that `some_low_level_api` might access `str` and
+  because it might be using it, it cannot destroy `str` until after the call.
+  The consequence of this is that the old hack is no longer needed for these
+  cases!
+
+- The `UnsafePointer` type now has a `lifetime` parameter that can be used when
+  the `UnsafePointer` is known to point into some lifetime.  This lifetime is
+  propagated through the `ptr[]` indirection operation.
+
 - The VS Code Mojo Debugger now has a `buildArgs` JSON debug configuration
   setting that can be used in conjunction with `mojoFile` to define the build
   arguments when compiling the Mojo file.
@@ -73,6 +103,10 @@ what we publish.
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- The `Dict.__getitem__` method now returns a reference instead of a copy of
+  the value (or raises).  This improves the performance of common code that
+  uses `Dict` by allowing borrows from the `Dict` elements.
+
 - Autoparameterization of parameters is now supported. Specifying a parameter
   type with unbound parameters causes them to be implicitly added to the
   function signature as inferred parameters.
@@ -120,6 +154,24 @@ what we publish.
   determining a default SDK to use. The user can select the default SDK to use
   with the `Mojo: Select the default MAX SDK` command.
 
+- Added a new [`Box`](/mojo/stdlib/memory/box/Box) type as a safe, single-owner,
+  non-nullable smart pointer with similar semantics to Rust's
+  [`Box<>`](https://doc.rust-lang.org/std/boxed/struct.Box.html) and C++'s
+  [`std::unique_ptr`](https://en.cppreference.com/w/cpp/memory/unique_ptr).
+
+  ([PR #3524](https://github.com/modularml/mojo/pull/3524) by [@szbergeron](https://github.com/szbergeron))
+
+- `ref` argument and result specifiers now allow providing a memory value
+  directly in the lifetime specifier, rather than requiring the use of
+  `__lifetime_of`.  It is still fine to use `__lifetime_of` explicitly though,
+  and this is required when specifying lifetimes for parameters (e.g. to the
+  `Reference` type). For example, this is now valid without `__lifetime_of`:
+
+  ```mojo
+  fn return_ref(a: String) -> ref [a] String:
+      return a
+  ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -146,6 +198,38 @@ what we publish.
 - `String.as_bytes_slice()` is renamed to `String.as_bytes_span()` since it
   returns a `Span` and not a `StringSlice`.
 
+- The flag for turning on asserts has changed, e.g. to enable all checks:
+
+  ```bash
+  mojo -D ASSERT=all main.mojo
+  ```
+
+  The levels are:
+
+  - none: all assertions off
+  - warn: print assertion errors e.g. for multithreaded tests (previously -D
+    ASSERT_WARNING)
+  - safe: the default mode for standard CPU safety assertions
+  - all: turn on all assertions (previously -D MOJO_ENABLE_ASSERTIONS)
+
+  You can now also pass `Stringable` args to format a message, which will have
+  no runtime penalty or IR bloat cost when assertions are off. Previously you
+  had to:
+
+  ```mojo
+  x = -1
+  debug_assert(
+    x > 0, String.format_sequence(“expected x to be more than 0 but got: ”, x)
+  )
+  ```
+
+  Which can't be optimized away by the compiler in release builds, you can now
+  pass multiple args for a formatted message at no runtime cost:
+
+  ```mojo
+  debug_assert(x > 0, “expected x to be more than 0 but got: ”, x)
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -155,5 +239,11 @@ what we publish.
 
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
+
+- [Issue #3544](https://github.com/modularml/mojo/issues/3544) - Known
+  mutable `ref` argument are not optimized as `noalias` by LLVM.
+
+- [Issue #3559](https://github.com/modularml/mojo/issues/3559) - VariadicPack
+  doesn't extend the lifetimes of the values it references.
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
