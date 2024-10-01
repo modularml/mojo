@@ -202,8 +202,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         constrained[
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
-        for i in self:
-            if value == rebind[Reference[C, __lifetime_of(self)]](i)[]:
+        for e in self:
+            if rebind[C](e[]) == value:
                 return True
         return False
 
@@ -235,9 +235,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         ]()
 
         var count = 0
-        for elem in self:
-            if value == rebind[Reference[C, __lifetime_of(self)]](elem)[]:
-                count += 1
+        for e in self:
+            count += int(rebind[C](e[]) == value)
         return count
 
     fn append(inout self, owned value: ElementType):
