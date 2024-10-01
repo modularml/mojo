@@ -793,6 +793,7 @@ struct UnsafePointer[
         T: AnyType = Self.type,
         /,
         address_space: AddressSpace = Self.address_space,
+        alignment: Int = Self.alignment,
         lifetime: Lifetime[True].type = Self.lifetime,
     ](self) -> UnsafePointer[
         T, address_space, Self.exclusive, alignment, lifetime
@@ -802,6 +803,7 @@ struct UnsafePointer[
         Parameters:
             T: The target type.
             address_space: The address space of the result.
+            alignment: Alignment of the destination pointer.
             lifetime: Lifetime of the destination pointer.
 
         Returns:
@@ -819,6 +821,7 @@ struct UnsafePointer[
         T: DType,
         /,
         address_space: AddressSpace = Self.address_space,
+        alignment: Int = Self.alignment,
         lifetime: Lifetime[True].type = Self.lifetime,
     ](self) -> UnsafePointer[
         Scalar[T], address_space, Self.exclusive, alignment, lifetime
@@ -828,13 +831,16 @@ struct UnsafePointer[
         Parameters:
             T: The target type.
             address_space: The address space of the result.
+            alignment: Alignment of the destination pointer.
             lifetime: Lifetime of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
             as the original UnsafePointer.
         """
-        return self.bitcast[Scalar[T], address_space]()
+        return self.bitcast[
+            Scalar[T], address_space=address_space, alignment=alignment
+        ]()
 
     @always_inline
     fn destroy_pointee(self: UnsafePointer[type, AddressSpace.GENERIC, *_]):
