@@ -190,7 +190,6 @@ struct InlineArray[
 
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
-
             ptr.init_pointee_copy(other[idx])
 
     fn __copyinit__(inout self, other: Self):

@@ -231,12 +231,19 @@ struct _VariadicListMemIter[
     var index: Int
     var src: Reference[Self.variadic_list_type, list_lifetime]
 
+    fn __init__(
+        inout self, index: Int, ref [list_lifetime]list: Self.variadic_list_type
+    ):
+        self.index = index
+        self.src = Reference.address_of(list)
+
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
         self.index += 1
         # TODO: Need to make this return a dereferenced reference, not a
         # reference that must be deref'd by the user.
-        # NOTE: Using UnsafePointer here to get lifetimes to match.
-        return UnsafePointer.address_of(self.src[][self.index - 1])[]
+        return rebind[Self.variadic_list_type.reference_type](
+            Reference.address_of(self.src[][self.index - 1])
+        )
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index

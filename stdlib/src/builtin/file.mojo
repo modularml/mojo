@@ -95,7 +95,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
         var handle = external_call[
             "KGEN_CompilerRT_IO_FileOpen", UnsafePointer[NoneType]
-        ](path, mode, Reference(err_msg))
+        ](path, mode, Reference.address_of(err_msg))
 
         if err_msg:
             self.handle = UnsafePointer[NoneType]()
@@ -117,7 +117,7 @@ struct FileHandle:
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
-            self.handle, Reference(err_msg)
+            self.handle, Reference.address_of(err_msg)
         )
 
         if err_msg:
@@ -193,8 +193,8 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
             self.handle,
-            Reference(size_copy),
-            Reference(err_msg),
+            Reference.address_of(size_copy),
+            Reference.address_of(err_msg),
         )
 
         if err_msg:
@@ -270,7 +270,7 @@ struct FileHandle:
             self.handle,
             ptr,
             size * sizeof[type](),
-            Reference(err_msg),
+            Reference.address_of(err_msg),
         )
 
         if err_msg:
@@ -336,8 +336,8 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
-            Reference(size_copy),
-            Reference(err_msg),
+            Reference.address_of(size_copy),
+            Reference.address_of(err_msg),
         )
 
         if err_msg:
@@ -394,7 +394,7 @@ struct FileHandle:
         )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, whence, Reference(err_msg)
+            self.handle, offset, whence, Reference.address_of(err_msg)
         )
 
         if err_msg:
@@ -446,7 +446,7 @@ struct FileHandle:
             self.handle,
             ptr.address,
             len,
-            Reference(err_msg),
+            Reference.address_of(err_msg),
         )
 
         if err_msg:
