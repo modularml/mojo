@@ -173,12 +173,8 @@ struct InlineArray[
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var eltref: Reference[
-                Self.ElementType, __lifetime_of(self)
-            ] = self.unsafe_get(i)
-            UnsafePointer.address_of(storage[i]).move_pointee_into(
-                UnsafePointer[Self.ElementType].address_of(eltref[])
-            )
+            var eltptr = UnsafePointer.address_of(self.unsafe_get(i))
+            UnsafePointer.address_of(storage[i]).move_pointee_into(eltptr)
 
         # Mark the elements as already destroyed.
         storage._is_owned = False
