@@ -1673,8 +1673,7 @@ struct String(
             # start of the whitespace which was already appended
             if lhs >= str_byte_len:
                 break
-            var b_len = _utf8_first_byte_sequence_length(ptr[lhs])
-            rhs = lhs + b_len
+            rhs = lhs + _utf8_first_byte_sequence_length(ptr[lhs])
             for s in _build_slice(ptr, rhs, str_byte_len):
                 if s.isspace():
                     break
