@@ -198,6 +198,38 @@ what we publish.
 - `String.as_bytes_slice()` is renamed to `String.as_bytes_span()` since it
   returns a `Span` and not a `StringSlice`.
 
+- The flag for turning on asserts has changed, e.g. to enable all checks:
+
+  ```bash
+  mojo -D ASSERT=all main.mojo
+  ```
+
+  The levels are:
+
+  - none: all assertions off
+  - warn: print assertion errors e.g. for multithreaded tests (previously -D
+    ASSERT_WARNING)
+  - safe: the default mode for standard CPU safety assertions
+  - all: turn on all assertions (previously -D MOJO_ENABLE_ASSERTIONS)
+
+  You can now also pass `Stringable` args to format a message, which will have
+  no runtime penalty or IR bloat cost when assertions are off. Previously you
+  had to:
+
+  ```mojo
+  x = -1
+  debug_assert(
+    x > 0, String.format_sequence(“expected x to be more than 0 but got: ”, x)
+  )
+  ```
+
+  Which can't be optimized away by the compiler in release builds, you can now
+  pass multiple args for a formatted message at no runtime cost:
+
+  ```mojo
+  debug_assert(x > 0, “expected x to be more than 0 but got: ”, x)
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
