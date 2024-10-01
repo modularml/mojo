@@ -136,6 +136,8 @@ alias Py_eval_input = 258
 alias Py_func_type_input = 345
 
 alias Py_tp_dealloc = 52
+alias Py_tp_init = 60
+alias Py_tp_methods = 64
 alias Py_tp_new = 65
 
 alias Py_TPFLAGS_DEFAULT = 0
@@ -147,6 +149,8 @@ alias Py_ssize_t = Int
 # TODO(MOCO-1138):
 #   This should be a C ABI function pointer, not a Mojo ABI function.
 alias PyCFunction = fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+
+alias METH_VARARGS = 0x1
 
 alias destructor = fn (PyObjectPtr) -> None
 
@@ -273,8 +277,6 @@ struct PyMethodDef:
         # TODO(MSTDL-896):
         #   Support a way to get the name of the function from its parameter
         #   type, similar to `get_linkage_name()`?
-
-        alias METH_VARARGS = 0x1
 
         return PyMethodDef(
             func_name.unsafe_cstr_ptr(),
