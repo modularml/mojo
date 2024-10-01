@@ -264,9 +264,14 @@ struct Span[
         """
         return len(self) > 0
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
         Parameters:
@@ -295,7 +300,7 @@ struct Span[
     @always_inline
     fn __ne__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
         Parameters:

@@ -90,7 +90,7 @@ fn ord(s: StringSlice) -> Int:
         s.byte_length() == int(num_bytes), "input string must be one character"
     )
     debug_assert(
-        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte ", b1, " at index 0"
     )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -98,8 +98,7 @@ fn ord(s: StringSlice) -> Int:
     for i in range(1, num_bytes):
         p += 1
         debug_assert(
-            p[] >> 6 == 0b00000010,
-            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+            p[] >> 6 == 0b00000010, "invalid UTF-8 byte ", b1, " at index ", i
         )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
@@ -874,6 +873,35 @@ struct String(
         ```mojo
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
         print(string) # "1, 2.0, three"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
+        ```
+        .
+        """
+
+        return Self.format_sequence(args)
+
+    @staticmethod
+    @no_inline
+    fn format_sequence(args: VariadicPack[_, Formattable, *_]) -> Self:
+        """
+        Construct a string directly from a variadic pack.
+
+        Args:
+            args: A VariadicPack of formattable arguments.
+
+        Returns:
+            A string formed by formatting the VariadicPack.
+
+        Examples:
+
+        ```mojo
+        fn variadic_pack_to_string[
+            *Ts: Formattable,
+        ](*args: *Ts) -> String:
+            return String.format_sequence(args)
+
+        string = variadic_pack_to_string(1, ", ", 2.0, ", ", "three")
         %# from testing import assert_equal
         %# assert_equal(string, "1, 2.0, three")
         ```

@@ -222,9 +222,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -240,7 +238,7 @@ struct InlineArray[
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int,
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
+    ](ref [_]self: Self) -> ref [self] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -277,9 +275,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
@@ -326,7 +322,7 @@ struct InlineArray[
     @always_inline
     fn __contains__[
         T: EqualityComparableCollectionElement, //
-    ](self, value: T) -> Bool:
+    ](self: InlineArray[T, size], value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo
@@ -345,16 +341,9 @@ struct InlineArray[
         Returns:
             True if the value is contained in the array, False otherwise.
         """
-        constrained[
-            _type_is_eq[T, Self.ElementType](),
-            "T must be equal to Self.ElementType",
-        ]()
 
         @parameter
         for i in range(size):
-            if (
-                rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
-                == value
-            ):
+            if self[i] == value:
                 return True
         return False
