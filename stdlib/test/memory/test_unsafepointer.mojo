@@ -132,6 +132,9 @@ def test_bitcast():
     assert_equal(int(ptr), int(ptr.bitcast[Int]()))
 
     assert_equal(int(ptr), int(aliased_ptr))
+
+    assert_equal(ptr.bitcast[ptr.type, alignment=33]().alignment, 33)
+
     _ = local
 
 
