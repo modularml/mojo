@@ -38,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_lifetime: AnyLifetime[list_mutability].type,
+    list_lifetime: Lifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -785,7 +785,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+    fn __getitem__(ref [_]self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -794,10 +794,15 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A reference to the element at the given index.
         """
+
         var normalized_idx = idx
+
         debug_assert(
             -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
+            "index: ",
+            normalized_idx,
+            " is out of bounds for `List` of size: ",
+            self.size,
         )
         if normalized_idx < 0:
             normalized_idx += len(self)
@@ -805,9 +810,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.T:
+    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it

@@ -15,13 +15,15 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not --crash %bare-mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s
+# RUN: not --crash %bare-mojo -D ASSERT=all %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 
-# CHECK-LABEL: test_fail
+# CHECK-FAIL-LABEL: test_fail
 fn main():
     print("== test_fail")
-    # CHECK: Assert Error: this fails
-    debug_assert(False, "this fails")
-    # CHECK-NOT: is never reached
+    # CHECK-FAIL: formatted failure message: 2, 4
+    debug_assert(
+        False, "formatted failure message: ", 2, ", ", Scalar[DType.uint8](4)
+    )
+    # CHECK-FAIL-NOT: is never reached
     print("is never reached")

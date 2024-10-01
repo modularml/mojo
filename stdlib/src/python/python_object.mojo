@@ -114,7 +114,9 @@ struct _PyIter(Sized):
 
 
 @register_passable
-struct TypedPythonObject[type_hint: StringLiteral]:
+struct TypedPythonObject[type_hint: StringLiteral](
+    SizedRaising,
+):
     """A wrapper around `PythonObject` that indicates the type of the contained
     object.
 
@@ -155,13 +157,25 @@ struct TypedPythonObject[type_hint: StringLiteral]:
         self._obj = other._obj
 
     # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    fn __len__(self) raises -> Int:
+        """Returns the length of the object.
+
+        Returns:
+            The length of the object.
+        """
+        return len(self._obj)
+
+    # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
     # TODO:
     #   This should have lifetime, or we should do this with a context
     #   manager, to prevent use after ASAP destruction.
-    fn unsafe_as_py_object_ptr(inout self) -> PyObjectPtr:
+    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.
 
         Returns:
@@ -172,6 +186,36 @@ struct TypedPythonObject[type_hint: StringLiteral]:
             usage of the pointer returned by this function.
         """
         return self._obj.unsafe_as_py_object_ptr()
+
+    # ===-------------------------------------------------------------------===#
+    # 'Tuple' Operations
+    # ===-------------------------------------------------------------------===#
+
+    fn __getitem__(
+        self: TypedPythonObject["Tuple"],
+        pos: Int,
+    ) raises -> PythonObject:
+        """Get an element from this tuple.
+
+        Args:
+            pos: The tuple element position to retrieve.
+
+        Returns:
+            The value of the tuple element at the specified position.
+        """
+        var cpython = _get_global_python_itf().cpython()
+
+        var item: PyObjectPtr = cpython.PyTuple_GetItem(
+            self.unsafe_as_py_object_ptr(),
+            pos,
+        )
+
+        if item.is_null():
+            raise Python.unsafe_get_python_exception(cpython)
+
+        # TODO(MSTDL-911): Avoid unnecessary owned reference counts when
+        #   returning borrowed PythonObject values.
+        return PythonObject.from_borrowed_ptr(item)
 
 
 @register_passable
@@ -372,7 +416,7 @@ struct PythonObject(
         self.py_object = cpython.toPython(string._strref_dangerous())
         string._strref_keepalive()
 
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
 
         Parameters:
@@ -414,7 +458,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
-    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:
@@ -504,7 +548,7 @@ struct PythonObject(
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn unsafe_as_py_object_ptr(inout self) -> PyObjectPtr:
+    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.
 
         Returns:

@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 import math
+from math.math import _call_ptx_intrinsic
 from sys import (
     PrefetchOptions,
     _RegisterPackType,
@@ -27,7 +28,7 @@ from sys import (
     triple_is_nvidia_cuda,
     bitwidthof,
 )
-from sys.info import _current_arch
+from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
 
 from sys._assembly import inlined_assembly
 from os import abort
@@ -117,8 +118,12 @@ fn _simd_construction_checks[type: DType, size: Int]():
     constrained[size > 0, "simd width must be > 0"]()
     constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
     constrained[
-        type is not DType.bfloat16 or not has_neon(),
+        not (type is DType.bfloat16 and has_neon()),
         "bf16 is not supported for ARM architectures",
+    ]()
+    constrained[
+        not (type.is_float8() and not _has_native_f8_support()),
+        "f8 is not supported on non sm_89 and sm_90 architectures",
     ]()
 
 
@@ -145,12 +150,8 @@ fn _has_native_bf16_support() -> Bool:
 
 
 @always_inline("nodebug")
-fn _is_sm_80() -> Bool:
-    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) in (
-        "sm_80",
-        "sm_86",
-        "sm_89",
-    )
+fn _has_native_f8_support() -> Bool:
+    return _is_sm_9x() or triple_is_nvidia_cuda["sm_89"]()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -535,7 +536,14 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if _is_sm_9x() and type is DType.bfloat16:
+            return _call_ptx_intrinsic[
+                scalar_instruction="add.rn.bf16",
+                vector2_instruction="add.rn.bf16x2",
+                scalar_constraints="=h,h,h",
+                vector_constraints="=r,r,r",
+            ](self, rhs)
+        elif _is_sm_8x() and type.is_half_float():
             return self.fma(1, rhs)
 
         return __mlir_op.`pop.add`(self.value, rhs.value)
@@ -554,8 +562,16 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if _is_sm_9x() and type is DType.bfloat16:
+            return _call_ptx_intrinsic[
+                scalar_instruction="sub.rn.bf16",
+                vector2_instruction="sub.rn.bf16x2",
+                scalar_constraints="=h,h,h",
+                vector_constraints="=r,r,r",
+            ](self, rhs)
+        elif _is_sm_8x() and type.is_half_float():
             return rhs.fma(-1, self)
+
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -575,9 +591,14 @@ struct SIMD[type: DType, size: Int](
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
-
-        @parameter
-        if _is_sm_80() and type.is_half_float():
+        elif _is_sm_9x() and type is DType.bfloat16:
+            return _call_ptx_intrinsic[
+                scalar_instruction="mul.rn.bf16",
+                vector2_instruction="mul.rn.bf16x2",
+                scalar_constraints="=h,h,h",
+                vector_constraints="=r,r,r",
+            ](self, rhs)
+        elif _is_sm_8x() and type.is_half_float():
             return self.fma(rhs, -0.0)
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
@@ -848,7 +869,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.and`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __xor__(self, rhs: Self) -> Self:
@@ -867,7 +888,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.xor`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.xor`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __or__(self, rhs: Self) -> Self:
@@ -886,7 +907,7 @@ struct SIMD[type: DType, size: Int](
             type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
-        return __mlir_op.`pop.or`(self.value, rhs.value)
+        return __mlir_op.`pop.simd.or`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __lshift__(self, rhs: Self) -> Self:
@@ -1389,7 +1410,7 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes_slice()[1:-1])
+            values = StringSlice(unsafe_from_utf8=output.as_bytes_span()[1:-1])
 
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
@@ -1761,7 +1782,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_80() and type.is_half_float():
+        if (_is_sm_8x() or _is_sm_9x()) and type.is_half_float():
             alias prefix = "fma.rn.bf16" if type is DType.bfloat16 else "fma.rn.f16"
 
             @parameter
@@ -1842,13 +1863,13 @@ struct SIMD[type: DType, size: Int](
 
             return array
 
-        alias length = variadic_len[mask]()
+        alias length = variadic_len[*mask]()
         constrained[
             output_size == length,
             "size of the mask must match the output SIMD size",
         ]()
         return __mlir_op.`pop.simd.shuffle`[
-            mask = _convert_variadic_to_pop_array[mask](),
+            mask = _convert_variadic_to_pop_array[*mask](),
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1901,7 +1922,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[mask](self)
+        return self._shuffle_list[*mask](self)
 
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -1919,7 +1940,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[mask](other)
+        return self._shuffle_list[*mask](other)
 
     @always_inline("nodebug")
     fn shuffle[mask: StaticIntTuple[size]](self) -> Self:

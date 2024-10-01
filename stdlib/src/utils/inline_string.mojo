@@ -278,10 +278,10 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -517,10 +517,10 @@ struct _FixedString[CAP: Int](
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 

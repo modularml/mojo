@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not --crash mojo -D MOJO_ENABLE_ASSERTIONS %s 2>&1
+# RUN: not --crash mojo -D ASSERT=all %s 2>&1
 
 from testing import assert_equal
 

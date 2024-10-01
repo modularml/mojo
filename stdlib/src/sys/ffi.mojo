@@ -21,6 +21,8 @@ from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
 from .intrinsics import _mlirtype_is_eq
 from builtin.builtin_list import _LITRefPackHelper
 
+from sys._libc import dlerror, dlopen, dlclose, dlsym
+
 alias c_char = Int8
 """C `char` type."""
 
@@ -48,6 +50,9 @@ alias c_size_t = UInt
 
 alias c_ssize_t = Int
 """C `ssize_t` type."""
+
+alias OpaquePointer = UnsafePointer[NoneType]
+"""An opaque pointer, equivalent to the C `void*` type."""
 
 
 fn _c_long_dtype() -> DType:
@@ -105,7 +110,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
     The library is loaded on initialization and unloaded by `close`.
     """
 
-    var handle: UnsafePointer[Int8]
+    var handle: OpaquePointer
     """The handle to the dynamic library."""
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
@@ -121,17 +126,13 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         @parameter
         if not os_is_windows():
-            var handle = external_call["dlopen", UnsafePointer[Int8]](
-                path.unsafe_cstr_ptr(), flags
-            )
-            if handle == UnsafePointer[Int8]():
-                var error_message = external_call[
-                    "dlerror", UnsafePointer[UInt8]
-                ]()
+            var handle = dlopen(path.unsafe_cstr_ptr(), flags)
+            if handle == OpaquePointer():
+                var error_message = dlerror()
                 abort("dlopen failed: " + String(error_message))
             self.handle = handle
         else:
-            self.handle = UnsafePointer[Int8]()
+            self.handle = OpaquePointer()
 
     fn __init__(inout self, *, other: Self):
         """Copy the object.
@@ -155,13 +156,12 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
             "Checking dynamic library symbol is not supported on Windows",
         ]()
 
-        var opaque_function_ptr = external_call["dlsym", UnsafePointer[Int8]](
-            self.handle.address, name.unsafe_cstr_ptr()
+        var opaque_function_ptr: OpaquePointer = dlsym(
+            self.handle,
+            name.unsafe_cstr_ptr(),
         )
-        if opaque_function_ptr:
-            return True
 
-        return False
+        return bool(opaque_function_ptr)
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
@@ -171,8 +171,8 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         @parameter
         if not os_is_windows():
-            _ = external_call["dlclose", Int](self.handle)
-            self.handle = UnsafePointer[Int8]()
+            _ = dlclose(self.handle)
+            self.handle = OpaquePointer()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.
@@ -278,14 +278,41 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         debug_assert(self.handle, "Dylib handle is null")
 
         @parameter
-        if not os_is_windows():
-            return external_call["dlsym", UnsafePointer[result_type]](
-                self.handle.address, name
-            )
-        else:
+        if os_is_windows():
             return abort[UnsafePointer[result_type]](
                 "get_symbol isn't supported on windows"
             )
+
+        # To check for `dlsym()` results that are _validly_ NULL, we do the
+        # dance described in https://man7.org/linux/man-pages/man3/dlsym.3.html:
+        #
+        # > In unusual cases (see NOTES) the value of the symbol could
+        # > actually be NULL.  Therefore, a NULL return from dlsym() need not
+        # > indicate an error.  The correct way to distinguish an error from
+        # > a symbol whose value is NULL is to call dlerror(3) to clear any
+        # > old error conditions, then call dlsym(), and then call dlerror(3)
+        # > again, saving its return value into a variable, and check whether
+        # > this saved value is not NULL.
+
+        var res = dlsym[result_type](self.handle, name)
+
+        if not res:
+            # Clear any potential unrelated error that pre-dates the `dlsym`
+            # call above.
+            _ = dlerror()
+
+            # Redo the `dlsym` call
+            res = dlsym[result_type](self.handle, name)
+
+            debug_assert(not res, "dlsym unexpectedly returned non-NULL result")
+
+            # Check if an error occurred during the 2nd `dlsym` call.
+            var err = dlerror()
+
+            if err:
+                abort("dlsym failed: " + String(err))
+
+        return res
 
 
 # ===----------------------------------------------------------------------===#

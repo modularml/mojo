@@ -229,13 +229,32 @@ fn now() -> Int:
 
 
 # ===----------------------------------------------------------------------===#
+# monotonic
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn monotonic() -> Int:
+    """
+    Returns the current monotonic time time in nanoseconds. This function
+    queries the current platform's monotonic clock, making it useful for
+    measuring time differences, but the significance of the returned value
+    varies depending on the underlying implementation.
+
+    Returns:
+        The current time in ns.
+    """
+    return perf_counter_ns()
+
+
+# ===----------------------------------------------------------------------===#
 # time_function
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline
 @parameter
-fn _time_function_windows[func: fn () capturing -> None]() -> Int:
+fn _time_function_windows[func: fn () capturing [_] -> None]() -> Int:
     """Calculates elapsed time in Windows"""
 
     var ticks_per_sec: _WINDOWS_LARGE_INTEGER = 0
@@ -266,7 +285,7 @@ fn _time_function_windows[func: fn () capturing -> None]() -> Int:
 
 @always_inline
 @parameter
-fn time_function[func: fn () capturing -> None]() -> Int:
+fn time_function[func: fn () capturing [_] -> None]() -> Int:
     """Measures the time spent in the function.
 
     Parameters:

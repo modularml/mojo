@@ -27,11 +27,14 @@ from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
-alias StaticString = StringSlice[ImmutableStaticLifetime]
+alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    debug_assert(
+        0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
+    )
     alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
     return int((sizes < c).cast[DType.uint8]().reduce_add())
 
@@ -122,7 +125,7 @@ fn _is_newline_start(
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for StringSlice
@@ -191,7 +194,7 @@ struct _StringSliceIter[
 
 struct StringSlice[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
 ](Stringable, Sized, Formattable):
     """
     A non-owning view to encoded string data.
@@ -212,7 +215,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self: StringSlice[ImmutableAnyLifetime], lit: StringLiteral
+        inout self: StringSlice[StaticConstantLifetime], lit: StringLiteral
     ):
         """Construct a new string slice from a string literal.
 
@@ -231,7 +234,7 @@ struct StringSlice[
         #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[ImmutableStaticLifetime](
+        self = StaticString(
             unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 
@@ -344,6 +347,11 @@ struct StringSlice[
         """
         return len(self._slice) > 0
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__(self, rhs: StringSlice) -> Bool:
         """Verify if a string slice is equal to another string slice.
 
@@ -389,6 +397,7 @@ struct StringSlice[
         """
         return self == rhs.as_string_slice()
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline
     fn __ne__(self, rhs: StringSlice) -> Bool:
         """Verify if span is not equal to another string slice.
@@ -425,25 +434,23 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(self) -> _StringSliceIter[lifetime]:
         """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[lifetime](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), False]:
+    fn __reversed__(self) -> _StringSliceIter[lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[lifetime, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -452,7 +459,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, lifetime]:
+    fn as_bytes_span(self) -> Span[UInt8, lifetime]:
         """Get the sequence of encoded bytes as a slice of the underlying string.
 
         Returns:
@@ -478,7 +485,7 @@ struct StringSlice[
             The length of this string slice in bytes.
         """
 
-        return len(self.as_bytes_slice())
+        return len(self.as_bytes_span())
 
     @always_inline
     @deprecated("use byte_length() instead")
@@ -489,7 +496,7 @@ struct StringSlice[
             The length of this string slice in bytes.
         """
 
-        return len(self.as_bytes_slice())
+        return len(self.as_bytes_span())
 
     fn _strref_dangerous(self) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.
