@@ -362,9 +362,7 @@ struct Variant[*Ts: CollectionElement](
         alias idx = Self._check[T]()
         return self._get_discr() == idx
 
-    fn unsafe_get[
-        T: CollectionElement
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn unsafe_get[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
