@@ -33,6 +33,9 @@ The C `int` type is typically a signed 32-bit integer on commonly used targets
 today.
 """
 
+alias c_uint = UInt32
+"""C `unsigned int` type."""
+
 alias c_long = Scalar[_c_long_dtype()]
 """C `long` type.
 

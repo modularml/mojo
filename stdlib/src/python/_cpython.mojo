@@ -10,6 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""
+Mojo bindings functions and types from the CPython C API.
+
+Documentation for these functions can be found online at:
+  <https://docs.python.org/3/c-api/stable.html#contents-of-limited-api>
+"""
 
 from collections import InlineArray
 from os import getenv, setenv, abort
@@ -67,7 +73,14 @@ fn create_wrapper_function[
         __mlir_op.`lit.ownership.mark_destroyed`(
             __get_mvalue_as_litref(py_self)
         )
+
+        # SAFETY:
+        #   Prevent `args` AND `args._obj` from being destroyed, since we don't
+        #   own them.
+        # TODO: Use a `mem.forget(args^)` function here in the future.
         __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(args))
+        var _obj = args._obj^
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(_obj))
 
         return result
 
