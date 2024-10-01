@@ -520,8 +520,8 @@ fn rotate_bits_left[shift: Int](x: Int) -> Int:
         The input rotated to the left by `shift` elements (with wrap-around).
     """
     constrained[
-        shift >= -sizeof[Int]() and shift < sizeof[Int](),
-        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+        shift >= -bitwidthof[Int]() and shift < bitwidthof[Int](),
+        "Constraints: -bitwidthof[Int]() <= shift < bitwidthof[Int]()",
     ]()
 
     @parameter
@@ -598,8 +598,8 @@ fn rotate_bits_right[shift: Int](x: Int) -> Int:
         The input rotated to the right by `shift` elements (with wrap-around).
     """
     constrained[
-        shift >= -sizeof[Int]() and shift < sizeof[Int](),
-        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+        shift >= -bitwidthof[Int]() and shift < bitwidthof[Int](),
+        "Constraints: -bitwidthof[Int]() <= shift < bitwidthof[Int]()",
     ]()
 
     @parameter
