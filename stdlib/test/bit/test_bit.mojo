@@ -276,6 +276,7 @@ def test_bit_not_simd():
 
 
 def test_is_power_of_two():
+    assert_equal(is_power_of_two(Int.MIN), False)
     assert_equal(is_power_of_two(-(2**59)), False)
     assert_equal(is_power_of_two(-1), False)
     assert_equal(is_power_of_two(0), False)
@@ -285,6 +286,7 @@ def test_is_power_of_two():
     assert_equal(is_power_of_two(4), True)
     assert_equal(is_power_of_two(5), False)
     assert_equal(is_power_of_two(2**59), True)
+    assert_equal(is_power_of_two(Int.MAX), False)
 
 
 def test_is_power_of_two_simd():
@@ -321,6 +323,8 @@ def test_is_power_of_two_simd():
         is_power_of_two(var4),
         SIMD[DType.bool, simd_width](False, False, False, True),
     )
+
+    assert_equal(is_power_of_two(Int64.MIN), False)
 
 
 def test_bit_width():
