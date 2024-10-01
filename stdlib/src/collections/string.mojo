@@ -2064,8 +2064,8 @@ struct String(
         alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
         var s_len = self.byte_length()
-        var cap = s_len + len(entries) * 2  # educated guess
-        var res = String(List[UInt8, hint_trivial_type=True](capacity=cap))
+        # fully guessing the capacity here to be at least 8 bytes per entry
+        var res = Self(Self._buffer_type(capacity=s_len + len(entries) * 8))
         var pos_in_self = 0
         var ptr = self.unsafe_ptr()
         alias `r` = UInt8(ord("r"))
@@ -2073,11 +2073,9 @@ struct String(
 
         @always_inline("nodebug")
         fn _build_slice(
-            s_ptr: UnsafePointer[UInt8], start: Int, end: Int
+            p: UnsafePointer[UInt8], start: Int, end: Int
         ) -> SelfSlice:
-            return SelfSlice(
-                unsafe_from_utf8_ptr=s_ptr + start, len=end - start
-            )
+            return SelfSlice(unsafe_from_utf8_ptr=p + start, len=end - start)
 
         var current_automatic_arg_index = 0
         for e in entries:
@@ -2085,9 +2083,7 @@ struct String(
                 pos_in_self < s_len, "pos_in_self >= self.byte_length()"
             )
             # FIXME(#3577): remove String constructor once it lands
-            res += String(
-                _build_slice(self.unsafe_ptr(), pos_in_self, e[].first_curly)
-            )
+            res += String(_build_slice(ptr, pos_in_self, e[].first_curly))
 
             if e[].is_escaped_brace():
                 res += "}" if e[].field[Bool] else "{"
@@ -2118,7 +2114,7 @@ struct String(
 
         if pos_in_self < s_len:
             # FIXME(#3577): remove String constructor once it lands
-            res += String(_build_slice(self.unsafe_ptr(), pos_in_self, s_len))
+            res += String(_build_slice(ptr, pos_in_self, s_len))
 
         return res^
 
@@ -2395,25 +2391,28 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     var first_curly: Int
     """The index of an opening brace around a substitution field."""
-
     var last_curly: Int
     """The index of an closing brace around a substitution field."""
-
     var conversion_flag: UInt8
     """Store the format specifier in a byte (e.g., ord("r") for repr). It is
     stored in a byte because every [format specifier](\
     https://docs.python.org/3/library/string.html#formatspec) is an ASCII
     character.
     """
+    alias supported_conversion_flags = SIMD[DType.uint8, 2](ord("s"), ord("r"))
+    """Currently supported conversion flags: `__str__` and `__repr__`."""
+    alias _FieldVariantType = Variant[String, Int, NoneType, Bool]
+    """Purpose of the `Variant` `Self.field`:
 
-    alias _FieldVariantType = Variant[
-        String,  # kwargs indexing (`{field_name}`)
-        Int,  # args manual indexing (`{3}`)
-        NoneType,  # args automatic indexing (`{}`)
-        Bool,  # for escaped curlies ('{{')
-    ]
+    - `Int` for manual indexing: (value field contains `0`).
+    - `NoneType` for automatic indexing: (value field contains `None`).
+    - `String` for **kwargs indexing: (value field contains `foo`).
+    - `Bool` for escaped curlies: (value field contains False for `{` or True
+        for `}`).
+    """
     var field: Self._FieldVariantType
-    """Store the substitution field."""
+    """Store the substitution field. See `Self._FieldVariantType` docstrings for
+    more details."""
 
     fn __init__(inout self, *, other: Self):
         self.first_curly = other.first_curly
@@ -2441,24 +2440,10 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         Args:
             format_src: The "format" part provided by the user.
-            len_pos_args: The len of *args
+            len_pos_args: The length of `*args`.
 
         Returns:
             A `List` of structured field entries.
-
-        Purpose of the `Variant` `Self.field`:
-
-        - `Int` for manual indexing
-            (value field contains `0`)
-
-        - `NoneType` for automatic indexing
-            (value field contains `None`)
-
-        - `String` for **kwargs indexing
-            (value field contains `foo`)
-
-        - `Bool` for escaped curlies
-            (value field contains False for `{` or True for '}')
         """
         var manual_indexing_count = 0
         var automatic_indexing_count = 0
@@ -2479,87 +2464,84 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 skip_next = False
                 continue
             if fmt_ptr[i] == `{`:
-                if start:
-                    # already one there.
-                    if i - start.value() == 1:
-                        # python escapes double curlies
+                if not start:
+                    start = i
+                    continue
+                if i - start.value() != 1:
+                    raise Error(
+                        "there is a single curly { left unclosed or unescaped"
+                    )
+                # python escapes double curlies
+                var current_entry = Self(
+                    first_curly=start.value(),
+                    last_curly=i,
+                    field=False,
+                    conversion_flag=0,
+                )
+                entries.append(current_entry^)
+                start = None
+                continue
+            elif fmt_ptr[i] == `}`:
+                if not start and (i + 1) < fmt_len:
+                    # python escapes double curlies
+                    if fmt_ptr[i + 1] == `}`:
                         var current_entry = Self(
-                            first_curly=start.value(),
-                            last_curly=i,
-                            field=False,
+                            first_curly=i,
+                            last_curly=i + 1,
+                            field=True,
                             conversion_flag=0,
                         )
                         entries.append(current_entry^)
-                        start = None
+                        skip_next = True
                         continue
-                    raise (
-                        "there is a single curly { left unclosed or unescaped"
-                    )
-                else:
-                    start = i
-                continue
-            elif fmt_ptr[i] == `}`:
-                if start:
-                    var start_value = start.value()
-                    var current_entry = Self(
-                        first_curly=start_value,
-                        last_curly=i,
-                        field=NoneType(),
-                        conversion_flag=0,
-                    )
-
-                    if i - start_value != 1:
-                        if current_entry._handle_field_and_break(
-                            format_src,
-                            len_pos_args,
-                            i,
-                            start_value,
-                            automatic_indexing_count,
-                            raised_automatic_index,
-                            manual_indexing_count,
-                            raised_manual_index,
-                            raised_kwarg_field,
-                        ):
-                            break
-                    else:
-                        # automatic indexing
-                        # current_entry.field is already None
-                        if automatic_indexing_count >= len_pos_args:
-                            raised_automatic_index = automatic_indexing_count
-                            break
-                        automatic_indexing_count += 1
-                    entries.append(current_entry^)
-                    start = None
-                else:
-                    # python escapes double curlies
-                    if (i + 1) < fmt_len:
-                        if fmt_ptr[i + 1] == `}`:
-                            var current_entry = Self(
-                                first_curly=i,
-                                last_curly=i + 1,
-                                field=True,
-                                conversion_flag=0,
-                            )
-                            entries.append(current_entry^)
-                            skip_next = True
-                            continue
-                    # if it is not an escaped one, it is an error
-                    raise (
+                elif not start:  # if it is not an escaped one, it is an error
+                    raise Error(
                         "there is a single curly } left unclosed or unescaped"
                     )
 
+                var start_value = start.value()
+                var current_entry = Self(
+                    first_curly=start_value,
+                    last_curly=i,
+                    field=NoneType(),
+                    conversion_flag=0,
+                )
+
+                if i - start_value != 1:
+                    if current_entry._handle_field_and_break(
+                        format_src,
+                        len_pos_args,
+                        i,
+                        start_value,
+                        automatic_indexing_count,
+                        raised_automatic_index,
+                        manual_indexing_count,
+                        raised_manual_index,
+                        raised_kwarg_field,
+                    ):
+                        break
+                else:
+                    # automatic indexing
+                    # current_entry.field is already None
+                    if automatic_indexing_count >= len_pos_args:
+                        raised_automatic_index = automatic_indexing_count
+                        break
+                    automatic_indexing_count += 1
+                entries.append(current_entry^)
+                start = None
+
         if raised_automatic_index:
-            raise "Automatic indexing require more args in *args"
-        if raised_kwarg_field:
-            raise "Index " + raised_kwarg_field.value() + " not in kwargs"
-        if manual_indexing_count and automatic_indexing_count:
-            raise "Cannot both use manual and automatic indexing"
-        if raised_manual_index:
-            raise (
-                "Index " + str(raised_manual_index.value()) + " not in *args"
-            )
-        if start:
-            raise "there is a single curly { left unclosed or unescaped"
+            raise Error("Automatic indexing require more args in *args")
+        elif raised_kwarg_field:
+            var val = raised_kwarg_field.value()
+            raise Error("Index " + val + " not in kwargs")
+        elif manual_indexing_count and automatic_indexing_count:
+            raise Error("Cannot both use manual and automatic indexing")
+        elif raised_manual_index:
+            var val = str(raised_manual_index.value())
+            raise Error("Index " + val + " not in *args")
+        elif start:
+            raise Error("there is a single curly { left unclosed or unescaped")
 
         return entries^
 
@@ -2575,19 +2557,11 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         inout raised_manual_index: Optional[Int],
         inout raised_kwarg_field: Optional[String],
     ) raises -> Bool:
-        # `__str__` and `__repr__`
-        alias supported_conversion_flags = SIMD[DType.uint8, 2](
-            ord("s"), ord("r")
-        )
-        alias SelfSlice = StringSlice[__lifetime_of(self)]
+        alias S = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
-        fn _build_slice(
-            s_ptr: UnsafePointer[UInt8], start: Int, end: Int
-        ) -> SelfSlice:
-            return SelfSlice(
-                unsafe_from_utf8_ptr=s_ptr + start, len=end - start
-            )
+        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
         var field = _build_slice(format_src.unsafe_ptr(), start_value + 1, i)
         var field_b_len = i - (start_value + 1)
@@ -2604,19 +2578,17 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         if exclamation_index != -1:
             var new_idx = exclamation_index + 1
-            if new_idx < field_b_len:
-                var f_ptr = field.unsafe_ptr()
-                var conversion_flag = f_ptr[new_idx]
-                if field_b_len - new_idx > 1 or (
-                    conversion_flag not in supported_conversion_flags
-                ):
-                    var f = String(_build_slice(f_ptr, new_idx, field_b_len))
-                    _ = field^
-                    raise Error('Conversion flag "' + f + '" not recognised.')
-                self.conversion_flag = conversion_flag
-            else:
-                raise "Empty conversion flag."
-
+            if new_idx >= field_b_len:
+                raise Error("Empty conversion flag.")
+            var f_ptr = field.unsafe_ptr()
+            var conversion_flag = f_ptr[new_idx]
+            if field_b_len - new_idx > 1 or (
+                conversion_flag not in Self.supported_conversion_flags
+            ):
+                var f = String(_build_slice(f_ptr, new_idx, field_b_len))
+                _ = field^
+                raise Error('Conversion flag "' + f + '" not recognised.')
+            self.conversion_flag = conversion_flag
             field = _build_slice(field.unsafe_ptr(), 0, exclamation_index)
 
         if field.byte_length() == 0:
