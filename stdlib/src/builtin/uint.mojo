@@ -98,8 +98,9 @@ struct UInt(IntLike):
 
         A small example.
         ```mojo
-        var x = UInt(50)
-        var x_as_string = str(x)  # x_as_string = "50"
+        %# from testing import assert_equal
+        x = UInt(50)
+        assert_equal(str(x), "50")
         ```
 
         Returns:
@@ -122,8 +123,9 @@ struct UInt(IntLike):
 
         A small example.
         ```mojo
-        var x = UInt(50)
-        var x_as_string = repr(x)  # x_as_string = "UInt(50)"
+        %# from testing import assert_equal
+        x = UInt(50)
+        assert_equal(repr(x), "UInt(50)")
         ```
 
         Returns:
