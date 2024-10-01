@@ -2059,7 +2059,7 @@ struct String(
         ```
         .
         """
-        # TODO(#3224): this function should be able to use Formatter syntax
+        # TODO(#3403 or #3252): this function should be able to use Formatter syntax
         # when the type implements it, since it will give great perf. benefits
         alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
