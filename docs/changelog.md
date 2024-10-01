@@ -83,6 +83,9 @@ what we publish.
   - Added `TypedPythonObject["Tuple].__getitem__` for accessing the elements of
     a Python tuple.
 
+- Added `Python.add_object()`, to add a named `PythonObject` value to a Python
+  'module' object instance.
+
 - Added `Python.unsafe_get_python_exception()`, as an efficient low-level
   utility to get the Mojo `Error` equivalent of the current CPython error state.
 

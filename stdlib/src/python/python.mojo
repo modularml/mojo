@@ -298,6 +298,37 @@ struct Python:
         if result != 0:
             Python.throw_python_exception_if_error_state(cpython)
 
+    @staticmethod
+    fn add_object(
+        inout module: TypedPythonObject["Module"],
+        name: StringLiteral,
+        value: PythonObject,
+    ) raises:
+        """Add a new object to `module` with the given name and value.
+
+        The provided object can be any type of Python object: an instance,
+        a type object, a function, etc.
+
+        The added value will be inserted into the `__dict__` of the provided
+        module.
+
+        Args:
+            module: The Python module to modify.
+            name: The name of the new object.
+            value: The python object value.
+        """
+
+        var cpython = _get_global_python_itf().cpython()
+
+        var result = cpython.PyModule_AddObjectRef(
+            module.unsafe_as_py_object_ptr(),
+            name.unsafe_cstr_ptr(),
+            value.unsafe_as_py_object_ptr(),
+        )
+
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
