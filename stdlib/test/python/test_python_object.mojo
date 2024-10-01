@@ -460,6 +460,28 @@ fn test_getitem_raises() raises:
     with assert_raises(contains="Custom error"):
         _ = with_get_exception[1]
 
+    with_2d = Python.evaluate(
+        """type('With2D', (), {
+            '__init__': lambda self: setattr(self, 'data', [[1, 2, 3], [4, 5, 6]]),
+            '__getitem__': lambda self, key: (
+                self.data[key[0]][key[1]] if isinstance(key, tuple)
+                else self.data[key]
+            )
+        })()"""
+    )
+    assert_equal("[1, 2, 3]", str(with_2d[0]))
+    assert_equal(2, with_2d[0, 1])
+    assert_equal(6, with_2d[1, 2])
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[0, 4]
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[2, 0]
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[2]
+
 
 def main():
     # initializing Python instance calls init_python
