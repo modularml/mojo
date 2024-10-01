@@ -2043,8 +2043,7 @@ struct String(
             args: The substitution values.
 
         Parameters:
-            Ts: The types of the substitution values.
-              Are required to implement `Stringable`.
+            Ts: The types of substitution values that implement `Stringable`.
 
         Returns:
             The template with the given values substituted.
@@ -2066,24 +2065,20 @@ struct String(
         var s_len = self.byte_length()
         # fully guessing the capacity here to be at least 8 bytes per entry
         var res = Self(Self._buffer_type(capacity=s_len + len(entries) * 8))
-        var pos_in_self = 0
+        var offset = 0
         var ptr = self.unsafe_ptr()
         alias `r` = UInt8(ord("r"))
-        alias SelfSlice = StringSlice[__lifetime_of(self)]
+        alias S = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
-        fn _build_slice(
-            p: UnsafePointer[UInt8], start: Int, end: Int
-        ) -> SelfSlice:
-            return SelfSlice(unsafe_from_utf8_ptr=p + start, len=end - start)
+        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
         var current_automatic_arg_index = 0
         for e in entries:
-            debug_assert(
-                pos_in_self < s_len, "pos_in_self >= self.byte_length()"
-            )
+            debug_assert(offset < s_len, "offset >= self.byte_length()")
             # FIXME(#3577): remove String constructor once it lands
-            res += String(_build_slice(ptr, pos_in_self, e[].first_curly))
+            res += String(_build_slice(ptr, offset, e[].first_curly))
 
             if e[].is_escaped_brace():
                 res += "}" if e[].field[Bool] else "{"
@@ -2110,11 +2105,11 @@ struct String(
 
                 current_automatic_arg_index += 1
 
-            pos_in_self = e[].last_curly + 1
+            offset = e[].last_curly + 1
 
-        if pos_in_self < s_len:
+        if offset < s_len:
             # FIXME(#3577): remove String constructor once it lands
-            res += String(_build_slice(ptr, pos_in_self, s_len))
+            res += String(_build_slice(ptr, offset, s_len))
 
         return res^
 
