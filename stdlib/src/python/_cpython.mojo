@@ -989,6 +989,26 @@ struct CPython:
         self._inc_total_rc()
         return f(obj)
 
+    fn PyObject_GetItem(
+        inout self, obj: PyObjectPtr, key: PyObjectPtr
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PyObject_GetItem")(obj, key)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyObject_GetItem, key:",
+            key._get_ptr_as_int(),
+            ", refcnt:",
+            self._Py_REFCNT(r),
+            ", parent obj:",
+            obj._get_ptr_as_int(),
+        )
+
+        self._inc_total_rc()
+        return r
+
     fn PyObject_GetAttrString(
         inout self,
         obj: PyObjectPtr,
