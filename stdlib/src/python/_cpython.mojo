@@ -23,7 +23,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int, OpaquePointer
+from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
 
 from python.python import _get_global_python_itf
 
@@ -135,6 +135,11 @@ alias Py_file_input = 257
 alias Py_eval_input = 258
 alias Py_func_type_input = 345
 
+alias Py_tp_dealloc = 52
+alias Py_tp_new = 65
+
+alias Py_TPFLAGS_DEFAULT = 0
+
 # TODO(MSTDL-892): Change this to alias ffi.C_ssize_t
 alias Py_ssize_t = Int
 
@@ -142,6 +147,8 @@ alias Py_ssize_t = Int
 # TODO(MOCO-1138):
 #   This should be a C ABI function pointer, not a Mojo ABI function.
 alias PyCFunction = fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+
+alias destructor = fn (PyObjectPtr) -> None
 
 
 @value
@@ -288,6 +295,27 @@ struct PyTypeObject:
     #   Fill this out based on
     #   https://docs.python.org/3/c-api/typeobj.html#pytypeobject-definition
     pass
+
+
+@value
+@register_passable("trivial")
+struct PyType_Spec:
+    var name: UnsafePointer[c_char]
+    var basicsize: c_int
+    var itemsize: c_int
+    var flags: c_uint
+    var slots: UnsafePointer[PyType_Slot]
+
+
+@value
+@register_passable("trivial")
+struct PyType_Slot:
+    var slot: c_int
+    var pfunc: OpaquePointer
+
+    @staticmethod
+    fn null() -> Self:
+        return PyType_Slot {slot: 0, pfunc: OpaquePointer()}
 
 
 @value
@@ -906,11 +934,36 @@ struct CPython:
 
         return add_functions_fn(mod, functions)
 
+    fn PyModule_AddObjectRef(
+        inout self,
+        module: PyObjectPtr,
+        name: UnsafePointer[c_char],
+        value: PyObjectPtr,
+    ) -> c_int:
+        var func = self.lib.get_function[
+            fn (PyObjectPtr, UnsafePointer[c_char], PyObjectPtr) -> c_int
+        ]("PyModule_AddObjectRef")
+
+        return func(module, name, value)
+
     fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
-        var value = self.lib.get_function[
-            fn (PyObjectPtr) -> UnsafePointer[Int8]
-        ]("PyModule_GetDict")(name.value)
-        return PyObjectPtr {value: value}
+        var value = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+            "PyModule_GetDict"
+        )(name.value)
+        return value
+
+    # ===-------------------------------------------------------------------===#
+    # Python Type operations
+    # ===-------------------------------------------------------------------===#
+
+    fn PyType_FromSpec(
+        inout self, spec: UnsafePointer[PyType_Spec]
+    ) -> PyObjectPtr:
+        var func = self.lib.get_function[
+            fn (UnsafePointer[PyType_Spec]) -> PyObjectPtr
+        ]("PyType_FromSpec")
+
+        return func(spec)
 
     # ===-------------------------------------------------------------------===#
     # Python Evaluation
