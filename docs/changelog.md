@@ -172,6 +172,15 @@ what we publish.
       return a
   ```
 
+- Support for multi-dimensional indexing for `PythonObject`
+  ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
+
+    ```mojo
+    var np = Python.import_module("numpy")
+    var a = np.array(PythonObject([1,2,3,1,2,3])).reshape(2,3)
+    print((a[0, 1])) # 2
+    ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
