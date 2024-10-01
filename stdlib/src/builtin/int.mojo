@@ -106,12 +106,9 @@ trait Intable:
     `Int`:
 
     ```mojo
-    var foo = Foo(42)
-    print(int(foo) == 42)
-    ```
-
-    ```plaintext
-    True
+    %# from testing import assert_equal
+    foo = Foo(42)
+    assert_equal(int(foo), 42)
     ```
 
     **Note:** If the `__int__()` method can raise an error, use the
@@ -153,13 +150,9 @@ trait IntableRaising:
     `Int`:
 
     ```mojo
-    fn main() raises:
-        var x = Foo(42)
-        print(int(x) == 42)
-    ```
-
-    ```plaintext
-    True
+    %# from testing import assert_equal
+    foo = Foo(42)
+    assert_equal(int(foo), 42)
     ```
     """
 
@@ -1177,9 +1170,9 @@ struct Int(
         Examples:
 
         ```mojo
-        assert_equal(10._decimal_digit_count(), 2)
-
-        assert_equal(-10._decimal_digit_count(), 2)
+        %# from testing import assert_equal
+        assert_equal(Int(10)._decimal_digit_count(), 2)
+        assert_equal(Int(-10)._decimal_digit_count(), 2)
         ```
         .
         """
