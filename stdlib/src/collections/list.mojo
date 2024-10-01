@@ -24,6 +24,7 @@ from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
 from memory import Reference, UnsafePointer, memcpy
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from utils import Span
 
 from .optional import Optional
@@ -37,6 +38,7 @@ from .optional import Optional
 struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
+    small_buffer_size: Int,
     hint_trivial_type: Bool,
     list_lifetime: Lifetime[list_mutability].type,
     forward: Bool = True,
@@ -46,13 +48,14 @@ struct _ListIter[
     Parameters:
         list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
+        small_buffer_size: The size of the small buffer.
         hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
             but it helps performance. Will go away in the future.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias list_type = List[T, hint_trivial_type]
+    alias list_type = List[T, small_buffer_size, hint_trivial_type]
 
     var index: Int
     var src: Reference[Self.list_type, list_lifetime]
@@ -79,9 +82,11 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement, hint_trivial_type: Bool = False](
-    CollectionElement, CollectionElementNew, Sized, Boolable
-):
+struct List[
+    T: CollectionElement,
+    small_buffer_size: Int = 0,
+    hint_trivial_type: Bool = False,
+](CollectionElement, CollectionElementNew, Sized, Boolable):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -89,11 +94,17 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     Parameters:
         T: The type of the elements.
+        small_buffer_size: Set if you need small buffer optimization.
         hint_trivial_type: A hint to the compiler that the type T is trivial.
             It's not mandatory, but if set, it allows some optimizations.
     """
 
     # Fields
+    alias _small_buffer_type = InlineArray[
+        UnsafeMaybeUninitialized[T], small_buffer_size
+    ]
+    alias sbo_enabled = Self.small_buffer_size != 0
+    var _small_buffer: Self._small_buffer_type
     var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
@@ -108,8 +119,21 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn __init__(inout self):
         """Constructs an empty list."""
         self.data = UnsafePointer[T]()
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+
+        @parameter
+        if Self.sbo_enabled:
+            self.data = self._small_buffer.unsafe_ptr().bitcast[T]()
+            self.capacity = Self.small_buffer_size
+        else:
+            # `self.data = UnsafePointer[T]()` is not there because
+            # we need to call it before calling
+            # `self.data = self._small_buffer.unsafe_ptr()`.
+            # Otherwise, we get the following compiler error:
+            # "potential indirect access to uninitialized value 'self.data'"
+            self.capacity = 0
+
         self.size = 0
-        self.capacity = 0
 
     fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the given list.
@@ -127,8 +151,19 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = UnsafePointer[T].alloc(capacity)
         self.size = 0
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+
+        @parameter
+        if Self.sbo_enabled:
+            if capacity <= Self.small_buffer_size:
+                self.capacity = Self.small_buffer_size
+                # needed to avoid "potential indirect access to uninitialized value 'self.data'"
+                self.data = UnsafePointer[T]()
+                self.data = self._small_buffer.unsafe_ptr().bitcast[T]()
+                return
+
+        self.data = UnsafePointer[T].alloc(capacity)
         self.capacity = capacity
 
     fn __init__(inout self, owned *values: T):
@@ -187,6 +222,14 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.data = unsafe_pointer
         self.size = size
         self.capacity = capacity
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+
+    @always_inline
+    fn _sbo_is_in_use(self) -> Bool:
+        @parameter
+        if not Self.sbo_enabled:
+            return False
+        return self.data == self._small_buffer.unsafe_ptr().bitcast[T]()
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
@@ -194,9 +237,22 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             existing: The existing list.
         """
-        self.data = existing.data
         self.size = existing.size
         self.capacity = existing.capacity
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+
+        @parameter
+        if Self.sbo_enabled:
+            if existing._sbo_is_in_use():
+                # Needed to avoid "potential indirect access to uninitialized value 'self.data'"
+                self.data = UnsafePointer[T]()
+                self.data = self._small_buffer.unsafe_ptr().bitcast[T]()
+
+                # We must move all elements from the previous small buffer to the new one.
+                for i in range(existing.size):
+                    (existing.data + i).move_pointee_into(self.data + i)
+                return
+        self.data = existing.data
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given list.
@@ -212,7 +268,13 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
-        self.data.free()
+        self._free_data_if_possible()
+
+    @always_inline
+    fn _free_data_if_possible(inout self):
+        """Free the memory of the list."""
+        if self.data and not self._sbo_is_in_use():
+            self.data.free()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -324,7 +386,9 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self.__mul(x)
 
-    fn __add__(self, owned other: Self) -> Self:
+    fn __add__(
+        self: Self, owned other: List[T, *_]
+    ) -> List[T, self.small_buffer_size, self.hint_trivial_type]:
         """Concatenates self with other and returns the result as a new list.
 
         Args:
@@ -337,7 +401,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         result.extend(other^)
         return result^
 
-    fn __iadd__(inout self, owned other: Self):
+    fn __iadd__(inout self: Self, owned other: List[T, *_]):
         """Appends the elements of other into self.
 
         Args:
@@ -347,7 +411,9 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self)]:
+    ) -> _ListIter[
+        T, Self.small_buffer_size, hint_trivial_type, __lifetime_of(self)
+    ]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -357,7 +423,9 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self), False]:
+    ) -> _ListIter[
+        T, Self.small_buffer_size, hint_trivial_type, __lifetime_of(self), False
+    ]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
@@ -476,6 +544,38 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return len(self) * sizeof[T]()
 
     fn _realloc(inout self, new_capacity: Int):
+        @parameter
+        if Self.sbo_enabled:
+            self._realloc_with_sbo(new_capacity)
+        else:
+            self._realloc_without_sbo(new_capacity)
+
+    @always_inline
+    fn _realloc_with_sbo(inout self, new_capacity: Int):
+        var new_data: UnsafePointer[T]
+
+        if new_capacity <= Self.small_buffer_size:
+            # We don't need to move anything if the data is already stored in the
+            # inline buffer and the new capacity still fits in that inline buffer.
+            if self._sbo_is_in_use():
+                return
+            new_data = self._small_buffer.unsafe_ptr().bitcast[T]()
+            self.capacity = Self.small_buffer_size
+        else:
+            new_data = UnsafePointer[T].alloc(new_capacity)
+            self.capacity = new_capacity
+
+        _move_pointee_into_many_elements[hint_trivial_type](
+            dest=new_data,
+            src=self.data,
+            size=self.size,
+        )
+
+        self._free_data_if_possible()
+        self.data = new_data
+
+    @always_inline
+    fn _realloc_without_sbo(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
         _move_pointee_into_many_elements[hint_trivial_type](
@@ -484,8 +584,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             size=self.size,
         )
 
-        if self.data:
-            self.data.free()
+        self._free_data_if_possible()
+
         self.data = new_data
         self.capacity = new_capacity
 
@@ -754,6 +854,18 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             The underlying data.
         """
+
+        @parameter
+        if Self.sbo_enabled:
+            if self._sbo_is_in_use():
+                # We use here the fact that if we reallocate for something
+                # that doesn't fit in the small buffer, then a heap allocation
+                # must be done. We allocate more than we need and it's not great
+                # for performance.
+                # TODO: add an argument "force_alloc" to the _realloc method
+                # to force heap allocation even if the capacity is smaller than the
+                # small buffer size.
+                self._realloc(Self.small_buffer_size + 1)
         var ptr = self.data
         self.data = UnsafePointer[T]()
         self.size = 0

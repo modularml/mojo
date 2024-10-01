@@ -79,7 +79,11 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 fn reversed[
     T: CollectionElement
 ](ref [_]value: List[T, *_]) -> _ListIter[
-    T, __type_of(value).hint_trivial_type, __lifetime_of(value), False
+    T,
+    __type_of(value).small_buffer_size,
+    __type_of(value).hint_trivial_type,
+    __lifetime_of(value),
+    False,
 ]:
     """Get a reversed iterator of the input list.
 
