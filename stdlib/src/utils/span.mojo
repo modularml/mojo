@@ -22,7 +22,6 @@ from utils import Span
 
 from collections import InlineArray
 from memory import Reference, UnsafePointer
-from sys.intrinsics import _type_is_eq
 from builtin.builtin_list import _lit_mut_cast
 
 
@@ -125,19 +124,16 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElement, size: Int, //
-    ](inout self, ref [lifetime]array: InlineArray[T2, size]):
+        size: Int, //
+    ](inout self, ref [lifetime]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
-            T2: The type of the elements in the span.
             size: The size of the InlineArray.
 
         Args:
             array: The array to which the span refers.
         """
-
-        constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
 
         self._data = UnsafePointer.address_of(array).bitcast[T]()
         self._len = size
