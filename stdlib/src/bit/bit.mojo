@@ -359,7 +359,7 @@ fn is_power_of_two(val: Int) -> Bool:
     Returns:
         True if the input value is a power of 2, False otherwise.
     """
-    return (val != 0) & (val & (val - 1) == 0)
+    return (val > 0) & (val & (val - 1) == 0)
 
 
 @always_inline
@@ -384,7 +384,11 @@ fn is_power_of_two[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    return (val != 0) & (val & (val - 1) == 0)
+    @parameter
+    if type.is_unsigned():
+        return pop_count(val) == 1
+    else:
+        return (val > 0) & (val & (val - 1) == 0)
 
 
 # ===----------------------------------------------------------------------===#
