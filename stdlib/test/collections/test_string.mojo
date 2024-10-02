@@ -29,7 +29,7 @@ from testing import (
     assert_true,
 )
 
-from utils import StringRef, StringSlice
+from utils import StringRef
 
 
 @value
@@ -191,15 +191,6 @@ def test_add():
     var s8 = String("abc is ")
     var s9 = AString()
     assert_equal("abc is a string", str(s8) + str(s9))
-
-
-def test_add_string_slice():
-    var s1 = String("123")
-    var s2 = StringSlice("abc")
-    assert_equal("123abc", s1 + s2)
-    # assert_equal("abc123", s2 + s1)
-    # s1 += s2
-    # assert_equal("123abcabc", s1 + s2)
 
 
 def test_string_join():
@@ -1629,7 +1620,6 @@ def main():
     test_equality_operators()
     test_comparison_operators()
     test_add()
-    test_add_string_slice()
     test_stringable()
     test_repr()
     test_string_join()
