@@ -359,7 +359,7 @@ fn is_power_of_two(val: Int) -> Bool:
     Returns:
         True if the input value is a power of 2, False otherwise.
     """
-    return (val != 0) & (val & (val - 1) == 0)
+    return (val > 0) & (val & (val - 1) == 0)
 
 
 @always_inline
@@ -384,7 +384,11 @@ fn is_power_of_two[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    return (val != 0) & (val & (val - 1) == 0)
+    @parameter
+    if type.is_unsigned():
+        return pop_count(val) == 1
+    else:
+        return (val > 0) & (val & (val - 1) == 0)
 
 
 # ===----------------------------------------------------------------------===#
@@ -520,8 +524,8 @@ fn rotate_bits_left[shift: Int](x: Int) -> Int:
         The input rotated to the left by `shift` elements (with wrap-around).
     """
     constrained[
-        shift >= -sizeof[Int]() and shift < sizeof[Int](),
-        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+        shift >= -bitwidthof[Int]() and shift < bitwidthof[Int](),
+        "Constraints: -bitwidthof[Int]() <= shift < bitwidthof[Int]()",
     ]()
 
     @parameter
@@ -598,8 +602,8 @@ fn rotate_bits_right[shift: Int](x: Int) -> Int:
         The input rotated to the right by `shift` elements (with wrap-around).
     """
     constrained[
-        shift >= -sizeof[Int]() and shift < sizeof[Int](),
-        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+        shift >= -bitwidthof[Int]() and shift < bitwidthof[Int](),
+        "Constraints: -bitwidthof[Int]() <= shift < bitwidthof[Int]()",
     ]()
 
     @parameter

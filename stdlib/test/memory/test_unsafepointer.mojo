@@ -132,6 +132,9 @@ def test_bitcast():
     assert_equal(int(ptr), int(ptr.bitcast[Int]()))
 
     assert_equal(int(ptr), int(aliased_ptr))
+
+    assert_equal(ptr.bitcast[ptr.type, alignment=33]().alignment, 33)
+
     _ = local
 
 
@@ -278,7 +281,7 @@ def test_load_and_store_simd():
 
     var ptr2 = UnsafePointer[Int8].alloc(16)
     for i in range(0, 16, 4):
-        ptr2.store[width=4](i, i)
+        ptr2.store(i, SIMD[DType.int8, 4](i))
     for i in range(16):
         assert_equal(ptr2[i], i // 4 * 4)
 
