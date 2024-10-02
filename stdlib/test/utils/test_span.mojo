@@ -191,7 +191,7 @@ def test_fill():
 def test_ref():
     var l = InlineArray[Int, 3](1, 2, 3)
     var s = Span[Int](array=l)
-    assert_true(s.as_ref() == Reference.address_of(l.unsafe_ptr()[]))
+    assert_true(s.as_ref() == Pointer.address_of(l.unsafe_ptr()[]))
 
 
 def main():

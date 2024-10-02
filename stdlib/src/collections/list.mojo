@@ -23,7 +23,7 @@ from collections import List
 from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
-from memory import Reference, UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy
 from utils import Span
 
 from .optional import Optional
@@ -55,21 +55,21 @@ struct _ListIter[
     alias list_type = List[T, hint_trivial_type]
 
     var index: Int
-    var src: Reference[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_lifetime]:
+    ) -> Pointer[T, list_lifetime]:
         @parameter
         if forward:
             self.index += 1
-            return Reference.address_of(self.src[][self.index - 1])
+            return Pointer.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return Reference.address_of(self.src[][self.index])
+            return Pointer.address_of(self.src[][self.index])
 
     fn __len__(self) -> Int:
         @parameter
@@ -353,7 +353,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _ListIter(0, Reference.address_of(self))
+        return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
         ref [_]self: Self,
@@ -363,7 +363,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self), Reference.address_of(self))
+        return _ListIter[forward=False](len(self), Pointer.address_of(self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations

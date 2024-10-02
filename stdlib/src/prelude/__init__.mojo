@@ -130,5 +130,5 @@ from collections.string import (
     islower,
     isprintable,
 )
-from memory import Reference, AddressSpace
+from memory import Pointer, AddressSpace
 from utils import Formattable, Formatter

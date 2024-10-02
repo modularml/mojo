@@ -152,7 +152,7 @@ fn hash[
 
     References:
 
-    - [Reference Implementation in Rust](https://github.com/tkaitchuck/aHash)
+    - [Pointer Implementation in Rust](https://github.com/tkaitchuck/aHash)
 
     ```mojo
     from random import rand

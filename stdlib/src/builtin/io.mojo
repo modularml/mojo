@@ -167,7 +167,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), Reference.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:

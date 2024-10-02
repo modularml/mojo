@@ -218,7 +218,7 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+        """Get a `Pointer` to the element at the given index.
 
         Args:
             idx: The index of the item.
@@ -234,7 +234,7 @@ struct InlineArray[
     fn __getitem__[
         idx: Int,
     ](ref [_]self: Self) -> ref [self] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+        """Get a `Pointer` to the element at the given index.
 
         Parameters:
             idx: The index of the item.
