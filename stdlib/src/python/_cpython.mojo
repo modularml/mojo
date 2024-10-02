@@ -62,6 +62,16 @@ alias METH_VARARGS = 0x1
 alias destructor = fn (PyObjectPtr) -> None
 
 
+# GIL
+@value
+@register_passable("trivial")
+struct PyGILState_STATE:
+    var current_state: c_int
+
+    alias PyGILState_LOCKED = c_int(0)
+    alias PyGILState_UNLOCKED = c_int(1)
+
+
 @value
 @register_passable("trivial")
 struct PyKeyValuePair:
@@ -662,11 +672,15 @@ struct CPython:
     # Python GIL and threading
     # ===-------------------------------------------------------------------===#
 
-    fn PyGILState_Ensure(inout self) -> Bool:
-        return self.lib.get_function[fn () -> Bool]("PyGILState_Ensure")()
+    fn PyGILState_Ensure(inout self) -> PyGILState_STATE:
+        return self.lib.get_function[fn () -> PyGILState_STATE](
+            "PyGILState_Ensure"
+        )()
 
-    fn PyGILState_Release(inout self, state: Bool):
-        self.lib.get_function[fn (Bool) -> None]("PyGILState_Release")(state)
+    fn PyGILState_Release(inout self, state: PyGILState_STATE):
+        self.lib.get_function[fn (PyGILState_STATE) -> None](
+            "PyGILState_Release"
+        )(state)
 
     fn PyEval_SaveThread(inout self) -> Int64:
         return self.lib.get_function[fn () -> Int64]("PyEval_SaveThread")()
