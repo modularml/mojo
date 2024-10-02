@@ -789,16 +789,11 @@ struct String(
             str_slice: The string slice from which to construct this string.
         """
 
-        # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_span())
-        var buffer = Self._buffer_type()
-        # +1 for null terminator, initialized to 0
-        buffer.resize(length + 1, 0)
-        memcpy(
-            dest=buffer.data,
-            src=str_slice.as_bytes_span().unsafe_ptr(),
-            count=length,
-        )
+        var length = str_slice.byte_length()
+        var buffer = Self._buffer_type(capacity=length + 1)
+        memcpy(buffer.data, str_slice.unsafe_ptr(), length)
+        buffer.size = length + 1
+        buffer.unsafe_set(length, 0)
         self = Self(buffer^)
 
     @always_inline
