@@ -1583,7 +1583,16 @@ struct String(
         ```
         .
         """
-        var output = List[String]()
+        var output: List[String]
+        alias prealloc = 16  # guessing, Python's implementation uses 12
+
+        @parameter
+        if enable_maxsplit:
+            output = List[String](
+                capacity=maxsplit + 1 if maxsplit < prealloc else prealloc
+            )
+        else:
+            output = List[String](capacity=prealloc)
         var str_byte_len = self.byte_length()
         var lhs = 0
         var rhs = 0
@@ -1669,8 +1678,16 @@ struct String(
         ```
         .
         """
+        var output: List[String]
+        alias prealloc = 16  # guessing, Python's implementation uses 12
 
-        var output = List[String]()
+        @parameter
+        if enable_maxsplit:
+            output = List[String](
+                capacity=maxsplit + 1 if maxsplit < prealloc else prealloc
+            )
+        else:
+            output = List[String](capacity=prealloc)
         var str_byte_len = self.byte_length()
         var lhs = 0
         var rhs = 0
@@ -2081,13 +2098,12 @@ struct String(
         var len_self = self.byte_length()
         var count = len_self * n + 1
         var buf = Self._buffer_type(capacity=count)
-        buf.resize(count, 0)
+        var ptr = buf.unsafe_ptr()
+        var s_ptr = self.unsafe_ptr()
         for i in range(n):
-            memcpy(
-                dest=buf.data + len_self * i,
-                src=self.unsafe_ptr(),
-                count=len_self,
-            )
+            memcpy(ptr + len_self * i, s_ptr, len_self)
+        ptr[len_self * n] = 0
+        buf.size = count
         return String(buf^)
 
     fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
