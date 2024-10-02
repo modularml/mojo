@@ -167,6 +167,7 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
+    # FIXME(MOCO-1291): Can't implement this due to ambiguity.
     # CollectionElementNew,
     Floatable,
     Floorable,
@@ -229,6 +230,7 @@ struct SIMD[type: DType, size: Int](
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
 
+    # FIXME(MOCO-1291): Can't implement this due to ambiguity.
     # @always_inline("nodebug")
     # fn __init__(inout self, *, other: SIMD[type, size]):
     #    """Explicitly copy the provided value.
