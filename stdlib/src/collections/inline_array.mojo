@@ -173,12 +173,8 @@ struct InlineArray[
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var eltref: Reference[
-                Self.ElementType, __lifetime_of(self)
-            ] = self.unsafe_get(i)
-            UnsafePointer.address_of(storage[i]).move_pointee_into(
-                UnsafePointer[Self.ElementType].address_of(eltref[])
-            )
+            var eltptr = UnsafePointer.address_of(self.unsafe_get(i))
+            UnsafePointer.address_of(storage[i]).move_pointee_into(eltptr)
 
         # Mark the elements as already destroyed.
         storage._is_owned = False
@@ -194,7 +190,6 @@ struct InlineArray[
 
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
-
             ptr.init_pointee_copy(other[idx])
 
     fn __copyinit__(inout self, other: Self):

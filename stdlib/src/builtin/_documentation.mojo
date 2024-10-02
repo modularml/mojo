@@ -32,15 +32,16 @@ fn doc_private():
     For example:
 
     ```mojo
+    %# from builtin._documentation import doc_private
     struct Foo:
-      @doc_private
-      fn __init__(inout self):
-        "This should not be called directly, prefer Foo.create instead."
-        return
+        @doc_private
+        fn __init__(inout self):
+            "This should not be called directly, use `Foo.create` instead."
+            return
 
-      @staticmethod
-      fn create() -> Self:
-        return Self()
+        @staticmethod
+        fn create() -> Self:
+            return Self()
     ```
     """
     return

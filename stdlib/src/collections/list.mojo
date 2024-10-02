@@ -66,10 +66,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[][self.index - 1]
+            return Reference.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return self.src[][self.index]
+            return Reference.address_of(self.src[][self.index])
 
     fn __len__(self) -> Int:
         @parameter
@@ -353,7 +353,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _ListIter(0, self)
+        return _ListIter(0, Reference.address_of(self))
 
     fn __reversed__(
         ref [_]self: Self,
@@ -363,7 +363,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self), self)
+        return _ListIter[forward=False](len(self), Reference.address_of(self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations

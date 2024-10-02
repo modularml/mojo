@@ -58,10 +58,10 @@ struct _InlineListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[][self.index - 1]
+            return Reference.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return self.src[][self.index]
+            return Reference.address_of(self.src[][self.index])
 
     fn __len__(self) -> Int:
         @parameter
@@ -177,7 +177,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _InlineListIter(0, self)
+        return _InlineListIter(0, Reference.address_of(self))
 
     fn __contains__[
         C: EqualityComparableCollectionElement, //
