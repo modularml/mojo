@@ -1090,19 +1090,32 @@ struct String(
             return self
         var self_len = self.byte_length()
         var other_len = other.byte_length()
-        var total_len = self_len + other_len
-        var buffer = Self._buffer_type()
-        buffer.resize(total_len + 1, 0)
-        memcpy(
-            buffer.data,
-            self.unsafe_ptr(),
-            self_len,
-        )
-        memcpy(
-            buffer.data + self_len,
-            other.unsafe_ptr(),
-            other_len + 1,  # Also copy the terminator
-        )
+        var buffer = Self._buffer_type(capacity=self_len + other_len + 1)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, self.unsafe_ptr(), self_len)
+        memcpy(ptr + self_len, other.unsafe_ptr(), other_len + 1)
+        buffer.size = self_len + other_len + 1
+        return Self(buffer^)
+
+    fn __add__(self, other: StringSlice) -> String:
+        """Creates a string by appending a string slice at the end.
+        Args:
+            other: The string slice to append.
+        Returns:
+            The new constructed string.
+        """
+        if not self:
+            return other
+        if not other:
+            return self
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
+        var buffer = Self._buffer_type(capacity=self_len + other_len + 1)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, self.unsafe_ptr(), self_len)
+        memcpy(ptr + self_len, other.unsafe_ptr(), other_len)
+        buffer.unsafe_set(self_len + other_len, 0)
+        buffer.size = self_len + other_len + 1
         return Self(buffer^)
 
     @always_inline
@@ -1117,6 +1130,26 @@ struct String(
         """
         return other + self
 
+    fn __radd__(self, other: StringSlice) -> String:
+        """Creates a string by prepending another string slice to the start.
+        Args:
+            other: The string to prepend.
+        Returns:
+            The new constructed string.
+        """
+        if not self:
+            return other
+        if not other:
+            return self
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
+        var buffer = Self._buffer_type(capacity=other_len + self_len + 1)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, other.unsafe_ptr(), other_len)
+        memcpy(ptr + other_len, self.unsafe_ptr(), self_len + 1)
+        buffer.size = self_len + other_len + 1
+        return Self(buffer^)
+
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
@@ -1130,14 +1163,26 @@ struct String(
             return
         var self_len = self.byte_length()
         var other_len = other.byte_length()
-        var total_len = self_len + other_len
-        self._buffer.resize(total_len + 1, 0)
-        # Copy the data alongside the terminator.
-        memcpy(
-            dest=self.unsafe_ptr() + self_len,
-            src=other.unsafe_ptr(),
-            count=other_len + 1,
-        )
+        self._buffer.reserve(self_len + other_len + 1)
+        memcpy(self.unsafe_ptr() + self_len, other.unsafe_ptr(), other_len + 1)
+        self._buffer.size = self_len + other_len + 1
+
+    fn __iadd__(inout self, other: StringSlice):
+        """Appends another string slice to this string.
+        Args:
+            other: The string to append.
+        """
+        if not self:
+            self = other
+            return
+        if not other:
+            return
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
+        self._buffer.reserve(self_len + other_len + 1)
+        memcpy(self.unsafe_ptr() + self_len, other.unsafe_ptr(), other_len)
+        self._buffer.unsafe_set(self_len + other_len, 0)
+        self._buffer.size = self_len + other_len + 1
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
