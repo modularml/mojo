@@ -23,6 +23,7 @@ from sys import (
     _libc as libc,
 )
 from sys._libc import dup, fclose, fdopen, fflush
+from sys.ffi import OpaquePointer
 
 from builtin.builtin_list import _LITRefPackHelper
 from builtin.dtype import _get_dtype_printf_format
@@ -40,7 +41,7 @@ from utils import Formattable, Formatter
 @value
 @register_passable("trivial")
 struct _fdopen[mode: StringLiteral = "a"]:
-    var handle: UnsafePointer[NoneType]
+    var handle: OpaquePointer
 
     fn __init__(inout self, stream_id: FileDescriptor):
         """Creates a file handle to the stdout/stderr stream.
@@ -124,7 +125,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
             UnsafePointer[UnsafePointer[UInt8]],
             UnsafePointer[UInt64],
             Int,
-            UnsafePointer[NoneType],
+            OpaquePointer,
         ](
             UnsafePointer.address_of(buffer),
             UnsafePointer.address_of(UInt64(0)),
@@ -166,7 +167,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), Reference(loaded_pack)
+            fmt.unsafe_cstr_ptr(), Reference.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
@@ -314,7 +315,7 @@ fn _put[
         var tmp = 0
         var arg_ptr = UnsafePointer.address_of(tmp)
         _ = external_call["vprintf", Int32](
-            x.unsafe_ptr(), arg_ptr.bitcast[UnsafePointer[NoneType]]()
+            x.unsafe_ptr(), arg_ptr.bitcast[OpaquePointer]()
         )
     else:
         alias MAX_STR_LEN = 0x1000_0000

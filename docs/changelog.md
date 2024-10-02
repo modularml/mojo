@@ -83,6 +83,9 @@ what we publish.
   - Added `TypedPythonObject["Tuple].__getitem__` for accessing the elements of
     a Python tuple.
 
+- Added `Python.add_object()`, to add a named `PythonObject` value to a Python
+  'module' object instance.
+
 - Added `Python.unsafe_get_python_exception()`, as an efficient low-level
   utility to get the Mojo `Error` equivalent of the current CPython error state.
 
@@ -171,6 +174,15 @@ what we publish.
   fn return_ref(a: String) -> ref [a] String:
       return a
   ```
+
+- Support for multi-dimensional indexing for `PythonObject`
+  ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
+
+    ```mojo
+    var np = Python.import_module("numpy")
+    var a = np.array(PythonObject([1,2,3,1,2,3])).reshape(2,3)
+    print((a[0, 1])) # 2
+    ```
 
 ### 🦋 Changed
 

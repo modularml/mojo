@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char
+from sys.ffi import c_char, OpaquePointer
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -1265,7 +1265,7 @@ struct String(
             value. This `String` MUST outlive the `Formatter` instance.
         """
 
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[String] = ptr0.bitcast[String]()
 
             # FIXME:
