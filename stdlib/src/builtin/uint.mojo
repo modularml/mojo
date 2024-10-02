@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
+from builtin._documentation import doc_private
 from builtin.hash import _hash_simd
 
 
@@ -56,6 +57,7 @@ struct UInt(IntLike):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct UInt from the given index value.
@@ -64,6 +66,18 @@ struct UInt(IntLike):
             value: The init value.
         """
         self.value = value
+
+    @doc_private
+    @always_inline("nodebug")
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+        """Construct UInt from the given Index value.
+
+        Args:
+            value: The init value.
+        """
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+            value
+        )
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
