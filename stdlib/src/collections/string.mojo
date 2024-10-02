@@ -1617,6 +1617,7 @@ struct String(
 
         return output^
 
+    @always_inline("nodebug")
     fn split(self, sep: String) raises -> List[String]:
         """Split the string by a separator.
 
@@ -1712,6 +1713,7 @@ struct String(
 
         return output^
 
+    @always_inline("nodebug")
     fn split(self, sep: NoneType = None) -> List[String]:
         """Split the string by every Whitespace separator.
 
