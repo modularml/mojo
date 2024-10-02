@@ -31,7 +31,7 @@ from sys import (
 )
 from collections import Optional
 from builtin.dtype import _integral_type_of
-from memory.reference import AddressSpace, _GPUAddressSpace
+from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
