@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import Reference, UnsafePointer
+from memory import Pointer, UnsafePointer
 
 
 # ===----------------------------------------------------------------------===#
@@ -229,20 +229,20 @@ struct _VariadicListMemIter[
     alias variadic_list_type = VariadicListMem[elt_type, elt_lifetime]
 
     var index: Int
-    var src: Reference[Self.variadic_list_type, list_lifetime]
+    var src: Pointer[Self.variadic_list_type, list_lifetime]
 
     fn __init__(
         inout self, index: Int, ref [list_lifetime]list: Self.variadic_list_type
     ):
         self.index = index
-        self.src = Reference.address_of(list)
+        self.src = Pointer.address_of(list)
 
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
         self.index += 1
         # TODO: Need to make this return a dereferenced reference, not a
         # reference that must be deref'd by the user.
         return rebind[Self.variadic_list_type.reference_type](
-            Reference.address_of(self.src[][self.index - 1])
+            Pointer.address_of(self.src[][self.index - 1])
         )
 
     fn __len__(self) -> Int:
@@ -297,7 +297,7 @@ struct VariadicListMem[
         lifetime: The reference lifetime of the underlying elements.
     """
 
-    alias reference_type = Reference[element_type, lifetime]
+    alias reference_type = Pointer[element_type, lifetime]
     alias _mlir_ref_type = Self.reference_type._mlir_type
     alias _mlir_type = __mlir_type[
         `!kgen.variadic<`, Self._mlir_ref_type, `, borrow_in_mem>`
@@ -639,7 +639,7 @@ struct VariadicPack[
             index: The element of the pack to return.
 
         Returns:
-            A reference to the element.  The Reference's mutability follows the
+            A reference to the element.  The Pointer's mutability follows the
             mutability of the pack argument convention.
         """
         litref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](
