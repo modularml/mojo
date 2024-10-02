@@ -27,6 +27,10 @@ struct Box[T: AnyType]:
 
     var _inner: UnsafePointer[T, AddressSpace.GENERIC]
 
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
     fn __init__[T: Movable](inout self: Box[T], owned value: T):
         """Construct a new Box[] by moving the passed value into a new backing allocation.
 
@@ -86,6 +90,15 @@ struct Box[T: AnyType]:
         self._inner = existing._inner
         existing._inner = UnsafePointer[T]()
 
+    fn __del__(owned self: Box[T]):
+        """Destroy the Box[]."""
+        self._inner.destroy_pointee()
+        self._inner.free()
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
     fn __getitem__(
         ref [_, AddressSpace.GENERIC._value.value]self
     ) -> ref [self, AddressSpace.GENERIC._value.value] T:
@@ -102,10 +115,9 @@ struct Box[T: AnyType]:
 
         return self._inner[]
 
-    fn __del__(owned self: Box[T]):
-        """Destroy the Box[]."""
-        self._inner.destroy_pointee()
-        self._inner.free()
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """UNSAFE: returns the backing pointer for this Box[].
@@ -132,3 +144,25 @@ struct Box[T: AnyType]:
         __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
 
         return r^
+
+    fn steal_data(owned self) -> UnsafePointer[T]:
+        """Take ownership over the heap allocated pointer backing this `Box`.
+
+        Safety:
+            This function is not unsafe to call, as a memory leak is not
+            considered unsafe.
+
+            However, to avoid a memory leak, callers should ensure that the
+            returned pointer is eventually deinitialized and deallocated.
+            Failure to do so will leak memory.
+
+        Returns:
+            The pointer owned by this box.
+        """
+
+        var ptr = self._inner
+
+        # Prevent the destructor from running on `self`
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+
+        return ptr
