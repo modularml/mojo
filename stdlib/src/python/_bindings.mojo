@@ -11,9 +11,37 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from memory import UnsafePointer
+
+from sys.ffi import c_int
+
 from python import PythonObject, TypedPythonObject
 from python.python import _get_global_python_itf
 from python._cpython import PyObject, PyObjectPtr, PyCFunction
+
+# ===-----------------------------------------------------------------------===#
+# Mojo Object
+# ===-----------------------------------------------------------------------===#
+
+# Must be ABI compatible with `initfunc`
+alias Typed_initfunc = fn (
+    PyObjectPtr, TypedPythonObject["Tuple"], PythonObject
+) -> c_int
+
+
+struct PyMojoObject[T: AnyType]:
+    """Storage backing a PyObject* wrapping a Mojo value."""
+
+    var ob_base: PyObject
+    var mojo_value: T
+
+    @staticmethod
+    fn unsafe_cast_obj(obj_raw_ptr: PyObjectPtr) -> UnsafePointer[T]:
+        var mojo_obj_ptr = obj_raw_ptr.value.bitcast[PyMojoObject[T]]()
+
+        # TODO(MSTDL-950): Should use something like `addr_of!`
+        return UnsafePointer[T].address_of(mojo_obj_ptr[].mojo_value)
+
 
 # ===-----------------------------------------------------------------------===#
 # PyCFunction Wrappers
