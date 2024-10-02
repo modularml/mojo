@@ -197,6 +197,13 @@ what we publish.
   - `StringRef` has been removed. Please explicitly import it via
     `from utils import StringRef`.
 
+- The `Reference` type has been renamed to `Pointer`: a memory safe complement
+  to `UnsafePointer`.  This change is motivated by the fact that `Pointer`
+  is assignable and requires an explicit dereference with `ptr[]`.  Renaming
+  to `Pointer` clarifies that "references" means `ref` arguments and results,
+  and gives us a model that is more similar to what the C++ community would
+  expect.
+
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
