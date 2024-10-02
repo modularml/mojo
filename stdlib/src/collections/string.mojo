@@ -1609,7 +1609,7 @@ struct String(
 
             @parameter
             if enable_maxsplit:
-                rhs = (str_byte_len - rhs) * int(items == maxsplit) + rhs
+                rhs += int(items == maxsplit) * (str_byte_len - rhs)
                 items += 1
 
             output.append(String(_build_slice(ptr, lhs, rhs)))
@@ -1704,7 +1704,7 @@ struct String(
 
             @parameter
             if enable_maxsplit:
-                rhs = (str_byte_len - rhs) * int(items == maxsplit) + rhs
+                rhs += int(items == maxsplit) * (str_byte_len - rhs)
                 items += 1
 
             output.append(String(_build_slice(ptr, lhs, rhs)))
