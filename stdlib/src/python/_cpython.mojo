@@ -26,7 +26,7 @@ from sys.arg import argv
 from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
 
 from python.python import _get_global_python_itf
-from python._bindings import Typed_initfunc
+from python._bindings import Typed_initproc
 
 from memory import UnsafePointer
 
@@ -241,7 +241,7 @@ struct PyType_Slot:
         return PyType_Slot(Py_tp_new, rebind[OpaquePointer](func))
 
     @staticmethod
-    fn tp_init(func: Typed_initfunc) -> Self:
+    fn tp_init(func: Typed_initproc) -> Self:
         return PyType_Slot(Py_tp_init, rebind[OpaquePointer](func))
 
     @staticmethod
