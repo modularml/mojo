@@ -31,7 +31,7 @@ alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
 
 
-@always_inline("nodebug")
+@always_inline
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     debug_assert(
         0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
@@ -68,7 +68,7 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
-@always_inline("nodebug")
+@always_inline
 fn _utf8_first_byte_sequence_length(b: UInt8) -> Int:
     """Get the length of the sequence starting with given byte. Do note that
     this does not work correctly if given a continuation byte."""
