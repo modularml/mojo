@@ -35,6 +35,7 @@ from builtin.value import StringableCollectionElement
 
 from .optional import Optional
 from bit import is_power_of_two
+from sys.ffi import OpaquePointer
 from memory import memcpy, bitcast, UnsafePointer
 
 
@@ -256,7 +257,7 @@ struct _DictIndex:
     this in the current type system.
     """
 
-    var data: UnsafePointer[NoneType]
+    var data: OpaquePointer
 
     @always_inline
     fn __init__(inout self, reserved: Int):

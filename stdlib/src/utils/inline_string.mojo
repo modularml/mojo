@@ -19,6 +19,7 @@ from collections import InlineArray
 from os import abort
 from collections import Optional
 from sys import sizeof
+from sys.ffi import OpaquePointer
 
 from memory import UnsafePointer, memcpy
 
@@ -474,7 +475,7 @@ struct _FixedString[CAP: Int](
         writer.write_str(self.as_string_slice())
 
     fn _unsafe_to_formatter(inout self) -> Formatter:
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
 
             var str_slice = StringSlice[ImmutableAnyLifetime](

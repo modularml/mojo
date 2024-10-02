@@ -16,6 +16,7 @@ themselves to a string.
 
 from builtin.io import _put
 from memory import UnsafePointer
+from sys.ffi import OpaquePointer
 
 # ===----------------------------------------------------------------------===#
 # Interface traits
@@ -81,8 +82,8 @@ struct Formatter:
     #   seemingly getting clobbered in between when the closure was constructed
     #   and first called. Once that bug is fixed, this should be replaced with
     #   an `escaping` closure again.
-    var _write_func: fn (UnsafePointer[NoneType], StringRef) -> None
-    var _write_func_arg: UnsafePointer[NoneType]
+    var _write_func: fn (OpaquePointer, StringRef) -> None
+    var _write_func_arg: OpaquePointer
     """Closure argument passed to `_write_func`."""
 
     # ===------------------------------------------------------------------===#
@@ -109,7 +110,7 @@ struct Formatter:
         """
 
         @always_inline
-        fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_fd(ptr: OpaquePointer, strref: StringRef):
             var fd0 = ptr.bitcast[FileDescriptor]()[].value
 
             _put(strref, file=fd0)
@@ -121,8 +122,8 @@ struct Formatter:
 
     fn __init__(
         inout self,
-        func: fn (UnsafePointer[NoneType], StringRef) -> None,
-        arg: UnsafePointer[NoneType],
+        func: fn (OpaquePointer, StringRef) -> None,
+        arg: OpaquePointer,
     ):
         """Constructs a formatter from any closure that accepts `StringRef`s.
 
@@ -215,7 +216,7 @@ struct Formatter:
         """
 
         @always_inline
-        fn write_to_stdout(_data: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_stdout(_data: OpaquePointer, strref: StringRef):
             _put(strref)
 
-        return Formatter(write_to_stdout, UnsafePointer[NoneType]())
+        return Formatter(write_to_stdout, OpaquePointer())

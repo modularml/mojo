@@ -19,7 +19,7 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call
+from .ffi import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
 
 
@@ -780,7 +780,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
         "kern.osproductversion".unsafe_cstr_ptr(),
         buf.data,
         Reference.address_of(buf_len),
-        UnsafePointer[NoneType](),
+        OpaquePointer(),
         Int(0),
     )
 

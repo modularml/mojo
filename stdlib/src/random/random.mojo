@@ -20,6 +20,7 @@ from random import seed
 """
 
 from sys import bitwidthof, external_call
+from sys.ffi import OpaquePointer
 from time import perf_counter_ns
 from collections import Optional
 
@@ -28,10 +29,10 @@ from math import floor
 import math
 
 
-fn _get_random_state() -> UnsafePointer[NoneType]:
+fn _get_random_state() -> OpaquePointer:
     return external_call[
         "KGEN_CompilerRT_GetRandomState",
-        UnsafePointer[NoneType],
+        OpaquePointer,
     ]()
 
 

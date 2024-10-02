@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.ffi import _get_global
+from sys.ffi import _get_global, OpaquePointer
 
 from memory import UnsafePointer
 from testing import assert_equal, assert_false, assert_true
@@ -53,14 +53,14 @@ fn assert_no_poison() raises:
 
 
 fn _initialize_poison(
-    payload: UnsafePointer[NoneType],
-) -> UnsafePointer[NoneType]:
+    payload: OpaquePointer,
+) -> OpaquePointer:
     var poison = UnsafePointer[Bool].alloc(1)
     poison.init_pointee_move(False)
     return poison.bitcast[NoneType]()
 
 
-fn _destroy_poison(p: UnsafePointer[NoneType]):
+fn _destroy_poison(p: OpaquePointer):
     p.free()
 
 
