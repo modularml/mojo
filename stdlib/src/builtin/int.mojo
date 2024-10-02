@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from builtin.io import _snprintf
@@ -315,6 +316,7 @@ struct Int(
         """
         self = other
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct Int from the given index value.
@@ -324,6 +326,7 @@ struct Int(
         """
         self.value = value
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
@@ -331,12 +334,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
@@ -344,12 +348,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
@@ -357,12 +362,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
@@ -371,9 +377,7 @@ struct Int(
             value: The init value.
         """
         self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                value
-            )
+            value
         )
 
     @always_inline("nodebug")
