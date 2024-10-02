@@ -1720,14 +1720,8 @@ struct String(
 
         return output^
 
-    fn split[
-        enable_maxsplit: Bool = False
-    ](self, sep: NoneType = None) -> List[String]:
+    fn split(self, sep: NoneType = None) -> List[String]:
         """Split the string by every Whitespace separator.
-
-        Parameters:
-            enable_maxsplit: Whether to enable maxsplit. This reduces branching
-                for maximum performance.
 
         Args:
             sep: None.
