@@ -1114,8 +1114,8 @@ struct String(
         var ptr = buffer.unsafe_ptr()
         memcpy(ptr, self.unsafe_ptr(), self_len)
         memcpy(ptr + self_len, other.unsafe_ptr(), other_len)
-        buffer.unsafe_set(self_len + other_len, 0)
         buffer.size = self_len + other_len + 1
+        buffer.unsafe_set(self_len + other_len, 0)
         return Self(buffer^)
 
     @always_inline
@@ -1181,8 +1181,8 @@ struct String(
         var other_len = other.byte_length()
         self._buffer.reserve(self_len + other_len + 1)
         memcpy(self.unsafe_ptr() + self_len, other.unsafe_ptr(), other_len)
-        self._buffer.unsafe_set(self_len + other_len, 0)
         self._buffer.size = self_len + other_len + 1
+        self._buffer.unsafe_set(self_len + other_len, 0)
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
