@@ -592,6 +592,7 @@ fn test_py_slice() raises:
         "[[1, 2, 3], [4, 5, 6]]", str(with_2d[PythonObject(Slice(0, 2))])
     )
     assert_equal("[[1, 2, 3], [4, 5, 6]]", str(with_2d[0:2]))
+    assert_equal("[[1, 3], [4, 6]]", str(with_2d[0:2, ::2]))
 
     assert_equal(
         "[6, 5, 4]", str(with_2d[1, PythonObject(Slice(None, None, -1))])
