@@ -167,7 +167,7 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
-    CollectionElementNew,
+    # CollectionElementNew,
     Floatable,
     Floorable,
     Formattable,
@@ -229,14 +229,14 @@ struct SIMD[type: DType, size: Int](
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
 
-    @always_inline("nodebug")
-    fn __init__(inout self, *, other: SIMD[type, size]):
-        """Explicitly copy the provided value.
+    # @always_inline("nodebug")
+    # fn __init__(inout self, *, other: SIMD[type, size]):
+    #    """Explicitly copy the provided value.
 
-        Args:
-            other: The value to copy.
-        """
-        self.__copyinit__(other)
+    #    Args:
+    #        other: The value to copy.
+    #    """
+    #    self.__copyinit__(other)
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
