@@ -326,29 +326,27 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 @always_inline
 fn _get_global[
     name: StringLiteral,
-    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
-    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
-](
-    payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()
-) -> UnsafePointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", UnsafePointer[NoneType]
-    ](StringRef(name), payload, init_fn, destroy_fn)
+    init_fn: fn (OpaquePointer) -> OpaquePointer,
+    destroy_fn: fn (OpaquePointer) -> None,
+](payload: OpaquePointer = OpaquePointer()) -> OpaquePointer:
+    return external_call["KGEN_CompilerRT_GetGlobalOrCreate", OpaquePointer](
+        StringRef(name), payload, init_fn, destroy_fn
+    )
 
 
 @always_inline
-fn _get_global_or_null[name: StringLiteral]() -> UnsafePointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_GetGlobalOrNull", UnsafePointer[NoneType]
-    ](name.unsafe_ptr(), name.byte_length())
+fn _get_global_or_null[name: StringLiteral]() -> OpaquePointer:
+    return external_call["KGEN_CompilerRT_GetGlobalOrNull", OpaquePointer](
+        name.unsafe_ptr(), name.byte_length()
+    )
 
 
 @always_inline
 fn _get_dylib[
     name: StringLiteral,
-    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
-    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
-](payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()) -> DLHandle:
+    init_fn: fn (OpaquePointer) -> OpaquePointer,
+    destroy_fn: fn (OpaquePointer) -> None,
+](payload: OpaquePointer = OpaquePointer()) -> DLHandle:
     var ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
         DLHandle
     ]()
@@ -359,10 +357,10 @@ fn _get_dylib[
 fn _get_dylib_function[
     name: StringLiteral,
     func_name: StringLiteral,
-    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
-    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
+    init_fn: fn (OpaquePointer) -> OpaquePointer,
+    destroy_fn: fn (OpaquePointer) -> None,
     result_type: AnyTrivialRegType,
-](payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()) -> result_type:
+](payload: OpaquePointer = OpaquePointer()) -> result_type:
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
@@ -374,7 +372,7 @@ fn _get_dylib_function[
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer.address_of(new_func).bitcast[UnsafePointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[OpaquePointer]()[],
     )
 
     return new_func

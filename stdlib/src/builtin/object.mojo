@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import Dict, List
 from sys.intrinsics import _type_is_eq
+from sys.ffi import OpaquePointer
 
 from memory import Arc, memcmp, memcpy, UnsafePointer
 
@@ -84,7 +85,7 @@ struct _RefCountedList:
 @register_passable("trivial")
 struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    var lst: UnsafePointer[NoneType]
+    var lst: OpaquePointer
     """The reference to the list."""
 
     @always_inline

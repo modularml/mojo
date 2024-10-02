@@ -33,6 +33,7 @@ with open("my_file.txt", "r") as f:
 
 from os import PathLike
 from sys import external_call, sizeof
+from sys.ffi import OpaquePointer
 from utils import Span, StringRef
 
 from memory import AddressSpace, UnsafePointer
@@ -69,12 +70,12 @@ struct _OwnedStringRef(Boolable):
 struct FileHandle:
     """File handle to an opened file."""
 
-    var handle: UnsafePointer[NoneType]
+    var handle: OpaquePointer
     """The underlying pointer to the file handle."""
 
     fn __init__(inout self):
         """Default constructor."""
-        self.handle = UnsafePointer[NoneType]()
+        self.handle = OpaquePointer()
 
     fn __init__(inout self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
@@ -94,11 +95,11 @@ struct FileHandle:
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[
-            "KGEN_CompilerRT_IO_FileOpen", UnsafePointer[NoneType]
+            "KGEN_CompilerRT_IO_FileOpen", OpaquePointer
         ](path, mode, Reference.address_of(err_msg))
 
         if err_msg:
-            self.handle = UnsafePointer[NoneType]()
+            self.handle = OpaquePointer()
             raise err_msg^.consume_as_error()
 
         self.handle = handle
@@ -123,7 +124,7 @@ struct FileHandle:
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        self.handle = UnsafePointer[NoneType]()
+        self.handle = OpaquePointer()
 
     fn __moveinit__(inout self, owned existing: Self):
         """Moves constructor for the file handle.
@@ -132,7 +133,7 @@ struct FileHandle:
           existing: The existing file handle.
         """
         self.handle = existing.handle
-        existing.handle = UnsafePointer[NoneType]()
+        existing.handle = OpaquePointer()
 
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads data from a file and sets the file handle seek position. If
