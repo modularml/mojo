@@ -77,7 +77,7 @@ struct PyGILState_STATE:
 struct PyKeyValuePair:
     var key: PyObjectPtr
     var value: PyObjectPtr
-    var position: Int
+    var position: c_int
     var success: Bool
 
 
@@ -299,7 +299,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
     var init_fn: Self._init_fn_type
 
     # The module's index into its interpreter's modules_by_index cache.
-    var index: Int
+    var index: Py_ssize_t
 
     # A copy of the module's __dict__ after the first time it was loaded.
     var dict_copy: UnsafePointer[PyObject]
@@ -366,7 +366,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
 # Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef_Slot
 @value
 struct PyModuleDef_Slot:
-    var slot: Int
+    var slot: c_int
     var value: OpaquePointer
 
 
@@ -383,7 +383,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     # Points to the contents of the docstring for the module.
     var docstring: UnsafePointer[c_char]
 
-    var size: Int
+    var size: Py_ssize_t
 
     # A pointer to a table of module-level functions.  Can be null if there
     # are no functions present.
@@ -392,13 +392,13 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     var slots: UnsafePointer[PyModuleDef_Slot]
 
     # TODO(MOCO-1138): These are C ABI function pointers, not Mojo functions.
-    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> Int
+    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> c_int
     alias _traverse_fn_type = fn (
         PyObjectPtr, Self._visitproc_fn_type, OpaquePointer
-    ) -> Int
+    ) -> c_int
     var traverse_fn: Self._traverse_fn_type
 
-    alias _clear_fn_type = fn (PyObjectPtr) -> Int
+    alias _clear_fn_type = fn (PyObjectPtr) -> c_int
     var clear_fn: Self._clear_fn_type
 
     alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
