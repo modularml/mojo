@@ -175,6 +175,10 @@ what we publish.
       return a
   ```
 
+- `StringRef` now implements `split()` which can be used to split a
+  `StringRef` into a `List[StringRef]` by a delimiter.
+  ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
+
 - Support for multi-dimensional indexing for `PythonObject`
   ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
 
