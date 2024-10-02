@@ -260,7 +260,25 @@ struct TemporaryDirectory:
 
 
 struct NamedTemporaryFile:
-    """A handle to a temporary file."""
+    """A handle to a temporary file.
+
+    Example:
+    ```mojo
+    from tempfile import NamedTemporaryFile
+    from pathlib import Path
+    def main():
+        var p: Path
+        with NamedTemporaryFile(mode="rw") as f:
+            p = f.name
+            f.write("Hello world!")
+            f.seek(0)
+            print(
+                f.read() == "Hello world!"
+            )
+        print(str(p), p.exists()) #Removed by default
+    ```
+    Note: `NamedTemporaryFile.__init__` document the arguments.
+    """
 
     var _file_handle: FileHandle
     """The underlying file handle."""
