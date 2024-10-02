@@ -19,6 +19,7 @@ from time import now
 ```
 """
 
+from os import abort
 from sys import (
     external_call,
     os_is_linux,
@@ -258,7 +259,9 @@ fn monotonic() -> Int:
 
 @always_inline
 @parameter
-fn _time_function_windows[func: fn () capturing [_] -> None]() -> Int:
+fn _time_function_windows[
+    func: fn () raises capturing [_] -> None
+]() raises -> Int:
     """Calculates elapsed time in Windows"""
 
     var ticks_per_sec: _WINDOWS_LARGE_INTEGER = 0
@@ -289,7 +292,7 @@ fn _time_function_windows[func: fn () capturing [_] -> None]() -> Int:
 
 @always_inline
 @parameter
-fn time_function[func: fn () capturing [_] -> None]() -> Int:
+fn time_function[func: fn () raises capturing [_] -> None]() raises -> Int:
     """Measures the time spent in the function.
 
     Parameters:
@@ -307,6 +310,28 @@ fn time_function[func: fn () capturing [_] -> None]() -> Int:
     func()
     var toc = perf_counter_ns()
     return toc - tic
+
+
+@always_inline
+@parameter
+fn time_function[func: fn () capturing [_] -> None]() -> Int:
+    """Measures the time spent in the function.
+
+    Parameters:
+        func: The function to time.
+
+    Returns:
+        The time elapsed in the function in ns.
+    """
+
+    @parameter
+    fn raising_func() raises:
+        func()
+
+    try:
+        return time_function[raising_func]()
+    except err:
+        return abort[Int](err)
 
 
 # ===----------------------------------------------------------------------===#
