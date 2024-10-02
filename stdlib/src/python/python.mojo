@@ -28,8 +28,8 @@ from memory import UnsafePointer
 
 from utils import StringRef
 
-from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
 from .python_object import PythonObject, TypedPythonObject
+from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
 
 
 fn _init_global(ignored: OpaquePointer) -> OpaquePointer:

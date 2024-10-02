@@ -26,6 +26,7 @@ from sys.arg import argv
 from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
 
 from python.python import _get_global_python_itf
+from python._bindings import Typed_initfunc
 
 from memory import UnsafePointer
 
@@ -60,6 +61,9 @@ alias PyCFunction = fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
 alias METH_VARARGS = 0x1
 
 alias destructor = fn (PyObjectPtr) -> None
+
+alias initproc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
+alias newfunc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
 
 
 # GIL
@@ -231,6 +235,22 @@ struct PyType_Spec:
 struct PyType_Slot:
     var slot: c_int
     var pfunc: OpaquePointer
+
+    @staticmethod
+    fn tp_new(func: newfunc) -> Self:
+        return PyType_Slot(Py_tp_new, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_init(func: Typed_initfunc) -> Self:
+        return PyType_Slot(Py_tp_init, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_dealloc(func: destructor) -> Self:
+        return PyType_Slot(Py_tp_dealloc, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_methods(methods: UnsafePointer[PyMethodDef]) -> Self:
+        return PyType_Slot(Py_tp_methods, rebind[OpaquePointer](methods))
 
     @staticmethod
     fn null() -> Self:
