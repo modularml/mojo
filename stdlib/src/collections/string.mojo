@@ -1099,8 +1099,10 @@ struct String(
 
     fn __add__(self, other: StringSlice) -> String:
         """Creates a string by appending a string slice at the end.
+
         Args:
             other: The string slice to append.
+
         Returns:
             The new constructed string.
         """
@@ -1115,7 +1117,7 @@ struct String(
         memcpy(ptr, self.unsafe_ptr(), self_len)
         memcpy(ptr + self_len, other.unsafe_ptr(), other_len)
         buffer.size = self_len + other_len + 1
-        buffer.unsafe_set(self_len + other_len, 0)
+        ptr[self_len + other_len] = 0
         return Self(buffer^)
 
     @always_inline
@@ -1132,8 +1134,10 @@ struct String(
 
     fn __radd__(self, other: StringSlice) -> String:
         """Creates a string by prepending another string slice to the start.
+
         Args:
             other: The string to prepend.
+
         Returns:
             The new constructed string.
         """
@@ -1169,6 +1173,7 @@ struct String(
 
     fn __iadd__(inout self, other: StringSlice):
         """Appends another string slice to this string.
+
         Args:
             other: The string to append.
         """
@@ -1182,7 +1187,7 @@ struct String(
         self._buffer.reserve(self_len + other_len + 1)
         memcpy(self.unsafe_ptr() + self_len, other.unsafe_ptr(), other_len)
         self._buffer.size = self_len + other_len + 1
-        self._buffer.unsafe_set(self_len + other_len, 0)
+        self._buffer.unsafe_ptr()[self_len + other_len] = 0
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
