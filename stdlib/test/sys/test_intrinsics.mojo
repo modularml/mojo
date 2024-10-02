@@ -37,7 +37,7 @@ def test_compressed_store():
     assert_equal(vector.load[width=4](0), F32x4(2.0, 3.0, 0.0, 0.0))
 
     # Just clear the buffer.
-    vector.store[width=4](0, 0)
+    vector.store(0, SIMD[DType.float32, 4](0))
 
     var val = F32x4(0.0, 1.0, 3.0, 0.0)
     compressed_store(val, vector, val != 0)
