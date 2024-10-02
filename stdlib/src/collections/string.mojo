@@ -791,9 +791,10 @@ struct String(
 
         var length = str_slice.byte_length()
         var buffer = Self._buffer_type(capacity=length + 1)
-        memcpy(buffer.data, str_slice.unsafe_ptr(), length)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, str_slice.unsafe_ptr(), length)
         buffer.size = length + 1
-        buffer.unsafe_set(length, 0)
+        ptr[length] = 0
         self = Self(buffer^)
 
     @always_inline
