@@ -16,7 +16,10 @@ from testing import assert_equal
 
 
 def test_str_none():
-    assert_equal(str(None), "None")
+    # TODO(#3393): Change to str(None) when MLIR types do not confuse overload resolution.
+    # The error we are receiving with str(None) is:
+    # cannot bind MLIR type 'None' to trait 'RepresentableCollectionElement'
+    assert_equal(str(NoneType()), "None")
 
 
 def main():

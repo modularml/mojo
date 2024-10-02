@@ -16,14 +16,19 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from memory import Reference, UnsafePointer
+from python import PythonObject
 
+
+from collections import Dict
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
 # ===----------------------------------------------------------------------===#
 
 
-struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
+struct ListLiteral[*Ts: CollectionElement](
+    Sized, CollectionElement, Formattable, Representable, Stringable
+):
     """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
@@ -78,6 +83,74 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
             The length of this ListLiteral.
         """
         return len(self.storage)
+
+    fn __str__(self) -> String:
+        """Returns a string representation of a ListLiteral.
+
+        Returns:
+            The string representation of the ListLiteral.
+
+        Here is an example below:
+        ```mojo
+        var my_list = [1, 2, "Mojo"]
+        print(str(my_list))
+        ```.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output^
+
+    fn __repr__(self) -> String:
+        """Returns a string representation of a ListLiteral.
+
+        Returns:
+            The string representation of the ListLiteral.
+
+        Here is an example below:
+        ```mojo
+        var my_list = [1, 2, "Mojo"]
+        print(repr(my_list))
+        ```.
+        """
+        return self.__str__()
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        """Format the list literal.
+
+        Args:
+            writer: The formatter to use.
+        """
+        writer.write("[")
+
+        @parameter
+        for i in range(len(VariadicList(Ts))):
+            alias T = Ts[i]
+            var s: String
+            if i > 0:
+                writer.write(", ")
+
+            @parameter
+            if _type_is_eq[T, PythonObject]():
+                s = str(rebind[PythonObject](self.storage[i]))
+            elif _type_is_eq[T, Int]():
+                s = repr(rebind[Int](self.storage[i]))
+            elif _type_is_eq[T, Float64]():
+                s = repr(rebind[Float64](self.storage[i]))
+            elif _type_is_eq[T, Bool]():
+                s = repr(rebind[Bool](self.storage[i]))
+            elif _type_is_eq[T, String]():
+                s = repr(rebind[String](self.storage[i]))
+            elif _type_is_eq[T, StringLiteral]():
+                s = repr(rebind[StringLiteral](self.storage[i]))
+            else:
+                s = String("unknown")
+                constrained[
+                    False, "cannot convert list literal element to string"
+                ]()
+            writer.write(s)
+        writer.write("]")
 
     # ===-------------------------------------------------------------------===#
     # Methods
