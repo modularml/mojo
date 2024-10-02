@@ -1103,6 +1103,7 @@ struct String(
             other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
+        return Self(buffer^)
 
     @always_inline
     fn __radd__(self, other: String) -> String:
