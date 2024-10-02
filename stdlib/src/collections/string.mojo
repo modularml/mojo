@@ -1563,8 +1563,7 @@ struct String(
         """Split the string by a separator.
 
         Parameters:
-            enable_maxsplit: Whether to enable maxsplit. This reduces branching
-                for maximum performance.
+            enable_maxsplit: Whether to enable maxsplit.
 
         Args:
             sep: The string to split on.
@@ -1610,11 +1609,8 @@ struct String(
 
             @parameter
             if enable_maxsplit:
-                if maxsplit > -1:
-                    if items == maxsplit:
-                        output.append(_build_slice(ptr, lhs, str_byte_len))
-                        return output^
-                    items += 1
+                rhs = (str_byte_len - rhs) * int(items == maxsplit) + rhs
+                items += 1
 
             output.append(String(_build_slice(ptr, lhs, rhs)))
             lhs = rhs + sep_len
@@ -1651,8 +1647,7 @@ struct String(
         """Split the string by every Whitespace separator.
 
         Parameters:
-            enable_maxsplit: Whether to enable maxsplit. This reduces branching
-                for maximum performance.
+            enable_maxsplit: Whether to enable maxsplit.
 
         Args:
             sep: None.
@@ -1709,11 +1704,8 @@ struct String(
 
             @parameter
             if enable_maxsplit:
-                if maxsplit > -1:
-                    if items == maxsplit:
-                        output.append(_build_slice(ptr, lhs, str_byte_len))
-                        break
-                    items += 1
+                rhs = (str_byte_len - rhs) * int(items == maxsplit) + rhs
+                items += 1
 
             output.append(String(_build_slice(ptr, lhs, rhs)))
             lhs = rhs
