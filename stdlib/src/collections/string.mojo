@@ -1583,16 +1583,13 @@ struct String(
         ```
         .
         """
-        var output: List[String]
         alias prealloc = 16  # guessing, Python's implementation uses 12
+        var amnt = prealloc
 
         @parameter
         if enable_maxsplit:
-            output = List[String](
-                capacity=maxsplit + 1 if maxsplit < prealloc else prealloc
-            )
-        else:
-            output = List[String](capacity=prealloc)
+            amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
+        var output = List[String](capacity=amnt)
         var str_byte_len = self.byte_length()
         var lhs = 0
         var rhs = 0
@@ -1602,10 +1599,6 @@ struct String(
             raise Error("Separator cannot be empty.")
         var ptr = self.unsafe_ptr()
         alias S = StringSlice[__lifetime_of(self)]
-
-        @always_inline("nodebug")
-        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
-            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
         while lhs <= str_byte_len:
             # FIXME(#3295): this will fail when find is changed to use unicode codepoints
@@ -1617,7 +1610,7 @@ struct String(
                 rhs += int(items == maxsplit) * (str_byte_len - rhs)
                 items += 1
 
-            output.append(String(_build_slice(ptr, lhs, rhs)))
+            output.append(S(unsafe_from_utf8_ptr=ptr + lhs, len=rhs - lhs))
             lhs = rhs + sep_len
 
         return output^
@@ -1678,16 +1671,13 @@ struct String(
         ```
         .
         """
-        var output: List[String]
         alias prealloc = 16  # guessing, Python's implementation uses 12
+        var amnt = prealloc
 
         @parameter
         if enable_maxsplit:
-            output = List[String](
-                capacity=maxsplit + 1 if maxsplit < prealloc else prealloc
-            )
-        else:
-            output = List[String](capacity=prealloc)
+            amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
+        var output = List[String](capacity=amnt)
         var str_byte_len = self.byte_length()
         var lhs = 0
         var rhs = 0
