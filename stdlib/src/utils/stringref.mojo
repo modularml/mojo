@@ -523,13 +523,13 @@ struct StringRef(
 
         var output = List[StringRef]()
         var ptr = self.unsafe_ptr()
-        var d_ptr = delimiter.unsafe_ptr()
+
         var current_offset = 0
-        alias S = Span[UInt8, ImmutableAnyLifetime]
-        var self_span = S(unsafe_ptr=ptr, len=len(self))
-        var delim_span = S(unsafe_ptr=d_ptr, len=len(delimiter))
+        alias S = StringSlice[ImmutableAnyLifetime]
+        var self_slice = S(unsafe_from_utf8_strref=self)
+        var delim_slice = S(unsafe_from_utf8_strref=delimiter)
         while True:
-            var loc = span.find(delim_span, current_offset)
+            var loc = self_slice.find(delim_slice, current_offset)
             # delimiter not found, so add the search slice from where we're currently at
             if loc == -1:
                 output.append(
