@@ -45,7 +45,13 @@ alias Typed_initproc = fn (
 ) -> c_int
 
 
-struct PyMojoObject[T: AnyType]:
+trait Pythonable(Defaultable):
+    """Represents a Mojo type that can be used from Python."""
+
+    pass
+
+
+struct PyMojoObject[T: Pythonable]:
     """Storage backing a PyObject* wrapping a Mojo value."""
 
     var ob_base: PyObject
@@ -61,15 +67,11 @@ struct PyMojoObject[T: AnyType]:
     @staticmethod
     fn python_type_object[
         type_name: StringLiteral,
-        empty_init_func: fn (UnsafePointer[T]) -> None,
-        del_func: fn (UnsafePointer[T]) -> None,
     ](owned methods: List[PyMethodDef]) raises -> TypedPythonObject["Type"]:
         """Construct a Python 'type' describing PyMojoObject[T].
 
         Parameters:
             type_name: The name of the Mojo type.
-            empty_init_func: A function that default initializes an instance of `T`.
-            del_func: A function that deinitializes an instance of `T`.
         """
 
         var cpython = _get_global_python_itf().cpython()
@@ -79,8 +81,8 @@ struct PyMojoObject[T: AnyType]:
             PyType_Slot.tp_new(
                 cpython.lib.get_function[newfunc]("PyType_GenericNew")
             ),
-            PyType_Slot.tp_init(create_empty_init_wrapper[empty_init_func]()),
-            PyType_Slot.tp_dealloc(create_dealloc_wrapper[del_func]()),
+            PyType_Slot.tp_init(create_empty_init_wrapper[T]()),
+            PyType_Slot.tp_dealloc(create_dealloc_wrapper[T]()),
             # FIXME: Avoid leaking the methods data pointer in this way.
             PyType_Slot.tp_methods(methods.steal_data()),
             # Zeroed item terminator
@@ -129,10 +131,13 @@ struct PyMojoObject[T: AnyType]:
 #
 # This function creates that wrapper function, and returns a pointer pointer to
 # it.
-fn create_empty_init_wrapper[
-    T: AnyType, //,
-    empty_init_func: fn (UnsafePointer[T]) -> None,
-]() -> Typed_initproc:
+fn create_empty_init_wrapper[T: Pythonable]() -> Typed_initproc:
+    """Create Python-compatible wrapper around a Mojo initializer function.
+
+    Parameters:
+        T: The wrapped Mojo type.
+    """
+
     fn wrapper(
         py_self: PyObjectPtr,
         args: TypedPythonObject["Tuple"],
@@ -152,11 +157,8 @@ fn create_empty_init_wrapper[
             # Call the user-provided initialization function.
             # ------------------------------------------------
 
-            # TODO(MOCO-1020):
-            #   If/when Mojo supports an `init` convention, use it here.
-            #   Change this callback to take an `init T` instead of an
-            #   `UnsafePointer[T]`, for more ergonomic code in the caller.
-            empty_init_func(obj_ptr)
+            # TODO(MSTDL-950): Avoid forming ref through uninit pointee.
+            T.__init__(obj_ptr[])
 
             return 0
         except e:
@@ -173,14 +175,17 @@ fn create_empty_init_wrapper[
     return wrapper
 
 
-fn create_dealloc_wrapper[
-    T: AnyType, //,
-    del_func: fn (UnsafePointer[T]) -> None,
-]() -> destructor:
+fn create_dealloc_wrapper[T: Pythonable]() -> destructor:
     fn wrapper(py_self: PyObjectPtr):
-        var self: UnsafePointer[T] = PyMojoObject[T].unsafe_cast_obj(py_self)
+        var self_ptr: UnsafePointer[T] = PyMojoObject[T].unsafe_cast_obj(
+            py_self
+        )
 
-        del_func(self)
+        # TODO(MSTDL-633):
+        #   Is this always safe? Wrap in GIL, because this could
+        #   evaluate arbitrary code?
+        # Destroy this `Person` instance.
+        self_ptr.destroy_pointee()
 
     return wrapper
 
