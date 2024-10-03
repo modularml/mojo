@@ -19,7 +19,7 @@ from collections import KeyElement
 
 from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
 from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,

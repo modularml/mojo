@@ -37,7 +37,7 @@ from bit import pop_count
 from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
 from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer

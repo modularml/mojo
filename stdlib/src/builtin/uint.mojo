@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
 from builtin._documentation import doc_private
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
 
 
 @lldb_formatter_wrapping_type
