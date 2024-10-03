@@ -36,7 +36,6 @@ from builtin.file_descriptor import FileDescriptor
 from builtin.float_literal import FloatLiteral
 from builtin.floatable import Floatable, FloatableRaising, float
 from builtin.format_int import bin, hex, oct
-from builtin.hash import hash, Hashable
 from builtin.identifiable import Identifiable, StringableIdentifiable
 from builtin.int import (
     Int,
@@ -130,5 +129,6 @@ from collections.string import (
     islower,
     isprintable,
 )
+from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
 from utils import Formattable, Formatter

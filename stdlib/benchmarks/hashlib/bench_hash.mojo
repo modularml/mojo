@@ -14,6 +14,19 @@
 # RUN: %mojo-no-debug %s -t
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId
+from bit import byte_swap, rotate_bits_left
+from memory import UnsafePointer
+from hashlib.hash import hash as old_hash
+from hashlib._ahash import (
+    AHasher,
+    hash as ahash,
+    _folded_multiply,
+    read_small,
+    U256,
+    U128,
+    MULTIPLE,
+    ROT,
+)
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -578,22 +591,6 @@ fn gen_word_pairs[words: String = words_en]() -> List[String]:
     except:
         pass
     return result
-
-
-from bit import byte_swap, rotate_bits_left
-from builtin._hash import hash
-from memory import UnsafePointer
-from builtin.hash import hash as old_hash
-from builtin._hash import (
-    AHasher,
-    hash as ahash,
-    _folded_multiply,
-    read_small,
-    U256,
-    U128,
-    MULTIPLE,
-    ROT,
-)
 
 
 # ===----------------------------------------------------------------------===#
