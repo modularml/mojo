@@ -83,6 +83,9 @@ what we publish.
   - Added `TypedPythonObject["Tuple].__getitem__` for accessing the elements of
     a Python tuple.
 
+- Added `Python.add_object()`, to add a named `PythonObject` value to a Python
+  'module' object instance.
+
 - Added `Python.unsafe_get_python_exception()`, as an efficient low-level
   utility to get the Mojo `Error` equivalent of the current CPython error state.
 
@@ -172,6 +175,19 @@ what we publish.
       return a
   ```
 
+- `StringRef` now implements `split()` which can be used to split a
+  `StringRef` into a `List[StringRef]` by a delimiter.
+  ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
+
+- Support for multi-dimensional indexing for `PythonObject`
+  ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
+
+    ```mojo
+    var np = Python.import_module("numpy")
+    var a = np.array(PythonObject([1,2,3,1,2,3])).reshape(2,3)
+    print((a[0, 1])) # 2
+    ```
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -180,6 +196,13 @@ what we publish.
     `from memory import UnsafePointer`.
   - `StringRef` has been removed. Please explicitly import it via
     `from utils import StringRef`.
+
+- The `Reference` type has been renamed to `Pointer`: a memory safe complement
+  to `UnsafePointer`.  This change is motivated by the fact that `Pointer`
+  is assignable and requires an explicit dereference with `ptr[]`.  Renaming
+  to `Pointer` clarifies that "references" means `ref` arguments and results,
+  and gives us a model that is more similar to what the C++ community would
+  expect.
 
 - A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
   specifies to the compiler that the resultant pointer is a distinct

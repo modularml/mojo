@@ -92,19 +92,34 @@ clause is optional.
 
 The `try` clause contains a code block to execute that might raise an error. If
 no error occurs, the entire code block executes. If an error occurs, execution
-of the code block stops at the point that the error is raised.
+of the code block stops at the point that the error is raised. Your program then
+continues with the execution of the `except` clause, if provided, or the
+`finally` clause.
 
 If the `except` clause is present, its code block executes only if an error
-occurred in the `try` clause. You can optionally provide the name of a variable
-after the `except` keyword. The `Error` instance is bound to the variable if an
-error occurs. The `except` clause "consumes" the error that occurred in the
-`try` clause. If desired, you can re-raise an error condition by executing a
-`raise` statement from within the `except` clause.
+occurred in the `try` clause. The `except` clause "consumes" the error that
+occurred in the `try` clause. You can then implement any error handling or
+recovery that's appropriate for your application.
+
+If you provide the name of a variable after the `except` keyword, then the
+`Error` instance is bound to the variable if an error occurs. The `Error` type
+implements the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait, so
+you can pass it as an argument to the [`print()`](/mojo/stdlib/builtin/io/print)
+function if you'd like to print its error message to the console. It also
+implements the [`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait, so you
+can pass it to the [`str()`](/mojo/stdlib/builtin/str/str) function if you want
+to extract the error message as a `String` for further processing.
+
+If desired, you can re-raise an error condition from your `except` clause simply
+by executing a `raise` statement from within its code block. This can be either
+a new `Error` instance or, if you provided a variable name to capture the
+`Error` that occurred originally, you can re-raise that error.
 
 :::note
 
-Because Mojo does not currently support typed errors, you can include at most
-one `except` clause, which catches any `Error` raised.
+Because Mojo does not currently support typed errors, a `try-except` control
+structure can include at most one `except` clause, which catches any `Error`
+raised.
 
 :::
 
@@ -116,9 +131,9 @@ not occur in the `try` clause. Note that the `else` clause is *skipped* if the
 If the `finally` clause is present, its code block executes after the `try`
 clause and the `except` or `else` clause, if applicable. The `finally` clause
 executes even if one of the other code blocks exit by executing a `continue`,
-`break`, or `return` statement. The `finally` clause is often used to release
-resources used by the `try` clause (such as a file handle) regardless of whether
-or not an error occurred.
+`break`, or `return` statement or by raising an error. The `finally` clause is
+often used to release resources used by the `try` clause (such as a file handle)
+regardless of whether or not an error occurred.
 
 As an example, consider the following program:
 
@@ -182,17 +197,18 @@ f.close()
 ```
 
 Calling [`close()`](/mojo/stdlib/builtin/file/FileHandle#close) releases the
-operating system resources associated with the opened file. If your program were
-to open many files without closing them, you could exhaust the resources
-available to your program and cause errors. The problem is even worse if you
-were writing to a file instead of reading from it, because the operating system
-might buffer the output in memory until the file is closed. If your program were
-to crash instead of exiting normally, that buffered data could be lost instead
-of being written to storage. The example above actually includes the call to
-`close()`, but it ignores the possibility that
-[`read()`](/mojo/stdlib/builtin/file/FileHandle#read) could raise an error,
-which would result in the program not executing the `close()`. To handle this
-scenario you would need to rewrite the code like this:
+memory and other operating system resources associated with the opened file. If
+your program were to open many files without closing them, you could exhaust the
+resources available to your program and cause errors. The problem is even worse
+if you were writing to a file instead of reading from it, because the operating
+system might buffer the output in memory until the file is closed. If your
+program were to crash instead of exiting normally, that buffered data could be
+lost instead of being written to storage.
+
+The example above actually includes the call to `close()`, but it ignores the
+possibility that [`read()`](/mojo/stdlib/builtin/file/FileHandle#read) could
+raise an error, which would result in the program not executing the `close()`.
+To handle this scenario you could rewrite the code to use `try` like this:
 
 ```mojo
 # Obtain a file handle to read from storage
@@ -210,8 +226,10 @@ However, the [`FileHandle`](/mojo/stdlib/builtin/file/FileHandle) struct
 returned by [`open()`](/mojo/stdlib/builtin/file/open) is a context manager.
 When used in conjunction with Mojo's `with` statement, a context manager ensures
 that the resources it manages are properly released at the end of the block,
-even if an error occurs. You could rewrite the example above to take advantage
-of the context manager like this:
+even if an error occurs. In the case of a `FileHandle`, that means that the call
+to `close()` takes place automatically. So you could rewrite the example above
+to take advantage of the context manager—and omit the explicit call to
+`close()`—like this:
 
 ```mojo
 with open(input_file, "r") as f:
@@ -238,7 +256,7 @@ of context managers in the Mojo standard library are
 [`BlockingScopedLock`](/mojo/stdlib/utils/lock/BlockingScopedLock), and
 [`assert_raises`](/mojo/stdlib/testing/testing/assert_raises). You can also
 create your own custom context managers, as described in [Write a custom context
-manager](#write-a-custom-context-manager).
+manager](#write-a-custom-context-manager) below.
 
 ## Write a custom context manager
 
@@ -258,10 +276,11 @@ Writing a custom context manager is a matter of defining a
 
   If the `with` code block raises an error, then the `__exit__()` method runs
   before any error processing occurs (that is, before it is caught by a
-  `try-except` structure or your program terminates). As discussed in [Define a
-  conditional `__exit__()` method](#define-a-conditional-__exit__-method), there
-  is an overloaded form of `__exit__()` that you can implement to determine
-  custom processing for error conditions in a `with` code block.
+  `try-except` structure or your program terminates). If you'd like to define
+  conditional processing for error conditions in a `with` code block, you can
+  implement an overloaded version of `__exit__()` that takes an `Error`
+  argument. For more information, see [Define a conditional `__exit__()`
+  method](#define-a-conditional-__exit__-method) below.
 
   For context managers that don't need to release resources or perform other
   actions on termination, you are not required to implement an `__exit__()`
@@ -325,10 +344,11 @@ Unhandled exception caught during execution: simulated error
 
 ### Define a conditional `__exit__()` method
 
-When creating a context manager, you must implement the `__exit__(self)` form of
-the `__exit__()` method. However, you also have the option of implementing an
-overloaded version that is invoked only when an error occurs in the `with` code
-block:
+When creating a context manager, you can implement the `__exit__(self)` form of
+the `__exit__()` method to handle completion of the `with` statement under all
+circumstances including errors. However, you have the option of additionally
+implementing an overloaded version that is invoked instead when an error occurs
+in the `with` code block:
 
 ```mojo
 fn __exit__(self, error: Error) raises -> Bool

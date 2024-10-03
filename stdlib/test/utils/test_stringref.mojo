@@ -102,8 +102,50 @@ def test_endswith():
     assert_true(ab.endswith("ab"))
 
 
+fn test_stringref_split() raises:
+    # Reject empty delimiters
+    with assert_raises(
+        contains="empty delimiter not allowed to be passed to split."
+    ):
+        _ = StringRef("hello").split("")
+
+    # Split in middle
+    var d1 = StringRef("n")
+    var in1 = StringRef("faang")
+    var res1 = in1.split(d1)
+    assert_equal(len(res1), 2)
+    assert_equal(res1[0], "faa")
+    assert_equal(res1[1], "g")
+
+    # Matches should be properly split in multiple case
+    var d2 = StringRef(" ")
+    var in2 = StringRef("modcon is coming soon")
+    var res2 = in2.split(d2)
+    assert_equal(len(res2), 4)
+    assert_equal(res2[0], "modcon")
+    assert_equal(res2[1], "is")
+    assert_equal(res2[2], "coming")
+    assert_equal(res2[3], "soon")
+
+    # No match from the delimiter
+    var d3 = StringRef("x")
+    var in3 = StringRef("hello world")
+    var res3 = in3.split(d3)
+    assert_equal(len(res3), 1)
+    assert_equal(res3[0], "hello world")
+
+    # Multiple character delimiter
+    var d4 = StringRef("ll")
+    var in4 = StringRef("hello")
+    var res4 = in4.split(d4)
+    assert_equal(len(res4), 2)
+    assert_equal(res4[0], "he")
+    assert_equal(res4[1], "o")
+
+
 def main():
     test_strref_from_start()
+    test_stringref_split()
     test_comparison_operators()
     test_intable()
     test_indexing()

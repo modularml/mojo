@@ -234,7 +234,7 @@ fn unroll_nested_call[
             func[index]()
 
 
-fn bench_compare():
+fn bench_compare() raises:
     alias type = DType.uint8
     alias width = simdwidthof[type]()
     alias unit = Unit.ns

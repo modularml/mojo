@@ -10,6 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""
+Mojo bindings functions and types from the CPython C API.
+
+Documentation for these functions can be found online at:
+  <https://docs.python.org/3/c-api/stable.html#contents-of-limited-api>
+"""
 
 from collections import InlineArray
 from os import getenv, setenv, abort
@@ -17,99 +23,14 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int, OpaquePointer
+from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
 
 from python.python import _get_global_python_itf
+from python._bindings import Typed_initproc
 
 from memory import UnsafePointer
 
 from utils import StringRef
-
-# ===-----------------------------------------------------------------------===#
-# Bindings Utilities
-# ===-----------------------------------------------------------------------===#
-
-
-fn create_wrapper_function[
-    user_func: fn (PythonObject, TypedPythonObject["Tuple"]) -> PythonObject
-]() -> PyCFunction:
-    #   > When a C function is called from Python, it borrows references to its
-    #   > arguments from the caller. The caller owns a reference to the object,
-    #   > so the borrowed reference’s lifetime is guaranteed until the function
-    #   > returns. Only when such a borrowed reference must be stored or passed
-    #   > on, it must be turned into an owned reference by calling Py_INCREF().
-    #   >
-    #   >  -- https://docs.python.org/3/extending/extending.html#ownership-rules
-
-    fn wrapper(py_self_ptr: PyObjectPtr, args_ptr: PyObjectPtr) -> PyObjectPtr:
-        # SAFETY:
-        #   Here we illegally (but carefully) construct _owned_ `PythonObject`
-        #   values from the borrowed object reference arguments. We are careful
-        #   down below to prevent the destructor for these objects from running
-        #   so that we do not illegally decrement the reference count of these
-        #   objects we do not own.
-        #
-        #   This is valid to do, because these are passed using the `borrowed`
-        #   argument convention to `user_func`, so logically they are treated
-        #   as Python borrowed references.
-        var py_self = PythonObject(py_self_ptr)
-        var args = TypedPythonObject["Tuple"](
-            unsafe_unchecked_from=PythonObject(args_ptr)
-        )
-
-        # SAFETY:
-        #   Call the user provided function, and take ownership of the
-        #   PyObjectPtr of the returned PythonObject.
-        var result = user_func(py_self, args).steal_data()
-
-        # Do not destroy the provided PyObjectPtr arguments, since they
-        # actually have ownership of the underlying object.
-        __mlir_op.`lit.ownership.mark_destroyed`(
-            __get_mvalue_as_litref(py_self)
-        )
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(args))
-
-        return result
-
-    return wrapper
-
-
-# Wrap a `raises` function
-fn create_wrapper_function[
-    user_func: fn (
-        PythonObject, TypedPythonObject["Tuple"]
-    ) raises -> PythonObject
-]() -> PyCFunction:
-    fn wrapper(
-        py_self: PythonObject, args: TypedPythonObject["Tuple"]
-    ) -> PythonObject:
-        var cpython = _get_global_python_itf().cpython()
-
-        var state = cpython.PyGILState_Ensure()
-
-        try:
-            var result = user_func(py_self, args)
-            return result
-        except e:
-            # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
-            var error_type = cpython.get_error_global("PyExc_Exception")
-
-            cpython.PyErr_SetString(
-                error_type,
-                e.unsafe_cstr_ptr(),
-            )
-
-            # Return a NULL `PyObject*`.
-            return PythonObject(PyObjectPtr())
-        finally:
-            cpython.PyGILState_Release(state)
-
-    # TODO:
-    #   Does this lead to multiple levels of indirect function calls for
-    #   `raises` functions? Could we fix that by marking `wrapper` here as
-    #   `@always_inline`?
-    # Call the non-`raises` overload of `create_wrapper_function`.
-    return create_wrapper_function[wrapper]()
 
 
 # ===-----------------------------------------------------------------------===#
@@ -122,6 +43,13 @@ alias Py_file_input = 257
 alias Py_eval_input = 258
 alias Py_func_type_input = 345
 
+alias Py_tp_dealloc = 52
+alias Py_tp_init = 60
+alias Py_tp_methods = 64
+alias Py_tp_new = 65
+
+alias Py_TPFLAGS_DEFAULT = 0
+
 # TODO(MSTDL-892): Change this to alias ffi.C_ssize_t
 alias Py_ssize_t = Int
 
@@ -130,13 +58,36 @@ alias Py_ssize_t = Int
 #   This should be a C ABI function pointer, not a Mojo ABI function.
 alias PyCFunction = fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
 
+alias METH_VARARGS = 0x1
+
+alias destructor = fn (PyObjectPtr) -> None
+
+alias initproc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
+alias newfunc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+
+
+# GIL
+@value
+@register_passable("trivial")
+struct PyGILState_STATE:
+    var current_state: c_int
+
+    alias PyGILState_LOCKED = c_int(0)
+    alias PyGILState_UNLOCKED = c_int(1)
+
+
+struct PyThreadState:
+    """Opaque struct."""
+
+    pass
+
 
 @value
 @register_passable("trivial")
 struct PyKeyValuePair:
     var key: PyObjectPtr
     var value: PyObjectPtr
-    var position: Int
+    var position: c_int
     var success: Bool
 
 
@@ -254,8 +205,6 @@ struct PyMethodDef:
         #   Support a way to get the name of the function from its parameter
         #   type, similar to `get_linkage_name()`?
 
-        alias METH_VARARGS = 0x1
-
         return PyMethodDef(
             func_name.unsafe_cstr_ptr(),
             func,
@@ -275,6 +224,43 @@ struct PyTypeObject:
     #   Fill this out based on
     #   https://docs.python.org/3/c-api/typeobj.html#pytypeobject-definition
     pass
+
+
+@value
+@register_passable("trivial")
+struct PyType_Spec:
+    var name: UnsafePointer[c_char]
+    var basicsize: c_int
+    var itemsize: c_int
+    var flags: c_uint
+    var slots: UnsafePointer[PyType_Slot]
+
+
+@value
+@register_passable("trivial")
+struct PyType_Slot:
+    var slot: c_int
+    var pfunc: OpaquePointer
+
+    @staticmethod
+    fn tp_new(func: newfunc) -> Self:
+        return PyType_Slot(Py_tp_new, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_init(func: Typed_initproc) -> Self:
+        return PyType_Slot(Py_tp_init, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_dealloc(func: destructor) -> Self:
+        return PyType_Slot(Py_tp_dealloc, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_methods(methods: UnsafePointer[PyMethodDef]) -> Self:
+        return PyType_Slot(Py_tp_methods, rebind[OpaquePointer](methods))
+
+    @staticmethod
+    fn null() -> Self:
+        return PyType_Slot {slot: 0, pfunc: OpaquePointer()}
 
 
 @value
@@ -339,7 +325,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
     var init_fn: Self._init_fn_type
 
     # The module's index into its interpreter's modules_by_index cache.
-    var index: Int
+    var index: Py_ssize_t
 
     # A copy of the module's __dict__ after the first time it was loaded.
     var dict_copy: UnsafePointer[PyObject]
@@ -406,7 +392,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
 # Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef_Slot
 @value
 struct PyModuleDef_Slot:
-    var slot: Int
+    var slot: c_int
     var value: OpaquePointer
 
 
@@ -423,7 +409,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     # Points to the contents of the docstring for the module.
     var docstring: UnsafePointer[c_char]
 
-    var size: Int
+    var size: Py_ssize_t
 
     # A pointer to a table of module-level functions.  Can be null if there
     # are no functions present.
@@ -432,13 +418,13 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     var slots: UnsafePointer[PyModuleDef_Slot]
 
     # TODO(MOCO-1138): These are C ABI function pointers, not Mojo functions.
-    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> Int
+    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> c_int
     alias _traverse_fn_type = fn (
         PyObjectPtr, Self._visitproc_fn_type, OpaquePointer
-    ) -> Int
+    ) -> c_int
     var traverse_fn: Self._traverse_fn_type
 
-    alias _clear_fn_type = fn (PyObjectPtr) -> Int
+    alias _clear_fn_type = fn (PyObjectPtr) -> c_int
     var clear_fn: Self._clear_fn_type
 
     alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
@@ -712,17 +698,25 @@ struct CPython:
     # Python GIL and threading
     # ===-------------------------------------------------------------------===#
 
-    fn PyGILState_Ensure(inout self) -> Bool:
-        return self.lib.get_function[fn () -> Bool]("PyGILState_Ensure")()
+    fn PyGILState_Ensure(inout self) -> PyGILState_STATE:
+        return self.lib.get_function[fn () -> PyGILState_STATE](
+            "PyGILState_Ensure"
+        )()
 
-    fn PyGILState_Release(inout self, state: Bool):
-        self.lib.get_function[fn (Bool) -> None]("PyGILState_Release")(state)
+    fn PyGILState_Release(inout self, state: PyGILState_STATE):
+        self.lib.get_function[fn (PyGILState_STATE) -> None](
+            "PyGILState_Release"
+        )(state)
 
-    fn PyEval_SaveThread(inout self) -> Int64:
-        return self.lib.get_function[fn () -> Int64]("PyEval_SaveThread")()
+    fn PyEval_SaveThread(inout self) -> UnsafePointer[PyThreadState]:
+        return self.lib.get_function[fn () -> UnsafePointer[PyThreadState]](
+            "PyEval_SaveThread"
+        )()
 
-    fn PyEval_RestoreThread(inout self, state: Int64):
-        self.lib.get_function[fn (Int64) -> None]("PyEval_RestoreThread")(state)
+    fn PyEval_RestoreThread(inout self, state: UnsafePointer[PyThreadState]):
+        self.lib.get_function[fn (UnsafePointer[PyThreadState]) -> None](
+            "PyEval_RestoreThread"
+        )(state)
 
     # ===-------------------------------------------------------------------===#
     # Python Dict operations
@@ -893,11 +887,36 @@ struct CPython:
 
         return add_functions_fn(mod, functions)
 
+    fn PyModule_AddObjectRef(
+        inout self,
+        module: PyObjectPtr,
+        name: UnsafePointer[c_char],
+        value: PyObjectPtr,
+    ) -> c_int:
+        var func = self.lib.get_function[
+            fn (PyObjectPtr, UnsafePointer[c_char], PyObjectPtr) -> c_int
+        ]("PyModule_AddObjectRef")
+
+        return func(module, name, value)
+
     fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
-        var value = self.lib.get_function[
-            fn (PyObjectPtr) -> UnsafePointer[Int8]
-        ]("PyModule_GetDict")(name.value)
-        return PyObjectPtr {value: value}
+        var value = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+            "PyModule_GetDict"
+        )(name.value)
+        return value
+
+    # ===-------------------------------------------------------------------===#
+    # Python Type operations
+    # ===-------------------------------------------------------------------===#
+
+    fn PyType_FromSpec(
+        inout self, spec: UnsafePointer[PyType_Spec]
+    ) -> PyObjectPtr:
+        var func = self.lib.get_function[
+            fn (UnsafePointer[PyType_Spec]) -> PyObjectPtr
+        ]("PyType_FromSpec")
+
+        return func(spec)
 
     # ===-------------------------------------------------------------------===#
     # Python Evaluation
@@ -1013,6 +1032,26 @@ struct CPython:
         )
         self._inc_total_rc()
         return f(obj)
+
+    fn PyObject_GetItem(
+        inout self, obj: PyObjectPtr, key: PyObjectPtr
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PyObject_GetItem")(obj, key)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyObject_GetItem, key:",
+            key._get_ptr_as_int(),
+            ", refcnt:",
+            self._Py_REFCNT(r),
+            ", parent obj:",
+            obj._get_ptr_as_int(),
+        )
+
+        self._inc_total_rc()
+        return r
 
     fn PyObject_GetAttrString(
         inout self,

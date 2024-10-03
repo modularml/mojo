@@ -35,6 +35,7 @@ from builtin.value import StringableCollectionElement
 
 from .optional import Optional
 from bit import is_power_of_two
+from sys.ffi import OpaquePointer
 from memory import memcpy, bitcast, UnsafePointer
 
 
@@ -74,7 +75,14 @@ struct _DictEntryIter[
 
     var index: Int
     var seen: Int
-    var src: Reference[Dict[K, V], dict_lifetime]
+    var src: Pointer[Dict[K, V], dict_lifetime]
+
+    fn __init__(
+        inout self, index: Int, seen: Int, ref [dict_lifetime]dict: Dict[K, V]
+    ):
+        self.index = index
+        self.seen = seen
+        self.src = Pointer.address_of(dict)
 
     fn __iter__(self) -> Self:
         return self
@@ -82,11 +90,13 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Reference[
+    ) -> Pointer[
         DictEntry[K, V], __lifetime_of(self.src[]._entries[0].value())
     ]:
         while True:
-            var opt_entry_ref = Reference(self.src[]._entries[self.index])
+            var opt_entry_ref = Pointer.address_of(
+                self.src[]._entries[self.index]
+            )
 
             @parameter
             if forward:
@@ -96,7 +106,7 @@ struct _DictEntryIter[
 
             if opt_entry_ref[]:
                 self.seen += 1
-                return opt_entry_ref[].value()
+                return Pointer.address_of(opt_entry_ref[].value())
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
@@ -129,8 +139,8 @@ struct _DictKeyIter[
 
     fn __next__(
         inout self,
-    ) -> Reference[K, __lifetime_of(self.iter.__next__()[].key)]:
-        return self.iter.__next__()[].key
+    ) -> Pointer[K, __lifetime_of(self.iter.__next__()[].key)]:
+        return Pointer.address_of(self.iter.__next__()[].key)
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -155,7 +165,7 @@ struct _DictValueIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias ref_type = Reference[V, dict_lifetime]
+    alias ref_type = Pointer[V, dict_lifetime]
 
     var iter: _DictEntryIter[K, V, dict_lifetime, forward]
 
@@ -174,7 +184,9 @@ struct _DictValueIter[
         var entry_ref = self.iter.__next__()
         # Cast through a pointer to grant additional mutability because
         # _DictEntryIter.next erases it.
-        return UnsafePointer.address_of(entry_ref[].value)[]
+        return Self.ref_type.address_of(
+            UnsafePointer.address_of(entry_ref[].value)[]
+        )
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -245,7 +257,7 @@ struct _DictIndex:
     this in the current type system.
     """
 
-    var data: UnsafePointer[NoneType]
+    var data: OpaquePointer
 
     @always_inline
     fn __init__(inout self, reserved: Int):
@@ -733,7 +745,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         except:
             return None
 
-    # TODO(MOCO-604): Return Optional[Reference] instead of raising
+    # TODO(MOCO-604): Return Optional[Pointer] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
     ) raises -> ref [self._entries[0].value().value] Self.V:
@@ -752,7 +764,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var index: Int
         found, slot, index = self._find_index(hash, key)
         if found:
-            var entry = Reference(self._entries[index])
+            var entry = Pointer.address_of(self._entries[index])
             debug_assert(entry[].__bool__(), "entry in index must be full")
             return entry[].value().value
         raise "KeyError"
@@ -818,7 +830,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         found, slot, index = self._find_index(hash, key)
         if found:
             self._set_index(slot, Self.REMOVED)
-            var entry = Reference(self._entries[index])
+            var entry = Pointer.address_of(self._entries[index])
             debug_assert(entry[].__bool__(), "entry in index must be full")
             var entry_value = entry[].unsafe_take()
             entry[] = None
@@ -905,7 +917,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn setdefault(
         inout self, key: K, owned default: V
-    ) raises -> Reference[V, __lifetime_of(self._find_ref(key))]:
+    ) raises -> ref [self._find_ref(key)] V:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
         Args:

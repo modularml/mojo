@@ -173,12 +173,8 @@ struct InlineArray[
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var eltref: Reference[
-                Self.ElementType, __lifetime_of(self)
-            ] = self.unsafe_get(i)
-            UnsafePointer.address_of(storage[i]).move_pointee_into(
-                UnsafePointer[Self.ElementType].address_of(eltref[])
-            )
+            var eltptr = UnsafePointer.address_of(self.unsafe_get(i))
+            UnsafePointer.address_of(storage[i]).move_pointee_into(eltptr)
 
         # Mark the elements as already destroyed.
         storage._is_owned = False
@@ -194,7 +190,6 @@ struct InlineArray[
 
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
-
             ptr.init_pointee_copy(other[idx])
 
     fn __copyinit__(inout self, other: Self):
@@ -223,7 +218,7 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+        """Get a `Pointer` to the element at the given index.
 
         Args:
             idx: The index of the item.
@@ -239,7 +234,7 @@ struct InlineArray[
     fn __getitem__[
         idx: Int,
     ](ref [_]self: Self) -> ref [self] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+        """Get a `Pointer` to the element at the given index.
 
         Parameters:
             idx: The index of the item.
