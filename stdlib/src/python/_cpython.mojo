@@ -1009,6 +1009,26 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PyObject_SetItem(
+        inout self, obj: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
+    ) -> Int:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> Int
+        ]("PyObject_SetItem")(obj, key, value)
+
+        self.log(
+            "PyObject_SetItem result:",
+            r,
+            ", key:",
+            key._get_ptr_as_int(),
+            ", value:",
+            value._get_ptr_as_int(),
+            ", parent obj:",
+            obj._get_ptr_as_int(),
+        )
+
+        return r
+
     fn PyObject_GetAttrString(
         inout self,
         obj: PyObjectPtr,
