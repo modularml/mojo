@@ -192,10 +192,11 @@ struct _StringSliceIter[
             return self.index - self.continuation_bytes
 
 
+@value
 struct StringSlice[
     is_mutable: Bool, //,
     lifetime: Lifetime[is_mutable].type,
-](Stringable, Sized, Formattable, CollectionElement):
+](Stringable, Sized, Formattable, CollectionElement, CollectionElementNew):
     """A non-owning view to encoded string data.
 
     TODO:
@@ -302,25 +303,18 @@ struct StringSlice[
 
         self._slice = byte_slice
 
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided `StringSlice`.
+
+        Args:
+            other: The `StringSlice` to copy.
+        """
+        self._slice = other._slice
+
     # ===------------------------------------------------------------------===#
     # Trait implementations
     # ===------------------------------------------------------------------===#
-
-    fn __copyinit__(inout self, existing: Self, /):
-        """Create a new instance of the value by copying an existing one.
-
-        Args:
-            existing: The value to copy.
-        """
-        self._slice = existing._slice
-
-    fn __moveinit__(inout self, owned existing: Self, /):
-        """Create a new instance of the value by moving the value of another.
-
-        Args:
-            existing: The value to move.
-        """
-        self._slice = existing._slice^
 
     @no_inline
     fn __str__(self) -> String:
