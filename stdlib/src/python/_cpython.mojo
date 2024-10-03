@@ -76,6 +76,12 @@ struct PyGILState_STATE:
     alias PyGILState_UNLOCKED = c_int(1)
 
 
+struct PyThreadState:
+    """Opaque struct."""
+
+    pass
+
+
 @value
 @register_passable("trivial")
 struct PyKeyValuePair:
@@ -702,11 +708,15 @@ struct CPython:
             "PyGILState_Release"
         )(state)
 
-    fn PyEval_SaveThread(inout self) -> Int64:
-        return self.lib.get_function[fn () -> Int64]("PyEval_SaveThread")()
+    fn PyEval_SaveThread(inout self) -> UnsafePointer[PyThreadState]:
+        return self.lib.get_function[fn () -> UnsafePointer[PyThreadState]](
+            "PyEval_SaveThread"
+        )()
 
-    fn PyEval_RestoreThread(inout self, state: Int64):
-        self.lib.get_function[fn (Int64) -> None]("PyEval_RestoreThread")(state)
+    fn PyEval_RestoreThread(inout self, state: UnsafePointer[PyThreadState]):
+        self.lib.get_function[fn (UnsafePointer[PyThreadState]) -> None](
+            "PyEval_RestoreThread"
+        )(state)
 
     # ===-------------------------------------------------------------------===#
     # Python Dict operations
