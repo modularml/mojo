@@ -227,7 +227,6 @@ struct InlineArray[
             A reference to the item at the given index.
         """
         var normalized_index = normalize_index["InlineArray"](idx, self)
-
         return self.unsafe_get(normalized_index)
 
     @always_inline("nodebug")
@@ -288,10 +287,10 @@ struct InlineArray[
         var idx_as_int = index(idx)
         debug_assert(
             0 <= idx_as_int < size,
-            (
-                "Index must be within bounds when using"
-                " `InlineArray.unsafe_get()`."
-            ),
+            " InlineArray.unsafe_get() index out of bounds: ",
+            idx_as_int,
+            " should be less than: ",
+            size,
         )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self._array).address,
