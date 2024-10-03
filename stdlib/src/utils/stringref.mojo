@@ -239,12 +239,8 @@ struct StringRef(
           True if the string contains the substring.
         """
         alias S = StringSlice[ImmutableAnyLifetime]
-        return (
-            S(unsafe_from_utf8_strref=self).find(
-                S(unsafe_from_utf8_strref=substr)
-            )
-            != -1
-        )
+        var s_slice = S(unsafe_from_utf8_strref=self)
+        return s_slice.find(S(unsafe_from_utf8_strref=substr)) != -1
 
     @always_inline
     fn __ne__(self, rhs: StringRef) -> Bool:
