@@ -1110,11 +1110,9 @@ struct CPython:
         inout self,
         obj: PyObjectPtr,
     ) -> c_int:
-        return int(
-            self.lib.get_function[fn (PyObjectPtr) -> c_int]("PyObject_IsTrue")(
-                obj
-            )
-        )
+        return self.lib.get_function[fn (PyObjectPtr) -> c_int](
+            "PyObject_IsTrue"
+        )(obj)
 
     fn PyObject_Length(
         inout self,
