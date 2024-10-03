@@ -76,6 +76,27 @@ fn env_get_int[name: StringLiteral, default: Int]() -> Int:
 
     Returns:
         An integer parameter value.
+
+    Example:
+    ```mojo
+    from sys.param_env import env_get_int
+
+    def main():
+        alias number = env_get_int[
+            "favorite_number",
+            1 # Default value
+        ]()
+        parametrized[number]()
+
+    fn parametrized[num: Int]():
+        print(num)
+    ```
+
+    If the program is `app.mojo`:
+    - `mojo run -D favorite_number=2 app.mojo`
+    - `mojo run -D app.mojo`
+
+    Note: useful for parametrizing SIMD vector sizes.
     """
 
     @parameter
