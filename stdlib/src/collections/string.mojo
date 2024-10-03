@@ -1447,19 +1447,6 @@ struct String(
         """
         return max(len(self._buffer) - 1, 0)
 
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes, excluding null terminator.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return max(len(self._buffer) - 1, 0)
-
     fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
