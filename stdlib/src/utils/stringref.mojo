@@ -507,6 +507,9 @@ struct StringRef(
             end -= 1
         return StringRef(ptr + start, end - start)
 
+    # FIXME: look at string's split and copy it to StringSlice
+    # Delete this after as it does not conform to Python's behavior and we don't
+    # want to keep using StringRef. I'll do it in another PR, this is a reminder
     fn split(self, delimiter: StringRef) raises -> List[StringRef]:
         """Split the StringRef by a delimiter.
 
@@ -524,10 +527,13 @@ struct StringRef(
 
         var output = List[StringRef]()
         var ptr = self.unsafe_ptr()
-
+        var d_ptr = delimiter.unsafe_ptr()
         var current_offset = 0
+        alias S = Span[UInt8, ImmutableAnyLifetime]
+        var self_span = S(unsafe_ptr=ptr, len=len(self))
+        var delim_span = S(unsafe_ptr=d_ptr, len=len(delimiter))
         while True:
-            var loc = self.find(delimiter, current_offset)
+            var loc = span.find(delim_span, current_offset)
             # delimiter not found, so add the search slice from where we're currently at
             if loc == -1:
                 output.append(
