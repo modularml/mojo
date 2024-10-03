@@ -196,10 +196,14 @@ def test_add():
 def test_add_string_slice():
     var s1 = String("123")
     var s2 = StringSlice("abc")
+    var s3: StringLiteral = "abc"
     assert_equal("123abc", s1 + s2)
+    assert_equal("123abc", s1 + s3)
     assert_equal("abc123", s2 + s1)
+    assert_equal("abc123", s3 + s1)
     s1 += s2
-    assert_equal("123abcabc", s1 + s2)
+    s1 += s3
+    assert_equal("123abcabc", s1)
 
 
 def test_string_join():

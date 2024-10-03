@@ -1111,6 +1111,18 @@ struct String(
         return Self._add[True](self.as_bytes_span(), other.as_bytes_span())
 
     @always_inline
+    fn __add__(self, other: StringLiteral) -> String:
+        """Creates a string by appending a string literal at the end.
+
+        Args:
+            other: The string literal to append.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[False](self.as_bytes_span(), other.as_bytes_span())
+
+    @always_inline
     fn __add__(self, other: StringSlice) -> String:
         """Creates a string by appending a string slice at the end.
 
@@ -1125,6 +1137,18 @@ struct String(
     @always_inline
     fn __radd__(self, other: String) -> String:
         """Creates a string by prepending another string to the start.
+
+        Args:
+            other: The string to prepend.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[True](other.as_bytes_span(), self.as_bytes_span())
+
+    @always_inline
+    fn __radd__(self, other: StringLiteral) -> String:
+        """Creates a string by prepending another string literal to the start.
 
         Args:
             other: The string to prepend.
@@ -1174,6 +1198,15 @@ struct String(
             other: The string to append.
         """
         self._iadd[True](other.as_bytes_span())
+
+    @always_inline
+    fn __iadd__(inout self, other: StringLiteral):
+        """Appends another string literal to this string.
+
+        Args:
+            other: The string to append.
+        """
+        self._iadd[False](other.as_bytes_span())
 
     @always_inline
     fn __iadd__(inout self, other: StringSlice):
