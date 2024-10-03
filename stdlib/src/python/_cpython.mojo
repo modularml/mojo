@@ -1009,11 +1009,13 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    # int PyObject_SetItem(PyObject *o, PyObject *key, PyObject *v)
+    # ref: https://docs.python.org/3/c-api/object.html#c.PyObject_SetItem
     fn PyObject_SetItem(
         inout self, obj: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
     ) -> c_int:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int 
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
         ]("PyObject_SetItem")(obj, key, value)
 
         self.log(
