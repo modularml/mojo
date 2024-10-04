@@ -114,6 +114,17 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
+    fn __init__(
+        inout self, *, ref [lifetime, address_space._value.value]to: type
+    ):
+        """Create a pointer with the input value.
+
+        Args:
+            to: The value to construct a pointer to.
+        """
+        self = Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(to)))
+
+    @always_inline
     fn __init__(inout self, other: UnsafePointer[type, address_space, *_, **_]):
         """Exclusivity parameter cast a pointer.
 
@@ -137,6 +148,7 @@ struct UnsafePointer[
     # Factory methods
     # ===-------------------------------------------------------------------===#
 
+    @deprecated("Use constructor UnsafePointer(to=arg) instead.")
     @staticmethod
     @always_inline("nodebug")
     fn address_of(

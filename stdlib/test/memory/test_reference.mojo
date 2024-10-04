@@ -41,7 +41,14 @@ def test_str():
     assert_true(str(a_ref).startswith("0x"))
 
 
+def test_pointer_to():
+    var local = 1
+    assert_not_equal(0, int(UnsafePointer(to=local)))
+    _ = local
+
+
 def main():
     test_copy_reference_explicitly()
     test_equality()
     test_str()
+    test_pointer_to()
