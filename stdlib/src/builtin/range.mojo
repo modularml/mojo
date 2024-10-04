@@ -62,6 +62,10 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
         self.curr -= 1
         return self.end - curr
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         return self.curr
@@ -91,6 +95,10 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
         var start = self.start
         self.start += 1
         return start
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -128,6 +136,10 @@ struct _StridedRangeIterator(Sized):
         self.start += self.step
         return result
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
 
 @value
 @register_passable("trivial")
@@ -151,6 +163,10 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         var result = self.start
         self.start += self.step
         return result
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -323,6 +339,10 @@ struct _UIntZeroStartingRange(UIntSized):
         return self.end - curr
 
     @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
     fn __len__(self) -> UInt:
         return self.curr
 
@@ -348,6 +368,10 @@ struct _UIntStridedRangeIterator(UIntSized):
         var result = self.start
         self.start += self.step
         return result
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
 
 @value
@@ -384,6 +408,10 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
         var result = self.start
         self.start += self.step
         return result
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> UInt:
