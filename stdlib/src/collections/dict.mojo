@@ -108,6 +108,10 @@ struct _DictEntryIter[
                 self.seen += 1
                 return Pointer.address_of(opt_entry_ref[].value())
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
 
@@ -141,6 +145,10 @@ struct _DictKeyIter[
         inout self,
     ) -> Pointer[K, __lifetime_of(self.iter.__next__()[].key)]:
         return Pointer.address_of(self.iter.__next__()[].key)
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -187,6 +195,10 @@ struct _DictValueIter[
         return Self.ref_type.address_of(
             UnsafePointer.address_of(entry_ref[].value)[]
         )
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return self.iter.__len__()

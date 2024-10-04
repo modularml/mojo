@@ -101,6 +101,10 @@ struct _PyIter(Sized):
             self.preparedNextItem = PythonObject(maybeNextItem)
         return current
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         """Return zero to halt iteration.
 

@@ -139,6 +139,10 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
         self.index += 1
         return self.src[self.index - 1]
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         return len(self.src) - self.index
 
@@ -244,6 +248,10 @@ struct _VariadicListMemIter[
         return rebind[Self.variadic_list_type.reference_type](
             Pointer.address_of(self.src[][self.index - 1])
         )
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
