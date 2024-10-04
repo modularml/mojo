@@ -65,7 +65,7 @@ struct _PyIter(Sized):
         """
         var cpython = _get_global_python_itf().cpython()
         self.iterator = iter
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
+        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object_ptr)
         if maybeNextItem.is_null():
             self.isDone = True
             self.preparedNextItem = PythonObject(PyObjectPtr())
@@ -94,7 +94,7 @@ struct _PyIter(Sized):
             return self.iterator
         var cpython = _get_global_python_itf().cpython()
         var current = self.preparedNextItem
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
+        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object_ptr)
         if maybeNextItem.is_null():
             self.isDone = True
         else:
@@ -238,7 +238,7 @@ struct PythonObject(
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    var py_object: PyObjectPtr
+    var py_object_ptr: PyObjectPtr
     """A pointer to the underlying Python object."""
 
     # ===-------------------------------------------------------------------===#
@@ -266,7 +266,7 @@ struct PythonObject(
         Args:
             ptr: The `PyObjectPtr` to take ownership of.
         """
-        self.py_object = ptr
+        self.py_object_ptr = ptr
 
     @staticmethod
     fn from_borrowed_ptr(borrowed_ptr: PyObjectPtr) -> Self:
@@ -340,8 +340,8 @@ struct PythonObject(
             none: None.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.Py_None()
-        cpython.Py_IncRef(self.py_object)
+        self.py_object_ptr = cpython.Py_None()
+        cpython.Py_IncRef(self.py_object_ptr)
 
     fn __init__(inout self, integer: Int):
         """Initialize the object with an integer value.
@@ -350,7 +350,7 @@ struct PythonObject(
             integer: The integer value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(integer)
+        self.py_object_ptr = cpython.toPython(integer)
 
     fn __init__(inout self, float: Float64):
         """Initialize the object with an floating-point value.
@@ -359,7 +359,7 @@ struct PythonObject(
             float: The float value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyFloat_FromDouble(float)
+        self.py_object_ptr = cpython.PyFloat_FromDouble(float)
 
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         """Initialize the object with a generic scalar value. If the scalar
@@ -376,13 +376,13 @@ struct PythonObject(
 
         @parameter
         if dt == DType.bool:
-            self.py_object = cpython.toPython(value.__bool__())
+            self.py_object_ptr = cpython.toPython(value.__bool__())
         elif dt.is_integral():
             var int_val = value.cast[DType.index]().value
-            self.py_object = cpython.toPython(int_val)
+            self.py_object_ptr = cpython.toPython(int_val)
         else:
             var fp_val = value.cast[DType.float64]()
-            self.py_object = cpython.PyFloat_FromDouble(fp_val)
+            self.py_object_ptr = cpython.PyFloat_FromDouble(fp_val)
 
     fn __init__(inout self, value: Bool):
         """Initialize the object from a bool.
@@ -391,7 +391,7 @@ struct PythonObject(
             value: The boolean value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(value)
+        self.py_object_ptr = cpython.toPython(value)
 
     fn __init__(inout self, value: StringLiteral):
         """Initialize the object from a string literal.
@@ -408,7 +408,7 @@ struct PythonObject(
             strref: The string reference.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(strref)
+        self.py_object_ptr = cpython.toPython(strref)
 
     fn __init__(inout self, string: String):
         """Initialize the object from a string.
@@ -417,7 +417,7 @@ struct PythonObject(
             string: The string value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(string._strref_dangerous())
+        self.py_object_ptr = cpython.toPython(string._strref_dangerous())
         string._strref_keepalive()
 
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
@@ -430,7 +430,7 @@ struct PythonObject(
             value: The list value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyList_New(len(value))
+        self.py_object_ptr = cpython.PyList_New(len(value))
 
         @parameter
         for i in range(len(VariadicList(Ts))):
@@ -459,8 +459,8 @@ struct PythonObject(
                     False, "cannot convert list element to python object"
                 ]()
 
-            cpython.Py_IncRef(obj.py_object)
-            _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
+            cpython.Py_IncRef(obj.py_object_ptr)
+            _ = cpython.PyList_SetItem(self.py_object_ptr, i, obj.py_object_ptr)
 
     fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
@@ -473,7 +473,7 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         alias length = len(VariadicList(Ts))
-        self.py_object = cpython.PyTuple_New(length)
+        self.py_object_ptr = cpython.PyTuple_New(length)
 
         @parameter
         for i in range(length):
@@ -502,8 +502,10 @@ struct PythonObject(
                     False, "cannot convert list element to python object"
                 ]()
 
-            cpython.Py_IncRef(obj.py_object)
-            _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
+            cpython.Py_IncRef(obj.py_object_ptr)
+            _ = cpython.PyTuple_SetItem(
+                self.py_object_ptr, i, obj.py_object_ptr
+            )
 
     fn __init__(inout self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
@@ -512,10 +514,12 @@ struct PythonObject(
             value: The dictionary value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyDict_New()
+        self.py_object_ptr = cpython.PyDict_New()
         for entry in value.items():
             var result = cpython.PyDict_SetItem(
-                self.py_object, entry[].key.py_object, entry[].value.py_object
+                self.py_object_ptr,
+                entry[].key.py_object_ptr,
+                entry[].value.py_object_ptr,
             )
 
     fn __copyinit__(inout self, existing: Self):
@@ -526,9 +530,9 @@ struct PythonObject(
         Args:
             existing: The value to copy.
         """
-        self.py_object = existing.py_object
+        self.py_object_ptr = existing.py_object_ptr
         var cpython = _get_global_python_itf().cpython()
-        cpython.Py_IncRef(self.py_object)
+        cpython.Py_IncRef(self.py_object_ptr)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -544,7 +548,7 @@ struct PythonObject(
             If the object is not iterable.
         """
         var cpython = _get_global_python_itf().cpython()
-        var iter = cpython.PyObject_GetIter(self.py_object)
+        var iter = cpython.PyObject_GetIter(self.py_object_ptr)
         Python.throw_python_exception_if_error_state(cpython)
         return _PyIter(PythonObject(iter))
 
@@ -562,7 +566,7 @@ struct PythonObject(
             Use-after-free: The caller must take care that `self` outlives the
             usage of the pointer returned by this function.
         """
-        return self.py_object
+        return self.py_object_ptr
 
     fn steal_data(owned self) -> PyObjectPtr:
         """Take ownership of the underlying pointer from the Python object.
@@ -570,8 +574,8 @@ struct PythonObject(
         Returns:
             The underlying data.
         """
-        var ptr = self.py_object
-        self.py_object = PyObjectPtr()
+        var ptr = self.py_object_ptr
+        self.py_object_ptr = PyObjectPtr()
 
         return ptr
 
@@ -584,9 +588,9 @@ struct PythonObject(
         # Acquire GIL such that __del__ can be called safely for cases where the
         # PyObject is handled in non-python contexts.
         var state = cpython.PyGILState_Ensure()
-        if not self.py_object.is_null():
-            cpython.Py_DecRef(self.py_object)
-        self.py_object = PyObjectPtr()
+        if not self.py_object_ptr.is_null():
+            cpython.Py_DecRef(self.py_object_ptr)
+        self.py_object_ptr = PyObjectPtr()
         cpython.PyGILState_Release(state)
 
     fn __getattr__(self, name: StringLiteral) raises -> PythonObject:
@@ -599,7 +603,7 @@ struct PythonObject(
             The value of the object attribute with the given name.
         """
         var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_GetAttrString(self.py_object, name)
+        var result = cpython.PyObject_GetAttrString(self.py_object_ptr, name)
         Python.throw_python_exception_if_error_state(cpython)
         if result.is_null():
             raise Error("Attribute is not found.")
@@ -612,12 +616,12 @@ struct PythonObject(
             name: The name of the object attribute to set.
             newValue: The new value to be set for that attribute.
         """
-        return self._setattr(name, newValue.py_object)
+        return self._setattr(name, newValue.py_object_ptr)
 
     fn _setattr(self, name: StringLiteral, newValue: PyObjectPtr) raises:
         var cpython = _get_global_python_itf().cpython()
         var result = cpython.PyObject_SetAttrString(
-            self.py_object, name, newValue
+            self.py_object_ptr, name, newValue
         )
         Python.throw_python_exception_if_error_state(cpython)
         if result < 0:
@@ -630,7 +634,7 @@ struct PythonObject(
             Whether the object evaluates as true.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.PyObject_IsTrue(self.py_object) == 1
+        return cpython.PyObject_IsTrue(self.py_object_ptr) == 1
 
     @always_inline
     fn __as_bool__(self) -> Bool:
@@ -652,7 +656,7 @@ struct PythonObject(
             True if they are the same object and False otherwise.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.Py_Is(self.py_object, other.py_object)
+        return cpython.Py_Is(self.py_object_ptr, other.py_object_ptr)
 
     fn __isnot__(self, other: PythonObject) -> Bool:
         """Test if the PythonObject is not the `other` PythonObject, the same as `x is not y` in
@@ -673,7 +677,7 @@ struct PythonObject(
             The length of the object.
         """
         var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_Length(self.py_object)
+        var result = cpython.PyObject_Length(self.py_object_ptr)
         if result == -1:
             # TODO: Improve error message so we say
             # "object of type 'int' has no len()" function to match Python
@@ -687,7 +691,7 @@ struct PythonObject(
             The length of the object.
         """
         var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_Length(self.py_object)
+        var result = cpython.PyObject_Length(self.py_object_ptr)
         # TODO: make this function raise when we can raise parametrically.
         debug_assert(result != -1, "object is not hashable")
         return result
@@ -705,18 +709,18 @@ struct PythonObject(
         var size = len(args)
         var key_obj: PyObjectPtr
         if size == 1:
-            key_obj = args[0].py_object
+            key_obj = args[0].py_object_ptr
         else:
             key_obj = cpython.PyTuple_New(size)
             for i in range(size):
-                var arg_value = args[i].py_object
+                var arg_value = args[i].py_object_ptr
                 cpython.Py_IncRef(arg_value)
                 var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
                 if result != 0:
                     raise Error("internal error: PyTuple_SetItem failed")
 
         cpython.Py_IncRef(key_obj)
-        var result = cpython.PyObject_GetItem(self.py_object, key_obj)
+        var result = cpython.PyObject_GetItem(self.py_object_ptr, key_obj)
         cpython.Py_DecRef(key_obj)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
@@ -733,25 +737,25 @@ struct PythonObject(
         var key_obj: PyObjectPtr
 
         if size == 1:
-            key_obj = args[0].py_object
+            key_obj = args[0].py_object_ptr
         else:
             key_obj = cpython.PyTuple_New(size)
             for i in range(size):
-                var arg_value = args[i].py_object
+                var arg_value = args[i].py_object_ptr
                 cpython.Py_IncRef(arg_value)
                 var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
                 if result != 0:
                     raise Error("internal error: PyTuple_SetItem failed")
 
         cpython.Py_IncRef(key_obj)
-        cpython.Py_IncRef(value.py_object)
+        cpython.Py_IncRef(value.py_object_ptr)
         var result = cpython.PyObject_SetItem(
-            self.py_object, key_obj, value.py_object
+            self.py_object_ptr, key_obj, value.py_object_ptr
         )
         if result != 0:
             Python.throw_python_exception_if_error_state(cpython)
         cpython.Py_DecRef(key_obj)
-        cpython.Py_DecRef(value.py_object)
+        cpython.Py_DecRef(value.py_object_ptr)
 
     fn _call_zero_arg_method(
         self, method_name: StringRef
@@ -759,7 +763,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(0)
         var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, method_name
+            self.py_object_ptr, method_name
         )
         if callable_obj.is_null():
             raise Error("internal error: PyObject_GetAttrString failed")
@@ -773,12 +777,12 @@ struct PythonObject(
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
-        var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
+        var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object_ptr)
         if result != 0:
             raise Error("internal error: PyTuple_SetItem failed")
-        cpython.Py_IncRef(rhs.py_object)
+        cpython.Py_IncRef(rhs.py_object_ptr)
         var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, method_name
+            self.py_object_ptr, method_name
         )
         if callable_obj.is_null():
             raise Error("internal error: PyObject_GetAttrString failed")
@@ -792,22 +796,24 @@ struct PythonObject(
     ) raises:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
-        var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
+        var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object_ptr)
         if result != 0:
             raise Error("internal error: PyTuple_SetItem failed")
 
-        cpython.Py_IncRef(rhs.py_object)
+        cpython.Py_IncRef(rhs.py_object_ptr)
         var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, method_name
+            self.py_object_ptr, method_name
         )
         if callable_obj.is_null():
             raise Error("internal error: PyObject_GetAttrString failed")
 
         # Destroy previously stored pyobject
-        if not self.py_object.is_null():
-            cpython.Py_DecRef(self.py_object)
+        if not self.py_object_ptr.is_null():
+            cpython.Py_DecRef(self.py_object_ptr)
 
-        self.py_object = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        self.py_object_ptr = cpython.PyObject_CallObject(
+            callable_obj, tuple_obj
+        )
         cpython.Py_DecRef(tuple_obj)
         cpython.Py_DecRef(callable_obj)
 
@@ -1332,7 +1338,7 @@ struct PythonObject(
         return self._call_zero_arg_method("__invert__")
 
     fn _get_ptr_as_int(self) -> Int:
-        return self.py_object._get_ptr_as_int()
+        return self.py_object_ptr._get_ptr_as_int()
 
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules
@@ -1356,7 +1362,7 @@ struct PythonObject(
         var num_pos_args = len(args)
         var tuple_obj = cpython.PyTuple_New(num_pos_args)
         for i in range(num_pos_args):
-            var arg_value = args[i].py_object
+            var arg_value = args[i].py_object_ptr
             cpython.Py_IncRef(arg_value)
             var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if result != 0:
@@ -1366,12 +1372,12 @@ struct PythonObject(
         for entry in kwargs.items():
             var key = cpython.toPython(entry[].key._strref_dangerous())
             var result = cpython.PyDict_SetItem(
-                dict_obj, key, entry[].value.py_object
+                dict_obj, key, entry[].value.py_object_ptr
             )
             if result != 0:
                 raise Error("internal error: PyDict_SetItem failed")
 
-        var callable_obj = self.py_object
+        var callable_obj = self.py_object_ptr
         cpython.Py_IncRef(callable_obj)
         var result = cpython.PyObject_Call(callable_obj, tuple_obj, dict_obj)
         cpython.Py_DecRef(callable_obj)
@@ -1396,7 +1402,7 @@ struct PythonObject(
             A floating point value that represents this object.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.PyFloat_AsDouble(self.py_object.value)
+        return cpython.PyFloat_AsDouble(self.py_object_ptr.value)
 
     fn __index__(self) -> Int:
         """Returns an index representation of the object.
@@ -1413,7 +1419,7 @@ struct PythonObject(
             An integral value that represents this object.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.PyLong_AsLong(self.py_object.value)
+        return cpython.PyLong_AsLong(self.py_object_ptr.value)
 
     fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
         """Convert a Python-owned and managed pointer into a Mojo pointer.
@@ -1444,10 +1450,10 @@ struct PythonObject(
             A string that represents this object.
         """
         var cpython = _get_global_python_itf().cpython()
-        var python_str: PythonObject = cpython.PyObject_Str(self.py_object)
+        var python_str: PythonObject = cpython.PyObject_Str(self.py_object_ptr)
         # copy the string
         var mojo_str = String(
-            cpython.PyUnicode_AsUTF8AndSize(python_str.py_object)
+            cpython.PyUnicode_AsUTF8AndSize(python_str.py_object_ptr)
         )
         # keep python object alive so the copy can occur
         _ = python_str
