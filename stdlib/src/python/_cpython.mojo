@@ -17,7 +17,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int, OpaquePointer
+from sys.ffi import DLHandle, c_char, c_int, OpaquePointer, c_ssize_t, c_size_t
 
 from memory import UnsafePointer
 
@@ -83,8 +83,9 @@ alias Py_eval_input = 258
 alias Py_func_type_input = 345
 
 # TODO(MSTDL-892): Change this to alias ffi.C_ssize_t
-alias Py_ssize_t = Int
+alias Py_ssize_t = c_ssize_t
 
+alias Py_size_t = c_size_t
 # Ref: https://docs.python.org/3/c-api/structures.html#c.PyCFunction
 # TODO(MOCO-1138):
 #   This should be a C ABI function pointer, not a Mojo ABI function.
@@ -1252,6 +1253,37 @@ struct CPython:
 
     fn PyFloat_FromDouble(inout self, value: Float32) -> PyObjectPtr:
         return self.PyFloat_FromDouble(value.cast[DType.float64]())
+
+
+    fn PyLong_FromSsize_t(inout self, value: Py_ssize_t) -> PyObjectPtr:
+        var r = self.lib.get_function[fn (Py_ssize_t) -> PyObjectPtr]("PyLong_FromSsize_t")(value)
+        self.log(
+            r._get_ptr_as_int(),
+            "NEWREF PyLong_FromSsize_t, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+        value,
+        )
+        self._inc_total_rc()
+        return r
+
+
+    fn PyLong_FromSize_t(inout self, value: Py_size_t) -> PyObjectPtr:
+        var r = self.lib.get_function[fn (Py_size_t) -> PyObjectPtr](
+            "PyLong_FromSize_t"
+        )(value)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyLong_FromSize_t, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
+        self._inc_total_rc()
+        return r
+
 
     fn PyBool_FromLong(inout self, value: Bool) -> PyObjectPtr:
         var long = 0

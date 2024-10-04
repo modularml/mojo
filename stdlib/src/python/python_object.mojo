@@ -376,9 +376,16 @@ struct PythonObject(
         elif dt.is_integral():
             var int_val = value.cast[DType.index]().value
             self.py_object = cpython.toPython(int_val)
-        else:
+        elif dt == DType.float64:
             var fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val)
+        elif dt == DType.ssize_t:
+            var fp_val = value.cast[DType.ssize_t]()
+            self.pyobject = cpython.PyLong_FromSsize_t(fp_val)   
+        else:
+            var fp_val = value.cast[DType.size_t]()
+            self.pyobject = cpython.PyLong_FromSize_t(fp_val)
+
 
     fn __init__(inout self, value: Bool):
         """Initialize the object from a bool.
@@ -1408,6 +1415,7 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyLong_AsLong(self.py_object.value)
+
 
     fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
         """Convert a Python-owned and managed pointer into a Mojo pointer.
