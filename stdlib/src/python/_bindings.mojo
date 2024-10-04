@@ -354,9 +354,9 @@ fn check_argument_type[
     instance of the Mojo `T` type.
     """
 
-    var opt: Optional[UnsafePointer[T]] = obj.py_object.try_cast_to_mojo_value[
-        T
-    ](type_name_id)
+    var opt: Optional[
+        UnsafePointer[T]
+    ] = obj.py_object_ptr.try_cast_to_mojo_value[T](type_name_id)
 
     if not opt:
         raise Error(
