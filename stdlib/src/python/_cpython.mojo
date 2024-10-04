@@ -1127,6 +1127,8 @@ struct CPython:
 
         return r
 
+    # PyObject *PySlice_New(PyObject *start, PyObject *stop, PyObject *step)
+    # ref: https://docs.python.org/3/c-api/slice.html#c.PySlice_New
     fn PySlice_New(
         inout self, start: PyObjectPtr, stop: PyObjectPtr, step: PyObjectPtr
     ) -> PyObjectPtr:
@@ -1454,12 +1456,6 @@ struct CPython:
         if py_stop != self.Py_None():
             self.Py_DecRef(py_stop)
         self.Py_DecRef(py_step)
-
-        self.log(
-            py_slice._get_ptr_as_int(),
-            " NEWREF PySlice_New, refcnt:",
-            self._Py_REFCNT(py_slice),
-        )
 
         return py_slice
 
