@@ -384,7 +384,7 @@ struct SIMD[type: DType, size: Int](
         for i in range(size):
             self[i] = elems[i]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
@@ -2049,7 +2049,7 @@ struct SIMD[type: DType, size: Int](
             result[i] = self[int(mask[i])]
         return result
 
-    @always_inline("nodebug")
+    @always_inline
     fn slice[
         output_width: Int, /, *, offset: Int = 0
     ](self) -> SIMD[type, output_width]:

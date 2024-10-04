@@ -29,7 +29,7 @@ from utils._select import _select_register_value as select
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@always_inline
 fn _sign(x: Int) -> Int:
     var result = 0
     result = select(x > 0, 1, result)
@@ -47,12 +47,12 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var curr: Int
     var end: Int
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, end: Int):
         self.curr = max(0, end)
         self.end = self.curr
 
-    @always_inline("nodebug")
+    @always_inline
     fn __iter__(self) -> Self:
         return self
 
@@ -66,16 +66,16 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         return self.curr
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         debug_assert(idx < self.__len__(), "index out of range")
         return index(idx)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, -1, -1)
 
@@ -86,7 +86,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     var start: Int
     var end: Int
 
-    @always_inline("nodebug")
+    @always_inline
     fn __iter__(self) -> Self:
         return self
 
@@ -100,16 +100,16 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         return max(0, self.end - self.start)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + index(idx)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
@@ -148,17 +148,17 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var end: Int
     var step: Int
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, start: Int, end: Int):
         self.start = start
         self.end = end
         self.step = 1
 
-    @always_inline("nodebug")
+    @always_inline
     fn __iter__(self) -> _StridedRangeIterator:
         return _StridedRangeIterator(self.start, self.end, self.step)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __next__(inout self) -> Int:
         var result = self.start
         self.start += self.step
@@ -168,7 +168,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         # If the step is positive we want to check that the start is smaller
         # than the end, if the step is negative we want to check the reverse.
@@ -185,12 +185,12 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         # return 0 without a branch.
         return ceildiv(select(cnd, 0, numerator), select(cnd, 1, denominator))
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + index(idx) * self.step
 
-    @always_inline("nodebug")
+    @always_inline
     fn __reversed__(self) -> _StridedRange:
         var shifted_end = self.end - _sign(self.step)
         var start = shifted_end - ((shifted_end - self.start) % self.step)
@@ -199,7 +199,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         return range(start, end, step)
 
 
-@always_inline("nodebug")
+@always_inline
 fn range[type: Intable](end: type) -> _ZeroStartingRange:
     """Constructs a [0; end) Range.
 
@@ -231,7 +231,7 @@ fn range[type: IntableRaising](end: type) raises -> _ZeroStartingRange:
     return _ZeroStartingRange(int(end))
 
 
-@always_inline("nodebug")
+@always_inline
 fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     """Constructs a [start; end) Range.
 
@@ -249,7 +249,7 @@ fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     return _SequentialRange(int(start), int(end))
 
 
-@always_inline("nodebug")
+@always_inline
 fn range[
     t0: IntableRaising, t1: IntableRaising
 ](start: t0, end: t1) raises -> _SequentialRange:
@@ -383,7 +383,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     var end: UInt
     var step: UInt
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, start: UInt, end: UInt, step: UInt):
         self.start = start
         self.end = end

@@ -39,7 +39,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, owned *args: *Ts):
         """Construct the list literal from the given values.
 
@@ -48,7 +48,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         """
         self.storage = Tuple(storage=args^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Copy construct the tuple.
 
@@ -70,7 +70,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """Get the list length.
 
@@ -83,7 +83,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn get[i: Int, T: CollectionElement](self) -> ref [self.storage] T:
         """Get a list element at the given index.
 
@@ -100,7 +100,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __contains__[
         T: EqualityComparableCollectionElement
     ](self, value: T) -> Bool:

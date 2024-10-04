@@ -96,7 +96,7 @@ struct PyKeyValuePair:
 struct PyObjectPtr:
     var value: UnsafePointer[Int8]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self):
         self.value = UnsafePointer[Int8]()
 
