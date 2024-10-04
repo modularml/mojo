@@ -148,7 +148,6 @@ struct UnsafePointer[
     # Factory methods
     # ===-------------------------------------------------------------------===#
 
-    @deprecated("Use constructor UnsafePointer(to=arg) instead.")
     @staticmethod
     @always_inline("nodebug")
     fn address_of(

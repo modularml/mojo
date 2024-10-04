@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_true, assert_not_equal
 
 
 def test_copy_reference_explicitly():
@@ -43,7 +43,7 @@ def test_str():
 
 def test_pointer_to():
     var local = 1
-    assert_not_equal(0, int(UnsafePointer(to=local)))
+    assert_not_equal(0, int(Pointer(to=local)))
     _ = local
 
 
