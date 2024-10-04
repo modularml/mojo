@@ -52,7 +52,7 @@ struct Slice(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, start: Int, end: Int):
         """Construct slice given the start and end values.
 
@@ -64,7 +64,7 @@ struct Slice(
         self.end = end
         self.step = 1
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(
         inout self,
         start: Optional[Int],
@@ -138,7 +138,7 @@ struct Slice(
         writer.write(repr(self.step))
         writer.write(")")
 
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -155,7 +155,7 @@ struct Slice(
             and self.step == other.step
         )
 
-    @always_inline("nodebug")
+    @always_inline
     fn __ne__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -232,7 +232,7 @@ struct Slice(
 # ===-----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(end: Int) -> Slice:
     """Construct slice given the end value.
 
@@ -245,7 +245,7 @@ fn slice(end: Int) -> Slice:
     return Slice(None, end, None)
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(start: Int, end: Int) -> Slice:
     """Construct slice given the start and end values.
 
@@ -259,7 +259,7 @@ fn slice(start: Int, end: Int) -> Slice:
     return Slice(start, end)
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(
     start: Optional[Int], end: Optional[Int], step: Optional[Int]
 ) -> Slice:
