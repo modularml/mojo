@@ -511,8 +511,7 @@ struct PythonObject(
         Args:
             slice: The dictionary value.
         """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(slice)
+        self.py_object = _slice_to_py_object_ptr(slice)
 
     fn __init__(inout self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
@@ -744,11 +743,11 @@ struct PythonObject(
         var key_obj: PyObjectPtr
 
         if size == 1:
-            key_obj = cpython.PySlice_FromSlice(args[0])
+            key_obj = _slice_to_py_object_ptr(args[0])
         else:
             key_obj = cpython.PyTuple_New(size)
             for i in range(size):
-                var slice_obj = cpython.PySlice_FromSlice(args[i])
+                var slice_obj = _slice_to_py_object_ptr(args[i])
                 var result = cpython.PyTuple_SetItem(key_obj, i, slice_obj)
                 if result != 0:
                     raise Error("internal error: PyTuple_SetItem failed")
@@ -1501,3 +1500,45 @@ struct PythonObject(
 
         # TODO: Avoid this intermediate String allocation, if possible.
         writer.write(str(self))
+
+
+# ===-----------------------------------------------------------------------===#
+# Helper functions
+# ===-----------------------------------------------------------------------===#
+
+
+fn _slice_to_py_object_ptr(slice: Slice) -> PyObjectPtr:
+    """Convert Mojo Slice to Python slice parameters.
+
+    Deliberately avoids using `span.indices()` here and instead passes
+    the Slice parameters directly to Python. Python's C implementation
+    already handles such conditions, allowing Python to apply its own slice
+    handling and error handling.
+
+
+    Args:
+        slice: A Mojo slice object to be converted.
+
+    Returns:
+        PyObjectPtr: The pointer to the Python slice.
+
+    """
+    cpython = _get_global_python_itf().cpython()
+    var py_start = cpython.Py_None()
+    var py_stop = cpython.Py_None()
+    var py_step = cpython.PyLong_FromLong(slice.step)
+
+    if slice.start:
+        py_start = cpython.PyLong_FromLong(slice.start.value())
+    if slice.end:
+        py_stop = cpython.PyLong_FromLong(slice.end.value())
+
+    var py_slice = cpython.PySlice_New(py_start, py_stop, py_step)
+
+    if py_start != cpython.Py_None():
+        cpython.Py_DecRef(py_start)
+    if py_stop != cpython.Py_None():
+        cpython.Py_DecRef(py_stop)
+    cpython.Py_DecRef(py_step)
+
+    return py_slice
