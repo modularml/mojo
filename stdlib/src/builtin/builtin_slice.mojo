@@ -40,12 +40,17 @@ struct Slice(
     ```
     """
 
+    # Fields
     var start: Optional[Int]
     """The starting index of the slice."""
     var end: Optional[Int]
     """The end index of the slice."""
     var step: Int
     """The step increment value of the slice."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __init__(inout self, start: Int, end: Int):
@@ -84,6 +89,10 @@ struct Slice(
             other: The slice to copy.
         """
         self.__init__(start=other.start, end=other.end, step=other.step)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
 
     @no_inline
     fn __str__(self) -> String:
@@ -169,20 +178,20 @@ struct Slice(
         Negative indices are wrapped using the length of the container.
         ```mojo
         s = slice(0, -1, 1)
-        s.indices(5) # returns (0, 4, 1)
+        i = s.indices(5) # returns (0, 4, 1)
         ```
 
         None indices are defaulted to the start or the end of the container
         based on whether `step` is positive or negative.
         ```mojo
         s = slice(None, None, 1)
-        s.indices(5) # returns (0, 5, 1)
+        i = s.indices(5) # returns (0, 5, 1)
         ```
 
         Out of bounds indices are clamped using the size of the container.
         ```mojo
         s = slice(20)
-        s.indices(5) # returns (0, 5, 1)
+        i = s.indices(5) # returns (0, 5, 1)
         ```
 
         Args:
@@ -216,6 +225,11 @@ struct Slice(
             end = length if positive_step else length - 1
 
         return (start.value(), end.value(), step)
+
+
+# ===-----------------------------------------------------------------------===#
+# Slice constructor functions
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
