@@ -20,6 +20,8 @@ from utils import StaticIntTuple
 ```
 """
 
+from sys import bitwidthof
+from builtin.dtype import _int_type_of_width
 from builtin.io import _get_dtype_printf_format, _snprintf
 from collections.string import _calc_initial_buffer_size
 
@@ -53,11 +55,8 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
 
 @always_inline
 fn _int_tuple_binary_apply[
-    size: Int,
-    binary_fn: fn (Int, Int) -> Int,
-](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
-    Int, size
-]:
+    binary_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Scalar[type],
+](a: StaticIntTuple, b: __type_of(a)) -> __type_of(a):
     """Applies a given element binary function to each pair of corresponding
     elements in two tuples.
 
@@ -65,10 +64,6 @@ fn _int_tuple_binary_apply[
         var a: StaticTuple[Int, size]
         var b: StaticTuple[Int, size]
         var c = _int_tuple_binary_apply[size, Int.add](a, b)
-
-    Parameters:
-        size: Static size of the operand and result tuples.
-        binary_fn: Binary function to apply to tuple elements.
 
     Args:
         a: Tuple containing lhs operands of the elementwise binary function.
@@ -78,24 +73,21 @@ fn _int_tuple_binary_apply[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[Int, size]()
+    var c = __type_of(a)()
 
     @parameter
-    for i in range(size):
+    for i in range(a.size):
         var a_elem = a.__getitem__[i]()
         var b_elem = b.__getitem__[i]()
-        c.__setitem__[i](binary_fn(a_elem, b_elem))
+        c.__setitem__[i](binary_fn[a._int_dtype](a_elem, b_elem))
 
     return c
 
 
 @always_inline
 fn _int_tuple_compare[
-    size: Int,
-    comp_fn: fn (Int, Int) -> Bool,
-](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
-    Bool, size
-]:
+    comp_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Bool,
+](a: StaticIntTuple, b: __type_of(a)) -> StaticTuple[Bool, a.size]:
     """Applies a given element compare function to each pair of corresponding
     elements in two tuples and produces a tuple of Bools containing result.
 
@@ -103,10 +95,6 @@ fn _int_tuple_compare[
         var a: StaticTuple[Int, size]
         var b: StaticTuple[Int, size]
         var c = _int_tuple_compare[size, Int.less_than](a, b)
-
-    Parameters:
-        size: Static size of the operand and result tuples.
-        comp_fn: Compare function to apply to tuple elements.
 
     Args:
         a: Tuple containing lhs operands of the elementwise compare function.
@@ -116,22 +104,21 @@ fn _int_tuple_compare[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[Bool, size]()
+    var c = StaticTuple[Bool, a.size]()
 
     @parameter
-    for i in range(size):
-        var a_elem: Int = a.__getitem__[i]()
-        var b_elem: Int = b.__getitem__[i]()
-        c.__setitem__[i](comp_fn(a_elem, b_elem))
+    for i in range(a.size):
+        var a_elem = a.__getitem__[i]()
+        var b_elem = b.__getitem__[i]()
+        c.__setitem__[i](comp_fn[a._int_dtype](a_elem, b_elem))
 
     return c
 
 
 @always_inline
 fn _bool_tuple_reduce[
-    size: Int,
     reduce_fn: fn (Bool, Bool) -> Bool,
-](a: StaticTuple[Bool, size], init: Bool) -> Bool:
+](a: StaticTuple[Bool, _], init: Bool) -> Bool:
     """Reduces the tuple argument with the given reduce function and initial
     value.
 
@@ -140,7 +127,6 @@ fn _bool_tuple_reduce[
         var c = _bool_tuple_reduce[size, _reduce_and_fn](a, True)
 
     Parameters:
-        size: Static size of the operand and result tuples.
         reduce_fn: Reduce function to accumulate tuple elements.
 
     Args:
@@ -154,7 +140,7 @@ fn _bool_tuple_reduce[
     var c: Bool = init
 
     @parameter
-    for i in range(size):
+    for i in range(a.size):
         c = reduce_fn(c, a.__getitem__[i]())
 
     return c
@@ -167,7 +153,7 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](
+struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
     Sized,
     Stringable,
     Formattable,
@@ -177,9 +163,16 @@ struct StaticIntTuple[size: Int](
 
     Parameters:
         size: The size of the tuple.
+        integer_bitwidth: The bitwidth of the underlying integer element type.
     """
 
-    var data: StaticTuple[Int, size]
+    alias _int_dtype = _int_type_of_width[integer_bitwidth]()
+    """The underlying dtype of the integer element value."""
+
+    alias _int_type = Scalar[Self._int_dtype]
+    """The underlying storage of the integer element value."""
+
+    var data: StaticTuple[Self._int_type, size]
     """The underlying storage of the tuple value."""
 
     @always_inline
@@ -304,8 +297,10 @@ struct StaticIntTuple[size: Int](
         """
 
         self.data = __mlir_op.`pop.array.repeat`[
-            _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
-        ](elem)
+            _type = __mlir_type[
+                `!pop.array<`, size.value, `, `, Self._int_type, `>`
+            ]
+        ](Self._int_type(elem))
 
     fn __init__(inout self, *, other: Self):
         """Copy constructor.
@@ -313,7 +308,7 @@ struct StaticIntTuple[size: Int](
         Args:
             other: The other tuple to copy from.
         """
-        self.data = StaticTuple[Int, size](other=other.data)
+        self.data = other.data
 
     @always_inline
     fn __init__(inout self, values: VariadicList[Int]):
@@ -322,8 +317,21 @@ struct StaticIntTuple[size: Int](
         Args:
             values: The list of values.
         """
-        constrained[size > 0]()
-        self.data = values
+
+        var num_elements = len(values)
+
+        debug_assert(
+            size == num_elements,
+            "[StaticIntTuple] mismatch in the number of elements",
+        )
+
+        var tup = Self()
+
+        @parameter
+        for idx in range(size):
+            tup[idx] = values[idx]
+
+        self = tup
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -333,6 +341,18 @@ struct StaticIntTuple[size: Int](
             The tuple size.
         """
         return size
+
+    @always_inline
+    fn __getitem__[idx: Int](self) -> Int:
+        """Gets an element from the tuple by index.
+
+        Parameters:
+            idx: The element index.
+
+        Returns:
+            The tuple element value.
+        """
+        return int(self.data.__getitem__[idx]())
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
@@ -344,10 +364,22 @@ struct StaticIntTuple[size: Int](
         Returns:
             The tuple element value.
         """
-        return self.data[idx]
+        return int(self.data[idx])
 
     @always_inline("nodebug")
     fn __setitem__[index: Int](inout self, val: Int):
+        """Sets an element in the tuple at the given static index.
+
+        Parameters:
+            index: The element index.
+
+        Args:
+            val: The value to store.
+        """
+        self.data.__setitem__[index](val)
+
+    @always_inline("nodebug")
+    fn __setitem__[index: Int](inout self, val: Self._int_type):
         """Sets an element in the tuple at the given static index.
 
         Parameters:
@@ -375,7 +407,12 @@ struct StaticIntTuple[size: Int](
         Returns:
             The corresponding StaticTuple object.
         """
-        return self.data
+        var res = StaticTuple[Int, size]()
+
+        @parameter
+        for i in range(size):
+            res[i] = int(self.__getitem__[i]())
+        return res
 
     @always_inline
     fn flattened_length(self) -> Int:
@@ -393,7 +430,7 @@ struct StaticIntTuple[size: Int](
         return length
 
     @always_inline
-    fn __add__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __add__(self, rhs: Self) -> Self:
         """Performs element-wise integer add.
 
         Args:
@@ -404,15 +441,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a + b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
-    fn __sub__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __sub__(self, rhs: Self) -> Self:
         """Performs element-wise integer subtract.
 
         Args:
@@ -423,15 +460,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a - b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
-    fn __mul__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __mul__(self, rhs: Self) -> Self:
         """Performs element-wise integer multiply.
 
         Args:
@@ -442,12 +479,12 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a * b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
     fn __floordiv__(self, rhs: Self) -> Self:
@@ -461,12 +498,12 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a // b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
     fn __rfloordiv__(self, rhs: Self) -> Self:
@@ -481,7 +518,7 @@ struct StaticIntTuple[size: Int](
         return rhs // self
 
     @always_inline
-    fn remu(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn remu(self, rhs: Self) -> Self:
         """Performs element-wise integer unsigned modulo.
 
         Args:
@@ -492,15 +529,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a % b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
-    fn __eq__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __eq__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple for equality.
 
         The tuples are equal if all corresponding elements are equal.
@@ -513,15 +550,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a == b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __ne__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __ne__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple for non-equality.
 
         The tuples are non-equal if at least one element of LHS isn't equal to
@@ -536,7 +573,7 @@ struct StaticIntTuple[size: Int](
         return not (self == rhs)
 
     @always_inline
-    fn __lt__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __lt__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using LT comparison.
 
         A tuple is less-than another tuple if all corresponding elements of lhs
@@ -552,15 +589,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a < b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __le__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __le__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using LE comparison.
 
         A tuple is less-or-equal than another tuple if all corresponding
@@ -576,15 +613,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a <= b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __gt__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __gt__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using GT comparison.
 
         A tuple is greater-than than another tuple if all corresponding
@@ -600,15 +637,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a > b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __ge__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __ge__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using GE comparison.
 
         A tuple is greater-or-equal than another tuple if all corresponding
@@ -624,11 +661,11 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a >= b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @no_inline
@@ -675,6 +712,15 @@ struct StaticIntTuple[size: Int](
 
         # TODO: Optimize this to avoid the intermediate String allocation.
         writer.write(str(self))
+
+    @always_inline
+    fn _as_index_tuple(self) -> StaticTuple[Int, size]:
+        var res = StaticTuple[Int, size]()
+
+        @parameter
+        for i in range(size):
+            res[i] = self.__getitem__[i]()
+        return res
 
 
 # ===----------------------------------------------------------------------===#
