@@ -17,7 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
-from builtin.hash import _hash_simd
+from builtin._documentation import doc_private
+from hashlib.hash import _hash_simd
 
 
 @lldb_formatter_wrapping_type
@@ -56,6 +57,7 @@ struct UInt(IntLike):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct UInt from the given index value.
@@ -64,6 +66,18 @@ struct UInt(IntLike):
             value: The init value.
         """
         self.value = value
+
+    @doc_private
+    @always_inline("nodebug")
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+        """Construct UInt from the given Index value.
+
+        Args:
+            value: The init value.
+        """
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+            value
+        )
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
@@ -98,8 +112,9 @@ struct UInt(IntLike):
 
         A small example.
         ```mojo
-        var x = UInt(50)
-        var x_as_string = str(x)  # x_as_string = "50"
+        %# from testing import assert_equal
+        x = UInt(50)
+        assert_equal(str(x), "50")
         ```
 
         Returns:
@@ -122,8 +137,9 @@ struct UInt(IntLike):
 
         A small example.
         ```mojo
-        var x = UInt(50)
-        var x_as_string = repr(x)  # x_as_string = "UInt(50)"
+        %# from testing import assert_equal
+        x = UInt(50)
+        assert_equal(repr(x), "UInt(50)")
         ```
 
         Returns:

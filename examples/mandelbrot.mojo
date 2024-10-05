@@ -43,7 +43,7 @@ struct Matrix[type: DType, rows: Int, cols: Int]:
         self.data = UnsafePointer[Scalar[type]].alloc(rows * cols)
 
     fn store[nelts: Int](self, row: Int, col: Int, val: SIMD[type, nelts]):
-        self.data.store[width=nelts](row * cols + col, val)
+        self.data.store(row * cols + col, val)
 
 
 fn mandelbrot_kernel_SIMD[
