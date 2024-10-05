@@ -184,6 +184,10 @@ struct _StringSliceIter[
                 unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
             )
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         @parameter
         if forward:
@@ -231,7 +235,7 @@ struct StringSlice[
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
         # TODO(#933): use when llvm intrinsics can be used at compile time
         # debug_assert(
-        #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
+        #     _is_valid_utf8(literal.unsafe_ptr(), literal.byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
         self = StaticString(
@@ -479,17 +483,6 @@ struct StringSlice[
 
     @always_inline
     fn byte_length(self) -> Int:
-        """Get the length of this string slice in bytes.
-
-        Returns:
-            The length of this string slice in bytes.
-        """
-
-        return len(self.as_bytes_span())
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
         """Get the length of this string slice in bytes.
 
         Returns:

@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 
-from builtin._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
+from hashlib._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
 from memory import UnsafePointer
 from testing import assert_equal
 

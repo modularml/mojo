@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char
+from sys.ffi import c_char, OpaquePointer
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -1269,7 +1269,7 @@ struct String(
             value. This `String` MUST outlive the `Formatter` instance.
         """
 
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[String] = ptr0.bitcast[String]()
 
             # FIXME:
@@ -1437,19 +1437,6 @@ struct String(
 
     @always_inline
     fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes, excluding null terminator.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return max(len(self._buffer) - 1, 0)
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
         """Get the string length in bytes.
 
         Returns:

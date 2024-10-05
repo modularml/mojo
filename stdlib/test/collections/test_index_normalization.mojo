@@ -10,42 +10,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %bare-mojo -D ASSERT=warn %s | FileCheck %s
 
-from collections._index_normalization import (
-    get_out_of_bounds_error_message,
-    normalize_index,
-)
+from collections._index_normalization import normalize_index
 
 from testing import assert_equal
 
 
 def test_out_of_bounds_message():
-    assert_equal(
-        get_out_of_bounds_error_message["List"](5, 2),
-        (
-            "The List has a length of 2. Thus the index provided should be"
-            " between -2 (inclusive) and 2 (exclusive) but the index value 5"
-            " was used. Aborting now to avoid an out-of-bounds access."
-        ),
-    )
+    l = List[Int](1, 2)
+    # CHECK: index out of bounds: 2
+    _ = normalize_index["List"](2, l)
+    # CHECK: index out of bounds: -3
+    _ = normalize_index["List"](-3, l)
 
-    assert_equal(
-        get_out_of_bounds_error_message["List"](0, 0),
-        (
-            "The List has a length of 0. Thus it's not possible to access its"
-            " values with an index but the index value 0 was used. Aborting now"
-            " to avoid an out-of-bounds access."
-        ),
-    )
-    assert_equal(
-        get_out_of_bounds_error_message["InlineArray"](8, 0),
-        (
-            "The InlineArray has a length of 0. Thus it's not possible to"
-            " access its values with an index but the index value 8 was used."
-            " Aborting now to avoid an out-of-bounds access."
-        ),
-    )
+    l2 = List[Int]()
+    # CHECK: indexing into a List that has 0 elements
+    _ = normalize_index["List"](2, l2)
 
 
 def test_normalize_index():

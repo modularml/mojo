@@ -15,6 +15,7 @@ from memory import UnsafePointer
 from os import Atomic
 from time import sleep
 from sys import external_call
+from sys.ffi import OpaquePointer
 
 
 # ===----------------------------------------------------------------------===#
@@ -25,14 +26,14 @@ from sys import external_call
 struct SpinWaiter:
     """A proxy for the C++ runtime's SpinWaiter type."""
 
-    var storage: UnsafePointer[NoneType]
+    var storage: OpaquePointer
     """Pointer to the underlying SpinWaiter instance."""
 
     fn __init__(inout self: Self):
         """Initializes a SpinWaiter instance."""
         self.storage = external_call[
             "KGEN_CompilerRT_AsyncRT_InitializeSpinWaiter",
-            UnsafePointer[NoneType],
+            OpaquePointer,
         ]()
 
     fn __del__(owned self: Self):
