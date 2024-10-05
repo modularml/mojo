@@ -37,7 +37,7 @@ from bit import pop_count
 from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
 from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
@@ -167,7 +167,8 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
-    CollectionElementNew,
+    # FIXME(MOCO-1291): Can't implement this due to ambiguity.
+    # CollectionElementNew,
     Floatable,
     Floorable,
     Formattable,
@@ -229,14 +230,15 @@ struct SIMD[type: DType, size: Int](
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
 
-    @always_inline("nodebug")
-    fn __init__(inout self, *, other: SIMD[type, size]):
-        """Explicitly copy the provided value.
+    # FIXME(MOCO-1291): Can't implement this due to ambiguity.
+    # @always_inline("nodebug")
+    # fn __init__(inout self, *, other: SIMD[type, size]):
+    #    """Explicitly copy the provided value.
 
-        Args:
-            other: The value to copy.
-        """
-        self.__copyinit__(other)
+    #    Args:
+    #        other: The value to copy.
+    #    """
+    #    self.__copyinit__(other)
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
@@ -382,7 +384,7 @@ struct SIMD[type: DType, size: Int](
         for i in range(size):
             self[i] = elems[i]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
@@ -1463,28 +1465,12 @@ struct SIMD[type: DType, size: Int](
                 @parameter
                 if type.is_half_float():
                     alias prefix = "abs.bf16" if type is DType.bfloat16 else "abs.f16"
-
-                    @parameter
-                    if size == 1:
-                        return inlined_assembly[
-                            prefix + " $0, $1;",
-                            Self,
-                            constraints="=h,h",
-                            has_side_effect=False,
-                        ](self)
-
-                    var res = Self()
-
-                    @parameter
-                    for i in range(0, size, 2):
-                        var val = inlined_assembly[
-                            prefix + "x2 $0, $1;",
-                            SIMD[type, 2],
-                            constraints="=r,r",
-                            has_side_effect=False,
-                        ](self.slice[2, offset=i]())
-                        res = res.insert[offset=i](val)
-                    return res
+                    return _call_ptx_intrinsic[
+                        scalar_instruction=prefix,
+                        vector2_instruction = prefix + "x2",
+                        scalar_constraints="=h,h",
+                        vector_constraints="=r,r",
+                    ](self)
                 return llvm_intrinsic["llvm.fabs", Self, has_side_effect=False](
                     self
                 )
@@ -2063,7 +2049,7 @@ struct SIMD[type: DType, size: Int](
             result[i] = self[int(mask[i])]
         return result
 
-    @always_inline("nodebug")
+    @always_inline
     fn slice[
         output_width: Int, /, *, offset: Int = 0
     ](self) -> SIMD[type, output_width]:

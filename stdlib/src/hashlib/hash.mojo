@@ -26,7 +26,7 @@ There are a few main tools in this module:
 """
 
 import random
-from sys.ffi import _get_global
+from sys.ffi import _get_global, OpaquePointer
 from sys import simdwidthof, bitwidthof
 from collections import InlineArray
 
@@ -52,15 +52,15 @@ fn _HASH_SECRET() -> UInt:
 
 
 fn _initialize_hash_secret(
-    payload: UnsafePointer[NoneType],
-) -> UnsafePointer[NoneType]:
+    payload: OpaquePointer,
+) -> OpaquePointer:
     var secret = random.random_ui64(0, UInt64.MAX)
     var data = UnsafePointer[Int].alloc(1)
     data[] = int(secret)
     return data.bitcast[NoneType]()
 
 
-fn _destroy_hash_secret(p: UnsafePointer[NoneType]):
+fn _destroy_hash_secret(p: OpaquePointer):
     p.free()
 
 
