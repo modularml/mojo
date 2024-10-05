@@ -40,9 +40,9 @@ struct StringLiteral(
     IntableRaising,
     KeyElement,
     Representable,
-    Sized,
     Stringable,
     FloatableRaising,
+    SizedSpanableCollectionElement,
 ):
     """This type represents a string literal.
 
@@ -366,6 +366,23 @@ struct StringLiteral(
         """
 
         return Span[UInt8, StaticConstantLifetime](
+            unsafe_ptr=self.unsafe_ptr(),
+            len=self.byte_length(),
+        )
+
+    @always_inline
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        # Does NOT include the NUL terminator.
+        return Span[UInt8, __lifetime_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )

@@ -1349,8 +1349,12 @@ struct String(
         # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
         # disambiguate with an explicit cast"
         @parameter
-        if _type_is_eq[T, String]() or _type_is_eq[T, StringLiteral]():
+        if _type_is_eq[T, String]():
             return self.fast_join(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self.fast_join(rebind[List[StringLiteral]](elems))
+        # elif _type_is_eq[T, StringSlice](): # FIXME(#3597): once StringSlice conforms to CollectionElement trait
+        #     return self.fast_join(rebind[List[StringSlice]](elems))
 
         var result: String = ""
         var is_first = True
