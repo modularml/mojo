@@ -383,11 +383,11 @@ struct PythonObject(
         elif dt == DType.float64:
             var fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val)
-        elif dt == DType.ssize_t:
-            var fp_val = value.cast[DType.ssize_t]()
+        elif dt.is_integral() and dt.is_unsigned():
+            var fp_val = value.cast[DType.index]().value
             self.pyobject = cpython.PyLong_FromSsize_t(fp_val)   
         else:
-            var fp_val = value.cast[DType.size_t]()
+            var fp_val = value.cast[DType.index]().value
             self.pyobject = cpython.PyLong_FromSize_t(fp_val)
 
 

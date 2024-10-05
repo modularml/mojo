@@ -23,7 +23,8 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer, c_ssize_t, c_size_t
+from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
+from stdlib.builtin.simd import Size_t, SSize_t
 from python.python import _get_global_python_itf
 from python._bindings import Typed_initproc
 
@@ -1380,7 +1381,7 @@ struct CPython:
         return r
 
 
-    fn PyLong_FromSize_t(inout self, value: Py_size_t) -> PyObjectPtr:
+    fn PyLong_FromSize_t(inout self, value: Size_t) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Py_size_t) -> PyObjectPtr](
             "PyLong_FromSize_t"
         )(value)
