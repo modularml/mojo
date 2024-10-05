@@ -14,40 +14,38 @@
 
 from testing import assert_equal
 
-from utils import Index, StaticIntTuple
+from utils import Index, IndexList
 
 
 def test_basics():
-    assert_equal(StaticIntTuple[2](1, 2), StaticIntTuple[2](1, 2))
-    assert_equal(StaticIntTuple[3](1, 2, 3), StaticIntTuple[3](1, 2, 3))
-    assert_equal(str(StaticIntTuple[3](1, 2, 3)), "(1, 2, 3)")
-    assert_equal(StaticIntTuple[3](1, 2, 3)[2], 3)
+    assert_equal(IndexList[2](1, 2), IndexList[2](1, 2))
+    assert_equal(IndexList[3](1, 2, 3), IndexList[3](1, 2, 3))
+    assert_equal(str(IndexList[3](1, 2, 3)), "(1, 2, 3)")
+    assert_equal(IndexList[3](1, 2, 3)[2], 3)
 
 
 def test_cast():
     assert_equal(
-        str(StaticIntTuple[2](1, 2).cast[DType.int32]()),
+        str(IndexList[2](1, 2).cast[DType.int32]()),
         "(1, 2)",
     )
     assert_equal(
-        str(StaticIntTuple[2, element_bitwidth=64](1, 2).cast[DType.int32]()),
+        str(IndexList[2, element_bitwidth=64](1, 2).cast[DType.int32]()),
         "(1, 2)",
     )
     assert_equal(
-        str(StaticIntTuple[2, element_bitwidth=32](1, 2).cast[DType.int64]()),
+        str(IndexList[2, element_bitwidth=32](1, 2).cast[DType.int64]()),
         "(1, 2)",
     )
     assert_equal(
         str(
-            StaticIntTuple[2, element_bitwidth=32](1, -2).cast[
-                element_bitwidth=64
-            ]()
+            IndexList[2, element_bitwidth=32](1, -2).cast[element_bitwidth=64]()
         ),
         "(1, -2)",
     )
     assert_equal(
         str(
-            StaticIntTuple[2, element_bitwidth=32](1, 2).cast[
+            IndexList[2, element_bitwidth=32](1, 2).cast[
                 element_bitwidth=64, unsigned=True
             ]()
         ),

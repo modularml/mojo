@@ -42,7 +42,7 @@ from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
-from utils import StringSlice, StaticTuple, StaticIntTuple, Span
+from utils import StringSlice, StaticTuple, IndexList, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -1931,7 +1931,7 @@ struct SIMD[type: DType, size: Int](
         return self._shuffle_variadic[*mask](other)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size, **_]](self) -> Self:
+    fn shuffle[mask: IndexList[size, **_]](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
@@ -1946,7 +1946,7 @@ struct SIMD[type: DType, size: Int](
         return self._shuffle_list[size, mask._as_index_tuple()](self)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size, **_]](self, other: Self) -> Self:
+    fn shuffle[mask: IndexList[size, **_]](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.

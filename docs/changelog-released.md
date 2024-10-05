@@ -1557,7 +1557,7 @@ Big themes for this release:
 - [`SIMD`](/mojo/stdlib/builtin/simd/SIMD) type:
 
   - Added [`SIMD.shuffle()`](/mojo/stdlib/builtin/simd/SIMD#shuffle) with
-    `StaticIntTuple` mask.
+    `IndexList` mask.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315))
 
   - [`SIMD.__bool__()`](/mojo/stdlib/builtin/simd/SIMD#__bool__) is constrained
@@ -4393,7 +4393,7 @@ the previous "read to EOF" behavior when size is negative.
 - [`TensorShape`](/mojo/stdlib/tensor/tensor_shape) and
   [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape) now have constructors
   that take [`DynamicVector[Int]`](/mojo/stdlib/collections/list/List)
-  and [`StaticIntTuple`](/mojo/stdlib/utils/index_/StaticIntTuple) to
+  and [`IndexList`](/mojo/stdlib/utils/index_/IndexList) to
   initialize shapes.
 
 - The [`String`](/mojo/stdlib/collections/string/String) type now has the

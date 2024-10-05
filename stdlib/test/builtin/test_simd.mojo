@@ -24,7 +24,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticTuple, StaticIntTuple
+from utils import unroll, StaticTuple, IndexList
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
