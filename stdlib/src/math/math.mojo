@@ -40,7 +40,7 @@ from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
 
 from utils import Span
-from utils.index import StaticIntTuple
+from utils.index import IndexList
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
 

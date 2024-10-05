@@ -253,6 +253,10 @@ what we publish.
   debug_assert(x > 0, “expected x to be more than 0 but got: ”, x)
   ```
 
+- The `StaticIntTuple` datastructure in the `utils` package has been renamed to
+  `IndexList`. The datastructure now allows one to specify the index bitwidth of
+  the elements along with whether the underlying indices are signed or unsigned.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed

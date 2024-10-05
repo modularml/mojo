@@ -10,13 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements `StaticIntTuple` which is commonly used to represent N-D
+"""Implements `IndexList` which is commonly used to represent N-D
 indices.
 
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils import StaticIntTuple
+from utils import IndexList
 ```
 """
 
@@ -56,7 +56,7 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
 @always_inline
 fn _int_tuple_binary_apply[
     binary_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Scalar[type],
-](a: StaticIntTuple, b: __type_of(a)) -> __type_of(a):
+](a: IndexList, b: __type_of(a)) -> __type_of(a):
     """Applies a given element binary function to each pair of corresponding
     elements in two tuples.
 
@@ -87,7 +87,7 @@ fn _int_tuple_binary_apply[
 @always_inline
 fn _int_tuple_compare[
     comp_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Bool,
-](a: StaticIntTuple, b: __type_of(a)) -> StaticTuple[Bool, a.size]:
+](a: IndexList, b: __type_of(a)) -> StaticTuple[Bool, a.size]:
     """Applies a given element compare function to each pair of corresponding
     elements in two tuples and produces a tuple of Bools containing result.
 
@@ -147,7 +147,7 @@ fn _bool_tuple_reduce[
 
 
 # ===----------------------------------------------------------------------===#
-# StaticIntTuple:
+# IndexList:
 # ===----------------------------------------------------------------------===#
 
 
@@ -165,7 +165,7 @@ fn _is_unsigned[type: DType]() -> Bool:
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[
+struct IndexList[
     size: Int,
     *,
     element_bitwidth: Int = bitwidthof[Int](),
@@ -220,7 +220,7 @@ struct StaticIntTuple[
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -245,7 +245,7 @@ struct StaticIntTuple[
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -270,7 +270,7 @@ struct StaticIntTuple[
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -295,7 +295,7 @@ struct StaticIntTuple[
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -340,7 +340,7 @@ struct StaticIntTuple[
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -420,7 +420,7 @@ struct StaticIntTuple[
 
     @always_inline("nodebug")
     fn as_tuple(self) -> StaticTuple[Int, size]:
-        """Converts this StaticIntTuple to StaticTuple.
+        """Converts this IndexList to StaticTuple.
 
         Returns:
             The corresponding StaticTuple object.
@@ -734,7 +734,7 @@ struct StaticIntTuple[
     @always_inline
     fn cast[
         type: DType
-    ](self) -> StaticIntTuple[
+    ](self) -> IndexList[
         size,
         element_bitwidth = bitwidthof[type](),
         unsigned = _is_unsigned[type](),
@@ -765,7 +765,7 @@ struct StaticIntTuple[
         *,
         element_bitwidth: Int = Self.element_bitwidth,
         unsigned: Bool = Self.unsigned,
-    ](self) -> StaticIntTuple[
+    ](self) -> IndexList[
         size, element_bitwidth=element_bitwidth, unsigned=unsigned
     ] as result:
         """Casts to the target DType.
@@ -795,7 +795,7 @@ struct StaticIntTuple[
 # Factory functions for creating index.
 # ===----------------------------------------------------------------------===#
 @always_inline
-fn Index[T0: Intable](x: T0) -> StaticIntTuple[1]:
+fn Index[T0: Intable](x: T0) -> IndexList[1]:
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -805,26 +805,26 @@ fn Index[T0: Intable](x: T0) -> StaticIntTuple[1]:
         x: The initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[1](int(x))
+    return IndexList[1](int(x))
 
 
 @always_inline
-fn Index(x: UInt) -> StaticIntTuple[1]:
+fn Index(x: UInt) -> IndexList[1]:
     """Constructs a 1-D Index from the given value.
 
     Args:
         x: The initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[1](x.value)
+    return IndexList[1](x.value)
 
 
 @always_inline
-fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> StaticIntTuple[2]:
+fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -836,13 +836,13 @@ fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> StaticIntTuple[2]:
         y: The 2nd initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[2](int(x), int(y))
+    return IndexList[2](int(x), int(y))
 
 
 @always_inline
-fn Index(x: UInt, y: UInt) -> StaticIntTuple[2]:
+fn Index(x: UInt, y: UInt) -> IndexList[2]:
     """Constructs a 2-D Index from the given values.
 
     Args:
@@ -850,15 +850,15 @@ fn Index(x: UInt, y: UInt) -> StaticIntTuple[2]:
         y: The 2nd initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[2](x.value, y.value)
+    return IndexList[2](x.value, y.value)
 
 
 @always_inline
 fn Index[
     T0: Intable, T1: Intable, T2: Intable
-](x: T0, y: T1, z: T2) -> StaticIntTuple[3]:
+](x: T0, y: T1, z: T2) -> IndexList[3]:
     """Constructs a 3-D Index from the given values.
 
     Parameters:
@@ -872,15 +872,15 @@ fn Index[
         z: The 3rd initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[3](int(x), int(y), int(z))
+    return IndexList[3](int(x), int(y), int(z))
 
 
 @always_inline
 fn Index[
     T0: Intable, T1: Intable, T2: Intable, T3: Intable
-](x: T0, y: T1, z: T2, w: T3) -> StaticIntTuple[4]:
+](x: T0, y: T1, z: T2, w: T3) -> IndexList[4]:
     """Constructs a 4-D Index from the given values.
 
     Parameters:
@@ -896,15 +896,15 @@ fn Index[
         w: The 4th initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[4](int(x), int(y), int(z), int(w))
+    return IndexList[4](int(x), int(y), int(z), int(w))
 
 
 @always_inline
 fn Index[
     T0: Intable, T1: Intable, T2: Intable, T3: Intable, T4: Intable
-](x: T0, y: T1, z: T2, w: T3, v: T4) -> StaticIntTuple[5]:
+](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[5]:
     """Constructs a 5-D Index from the given values.
 
     Parameters:
@@ -922,9 +922,9 @@ fn Index[
         v: The 5th initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[5](int(x), int(y), int(z), int(w), int(v))
+    return IndexList[5](int(x), int(y), int(z), int(w), int(v))
 
 
 # ===----------------------------------------------------------------------===#
@@ -933,7 +933,7 @@ fn Index[
 
 
 @always_inline
-fn product[size: Int](tuple: StaticIntTuple[size], end_idx: Int) -> Int:
+fn product[size: Int](tuple: IndexList[size], end_idx: Int) -> Int:
     """Computes a product of values in the tuple up to the given index.
 
     Parameters:
@@ -952,7 +952,7 @@ fn product[size: Int](tuple: StaticIntTuple[size], end_idx: Int) -> Int:
 @always_inline
 fn product[
     size: Int
-](tuple: StaticIntTuple[size], start_idx: Int, end_idx: Int) -> Int:
+](tuple: IndexList[size], start_idx: Int, end_idx: Int) -> Int:
     """Computes a product of values in the tuple in the given index range.
 
     Parameters:

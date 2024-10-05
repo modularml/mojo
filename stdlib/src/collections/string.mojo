@@ -26,7 +26,7 @@ from python import PythonObject
 
 from utils import (
     Span,
-    StaticIntTuple,
+    IndexList,
     StringRef,
     StringSlice,
     Variant,
