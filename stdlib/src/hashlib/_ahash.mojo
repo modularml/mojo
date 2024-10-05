@@ -79,7 +79,7 @@ struct AHasher[key: U256](_Hasher):
 
     fn __init__(inout self):
         """Initialize the hasher."""
-        var pi_key = key ^ U256(
+        alias pi_key = key ^ U256(
             0x243F_6A88_85A3_08D3,
             0x1319_8A2E_0370_7344,
             0xA409_3822_299F_31D0,
@@ -144,7 +144,13 @@ struct AHasher[key: U256](_Hasher):
         Args:
             new_data: Value used for update.
         """
-        var v64 = new_data.cast[DType.uint64]()
+        var v64: SIMD[DType.uint64, new_data.size]
+
+        @parameter
+        if new_data.type.is_floating_point():
+            v64 = new_data._float_to_bits[DType.uint64]()
+        else:
+            v64 = new_data.cast[DType.uint64]()
 
         @parameter
         if v64.size == 1:
@@ -177,7 +183,7 @@ struct AHasher[key: U256](_Hasher):
 
 fn hash[
     key: U256 = U256(0, 0, 0, 0)
-](bytes: UnsafePointer[UInt8], n: Int) -> UInt:
+](bytes: UnsafePointer[UInt8], n: Int) -> UInt64:
     """Hash a byte array using an adopted AHash algorithm.
 
     References:
@@ -207,4 +213,4 @@ fn hash[
 
     var hasher = AHasher[key]()
     hasher._update_with_bytes(bytes, n)
-    return UInt(int(hasher^.finish()))
+    return hasher^.finish()
