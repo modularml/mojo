@@ -21,7 +21,7 @@ from utils import StaticIntTuple
 """
 
 from sys import bitwidthof
-from builtin.dtype import _int_type_of_width
+from builtin.dtype import _int_type_of_width, _uint_type_of_width
 from builtin.io import _get_dtype_printf_format, _snprintf
 from collections.string import _calc_initial_buffer_size
 
@@ -151,9 +151,26 @@ fn _bool_tuple_reduce[
 # ===----------------------------------------------------------------------===#
 
 
+fn _type_of_width[bitwidth: Int, unsigned: Bool]() -> DType:
+    @parameter
+    if unsigned:
+        return _uint_type_of_width[bitwidth]()
+    else:
+        return _int_type_of_width[bitwidth]()
+
+
+fn _is_unsigned[type: DType]() -> Bool:
+    return type in (DType.uint8, DType.uint16, DType.uint32, DType.uint64)
+
+
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
+struct StaticIntTuple[
+    size: Int,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](
     Sized,
     Stringable,
     Formattable,
@@ -163,10 +180,11 @@ struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
 
     Parameters:
         size: The size of the tuple.
-        integer_bitwidth: The bitwidth of the underlying integer element type.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
     """
 
-    alias _int_dtype = _int_type_of_width[integer_bitwidth]()
+    alias _int_dtype = _type_of_width[element_bitwidth, unsigned]()
     """The underlying dtype of the integer element value."""
 
     alias _int_type = Scalar[Self._int_dtype]
@@ -716,7 +734,11 @@ struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
     @always_inline
     fn cast[
         type: DType
-    ](self) -> StaticIntTuple[size, integer_bitwidth = bitwidthof[type]()]:
+    ](self) -> StaticIntTuple[
+        size,
+        element_bitwidth = bitwidthof[type](),
+        unsigned = _is_unsigned[type](),
+    ] as result:
         """Casts to the target DType.
 
         Parameters:
@@ -726,22 +748,7 @@ struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
             The list casted to the target type.
         """
         constrained[type.is_integral(), "the target type must be integral"]()
-        return self.cast[bitwidthof[type]()]()
 
-    @always_inline
-    fn cast[
-        integer_bitwidth: Int
-    ](self) -> StaticIntTuple[
-        size, integer_bitwidth=integer_bitwidth
-    ] as result:
-        """Casts to the target DType.
-
-        Parameters:
-            integer_bitwidth: The bitwidth to cast towards.
-
-        Returns:
-            The list casted to the target type.
-        """
         var res = __type_of(result)()
 
         @parameter
@@ -752,6 +759,27 @@ struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
                 ).cast[result._int_dtype]()
             )
         return res
+
+    @always_inline
+    fn cast[
+        *,
+        element_bitwidth: Int = Self.element_bitwidth,
+        unsigned: Bool = Self.unsigned,
+    ](self) -> StaticIntTuple[
+        size, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ] as result:
+        """Casts to the target DType.
+
+        Parameters:
+            element_bitwidth: The bitwidth to cast towards.
+            unsigned: The signess of the list.
+
+        Returns:
+            The list casted to the target type.
+        """
+        return rebind[__type_of(result)](
+            self.cast[_type_of_width[element_bitwidth, unsigned]()]()
+        )
 
     @always_inline
     fn _as_index_tuple(self) -> StaticTuple[Int, size]:
