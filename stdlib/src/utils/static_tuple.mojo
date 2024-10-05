@@ -181,21 +181,6 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         return val
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self.element_type):
-        """Stores a single value into the tuple at the specified index.
-
-        Parameters:
-            index: The index into the tuple.
-
-        Args:
-            val: The value to store.
-        """
-        constrained[index < size]()
-        var tmp = self
-        _set_array_elem[index, size, Self.element_type](val, tmp.array)
-        self = tmp
-
-    @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
@@ -230,4 +215,19 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
             UnsafePointer.address_of(tmp.array).address, idx.value
         )
         UnsafePointer(ptr)[] = val
+        self = tmp
+
+    @always_inline("nodebug")
+    fn __setitem__[index: Int](inout self, val: Self.element_type):
+        """Stores a single value into the tuple at the specified index.
+
+        Parameters:
+            index: The index into the tuple.
+
+        Args:
+            val: The value to store.
+        """
+        constrained[index < size]()
+        var tmp = self
+        _set_array_elem[index, size, Self.element_type](val, tmp.array)
         self = tmp

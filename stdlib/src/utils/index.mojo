@@ -714,6 +714,46 @@ struct StaticIntTuple[size: Int, *, integer_bitwidth: Int = bitwidthof[Int]()](
         writer.write(str(self))
 
     @always_inline
+    fn cast[
+        type: DType
+    ](self) -> StaticIntTuple[size, integer_bitwidth = bitwidthof[type]()]:
+        """Casts to the target DType.
+
+        Parameters:
+            type: The type to cast towards.
+
+        Returns:
+            The list casted to the target type.
+        """
+        constrained[type.is_integral(), "the target type must be integral"]()
+        return self.cast[bitwidthof[type]()]()
+
+    @always_inline
+    fn cast[
+        integer_bitwidth: Int
+    ](self) -> StaticIntTuple[
+        size, integer_bitwidth=integer_bitwidth
+    ] as result:
+        """Casts to the target DType.
+
+        Parameters:
+            integer_bitwidth: The bitwidth to cast towards.
+
+        Returns:
+            The list casted to the target type.
+        """
+        var res = __type_of(result)()
+
+        @parameter
+        for i in range(size):
+            res.data[i] = rebind[__type_of(result.data).element_type](
+                rebind[Scalar[Self._int_dtype]](
+                    self.data.__getitem__[i]()
+                ).cast[result._int_dtype]()
+            )
+        return res
+
+    @always_inline
     fn _as_index_tuple(self) -> StaticTuple[Int, size]:
         var res = StaticTuple[Int, size]()
 
