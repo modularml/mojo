@@ -2217,7 +2217,7 @@ fn factorial(n: Int) -> Int:
     Returns:
         The factorial of the input. Results are undefined for negative inputs.
     """
-    alias table = StaticIntTuple[21](
+    alias table = StaticTuple[Int, 21](
         1,
         1,
         2,

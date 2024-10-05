@@ -42,7 +42,7 @@ from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
-from utils import StringSlice, StaticIntTuple, Span
+from utils import StringSlice, StaticTuple, StaticIntTuple, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -1802,7 +1802,7 @@ struct SIMD[type: DType, size: Int](
         )
 
     @always_inline("nodebug")
-    fn _shuffle_list[
+    fn _shuffle_variadic[
         *mask: Int, output_size: Int = size
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
@@ -1835,6 +1835,8 @@ struct SIMD[type: DType, size: Int](
                 ]
             ]()
 
+            var array_ptr = UnsafePointer.address_of(array)
+
             @parameter
             for idx in range(output_size):
                 alias val = mask[idx]
@@ -1843,7 +1845,7 @@ struct SIMD[type: DType, size: Int](
                     "invalid index in the shuffle operation",
                 ]()
                 var ptr = __mlir_op.`pop.array.gep`(
-                    UnsafePointer.address_of(array).address, idx.value
+                    array_ptr.address, idx.value
                 )
                 __mlir_op.`pop.store`(val, ptr)
 
@@ -1863,14 +1865,14 @@ struct SIMD[type: DType, size: Int](
 
     @always_inline("nodebug")
     fn _shuffle_list[
-        output_size: Int, mask: StaticIntTuple[output_size]
+        output_size: Int, mask: StaticTuple[Int, output_size]
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
 
         Parameters:
-            output_size: The size of the output vector.
+            output_size: The output SIMD size.
             mask: The permutation to use in the shuffle.
 
         Args:
@@ -1889,7 +1891,7 @@ struct SIMD[type: DType, size: Int](
             ]()
 
         return __mlir_op.`pop.simd.shuffle`[
-            mask = mask.data.array,
+            mask = mask.array,
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1908,7 +1910,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[*mask](self)
+        return self._shuffle_variadic[*mask](self)
 
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -1926,10 +1928,10 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[*mask](other)
+        return self._shuffle_variadic[*mask](other)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size]](self) -> Self:
+    fn shuffle[mask: StaticIntTuple[size, **_]](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
@@ -1941,10 +1943,10 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask](self)
+        return self._shuffle_list[size, mask._as_index_tuple()](self)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size]](self, other: Self) -> Self:
+    fn shuffle[mask: StaticIntTuple[size, **_]](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
@@ -1959,7 +1961,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask](other)
+        return self._shuffle_list[size, mask._as_index_tuple()](other)
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -2139,7 +2141,7 @@ struct SIMD[type: DType, size: Int](
         ](self, value, Int64(offset))
 
     @always_inline("nodebug")
-    fn join(self, other: Self) -> SIMD[type, 2 * size]:
+    fn join(self, other: Self) -> SIMD[type, 2 * size] as result:
         """Concatenates the two vectors together.
 
         Args:
@@ -2151,8 +2153,8 @@ struct SIMD[type: DType, size: Int](
 
         @always_inline
         @parameter
-        fn build_indices() -> StaticIntTuple[2 * size]:
-            var indices = StaticIntTuple[2 * size]()
+        fn build_indices() -> StaticTuple[Int, 2 * size]:
+            var indices = StaticTuple[Int, 2 * size](0)
 
             @parameter
             for i in range(2 * size):
