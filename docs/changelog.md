@@ -270,3 +270,5 @@ what we publish.
   doesn't extend the lifetimes of the values it references.
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
+
+- The variadic initializer for `SIMD` now works in parameter expressions.
