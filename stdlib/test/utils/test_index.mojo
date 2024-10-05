@@ -30,15 +30,27 @@ def test_cast():
         "(1, 2)",
     )
     assert_equal(
-        str(StaticIntTuple[2, integer_bitwidth=64](1, 2).cast[DType.int32]()),
+        str(StaticIntTuple[2, element_bitwidth=64](1, 2).cast[DType.int32]()),
         "(1, 2)",
     )
     assert_equal(
-        str(StaticIntTuple[2, integer_bitwidth=32](1, 2).cast[DType.int64]()),
+        str(StaticIntTuple[2, element_bitwidth=32](1, 2).cast[DType.int64]()),
         "(1, 2)",
     )
     assert_equal(
-        str(StaticIntTuple[2, integer_bitwidth=32](1, 2).cast[64]()),
+        str(
+            StaticIntTuple[2, element_bitwidth=32](1, -2).cast[
+                element_bitwidth=64
+            ]()
+        ),
+        "(1, -2)",
+    )
+    assert_equal(
+        str(
+            StaticIntTuple[2, element_bitwidth=32](1, 2).cast[
+                element_bitwidth=64, unsigned=True
+            ]()
+        ),
         "(1, 2)",
     )
 
