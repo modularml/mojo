@@ -179,7 +179,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
     # TODO:
     #   This should have lifetime, or we should do this with a context
     #   manager, to prevent use after ASAP destruction.
-    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
+    fn unsafe_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.
 
         Returns:
@@ -189,7 +189,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
             Use-after-free: The caller must take care that `self` outlives the
             usage of the pointer returned by this function.
         """
-        return self._obj.unsafe_as_py_object_ptr()
+        return self._obj.unsafe_py_object_ptr()
 
     # ===-------------------------------------------------------------------===#
     # 'Tuple' Operations
@@ -210,7 +210,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
         var cpython = _get_global_python_itf().cpython()
 
         var item: PyObjectPtr = cpython.PyTuple_GetItem(
-            self.unsafe_as_py_object_ptr(),
+            self.unsafe_py_object_ptr(),
             pos,
         )
 
@@ -556,7 +556,7 @@ struct PythonObject(
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
+    fn unsafe_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.
 
         Returns:
