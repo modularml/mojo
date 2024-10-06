@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the utils package."""
 
-from .index import Index, StaticIntTuple, product
+from .index import Index, IndexList, product
 from .inline_string import InlineString
 from .loop import unroll
 from .span import Spanable, Span

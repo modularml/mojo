@@ -24,7 +24,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticIntTuple
+from utils import unroll, StaticTuple, IndexList
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
@@ -825,22 +825,24 @@ def test_shuffle():
     )
 
     assert_equal(
-        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
+        vec._shuffle_variadic[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](
+            vec
+        ),
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
 
     assert_equal(
-        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        vec._shuffle_list[width, StaticTuple[Int, width](3, 2, 1, 0)](vec),
         SIMD[dtype, width](103, 102, 101, 100),
     )
     assert_equal(
-        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        vec._shuffle_list[width, StaticTuple[Int, width](0, 2, 4, 6)](vec),
         SIMD[dtype, width](100, 102, 100, 102),
     )
 
     assert_equal(
         vec._shuffle_list[
-            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+            2 * width, StaticTuple[Int, 2 * width](7, 6, 5, 4, 3, 2, 1, 0)
         ](vec),
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )

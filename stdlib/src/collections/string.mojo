@@ -27,7 +27,7 @@ from python import PythonObject
 from sys.intrinsics import _type_is_eq
 from utils import (
     Span,
-    StaticIntTuple,
+    IndexList,
     StringRef,
     StringSlice,
     Variant,
