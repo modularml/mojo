@@ -21,7 +21,7 @@ from hashlib._ahash import (
     AHasher,
     hash as ahash,
     _folded_multiply,
-    read_small,
+    _read_small,
     U256,
     U128,
     MULTIPLE,

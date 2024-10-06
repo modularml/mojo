@@ -14,6 +14,7 @@
 
 
 from hashlib._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
+from hashlib._ahash import AHasher
 from memory import UnsafePointer
 from testing import assert_equal
 
@@ -102,6 +103,26 @@ struct ComplexHashableStructWithList(_HashableWithHasher):
         _ = self._value3
 
 
+@value
+struct ComplexHashableStructWithListAndWideSIMD(_HashableWithHasher):
+    var _value1: SomeHashableStruct
+    var _value2: SomeHashableStruct
+    var _value3: List[UInt8]
+    var _value4: SIMD[DType.uint32, 4]
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        hasher.update(self._value1)
+        hasher.update(self._value2)
+        # This is okay because self is passed as borrowed so the pointer will
+        # be valid until at least the end of the function
+        hasher._update_with_bytes(
+            data=self._value3.unsafe_ptr(),
+            length=len(self._value3),
+        )
+        hasher._update_with_simd(self._value4)
+        _ = self._value3
+
+
 def test_update_with_bytes():
     var hasher = DummyHasher()
     var hashable = ComplexHashableStructWithList(
@@ -111,9 +132,30 @@ def test_update_with_bytes():
     assert_equal(hasher^.finish(), 58)
 
 
+def test_with_ahasher():
+    var hashable1 = ComplexHashableStructWithList(
+        SomeHashableStruct(42), SomeHashableStruct(10), List[UInt8](1, 2, 3)
+    )
+    var hash_value = _hash_with_hasher[
+        AHasher[SIMD[DType.uint64, 4](0, 0, 0, 0)]
+    ](hashable1)
+    assert_equal(hash_value, 12427888534629009331)
+    var hashable2 = ComplexHashableStructWithListAndWideSIMD(
+        SomeHashableStruct(42),
+        SomeHashableStruct(10),
+        List[UInt8](1, 2, 3),
+        SIMD[DType.uint32, 4](1, 2, 3, 4),
+    )
+    hash_value = _hash_with_hasher[AHasher[SIMD[DType.uint64, 4](0, 0, 0, 0)]](
+        hashable2
+    )
+    assert_equal(hash_value, 9463003097190363949)
+
+
 def main():
     test_hasher()
     test_hash_with_hasher()
     test_complex_hasher()
     test_complexe_hash_with_hasher()
     test_update_with_bytes()
+    test_with_ahasher()
