@@ -26,6 +26,7 @@ from sys.arg import argv
 from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
 
 from python.python import _get_global_python_itf
+from python._bindings import Typed_initproc
 
 from memory import UnsafePointer
 
@@ -61,13 +62,32 @@ alias METH_VARARGS = 0x1
 
 alias destructor = fn (PyObjectPtr) -> None
 
+alias initproc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
+alias newfunc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+
+
+# GIL
+@value
+@register_passable("trivial")
+struct PyGILState_STATE:
+    var current_state: c_int
+
+    alias PyGILState_LOCKED = c_int(0)
+    alias PyGILState_UNLOCKED = c_int(1)
+
+
+struct PyThreadState:
+    """Opaque struct."""
+
+    pass
+
 
 @value
 @register_passable("trivial")
 struct PyKeyValuePair:
     var key: PyObjectPtr
     var value: PyObjectPtr
-    var position: Int
+    var position: c_int
     var success: Bool
 
 
@@ -76,7 +96,7 @@ struct PyKeyValuePair:
 struct PyObjectPtr:
     var value: UnsafePointer[Int8]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self):
         self.value = UnsafePointer[Int8]()
 
@@ -223,6 +243,22 @@ struct PyType_Slot:
     var pfunc: OpaquePointer
 
     @staticmethod
+    fn tp_new(func: newfunc) -> Self:
+        return PyType_Slot(Py_tp_new, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_init(func: Typed_initproc) -> Self:
+        return PyType_Slot(Py_tp_init, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_dealloc(func: destructor) -> Self:
+        return PyType_Slot(Py_tp_dealloc, rebind[OpaquePointer](func))
+
+    @staticmethod
+    fn tp_methods(methods: UnsafePointer[PyMethodDef]) -> Self:
+        return PyType_Slot(Py_tp_methods, rebind[OpaquePointer](methods))
+
+    @staticmethod
     fn null() -> Self:
         return PyType_Slot {slot: 0, pfunc: OpaquePointer()}
 
@@ -289,7 +325,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
     var init_fn: Self._init_fn_type
 
     # The module's index into its interpreter's modules_by_index cache.
-    var index: Int
+    var index: Py_ssize_t
 
     # A copy of the module's __dict__ after the first time it was loaded.
     var dict_copy: UnsafePointer[PyObject]
@@ -356,7 +392,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
 # Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef_Slot
 @value
 struct PyModuleDef_Slot:
-    var slot: Int
+    var slot: c_int
     var value: OpaquePointer
 
 
@@ -373,7 +409,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     # Points to the contents of the docstring for the module.
     var docstring: UnsafePointer[c_char]
 
-    var size: Int
+    var size: Py_ssize_t
 
     # A pointer to a table of module-level functions.  Can be null if there
     # are no functions present.
@@ -382,13 +418,13 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     var slots: UnsafePointer[PyModuleDef_Slot]
 
     # TODO(MOCO-1138): These are C ABI function pointers, not Mojo functions.
-    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> Int
+    alias _visitproc_fn_type = fn (PyObjectPtr, OpaquePointer) -> c_int
     alias _traverse_fn_type = fn (
         PyObjectPtr, Self._visitproc_fn_type, OpaquePointer
-    ) -> Int
+    ) -> c_int
     var traverse_fn: Self._traverse_fn_type
 
-    alias _clear_fn_type = fn (PyObjectPtr) -> Int
+    alias _clear_fn_type = fn (PyObjectPtr) -> c_int
     var clear_fn: Self._clear_fn_type
 
     alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
@@ -662,17 +698,25 @@ struct CPython:
     # Python GIL and threading
     # ===-------------------------------------------------------------------===#
 
-    fn PyGILState_Ensure(inout self) -> Bool:
-        return self.lib.get_function[fn () -> Bool]("PyGILState_Ensure")()
+    fn PyGILState_Ensure(inout self) -> PyGILState_STATE:
+        return self.lib.get_function[fn () -> PyGILState_STATE](
+            "PyGILState_Ensure"
+        )()
 
-    fn PyGILState_Release(inout self, state: Bool):
-        self.lib.get_function[fn (Bool) -> None]("PyGILState_Release")(state)
+    fn PyGILState_Release(inout self, state: PyGILState_STATE):
+        self.lib.get_function[fn (PyGILState_STATE) -> None](
+            "PyGILState_Release"
+        )(state)
 
-    fn PyEval_SaveThread(inout self) -> Int64:
-        return self.lib.get_function[fn () -> Int64]("PyEval_SaveThread")()
+    fn PyEval_SaveThread(inout self) -> UnsafePointer[PyThreadState]:
+        return self.lib.get_function[fn () -> UnsafePointer[PyThreadState]](
+            "PyEval_SaveThread"
+        )()
 
-    fn PyEval_RestoreThread(inout self, state: Int64):
-        self.lib.get_function[fn (Int64) -> None]("PyEval_RestoreThread")(state)
+    fn PyEval_RestoreThread(inout self, state: UnsafePointer[PyThreadState]):
+        self.lib.get_function[fn (UnsafePointer[PyThreadState]) -> None](
+            "PyEval_RestoreThread"
+        )(state)
 
     # ===-------------------------------------------------------------------===#
     # Python Dict operations
@@ -690,11 +734,13 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    # int PyDict_SetItem(PyObject *p, PyObject *key, PyObject *val)
+    # ref: https://docs.python.org/3/c-api/dict.html#c.PyDict_SetItem
     fn PyDict_SetItem(
         inout self, dict_obj: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
-    ) -> Int:
+    ) -> c_int:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> Int32
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
         ](StringRef("PyDict_SetItem"))(dict_obj, key, value)
 
         self.log(
@@ -704,7 +750,7 @@ struct CPython:
             value._get_ptr_as_int(),
         )
 
-        return int(r)
+        return r
 
     fn PyDict_GetItemWithError(
         inout self, dict_obj: PyObjectPtr, key: PyObjectPtr
@@ -730,6 +776,8 @@ struct CPython:
             self.dict_type = self.lib.get_function[PyObjectPtr]("PyDict_Type")
         return self.dict_type
 
+    # int PyDict_Next(PyObject *p, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue)
+    # ref: https://docs.python.org/3/c-api/dict.html#c.PyDict_Next
     fn PyDict_Next(
         inout self, dictionary: PyObjectPtr, p: Int
     ) -> PyKeyValuePair:
@@ -745,7 +793,7 @@ struct CPython:
                 UnsafePointer[Int],
                 UnsafePointer[UnsafePointer[Int8]],
                 UnsafePointer[UnsafePointer[Int8]],
-            ) -> Int
+            ) -> c_int
         ]("PyDict_Next")(
             dictionary,
             position,
@@ -832,13 +880,15 @@ struct CPython:
         var module_api_version = 1013
         return create_module_fn(module_def_ptr, module_api_version)
 
+    # int PyModule_AddFunctions(PyObject *module, PyMethodDef *functions)
+    # ref: https://docs.python.org/3/c-api/module.html#c.PyModule_AddFunctions
     fn PyModule_AddFunctions(
         inout self,
         mod: PyObjectPtr,
         functions: UnsafePointer[PyMethodDef],
-    ) -> Int:
+    ) -> c_int:
         var add_functions_fn = self.lib.get_function[
-            fn (PyObjectPtr, UnsafePointer[PyMethodDef]) -> Int
+            fn (PyObjectPtr, UnsafePointer[PyMethodDef]) -> c_int
         ]("PyModule_AddFunctions")
 
         return add_functions_fn(mod, functions)
@@ -878,6 +928,8 @@ struct CPython:
     # Python Evaluation
     # ===-------------------------------------------------------------------===#
 
+    # int PyRun_SimpleString(const char *command)
+    # ref: https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_SimpleString
     fn PyRun_SimpleString(inout self, strref: StringRef) -> Bool:
         """Executes the given Python code.
 
@@ -888,7 +940,7 @@ struct CPython:
             `True` if the code executed successfully or `False` if the code
             raised an exception.
         """
-        var status = self.lib.get_function[fn (UnsafePointer[UInt8]) -> Int](
+        var status = self.lib.get_function[fn (UnsafePointer[UInt8]) -> c_int](
             StringRef("PyRun_SimpleString")
         )(strref.data)
         # PyRun_SimpleString returns 0 on success and -1 if an exception was
@@ -962,15 +1014,17 @@ struct CPython:
     # Python Object operations
     # ===-------------------------------------------------------------------===#
 
+    # int Py_Is(PyObject *x, PyObject *y)
+    # ref: https://docs.python.org/3/c-api/structures.html#c.Py_Is
     fn Py_Is(
         inout self,
         rhs: PyObjectPtr,
         lhs: PyObjectPtr,
     ) -> Bool:
         if self.version.minor >= 10:
-            var r = self.lib.get_function[fn (PyObjectPtr, PyObjectPtr) -> Int](
-                "Py_Is"
-            )(rhs, lhs)
+            var r = self.lib.get_function[
+                fn (PyObjectPtr, PyObjectPtr) -> c_int
+            ]("Py_Is")(rhs, lhs)
             return r > 0
         else:
             return rhs == lhs
@@ -1009,6 +1063,26 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PyObject_SetItem(
+        inout self, obj: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
+    ) -> c_int:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
+        ]("PyObject_SetItem")(obj, key, value)
+
+        self.log(
+            "PyObject_SetItem result:",
+            r,
+            ", key:",
+            key._get_ptr_as_int(),
+            ", value:",
+            value._get_ptr_as_int(),
+            ", parent obj:",
+            obj._get_ptr_as_int(),
+        )
+
+        return r
+
     fn PyObject_GetAttrString(
         inout self,
         obj: PyObjectPtr,
@@ -1031,11 +1105,13 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    # int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
+    # ref: https://docs.python.org/3/c-api/object.html#c.PyObject_SetAttrString
     fn PyObject_SetAttrString(
         inout self, obj: PyObjectPtr, name: StringRef, new_value: PyObjectPtr
-    ) -> Int:
+    ) -> c_int:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, UnsafePointer[UInt8], PyObjectPtr) -> Int
+            fn (PyObjectPtr, UnsafePointer[UInt8], PyObjectPtr) -> c_int
         ]("PyObject_SetAttrString")(obj, name.data, new_value)
 
         self.log(
@@ -1092,15 +1168,15 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    # int PyObject_IsTrue(PyObject *o)
+    # ref: https://docs.python.org/3/c-api/object.html#c.PyObject_IsTrue
     fn PyObject_IsTrue(
         inout self,
         obj: PyObjectPtr,
-    ) -> Int:
-        return int(
-            self.lib.get_function[fn (PyObjectPtr) -> Int32]("PyObject_IsTrue")(
-                obj
-            )
-        )
+    ) -> c_int:
+        return self.lib.get_function[fn (PyObjectPtr) -> c_int](
+            "PyObject_IsTrue"
+        )(obj)
 
     fn PyObject_Length(
         inout self,
@@ -1164,18 +1240,20 @@ struct CPython:
             fn (PyObjectPtr, Py_ssize_t) -> PyObjectPtr
         ]("PyTuple_GetItem")(tuple, pos)
 
+    # int PyTuple_SetItem(PyObject *p, Py_ssize_t pos, PyObject *o)
+    # ref: https://docs.python.org/3/c-api/tuple.html#c.PyTuple_SetItem
     fn PyTuple_SetItem(
         inout self,
         tuple_obj: PyObjectPtr,
         index: Int,
         element: PyObjectPtr,
-    ) -> Int:
+    ) -> c_int:
         # PyTuple_SetItem steals the reference - the element object will be
         # destroyed along with the tuple
         self._dec_total_rc()
-        return self.lib.get_function[fn (PyObjectPtr, Int, PyObjectPtr) -> Int](
-            StringRef("PyTuple_SetItem")
-        )(tuple_obj, index, element)
+        return self.lib.get_function[
+            fn (PyObjectPtr, Int, PyObjectPtr) -> c_int
+        ](StringRef("PyTuple_SetItem"))(tuple_obj, index, element)
 
     # ===-------------------------------------------------------------------===#
     # Python List operations
@@ -1447,14 +1525,18 @@ struct CPython:
             self._inc_total_rc()
         return next_obj
 
+    # int PyIter_Check(PyObject *o)
+    # ref: https://docs.python.org/3/c-api/iter.html#c.PyIter_Check
     fn PyIter_Check(inout self, obj: PyObjectPtr) -> Bool:
         var follows_iter_protocol = self.lib.get_function[
-            fn (PyObjectPtr) -> Int
+            fn (PyObjectPtr) -> c_int
         ]("PyIter_Check")(obj)
         return follows_iter_protocol != 0
 
+    # int PySequence_Check(PyObject *o)
+    # https://docs.python.org/3/c-api/sequence.html#c.PySequence_Check
     fn PySequence_Check(inout self, obj: PyObjectPtr) -> Bool:
         var follows_seq_protocol = self.lib.get_function[
-            fn (PyObjectPtr) -> Int
+            fn (PyObjectPtr) -> c_int
         ]("PySequence_Check")(obj)
         return follows_seq_protocol != 0
