@@ -21,7 +21,7 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Reference, UnsafePointer
+from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
 
 
@@ -51,14 +51,18 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Reference[T, lifetime]:
+    ) -> Pointer[T, lifetime]:
         @parameter
         if forward:
             self.index += 1
-            return Reference.address_of(self.src[self.index - 1])
+            return Pointer.address_of(self.src[self.index - 1])
         else:
             self.index -= 1
-            return Reference.address_of(self.src[self.index])
+            return Pointer.address_of(self.src[self.index])
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> Int:
@@ -222,15 +226,15 @@ struct Span[
 
         return self._data
 
-    fn as_ref(self) -> Reference[T, lifetime]:
+    fn as_ref(self) -> Pointer[T, lifetime]:
         """
-        Gets a Reference to the first element of this slice.
+        Gets a Pointer to the first element of this slice.
 
         Returns:
-            A Reference pointing at the first element of this slice.
+            A Pointer pointing at the first element of this slice.
         """
 
-        return Reference[T, lifetime].address_of(self._data[0])
+        return Pointer[T, lifetime].address_of(self._data[0])
 
     @always_inline
     fn copy_from[

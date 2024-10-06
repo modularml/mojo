@@ -40,6 +40,7 @@ struct Slice(
     ```
     """
 
+    # Fields
     var start: Optional[Int]
     """The starting index of the slice."""
     var end: Optional[Int]
@@ -47,7 +48,11 @@ struct Slice(
     var step: Int
     """The step increment value of the slice."""
 
-    @always_inline("nodebug")
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
     fn __init__(inout self, start: Int, end: Int):
         """Construct slice given the start and end values.
 
@@ -59,7 +64,7 @@ struct Slice(
         self.end = end
         self.step = 1
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(
         inout self,
         start: Optional[Int],
@@ -84,6 +89,10 @@ struct Slice(
             other: The slice to copy.
         """
         self.__init__(start=other.start, end=other.end, step=other.step)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
 
     @no_inline
     fn __str__(self) -> String:
@@ -129,7 +138,7 @@ struct Slice(
         writer.write(repr(self.step))
         writer.write(")")
 
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -146,7 +155,7 @@ struct Slice(
             and self.step == other.step
         )
 
-    @always_inline("nodebug")
+    @always_inline
     fn __ne__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -169,20 +178,20 @@ struct Slice(
         Negative indices are wrapped using the length of the container.
         ```mojo
         s = slice(0, -1, 1)
-        s.indices(5) # returns (0, 4, 1)
+        i = s.indices(5) # returns (0, 4, 1)
         ```
 
         None indices are defaulted to the start or the end of the container
         based on whether `step` is positive or negative.
         ```mojo
         s = slice(None, None, 1)
-        s.indices(5) # returns (0, 5, 1)
+        i = s.indices(5) # returns (0, 5, 1)
         ```
 
         Out of bounds indices are clamped using the size of the container.
         ```mojo
         s = slice(20)
-        s.indices(5) # returns (0, 5, 1)
+        i = s.indices(5) # returns (0, 5, 1)
         ```
 
         Args:
@@ -218,7 +227,12 @@ struct Slice(
         return (start.value(), end.value(), step)
 
 
-@always_inline("nodebug")
+# ===-----------------------------------------------------------------------===#
+# Slice constructor functions
+# ===-----------------------------------------------------------------------===#
+
+
+@always_inline
 fn slice(end: Int) -> Slice:
     """Construct slice given the end value.
 
@@ -231,7 +245,7 @@ fn slice(end: Int) -> Slice:
     return Slice(None, end, None)
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(start: Int, end: Int) -> Slice:
     """Construct slice given the start and end values.
 
@@ -245,7 +259,7 @@ fn slice(start: Int, end: Int) -> Slice:
     return Slice(start, end)
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(
     start: Optional[Int], end: Optional[Int], step: Optional[Int]
 ) -> Slice:
