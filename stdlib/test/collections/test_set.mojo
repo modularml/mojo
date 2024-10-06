@@ -460,6 +460,11 @@ def test_discard():
 
 
 def test_clear():
+    # Shouldn't fail when clearing a 0 length set
+    set0 = Set[Int]()
+    set0.clear()
+    assert_equal(0, len(set0))
+
     set1 = Set[Int](1, 2, 3)
     set1.clear()
     assert_true(set1 == Set[Int]())

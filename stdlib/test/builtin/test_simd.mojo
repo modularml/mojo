@@ -24,7 +24,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticIntTuple
+from utils import unroll, StaticTuple, IndexList
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
@@ -160,7 +160,9 @@ def test_issue_20421():
     var a = UnsafePointer[UInt8, alignment=64].alloc(count=16 * 64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = a.offset(128 + 64 + 4).bitcast[Int32]().load[width=4]()
+    var av16 = a.offset(128 + 64 + 4).bitcast[Int32]().load[
+        width=4, alignment=1
+    ]()
     assert_equal(
         av16,
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
@@ -823,22 +825,24 @@ def test_shuffle():
     )
 
     assert_equal(
-        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
+        vec._shuffle_variadic[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](
+            vec
+        ),
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
 
     assert_equal(
-        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        vec._shuffle_list[width, StaticTuple[Int, width](3, 2, 1, 0)](vec),
         SIMD[dtype, width](103, 102, 101, 100),
     )
     assert_equal(
-        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        vec._shuffle_list[width, StaticTuple[Int, width](0, 2, 4, 6)](vec),
         SIMD[dtype, width](100, 102, 100, 102),
     )
 
     assert_equal(
         vec._shuffle_list[
-            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+            2 * width, StaticTuple[Int, 2 * width](7, 6, 5, 4, 3, 2, 1, 0)
         ](vec),
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
