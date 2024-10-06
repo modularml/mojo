@@ -154,7 +154,7 @@ struct InlineArray[
 
         self = Self(storage=elems^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(
         inout self,
         *,
@@ -216,7 +216,7 @@ struct InlineArray[
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
@@ -229,7 +229,7 @@ struct InlineArray[
         var normalized_index = normalize_index["InlineArray"](idx, self)
         return self.unsafe_get(normalized_index)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__[
         idx: Int,
     ](ref [_]self: Self) -> ref [self] Self.ElementType:
@@ -255,7 +255,7 @@ struct InlineArray[
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
 
@@ -268,7 +268,7 @@ struct InlineArray[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
