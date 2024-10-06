@@ -16,6 +16,10 @@ what we publish.
 
 ### ⭐️ New
 
+- `FileHandle` are now copyable and movable and can be passed by value or add
+  them to lists, tuples, etc. This allows for more ergonomic and efficient
+  handling of file handles in Mojo.
+
 - Mojo can now interpret simple LLVM intrinsics in parameter expressions,
   enabling things like `count_leading_zeros` to work at compile time:
   [Issue #933](https://github.com/modularml/mojo/issues/933).
