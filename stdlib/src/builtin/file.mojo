@@ -67,6 +67,7 @@ struct _OwnedStringRef(Boolable):
         return self.length != 0
 
 
+@value
 struct FileHandle:
     """File handle to an opened file."""
 
