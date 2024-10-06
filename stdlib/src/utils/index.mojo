@@ -432,6 +432,22 @@ struct IndexList[
             res[i] = int(self.__getitem__[i]())
         return res
 
+    @always_inline("nodebug")
+    fn canonicalize(
+        self,
+    ) -> IndexList[
+        size, element_bitwidth = bitwidthof[Int](), unsigned=False
+    ] as result:
+        """Canonicalizes the IndexList.
+
+        Returns:
+            Canonicalizes the object.
+        """
+        return self.cast[
+            element_bitwidth = result.element_bitwidth,
+            unsigned = result.unsigned,
+        ]()
+
     @always_inline
     fn flattened_length(self) -> Int:
         """Returns the flattened length of the tuple.
@@ -777,18 +793,17 @@ struct IndexList[
         Returns:
             The list casted to the target type.
         """
+
+        @parameter
+        if (
+            element_bitwidth == Self.element_bitwidth
+            and unsigned == Self.unsigned
+        ):
+            return rebind[__type_of(result)](self)
+
         return rebind[__type_of(result)](
             self.cast[_type_of_width[element_bitwidth, unsigned]()]()
         )
-
-    @always_inline
-    fn _as_index_tuple(self) -> StaticTuple[Int, size]:
-        var res = StaticTuple[Int, size]()
-
-        @parameter
-        for i in range(size):
-            res[i] = self.__getitem__[i]()
-        return res
 
 
 # ===----------------------------------------------------------------------===#

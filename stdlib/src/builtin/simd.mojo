@@ -1943,7 +1943,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask._as_index_tuple()](self)
+        return self._shuffle_list[size, mask.as_tuple()](self)
 
     @always_inline("nodebug")
     fn shuffle[mask: IndexList[size, **_]](self, other: Self) -> Self:
@@ -1961,7 +1961,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask._as_index_tuple()](other)
+        return self._shuffle_list[size, mask.as_tuple()](other)
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:

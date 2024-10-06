@@ -691,7 +691,14 @@ fn _scientific_notation_digits[type: DType]() -> StringLiteral:
 # ===-------------------------------------------------------------------===#
 
 
+@parameter
+@always_inline
 fn _int_type_of_width[width: Int]() -> DType:
+    constrained[
+        width == 8 or width == 16 or width == 32 or width == 64,
+        "width must be either 8, 16, 32, or 64",
+    ]()
+
     @parameter
     if width == 8:
         return DType.int8
@@ -700,7 +707,6 @@ fn _int_type_of_width[width: Int]() -> DType:
     elif width == 32:
         return DType.int32
     else:
-        constrained[width == 64]()
         return DType.int64
 
 
@@ -709,7 +715,14 @@ fn _int_type_of_width[width: Int]() -> DType:
 # ===-------------------------------------------------------------------===#
 
 
+@parameter
+@always_inline
 fn _uint_type_of_width[width: Int]() -> DType:
+    constrained[
+        width == 8 or width == 16 or width == 32 or width == 64,
+        "width must be either 8, 16, 32, or 64",
+    ]()
+
     @parameter
     if width == 8:
         return DType.uint8
@@ -718,7 +731,6 @@ fn _uint_type_of_width[width: Int]() -> DType:
     elif width == 32:
         return DType.uint32
     else:
-        constrained[width == 64]()
         return DType.uint64
 
 
