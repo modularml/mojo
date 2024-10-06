@@ -59,12 +59,12 @@ In addition, Mojo functions have the following return syntax:
    pattern syntax here.
 
 I suggest we rename `borrowed` to `ref` (without square brackets), rename
-`inout` to `mutref` and introduce a new `out` convention.  Such a change will
+`inout` to `mut` and introduce a new `out` convention.  Such a change will
 give us:
 
 1) `ref`: This is the implicit convention that provides an immutable
    reference to another value with an inferred lifetime.
-2) `mutref`: This argument convention is a mutable reference to a value from a
+2) `mut`: This argument convention is a mutable reference to a value from a
    callee with an inferred lifetime.
 3) `ref [lifetime]`: **No change:** this works as it does today.
 4) `owned`: **No change:** unrelated to this proposal, let's stay focused.
@@ -72,10 +72,11 @@ give us:
    uninitialized memory and returns it initialized (when an error isn't thrown)
    which means it's a named output.  Let's call it `out`, which will allow one
    to write `var x: fn (out Foo) -> None = Foo.__init__` as you'd expect.
-6) `mutref [lifetime]`: If there is a good reason, we could allow `mutref` to
-   be used as a constraint that the lifetime is mutable.  This is actually nice
-   for things like `mutref [_]` which would only infer a mutable lifetime (not
-   a parametricly mutable lifetime) but is mostly a consistency thing.
+
+I don't see a reason to allow `mut [lifetime]`: the only use-case would be if
+you'd want to explicitly declare lifetime as a parameter, but I'm not sure why
+that is useful (vs inferring it).  We can evaluate adding it if there is a
+compelling reason to over time.
 
 Finally, let's align the result syntax:
 
@@ -97,15 +98,18 @@ in/out.
 
 ### Alternatives considered
 
-I expect the biggest bikeshed to be around the `mutref` keyword, we might
-consider instead:
+I expect the biggest bikeshed to be around the `mut` keyword.  The benefits of
+its name is that it is short.  The major downside of it is that it doesn't
+convey that it is a reference.
 
-- `mut`: This is shorter, and the same length as `ref` but isn't clear to
-  readers that it is a reference (losing important readability and information)
-  and I don't see why it is useful for mutable references to be specifically
-  compact.
+We might consider instead:
+
+- `mutref`: This clarifies that this is a reference.
 - `mut ref`: we could use a space, but this seems like unnecessary verbosity
   and I don't see an advantage over `mutref`.
+
+I'd love to see discussion, new ideas, and additional positions and rationale:
+I'll update the proposal with those changes.
 
 ## Rename "Lifetime" (the type, but also conceptually)
 
@@ -133,18 +137,18 @@ the region of code where a value may be accessed, and this lifetime may even
 have holes:
 
 ```mojo
-  var s : String
-  # Not alive here.
-  s = "hello"
-  # alive here
-  use(s)
-  # destroyed here.
-  unrelated_stuff()
-  # ...
-  s = "goodbye"
-  # alive here
-  use(s)
-  # destroyed here
+    var s : String
+    # Not alive here.
+    s = "hello"
+    # alive here
+    use(s)
+    # destroyed here.
+    unrelated_stuff()
+    # ...
+    s = "goodbye"
+    # alive here
+    use(s)
+    # destroyed here
 ```
 
 Mojo's design is also completely different in Mojo and Rust: Mojo has early
@@ -180,38 +184,44 @@ them:
 - `Region`: this can work, but (to me at least) has connotations of nesting
   which aren't appropriate.  It is also a very generic word.
 - `Target`: very generic.
-
-## Rename the "transfer operator" (`x^`)
-
-This is a minor thing, but the "transfer operator" could use a rebranding
-in the documentation.  First, unlike other operators (like `+`) it isn't
-tied into a method (like `__add__`): perhaps renaming it to a "sigil"
-instead of an "operator" would be warranted.
-
-More importantly though, this operator *makes the specified value able to
-be transferred/consumed*, it does not itself transfer the value.  I'm not
-sure what to call this.
+- `Provenance`: verbose and technical.
 
 ## Implementation
 
 All of these changes can be done in a way that is effectively additive: we need
-to take `mutref` as a new keyword, but otherwise we can accept the new and the
+to take `mut` as a new keyword, but otherwise we can accept the new and the
 old syntax in the 24.6 release and then remove the old syntax in subsequent
 releases.
+
+Lifetimes have been in heavy development, so I don't think we need to "phase in"
+the changes to `Lifetime` etc, but we can keep around compatibility aliases for
+a release if helpful.
 
 ## Future directions
 
 It is important to consider how this proposal intersects with likely future
-work.  The most relevant upcoming feature work will be to introduce "patterns"
-to Mojo.  Patterns are a [core part of Python](https://docs.python.org/3/reference/compound_stmts.html#patterns)
-which we need for compatibility with the Python ecosystem, and are the basis
-for `match` statements and other things.  When we implement them, we will allow
-`var` statements to contain irrefutable patterns, and we will introduce a new
-`ref` and `mutref` pattern to bind a reference to a value instead of copying
-it.
+work.  This section includes a few of them for framing and perspective, but with
+the goal of locking in the details above before we tackle these.
+
+### Patterns + Local reference bindings
+
+The most relevant upcoming feature work will be to introduce "patterns"
+to Mojo.  Python supports both [Targets](https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-target)
+and [Patterns](https://docs.python.org/3/reference/compound_stmts.html#patterns)
+(closely related)
+which we need for compatibility with the Python ecosystem.  These are the basis
+for `match` statements, unpack assignment syntax `(a,b) = foo()` and other
+things.  
+
+Mojo currently has support for targets, but not patterns.  When we implement
+patterns, we will extend `var` and `for` statements to work with them and we
+will introduce a new
+`ref` pattern to bind a reference to a value instead of copying it.  Because
+there is always an initializer value, we can allow `ref` to always infer the
+mutability of the initialized value like the `ref [_]` argument convention does.
 
 This will allow many nice things for example it will eliminate the need for
-`elt[]` when foreaching over a list:
+`elt[]` when for-each-ing over a list:
 
 ```mojo
   # Copy the elements of the list into elt (required for Python compat), like
@@ -220,41 +230,134 @@ This will allow many nice things for example it will eliminate the need for
       elt += "foo"
 
   # Bind a mutable reference to elements in the list, like
-  # `for (auto &elt : list)` in C++.
-  for mutref elt in list:
+  # `for (auto &elt : mutlist)` in C++.
+  # This happens when `mutlist` yields mutable references.
+  for ref elt in mutlist:
       elt += "foo"
 
   # Bind an immutable reference to elements in the list, like
-  # `for (const auto &elt : list)` in C++.
-  for ref elt in list:
-      elt += "foo"
+  # `for (const auto &elt : immlist)` in C++
+  # This happens when `mutlist` yields immutable references.
+  for ref elt in immlist:
+      use(elt.field) # no need to copy elt to access a subfield.
+      #elt += foo # This would be an error, can't mutate immutable reference.
 ```
 
 Furthermore, we will allow patterns in `var` statements, so you'll be able to
-declare local references on the stack:
+declare local references on the stack.
 
 ```mojo
-  # Copy an element out of the list, like "auto x = list[i]" in C++.
-  var a = list[i]
+    # Copy an element out of the list, like "auto x = list[i]" in C++.
+    var a = list[i]
 
-  # Mutref to an element in the list, like "auto &x = list[i]" in C++.
-  var (mutref b) = list[i]
-  b += "foo"
+    # Unpack tuple elements with tuple patterns:
+    var (a1, a2) = list[i]
 
-  # Mutref to an element in the list, better syntax
-  mutref c = list[i]
-  print(len(c))
+    # Bind a ref to an element in the list, like "auto &x = mutlist[i]" in C++.
+    var (ref b) = mutlist[i]
+    b += "foo"
 
-  # Immutable ref to an element in the list, like
-  # "const auto &x = list[i]" in C++.
-  var (ref d) = list[i]
-  d += "foo"
+    # I don't see a reason not to allow `ref` in "target" syntax, so let's do
+    # that too: 
+    ref c = mutlist[i]
+    c += "foo"
 
-  # Immutable ref to an element in the list, better syntax
-  ref e = list[i]
-  print(len(e))
+    # Parametric mutability automatically infers immutable vs mutable reference
+    # from the initializer.
+    ref d = immlist[i]
+    print(len(d))
 ```
+
+This should fully dovetail with parametric mutability at the function signature
+level as well, an advanced example:
+
+```mojo
+struct Aggregate:
+    var field: String
+
+fn complicated(ref [_] agg: Aggregate) -> ref [agg.field] String:
+    ref field = agg.field  # automatically propagates mutability
+    print(field)
+    return field
+```
+
+The nice thing about this is that it propagates parametric mutability, so the
+result of a call to `complicated` will return a mutable reference if provided a
+mutable reference, or return an immutable (or parametric!) reference if provided
+that instead.
 
 We believe that this will provide a nice and familiar model to a wide variety
 of programmers with ergonomic syntax and full safety.  We're excited for what
 this means for Mojo.
+
+### Making `ref` a first class type
+
+Right now `ref` is not a first class type - it is an argument and result
+specifier as part of argument conventions.  After adding pattern support, we
+should look to extend ref to conform to specific traits (e.g. `AnyType` and
+`Movable` and `Copyable`), which would allow it to be used in collections, and
+enable things like:
+
+```mojo
+struct Dict[K: KeyElement, V: CollectionElement]:
+    ...
+    fn __getitem__(self, key: K) -> Optional[ref [...] Self.V]:
+        ...
+```
+
+Today this isn't possible because `ref` isn't a first class type, so you can't
+return an optional reference, or have an array of ref's.  The workaround for
+today is to use `Pointer` which handles this with a level of abstraction, or
+use `raises` in the specific case of `Dict.__getitem__`.
+
+### Consider renaming `owned` argument convention
+
+This dovetails into questions about what we should do with the `owned` keyword,
+and whether we should rename it.
+
+One suggestion is to rename it to `var` because a `var` declaration is an owned
+mutable value just like an `owned` argument.  The major problem that I see with
+this approach is that the argument is "like a var" to the *callee*, but the
+important part of method signatures are how they communicate to the *caller*
+(e.g. when shown in API docs).
+
+Because of this, I think the use of `var` keyword would be very confusing in
+practice, e.g. consider the API docs for `List.append`:
+
+```mojo
+struct List[...]:
+   ...
+   fn append(out self, var value: T): # doesn't send a "consuming" signal.
+      ...
+```
+
+Furthermore, I don't think it would convey the right intention in `__del__` or
+`__moveinit__`:
+
+```mojo
+struct YourType:
+   fn __del__(var self):
+      ...
+   fn __moveinit__(out self, var existing: Self):
+      ...
+```
+
+The problem here is that we need some keyword that conveys that the function
+"consumes an owned value", which is is the important thing from the caller
+perspective.
+
+Other potential names are something like `consuming` (which is what Swift uses)
+or `consumes` or `takes`.  I would love suggestions that take into consideration
+the above problems.
+
+### Rename the "transfer operator" (`x^`)
+
+This is a minor thing, but the "transfer operator" could use a rebranding
+in the documentation.  First, unlike other operators (like `+`) it isn't
+tied into a method (like `__add__`): perhaps renaming it to a "sigil"
+instead of an "operator" would be warranted.
+
+More importantly though, this operator *makes the specified value able to
+be transferred/consumed*, it does not itself transfer the value.  It seems
+highly tied into the discussion about what to do with `owned`, but I'm not
+sure what to call this.  Perhaps one will flow from the other.
