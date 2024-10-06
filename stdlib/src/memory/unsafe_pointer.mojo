@@ -192,7 +192,7 @@ struct UnsafePointer[
         """
 
         # We're unsafe, so we can have unsafe things.
-        alias _ref_type = Reference[type, lifetime, address_space]
+        alias _ref_type = Pointer[type, lifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
                 UnsafePointer[type, address_space, False, alignment, lifetime](

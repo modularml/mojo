@@ -154,7 +154,7 @@ struct InlineArray[
 
         self = Self(storage=elems^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(
         inout self,
         *,
@@ -216,9 +216,9 @@ struct InlineArray[
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+        """Get a `Pointer` to the element at the given index.
 
         Args:
             idx: The index of the item.
@@ -227,14 +227,13 @@ struct InlineArray[
             A reference to the item at the given index.
         """
         var normalized_index = normalize_index["InlineArray"](idx, self)
-
         return self.unsafe_get(normalized_index)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__[
         idx: Int,
     ](ref [_]self: Self) -> ref [self] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+        """Get a `Pointer` to the element at the given index.
 
         Parameters:
             idx: The index of the item.
@@ -256,7 +255,7 @@ struct InlineArray[
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
 
@@ -269,7 +268,7 @@ struct InlineArray[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
@@ -288,10 +287,10 @@ struct InlineArray[
         var idx_as_int = index(idx)
         debug_assert(
             0 <= idx_as_int < size,
-            (
-                "Index must be within bounds when using"
-                " `InlineArray.unsafe_get()`."
-            ),
+            " InlineArray.unsafe_get() index out of bounds: ",
+            idx_as_int,
+            " should be less than: ",
+            size,
         )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self._array).address,

@@ -48,7 +48,7 @@ struct Op(Stringable):
     alias ld = 5
     alias st = 6
 
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, other: Op) -> Bool:
         return self.op_code == other.op_code
 

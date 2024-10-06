@@ -10,14 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the Reference type.
+"""Implements the Pointer type.
 
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory import Reference
+from memory import Pointer
 ```
 """
+
+# TODO: This is kept for compatibility, remove this in the future.
+alias Reference = Pointer[*_]
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace
@@ -261,25 +264,25 @@ struct AddressSpace(EqualityComparable):
 
 
 # ===----------------------------------------------------------------------===#
-# Reference
+# Pointer
 # ===----------------------------------------------------------------------===#
 
 
 @value
 @register_passable("trivial")
-struct Reference[
+struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
     lifetime: Lifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
-    """Defines a non-nullable safe reference.
+    """Defines a non-nullable safe pointer.
 
     Parameters:
-        is_mutable: Whether the referenced data may be mutated through this.
+        is_mutable: Whether the pointee data may be mutated through this.
         type: Type of the underlying data.
-        lifetime: The lifetime of the reference.
-        address_space: The address space of the referenced data.
+        lifetime: The lifetime of the pointer.
+        address_space: The address space of the pointee data.
     """
 
     alias _mlir_type = __mlir_type[
@@ -293,7 +296,7 @@ struct Reference[
     ]
 
     var _value: Self._mlir_type
-    """The underlying MLIR reference."""
+    """The underlying MLIR representation."""
 
     # ===------------------------------------------------------------------===#
     # Initializers
@@ -301,10 +304,10 @@ struct Reference[
 
     @always_inline("nodebug")
     fn __init__(inout self, *, _mlir_value: Self._mlir_type):
-        """Constructs a Reference from its MLIR prepresentation.
+        """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
-             _mlir_value: The MLIR representation reference.
+             _mlir_value: The MLIR representation of the pointer.
         """
         self._value = _mlir_value
 
@@ -313,23 +316,23 @@ struct Reference[
     fn address_of(
         ref [lifetime, address_space._value.value]value: type
     ) -> Self:
-        """Constructs a Reference from a value reference.
+        """Constructs a Pointer from a reference to a value.
 
         Args:
-            value: The value reference.
+            value: The value to get the address of.
 
         Returns:
-            The result Reference.
+            The result Pointer.
         """
-        return Reference(_mlir_value=__get_mvalue_as_litref(value))
+        return Pointer(_mlir_value=__get_mvalue_as_litref(value))
 
     fn __init__(inout self, *, other: Self):
-        """Constructs a copy from another Reference.
+        """Constructs a copy from another Pointer.
 
         Note that this does **not** copy the underlying data.
 
         Args:
-            other: The `Reference` to copy.
+            other: The `Pointer` to copy.
         """
         self._value = other._value
 
@@ -339,10 +342,10 @@ struct Reference[
 
     @always_inline("nodebug")
     fn __getitem__(self) -> ref [lifetime, address_space._value.value] type:
-        """Enable subscript syntax `ref[]` to access the element.
+        """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:
-            The MLIR reference for the Mojo compiler to use.
+            A reference to the underlying value in memory.
         """
         return __get_litref_as_mvalue(self._value)
 
@@ -352,7 +355,7 @@ struct Reference[
     # accesses to the lifetime.
     @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
-    fn __eq__(self, rhs: Reference[type, _, address_space]) -> Bool:
+    fn __eq__(self, rhs: Pointer[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are equal.
 
         Args:
@@ -367,7 +370,7 @@ struct Reference[
 
     @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline("nodebug")
-    fn __ne__(self, rhs: Reference[type, _, address_space]) -> Bool:
+    fn __ne__(self, rhs: Pointer[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are not equal.
 
         Args:
@@ -380,9 +383,9 @@ struct Reference[
 
     @no_inline
     fn __str__(self) -> String:
-        """Gets a string representation of the Reference.
+        """Gets a string representation of the Pointer.
 
         Returns:
-            The string representation of the Reference.
+            The string representation of the Pointer.
         """
         return str(UnsafePointer.address_of(self[]))

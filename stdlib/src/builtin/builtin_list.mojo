@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import Reference, UnsafePointer
+from memory import Pointer, UnsafePointer
 
 
 # ===----------------------------------------------------------------------===#
@@ -39,7 +39,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, owned *args: *Ts):
         """Construct the list literal from the given values.
 
@@ -48,7 +48,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         """
         self.storage = Tuple(storage=args^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Copy construct the tuple.
 
@@ -70,7 +70,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """Get the list length.
 
@@ -83,7 +83,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn get[i: Int, T: CollectionElement](self) -> ref [self.storage] T:
         """Get a list element at the given index.
 
@@ -100,7 +100,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __contains__[
         T: EqualityComparableCollectionElement
     ](self, value: T) -> Bool:
@@ -138,6 +138,10 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
     fn __next__(inout self) -> type:
         self.index += 1
         return self.src[self.index - 1]
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return len(self.src) - self.index
@@ -229,21 +233,25 @@ struct _VariadicListMemIter[
     alias variadic_list_type = VariadicListMem[elt_type, elt_lifetime]
 
     var index: Int
-    var src: Reference[Self.variadic_list_type, list_lifetime]
+    var src: Pointer[Self.variadic_list_type, list_lifetime]
 
     fn __init__(
         inout self, index: Int, ref [list_lifetime]list: Self.variadic_list_type
     ):
         self.index = index
-        self.src = Reference.address_of(list)
+        self.src = Pointer.address_of(list)
 
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
         self.index += 1
         # TODO: Need to make this return a dereferenced reference, not a
         # reference that must be deref'd by the user.
         return rebind[Self.variadic_list_type.reference_type](
-            Reference.address_of(self.src[][self.index - 1])
+            Pointer.address_of(self.src[][self.index - 1])
         )
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
@@ -297,7 +305,7 @@ struct VariadicListMem[
         lifetime: The reference lifetime of the underlying elements.
     """
 
-    alias reference_type = Reference[element_type, lifetime]
+    alias reference_type = Pointer[element_type, lifetime]
     alias _mlir_ref_type = Self.reference_type._mlir_type
     alias _mlir_type = __mlir_type[
         `!kgen.variadic<`, Self._mlir_ref_type, `, borrow_in_mem>`
@@ -639,7 +647,7 @@ struct VariadicPack[
             index: The element of the pack to return.
 
         Returns:
-            A reference to the element.  The Reference's mutability follows the
+            A reference to the element.  The Pointer's mutability follows the
             mutability of the pack argument convention.
         """
         litref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](

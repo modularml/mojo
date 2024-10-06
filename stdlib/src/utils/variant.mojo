@@ -208,7 +208,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            A reference to the internal data.
         """
         if not self.isa[T]():
             abort("get: wrong variant type")
@@ -377,7 +377,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            The internal data represented as a `Pointer[T]`.
         """
         debug_assert(self.isa[T](), "get: wrong variant type")
         return self._get_ptr[T]()[]
