@@ -27,10 +27,11 @@ from sys import (
     triple_is_nvidia_cuda,
     external_call,
     simdwidthof,
+    _libc as libc,
 )
 from collections import Optional
 from builtin.dtype import _integral_type_of
-from memory.reference import AddressSpace, _GPUAddressSpace
+from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -50,7 +51,7 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @always_inline
 fn _memcmp_impl_unconstrained[
     type: DType
-](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
     alias simd_width = simdwidthof[type]()
     if count < simd_width:
         for i in range(count):
@@ -94,7 +95,7 @@ fn _memcmp_impl_unconstrained[
 @always_inline
 fn _memcmp_impl[
     type: DType
-](s1: UnsafePointer[Scalar[type], *_], s2: __type_of(s1), count: Int) -> Int:
+](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
     constrained[type.is_integral(), "the input dtype must be integral"]()
     return _memcmp_impl_unconstrained(s1, s2, count)
 
@@ -142,62 +143,7 @@ fn memcmp[
 
 
 @always_inline
-fn memcpy[count: Int](dest: UnsafePointer, src: __type_of(dest)):
-    """Copies a memory area.
-
-    Parameters:
-        count: The number of elements to copy (not bytes!).
-
-    Args:
-        dest: The destination pointer.
-        src: The source pointer.
-    """
-    alias n = count * sizeof[dest.type]()
-
-    var dest_data = dest.bitcast[Int8]()
-    var src_data = src.bitcast[Int8]()
-
-    @parameter
-    if n < 5:
-
-        @parameter
-        for i in range(n):
-            dest_data[i] = src_data[i]
-        return
-
-    @parameter
-    if n <= 16:
-
-        @parameter
-        if n >= 8:
-            var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
-            dest_data.offset(n - ui64_size).bitcast[
-                Int64
-            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
-            return
-
-        var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
-        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
-            n - ui32_size
-        ).bitcast[Int32]()[0]
-        return
-
-    var dest_ptr = dest_data.bitcast[Int8]()
-    var src_ptr = src_data.bitcast[Int8]()
-
-    # Copy in 32-byte chunks.
-    alias chunk_size = 32
-    alias vector_end = _align_down(n, chunk_size)
-    for i in range(0, vector_end, chunk_size):
-        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
-    for i in range(vector_end, n):
-        dest_ptr.store(i, src_ptr.load(i))
-
-
-@always_inline
-fn memcpy(
+fn _memcpy_impl(
     dest_data: UnsafePointer[Int8, *_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
@@ -258,8 +204,17 @@ fn memcpy(
 
 
 @always_inline
-fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
+fn memcpy[
+    T: AnyType
+](
+    dest: UnsafePointer[T, AddressSpace.GENERIC, *_],
+    src: UnsafePointer[T, AddressSpace.GENERIC, *_],
+    count: Int,
+):
     """Copies a memory area.
+
+    Parameters:
+        T: The element type.
 
     Args:
         dest: The destination pointer.
@@ -267,7 +222,11 @@ fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy.
     """
     var n = count * sizeof[dest.type]()
-    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
+    _memcpy_impl(
+        dest.bitcast[Int8, lifetime=MutableAnyLifetime](),
+        src.bitcast[Int8, lifetime=MutableAnyLifetime](),
+        n,
+    )
 
 
 # ===----------------------------------------------------------------------===#
@@ -480,6 +439,6 @@ fn _malloc[
 fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
     @parameter
     if triple_is_nvidia_cuda():
-        external_call["free", NoneType](ptr.bitcast[NoneType]())
+        libc.free(ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)

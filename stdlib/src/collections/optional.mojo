@@ -313,7 +313,7 @@ struct Optional[T: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
+    fn value(ref [_]self: Self) -> ref [self._value] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -322,7 +322,7 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), the program will abort
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         if not self.__bool__():
             abort(".value() on empty Optional")
@@ -330,7 +330,7 @@ struct Optional[T: CollectionElement](
         return self.unsafe_value()
 
     @always_inline
-    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
+    fn unsafe_value(ref [_]self: Self) -> ref [self._value] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -339,10 +339,10 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.unsafe_get[T]()[]
+        return self._value.unsafe_get[T]()
 
     fn take(inout self) -> T:
         """Move the value out of the Optional.

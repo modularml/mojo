@@ -18,10 +18,12 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import (
     bitwidthof,
     external_call,
-    os_is_windows,
     stdout,
     triple_is_nvidia_cuda,
+    _libc as libc,
 )
+from sys._libc import dup, fclose, fdopen, fflush
+from sys.ffi import OpaquePointer
 
 from builtin.builtin_list import _LITRefPackHelper
 from builtin.dtype import _get_dtype_printf_format
@@ -36,18 +38,10 @@ from utils import Formattable, Formatter
 # ===----------------------------------------------------------------------=== #
 
 
-fn _dup(fd: Int32) -> Int32:
-    @parameter
-    if os_is_windows():
-        return external_call["_dup", Int32](fd)
-    else:
-        return external_call["dup", Int32](fd)
-
-
 @value
 @register_passable("trivial")
 struct _fdopen[mode: StringLiteral = "a"]:
-    var handle: UnsafePointer[NoneType]
+    var handle: OpaquePointer
 
     fn __init__(inout self, stream_id: FileDescriptor):
         """Creates a file handle to the stdout/stderr stream.
@@ -56,15 +50,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
             stream_id: The stream id
         """
 
-        @parameter
-        if os_is_windows():
-            self.handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_cstr_ptr()
-            )
-        else:
-            self.handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_cstr_ptr()
-            )
+        self.handle = fdopen(dup(stream_id.value), mode.unsafe_cstr_ptr())
 
     fn __enter__(self) -> Self:
         """Open the file handle for use within a context manager"""
@@ -72,7 +58,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
 
     fn __exit__(self):
         """Closes the file handle."""
-        _ = external_call["fclose", Int32](self.handle)
+        _ = fclose(self.handle)
 
     fn readline(self) -> String:
         """Reads an entire line from stdin or until EOF. Lines are delimited by a newline character.
@@ -139,7 +125,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
             UnsafePointer[UnsafePointer[UInt8]],
             UnsafePointer[UInt64],
             Int,
-            UnsafePointer[NoneType],
+            OpaquePointer,
         ](
             UnsafePointer.address_of(buffer),
             UnsafePointer.address_of(UInt64(0)),
@@ -149,7 +135,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
         # Copy the buffer (excluding the delimiter itself) into a Mojo String.
         var s = String(StringRef(buffer, bytes_read - 1))
         # Explicitly free the buffer using free() instead of the Mojo allocator.
-        external_call["free", NoneType](buffer.bitcast[NoneType]())
+        libc.free(buffer.bitcast[NoneType]())
         return s
 
 
@@ -161,7 +147,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
 @no_inline
 fn _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
-        _ = external_call["fflush", Int32](fd.handle)
+        _ = fflush(fd.handle)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -181,9 +167,8 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), Reference(loaded_pack)
+            fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
-        _ = loaded_pack
     else:
         with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
@@ -330,9 +315,8 @@ fn _put[
         var tmp = 0
         var arg_ptr = UnsafePointer.address_of(tmp)
         _ = external_call["vprintf", Int32](
-            x.unsafe_ptr(), arg_ptr.bitcast[UnsafePointer[NoneType]]()
+            x.unsafe_ptr(), arg_ptr.bitcast[OpaquePointer]()
         )
-        _ = tmp
     else:
         alias MAX_STR_LEN = 0x1000_0000
 

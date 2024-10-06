@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char
+from sys.ffi import c_char, OpaquePointer
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -26,7 +26,7 @@ from python import PythonObject
 
 from utils import (
     Span,
-    StaticIntTuple,
+    IndexList,
     StringRef,
     StringSlice,
     Variant,
@@ -90,7 +90,7 @@ fn ord(s: StringSlice) -> Int:
         s.byte_length() == int(num_bytes), "input string must be one character"
     )
     debug_assert(
-        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte ", b1, " at index 0"
     )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -98,8 +98,7 @@ fn ord(s: StringSlice) -> Int:
     for i in range(1, num_bytes):
         p += 1
         debug_assert(
-            p[] >> 6 == 0b00000010,
-            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+            p[] >> 6 == 0b00000010, "invalid UTF-8 byte ", b1, " at index ", i
         )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
@@ -790,13 +789,13 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_slice())
+        var length: Int = len(str_slice.as_bytes_span())
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            src=str_slice.as_bytes_span().unsafe_ptr(),
             count=length,
         )
         self = Self(buffer^)
@@ -874,6 +873,35 @@ struct String(
         ```mojo
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
         print(string) # "1, 2.0, three"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
+        ```
+        .
+        """
+
+        return Self.format_sequence(args)
+
+    @staticmethod
+    @no_inline
+    fn format_sequence(args: VariadicPack[_, Formattable, *_]) -> Self:
+        """
+        Construct a string directly from a variadic pack.
+
+        Args:
+            args: A VariadicPack of formattable arguments.
+
+        Returns:
+            A string formed by formatting the VariadicPack.
+
+        Examples:
+
+        ```mojo
+        fn variadic_pack_to_string[
+            *Ts: Formattable,
+        ](*args: *Ts) -> String:
+            return String.format_sequence(args)
+
+        string = variadic_pack_to_string(1, ", ", 2.0, ", ", "three")
         %# from testing import assert_equal
         %# assert_equal(string, "1, 2.0, three")
         ```
@@ -1241,7 +1269,7 @@ struct String(
             value. This `String` MUST outlive the `Formatter` instance.
         """
 
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[String] = ptr0.bitcast[String]()
 
             # FIXME:
@@ -1380,7 +1408,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1405,23 +1433,10 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
 
     @always_inline
     fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes, excluding null terminator.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return max(len(self._buffer) - 1, 0)
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
         """Get the string length in bytes.
 
         Returns:
@@ -2199,7 +2214,7 @@ struct String(
         debug_assert(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
-        var fillbyte = fillchar.as_bytes_slice()[0]
+        var fillbyte = fillchar.as_bytes_span()[0]
         var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)

@@ -101,6 +101,10 @@ struct _PyIter(Sized):
             self.preparedNextItem = PythonObject(maybeNextItem)
         return current
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         """Return zero to halt iteration.
 
@@ -114,7 +118,9 @@ struct _PyIter(Sized):
 
 
 @register_passable
-struct TypedPythonObject[type_hint: StringLiteral]:
+struct TypedPythonObject[type_hint: StringLiteral](
+    SizedRaising,
+):
     """A wrapper around `PythonObject` that indicates the type of the contained
     object.
 
@@ -155,13 +161,25 @@ struct TypedPythonObject[type_hint: StringLiteral]:
         self._obj = other._obj
 
     # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    fn __len__(self) raises -> Int:
+        """Returns the length of the object.
+
+        Returns:
+            The length of the object.
+        """
+        return len(self._obj)
+
+    # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
     # TODO:
     #   This should have lifetime, or we should do this with a context
     #   manager, to prevent use after ASAP destruction.
-    fn unsafe_as_py_object_ptr(inout self) -> PyObjectPtr:
+    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.
 
         Returns:
@@ -172,6 +190,36 @@ struct TypedPythonObject[type_hint: StringLiteral]:
             usage of the pointer returned by this function.
         """
         return self._obj.unsafe_as_py_object_ptr()
+
+    # ===-------------------------------------------------------------------===#
+    # 'Tuple' Operations
+    # ===-------------------------------------------------------------------===#
+
+    fn __getitem__(
+        self: TypedPythonObject["Tuple"],
+        pos: Int,
+    ) raises -> PythonObject:
+        """Get an element from this tuple.
+
+        Args:
+            pos: The tuple element position to retrieve.
+
+        Returns:
+            The value of the tuple element at the specified position.
+        """
+        var cpython = _get_global_python_itf().cpython()
+
+        var item: PyObjectPtr = cpython.PyTuple_GetItem(
+            self.unsafe_as_py_object_ptr(),
+            pos,
+        )
+
+        if item.is_null():
+            raise Python.unsafe_get_python_exception(cpython)
+
+        # TODO(MSTDL-911): Avoid unnecessary owned reference counts when
+        #   returning borrowed PythonObject values.
+        return PythonObject.from_borrowed_ptr(item)
 
 
 @register_passable
@@ -372,7 +420,7 @@ struct PythonObject(
         self.py_object = cpython.toPython(string._strref_dangerous())
         string._strref_keepalive()
 
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
 
         Parameters:
@@ -414,7 +462,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
-    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:
@@ -504,7 +552,7 @@ struct PythonObject(
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn unsafe_as_py_object_ptr(inout self) -> PyObjectPtr:
+    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.
 
         Returns:
@@ -653,22 +701,23 @@ struct PythonObject(
         Returns:
             The value corresponding to the given key for this object.
         """
-        var size = len(args)
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size)
-        for i in range(size):
-            var arg_value = args[i].py_object
-            cpython.Py_IncRef(arg_value)
-            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
-            if result != 0:
-                raise Error("internal error: PyTuple_SetItem failed")
+        var size = len(args)
+        var key_obj: PyObjectPtr
+        if size == 1:
+            key_obj = args[0].py_object
+        else:
+            key_obj = cpython.PyTuple_New(size)
+            for i in range(size):
+                var arg_value = args[i].py_object
+                cpython.Py_IncRef(arg_value)
+                var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
+                if result != 0:
+                    raise Error("internal error: PyTuple_SetItem failed")
 
-        var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, "__getitem__"
-        )
-        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
-        cpython.Py_DecRef(callable_obj)
-        cpython.Py_DecRef(tuple_obj)
+        cpython.Py_IncRef(key_obj)
+        var result = cpython.PyObject_GetItem(self.py_object, key_obj)
+        cpython.Py_DecRef(key_obj)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
@@ -679,29 +728,30 @@ struct PythonObject(
             args: The key or keys to set on this object.
             value: The value to set.
         """
-        var size = len(args)
-
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size + 1)
-        for i in range(size):
-            var arg_value = args[i].py_object
-            cpython.Py_IncRef(arg_value)
-            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
-            if result != 0:
-                raise Error("internal error: PyTuple_SetItem failed")
+        var size = len(args)
+        var key_obj: PyObjectPtr
 
+        if size == 1:
+            key_obj = args[0].py_object
+        else:
+            key_obj = cpython.PyTuple_New(size)
+            for i in range(size):
+                var arg_value = args[i].py_object
+                cpython.Py_IncRef(arg_value)
+                var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
+                if result != 0:
+                    raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(key_obj)
         cpython.Py_IncRef(value.py_object)
-        var result2 = cpython.PyTuple_SetItem(tuple_obj, size, value.py_object)
-        if result2 != 0:
-            raise Error("internal error: PyTuple_SetItem failed")
-
-        var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, "__setitem__"
+        var result = cpython.PyObject_SetItem(
+            self.py_object, key_obj, value.py_object
         )
-        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
-        cpython.Py_DecRef(callable_obj)
-        cpython.Py_DecRef(tuple_obj)
-        Python.throw_python_exception_if_error_state(cpython)
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
+        cpython.Py_DecRef(key_obj)
+        cpython.Py_DecRef(value.py_object)
 
     fn _call_zero_arg_method(
         self, method_name: StringRef

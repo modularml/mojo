@@ -1,0 +1,446 @@
+---
+title: Errors, error handling, and context managers
+sidebar_label: Errors and context managers
+---
+
+This page discusses how to raise errors in Mojo programs and how to detect and
+handle error conditions. It also discusses how you can use context managers to
+allocate and release resources such as files correctly, even when error
+conditions occur. Finally, it shows you how to implement context managers for
+your own custom resources.
+
+## Raise an error
+
+The `raise` statement raises an error condition in your program. You provide the
+`raise` statement with an [`Error`](/mojo/stdlib/builtin/error/Error) instance
+to indicate the type of error that occurred. For example:
+
+```mojo
+raise Error("integer overflow")
+```
+
+As a convenience, you can instead provide an error message in the form of a
+[`String`](/mojo/stdlib/collections/string/String) or
+[`StringLiteral`](/mojo/stdlib/builtin/string_literal/StringLiteral) value, and
+`raise` automatically uses that to create an `Error` instance. So you can raise
+the same error condition as shown above by executing:
+
+```mojo
+raise "integer overflow"
+```
+
+:::note
+
+Currently, Mojo does not support typed error conditions. All errors are
+instances of `Error`, and the only thing that distinguishes different error
+conditions is the error message that you provide.
+
+:::
+
+An error interrupts the current execution flow of your program. If you provide
+an error handler (as described in [Handle an error](#handle-an-error)) in the
+current scope or any calling scope, execution resumes with that handler. If
+there is no applicable error handler, your program terminates with a non-zero
+exit code and prints the error message. For example:
+
+```output
+Unhandled exception caught during execution: integer overflow
+```
+
+If a function you define using the `fn` keyword can raise an error, you must
+include the `raises` keyword in the function definition. For example:
+
+```mojo
+fn incr(n: Int) raises -> Int:
+    if n == Int.MAX:
+        raise "inc: integer overflow"
+    else:
+        return n + 1
+```
+
+On the other hand, you **cannot** use the `raises` keyword when defining a
+function using the `def` keyword, because `def` already implies that the
+function may raise an error. So the following is equivalent to the function
+defined above:
+
+```mojo
+def incr(n: Int) -> Int:
+    if n == Int.MAX:
+        raise "inc: integer overflow"
+    else:
+        return n + 1
+```
+
+## Handle an error
+
+Mojo allows you to detect and handle error conditions using the `try-except`
+control flow structure, whose full syntax is:
+
+```mojo
+try:
+    # Code block to execute that might raise an error
+except <optional_variable_name>:
+    # Code block to execute if an error occurs
+else:
+    # Code block to execute if no error occurs
+finally:
+    # Final code block to execute in all circumstances
+```
+
+You must include one or both of the `except` and `finally` clauses. The `else`
+clause is optional.
+
+The `try` clause contains a code block to execute that might raise an error. If
+no error occurs, the entire code block executes. If an error occurs, execution
+of the code block stops at the point that the error is raised. Your program then
+continues with the execution of the `except` clause, if provided, or the
+`finally` clause.
+
+If the `except` clause is present, its code block executes only if an error
+occurred in the `try` clause. The `except` clause "consumes" the error that
+occurred in the `try` clause. You can then implement any error handling or
+recovery that's appropriate for your application.
+
+If you provide the name of a variable after the `except` keyword, then the
+`Error` instance is bound to the variable if an error occurs. The `Error` type
+implements the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait, so
+you can pass it as an argument to the [`print()`](/mojo/stdlib/builtin/io/print)
+function if you'd like to print its error message to the console. It also
+implements the [`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait, so you
+can pass it to the [`str()`](/mojo/stdlib/builtin/str/str) function if you want
+to extract the error message as a `String` for further processing.
+
+If desired, you can re-raise an error condition from your `except` clause simply
+by executing a `raise` statement from within its code block. This can be either
+a new `Error` instance or, if you provided a variable name to capture the
+`Error` that occurred originally, you can re-raise that error.
+
+:::note
+
+Because Mojo does not currently support typed errors, a `try-except` control
+structure can include at most one `except` clause, which catches any `Error`
+raised.
+
+:::
+
+If the `else` clause is present, its code block executes only if an error does
+not occur in the `try` clause. Note that the `else` clause is *skipped* if the
+`try` clause executes a `continue`, `break`, or `return` that exits from the
+`try` block.
+
+If the `finally` clause is present, its code block executes after the `try`
+clause and the `except` or `else` clause, if applicable. The `finally` clause
+executes even if one of the other code blocks exit by executing a `continue`,
+`break`, or `return` statement or by raising an error. The `finally` clause is
+often used to release resources used by the `try` clause (such as a file handle)
+regardless of whether or not an error occurred.
+
+As an example, consider the following program:
+
+```mojo
+def incr(n: Int) -> Int:
+    if n == Int.MAX:
+        raise "inc: integer overflow"
+    else:
+        return n + 1
+
+def main():
+    values = List(0, 1, Int.MAX)
+    for value in values:
+        try:
+            print()
+            print("try     =>", value[])
+            if value[] == 1:
+                continue
+            result = str("{} incremented is {}").format(value[], incr(value[]))
+        except e:
+            print("except  =>", e)
+        else:
+            print("else    =>", result)
+        finally:
+            print("finally => ====================")
+
+```
+
+Running this program generates the following output:
+
+```output
+try     => 0
+else    => 0 incremented is 1
+finally => ====================
+
+try     => 1
+finally => ====================
+
+try     => 9223372036854775807
+except  => inc: integer overflow
+finally => ====================
+```
+
+## Use a context manager
+
+A *context manager* is an object that manages resources such as files, network
+connections, and database connections. It provides a way to allocate resources
+and release them automatically when they are no longer needed, ensuring proper
+cleanup and preventing resource leaks even in the case of error conditions.
+
+As an example, consider reading data from a file. A naive approach might look
+like this:
+
+```mojo
+# Obtain a file handle to read from storage
+f = open(input_file, "r")
+content = f.read()
+# Process the content as needed
+# Close the file handle
+f.close()
+```
+
+Calling [`close()`](/mojo/stdlib/builtin/file/FileHandle#close) releases the
+memory and other operating system resources associated with the opened file. If
+your program were to open many files without closing them, you could exhaust the
+resources available to your program and cause errors. The problem is even worse
+if you were writing to a file instead of reading from it, because the operating
+system might buffer the output in memory until the file is closed. If your
+program were to crash instead of exiting normally, that buffered data could be
+lost instead of being written to storage.
+
+The example above actually includes the call to `close()`, but it ignores the
+possibility that [`read()`](/mojo/stdlib/builtin/file/FileHandle#read) could
+raise an error, which would result in the program not executing the `close()`.
+To handle this scenario you could rewrite the code to use `try` like this:
+
+```mojo
+# Obtain a file handle to read from storage
+f = open(input_file, "r")
+
+try:
+    content = f.read()
+    # Process the content as needed
+finally:
+    # Ensure that the file handle is closed even if read() raises an error
+    f.close()
+```
+
+However, the [`FileHandle`](/mojo/stdlib/builtin/file/FileHandle) struct
+returned by [`open()`](/mojo/stdlib/builtin/file/open) is a context manager.
+When used in conjunction with Mojo's `with` statement, a context manager ensures
+that the resources it manages are properly released at the end of the block,
+even if an error occurs. In the case of a `FileHandle`, that means that the call
+to `close()` takes place automatically. So you could rewrite the example above
+to take advantage of the context manager—and omit the explicit call to
+`close()`—like this:
+
+```mojo
+with open(input_file, "r") as f:
+    content = f.read()
+    # Process the content as needed
+```
+
+The `with` statement also allows you to use multiple context managers within the
+same code block. As an example, the following code opens one text file, reads
+its entire content, converts it to upper case, and then writes the result to a
+different file:
+
+```mojo
+    with open(input_file, "r") as f_in, open(output_file, "w") as f_out:
+        input_text = f_in.read()
+        output_text = input_text.upper()
+        f_out.write(output_text)
+```
+
+`FileHandle` is perhaps the most commonly used context manager. Other examples
+of context managers in the Mojo standard library are
+[`NamedTemporaryFile`](/mojo/stdlib/tempfile/tempfile/NamedTemporaryFile),
+[`TemporaryDirectory`](/mojo/stdlib/tempfile/tempfile/TemporaryDirectory),
+[`BlockingScopedLock`](/mojo/stdlib/utils/lock/BlockingScopedLock), and
+[`assert_raises`](/mojo/stdlib/testing/testing/assert_raises). You can also
+create your own custom context managers, as described in [Write a custom context
+manager](#write-a-custom-context-manager) below.
+
+## Write a custom context manager
+
+Writing a custom context manager is a matter of defining a
+[struct](/mojo/manual/structs) that implements two special *dunder* methods
+("double underscore" methods): `__enter__()` and `__exit__()`:
+
+- `__enter__()` is called by the `with` statement to enter the runtime context.
+  The `__enter__()` method should initialize any state necessary for the context
+  and return the context manager.
+
+- `__exit__()` is called when the `with` code block completes execution, even if
+  the `with` code block terminates with a call to `continue`, `break`, or
+  `return`. The `__exit__()` method should release any resources associated with
+  the context. After the `__exit__()` method returns, the context manager is
+  destroyed.
+
+  If the `with` code block raises an error, then the `__exit__()` method runs
+  before any error processing occurs (that is, before it is caught by a
+  `try-except` structure or your program terminates). If you'd like to define
+  conditional processing for error conditions in a `with` code block, you can
+  implement an overloaded version of `__exit__()` that takes an `Error`
+  argument. For more information, see [Define a conditional `__exit__()`
+  method](#define-a-conditional-__exit__-method) below.
+
+  For context managers that don't need to release resources or perform other
+  actions on termination, you are not required to implement an `__exit__()`
+  method. In that case the context manager is destroyed automatically after the
+  `with` code block completes execution.
+
+Here is an example of implementing a `Timer` context manager, which prints the
+amount of time spent executing the `with` code block:
+
+```mojo title="context_mgr.mojo"
+import sys
+import time
+
+@value
+struct Timer:
+    var start_time: Int
+
+    fn __init__(inout self):
+        self.start_time = 0
+
+    fn __enter__(inout self) -> Self:
+        self.start_time = time.perf_counter_ns()
+        return self
+
+    fn __exit__(inout self):
+        end_time = time.perf_counter_ns()
+        elapsed_time_ms = round(((end_time - self.start_time) / 1e6), 3)
+        print("Elapsed time:", elapsed_time_ms, "milliseconds")
+
+def main():
+    with Timer():
+        print("Beginning execution")
+        time.sleep(1)
+        if len(sys.argv()) > 1:
+            raise "simulated error"
+        time.sleep(1)
+        print("Ending execution")
+```
+
+Running this example produces output like this:
+
+```sh
+mojo context_mgr.mojo
+```
+
+```output
+Beginning execution
+Ending execution
+Elapsed time: 2010.0 milliseconds
+```
+
+```sh
+mojo context_mgr.mojo fail
+```
+
+```output
+Beginning execution
+Elapsed time: 1002.0 milliseconds
+Unhandled exception caught during execution: simulated error
+```
+
+### Define a conditional `__exit__()` method
+
+When creating a context manager, you can implement the `__exit__(self)` form of
+the `__exit__()` method to handle completion of the `with` statement under all
+circumstances including errors. However, you have the option of additionally
+implementing an overloaded version that is invoked instead when an error occurs
+in the `with` code block:
+
+```mojo
+fn __exit__(self, error: Error) raises -> Bool
+```
+
+Given the `Error` that occurred as an argument, the method can:
+
+- Return `True` to suppress the error
+- Return `False` to re-raise the error
+- Raise a new error
+
+The following is an example of a context manager that suppresses only a certain
+type of error condition and propagates all others:
+
+```mojo title="conditional_context_mgr.mojo"
+import sys
+import time
+
+@value
+struct ConditionalTimer:
+    var start_time: Int
+
+    fn __init__(inout self):
+        self.start_time = 0
+
+    fn __enter__(inout self) -> Self:
+        self.start_time = time.perf_counter_ns()
+        return self
+
+    fn __exit__(inout self):
+        end_time = time.perf_counter_ns()
+        elapsed_time_ms = round(((end_time - self.start_time) / 1e6), 3)
+        print("Elapsed time:", elapsed_time_ms, "milliseconds")
+
+    fn __exit__(inout self, e: Error) raises -> Bool:
+        if str(e) == "just a warning":
+            print("Suppressing error:", e)
+            self.__exit__()
+            return True
+        else:
+            print("Propagating error")
+            self.__exit__()
+            return False
+
+def flaky_identity(n: Int) -> Int:
+    if (n % 4) == 0:
+        raise "really bad"
+    elif (n % 2) == 0:
+        raise "just a warning"
+    else:
+        return n
+
+def main():
+    for i in range(1, 9):
+        with ConditionalTimer():
+            print("\nBeginning execution")
+
+            print("i =", i)
+            time.sleep(0.1)
+
+            if i == 3:
+                print("continue executed")
+                continue
+
+            j = flaky_identity(i)
+            print("j =", j)
+
+            print("Ending execution")
+```
+
+Running this example produces this output:
+
+```output
+Beginning execution
+i = 1
+j = 1
+Ending execution
+Elapsed time: 105.0 milliseconds
+
+Beginning execution
+i = 2
+Suppressing error: just a warning
+Elapsed time: 106.0 milliseconds
+
+Beginning execution
+i = 3
+continue executed
+Elapsed time: 106.0 milliseconds
+
+Beginning execution
+i = 4
+Propagating error
+Elapsed time: 106.0 milliseconds
+Unhandled exception caught during execution: really bad
+```

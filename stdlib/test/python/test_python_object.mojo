@@ -409,6 +409,114 @@ fn test_none() raises:
     assert_true(n is None)
 
 
+fn test_getitem_raises() raises:
+    var a = PythonObject(2)
+    with assert_raises(contains="'int' object is not subscriptable"):
+        _ = a[0]
+    with assert_raises(contains="'int' object is not subscriptable"):
+        _ = a[0, 0]
+
+    var b = PythonObject(2.2)
+    with assert_raises(contains="'float' object is not subscriptable"):
+        _ = b[0]
+    with assert_raises(contains="'float' object is not subscriptable"):
+        _ = b[0, 0]
+
+    var c = PythonObject(True)
+    with assert_raises(contains="'bool' object is not subscriptable"):
+        _ = c[0]
+    with assert_raises(contains="'bool' object is not subscriptable"):
+        _ = c[0, 0]
+
+    var d = PythonObject(None)
+    with assert_raises(contains="'NoneType' object is not subscriptable"):
+        _ = d[0]
+    with assert_raises(contains="'NoneType' object is not subscriptable"):
+        _ = d[0, 0]
+
+    with_get = Python.evaluate(
+        """type('WithGetItem', (), {
+            '__getitem__': lambda self, key: 
+                'Keys: {0}'.format(", ".join(map(str, key))) if isinstance(key, tuple) 
+                else 'Key: {0}'.format(key)
+         })()"""
+    )
+    assert_equal("Key: 0", str(with_get[0]))
+    assert_equal("Keys: 0, 0", str(with_get[0, 0]))
+    assert_equal("Keys: 0, 0, 0", str(with_get[0, 0, 0]))
+
+    var without_get = Python.evaluate(
+        "type('WithOutGetItem', (), {'__str__': lambda self: \"SomeString\"})()"
+    )
+    with assert_raises(contains="'WithOutGetItem' object is not subscriptable"):
+        _ = without_get[0]
+
+    with assert_raises(contains="'WithOutGetItem' object is not subscriptable"):
+        _ = without_get[0, 0]
+
+    var with_get_exception = Python.evaluate(
+        "type('WithGetItemException', (), {'__getitem__': lambda self, key: (_"
+        ' for _ in ()).throw(ValueError("Custom error")),})()'
+    )
+
+    with assert_raises(contains="Custom error"):
+        _ = with_get_exception[1]
+
+    with_2d = Python.evaluate(
+        """type('With2D', (), {
+            '__init__': lambda self: setattr(self, 'data', [[1, 2, 3], [4, 5, 6]]),
+            '__getitem__': lambda self, key: (
+                self.data[key[0]][key[1]] if isinstance(key, tuple)
+                else self.data[key]
+            )
+        })()"""
+    )
+    assert_equal("[1, 2, 3]", str(with_2d[0]))
+    assert_equal(2, with_2d[0, 1])
+    assert_equal(6, with_2d[1, 2])
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[0, 4]
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[2, 0]
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[2]
+
+
+def test_setitem_raises():
+    t = Python.evaluate("(1,2,3)")
+    with assert_raises(
+        contains="'tuple' object does not support item assignment"
+    ):
+        t[0] = 0
+
+    lst = Python.evaluate("[1, 2, 3]")
+    with assert_raises(contains="list assignment index out of range"):
+        lst[10] = 4
+
+    s = Python.evaluate('"hello"')
+    with assert_raises(
+        contains="'str' object does not support item assignment"
+    ):
+        s[3] = "xy"
+
+    custom = Python.evaluate(
+        """type('Custom', (), {
+        '__init__': lambda self: None,
+    })()"""
+    )
+    with assert_raises(
+        contains="'Custom' object does not support item assignment"
+    ):
+        custom[0] = 0
+
+    d = Python.evaluate("{}")
+    with assert_raises(contains="unhashable type: 'list'"):
+        d[[1, 2, 3]] = 5
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -423,3 +531,5 @@ def main():
     test_dict()
     test_none()
     test_nested_object()
+    test_getitem_raises()
+    test_setitem_raises()
