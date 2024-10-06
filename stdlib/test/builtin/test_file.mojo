@@ -281,6 +281,17 @@ def test_file_get_raw_fd():
     f3.close()
 
 
+def test_list_of_file_handles():
+    var f1 = open(Path(gettempdir().value()) / "test_file_dummy_1", "rw")
+    var f2 = open(Path(gettempdir().value()) / "test_file_dummy_2", "rw")
+    var f3 = open(Path(gettempdir().value()) / "test_file_dummy_3", "rw")
+
+    var files = List(f1, f2, f3)
+
+    for f in files:
+        print("test from file", file=f[]._get_raw_fd(), flush=True, end="")
+
+
 def main():
     test_file_read()
     test_file_read_multi()
@@ -295,3 +306,4 @@ def main():
     test_file_write_again()
     test_file_read_to_dtype_pointer()
     test_file_get_raw_fd()
+    test_list_of_file_handles()
