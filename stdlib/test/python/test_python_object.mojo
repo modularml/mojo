@@ -485,6 +485,38 @@ fn test_getitem_raises() raises:
         _ = with_2d[2]
 
 
+def test_setitem_raises():
+    t = Python.evaluate("(1,2,3)")
+    with assert_raises(
+        contains="'tuple' object does not support item assignment"
+    ):
+        t[0] = 0
+
+    lst = Python.evaluate("[1, 2, 3]")
+    with assert_raises(contains="list assignment index out of range"):
+        lst[10] = 4
+
+    s = Python.evaluate('"hello"')
+    with assert_raises(
+        contains="'str' object does not support item assignment"
+    ):
+        s[3] = "xy"
+
+    custom = Python.evaluate(
+        """type('Custom', (), {
+        '__init__': lambda self: None,
+    })()"""
+    )
+    with assert_raises(
+        contains="'Custom' object does not support item assignment"
+    ):
+        custom[0] = 0
+
+    d = Python.evaluate("{}")
+    with assert_raises(contains="unhashable type: 'list'"):
+        d[[1, 2, 3]] = 5
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -500,3 +532,4 @@ def main():
     test_none()
     test_nested_object()
     test_getitem_raises()
+    test_setitem_raises()

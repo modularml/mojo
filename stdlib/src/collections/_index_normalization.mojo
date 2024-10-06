@@ -13,37 +13,6 @@
 """The utilities provided in this module help normalize the access
 to data elements in arrays."""
 
-from sys import triple_is_nvidia_cuda
-from os import abort
-
-
-fn get_out_of_bounds_error_message[
-    container_name: StringLiteral
-](i: Int, container_length: Int) -> String:
-    if container_length == 0:
-        return (
-            "The "
-            + container_name
-            + " has a length of 0. Thus it's not possible to access its values"
-            " with an index but the index value "
-            + str(i)
-            + " was used. Aborting now to avoid an out-of-bounds access."
-        )
-    else:
-        return (
-            "The "
-            + container_name
-            + " has a length of "
-            + str(container_length)
-            + ". Thus the index provided should be between "
-            + str(-container_length)
-            + " (inclusive) and "
-            + str(container_length)
-            + " (exclusive) but the index value "
-            + str(i)
-            + " was used. Aborting now to avoid an out-of-bounds access."
-        )
-
 
 @always_inline
 fn normalize_index[
@@ -64,16 +33,24 @@ fn normalize_index[
     Returns:
         The normalized index value.
     """
-    var container_length = len(container)
-    if not (-container_length <= idx < container_length):
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            abort()
-        else:
-            abort(
-                get_out_of_bounds_error_message[container_name](
-                    idx, container_length
-                )
-            )
-    return idx + int(idx < 0) * container_length
+    debug_assert[assert_mode="safe", cpu_only=True](
+        len(container) > 0,
+        "indexing into a ",
+        container_name,
+        " that has 0 elements",
+    )
+    debug_assert[assert_mode="safe", cpu_only=True](
+        -len(container) <= idx < len(container),
+        container_name,
+        " has length: ",
+        len(container),
+        " index out of bounds: ",
+        idx,
+        " should be between ",
+        -len(container),
+        " and ",
+        len(container) - 1,
+    )
+    if idx >= 0:
+        return idx
+    return idx + len(container)
