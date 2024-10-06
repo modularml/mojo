@@ -26,7 +26,7 @@ from python import PythonObject
 
 from utils import (
     Span,
-    StaticIntTuple,
+    IndexList,
     StringRef,
     StringSlice,
     Variant,
@@ -1437,19 +1437,6 @@ struct String(
 
     @always_inline
     fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes, excluding null terminator.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return max(len(self._buffer) - 1, 0)
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
         """Get the string length in bytes.
 
         Returns:
