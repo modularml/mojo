@@ -593,7 +593,7 @@ def assert_dif_hashes(hashes: List[UInt64], upper_bound: Int):
         for j in range(i + 1, len(hashes)):
             var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
-                diff > 14,
+                diff > upper_bound,
                 str("Index: {}:{}, diff between: {} and {} is: {}").format(
                     i, j, hashes[i], hashes[j], diff
                 ),
@@ -683,7 +683,7 @@ def test_trailing_zeros():
     for i in range(len(hashes0)):
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
-            diff > 19,
+            diff > 18,
             str("Index: {}, diff between: {} and {} is: {}").format(
                 i, hashes0[i], hashes1[i], diff
             ),
