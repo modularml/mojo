@@ -253,6 +253,10 @@ what we publish.
   debug_assert(x > 0, “expected x to be more than 0 but got: ”, x)
   ```
 
+- The `StaticIntTuple` datastructure in the `utils` package has been renamed to
+  `IndexList`. The datastructure now allows one to specify the index bitwidth of
+  the elements along with whether the underlying indices are signed or unsigned.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -270,3 +274,5 @@ what we publish.
   doesn't extend the lifetimes of the values it references.
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
+
+- The variadic initializer for `SIMD` now works in parameter expressions.
