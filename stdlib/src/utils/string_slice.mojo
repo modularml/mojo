@@ -747,7 +747,7 @@ trait _Stringlike:
         """Get the string length in bytes.
 
         Returns:
-            The length of this StringLiteral in bytes.
+            The length of this string in bytes.
 
         Notes:
             This does not include the trailing null terminator in the count.
