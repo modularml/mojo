@@ -594,9 +594,9 @@ def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
             var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
                 diff > 14,
-                # str("Index: {}:{}, diff between: {} and {} is: {}").format(
-                #     i, j, hashes[i], hashes[j], diff
-                # ),
+                Stirng("Index: {}:{}, diff between: {} and {} is: {}").format(
+                    i, j, hashes[i], hashes[j], diff
+                ),
             )
 
 
@@ -660,9 +660,9 @@ def test_avalanche():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 16,
-            # str("Index: {}, diff between: {} and {} is: {}").format(
-            #     i, hashes0[i], hashes1[i], diff
-            # ),
+            Stirng("Index: {}, diff between: {} and {} is: {}").format(
+                i, hashes0[i], hashes1[i], diff
+            ),
         )
 
     assert_dif_hashes(hashes0, 14)
@@ -684,9 +684,9 @@ def test_trailing_zeros():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 19,
-            # str("Index: {}, diff between: {} and {} is: {}").format(
-            #     i, hashes0[i], hashes1[i], diff
-            # ),
+            Stirng("Index: {}, diff between: {} and {} is: {}").format(
+                i, hashes0[i], hashes1[i], diff
+            ),
         )
 
     assert_dif_hashes(hashes0, 18)
@@ -710,7 +710,9 @@ def assert_fill_factor[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor for  is , provided lower boound was ")
+        str("Fill factor for {} is {}, provided lower boound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
@@ -731,7 +733,9 @@ def assert_fill_factor_old_hash[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor for  is , provided lower bound was ")
+        str("Fill factor for {} is {}, provided lower bound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
