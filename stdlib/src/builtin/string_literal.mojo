@@ -23,8 +23,11 @@ from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from collections.string import _atol, StringRepresentable, _FormatCurlyEntry
-from utils.string_slice import _StringSliceIter
+from utils.string_slice import (
+    _StringSliceIter,
+    _FormatCurlyEntry,
+    _CurlyEntryFormattable,
+)
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -204,27 +207,25 @@ struct StringLiteral(
         """
         return len(self) != 0
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
-
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        If the string cannot be parsed as an int, an error is raised.
 
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return int(self.as_string_slice())
 
+    @always_inline
     fn __float__(self) raises -> Float64:
-        """Parses the string as a float point number and returns that value.
-
-        If the string cannot be parsed as a float, an error is raised.
+        """Parses the string as a float point number and returns that value. If
+        the string cannot be parsed as a float, an error is raised.
 
         Returns:
             A float value that represents the string, or otherwise raises.
         """
-        return atof(self)
+        return float(self.as_string_slice())
 
     @no_inline
     fn __str__(self) -> String:
@@ -372,7 +373,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
+    fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
         """Format a template with `*args`.
 
         Args:

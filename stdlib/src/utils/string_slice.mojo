@@ -22,14 +22,8 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils import Span
-from collections.string import (
-    _isspace,
-    _atol,
-    _atof,
-    _FormatCurlyEntry,
-    StringRepresentable,
-)
-from collections import List
+from collections.string import _isspace, _atol, _atof
+from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
@@ -464,6 +458,7 @@ struct StringSlice[
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
         If the string cannot be parsed as an int, an error is raised.
@@ -473,6 +468,7 @@ struct StringSlice[
         """
         return _atol(self._strref_dangerous())
 
+    @always_inline
     fn __float__(self) raises -> Float64:
         """Parses the string as a float point number and returns that value. If
         the string cannot be parsed as a float, an error is raised.
@@ -575,7 +571,7 @@ struct StringSlice[
         return StringSlice(unsafe_from_utf8=self._slice[abs_start:])
 
     @always_inline
-    fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
+    fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
         """Format a template with `*args`.
 
         Args:
@@ -726,3 +722,333 @@ struct StringSlice[
             current_offset += eol_location + eol_length
 
         return output^
+
+
+# ===----------------------------------------------------------------------===#
+# Format method structures
+# ===----------------------------------------------------------------------===#
+
+
+trait _CurlyEntryFormattable(Stringable, Representable):
+    """This trait is used by the `format()` method to support format specifiers.
+    Currently, it is a composition of both `Stringable` and `Representable`
+    traits i.e. a type to be formatted must implement both. In the future this
+    will be less constrained.
+    """
+
+    pass
+
+
+trait _Stringlike:
+    """Trait intended to be used only with `String`, `StringLiteral` and
+    `StringSlice`."""
+
+    fn byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
+        """
+        ...
+
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        ...
+
+
+@value
+struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
+    """The struct that handles string-like formatting by curly braces entries.
+    This is internal for the types: `String`, `StringLiteral` and `StringSlice`.
+    """
+
+    var first_curly: Int
+    """The index of an opening brace around a substitution field."""
+    var last_curly: Int
+    """The index of an closing brace around a substitution field."""
+    var conversion_flag: UInt8
+    """Store the format specifier in a byte (e.g., ord("r") for repr). It is
+    stored in a byte because every [format specifier](\
+    https://docs.python.org/3/library/string.html#formatspec) is an ASCII
+    character.
+    """
+    alias supported_conversion_flags = SIMD[DType.uint8, 2](ord("s"), ord("r"))
+    """Currently supported conversion flags: `__str__` and `__repr__`."""
+    alias _FieldVariantType = Variant[String, Int, NoneType, Bool]
+    """Purpose of the `Variant` `Self.field`:
+
+    - `Int` for manual indexing: (value field contains `0`).
+    - `NoneType` for automatic indexing: (value field contains `None`).
+    - `String` for **kwargs indexing: (value field contains `foo`).
+    - `Bool` for escaped curlies: (value field contains False for `{` or True
+        for `}`).
+    """
+    var field: Self._FieldVariantType
+    """Store the substitution field. See `Self._FieldVariantType` docstrings for
+    more details."""
+    alias _args_t = VariadicPack[element_trait=_CurlyEntryFormattable, *_]
+    """Args types that are formattable by curly entry."""
+
+    fn __init__(inout self, *, other: Self):
+        self.first_curly = other.first_curly
+        self.last_curly = other.last_curly
+        self.conversion_flag = other.conversion_flag
+        self.field = Self._FieldVariantType(other=other.field)
+
+    @always_inline
+    fn is_escaped_brace(ref [_]self) -> Bool:
+        return self.field.isa[Bool]()
+
+    @always_inline
+    fn is_kwargs_field(ref [_]self) -> Bool:
+        return self.field.isa[String]()
+
+    @always_inline
+    fn is_automatic_indexing(ref [_]self) -> Bool:
+        return self.field.isa[NoneType]()
+
+    @always_inline
+    fn is_manual_indexing(ref [_]self) -> Bool:
+        return self.field.isa[Int]()
+
+    @staticmethod
+    fn format[T: _Stringlike](fmt_src: T, args: Self._args_t) raises -> String:
+        alias len_pos_args = __type_of(args).__len__()
+        var entries = Self._create_entries(fmt_src, len_pos_args)
+        var fmt_len = fmt_src.byte_length()
+        # fully guessing the capacity here to be at least 8 bytes per entry
+        var buf = String._buffer_type(capacity=fmt_len + len(entries) * 8)
+        buf.size = 1
+        buf.unsafe_set(0, 0)
+        var res = String(buf^)
+        var offset = 0
+        var ptr = fmt_src.unsafe_ptr()
+        alias S = StringSlice[ImmutableAnyLifetime]
+
+        @always_inline("nodebug")
+        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+
+        var auto_arg_index = 0
+        for e in entries:
+            debug_assert(offset < fmt_len, "offset >= self.byte_length()")
+            res += _build_slice(ptr, offset, e[].first_curly)
+            Self._format_entry[len_pos_args](res, e[], auto_arg_index, args)
+            offset = e[].last_curly + 1
+
+        if offset < fmt_len:
+            res += _build_slice(ptr, offset, fmt_len)
+
+        return res^
+
+    @staticmethod
+    fn _create_entries[
+        T: _Stringlike
+    ](fmt_src: T, len_pos_args: Int) raises -> List[Self]:
+        var manual_indexing_count = 0
+        var automatic_indexing_count = 0
+        var raised_manual_index = Optional[Int](None)
+        var raised_automatic_index = Optional[Int](None)
+        var raised_kwarg_field = Optional[String](None)
+        alias `}` = UInt8(ord("}"))
+        alias `{` = UInt8(ord("{"))
+
+        var entries = List[Self]()
+        var start = Optional[Int](None)
+        var skip_next = False
+        var fmt_ptr = fmt_src.unsafe_ptr()
+        var fmt_len = fmt_src.byte_length()
+
+        for i in range(fmt_len):
+            if skip_next:
+                skip_next = False
+                continue
+            if fmt_ptr[i] == `{`:
+                if not start:
+                    start = i
+                    continue
+                if i - start.value() != 1:
+                    raise Error(
+                        "there is a single curly { left unclosed or unescaped"
+                    )
+                # python escapes double curlies
+                var current_entry = Self(
+                    first_curly=start.value(),
+                    last_curly=i,
+                    field=False,
+                    conversion_flag=0,
+                )
+                entries.append(current_entry^)
+                start = None
+                continue
+            elif fmt_ptr[i] == `}`:
+                if not start and (i + 1) < fmt_len:
+                    # python escapes double curlies
+                    if fmt_ptr[i + 1] == `}`:
+                        var current_entry = Self(
+                            first_curly=i,
+                            last_curly=i + 1,
+                            field=True,
+                            conversion_flag=0,
+                        )
+                        entries.append(current_entry^)
+                        skip_next = True
+                        continue
+                elif not start:  # if it is not an escaped one, it is an error
+                    raise Error(
+                        "there is a single curly } left unclosed or unescaped"
+                    )
+
+                var start_value = start.value()
+                var current_entry = Self(
+                    first_curly=start_value,
+                    last_curly=i,
+                    field=NoneType(),
+                    conversion_flag=0,
+                )
+
+                if i - start_value != 1:
+                    if current_entry._handle_field_and_break(
+                        fmt_src,
+                        len_pos_args,
+                        i,
+                        start_value,
+                        automatic_indexing_count,
+                        raised_automatic_index,
+                        manual_indexing_count,
+                        raised_manual_index,
+                        raised_kwarg_field,
+                    ):
+                        break
+                else:
+                    # automatic indexing
+                    # current_entry.field is already None
+                    if automatic_indexing_count >= len_pos_args:
+                        raised_automatic_index = automatic_indexing_count
+                        break
+                    automatic_indexing_count += 1
+                entries.append(current_entry^)
+                start = None
+
+        if raised_automatic_index:
+            raise Error("Automatic indexing require more args in *args")
+        elif raised_kwarg_field:
+            var val = raised_kwarg_field.value()
+            raise Error("Index " + val + " not in kwargs")
+        elif manual_indexing_count and automatic_indexing_count:
+            raise Error("Cannot both use manual and automatic indexing")
+        elif raised_manual_index:
+            var val = str(raised_manual_index.value())
+            raise Error("Index " + val + " not in *args")
+        elif start:
+            raise Error("there is a single curly { left unclosed or unescaped")
+
+        return entries^
+
+    fn _handle_field_and_break[
+        T: _Stringlike
+    ](
+        inout self,
+        fmt_src: T,
+        len_pos_args: Int,
+        i: Int,
+        start_value: Int,
+        inout automatic_indexing_count: Int,
+        inout raised_automatic_index: Optional[Int],
+        inout manual_indexing_count: Int,
+        inout raised_manual_index: Optional[Int],
+        inout raised_kwarg_field: Optional[String],
+    ) raises -> Bool:
+        alias S = StringSlice[ImmutableAnyLifetime]
+
+        @always_inline("nodebug")
+        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+
+        var field = _build_slice(fmt_src.unsafe_ptr(), start_value + 1, i)
+        var field_b_len = i - (start_value + 1)
+        # FIXME(#3526): this will break once find works with unicode codepoints
+        var exclamation_index = field.find("!")
+
+        # TODO: Future implementation of format specifiers
+        # When implementing format specifiers, modify this section to handle:
+        # replacement_field ::= "{" [field_name] ["!" conversion] [":" format_spec] "}"
+        # this will involve:
+        # 1. finding a colon ':' after the conversion flag (if present)
+        # 2. extracting the format_spec if a colon is found
+        # 3. adjusting the field and conversion_flag parsing accordingly
+
+        if exclamation_index != -1:
+            var new_idx = exclamation_index + 1
+            if new_idx >= field_b_len:
+                raise Error("Empty conversion flag.")
+            var f_ptr = field.unsafe_ptr()
+            var conversion_flag = f_ptr[new_idx]
+            if field_b_len - new_idx > 1 or (
+                conversion_flag not in Self.supported_conversion_flags
+            ):
+                var f = String(_build_slice(f_ptr, new_idx, field_b_len))
+                _ = field^
+                raise Error('Conversion flag "' + f + '" not recognised.')
+            self.conversion_flag = conversion_flag
+            field = _build_slice(field.unsafe_ptr(), 0, exclamation_index)
+
+        if field.byte_length() == 0:
+            # an empty field, so it's automatic indexing
+            if automatic_indexing_count >= len_pos_args:
+                raised_automatic_index = automatic_indexing_count
+                return True
+            automatic_indexing_count += 1
+        else:
+            try:
+                # field is a number for manual indexing:
+                var number = int(field)
+                self.field = number
+                if number >= len_pos_args or number < 0:
+                    raised_manual_index = number
+                    return True
+                manual_indexing_count += 1
+            except e:
+                debug_assert(
+                    "not convertible to integer" in str(e),
+                    "Not the expected error from atol",
+                )
+                # field is a keyword for **kwargs:
+                var f = str(field)
+                self.field = f
+                raised_kwarg_field = f
+                return True
+        return False
+
+    @staticmethod
+    fn _format_entry[
+        len_pos_args: Int
+    ](inout res: String, e: Self, inout auto_idx: Int, args: Self._args_t):
+        # TODO(#3403 or #3252): this function should be able to use Formatter syntax
+        # when the type implements it, since it will give great perf. benefits
+        alias `r` = UInt8(ord("r"))
+
+        @parameter
+        fn _format(idx: Int):
+            @parameter
+            for i in range(len_pos_args):
+                if i == idx:
+                    if e.conversion_flag == `r`:
+                        res += repr(args[i])
+                    else:
+                        res += str(args[i])
+
+        if e.is_escaped_brace():
+            res += "}" if e.field[Bool] else "{"
+        elif e.is_manual_indexing():
+            _format(e.field[Int])
+        elif e.is_automatic_indexing():
+            _format(auto_idx)
+            auto_idx += 1
