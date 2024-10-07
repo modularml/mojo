@@ -2064,8 +2064,7 @@ struct String(
         var current_automatic_arg_index = 0
         for e in entries:
             debug_assert(offset < s_len, "offset >= self.byte_length()")
-            # FIXME(#3591): remove String constructor once it lands
-            res += String(_build_slice(ptr, offset, e[].first_curly))
+            res += _build_slice(ptr, offset, e[].first_curly)
 
             if e[].is_escaped_brace():
                 res += "}" if e[].field[Bool] else "{"
@@ -2095,8 +2094,7 @@ struct String(
             offset = e[].last_curly + 1
 
         if offset < s_len:
-            # FIXME(#3591): remove String constructor once it lands
-            res += String(_build_slice(ptr, offset, s_len))
+            res += _build_slice(ptr, offset, s_len)
 
         return res^
 
