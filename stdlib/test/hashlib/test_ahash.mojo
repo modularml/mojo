@@ -699,7 +699,6 @@ def assert_fill_factor[
     # A perfect hash function is when the number of buckets is equal to number of words
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
-    assert_equal(len(buckets), num_buckets)
     for w in words:
         var h = hash(w[].unsafe_ptr(), w[].byte_length())
         buckets[h % num_buckets] += 1
@@ -723,7 +722,6 @@ def assert_fill_factor_old_hash[
     # A perfect hash function is when the number of buckets is equal to number of words
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
-    assert_equal(len(buckets), num_buckets)
     for w in words:
         var h = old_hash(w[].unsafe_ptr(), w[].byte_length())
         buckets[h % num_buckets] += 1

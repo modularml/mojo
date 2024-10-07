@@ -1405,7 +1405,7 @@ def test_format_args():
 
     with assert_raises(contains=curly("}")):
         _ = String("}").format(1)
-    
+
     with assert_raises(contains=""):
         _ = String("{}").format()
 

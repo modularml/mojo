@@ -817,6 +817,7 @@ def test_list_mult():
     assert_equal(len(l), 3)
     assert_equal("[0, 0, 0]", l.__str__())
 
+
 def test_list_contains():
     var x = List[Int](1, 2, 3)
     assert_false(0 in x)
