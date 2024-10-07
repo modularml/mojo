@@ -2021,6 +2021,7 @@ struct String(
             )
         return String(buf^)
 
+    @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
         """Format a template with `*args`.
 
