@@ -1382,40 +1382,32 @@ def test_format_args():
     var s = String(" {} , {} {} !").format("Hello", "Beautiful", "World")
     assert_equal(s, " Hello , Beautiful World !")
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    fn curly(c: StringLiteral) -> StringLiteral:
+        return "there is a single curly " + c + " left unclosed or unescaped"
+
+    with assert_raises(contains=curly("{")):
         _ = String("{ {}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{ {0}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{}{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("{}}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{} {").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("}").format(1)
+    
+    with assert_raises(contains=""):
+        _ = String("{}").format()
 
     assert_equal(String("}}").format(), "}")
     assert_equal(String("{{").format(), "{")

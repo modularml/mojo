@@ -594,7 +594,7 @@ def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
             var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
                 diff > 14,
-                String("Index: {}:{}, diff between: {} and {} is: {}").format(
+                str("Index: {}:{}, diff between: {} and {} is: {}").format(
                     i, j, hashes[i], hashes[j], diff
                 ),
             )
@@ -660,7 +660,7 @@ def test_avalanche():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 16,
-            String("Index: {}, diff between: {} and {} is: {}").format(
+            str("Index: {}, diff between: {} and {} is: {}").format(
                 i, hashes0[i], hashes1[i], diff
             ),
         )
@@ -684,7 +684,7 @@ def test_trailing_zeros():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 19,
-            String("Index: {}, diff between: {} and {} is: {}").format(
+            str("Index: {}, diff between: {} and {} is: {}").format(
                 i, hashes0[i], hashes1[i], diff
             ),
         )
