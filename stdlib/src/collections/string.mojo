@@ -2045,8 +2045,6 @@ struct String(
         ```
         .
         """
-        # TODO(#3403 or #3252): this function should be able to use Formatter syntax
-        # when the type implements it, since it will give great perf. benefits
         alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
         var s_len = self.byte_length()
@@ -2054,7 +2052,6 @@ struct String(
         var res = Self(Self._buffer_type(capacity=s_len + len(entries) * 8))
         var offset = 0
         var ptr = self.unsafe_ptr()
-        alias `r` = UInt8(ord("r"))
         alias S = StringSlice[__lifetime_of(self)]
 
         @always_inline("nodebug")
@@ -2065,32 +2062,9 @@ struct String(
         for e in entries:
             debug_assert(offset < s_len, "offset >= self.byte_length()")
             res += _build_slice(ptr, offset, e[].first_curly)
-
-            if e[].is_escaped_brace():
-                res += "}" if e[].field[Bool] else "{"
-
-            if e[].is_manual_indexing():
-
-                @parameter
-                for i in range(num_pos_args):
-                    if i == e[].field[Int]:
-                        if e[].conversion_flag == `r`:
-                            res += repr(args[i])
-                        else:
-                            res += str(args[i])
-
-            if e[].is_automatic_indexing():
-
-                @parameter
-                for i in range(num_pos_args):
-                    if i == current_automatic_arg_index:
-                        if e[].conversion_flag == `r`:
-                            res += repr(args[i])
-                        else:
-                            res += str(args[i])
-
-                current_automatic_arg_index += 1
-
+            _FormatCurlyEntry.format_entry[num_pos_args](
+                res, e[], current_automatic_arg_index, args
+            )
             offset = e[].last_curly + 1
 
         if offset < s_len:
@@ -2597,3 +2571,34 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 raised_kwarg_field = f
                 return True
         return False
+
+    @staticmethod
+    fn format_entry[
+        num_pos_args: Int
+    ](
+        inout res: String,
+        e: Self,
+        inout current_automatic_arg_index: Int,
+        args: VariadicPack[element_trait=StringRepresentable, *_],
+    ):
+        # TODO(#3403 or #3252): this function should be able to use Formatter syntax
+        # when the type implements it, since it will give great perf. benefits
+        alias `r` = UInt8(ord("r"))
+
+        @parameter
+        fn _format(idx: Int):
+            @parameter
+            for i in range(num_pos_args):
+                if i == idx:
+                    if e.conversion_flag == `r`:
+                        res += repr(args[i])
+                    else:
+                        res += str(args[i])
+
+        if e.is_escaped_brace():
+            res += "}" if e.field[Bool] else "{"
+        elif e.is_manual_indexing():
+            _format(e.field[Int])
+        elif e.is_automatic_indexing():
+            _format(current_automatic_arg_index)
+            current_automatic_arg_index += 1
