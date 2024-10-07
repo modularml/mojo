@@ -1,6 +1,7 @@
 # Resyntaxing argument conventions and References
 
 Date: October 2024
+
 Previous revision: [[June 2023](https://github.com/modularml/mojo/blob/f8d7cb8ba4c21ec3fbc87e21609b3fd56cab695f/proposals/lifetimes-keyword-renaming.md)]
 
 The design of the Mojo references subsystem is starting to come together.  To
@@ -38,13 +39,14 @@ following argument conventions:
    reference to another value with an inferred lifetime.
 2) `inout`: This argument convention is a mutable reference to a value from a
    caller with an inferred lifetime.
-3) `ref [lifetime]`: this argument convention allows either a mutable or
-   immutable reference with a specified lifetime.  It can be used with `ref [_]`
-   to infer an arbitrary lifetime.
-4) `owned`: This argument convention provides a mutable reference to value that
+3) `ref [lifetime]`: this argument convention allows a reference to something of
+   the specified lifetime, the lifetime specifies the mutability requirements.
+4) `ref [_]`: this is a shorthand for binding a reference to an anonymous
+   lifetime with any mutability.
+5) `owned`: This argument convention provides a mutable reference to value that
    the callee may need to destroy.  I'd like to ignore this convention for the
    purposes of this document to keep it focused.
-5) `fn __init__(inout self)`: Mojo has a special hack that allows (and requires)
+6) `fn __init__(inout self)`: Mojo has a special hack that allows (and requires)
    one to write the `self` argument on init functions as `inout`.  This doesn't
    make sense because the value isn't live-in, and indeed you will see poor
    error messages with code like `var x: fn (inout Foo) -> None = Foo.__init__`.
@@ -58,22 +60,26 @@ In addition, Mojo functions have the following return syntax:
    was to follow Python pattern syntax, but it is weird and we can't allow other
    pattern syntax here.
 
-I suggest we rename `borrowed` to `ref` (without square brackets), rename
-`inout` to `mut` and introduce a new `out` convention.  Such a change will
+I suggest we rename `borrowed` to `immref` (without square brackets), rename
+`inout` to `mutref` and introduce a new `out` convention.  Such a change will
 give us:
 
-1) `ref`: This is the implicit convention that provides an immutable
-   reference to another value with an inferred lifetime.
-2) `mut`: This argument convention is a mutable reference to a value from a
+1) `immref`: This is convention provides an immutable reference to another value
+   with an inferred lifetime.  As with `borrowed` it is allowed, but will never
+   be written in practice.
+2) `mutref`: This argument convention is a mutable reference to a value from a
    callee with an inferred lifetime.
 3) `ref [lifetime]`: **No change:** this works as it does today.
-4) `owned`: **No change:** unrelated to this proposal, let's stay focused.
-5) `fn __init__(out self)`: The `__init__` function takes `self` as
+4) `ref`: Bind to an arbitrary reference with inferred lifetime and mutability,
+   this is the same as `ref [_]`.
+5) `owned`: **No change:** unrelated to this proposal, let's stay focused.
+6) `fn __init__(out self)`: The `__init__` function takes `self` as
    uninitialized memory and returns it initialized (when an error isn't thrown)
    which means it's a named output.  Let's call it `out`, which will allow one
    to write `var x: fn (out Foo) -> None = Foo.__init__` as you'd expect.
 
-I don't see a reason to allow `mut [lifetime]`: the only use-case would be if
+I don't see a reason to allow explicit lifetime specifications on `immref` and
+`mutref`, e.g. `mutref [lifetime]`. The only use-case would be if
 you'd want to explicitly declare lifetime as a parameter, but I'm not sure why
 that is useful (vs inferring it).  We can evaluate adding it if there is a
 compelling reason to over time.
@@ -89,7 +95,7 @@ Finally, let's align the result syntax:
    function definition from the type specification.  The later is very pretty,
    would provide a path to "real" multiple return values, and would make the
    model consistent with `__init__` but has implementation risk that we'd have
-   to explore.
+   to explore.  In any case, this isn't really core to the rest of the proposal.
 
 As a benefit of these changes, we'd get rid of the `borrowed` terminology, which
 is loaded with Rust semantics that we don't carry, and get rid of the `inout`
@@ -98,13 +104,14 @@ in/out.
 
 ### Alternatives considered
 
-I expect the biggest bikeshed to be around the `mut` keyword.  The benefits of
-its name is that it is short.  The major downside of it is that it doesn't
-convey that it is a reference.
+I expect the biggest bikeshed to be around the `mutref` keyword.  The benefits
+of its name is that it is clear that this is a reference, keeps in aligned with
+`ref` in other parts of the language, and is short.
 
 We might consider instead:
 
-- `mutref`: This clarifies that this is a reference.
+- `mut`: This is shorter, but loses that this is a reference.  Also the name
+  `imm` for the borrowed replacement would be a bit odd.
 - `mut ref`: we could use a space, but this seems like unnecessary verbosity
   and I don't see an advantage over `mutref`.
 
@@ -186,10 +193,14 @@ them:
 - `Target`: very generic.
 - `Provenance`: verbose and technical.
 
+Furthermore if we're taking "mut" and "imm" as the root word for references, we
+should decide if we're enshrining that as a [term of art](https://www.swift.org/documentation/api-design-guidelines/#use-terminology-well)
+in Mojo.  If so, we should use names like `MutOrigin` and `ImmOrigin`.
+
 ## Implementation
 
 All of these changes can be done in a way that is effectively additive: we need
-to take `mut` as a new keyword, but otherwise we can accept the new and the
+to take `mutref` as a new keyword, but otherwise we can accept the new and the
 old syntax in the 24.6 release and then remove the old syntax in subsequent
 releases.
 
