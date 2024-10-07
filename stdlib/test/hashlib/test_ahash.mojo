@@ -660,9 +660,9 @@ def test_avalanche():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 16,
-            # str("Index: {}, diff between: {} and {} is: {}").format(
-            #     i, hashes0[i], hashes1[i], diff
-            # ),
+            str("Index: {}, diff between: {} and {} is: {}").format(
+                i, hashes0[i], hashes1[i], diff
+            ),
         )
 
     assert_dif_hashes(hashes0, 14)
