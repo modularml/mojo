@@ -2045,8 +2045,8 @@ struct String(
         ```
         .
         """
-        alias num_pos_args = len(VariadicList(Ts))
-        var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
+        alias len_pos_args = len(VariadicList(Ts))
+        var entries = _FormatCurlyEntry.create_entries(self, len_pos_args)
         var s_len = self.byte_length()
         # fully guessing the capacity here to be at least 8 bytes per entry
         var res = Self(Self._buffer_type(capacity=s_len + len(entries) * 8))
@@ -2062,7 +2062,7 @@ struct String(
         for e in entries:
             debug_assert(offset < s_len, "offset >= self.byte_length()")
             res += _build_slice(ptr, offset, e[].first_curly)
-            _FormatCurlyEntry.format_entry[num_pos_args](
+            _FormatCurlyEntry.format_entry[len_pos_args](
                 res, e[], current_automatic_arg_index, args
             )
             offset = e[].last_curly + 1
@@ -2574,7 +2574,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     @staticmethod
     fn format_entry[
-        num_pos_args: Int
+        len_pos_args: Int
     ](
         inout res: String,
         e: Self,
@@ -2588,7 +2588,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         @parameter
         fn _format(idx: Int):
             @parameter
-            for i in range(num_pos_args):
+            for i in range(len_pos_args):
                 if i == idx:
                     if e.conversion_flag == `r`:
                         res += repr(args[i])

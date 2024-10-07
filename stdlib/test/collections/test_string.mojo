@@ -1379,14 +1379,8 @@ def test_format_args():
     with assert_raises(contains="Index first not in kwargs"):
         _ = String("A {first} B {second}").format(1, 2)
 
-    assert_equal(
-        String(" {} , {} {} !").format(
-            "Hello",
-            "Beautiful",
-            "World",
-        ),
-        " Hello , Beautiful World !",
-    )
+    var s = String(" {} , {} {} !").format("Hello", "Beautiful", "World")
+    assert_equal(s, " Hello , Beautiful World !")
 
     with assert_raises(
         contains="there is a single curly { left unclosed or unescaped"
@@ -1452,13 +1446,8 @@ def test_format_args():
     output = String(vinput).format()
     assert_equal(len(output), 0)
 
-    assert_equal(
-        String("{0} {1} ❤️‍🔥 {1} {0}").format(
-            "🔥",
-            "Mojo",
-        ),
-        "🔥 Mojo ❤️‍🔥 Mojo 🔥",
-    )
+    var res = "🔥 Mojo ❤️‍🔥 Mojo 🔥"
+    assert_equal(String("{0} {1} ❤️‍🔥 {1} {0}").format("🔥", "Mojo"), res)
 
     assert_equal(String("{0} {1}").format(True, 1.125), "True 1.125")
 
