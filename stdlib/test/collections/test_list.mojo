@@ -813,6 +813,9 @@ def test_list_mult():
     assert_equal(len(l), 0)
     assert_equal(len(List[Int](1, 2, 3) * 0), 0)
 
+    l = List[Int](0) * 3
+    assert_equal(len(l), 3)
+    assert_equal("[0, 0, 0]", l.__str__())
 
 def test_list_contains():
     var x = List[Int](1, 2, 3)

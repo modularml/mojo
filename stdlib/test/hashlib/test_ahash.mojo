@@ -594,9 +594,9 @@ def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
             var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
                 diff > 14,
-                str("Index: {}:{}, diff between: {} and {} is: {}").format(
-                    i, j, hashes[i], hashes[j], diff
-                ),
+                # str("Index: {}:{}, diff between: {} and {} is: {}").format(
+                #     i, j, hashes[i], hashes[j], diff
+                # ),
             )
 
 
@@ -660,9 +660,9 @@ def test_avalanche():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 16,
-            str("Index: {}, diff between: {} and {} is: {}").format(
-                i, hashes0[i], hashes1[i], diff
-            ),
+            # str("Index: {}, diff between: {} and {} is: {}").format(
+            #     i, hashes0[i], hashes1[i], diff
+            # ),
         )
 
     assert_dif_hashes(hashes0, 14)
@@ -684,9 +684,9 @@ def test_trailing_zeros():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 19,
-            str("Index: {}, diff between: {} and {} is: {}").format(
-                i, hashes0[i], hashes1[i], diff
-            ),
+            # str("Index: {}, diff between: {} and {} is: {}").format(
+            #     i, hashes0[i], hashes1[i], diff
+            # ),
         )
 
     assert_dif_hashes(hashes0, 18)
@@ -701,6 +701,7 @@ def assert_fill_factor[
     var buckets = List[Int](0) * num_buckets
     for w in words:
         var h = hash(w[].unsafe_ptr(), w[].byte_length())
+        assert_true(h % num_buckets > 0)
         buckets[h % num_buckets] += 1
     var unfilled = 0
     for v in buckets:
@@ -710,9 +711,9 @@ def assert_fill_factor[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor for {} is {}, provided lower boound was {}").format(
-            label, fill_factor, lower_bound
-        ),
+        # str("Fill factor for {} is {}, provided lower boound was {}").format(
+        #     label, fill_factor, lower_bound
+        # ),
     )
 
 
@@ -724,6 +725,7 @@ def assert_fill_factor_old_hash[
     var buckets = List[Int](0) * num_buckets
     for w in words:
         var h = old_hash(w[].unsafe_ptr(), w[].byte_length())
+        assert_true(h % num_buckets > 0)
         buckets[h % num_buckets] += 1
     var unfilled = 0
     for v in buckets:
@@ -733,9 +735,9 @@ def assert_fill_factor_old_hash[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor for {} is {}, provided lower bound was {}").format(
-            label, fill_factor, lower_bound
-        ),
+        # str("Fill factor for {} is {}, provided lower bound was {}").format(
+        #     label, fill_factor, lower_bound
+        # ),
     )
 
 

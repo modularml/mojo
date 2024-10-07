@@ -2047,8 +2047,6 @@ struct String(
         """
         alias len_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, len_pos_args)
-        if len(entries) == 0:
-            return self
         var s_len = self.byte_length()
         # fully guessing the capacity here to be at least 8 bytes per entry
         var res = Self(Self._buffer_type(capacity=s_len + len(entries) * 8))
