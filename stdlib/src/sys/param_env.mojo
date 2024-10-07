@@ -96,7 +96,7 @@ fn env_get_int[name: StringLiteral, default: Int]() -> Int:
     - `mojo run -D favorite_number=2 app.mojo`
     - `mojo run -D app.mojo`
 
-    Note: useful for parametrizing SIMD vector sizes.
+    Note: useful for parameterizing SIMD vector sizes.
     """
 
     @parameter
