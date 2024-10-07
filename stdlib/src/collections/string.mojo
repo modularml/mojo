@@ -2045,35 +2045,7 @@ struct String(
         ```
         .
         """
-        alias len_pos_args = len(VariadicList(Ts))
-        var entries = _FormatCurlyEntry.create_entries(self, len_pos_args)
-        var s_len = self.byte_length()
-        # fully guessing the capacity here to be at least 8 bytes per entry
-        var buf = Self._buffer_type(capacity=s_len + len(entries) * 8)
-        buf.size = 1
-        buf.unsafe_set(0, 0)
-        var res = Self(buf^)
-        var offset = 0
-        var ptr = self.unsafe_ptr()
-        alias S = StringSlice[__lifetime_of(self)]
-
-        @always_inline("nodebug")
-        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
-            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
-
-        var current_automatic_arg_index = 0
-        for e in entries:
-            debug_assert(offset < s_len, "offset >= self.byte_length()")
-            res += _build_slice(ptr, offset, e[].first_curly)
-            _FormatCurlyEntry.format_entry[len_pos_args](
-                res, e[], current_automatic_arg_index, args
-            )
-            offset = e[].last_curly + 1
-
-        if offset < s_len:
-            res += _build_slice(ptr, offset, s_len)
-
-        return res^
+        return _FormatCurlyEntry.format(self, args)
 
     fn isdigit(self) -> Bool:
         """A string is a digit string if all characters in the string are digits
@@ -2340,6 +2312,30 @@ trait StringRepresentable(Stringable, Representable):
     pass
 
 
+trait _Stringlike:
+    """Trait intended to be used only with `String`, `StringLiteral` and
+    `StringSlice`."""
+
+    fn byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
+        """
+        ...
+
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        ...
+
+
 @value
 struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     """Internally used by the `format()` method. Specifically to structure
@@ -2390,9 +2386,43 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[Int]()
 
     @staticmethod
-    fn create_entries(
-        format_src: String, len_pos_args: Int
-    ) raises -> List[Self]:
+    fn format[
+        T: _Stringlike
+    ](
+        format_src: T, args: VariadicPack[element_trait=StringRepresentable, *_]
+    ) raises -> String:
+        alias len_pos_args = __type_of(args).__len__()
+        var entries = Self.create_entries(format_src, len_pos_args)
+        var fmt_len = format_src.byte_length()
+        # fully guessing the capacity here to be at least 8 bytes per entry
+        var buf = String._buffer_type(capacity=fmt_len + len(entries) * 8)
+        buf.size = 1
+        buf.unsafe_set(0, 0)
+        var res = String(buf^)
+        var offset = 0
+        var ptr = format_src.unsafe_ptr()
+        alias S = StringSlice[ImmutableAnyLifetime]
+
+        @always_inline("nodebug")
+        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+
+        var auto_arg_index = 0
+        for e in entries:
+            debug_assert(offset < fmt_len, "offset >= self.byte_length()")
+            res += _build_slice(ptr, offset, e[].first_curly)
+            Self.format_entry[len_pos_args](res, e[], auto_arg_index, args)
+            offset = e[].last_curly + 1
+
+        if offset < fmt_len:
+            res += _build_slice(ptr, offset, fmt_len)
+
+        return res^
+
+    @staticmethod
+    fn create_entries[
+        T: _Stringlike
+    ](format_src: T, len_pos_args: Int) raises -> List[Self]:
         """Used internally by the `format()` method.
 
         Args:
@@ -2502,9 +2532,11 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         return entries^
 
-    fn _handle_field_and_break(
+    fn _handle_field_and_break[
+        T: _Stringlike
+    ](
         inout self,
-        format_src: String,
+        format_src: T,
         len_pos_args: Int,
         i: Int,
         start_value: Int,
@@ -2514,7 +2546,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         inout raised_manual_index: Optional[Int],
         inout raised_kwarg_field: Optional[String],
     ) raises -> Bool:
-        alias S = StringSlice[__lifetime_of(self)]
+        alias S = StringSlice[ImmutableAnyLifetime]
 
         @always_inline("nodebug")
         fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:

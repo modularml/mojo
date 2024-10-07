@@ -23,7 +23,8 @@ from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from collections.string import _atol, _StringSliceIter
+from collections.string import _atol, StringRepresentable, _FormatCurlyEntry
+from utils.string_slice import _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -369,6 +370,31 @@ struct StringLiteral(
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
+
+    @always_inline
+    fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
+        """Format a template with `*args`.
+
+        Args:
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of substitution values that implement `Stringable`.
+
+        Returns:
+            The template with the given values substituted.
+
+        Examples:
+
+        ```mojo
+        # Manual indexing:
+        print("{0} {1} {0}".format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print("{} {}".format(True, "hello world")) # True hello world
+        ```
+        .
+        """
+        return _FormatCurlyEntry.format(self, args)
 
     fn format_to(self, inout writer: Formatter):
         """

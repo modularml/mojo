@@ -22,7 +22,13 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils import Span
-from collections.string import _isspace, _atol, _atof
+from collections.string import (
+    _isspace,
+    _atol,
+    _atof,
+    _FormatCurlyEntry,
+    StringRepresentable,
+)
 from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
@@ -567,6 +573,31 @@ struct StringSlice[
         # When we support utf-8 slicing, we should drop self._slice[abs_start:]
         # and use something smarter.
         return StringSlice(unsafe_from_utf8=self._slice[abs_start:])
+
+    @always_inline
+    fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
+        """Format a template with `*args`.
+
+        Args:
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of substitution values that implement `Stringable`.
+
+        Returns:
+            The template with the given values substituted.
+
+        Examples:
+
+        ```mojo
+        # Manual indexing:
+        print("{0} {1} {0}".format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print("{} {}".format(True, "hello world")) # True hello world
+        ```
+        .
+        """
+        return _FormatCurlyEntry.format(self, args)
 
     fn find(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
