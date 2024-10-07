@@ -710,8 +710,7 @@ def assert_fill_factor[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor for  is , provided lower boound was ").format(
-        ),
+        str("Fill factor for  is , provided lower boound was ")
     )
 
 
@@ -732,8 +731,7 @@ def assert_fill_factor_old_hash[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        str("Fill factor for  is , provided lower bound was ").format(
-        ),
+        str("Fill factor for  is , provided lower bound was ")
     )
 
 
