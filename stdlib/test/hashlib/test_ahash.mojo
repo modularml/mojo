@@ -591,12 +591,14 @@ def dif_bits(i1: UInt, i2: UInt) -> Int:
 def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
     for i in range(len(hashes)):
         for j in range(i + 1, len(hashes)):
-            var diff = dif_bits(hashes[i], hashes[j])
+            var i_val = hashes[i]
+            var j_val = hashes[j]
+            var diff = dif_bits(i_val, j_val)
             assert_true(
                 diff > 14,
-                # str("Index: {}:{}, diff between: {} and {} is: {}").format(
-                #     i, j, hashes[i], hashes[j], diff
-                # ),
+                str("Index: {}:{}, diff between: {} and {} is: {}").format(
+                    i, j, i_val, j_val, diff
+                ),
             )
 
 
