@@ -742,7 +742,7 @@ struct String(
             impl: The buffer.
         """
         debug_assert(
-            impl[-1] == 0,
+            len(impl) > 0 and impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
         # We make a backup because steal_data() will clear size and capacity.
@@ -2049,7 +2049,10 @@ struct String(
         var entries = _FormatCurlyEntry.create_entries(self, len_pos_args)
         var s_len = self.byte_length()
         # fully guessing the capacity here to be at least 8 bytes per entry
-        var res = Self(Self._buffer_type(capacity=s_len + len(entries) * 8))
+        var buf = Self._buffer_type(capacity=s_len + len(entries) * 8)
+        buf.size = 1
+        buf.unsafe_set(0, 0)
+        var res = Self(buf^)
         var offset = 0
         var ptr = self.unsafe_ptr()
         alias S = StringSlice[__lifetime_of(self)]

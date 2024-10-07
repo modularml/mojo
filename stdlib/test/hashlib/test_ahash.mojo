@@ -16,7 +16,7 @@ from bit import pop_count
 from hashlib._ahash import hash
 from hashlib.hash import hash as old_hash
 from testing import assert_equal, assert_not_equal, assert_true
-from memory import memset_zero, UnsafePointer
+from memory import memset_zero, stack_allocation
 from time import now
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
@@ -573,7 +573,7 @@ you, утра, боль, хорошие, пришёл, открой, брось,
 fn gen_word_pairs[words: String = words_en]() -> List[String]:
     var result = List[String]()
     try:
-        var list = words.split(",")
+        var list = words.split(", ")
         for w in list:
             var w1 = w[].strip()
             for w in list:
@@ -594,9 +594,9 @@ def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
             var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
                 diff > 14,
-                # str("Index: {}:{}, diff between: {} and {} is: {}").format(
-                #     i, j, hashes[i], hashes[j], diff
-                # ),
+                str("Index: {}:{}, diff between: {} and {} is: {}").format(
+                    i, j, hashes[i], hashes[j], diff
+                ),
             )
 
 
@@ -642,7 +642,7 @@ def test_hash_byte_array():
 def test_avalanche():
     # test that values which differ just in one bit,
     # produce significatly different hash values
-    var data = UnsafePointer[UInt8].alloc(256)
+    var data = stack_allocation[256, UInt8]()
     memset_zero(data, 256)
     var hashes0 = List[UInt]()
     var hashes1 = List[UInt]()
@@ -672,7 +672,7 @@ def test_avalanche():
 def test_trailing_zeros():
     # checks that a value with different amount of trailing zeros,
     # results in significantly different hash values
-    var data = UnsafePointer[UInt8].alloc(8)
+    var data = stack_allocation[8, UInt8]()
     data[0] = 23
     var hashes0 = List[UInt]()
     var hashes1 = List[UInt]()
@@ -684,9 +684,9 @@ def test_trailing_zeros():
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
             diff > 19,
-            # str("Index: {}, diff between: {} and {} is: {}").format(
-            #     i, hashes0[i], hashes1[i], diff
-            # ),
+            str("Index: {}, diff between: {} and {} is: {}").format(
+                i, hashes0[i], hashes1[i], diff
+            ),
         )
 
     assert_dif_hashes(hashes0, 18)
@@ -699,9 +699,9 @@ def assert_fill_factor[
     # A perfect hash function is when the number of buckets is equal to number of words
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
+    assert_equal(len(buckets), num_buckets)
     for w in words:
         var h = hash(w[].unsafe_ptr(), w[].byte_length())
-        assert_true(h % num_buckets > 0)
         buckets[h % num_buckets] += 1
     var unfilled = 0
     for v in buckets:
@@ -711,9 +711,9 @@ def assert_fill_factor[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        # str("Fill factor for {} is {}, provided lower boound was {}").format(
-        #     label, fill_factor, lower_bound
-        # ),
+        str("Fill factor for {} is {}, provided lower boound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
@@ -723,9 +723,9 @@ def assert_fill_factor_old_hash[
     # A perfect hash function is when the number of buckets is equal to number of words
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
+    assert_equal(len(buckets), num_buckets)
     for w in words:
         var h = old_hash(w[].unsafe_ptr(), w[].byte_length())
-        assert_true(h % num_buckets > 0)
         buckets[h % num_buckets] += 1
     var unfilled = 0
     for v in buckets:
@@ -735,9 +735,9 @@ def assert_fill_factor_old_hash[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        # str("Fill factor for {} is {}, provided lower bound was {}").format(
-        #     label, fill_factor, lower_bound
-        # ),
+        str("Fill factor for {} is {}, provided lower bound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
