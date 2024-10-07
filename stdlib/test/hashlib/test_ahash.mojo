@@ -591,14 +591,12 @@ def dif_bits(i1: UInt, i2: UInt) -> Int:
 def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
     for i in range(len(hashes)):
         for j in range(i + 1, len(hashes)):
-            var i_val = hashes[i]
-            var j_val = hashes[j]
-            var diff = dif_bits(i_val, j_val)
+            var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
                 diff > 14,
-                str("Index: {}:{}, diff between: {} and {} is: {}").format(
-                    i, j, i_val, j_val, diff
-                ),
+                # str("Index: {}:{}, diff between: {} and {} is: {}").format(
+                #     i, j, hashes[i], hashes[j], diff
+                # ),
             )
 
 
@@ -712,9 +710,9 @@ def assert_fill_factor[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        # str("Fill factor for {} is {}, provided lower boound was {}").format(
-        #     label, fill_factor, lower_bound
-        # ),
+        str("Fill factor for {} is {}, provided lower boound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
@@ -735,9 +733,9 @@ def assert_fill_factor_old_hash[
     var fill_factor = 1 - unfilled / num_buckets
     assert_true(
         fill_factor >= lower_bound,
-        # str("Fill factor for {} is {}, provided lower bound was {}").format(
-        #     label, fill_factor, lower_bound
-        # ),
+        str("Fill factor for {} is {}, provided lower bound was {}").format(
+            label, fill_factor, lower_bound
+        ),
     )
 
 
