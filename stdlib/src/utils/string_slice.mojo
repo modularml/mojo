@@ -1297,12 +1297,13 @@ struct _FormatSpec:
                 break
             idx += 1
 
-        if colon_idx != -1:
-            raise Error("format specifiers not supported yet.")
-            # TODO: Future implementation of format specifiers
-            # When implementing format specifiers, modify this section to handle:
-            # fmt_str ::= "{" [":" format_spec] "}"
-            # this will involve:
-            # 1. finding a colon ':'
-            # 2. extracting the format_spec if a colon is found
-        return Self()
+        if colon_idx == -1:
+            return Self()
+
+        # TODO: Future implementation of format specifiers
+        # When implementing format specifiers, modify this section to handle:
+        # fmt_str ::= "{" [":" format_spec] "}"
+        # this will involve:
+        # 1. finding a colon ':'
+        # 2. extracting the format_spec if a colon is found
+        raise Error("format specifiers not supported yet.")
