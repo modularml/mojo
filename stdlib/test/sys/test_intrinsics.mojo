@@ -19,6 +19,7 @@ from sys import (
     strided_load,
     strided_store,
 )
+from sys.intrinsics import likely, unlikely
 
 from memory import UnsafePointer, memset_zero
 from testing import assert_equal
@@ -121,9 +122,15 @@ fn test_strided_store() raises:
     vector.free()
 
 
+def test_likely_unlikely():
+    assert_equal(likely(True), True)
+    assert_equal(unlikely(True), True)
+
+
 def main():
     test_compressed_store()
     test_masked_load()
     test_masked_store()
     test_strided_load()
     test_strided_store()
+    test_likely_unlikely()
