@@ -53,6 +53,51 @@ fn is_defined[name: StringLiteral]() -> Bool:
     return __mlir_attr[`#kgen.param.expr<get_env, `, name.value, `> : i1`]
 
 
+fn env_get_bool[name: StringLiteral]() -> Bool:
+    """Try to get an boolean-valued define. Compilation fails if the
+    name is not defined or the value is neither `True` or `False`.
+
+    Parameters:
+        name: The name of the define.
+
+    Returns:
+        An boolean parameter value.
+    """
+    alias val = env_get_string[name]()
+
+    @parameter
+    if val in ("True", "true"):
+        return True
+
+    @parameter
+    if val in ("False", "false"):
+        return False
+
+    constrained[
+        False, "the boolean environment value is neither `True` nor `False`"
+    ]()
+    return False
+
+
+fn env_get_bool[name: StringLiteral, default: Bool]() -> Bool:
+    """Try to get an bool-valued define. If the name is not defined, return
+    a default value instead. The boolean must be either `True` or `False`.
+
+    Parameters:
+        name: The name of the define.
+        default: The default value to use.
+
+    Returns:
+        An bool parameter value.
+    """
+
+    @parameter
+    if is_defined[name]():
+        return env_get_bool[name]()
+    else:
+        return default
+
+
 fn env_get_int[name: StringLiteral]() -> Int:
     """Try to get an integer-valued define. Compilation fails if the
     name is not defined.
