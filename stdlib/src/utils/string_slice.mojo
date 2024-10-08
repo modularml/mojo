@@ -578,7 +578,8 @@ struct StringSlice[
             args: The substitution values.
 
         Parameters:
-            Ts: The types of substitution values that implement `Stringable`.
+            Ts: The types of substitution values that implement `Representable`
+                and `Stringable` (to be changed and made more flexible).
 
         Returns:
             The template with the given values substituted.
