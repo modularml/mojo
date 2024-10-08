@@ -318,6 +318,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
 
@@ -331,6 +332,8 @@ struct StringLiteral(
         #   return type.
         return ptr.bitcast[UInt8]()
 
+    @always_inline
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
