@@ -901,6 +901,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 start = None
                 continue
             elif fmt_ptr[i] == `}`:
+                total_estimated_entry_byte_width -= 2 # remove {}
                 if not start and (i + 1) < fmt_len:
                     # python escapes double curlies
                     if fmt_ptr[i + 1] == `}`:
