@@ -973,39 +973,38 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
         var field = _build_slice(fmt_src.unsafe_ptr(), start_value + 1, i)
-        var field_b_len = i - (start_value + 1)
-        # FIXME(#3526): this will break once find works with unicode codepoints
-        var exclamation_index = field.find("!")
-        var width = 0
+        var field_ptr = field.unsafe_ptr()
+        var field_len = i - (start_value + 1)
+        var exclamation_index = -1
+        var idx = 0
+        while idx < field_len:
+            if field_ptr[idx] == ord("!"):
+                exclamation_index = idx
+                break
+            idx += 1
+        var new_idx = exclamation_index + 1
         if exclamation_index != -1:
-            var new_idx = exclamation_index + 1
-            if new_idx == field_b_len:
+            if new_idx == field_len:
                 raise Error("Empty conversion flag.")
-            var f_ptr = field.unsafe_ptr()
-            var conversion_flag = f_ptr[new_idx]
-            if field_b_len - new_idx > 1 or (
+            var conversion_flag = field_ptr[new_idx]
+            if field_len - new_idx > 1 or (
                 conversion_flag not in Self.supported_conversion_flags
             ):
-                var f = String(_build_slice(f_ptr, new_idx, field_b_len))
+                var f = String(_build_slice(field_ptr, new_idx, field_len))
                 _ = field^
                 raise Error('Conversion flag "' + f + '" not recognised.')
             self.conversion_flag = conversion_flag
-            field = _build_slice(field.unsafe_ptr(), 0, exclamation_index)
+            field = _build_slice(field_ptr, 0, exclamation_index)
+        else:
+            new_idx += 1
 
-            if new_idx < field_b_len:
-                var fmt_spec = _FormatSpec()
-                # TODO: Future implementation of format specifiers
-                # When implementing format specifiers, modify this section to handle:
-                # replacement_field ::= "{" [field_name] ["!" conversion] [":" format_spec] "}"
-                # this will involve:
-                # 1. finding a colon ':' after the conversion flag (if present)
-                # 2. extracting the format_spec if a colon is found
-                width = int(fmt_spec.width)
+        var extra = int(new_idx < field_len)
+        var fmt_field = _build_slice(field_ptr, new_idx + extra, field_len)
+        self.format_spec = _FormatSpec.parse(fmt_field)
+        var w = int(self.format_spec.width)
         # fully guessing the byte width here to be at least 8 bytes per entry
         # minus the length of the whole format specification
-        total_estimated_entry_byte_width += (
-            8 * int(width > 0) + width - (field_b_len + 2)
-        )
+        total_estimated_entry_byte_width += 8 * int(w > 0) + w - (field_len + 2)
 
         if field.byte_length() == 0:
             # an empty field, so it's automatic indexing
@@ -1241,7 +1240,7 @@ struct _FormatSpec:
     fn __init__(
         inout self,
         fill: UInt8 = ord(" "),
-        align: UInt8 = ord("<"),
+        align: UInt8 = 0,
         sign: UInt8 = ord("-"),
         coerce_z: Bool = False,
         alternate_form: Bool = False,
@@ -1250,6 +1249,24 @@ struct _FormatSpec:
         precision: UInt8 = 0,
         type: UInt8 = 0,
     ):
+        """Construct a FormatSpec instance.
+
+        Args:
+            fill: Defaults to space.
+            align: Defaults to 0 which is adjusted to the default for the arg
+                type.
+            sign: Defaults to `-`.
+            coerce_z: Defaults to False.
+            alternate_form: Defaults to False.
+            width: Defaults to 0 which is adjusted to the default for the arg
+                type.
+            grouping_option: Defaults to 0 which is adjusted to the default for
+                the arg type.
+            precision: Defaults to 0 which is adjusted to the default for the
+                arg type.
+            type: Defaults to 0 which is adjusted to the default for the arg
+                type.
+        """
         self.fill = fill
         self.align = align
         self.sign = sign
@@ -1259,3 +1276,33 @@ struct _FormatSpec:
         self.grouping_option = grouping_option
         self.precision = precision
         self.type = type
+
+    @staticmethod
+    fn parse(fmt_str: StringSlice) raises -> Self:
+        """Parses the format spec string.
+
+        Args:
+            fmt_str: The StringSlice with the format spec.
+
+        Returns:
+            An instance of FormatSpec.
+        """
+        var f_len = fmt_str.byte_length()
+        var f_ptr = fmt_str.unsafe_ptr()
+        var colon_idx = -1
+        var idx = 0
+        while idx < f_len:
+            if f_ptr[idx] == ord(":"):
+                exclamation_index = idx
+                break
+            idx += 1
+
+        if colon_idx != -1:
+            raise Error("format specifiers not supported yet.")
+            # TODO: Future implementation of format specifiers
+            # When implementing format specifiers, modify this section to handle:
+            # fmt_str ::= "{" [":" format_spec] "}"
+            # this will involve:
+            # 1. finding a colon ':'
+            # 2. extracting the format_spec if a colon is found
+        return Self()
