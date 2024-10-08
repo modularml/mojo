@@ -17,7 +17,8 @@ from sys import sizeof, alignof
 from sys.ffi import OpaquePointer
 
 import python._cpython as cp
-from python import TypedPythonObject, Python
+from python import TypedPythonObject, Python, PythonObject
+from python.python import _get_global_python_itf
 from python._cpython import (
     PyObjectPtr,
     PyMethodDef,
@@ -25,6 +26,10 @@ from python._cpython import (
     PyType_Spec,
     CPython,
 )
+
+
+fn get_cpython() -> CPython:
+    return _get_global_python_itf().cpython()
 
 
 fn create_pybind_module[
@@ -63,6 +68,19 @@ fn pyobj_destroy_as[T: AnyType](pyobj: PyObjectPtr):
     pyobj.value.bitcast[T]().destroy_pointee()
 
 
+fn fail_initialization(owned err: Error) -> PythonObject:
+    # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
+    cpython = get_cpython()
+    error_type = cpython.get_error_global("PyExc_Exception")
+
+    cpython.PyErr_SetString(
+        error_type,
+        err.unsafe_cstr_ptr(),
+    )
+    _ = err^
+    return PythonObject(PyObjectPtr())
+
+
 alias MutableGlobalLifetime = __mlir_attr[
     `#lit.lifetime.field<`,
     `#lit.static.lifetime : !lit.lifetime<1>`,
@@ -77,12 +95,13 @@ alias PyGlobalPtr = UnsafePointer[lifetime=MutableGlobalLifetime, alignment=1]
 fn gen_pytype_wrapper[
     T: AnyType, name: StringLiteral
 ](
-    inout cpython: CPython,
     inout module: TypedPythonObject["Module"],
     methods: PyGlobalPtr[PyMethodDef],
     slots: PyGlobalPtr[PyType_Slot],
     spec: PyGlobalPtr[PyType_Spec],
 ) raises:
+    cpython = get_cpython()
+
     # TODO(MOCO-1301): Add support for member method generation.
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
 
