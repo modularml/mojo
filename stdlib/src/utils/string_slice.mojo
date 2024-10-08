@@ -777,7 +777,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     # TODO: ord("a") conversion flag not supported yet
     var conversion_flag: UInt8
     """The type of conversion for the entry: {ord("s"), ord("r")}."""
-    var format_spec: _FormatSpec
+    var format_spec: Optional[_FormatSpec]
     """The format specifier."""
     # TODO: ord("a") conversion flag not supported yet
     alias supported_conversion_flags = SIMD[DType.uint8, 2](ord("s"), ord("r"))
@@ -809,8 +809,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         first_curly: Int,
         last_curly: Int,
         field: Self._FieldVariantType,
-        conversion_flag: UInt8 = ord("s"),
-        format_spec: _FormatSpec = _FormatSpec(),
+        conversion_flag: UInt8 = 0,
+        format_spec: Optional[_FormatSpec] = None,
     ):
         self.first_curly = first_curly
         self.last_curly = last_curly
@@ -901,7 +901,6 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 start = None
                 continue
             elif fmt_ptr[i] == `}`:
-                total_estimated_entry_byte_width -= 2 # remove {}
                 if not start and (i + 1) < fmt_len:
                     # python escapes double curlies
                     if fmt_ptr[i + 1] == `}`:
@@ -1001,8 +1000,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         var extra = int(new_idx < field_len)
         var fmt_field = _build_slice(field_ptr, new_idx + extra, field_len)
-        self.format_spec = _FormatSpec.parse(fmt_field)
-        var w = int(self.format_spec.width)
+        # self.format_spec = _FormatSpec.parse(fmt_field)
+        # var w = int(self.format_spec.value().width) if self.format_spec else 0
+        var w = 0
         # fully guessing the byte width here to be at least 8 bytes per entry
         # minus the length of the whole format specification
         total_estimated_entry_byte_width += 8 * int(w > 0) + w - (field_len + 2)
@@ -1052,17 +1052,46 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             @parameter
             for i in range(len_pos_args):
                 if i == idx:
+                    var type_impls_repr = True  # TODO
+                    var type_impls_str = True  # TODO
+                    var type_impls_formatter_repr = True  # TODO
+                    var type_impls_formatter_str = True  # TODO
                     var flag = e.conversion_flag
-                    if flag == `r`:
-                        res += repr(args[i])
-                    elif flag == `s`:
-                        res += str(args[i])
+                    var empty = flag == 0 and not e.format_spec
+
+                    var data: String
+                    if empty and type_impls_formatter_str:
+                        data = str(args[i])  # TODO: use formatter and return
+                    elif empty and type_impls_str:
+                        data = str(args[i])
+                    elif flag == `s` and type_impls_formatter_str:
+                        if empty:
+                            # TODO: use formatter and return
+                            pass
+                        data = str(args[i])
+                    elif flag == `s` and type_impls_str:
+                        data = str(args[i])
+                    elif flag == `r` and type_impls_formatter_repr:
+                        if empty:
+                            # TODO: use formatter and return
+                            pass
+                        data = repr(args[i])
+                    elif flag == `r` and type_impls_repr:
+                        data = repr(args[i])
+                    elif e.format_spec:
+                        e.format_spec.value().stringify(res, args[i])
+                        return
                     else:
+                        alias argnum = "Argument number: "
                         alias does_not = " does not implement the trait "
                         alias needed = "needed for conversion_flag: "
-                        alias argnum = "Argument number: "
                         var flg = String(List[UInt8](flag, 0))
                         raise Error(argnum + str(i) + does_not + needed + flg)
+
+                    if e.format_spec:
+                        e.format_spec.value().format_string(res, data)
+                    else:
+                        res += data
 
         if e.is_escaped_brace():
             res += "}" if e.field[Bool] else "{"
@@ -1279,7 +1308,7 @@ struct _FormatSpec:
         self.type = type
 
     @staticmethod
-    fn parse(fmt_str: StringSlice) raises -> Self:
+    fn parse(fmt_str: StringSlice) raises -> Optional[Self]:
         """Parses the format spec string.
 
         Args:
@@ -1299,7 +1328,34 @@ struct _FormatSpec:
             idx += 1
 
         if colon_idx == -1:
-            return Self()
+            return None
 
-        # TODO: Future implementation of format specifiers
+        # TODO: Future implementation of format specifiers (remove raises after)
         raise Error("format specifiers not supported yet.")
+
+    fn stringify[
+        T: _CurlyEntryFormattable
+    ](self, inout res: String, item: T) raises:
+        """Stringify a type according to its format specification.
+
+        Args:
+            res: The resulting String.
+            item: The item to stringify.
+        """
+        var type_implements_float = True  # TODO
+        var type_implements_int = True  # TODO
+
+        # TODO: transform to int/float depending on format spec and stringify
+        # with hex/bin/oct etc.
+        res += str(item)
+
+    fn format_string(self, inout res: String, item: String) raises:
+        """Transform a String according to its format specification.
+
+        Args:
+            res: The resulting String.
+            item: The item to format.
+        """
+
+        # TODO: align, fill, etc.
+        res += item
