@@ -673,6 +673,7 @@ def test_trailing_zeros():
     # checks that a value with different amount of trailing zeros,
     # results in significantly different hash values
     var data = stack_allocation[8, UInt8]()
+    memset_zero(data, 8)
     data[0] = 23
     var hashes0 = List[UInt]()
     var hashes1 = List[UInt]()
