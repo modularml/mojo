@@ -40,7 +40,7 @@ fn inlined_assembly[
                 _type=None,
                 assembly = asm.value,
                 constraints = constraints.value,
-                hasSideEffects = __mlir_attr.unit,
+                has_side_effects = __mlir_attr.unit,
             ](loaded_pack)
         else:
             __mlir_op.`pop.inline_asm`[
@@ -57,7 +57,7 @@ fn inlined_assembly[
                 _type=result_type,
                 assembly = asm.value,
                 constraints = constraints.value,
-                hasSideEffects = __mlir_attr.unit,
+                has_side_effects = __mlir_attr.unit,
             ](loaded_pack)
         else:
             return __mlir_op.`pop.inline_asm`[
