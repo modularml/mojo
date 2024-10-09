@@ -32,36 +32,16 @@ fn inlined_assembly[
     var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
     @parameter
-    if _mlirtype_is_eq[result_type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.inline_asm`[
-                _type=None,
-                assembly = asm.value,
-                constraints = constraints.value,
-                hasSideEffects = __mlir_attr.unit,
-            ](loaded_pack)
-        else:
-            __mlir_op.`pop.inline_asm`[
-                _type=None,
-                assembly = asm.value,
-                constraints = constraints.value,
-            ](loaded_pack)
-        return rebind[result_type](None)
+    if has_side_effect:
+        return __mlir_op.`pop.inline_asm`[
+            _type=result_type,
+            assembly = asm.value,
+            constraints = constraints.value,
+            hasSideEffects = __mlir_attr.unit,
+        ](loaded_pack)
     else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.inline_asm`[
-                _type=result_type,
-                assembly = asm.value,
-                constraints = constraints.value,
-                hasSideEffects = __mlir_attr.unit,
-            ](loaded_pack)
-        else:
-            return __mlir_op.`pop.inline_asm`[
-                _type=result_type,
-                assembly = asm.value,
-                constraints = constraints.value,
-            ](loaded_pack)
+        return __mlir_op.`pop.inline_asm`[
+            _type=result_type,
+            assembly = asm.value,
+            constraints = constraints.value,
+        ](loaded_pack)

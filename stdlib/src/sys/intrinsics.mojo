@@ -53,35 +53,16 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value,
-                _type=None,
-            ]()
-            return rebind[type](None)
-
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ]()
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value,
-                _type=type,
-            ]()
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
         ]()
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ]()
 
 
 @always_inline("nodebug")
@@ -112,32 +93,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0)
 
 
 @always_inline("nodebug")
@@ -172,31 +136,16 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1)
-        return rebind[type](None)
-    else:
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1)
-
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1)
+
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1)
 
 
 @always_inline("nodebug")
@@ -236,32 +185,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1, arg2)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2)
 
 
 @always_inline("nodebug")
@@ -305,32 +237,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1, arg2, arg3)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3)
 
 
 @always_inline("nodebug")
@@ -373,32 +288,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1, arg2, arg3, arg4)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3, arg4)
 
 
 @always_inline("nodebug")
@@ -444,33 +342,16 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value,
-                _type=type,
-            ](arg0, arg1, arg2, arg3, arg4, arg5)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3, arg4, arg5)
 
 
 @always_inline("nodebug")
@@ -519,32 +400,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 
 
 @always_inline("nodebug")
@@ -604,32 +468,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 
 
 @always_inline("nodebug")
@@ -693,33 +540,16 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value,
-                _type=type,
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 
 
 @always_inline("nodebug")
@@ -788,32 +618,15 @@ fn llvm_intrinsic[
     """
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+    if has_side_effect:
         return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
+            intrin = intrin.value, _type=type
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+    return __mlir_op.`pop.call_llvm_intrinsic`[
+        intrin = intrin.value,
+        _type=type,
+        hasSideEffects = __mlir_attr.false,
+    ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
 
 
 # ===----------------------------------------------------------------------===#

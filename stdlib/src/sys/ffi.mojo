@@ -406,16 +406,9 @@ fn external_call[
     # all the members of the pack.
     var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            loaded_pack
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            loaded_pack
-        )
+    return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+        loaded_pack
+    )
 
 
 # ===----------------------------------------------------------------------===#
