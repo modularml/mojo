@@ -19,7 +19,7 @@ from sys import (
     strided_load,
     strided_store,
 )
-from sys.intrinsics import likely, unlikely
+from sys.intrinsics import likely, unlikely, assume
 
 from memory import UnsafePointer, memset_zero
 from testing import assert_equal
@@ -127,6 +127,10 @@ def test_likely_unlikely():
     assert_equal(unlikely(True), True)
 
 
+def test_assume():
+    assume(True)
+
+
 def main():
     test_compressed_store()
     test_masked_load()
@@ -134,3 +138,4 @@ def main():
     test_strided_load()
     test_strided_store()
     test_likely_unlikely()
+    test_assume()
