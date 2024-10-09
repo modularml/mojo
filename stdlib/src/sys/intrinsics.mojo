@@ -1540,3 +1540,19 @@ fn unlikely(val: Bool) -> Bool:
       The input value.
     """
     return llvm_intrinsic["llvm.expect", Bool](val, False)
+
+
+# ===----------------------------------------------------------------------=== #
+# assume
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn assume(val: Bool):
+    """Signals to the optimizer that the condition is always true. This allows
+    the optimizer to optimize the code.
+
+    Args:
+      val: The input value which is assumed to be `True`.
+    """
+    llvm_intrinsic["llvm.assume", NoneType](val)
