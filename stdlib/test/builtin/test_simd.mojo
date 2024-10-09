@@ -1535,6 +1535,29 @@ def test_powf():
     )
 
 
+def test_rpow():
+    alias F32x4 = SIMD[DType.float32, 4]
+    alias I32x4 = SIMD[DType.int32, 4]
+
+    var f32x4_val = F32x4(0, 1, 2, 3)
+    var i32x4_val = I32x4(0, 1, 2, 3)
+
+    assert_equal(0**i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(2**i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal((-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(Int(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(Int(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(Int(-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(UInt(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(UInt(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+
+    assert_almost_equal(1.0**f32x4_val, F32x4(1.0, 1.0, 1.0, 1.0))
+    assert_almost_equal(2.5**f32x4_val, F32x4(1.0, 2.5, 6.25, 15.625))
+    assert_almost_equal(3.0**f32x4_val, F32x4(1.0, 3.0, 9.0, 27.0))
+
+
 def test_modf():
     var f32 = _modf(Float32(123.5))
     assert_almost_equal(f32[0], 123)
@@ -1809,6 +1832,7 @@ def main():
     test_mod()
     test_pow()
     test_powf()
+    test_rpow()
     test_radd()
     test_reduce()
     test_reduce_bit_count()
