@@ -1194,20 +1194,20 @@ struct CPython:
         )
 
     fn PyObject_GetIter(
-        inout self, traversablePyObject: PyObjectPtr
+        inout self, traversable_py_object: PyObjectPtr
     ) -> PyObjectPtr:
         var iter = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyObject_GetIter"
-        )(traversablePyObject)
+        )(traversable_py_object)
 
         self.log(
             iter._get_ptr_as_int(),
             " NEWREF PyObject_GetIter, refcnt:",
             self._Py_REFCNT(iter),
             "referencing ",
-            traversablePyObject._get_ptr_as_int(),
+            traversable_py_object._get_ptr_as_int(),
             "refcnt of traversable: ",
-            self._Py_REFCNT(traversablePyObject),
+            self._Py_REFCNT(traversable_py_object),
         )
 
         self._inc_total_rc()
@@ -1328,14 +1328,14 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn toPython(inout self, litString: StringRef) -> PyObjectPtr:
-        return self.PyString_FromStringAndSize(litString)
+    fn to_python(inout self, lit_string: StringRef) -> PyObjectPtr:
+        return self.PyString_FromStringAndSize(lit_string)
 
-    fn toPython(inout self, litInt: Int) -> PyObjectPtr:
-        return self.PyLong_FromLong(litInt.value)
+    fn to_python(inout self, lit_int: Int) -> PyObjectPtr:
+        return self.PyLong_FromLong(lit_int.value)
 
-    fn toPython(inout self, litBool: Bool) -> PyObjectPtr:
-        return self.PyBool_FromLong(1 if litBool else 0)
+    fn to_python(inout self, lit_bool: Bool) -> PyObjectPtr:
+        return self.PyBool_FromLong(1 if lit_bool else 0)
 
     fn PyLong_AsLong(inout self, py_object: PyObjectPtr) -> Int:
         return self.lib.get_function[fn (PyObjectPtr) -> Int]("PyLong_AsLong")(
