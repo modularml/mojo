@@ -25,6 +25,31 @@ from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
 
 
+trait Spanable:
+    """
+    The `Spanable` trait denotes a type that can be returned as a immutable byte slice.
+    """
+
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+    fn byte_length(self) -> Int:
+        """Returns the length of the byte slice.
+
+        Returns:
+            The length of the byte slice.
+        """
+        ...
+
+
 @value
 struct _SpanIter[
     is_mutable: Bool, //,

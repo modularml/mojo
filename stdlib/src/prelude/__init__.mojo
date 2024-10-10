@@ -91,6 +91,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
+    SizedSpanableCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -131,4 +132,4 @@ from collections.string import (
 )
 from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
-from utils import Formattable, Formatter
+from utils import Spanable, Formattable, Formatter

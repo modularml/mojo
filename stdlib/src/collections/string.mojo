@@ -24,6 +24,7 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
+from sys.intrinsics import _type_is_eq
 from utils import (
     Span,
     IndexList,
@@ -688,6 +689,7 @@ fn isprintable(c: UInt8) -> Bool:
 struct String(
     Sized,
     Stringable,
+    Spanable,
     Representable,
     IntableRaising,
     KeyElement,
@@ -1300,7 +1302,7 @@ struct String(
             curr += self + str(elems[i])
         return curr
 
-    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+    fn join[*Types: Formattable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1314,15 +1316,16 @@ struct String(
         """
 
         var result: String = ""
+        var formatter = result._unsafe_to_formatter()
         var is_first = True
 
         @parameter
-        fn add_elt[T: Stringable](a: T):
+        fn add_elt[T: Formattable](a: T):
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(a)
+                self.format_to(formatter)
+            a.format_to(formatter)
 
         elems.each[add_elt]()
         _ = is_first
@@ -1340,6 +1343,19 @@ struct String(
         Returns:
             The joined string.
         """
+
+        # TODO(#3403): the renaming of the following method from join to fast_join and
+        # the _type_is_eq() call is a hack needed to avoid the following error:
+        # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
+        # disambiguate with an explicit cast"
+        @parameter
+        if _type_is_eq[T, String]():
+            return self.fast_join(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self.fast_join(rebind[List[StringLiteral]](elems))
+        # elif _type_is_eq[T, StringSlice](): # FIXME(#3597): once StringSlice conforms to CollectionElement trait
+        #     return self.fast_join(rebind[List[StringSlice]](elems))
+
         var result: String = ""
         var is_first = True
 
@@ -1351,6 +1367,52 @@ struct String(
             result += str(e[])
 
         return result
+
+    fn fast_join[
+        T: SizedSpanableCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var n_elems = len(elems)
+        if n_elems == 0:
+            return String("")
+        var len_self = self.byte_length()
+        var len_elems = 0
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
+        for e_ref in elems:
+            len_elems += e_ref[].byte_length()
+        var capacity = len_self * (n_elems - 1) + len_elems
+        var buf = Self._buffer_type(capacity=capacity)
+        var self_ptr = self.unsafe_ptr()
+        var ptr = buf.unsafe_ptr()
+        var offset = 0
+        var i = 0
+        var is_first = True
+        while i < n_elems:
+            if is_first:
+                is_first = False
+            else:
+                memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
+                offset += len_self
+            var e = elems[i].as_bytes_span()
+            var e_len = len(e)
+            memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
+            offset += e_len
+            i += 1
+        buf.size = capacity
+        buf.append(0)
+        return String(buf^)
 
     fn _strref_dangerous(self) -> StringRef:
         """
