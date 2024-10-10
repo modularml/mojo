@@ -22,7 +22,6 @@ from .intrinsics import _mlirtype_is_eq
 from builtin.builtin_list import _LITRefPackHelper
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
-from sys.ffi import c_char_ptr
 
 alias c_char = Int8
 """C `char` type."""
