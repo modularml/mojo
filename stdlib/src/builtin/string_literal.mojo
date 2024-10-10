@@ -213,7 +213,7 @@ struct StringLiteral(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return _atol(self.as_string_slice())
 
     fn __float__(self) raises -> Float64:
         """Parses the string as a float point number and returns that value.
