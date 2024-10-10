@@ -87,6 +87,11 @@ fn _c_long_long_dtype() -> DType:
         return abort[DType]()
 
 
+trait _UnsafePtrU8:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        ...
+
+
 @always_inline
 fn c_char_ptr[T: _UnsafePtrU8](item: T) -> UnsafePointer[c_char]:
     """Get the C.char pointer.
