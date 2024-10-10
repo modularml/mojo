@@ -194,6 +194,15 @@ struct Error(
         """
         return self.data.bitcast[c_char]()
 
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        return self.data
+
+
     fn _message(self) -> String:
         """Converts the Error to string representation.
 
