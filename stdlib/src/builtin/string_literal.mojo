@@ -277,15 +277,23 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantLifetime]:
-        """Return an iterator over the string literal.
+    fn __iter__(self) -> _StringSliceIter[StaticConstantLifetime]:
+        """Iterate over the string, returning immutable references.
 
         Returns:
-            An iterator over the string.
+            An iterator of references to the string elements.
         """
-        return _StringSliceIter[StaticConstantLifetime](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
+        alias S = _StringSliceIter[StaticConstantLifetime]
+        return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
+
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantLifetime, False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        alias S = _StringSliceIter[StaticConstantLifetime, False]
+        return S(unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
