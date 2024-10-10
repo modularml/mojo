@@ -45,7 +45,7 @@ struct Slice(
     """The starting index of the slice."""
     var end: Optional[Int]
     """The end index of the slice."""
-    var step: Int
+    var step: Optional[Int]
     """The step increment value of the slice."""
 
     # ===-------------------------------------------------------------------===#
@@ -62,7 +62,7 @@ struct Slice(
         """
         self.start = start
         self.end = end
-        self.step = 1
+        self.step = None
 
     @always_inline
     fn __init__(
@@ -80,7 +80,7 @@ struct Slice(
         """
         self.start = start
         self.end = end
-        self.step = step.or_else(1)
+        self.step = step
 
     fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the Slice.
@@ -135,7 +135,7 @@ struct Slice(
         writer.write(", ")
         write_optional(self.end)
         writer.write(", ")
-        writer.write(repr(self.step))
+        write_optional(self.step)
         writer.write(")")
 
     @always_inline
@@ -200,7 +200,7 @@ struct Slice(
         Returns:
             A tuple containing three integers for start, end, and step.
         """
-        var step = self.step
+        var step = self.step.or_else(1)
 
         var start = self.start
         var end = self.end
