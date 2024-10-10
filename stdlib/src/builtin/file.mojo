@@ -31,6 +31,7 @@ with open("my_file.txt", "r") as f:
 
 """
 
+from memory import Arc
 from os import PathLike
 from sys import external_call, sizeof
 from sys.ffi import OpaquePointer
@@ -67,15 +68,16 @@ struct _OwnedStringRef(Boolable):
         return self.length != 0
 
 
+@value
 struct FileHandle:
     """File handle to an opened file."""
 
-    var handle: OpaquePointer
+    var handle: Arc[OpaquePointer]
     """The underlying pointer to the file handle."""
 
     fn __init__(inout self):
         """Default constructor."""
-        self.handle = OpaquePointer()
+        self.handle = Arc(OpaquePointer())
 
     fn __init__(inout self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
@@ -99,32 +101,33 @@ struct FileHandle:
         ](path, mode, Pointer.address_of(err_msg))
 
         if err_msg:
-            self.handle = OpaquePointer()
+            self.handle = Arc(OpaquePointer())
             raise err_msg^.consume_as_error()
 
-        self.handle = handle
+        self.handle = Arc(handle)
 
     fn __del__(owned self):
         """Closes the file handle."""
         try:
-            self.close()
+            if self.handle.count() == 1:
+                self.close()
         except:
             pass
 
     fn close(inout self) raises:
         """Closes the file handle."""
-        if not self.handle:
+        if not self.handle[]:
             return
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
-            self.handle, Pointer.address_of(err_msg)
+            self.handle[], Pointer.address_of(err_msg)
         )
 
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        self.handle = OpaquePointer()
+        self.handle = Arc(OpaquePointer())
 
     fn __moveinit__(inout self, owned existing: Self):
         """Moves constructor for the file handle.
@@ -133,7 +136,7 @@ struct FileHandle:
           existing: The existing file handle.
         """
         self.handle = existing.handle
-        existing.handle = OpaquePointer()
+        existing.handle = Arc(OpaquePointer())
 
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads data from a file and sets the file handle seek position. If
@@ -184,7 +187,7 @@ struct FileHandle:
         ```
         .
         """
-        if not self.handle:
+        if not self.handle[]:
             raise Error("invalid file handle")
 
         var size_copy: Int64 = size
@@ -193,7 +196,7 @@ struct FileHandle:
         var buf = external_call[
             "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
-            self.handle,
+            self.handle[],
             Pointer.address_of(size_copy),
             Pointer.address_of(err_msg),
         )
@@ -260,7 +263,7 @@ struct FileHandle:
         .
         """
 
-        if not self.handle:
+        if not self.handle[]:
             raise Error("invalid file handle")
 
         var err_msg = _OwnedStringRef()
@@ -268,7 +271,7 @@ struct FileHandle:
         var bytes_read = external_call[
             "KGEN_CompilerRT_IO_FileReadToAddress", Int64
         ](
-            self.handle,
+            self.handle[],
             ptr,
             size * sizeof[type](),
             Pointer.address_of(err_msg),
@@ -327,7 +330,7 @@ struct FileHandle:
         ```
         .
         """
-        if not self.handle:
+        if not self.handle[]:
             raise Error("invalid file handle")
 
         var size_copy: Int64 = size
@@ -336,7 +339,7 @@ struct FileHandle:
         var buf = external_call[
             "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
-            self.handle,
+            self.handle[],
             Pointer.address_of(size_copy),
             Pointer.address_of(err_msg),
         )
@@ -386,7 +389,7 @@ struct FileHandle:
         ```
         .
         """
-        if not self.handle:
+        if not self.handle[]:
             raise "invalid file handle"
 
         debug_assert(
@@ -395,7 +398,7 @@ struct FileHandle:
         )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, whence, Pointer.address_of(err_msg)
+            self.handle[], offset, whence, Pointer.address_of(err_msg)
         )
 
         if err_msg:
@@ -439,12 +442,12 @@ struct FileHandle:
           ptr: The pointer to the data to write.
           len: The length of the pointer (in bytes).
         """
-        if not self.handle:
+        if not self.handle[]:
             raise Error("invalid file handle")
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileWrite", NoneType](
-            self.handle,
+            self.handle[],
             ptr.address,
             len,
             Pointer.address_of(err_msg),
@@ -465,7 +468,7 @@ struct FileHandle:
         var i64_res = external_call[
             "KGEN_CompilerRT_IO_GetFD",
             Int64,
-        ](self.handle)
+        ](self.handle[])
         return Int(i64_res.value)
 
 
