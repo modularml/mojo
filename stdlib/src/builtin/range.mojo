@@ -340,8 +340,7 @@ struct _UIntZeroStartingRange(UIntSized):
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        # FIXME(KERN-1024): This should be an unsigned comparison!
-        return Int(self.__len__().value) > 0
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> UInt:
@@ -372,8 +371,7 @@ struct _UIntStridedRangeIterator(UIntSized):
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        # FIXME(KERN-1024): This should be an unsigned comparison!
-        return Int(self.__len__().value) > 0
+        return self.__len__() > 0
 
 
 @value
@@ -413,8 +411,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        # FIXME(KERN-1024): This should be an unsigned comparison!
-        return Int(self.__len__().value) > 0
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> UInt:
