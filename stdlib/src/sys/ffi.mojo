@@ -84,6 +84,32 @@ fn _c_long_long_dtype() -> DType:
         constrained[False, "size of C `long long` is unknown on this target"]()
         return abort[DType]()
 
+trait _UnsafePtrU8:
+    fn unsafe_ptr() -> UnsafePointer[UInt8]:
+        ...
+
+fn char_ptr[T: _UnsafePtrU8](item: T) -> UnsafePointer[c_char]:
+    """Get the C.char pointer.
+    
+    Args:
+        item: The item.
+    
+    Returns:
+        The pointer.
+    """
+    return item.unsafe_ptr().bitcast[c_char]()
+
+fn char_ptr[T: AnyType](ptr: UnsafePointer[T]) -> UnsafePointer[c_char]:
+    """Get the C.char pointer.
+    
+    Args:
+        ptr: The pointer.
+    
+    Returns:
+        The pointer.
+    """
+    return ptr.bitcast[c_char]()
+
 
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
