@@ -1337,15 +1337,15 @@ struct CPython:
     fn toPython(inout self, litBool: Bool) -> PyObjectPtr:
         return self.PyBool_FromLong(1 if litBool else 0)
 
-    fn PyLong_AsLong(inout self, py_object: PyObjectPtr) -> Int:
+    fn PyLong_AsLong(inout self, py_object_ptr: PyObjectPtr) -> Int:
         return self.lib.get_function[fn (PyObjectPtr) -> Int]("PyLong_AsLong")(
-            py_object
+            py_object_ptr
         )
 
-    fn PyFloat_AsDouble(inout self, py_object: PyObjectPtr) -> Float64:
+    fn PyFloat_AsDouble(inout self, py_object_ptr: PyObjectPtr) -> Float64:
         return self.lib.get_function[fn (PyObjectPtr) -> Float64](
             "PyFloat_AsDouble"
-        )(py_object)
+        )(py_object_ptr)
 
     fn PyFloat_FromDouble(inout self, value: Float64) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Float64) -> PyObjectPtr](
@@ -1407,10 +1407,12 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
+    fn PyUnicode_AsUTF8AndSize(
+        inout self, py_object_ptr: PyObjectPtr
+    ) -> StringRef:
         var result = self.lib.get_function[
             fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[c_char]
-        ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
+        ]("PyUnicode_AsUTF8AndSize")(py_object_ptr, UnsafePointer[Int]())
         return StringRef(result)
 
     # ===-------------------------------------------------------------------===#
