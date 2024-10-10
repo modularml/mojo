@@ -52,7 +52,6 @@ fn _default_alignment[type: DType, width: Int = 1]() -> Int:
 struct UnsafePointer[
     type: AnyType,
     address_space: AddressSpace = AddressSpace.GENERIC,
-    exclusive: Bool = False,
     alignment: Int = _default_alignment[type](),
     lifetime: Lifetime[True].type = MutableAnyLifetime,
 ](
@@ -69,7 +68,6 @@ struct UnsafePointer[
     Parameters:
         type: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
-        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
         alignment: The minimum alignment of this pointer known statically.
         lifetime: The lifetime of the memory being addressed.
     """
@@ -144,7 +142,6 @@ struct UnsafePointer[
     ) -> UnsafePointer[
         type,
         address_space,
-        False,
         1,
         # TODO: Propagate lifetime of the argument.
     ] as result:
@@ -164,7 +161,7 @@ struct UnsafePointer[
     @always_inline
     fn alloc(
         count: Int,
-    ) -> UnsafePointer[type, AddressSpace.GENERIC, exclusive, alignment]:
+    ) -> UnsafePointer[type, AddressSpace.GENERIC, alignment]:
         """Allocate an array with specified or default alignment.
 
         Args:
@@ -195,7 +192,7 @@ struct UnsafePointer[
         alias _ref_type = Pointer[type, lifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[type, address_space, False, alignment, lifetime](
+                UnsafePointer[type, address_space, alignment, lifetime](
                     self
                 ).address
             )
@@ -430,7 +427,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn as_noalias_ptr(
         self,
-    ) -> UnsafePointer[type, address_space, True, alignment, lifetime]:
+    ) -> UnsafePointer[type, address_space, alignment, lifetime]:
         """Cast the pointer to a new pointer that is known not to locally alias
         any other pointer. In other words, the pointer transitively does not
         alias any other memory value declared in the local function context.
@@ -886,9 +883,7 @@ struct UnsafePointer[
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
         lifetime: Lifetime[True].type = Self.lifetime,
-    ](self) -> UnsafePointer[
-        T, address_space, Self.exclusive, alignment, lifetime
-    ]:
+    ](self) -> UnsafePointer[T, address_space, alignment, lifetime]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
@@ -914,9 +909,7 @@ struct UnsafePointer[
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
         lifetime: Lifetime[True].type = Self.lifetime,
-    ](self) -> UnsafePointer[
-        Scalar[T], address_space, Self.exclusive, alignment, lifetime
-    ]:
+    ](self) -> UnsafePointer[Scalar[T], address_space, alignment, lifetime]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
