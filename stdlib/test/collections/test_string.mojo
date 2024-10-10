@@ -824,6 +824,11 @@ def test_split():
     assert_equal(res6[2], "долор")
     assert_equal(res6[3], "сит")
     assert_equal(res6[4], "амет")
+    var res7 = in6.split("м")
+    assert_equal(res7[0], "Лоре")
+    assert_equal(res7[1], " ипсу")
+    assert_equal(res7[2], " долор сит а")
+    assert_equal(res7[3], "ет")
 
     with assert_raises(contains="Separator cannot be empty."):
         _ = String("1, 2, 3").split("")

@@ -39,6 +39,7 @@ from utils.string_slice import (
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
     _shift_unicode_to_utf8,
+    _utf8_first_byte_sequence_length,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -788,16 +789,12 @@ struct String(
             str_slice: The string slice from which to construct this string.
         """
 
-        # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_span())
-        var buffer = Self._buffer_type()
-        # +1 for null terminator, initialized to 0
-        buffer.resize(length + 1, 0)
-        memcpy(
-            dest=buffer.data,
-            src=str_slice.as_bytes_span().unsafe_ptr(),
-            count=length,
-        )
+        var length = str_slice.byte_length()
+        var buffer = Self._buffer_type(capacity=length + 1)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, str_slice.unsafe_ptr(), length)
+        buffer.size = length + 1
+        ptr[length] = 0
         self = Self(buffer^)
 
     @always_inline
@@ -1543,13 +1540,17 @@ struct String(
         """
         return self.as_string_slice().isspace()
 
-    fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
+    fn split[
+        enable_maxsplit: Bool = True
+    ](self, sep: String, maxsplit: Int) raises -> List[String]:
         """Split the string by a separator.
+
+        Parameters:
+            enable_maxsplit: Whether to enable maxsplit.
 
         Args:
             sep: The string to split on.
             maxsplit: The maximum amount of items to split from String.
-                Defaults to unlimited.
 
         Returns:
             A List of Strings containing the input split by the separator.
@@ -1569,44 +1570,74 @@ struct String(
         ```
         .
         """
-        var output = List[String]()
+        alias prealloc = 16  # guessing, Python's implementation uses 12
+        var amnt = prealloc
 
-        var str_byte_len = self.byte_length() - 1
+        @parameter
+        if enable_maxsplit:
+            amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
+        var output = List[String](capacity=amnt)
+        var str_byte_len = self.byte_length()
         var lhs = 0
         var rhs = 0
         var items = 0
         var sep_len = sep.byte_length()
         if sep_len == 0:
             raise Error("Separator cannot be empty.")
-        if str_byte_len < 0:
-            output.append("")
+        var ptr = self.unsafe_ptr()
+        alias S = StringSlice[__lifetime_of(self)]
 
         while lhs <= str_byte_len:
+            # FIXME(#3295): this will fail when find is changed to use unicode codepoints
             rhs = self.find(sep, lhs)
-            if rhs == -1:
-                output.append(self[lhs:])
-                break
+            rhs += int(rhs == -1) * (str_byte_len + 1)  # if not found go to end
 
-            if maxsplit > -1:
-                if items == maxsplit:
-                    output.append(self[lhs:])
-                    break
+            @parameter
+            if enable_maxsplit:
+                rhs += int(items == maxsplit) * (str_byte_len - rhs)
                 items += 1
 
-            output.append(self[lhs:rhs])
+            output.append(S(unsafe_from_utf8_ptr=ptr + lhs, len=rhs - lhs))
             lhs = rhs + sep_len
 
-        if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
-            output.append("")
-        return output
+        return output^
 
-    fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
+    @always_inline("nodebug")
+    fn split(self, sep: String) raises -> List[String]:
+        """Split the string by a separator.
+
+        Args:
+            sep: The string to split on.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Raises:
+            If the separator is empty.
+
+        Examples:
+
+        ```mojo
+        # Splitting a space
+        _ = String("hello world").split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = String("hello,,world").split(",") # ["hello", "", "world"]
+        ```
+        .
+        """
+        return self.split[enable_maxsplit=False](sep, maxsplit=-1)
+
+    fn split[
+        enable_maxsplit: Bool = True
+    ](self, sep: NoneType, maxsplit: Int) -> List[String]:
         """Split the string by every Whitespace separator.
+
+        Parameters:
+            enable_maxsplit: Whether to enable maxsplit.
 
         Args:
             sep: None.
-            maxsplit: The maximum amount of items to split from String. Defaults
-                to unlimited.
+            maxsplit: The maximum amount of items to split from String.
 
         Returns:
             A List of Strings containing the input split by the separator.
@@ -1627,48 +1658,78 @@ struct String(
         ```
         .
         """
+        alias prealloc = 16  # guessing, Python's implementation uses 12
+        var amnt = prealloc
 
-        fn num_bytes(b: UInt8) -> Int:
-            var flipped = ~b
-            return int(count_leading_zeros(flipped) + (flipped >> 7))
-
-        var output = List[String]()
-        var str_byte_len = self.byte_length() - 1
+        @parameter
+        if enable_maxsplit:
+            amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
+        var output = List[String](capacity=amnt)
+        var str_byte_len = self.byte_length()
         var lhs = 0
         var rhs = 0
         var items = 0
+        var ptr = self.unsafe_ptr()
+        alias S = StringSlice[__lifetime_of(self)]
+
+        @always_inline("nodebug")
+        fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+
         while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            for s in self[lhs:]:
-                if not str(s).isspace():  # TODO: with StringSlice.isspace()
+            for s in _build_slice(ptr, lhs, str_byte_len):
+                if not s.isspace():
                     break
                 lhs += s.byte_length()
-            # if it went until the end of the String, then
-            # it should be sliced up until the original
-            # start of the whitespace which was already appended
-            if lhs - 1 == str_byte_len:
+            # if it went until the end of the String, then it should be sliced
+            # until the start of the whitespace which was already appended
+            if lhs == str_byte_len:
                 break
-            elif lhs == str_byte_len:
-                # if the last char is not whitespace
-                output.append(self[str_byte_len])
-                break
-            rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
-            for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
-                if str(s).isspace():  # TODO: with StringSlice.isspace()
+            rhs = lhs + _utf8_first_byte_sequence_length(ptr[lhs])
+            for s in _build_slice(ptr, rhs, str_byte_len):
+                if s.isspace():
                     break
                 rhs += s.byte_length()
 
-            if maxsplit > -1:
-                if items == maxsplit:
-                    output.append(self[lhs:])
-                    break
+            @parameter
+            if enable_maxsplit:
+                rhs += int(items == maxsplit) * (str_byte_len - rhs)
                 items += 1
 
-            output.append(self[lhs:rhs])
+            output.append(String(_build_slice(ptr, lhs, rhs)))
             lhs = rhs
 
-        return output
+        return output^
+
+    @always_inline("nodebug")
+    fn split(self, sep: NoneType = None) -> List[String]:
+        """Split the string by every Whitespace separator.
+
+        Args:
+            sep: None.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = String("      ").split() # []
+        _ = String("").split() # []
+
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = String("      hello    world     ").split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        _ = String(
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+        ).split()  # ["hello", "world"]
+        ```
+        .
+        """
+        return self.split[enable_maxsplit=False](None, maxsplit=-1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
@@ -2014,13 +2075,12 @@ struct String(
         var len_self = self.byte_length()
         var count = len_self * n + 1
         var buf = Self._buffer_type(capacity=count)
-        buf.resize(count, 0)
+        var ptr = buf.unsafe_ptr()
+        var s_ptr = self.unsafe_ptr()
         for i in range(n):
-            memcpy(
-                dest=buf.data + len_self * i,
-                src=self.unsafe_ptr(),
-                count=len_self,
-            )
+            memcpy(ptr + len_self * i, s_ptr, len_self)
+        ptr[len_self * n] = 0
+        buf.size = count
         return String(buf^)
 
     fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
