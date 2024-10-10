@@ -515,9 +515,9 @@ struct _ObjectImpl(
         lowest-common denominator type for performing comparisons, in order of
         increasing priority: bool, int, and then float.
         """
-        var lhsId = lhs.get_type_id()
-        var rhsId = rhs.get_type_id()
-        if lhsId == rhsId:
+        var lhs_id = lhs.get_type_id()
+        var rhs_id = rhs.get_type_id()
+        if lhs_id == rhs_id:
             return
 
         @parameter
@@ -530,10 +530,10 @@ struct _ObjectImpl(
                 else:
                     value = value.convert_int_to_float()
 
-        if lhsId > rhsId:
-            convert(rhs, rhsId, lhsId)
+        if lhs_id > rhs_id:
+            convert(rhs, rhs_id, lhs_id)
         else:
-            convert(lhs, lhsId, rhsId)
+            convert(lhs, lhs_id, rhs_id)
 
     @staticmethod
     fn coerce_arithmetic_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
@@ -1038,15 +1038,15 @@ struct object(
         """
         lhs._comparison_type_check()
         rhs._comparison_type_check()
-        var lhsValue = lhs._value
-        var rhsValue = rhs._value
-        _ObjectImpl.coerce_comparison_type(lhsValue, rhsValue)
-        if lhsValue.is_float():
-            return fp_func(lhsValue.get_as_float(), rhsValue.get_as_float())
-        if lhsValue.is_int():
-            return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
-        debug_assert(lhsValue.is_bool(), "expected both values to be bool")
-        return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
+        var lhs_value = lhs._value
+        var rhs_value = rhs._value
+        _ObjectImpl.coerce_comparison_type(lhs_value, rhs_value)
+        if lhs_value.is_float():
+            return fp_func(lhs_value.get_as_float(), rhs_value.get_as_float())
+        if lhs_value.is_int():
+            return int_func(lhs_value.get_as_int(), rhs_value.get_as_int())
+        debug_assert(lhs_value.is_bool(), "expected both values to be bool")
+        return bool_func(lhs_value.get_as_bool(), rhs_value.get_as_bool())
 
     @always_inline
     fn _string_compare(self, rhs: object) -> Int:
@@ -1249,12 +1249,12 @@ struct object(
         """
         lhs._arithmetic_type_check()
         rhs._arithmetic_type_check()
-        var lhsValue = lhs._value
-        var rhsValue = rhs._value
-        _ObjectImpl.coerce_arithmetic_type(lhsValue, rhsValue)
-        if lhsValue.is_float():
-            return fp_func(lhsValue.get_as_float(), rhsValue.get_as_float())
-        return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
+        var lhs_value = lhs._value
+        var rhs_value = rhs._value
+        _ObjectImpl.coerce_arithmetic_type(lhs_value, rhs_value)
+        if lhs_value.is_float():
+            return fp_func(lhs_value.get_as_float(), rhs_value.get_as_float())
+        return int_func(lhs_value.get_as_int(), rhs_value.get_as_int())
 
     @staticmethod
     @always_inline
@@ -1273,12 +1273,12 @@ struct object(
         """
         lhs._arithmetic_integral_type_check()
         rhs._arithmetic_integral_type_check()
-        var lhsValue = lhs._value
-        var rhsValue = rhs._value
-        _ObjectImpl.coerce_integral_type(lhsValue, rhsValue)
-        if lhsValue.is_int():
-            return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
-        return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
+        var lhs_value = lhs._value
+        var rhs_value = rhs._value
+        _ObjectImpl.coerce_integral_type(lhs_value, rhs_value)
+        if lhs_value.is_int():
+            return int_func(lhs_value.get_as_int(), rhs_value.get_as_int())
+        return bool_func(lhs_value.get_as_bool(), rhs_value.get_as_bool())
 
     @always_inline
     fn __neg__(self) raises -> object:
@@ -1323,14 +1323,14 @@ struct object(
             The sum or concatenated values.
         """
         if self._value.is_str() and rhs._value.is_str():
-            var lhsStr = self._value.get_as_string()
-            var rhsStr = rhs._value.get_as_string()
-            var length = lhsStr.length + rhsStr.length
+            var lhs_str = self._value.get_as_string()
+            var rhs_str = rhs._value.get_as_string()
+            var length = lhs_str.length + rhs_str.length
             var impl = _ImmutableString(
                 UnsafePointer[UInt8].alloc(length), length
             )
-            memcpy(impl.data, lhsStr.data, lhsStr.length)
-            memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
+            memcpy(impl.data, lhs_str.data, lhs_str.length)
+            memcpy(impl.data + lhs_str.length, rhs_str.data, rhs_str.length)
             var result = object()
             result._value = impl
             return result

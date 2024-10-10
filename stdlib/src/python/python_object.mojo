@@ -38,9 +38,9 @@ struct _PyIter(Sized):
 
     var iterator: PythonObject
     """The iterator object that stores location."""
-    var preparedNextItem: PythonObject
+    var prepared_next_item: PythonObject
     """The next item to vend or zero if there are no items."""
-    var isDone: Bool
+    var is_done: Bool
     """Stores True if the iterator is pointing to the last item."""
 
     # ===-------------------------------------------------------------------===#
@@ -54,8 +54,8 @@ struct _PyIter(Sized):
             existing: Initialized _PyIter instance.
         """
         self.iterator = existing.iterator
-        self.preparedNextItem = existing.preparedNextItem
-        self.isDone = existing.isDone
+        self.prepared_next_item = existing.prepared_next_item
+        self.is_done = existing.is_done
 
     fn __init__(inout self, iter: PythonObject):
         """Initialize an iterator.
@@ -65,19 +65,19 @@ struct _PyIter(Sized):
         """
         var cpython = _get_global_python_itf().cpython()
         self.iterator = iter
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
-        if maybeNextItem.is_null():
-            self.isDone = True
-            self.preparedNextItem = PythonObject(PyObjectPtr())
+        var maybe_next_item = cpython.PyIter_Next(self.iterator.py_object)
+        if maybe_next_item.is_null():
+            self.is_done = True
+            self.prepared_next_item = PythonObject(PyObjectPtr())
         else:
-            self.preparedNextItem = PythonObject(maybeNextItem)
-            self.isDone = False
+            self.prepared_next_item = PythonObject(maybe_next_item)
+            self.is_done = False
 
     fn __init__(inout self):
         """Initialize an empty iterator."""
         self.iterator = PythonObject(PyObjectPtr())
-        self.isDone = True
-        self.preparedNextItem = PythonObject(PyObjectPtr())
+        self.is_done = True
+        self.prepared_next_item = PythonObject(PyObjectPtr())
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -93,12 +93,12 @@ struct _PyIter(Sized):
         if not self.iterator:
             return self.iterator
         var cpython = _get_global_python_itf().cpython()
-        var current = self.preparedNextItem
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
-        if maybeNextItem.is_null():
-            self.isDone = True
+        var current = self.prepared_next_item
+        var maybe_next_item = cpython.PyIter_Next(self.iterator.py_object)
+        if maybe_next_item.is_null():
+            self.is_done = True
         else:
-            self.preparedNextItem = PythonObject(maybeNextItem)
+            self.prepared_next_item = PythonObject(maybe_next_item)
         return current
 
     @always_inline
@@ -111,7 +111,7 @@ struct _PyIter(Sized):
         Returns:
             0 if the traversal is complete and 1 otherwise.
         """
-        if self.isDone:
+        if self.is_done:
             return 0
         else:
             return 1
@@ -350,7 +350,7 @@ struct PythonObject(
             integer: The integer value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(integer)
+        self.py_object = cpython.to_python(integer)
 
     fn __init__(inout self, float: Float64):
         """Initialize the object with an floating-point value.
@@ -376,10 +376,10 @@ struct PythonObject(
 
         @parameter
         if dt == DType.bool:
-            self.py_object = cpython.toPython(value.__bool__())
+            self.py_object = cpython.to_python(value.__bool__())
         elif dt.is_integral():
             var int_val = value.cast[DType.index]().value
-            self.py_object = cpython.toPython(int_val)
+            self.py_object = cpython.to_python(int_val)
         else:
             var fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val)
@@ -391,7 +391,7 @@ struct PythonObject(
             value: The boolean value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(value)
+        self.py_object = cpython.to_python(value)
 
     fn __init__(inout self, value: StringLiteral):
         """Initialize the object from a string literal.
@@ -408,7 +408,7 @@ struct PythonObject(
             strref: The string reference.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(strref)
+        self.py_object = cpython.to_python(strref)
 
     fn __init__(inout self, string: String):
         """Initialize the object from a string.
@@ -417,7 +417,7 @@ struct PythonObject(
             string: The string value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(string._strref_dangerous())
+        self.py_object = cpython.to_python(string._strref_dangerous())
         string._strref_keepalive()
 
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
@@ -605,19 +605,19 @@ struct PythonObject(
             raise Error("Attribute is not found.")
         return PythonObject(result)
 
-    fn __setattr__(self, name: StringLiteral, newValue: PythonObject) raises:
+    fn __setattr__(self, name: StringLiteral, new_value: PythonObject) raises:
         """Set the given value for the object attribute with the given name.
 
         Args:
             name: The name of the object attribute to set.
-            newValue: The new value to be set for that attribute.
+            new_value: The new value to be set for that attribute.
         """
-        return self._setattr(name, newValue.py_object)
+        return self._setattr(name, new_value.py_object)
 
-    fn _setattr(self, name: StringLiteral, newValue: PyObjectPtr) raises:
+    fn _setattr(self, name: StringLiteral, new_value: PyObjectPtr) raises:
         var cpython = _get_global_python_itf().cpython()
         var result = cpython.PyObject_SetAttrString(
-            self.py_object, name, newValue
+            self.py_object, name, new_value
         )
         Python.throw_python_exception_if_error_state(cpython)
         if result < 0:
@@ -1364,7 +1364,7 @@ struct PythonObject(
 
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
-            var key = cpython.toPython(entry[].key._strref_dangerous())
+            var key = cpython.to_python(entry[].key._strref_dangerous())
             var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object
             )
