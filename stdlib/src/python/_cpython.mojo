@@ -206,10 +206,7 @@ struct PyMethodDef:
         #   type, similar to `get_linkage_name()`?
 
         return PyMethodDef(
-            c_char_ptr(func_name),
-            func,
-            METH_VARARGS,
-            c_char_ptr(docstring)
+            c_char_ptr(func_name), func, METH_VARARGS, c_char_ptr(docstring)
         )
 
 

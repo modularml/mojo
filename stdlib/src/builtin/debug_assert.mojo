@@ -297,7 +297,9 @@ fn _debug_assert_msg(
     @parameter
     if triple_is_nvidia_cuda():
         external_call["__assertfail", NoneType](
-            c_char_ptr("debug_assert message must be a single StringLiteral on GPU"),
+            c_char_ptr(
+                "debug_assert message must be a single StringLiteral on GPU"
+            ),
             c_char_ptr(loc.file_name),
             c_uint(loc.line),
             # TODO(MSTDL-962) pass through the funciton name here

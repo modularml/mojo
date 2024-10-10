@@ -49,10 +49,7 @@ fn fail_initialization(owned err: Error) -> PythonObject:
     cpython = get_cpython()
     error_type = cpython.get_error_global("PyExc_Exception")
 
-    cpython.PyErr_SetString(
-        error_type,
-        c_char_ptr(err)
-    )
+    cpython.PyErr_SetString(error_type, c_char_ptr(err))
     _ = err^
     return PythonObject(PyObjectPtr())
 

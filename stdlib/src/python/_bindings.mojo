@@ -165,10 +165,7 @@ fn create_empty_init_wrapper[T: Pythonable]() -> Typed_initproc:
             # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
             var error_type = cpython.get_error_global("PyExc_ValueError")
 
-            cpython.PyErr_SetString(
-                error_type,
-                c_char_ptr(e)
-            )
+            cpython.PyErr_SetString(error_type, c_char_ptr(e))
 
             return -1
 
@@ -266,10 +263,7 @@ fn create_wrapper_function[
             # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
             var error_type = cpython.get_error_global("PyExc_Exception")
 
-            cpython.PyErr_SetString(
-                error_type,
-                c_char_ptr(e)
-            )
+            cpython.PyErr_SetString(error_type, c_char_ptr(e))
 
             # Return a NULL `PyObject*`.
             return PythonObject(PyObjectPtr())

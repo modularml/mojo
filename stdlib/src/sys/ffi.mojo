@@ -193,8 +193,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         ]()
 
         var opaque_function_ptr: OpaquePointer = dlsym(
-            self.handle,
-            c_char_ptr(name)
+            self.handle, c_char_ptr(name)
         )
 
         return bool(opaque_function_ptr)
