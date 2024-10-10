@@ -13,7 +13,7 @@
 ##===----------------------------------------------------------------------===##
 set -euo pipefail
 
-LLVM_VERSION=18
+LLVM_VERSION=${1:-18}
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
 sudo ./llvm.sh $LLVM_VERSION
