@@ -1123,7 +1123,7 @@ struct Int(
         Args:
             hasher: The hasher instance.
         """
-        hasher._update_with_simd(Scalar[DType.int64](self))
+        hasher._update_with_simd(Int64(self))
 
     # ===-------------------------------------------------------------------===#
     # Methods
