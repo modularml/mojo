@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 from bit import pop_count
-from hashlib._ahash import hash
+from hashlib._ahash import hash, AHasher
 from hashlib.hash import hash as old_hash
 from testing import assert_equal, assert_not_equal, assert_true
 from memory import memset_zero, stack_allocation
@@ -584,11 +584,11 @@ fn gen_word_pairs[words: String = words_en]() -> List[String]:
     return result
 
 
-def dif_bits(i1: UInt, i2: UInt) -> Int:
-    return pop_count(i1 ^ i2)
+def dif_bits(i1: UInt64, i2: UInt64) -> Int:
+    return int(pop_count(i1 ^ i2))
 
 
-def assert_dif_hashes(hashes: List[UInt], upper_bound: Int):
+def assert_dif_hashes(hashes: List[UInt64], upper_bound: Int):
     for i in range(len(hashes)):
         for j in range(i + 1, len(hashes)):
             var diff = dif_bits(hashes[i], hashes[j])
@@ -644,8 +644,8 @@ def test_avalanche():
     # produce significatly different hash values
     var data = stack_allocation[256, UInt8]()
     memset_zero(data, 256)
-    var hashes0 = List[UInt]()
-    var hashes1 = List[UInt]()
+    var hashes0 = List[UInt64]()
+    var hashes1 = List[UInt64]()
     hashes0.append(hash(data, 256))
     hashes1.append(hash[SIMD[DType.uint64, 4](0, 1, 0, 0)](data, 256))
 
@@ -675,8 +675,8 @@ def test_trailing_zeros():
     var data = stack_allocation[8, UInt8]()
     memset_zero(data, 8)
     data[0] = 23
-    var hashes0 = List[UInt]()
-    var hashes1 = List[UInt]()
+    var hashes0 = List[UInt64]()
+    var hashes1 = List[UInt64]()
     for i in range(1, 9):
         hashes0.append(hash(data, i))
         hashes1.append(hash[SIMD[DType.uint64, 4](0, 1, 0, 0)](data, i))
@@ -702,7 +702,7 @@ def assert_fill_factor[
     var buckets = List[Int](0) * num_buckets
     for w in words:
         var h = hash(w[].unsafe_ptr(), w[].byte_length())
-        buckets[h % num_buckets] += 1
+        buckets[int(h) % num_buckets] += 1
     var unfilled = 0
     for v in buckets:
         if v[] == 0:
@@ -755,7 +755,7 @@ def test_fill_factor():
     assert_fill_factor["EL"](words, len(words), 0.63)
     assert_fill_factor["EL"](words, len(words) // 2, 0.86)
     assert_fill_factor["EL"](words, len(words) // 4, 0.98)
-    assert_fill_factor["EL"](words, len(words) // 12, 1.0)
+    assert_fill_factor["EL"](words, len(words) // 13, 1.0)
 
     assert_fill_factor_old_hash["EL"](words, len(words), 0.015)
 
@@ -800,8 +800,50 @@ def test_fill_factor():
     assert_fill_factor_old_hash["RU"](words, len(words), 0.015)
 
 
+def test_hash_simd_values():
+    fn hash(value: SIMD) -> UInt64:
+        var hasher = AHasher[SIMD[DType.uint64, 4](0)]()
+        hasher._update_with_simd(value)
+        return hasher^.finish()
+
+    assert_equal(hash(SIMD[DType.float16, 1](1.5)), 18058966248987367737)
+    assert_equal(hash(SIMD[DType.float32, 1](1.5)), 13467270117196531127)
+    assert_equal(hash(SIMD[DType.float64, 1](1.5)), 719560574162820089)
+    assert_equal(hash(SIMD[DType.float16, 1](1)), 1206414632147291024)
+    assert_equal(hash(SIMD[DType.float32, 1](1)), 9557262614467209093)
+    assert_equal(hash(SIMD[DType.float64, 1](1)), 7961842588256067709)
+
+    assert_equal(hash(SIMD[DType.int8, 1](1)), 4759877148789019546)
+    assert_equal(hash(SIMD[DType.int16, 1](1)), 4759877148789019546)
+    assert_equal(hash(SIMD[DType.int32, 1](1)), 4759877148789019546)
+    assert_equal(hash(SIMD[DType.int64, 1](1)), 4759877148789019546)
+    assert_equal(hash(SIMD[DType.bool, 1](True)), 4759877148789019546)
+
+    assert_equal(hash(SIMD[DType.int8, 1](-1)), 7301741325190448010)
+    assert_equal(hash(SIMD[DType.int16, 1](-1)), 7301741325190448010)
+    assert_equal(hash(SIMD[DType.int32, 1](-1)), 7301741325190448010)
+    assert_equal(hash(SIMD[DType.int64, 1](-1)), 7301741325190448010)
+
+    assert_equal(hash(SIMD[DType.int8, 1](0)), 16659764227661506736)
+    assert_equal(hash(SIMD[DType.int8, 2](0)), 1562284133626399299)
+    assert_equal(hash(SIMD[DType.int8, 4](0)), 17902233708981521127)
+    assert_equal(hash(SIMD[DType.int8, 8](0)), 632562262308536351)
+    assert_equal(hash(SIMD[DType.int8, 16](0)), 7298276873920245913)
+    assert_equal(hash(SIMD[DType.int8, 32](0)), 7079057015559465054)
+    assert_equal(hash(SIMD[DType.int8, 64](0)), 11911213625103275990)
+
+    assert_equal(hash(SIMD[DType.int32, 1](0)), 16659764227661506736)
+    assert_equal(hash(SIMD[DType.int32, 2](0)), 1562284133626399299)
+    assert_equal(hash(SIMD[DType.int32, 4](0)), 17902233708981521127)
+    assert_equal(hash(SIMD[DType.int32, 8](0)), 632562262308536351)
+    assert_equal(hash(SIMD[DType.int32, 16](0)), 7298276873920245913)
+    assert_equal(hash(SIMD[DType.int32, 32](0)), 7079057015559465054)
+    assert_equal(hash(SIMD[DType.int32, 64](0)), 11911213625103275990)
+
+
 def main():
     test_hash_byte_array()
     test_avalanche()
     test_trailing_zeros()
     test_fill_factor()
+    test_hash_simd_values()

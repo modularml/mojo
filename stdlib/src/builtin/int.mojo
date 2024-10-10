@@ -593,8 +593,8 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
-        div = select(self > 0 & rhs > 0, div, divMod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
+        div = select(self > 0 & rhs > 0, div, div_mod)
         div = select(rhs == 0, 0, div)
         return div
 
@@ -612,9 +612,9 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
         mod = select(
-            self > 0 & rhs > 0, self._positive_rem(denominator), divMod
+            self > 0 & rhs > 0, self._positive_rem(denominator), div_mod
         )
         mod = select(rhs == 0, 0, mod)
         return mod
