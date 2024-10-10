@@ -1980,6 +1980,7 @@ struct String(
             return self[: -suffix.byte_length()]
         return self
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
         If the string cannot be parsed as an int, an error is raised.
@@ -1989,6 +1990,7 @@ struct String(
         """
         return atol(self)
 
+    @always_inline
     fn __float__(self) raises -> Float64:
         """Parses the string as a float point number and returns that value. If
         the string cannot be parsed as a float, an error is raised.

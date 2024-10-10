@@ -837,9 +837,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     @staticmethod
     fn format[T: _Stringlike](fmt_src: T, args: Self._args_t) raises -> String:
         alias len_pos_args = __type_of(args).__len__()
-        var entries_size_est = Self._create_entries(fmt_src, len_pos_args)
+        entries, size_estimation = Self._create_entries(fmt_src, len_pos_args)
         var fmt_len = fmt_src.byte_length()
-        var buf = String._buffer_type(capacity=fmt_len + entries_size_est[1])
+        var buf = String._buffer_type(capacity=fmt_len + size_estimation)
         buf.size = 1
         buf.unsafe_set(0, 0)
         var res = String(buf^)
@@ -852,7 +852,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
         var auto_arg_index = 0
-        for e in entries_size_est[0]:
+        for e in entries:
             debug_assert(offset < fmt_len, "offset >= self.byte_length()")
             res += _build_slice(ptr, offset, e[].first_curly)
             Self._format_entry[len_pos_args](res, e[], auto_arg_index, args)
@@ -1342,7 +1342,9 @@ struct _FormatSpec:
             item: The item to stringify.
         """
         var type_implements_float = True  # TODO
+        var type_implements_float_raising = True  # TODO
         var type_implements_int = True  # TODO
+        var type_implements_int_raising = True  # TODO
 
         # TODO: transform to int/float depending on format spec and stringify
         # with hex/bin/oct etc.
