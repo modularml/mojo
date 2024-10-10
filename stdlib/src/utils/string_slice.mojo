@@ -1000,9 +1000,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         var extra = int(new_idx < field_len)
         var fmt_field = _build_slice(field_ptr, new_idx + extra, field_len)
-        # self.format_spec = _FormatSpec.parse(fmt_field)
-        # var w = int(self.format_spec.value().width) if self.format_spec else 0
-        var w = 0
+        self.format_spec = _FormatSpec.parse(fmt_field)
+        var w = int(self.format_spec.value().width) if self.format_spec else 0
         # fully guessing the byte width here to be at least 8 bytes per entry
         # minus the length of the whole format specification
         total_estimated_entry_byte_width += 8 * int(w > 0) + w - (field_len + 2)
@@ -1308,7 +1307,7 @@ struct _FormatSpec:
         self.type = type
 
     @staticmethod
-    fn parse(fmt_str: StringSlice) raises -> Optional[Self]:
+    fn parse(fmt_str: StringSlice) -> Optional[Self]:
         """Parses the format spec string.
 
         Args:
@@ -1330,8 +1329,8 @@ struct _FormatSpec:
         if colon_idx == -1:
             return None
 
-        # TODO: Future implementation of format specifiers (remove raises after)
-        raise Error("format specifiers not supported yet.")
+        # TODO: Future implementation of format specifiers
+        return None
 
     fn stringify[
         T: _CurlyEntryFormattable
