@@ -188,6 +188,10 @@ what we publish.
     print((a[0, 1])) # 2
     ```
 
+- [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
+  [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
+  compared for pointer equivalence using `a is b`.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
