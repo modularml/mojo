@@ -202,7 +202,6 @@ struct Error(
         """
         return self.data
 
-
     fn _message(self) -> String:
         """Converts the Error to string representation.
 
