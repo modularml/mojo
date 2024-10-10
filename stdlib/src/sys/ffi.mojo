@@ -85,7 +85,7 @@ fn _c_long_long_dtype() -> DType:
         return abort[DType]()
 
 trait _UnsafePtrU8:
-    fn unsafe_ptr() -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         ...
 
 @always_inline
