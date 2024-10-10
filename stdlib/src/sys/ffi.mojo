@@ -428,7 +428,7 @@ fn external_call[
         return __mlir_op.`pop.external_call`[func = callee.value, _type=type](p)
 
 
-# FIXME: no one should be having to set variadicType to do externall call
+# FIXME: no one should be having to do manual pop.external_call for extra_args
 # TODO: variadic_type should be built at compile type by iterating over
 # __type_of(args) and somehow getting the mlir type string out and concatenating
 # @always_inline("nodebug")

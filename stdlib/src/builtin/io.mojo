@@ -158,17 +158,26 @@ fn _flush(file: FileDescriptor = stdout):
 fn _printf[
     fmt: StringLiteral, *types: AnyType
 ](*args: *types, file: FileDescriptor = stdout):
+    var loaded_pack = args._get_loaded_kgen_pack()
+
     @parameter
     if triple_is_nvidia_cuda():
-        var loaded_pack = args._get_loaded_kgen_pack()
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
-            _ = external_call["KGEN_CompilerRT_fprintf", Int32](
-                fd, fmt.unsafe_cstr_ptr(), args
-            )
+            # FIXME: externall_call should handle this
+            _ = __mlir_op.`pop.external_call`[
+                func = "KGEN_CompilerRT_fprintf".value,
+                variadicType = __mlir_attr[
+                    `(`,
+                    `!kgen.pointer<none>,`,
+                    `!kgen.pointer<scalar<si8>>`,
+                    `) -> !pop.scalar<si32>`,
+                ],
+                _type=Int32,
+            ](fd, fmt.unsafe_cstr_ptr(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
