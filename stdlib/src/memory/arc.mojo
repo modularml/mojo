@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -170,3 +170,25 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             The current amount of references to the pointee.
         """
         return self._inner[].refcount.load()
+
+    fn __is__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at the same object.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at the same object and False otherwise.
+        """
+        return self._inner == rhs._inner
+
+    fn __isnot__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at different objects.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at different objects and False otherwise.
+        """
+        return self._inner != rhs._inner
