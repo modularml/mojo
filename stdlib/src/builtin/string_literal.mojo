@@ -360,7 +360,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes_span(self) -> Span[UInt8, StaticConstantLifetime]:
+    fn as_bytes(self) -> Span[UInt8, StaticConstantLifetime]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 

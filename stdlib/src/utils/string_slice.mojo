@@ -463,7 +463,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes_span(self) -> Span[UInt8, lifetime]:
+    fn as_bytes(self) -> Span[UInt8, lifetime]:
         """Get the sequence of encoded bytes as a slice of the underlying string.
 
         Returns:
@@ -489,7 +489,7 @@ struct StringSlice[
             The length of this string slice in bytes.
         """
 
-        return len(self.as_bytes_span())
+        return len(self.as_bytes())
 
     fn _strref_dangerous(self) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.

@@ -1425,7 +1425,7 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes_span()[1:-1])
+            values = StringSlice(unsafe_from_utf8=output.as_bytes()[1:-1])
 
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
