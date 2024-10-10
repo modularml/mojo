@@ -25,7 +25,6 @@ from sys import (
 from sys._libc import dup, fclose, fdopen, fflush
 from sys.ffi import OpaquePointer
 
-from builtin.builtin_list import _LITRefPackHelper
 from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
@@ -158,29 +157,18 @@ fn _flush(file: FileDescriptor = stdout):
 @no_inline
 fn _printf[
     fmt: StringLiteral, *types: AnyType
-](*arguments: *types, file: FileDescriptor = stdout):
-    # The argument pack will contain references for each value in the pack,
-    # but we want to pass their values directly into the C printf call. Load
-    # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
-
+](*args: *types, file: FileDescriptor = stdout):
     @parameter
     if triple_is_nvidia_cuda():
+        var loaded_pack = args._get_loaded_kgen_pack()
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
-            _ = __mlir_op.`pop.external_call`[
-                func = "KGEN_CompilerRT_fprintf".value,
-                variadicType = __mlir_attr[
-                    `(`,
-                    `!kgen.pointer<none>,`,
-                    `!kgen.pointer<scalar<si8>>`,
-                    `) -> !pop.scalar<si32>`,
-                ],
-                _type=Int32,
-            ](fd, fmt.unsafe_cstr_ptr(), loaded_pack)
+            _ = external_call["KGEN_CompilerRT_fprintf", Int32](
+                fd, fmt.unsafe_cstr_ptr(), args
+            )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -191,7 +179,7 @@ fn _printf[
 @no_inline
 fn _snprintf[
     fmt: StringLiteral, *types: AnyType
-](str: UnsafePointer[UInt8], size: Int, *arguments: *types) -> Int:
+](str: UnsafePointer[UInt8], size: Int, *args: *types) -> Int:
     """Writes a format string into an output pointer.
 
     Parameters:
@@ -201,29 +189,24 @@ fn _snprintf[
     Args:
         str: A pointer into which the format string is written.
         size: At most, `size - 1` bytes are written into the output string.
-        arguments: Arguments interpolated into the format string.
+        args: Arguments interpolated into the format string.
 
     Returns:
         The number of bytes written into the output string.
     """
-    # The argument pack will contain references for each value in the pack,
-    # but we want to pass their values directly into the C snprintf call. Load
-    # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
-
-    return int(
-        __mlir_op.`pop.external_call`[
-            func = "snprintf".value,
-            variadicType = __mlir_attr[
-                `(`,
-                `!kgen.pointer<scalar<si8>>,`,
-                `!pop.scalar<index>, `,
-                `!kgen.pointer<scalar<si8>>`,
-                `) -> !pop.scalar<si32>`,
-            ],
-            _type=Int32,
-        ](str, size, fmt.unsafe_cstr_ptr(), loaded_pack)
-    )
+    # FIXME: externall_call should handle this
+    var num = __mlir_op.`pop.external_call`[
+        func = "snprintf".value,
+        variadicType = __mlir_attr[
+            `(`,
+            `!kgen.pointer<scalar<si8>>,`,
+            `!pop.scalar<index>, `,
+            `!kgen.pointer<scalar<si8>>`,
+            `) -> !pop.scalar<si32>`,
+        ],
+        _type=Int32,
+    ](str, size, fmt.unsafe_cstr_ptr(), args._get_loaded_kgen_pack())
+    return int(num)
 
 
 @no_inline

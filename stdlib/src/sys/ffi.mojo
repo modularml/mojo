@@ -19,7 +19,6 @@ from utils import StringRef
 
 from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
 from .intrinsics import _mlirtype_is_eq
-from builtin.builtin_list import _LITRefPackHelper
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
 
@@ -383,39 +382,93 @@ fn _get_dylib_function[
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@always_inline
 fn external_call[
     callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
-](*arguments: *types) -> type:
+](*args: *types) -> type:
     """Calls an external function.
 
     Args:
-      arguments: The arguments to pass to the external function.
+        args: The arguments to pass to the external function.
 
     Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      types: The argument types.
+        callee: The name of the external function.
+        type: The return type.
+        types: The argument types.
 
     Returns:
-      The external call result.
+        The external call result.
     """
+    return external_call[callee, type](args)
 
-    # The argument pack will contain references for each value in the pack,
-    # but we want to pass their values directly into the C printf call. Load
-    # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral, type: AnyTrivialRegType
+](args: VariadicPack) -> type:
+    """Calls an external function.
+
+    Args:
+        args: The arguments to pass to the external function.
+
+    Parameters:
+        callee: The name of the external function.
+        type: The return type.
+
+    Returns:
+        The external call result.
+    """
+    var p = args._get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            loaded_pack
-        )
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](p)
         return rebind[type](None)
     else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            loaded_pack
-        )
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](p)
+
+
+# FIXME: no one should be having to set variadicType to do externall call
+# TODO: variadic_type should be built at compile type by iterating over
+# __type_of(args) and somehow getting the mlir type string out and concatenating
+# @always_inline("nodebug")
+# fn external_call[
+#     callee: StringLiteral, type: AnyTrivialRegType, variadic_type: StringLiteral
+# ](args: VariadicPack, extra_args: VariadicPack) -> type:
+#     """Calls an external function.
+
+#     Parameters:
+#         callee: The name of the external function.
+#         type: The return type.
+#         variadic_type: The MLIR attribute string defining the function call for
+#             `args` e.g. `"(!kgen.pointer<scalar<si8>>,!pop.scalar<index>,
+#             !kgen.pointer<scalar<si8>>) -> !pop.scalar<si32>"`.
+
+#     Args:
+#         args: The arguments to pass to the external function.
+#         extra_args: The extra arguments to pass to the external function as an
+#             undefined length of data usually denoted by `...`.
+
+#     Returns:
+#         The external call result.
+#     """
+#     var p = args._get_loaded_kgen_pack()
+#     var e = extra_args._get_loaded_kgen_pack()
+
+#     @parameter
+#     if _mlirtype_is_eq[type, NoneType]():
+#         __mlir_op.`pop.external_call`[
+#             func = callee.value,
+#             variadicType = __mlir_attr[variadic_type],
+#             _type=None,
+#         ](p, e)
+#         return rebind[type](None)
+#     else:
+#         return __mlir_op.`pop.external_call`[
+#             func = callee.value,
+#             variadicType = __mlir_attr[variadic_type],
+#             _type=type,
+#         ](p, e)
 
 
 # ===----------------------------------------------------------------------===#
@@ -426,13 +479,13 @@ fn external_call[
 @always_inline("nodebug")
 fn _external_call_const[
     callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
-](*arguments: *types) -> type:
+](*args: *types) -> type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
     to the same function.
 
     Args:
-      arguments: The arguments to pass to the external function.
+      args: The arguments to pass to the external function.
 
     Parameters:
       callee: The name of the external function.
@@ -442,11 +495,6 @@ fn _external_call_const[
     Returns:
       The external call result.
     """
-
-    # The argument pack will contain references for each value in the pack,
-    # but we want to pass their values directly into the C printf call. Load
-    # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
     return __mlir_op.`pop.external_call`[
         func = callee.value,
@@ -458,4 +506,4 @@ fn _external_call_const[
             `inaccessibleMem = none>`,
         ],
         _type=type,
-    ](loaded_pack)
+    ](args._get_loaded_kgen_pack())
