@@ -1540,3 +1540,31 @@ struct CPython:
             fn (PyObjectPtr) -> c_int
         ]("PySequence_Check")(obj)
         return follows_seq_protocol != 0
+
+    # ===-------------------------------------------------------------------===#
+    # Python Slice Creation
+    # ===-------------------------------------------------------------------===#
+
+    # PyObject *PySlice_New(PyObject *start, PyObject *stop, PyObject *step)
+    # ref: https://docs.python.org/3/c-api/slice.html#c.PySlice_New
+    fn PySlice_New(
+        inout self, start: PyObjectPtr, stop: PyObjectPtr, step: PyObjectPtr
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PySlice_New")(start, stop, step)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PySlice_New, refcnt:",
+            self._Py_REFCNT(r),
+            ", start:",
+            start._get_ptr_as_int(),
+            ", stop:",
+            stop._get_ptr_as_int(),
+            ", step:",
+            step._get_ptr_as_int(),
+        )
+
+        self._inc_total_rc()
+        return r
