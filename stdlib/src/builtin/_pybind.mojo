@@ -14,7 +14,7 @@
 from memory import UnsafePointer
 
 from sys import sizeof, alignof
-from sys.ffi import OpaquePointer
+from sys.ffi import OpaquePointer, c_char_ptr
 
 import python._cpython as cp
 from python import TypedPythonObject, Python, PythonObject
@@ -51,7 +51,7 @@ fn fail_initialization(owned err: Error) -> PythonObject:
 
     cpython.PyErr_SetString(
         error_type,
-        err.unsafe_cstr_ptr(),
+        c_char_ptr(err)
     )
     _ = err^
     return PythonObject(PyObjectPtr())
@@ -119,7 +119,7 @@ fn gen_pytype_wrapper[
     spec.init_pointee_move(
         PyType_Spec {
             # FIXME(MOCO-1306): This should be `T.__name__`.
-            name: name.unsafe_cstr_ptr(),
+            name: c_char_ptr(name),
             basicsize: sizeof[T](),
             itemsize: 0,
             flags: cp.Py_TPFLAGS_DEFAULT,

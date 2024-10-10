@@ -333,7 +333,7 @@ struct StringLiteral(
         return ptr.bitcast[UInt8]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
+    @deprecated("Use `sys.ffi::c_char_ptr() -> UnsafePointer[c_char]` instead.")
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 

@@ -13,7 +13,7 @@
 
 from memory import UnsafePointer, Box
 
-from sys.ffi import c_int
+from sys.ffi import c_int, c_char_ptr
 from sys.info import sizeof
 
 from os import abort
@@ -90,7 +90,7 @@ struct PyMojoObject[T: Pythonable]:
         )
 
         var type_spec = PyType_Spec {
-            name: type_name.unsafe_cstr_ptr(),
+            name: c_char_ptr(type_name),
             basicsize: sizeof[PyMojoObject[T]](),
             itemsize: 0,
             flags: Py_TPFLAGS_DEFAULT,
@@ -167,7 +167,7 @@ fn create_empty_init_wrapper[T: Pythonable]() -> Typed_initproc:
 
             cpython.PyErr_SetString(
                 error_type,
-                e.unsafe_cstr_ptr(),
+                c_char_ptr(e)
             )
 
             return -1
@@ -268,7 +268,7 @@ fn create_wrapper_function[
 
             cpython.PyErr_SetString(
                 error_type,
-                e.unsafe_cstr_ptr(),
+                c_char_ptr(e)
             )
 
             # Return a NULL `PyObject*`.

@@ -20,7 +20,7 @@ from os import abort
 from sys import is_defined, triple_is_nvidia_cuda
 from sys._build import is_debug_build
 from sys.param_env import env_get_string
-from sys.ffi import external_call, c_uint, c_size_t, c_char
+from sys.ffi import external_call, c_uint, c_size_t, c_char, c_char_ptr
 from sys.info import sizeof
 from memory import UnsafePointer
 
@@ -297,12 +297,11 @@ fn _debug_assert_msg(
     @parameter
     if triple_is_nvidia_cuda():
         external_call["__assertfail", NoneType](
-            "debug_assert message must be a single StringLiteral on GPU"
-            .unsafe_cstr_ptr(),
-            loc.file_name.unsafe_cstr_ptr(),
+            c_char_ptr("debug_assert message must be a single StringLiteral on GPU"),
+            c_char_ptr(loc.file_name),
             c_uint(loc.line),
             # TODO(MSTDL-962) pass through the funciton name here
-            "kernel".unsafe_cstr_ptr(),
+            c_char_ptr("kernel"),
             c_size_t(sizeof[Int8]()),
         )
 
@@ -330,11 +329,11 @@ fn _debug_assert_msg_literal(message: StringLiteral, loc: _SourceLocation):
     @parameter
     if triple_is_nvidia_cuda():
         external_call["__assertfail", NoneType](
-            message.unsafe_cstr_ptr(),
-            loc.file_name.unsafe_cstr_ptr(),
+            c_char_ptr(message),
+            c_char_ptr(loc.file_name),
             c_uint(loc.line),
             # TODO(MSTDL-962) pass through the funciton name here
-            "kernel".unsafe_cstr_ptr(),
+            c_char_ptr("kernel"),
             c_size_t(sizeof[Int8]()),
         )
     else:

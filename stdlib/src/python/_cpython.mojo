@@ -23,7 +23,7 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
+from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer, c_char_ptr
 
 from python.python import _get_global_python_itf
 from python._bindings import Typed_initproc
@@ -206,10 +206,10 @@ struct PyMethodDef:
         #   type, similar to `get_linkage_name()`?
 
         return PyMethodDef(
-            func_name.unsafe_cstr_ptr(),
+            c_char_ptr(func_name),
             func,
             METH_VARARGS,
-            docstring.unsafe_cstr_ptr(),
+            c_char_ptr(docstring)
         )
 
 
@@ -432,7 +432,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
 
     fn __init__(inout self, name: String):
         self.base = PyModuleDef_Base()
-        self.name = name.unsafe_cstr_ptr()
+        self.name = c_char_ptr(name)
         self.docstring = UnsafePointer[c_char]()
         # means that the module does not support sub-interpreters
         self.size = -1
@@ -1393,7 +1393,7 @@ struct CPython:
                 UnsafePointer[c_char],
             ) -> PyObjectPtr
         ](StringRef("PyUnicode_DecodeUTF8"))(
-            strref.data, strref.length, "strict".unsafe_cstr_ptr()
+            strref.data, strref.length, c_char_ptr("strict")
         )
 
         self.log(

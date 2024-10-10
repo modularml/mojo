@@ -22,6 +22,7 @@ from .intrinsics import _mlirtype_is_eq
 from builtin.builtin_list import _LITRefPackHelper
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
+from sys.ffi import c_char_ptr
 
 alias c_char = Int8
 """C `char` type."""
@@ -86,6 +87,38 @@ fn _c_long_long_dtype() -> DType:
         return abort[DType]()
 
 
+@always_inline
+fn c_char_ptr[T: _UnsafePtrU8](item: T) -> UnsafePointer[c_char]:
+    """Get the C.char pointer.
+
+    Parameters:
+        T: The type.
+
+    Args:
+        item: The item.
+
+    Returns:
+        The pointer.
+    """
+    return item.unsafe_ptr().bitcast[c_char]()
+
+
+@always_inline
+fn c_char_ptr[T: AnyType](ptr: UnsafePointer[T]) -> UnsafePointer[c_char]:
+    """Get the C.char pointer.
+
+    Parameters:
+        T: The type.
+
+    Args:
+        ptr: The pointer.
+
+    Returns:
+        The pointer.
+    """
+    return ptr.bitcast[c_char]()
+
+
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
 
@@ -129,7 +162,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         @parameter
         if not os_is_windows():
-            var handle = dlopen(path.unsafe_cstr_ptr(), flags)
+            var handle = dlopen(c_char_ptr(path), flags)
             if handle == OpaquePointer():
                 var error_message = dlerror()
                 abort("dlopen failed: " + String(error_message))
@@ -161,7 +194,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         var opaque_function_ptr: OpaquePointer = dlsym(
             self.handle,
-            name.unsafe_cstr_ptr(),
+            c_char_ptr(name)
         )
 
         return bool(opaque_function_ptr)
@@ -203,7 +236,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name.unsafe_cstr_ptr())
+        return self._get_function[result_type](c_char_ptr(name))
 
     @always_inline
     fn _get_function[
@@ -244,7 +277,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.unsafe_cstr_ptr())
+        return self._get_function[result_type](c_char_ptr(func_name))
 
     fn get_symbol[
         result_type: AnyType,
@@ -261,7 +294,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         Returns:
             A pointer to the symbol.
         """
-        return self.get_symbol[result_type](name.unsafe_cstr_ptr())
+        return self.get_symbol[result_type](c_char_ptr(name))
 
     fn get_symbol[
         result_type: AnyType

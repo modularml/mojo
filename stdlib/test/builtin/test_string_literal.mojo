@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.ffi import c_char
+from sys.ffi import c_char, c_char_ptr
 from memory import UnsafePointer
 
 from testing import (
@@ -227,7 +227,7 @@ def test_layout():
     # assert_equal(empty[0], 0)
 
     # Test non-empty StringLiteral C string
-    var ptr: UnsafePointer[c_char] = "hello".unsafe_cstr_ptr()
+    var ptr: UnsafePointer[c_char] = c_char_ptr("hello")
     assert_equal(ptr[0], ord("h"))
     assert_equal(ptr[1], ord("e"))
     assert_equal(ptr[2], ord("l"))

@@ -183,6 +183,7 @@ struct Error(
     # Methods
     # ===-------------------------------------------------------------------===#
 
+    @deprecated("Use `sys.ffi::c_char_ptr() -> UnsafePointer[c_char]` instead.")
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 

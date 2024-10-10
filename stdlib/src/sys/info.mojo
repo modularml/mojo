@@ -19,7 +19,7 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
+from .ffi import _external_call_const, external_call, OpaquePointer, c_char_ptr
 from memory import UnsafePointer
 
 
@@ -793,7 +793,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     var buf_len = Int(INITIAL_CAPACITY)
 
     var err = external_call["sysctlbyname", Int32](
-        "kern.osproductversion".unsafe_cstr_ptr(),
+        c_char_ptr("kern.osproductversion"),
         buf.data,
         Pointer.address_of(buf_len),
         OpaquePointer(),
