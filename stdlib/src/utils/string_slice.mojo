@@ -561,27 +561,22 @@ struct StringSlice[
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return 0
+        # FIXME(#3526): this should return unicode codepoint offsets
+        return self.as_bytes_span().find(substr.as_bytes_span(), start)
 
-        if self.byte_length() < substr.byte_length() + start:
-            return -1
+    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
+        """Finds the offset of the last occurrence of `substr` starting at
+        `start`. If not found, returns -1.
 
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
+        Args:
+          substr: The substring to find.
+          start: The offset from which to find.
 
-        var loc = stringref._memmem(
-            haystack_str.unsafe_ptr(),
-            haystack_str.byte_length(),
-            substr.unsafe_ptr(),
-            substr.byte_length(),
-        )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
+        Returns:
+          The offset of `substr` relative to the beginning of the string.
+        """
+        # FIXME(#3526): this should return unicode codepoint offsets
+        return self.as_bytes_span().rfind(substr.as_bytes_span(), start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a

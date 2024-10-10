@@ -1511,7 +1511,6 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-
         return self.as_string_slice().find(substr.as_string_slice(), start)
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
@@ -1525,10 +1524,7 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-
-        return self._strref_dangerous().rfind(
-            substr._strref_dangerous(), start=start
-        )
+        return self.as_string_slice().rfind(substr.as_string_slice(), start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given String is a
