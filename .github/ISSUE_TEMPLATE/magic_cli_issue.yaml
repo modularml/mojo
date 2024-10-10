@@ -1,0 +1,59 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2024, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+name: Magic CLI issue
+description: Create an issue for the Magic CLI tool.
+title: "[Magic CLI]: "
+labels:
+  - magic-cli
+  - mojo-repo
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out an issue report!
+
+        Please provide a descriptive title above and fill in the following fields.
+
+  - type: textarea
+    id: Description
+    attributes:
+      label: Issue description
+      description: Describe the issue you encountered and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: Steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the specific steps to reproduce the issue.
+      value: |
+        - Include relevant code snippet that did not work as expected.
+        - If applicable, add screenshots to help explain the problem.
+        - Include anything else that might help us debug the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: Context
+    attributes:
+      label: Version Info
+      description: Which version of the Magic CLI are you using?
+      value: |
+        - Provide magic CLI version by pasting the output of `magic --version`
+        - What OS did you install the magic CLI on?
+        - If you're on Linux include the flavor and version e.g. Ubuntu 22.04.
+        - Include your CPU architecture e.g. x86-64 or arm64.
+        - If related to unresolvable dependencies, include the contents of your
+        `magic.lock` file.
+      render: shell
