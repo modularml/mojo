@@ -376,8 +376,14 @@ struct SIMD[type: DType, size: Int](
             ),
         )
 
-        self = __mlir_op.`kgen.undef`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        self = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[
+                `!pop.simd<`, size.value, `, `, type.value, `>`
+            ],
+            value = __mlir_attr[
+                `#kgen.unknown : `,
+                __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
+            ],
         ]()
 
         @parameter
@@ -1842,10 +1848,16 @@ struct SIMD[type: DType, size: Int](
         fn _convert_variadic_to_pop_array[
             *mask: Int
         ]() -> __mlir_type[`!pop.array<`, output_size.value, `, `, Int, `>`]:
-            var array = __mlir_op.`kgen.undef`[
+            var array = __mlir_op.`kgen.param.constant`[
                 _type = __mlir_type[
                     `!pop.array<`, output_size.value, `, `, Int, `>`
-                ]
+                ],
+                value = __mlir_attr[
+                    `#kgen.unknown : `,
+                    __mlir_type[
+                        `!pop.array<`, output_size.value, `, `, Int, `>`
+                    ],
+                ],
             ]()
 
             var array_ptr = UnsafePointer.address_of(array)

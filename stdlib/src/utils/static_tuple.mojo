@@ -77,8 +77,13 @@ fn _create_array[
         ](lst[0])
 
     debug_assert(size == len(lst), "mismatch in the number of elements")
-    var array = __mlir_op.`kgen.undef`[
-        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+
+    var array = __mlir_op.`kgen.param.constant`[
+        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        value = __mlir_attr[
+            `#kgen.unknown : `,
+            __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        ],
     ]()
 
     @parameter
@@ -124,7 +129,10 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     fn __init__(inout self):
         """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[size]()
-        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self.array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     @always_inline
     fn __init__(inout self, *elems: Self.element_type):
