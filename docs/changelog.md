@@ -261,6 +261,9 @@ what we publish.
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
 
+- `String.as_bytes()` now returns a `Span[UInt8]` instead of a `List[Int8]`. The
+  old behavior can be achieved by using `List(s.as_bytes())`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
