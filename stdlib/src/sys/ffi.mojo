@@ -85,43 +85,6 @@ fn _c_long_long_dtype() -> DType:
         return abort[DType]()
 
 
-trait _UnsafePtrU8:
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        ...
-
-
-@always_inline
-fn char_ptr[T: _UnsafePtrU8](item: T) -> UnsafePointer[c_char]:
-    """Get the C.char pointer.
-
-    Parameters:
-        T: The type.
-
-    Args:
-        item: The item.
-
-    Returns:
-        The pointer.
-    """
-    return item.unsafe_ptr().bitcast[c_char]()
-
-
-@always_inline
-fn char_ptr[T: AnyType](ptr: UnsafePointer[T]) -> UnsafePointer[c_char]:
-    """Get the C.char pointer.
-
-    Parameters:
-        T: The type.
-
-    Args:
-        ptr: The pointer.
-
-    Returns:
-        The pointer.
-    """
-    return ptr.bitcast[c_char]()
-
-
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
 

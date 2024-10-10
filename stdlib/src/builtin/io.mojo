@@ -23,7 +23,7 @@ from sys import (
     _libc as libc,
 )
 from sys._libc import dup, fclose, fdopen, fflush
-from sys.ffi import OpaquePointer, char_ptr
+from sys.ffi import OpaquePointer, c_char
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
@@ -159,7 +159,7 @@ fn _printf[
     fmt: StringLiteral, *types: AnyType
 ](*args: *types, file: FileDescriptor = stdout):
     var loaded_pack = args._get_loaded_kgen_pack()
-    var f = char_ptr(fmt)
+    var f = fmt.unsafe_ptr().bitcast[c_char]()
 
     @parameter
     if triple_is_nvidia_cuda():
@@ -202,6 +202,7 @@ fn _snprintf[
     Returns:
         The number of bytes written into the output string.
     """
+    var f = fmt.unsafe_ptr().bitcast[c_char]()
     # FIXME: externall_call should handle this
     var num = __mlir_op.`pop.external_call`[
         func = "snprintf".value,
@@ -213,7 +214,7 @@ fn _snprintf[
             `) -> !pop.scalar<si32>`,
         ],
         _type=Int32,
-    ](char_ptr(str), size, char_ptr(fmt), args._get_loaded_kgen_pack())
+    ](str.bitcast[c_char](), size, f, args._get_loaded_kgen_pack())
     return int(num)
 
 
