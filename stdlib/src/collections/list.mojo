@@ -23,7 +23,7 @@ from collections import List
 from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
-from memory import Pointer, UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy, memset
 from utils import Span
 
 from .optional import Optional
@@ -644,8 +644,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.resize(new_size)
         else:
             self.reserve(new_size)
-            for i in range(self.size, new_size):
-                (self.data + i).init_pointee_copy(value)
+            memset(self.data + self.size, value, new_size - self.size)
             self.size = new_size
 
     fn resize(inout self, new_size: Int):
