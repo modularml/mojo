@@ -94,6 +94,9 @@ trait _UnsafePtrU8:
 fn char_ptr[T: _UnsafePtrU8](item: T) -> UnsafePointer[c_char]:
     """Get the C.char pointer.
 
+    Parameters:
+        T: The type.
+
     Args:
         item: The item.
 
@@ -106,6 +109,9 @@ fn char_ptr[T: _UnsafePtrU8](item: T) -> UnsafePointer[c_char]:
 @always_inline
 fn char_ptr[T: AnyType](ptr: UnsafePointer[T]) -> UnsafePointer[c_char]:
     """Get the C.char pointer.
+
+    Parameters:
+        T: The type.
 
     Args:
         ptr: The pointer.
