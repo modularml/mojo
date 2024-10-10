@@ -19,12 +19,13 @@ from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
 from builtin._documentation import doc_private
 from hashlib.hash import _hash_simd
+from hashlib._hasher import _HashableWithHasher, _Hasher
 
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(IntLike):
+struct UInt(IntLike, _HashableWithHasher):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -157,6 +158,17 @@ struct UInt(IntLike):
         """
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.uint64](self))
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this uint value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(Scalar[DType.uint64](self))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: UInt) -> Bool:

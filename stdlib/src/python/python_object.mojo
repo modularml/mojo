@@ -25,6 +25,8 @@ from memory import UnsafePointer
 from collections import Dict
 from utils import StringRef
 
+from hashlib._hasher import _HashableWithHasher, _Hasher
+
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
 
@@ -231,6 +233,7 @@ struct PythonObject(
     SizedRaising,
     Stringable,
     Formattable,
+    _HashableWithHasher,
 ):
     """A Python object."""
 
@@ -691,6 +694,21 @@ struct PythonObject(
         # TODO: make this function raise when we can raise parametrically.
         debug_assert(result != -1, "object is not hashable")
         return result
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this python object hash value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var result = cpython.PyObject_Hash(self.py_object)
+        # TODO: make this function raise when we can raise parametrically.
+        debug_assert(result != -1, "object is not hashable")
+        hasher.update(result)
 
     fn __getitem__(self, *args: PythonObject) raises -> PythonObject:
         """Return the value for the given key or keys.
