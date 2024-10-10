@@ -465,49 +465,6 @@ fn external_call[
         return __mlir_op.`pop.external_call`[func = callee.value, _type=type](p)
 
 
-# FIXME: no one should be having to do manual pop.external_call for extra_args
-# TODO: variadic_type should be built at compile type by iterating over
-# __type_of(args) and somehow getting the mlir type string out and concatenating
-# @always_inline("nodebug")
-# fn external_call[
-#     callee: StringLiteral, type: AnyTrivialRegType, variadic_type: StringLiteral
-# ](args: VariadicPack, extra_args: VariadicPack) -> type:
-#     """Calls an external function.
-
-#     Parameters:
-#         callee: The name of the external function.
-#         type: The return type.
-#         variadic_type: The MLIR attribute string defining the function call for
-#             `args` e.g. `"(!kgen.pointer<scalar<si8>>,!pop.scalar<index>,
-#             !kgen.pointer<scalar<si8>>) -> !pop.scalar<si32>"`.
-
-#     Args:
-#         args: The arguments to pass to the external function.
-#         extra_args: The extra arguments to pass to the external function as an
-#             undefined length of data usually denoted by `...`.
-
-#     Returns:
-#         The external call result.
-#     """
-#     var p = args._get_loaded_kgen_pack()
-#     var e = extra_args._get_loaded_kgen_pack()
-
-#     @parameter
-#     if _mlirtype_is_eq[type, NoneType]():
-#         __mlir_op.`pop.external_call`[
-#             func = callee.value,
-#             variadicType = __mlir_attr[variadic_type],
-#             _type=None,
-#         ](p, e)
-#         return rebind[type](None)
-#     else:
-#         return __mlir_op.`pop.external_call`[
-#             func = callee.value,
-#             variadicType = __mlir_attr[variadic_type],
-#             _type=type,
-#         ](p, e)
-
-
 # ===----------------------------------------------------------------------===#
 # _external_call_const
 # ===----------------------------------------------------------------------===#
