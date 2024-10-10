@@ -37,6 +37,7 @@ from .optional import Optional
 from bit import is_power_of_two
 from sys.ffi import OpaquePointer
 from memory import memcpy, bitcast, UnsafePointer
+from sys.intrinsics import _type_is_eq
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
@@ -53,6 +54,44 @@ trait RepresentableKeyElement(KeyElement, Representable):
     dictionary keys and Stringable."""
 
     pass
+
+
+@always_inline("nodebug")
+fn _hash_str(s: String) -> UInt:
+    """Hash a string using the DJBX33A hash algorithm.
+
+    When the string is small, the default SIMD hash function is not as efficient
+    as the SIMD machinery has some overhead that is not worth it for small data.
+
+    Args:
+        s: The string to hash.
+
+    Returns:
+        A 64-bit hash value. This value is _not_ suitable for cryptographic
+        uses. Its intended usage is for data structures.
+    """
+    var hash = 5381  # typical starting value
+    for c in s.as_string_slice():
+        hash = ((hash << 5) + hash) + ord(c)  # hash * 33 + ord(char)
+    return hash
+
+
+@always_inline("nodebug")
+fn _hash_key[K: KeyElement](key: K) -> Int:
+    """Hash a key using the underlying hash function.
+
+    Args:
+        key: The key to hash.
+
+    Returns:
+        A 64-bit hash value. This value is _not_ suitable for cryptographic
+        uses. Its intended usage is for data structures.
+    """
+
+    @parameter
+    if _type_is_eq[K, String]() or _type_is_eq[K, StringLiteral]():
+        return _hash_str(rebind[String](key))
+    return hash(key)
 
 
 @value
@@ -229,7 +268,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
             key: The key of the entry.
             value: The value of the entry.
         """
-        self.hash = hash(key)
+        self.hash = _hash_key(key)
         self.key = key^
         self.value = value^
 
@@ -242,6 +281,18 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.hash = other.hash
         self.key = other.key
         self.value = other.value
+
+    fn __init__(inout self, owned key: K, owned value: V, key_hash: Int):
+        """Create an entry from a key and value, computing the hash.
+
+        Args:
+            key: The key of the entry.
+            value: The value of the entry.
+            key_hash: The hash of the key.
+        """
+        self.key = key^
+        self.value = value^
+        self.hash = key_hash
 
     fn reap_value(owned self) -> V:
         """Take the value from an owned entry.
@@ -604,7 +655,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             key: The key to associate with the specified value.
             value: The data to store in the dictionary.
         """
-        self._insert(key^, value^)
+        self._insert_with_hash(key^, value^, _hash_key(key))
 
     fn __contains__(self, key: K) -> Bool:
         """Check if a given key is in the dictionary or not.
@@ -770,7 +821,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             An optional value containing a reference to the value if it is
             present, otherwise an empty Optional.
         """
-        var hash = hash(key)
+        var hash = _hash_key(key)
         var found: Bool
         var slot: Int
         var index: Int
@@ -835,7 +886,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Raises:
             "KeyError" if the key was not present in the dictionary.
         """
-        var hash = hash(key)
+        var hash = _hash_key(key)
         var found: Bool
         var slot: Int
         var index: Int
@@ -973,6 +1024,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._set_index(slot, index)
             self.size += 1
             self._n_entries += 1
+
+    @always_inline("nodebug")
+    fn _insert_with_hash(inout self, owned key: K, owned value: V, hash: Int):
+        self._insert(DictEntry[K, V](key^, value^, hash))
 
     fn _get_index(self, slot: Int) -> Int:
         return self._index.get_index(self._reserved(), slot)
