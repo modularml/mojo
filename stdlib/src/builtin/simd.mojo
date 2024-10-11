@@ -2767,8 +2767,8 @@ struct SIMD[type: DType, size: Int](
         .
         """
 
-        fn build_idx() -> StaticIntTuple[size]:
-            var values = StaticIntTuple[size]()
+        fn build_idx() -> IndexList[size]:
+            var values = IndexList[size]()
             var idx = 0
 
             @parameter
@@ -2778,7 +2778,7 @@ struct SIMD[type: DType, size: Int](
             return values
 
         alias idx = build_idx()
-        return self.shuffle[idx]()
+        return self.shuffle[mask=idx]()
 
 
 fn _pshuf_or_tbl1(
