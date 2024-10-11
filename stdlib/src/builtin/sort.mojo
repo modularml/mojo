@@ -262,7 +262,7 @@ fn _quicksort[
 # ===----------------------------------------------------------------------===#
 
 
-fn merge[
+fn _merge[
     type: CollectionElement,
     span_lifetime: ImmutableLifetime,
     result_lifetime: MutableLifetime, //,
@@ -330,7 +330,6 @@ fn _stable_sort_impl[
     if size <= 1:
         return
     var i = 0
-    var array = span.unsafe_ptr()
     while i < size:
         _insertion_sort[cmp_fn](
             span[i : min(i + insertion_sort_threshold, size)]
@@ -342,7 +341,7 @@ fn _stable_sort_impl[
         while j + merge_size < size:
             var span1 = span[j : j + merge_size]
             var span2 = span[j + merge_size : min(size, j + 2 * merge_size)]
-            merge[cmp_fn](
+            _merge[cmp_fn](
                 span1.get_immutable(), span2.get_immutable(), temp_buff
             )
             for i in range(merge_size + len(span2)):

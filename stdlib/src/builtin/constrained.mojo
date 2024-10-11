@@ -28,6 +28,28 @@ fn constrained[cond: Bool, msg: StringLiteral = "param assertion failed"]():
     Parameters:
         cond: The bool value to assert.
         msg: The message to display on failure.
+
+    Example:
+
+    ```mojo
+    from sys.info import num_physical_cores
+
+    def main():
+        alias cores_to_use = 2
+        multicore_check[cores_to_use]()
+
+    def multicore_check[cores: Int]():
+        constrained[
+            cores <= num_physical_cores(),
+            "build failed: not enough cores"
+        ]()
+        constrained[
+            cores >= 2,
+            "at least two cores are required"
+        ]()
+
+    ```
+
     """
     __mlir_op.`kgen.param.assert`[
         cond = cond.__mlir_i1__(), message = msg.value
