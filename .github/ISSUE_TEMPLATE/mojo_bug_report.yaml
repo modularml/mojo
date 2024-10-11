@@ -40,5 +40,6 @@ body:
       value: |
         - What OS did you do install Mojo on ?
         - Provide version information for Mojo by pasting the output of `mojo -v`
-        - Provide Modular CLI version by pasting the output of `modular -v`
+        - Provide Magic CLI version by pasting the output of `magic -V` or `magic --version` 
+        - Optionally, provide more information with `magic info`.
       render: shell
