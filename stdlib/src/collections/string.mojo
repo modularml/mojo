@@ -24,6 +24,8 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
+from hashlib._hasher import _HashableWithHasher, _Hasher
+
 from utils import (
     Span,
     IndexList,
@@ -697,6 +699,7 @@ struct String(
     ToFormatter,
     CollectionElementNew,
     FloatableRaising,
+    _HashableWithHasher,
 ):
     """Represents a mutable string."""
 
@@ -1818,6 +1821,17 @@ struct String(
             builtin documentation for more details.
         """
         return hash(self._strref_dangerous())
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
 
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()
