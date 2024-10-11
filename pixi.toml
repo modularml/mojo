@@ -12,3 +12,4 @@ benchmarks = { cmd = ["./stdlib/scripts/run-benchmarks.sh"], env = { MODULAR_MOJ
 [dependencies]
 python = ">=3.9,<3.13"
 max = "*"
+numpy = ">=1.26.4,<1.27"

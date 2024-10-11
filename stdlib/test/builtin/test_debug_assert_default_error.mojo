@@ -15,6 +15,19 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
+<<<<<<<< HEAD:stdlib/test/sys/test_dlhandle.mojo
+# RUN: not --crash mojo %s 2>&1
+
+from sys import DLHandle
+
+
+def check_invalid_dlhandle():
+    _ = DLHandle("/an/invalid/library")
+
+
+def main():
+    check_invalid_dlhandle()
+========
 # RUN: not --crash %bare-mojo %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 
@@ -27,3 +40,4 @@ fn main():
     )
     # CHECK-FAIL-NOT: is never reached
     print("is never reached")
+>>>>>>>> origin/nightly:stdlib/test/builtin/test_debug_assert_default_error.mojo
