@@ -47,6 +47,7 @@ struct _NoneType(CollectionElement, CollectionElementNew):
 # ===----------------------------------------------------------------------===#
 
 
+@value
 struct Optional[T: CollectionElement](
     CollectionElement, CollectionElementNew, Boolable
 ):
@@ -125,22 +126,6 @@ struct Optional[T: CollectionElement](
             other: The Optional to copy.
         """
         self.__copyinit__(other)
-
-    fn __copyinit__(inout self, other: Self):
-        """Copy construct an Optional.
-
-        Args:
-            other: The Optional to copy.
-        """
-        self._value = other._value
-
-    fn __moveinit__(inout self, owned other: Self):
-        """Move this `Optional`.
-
-        Args:
-            other: The `Optional` to move from.
-        """
-        self._value = other._value^
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders

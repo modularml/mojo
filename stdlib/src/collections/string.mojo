@@ -687,6 +687,7 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@value
 struct String(
     Sized,
     Stringable,
@@ -830,24 +831,6 @@ struct String(
                 unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
             )
         )
-
-    @always_inline
-    fn __copyinit__(inout self, existing: Self):
-        """Creates a deep copy of an existing string.
-
-        Args:
-            existing: The string to copy.
-        """
-        self._buffer = existing._buffer
-
-    @always_inline
-    fn __moveinit__(inout self, owned existing: String):
-        """Move the value of a string.
-
-        Args:
-            existing: The string to move.
-        """
-        self._buffer = existing._buffer^
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
