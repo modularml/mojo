@@ -208,7 +208,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            A reference to the internal data.
         """
         if not self.isa[T]():
             abort("get: wrong variant type")
@@ -362,9 +362,7 @@ struct Variant[*Ts: CollectionElement](
         alias idx = Self._check[T]()
         return self._get_discr() == idx
 
-    fn unsafe_get[
-        T: CollectionElement
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn unsafe_get[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
@@ -379,7 +377,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            The internal data represented as a `Pointer[T]`.
         """
         debug_assert(self.isa[T](), "get: wrong variant type")
         return self._get_ptr[T]()[]

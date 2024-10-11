@@ -37,12 +37,12 @@ from bit import pop_count
 from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
 from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
-from utils import StringSlice, StaticIntTuple, Span
+from utils import StringSlice, StaticTuple, IndexList, Span
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -167,7 +167,8 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
-    CollectionElementNew,
+    # FIXME(MOCO-1291): Can't implement this due to ambiguity.
+    # CollectionElementNew,
     Floatable,
     Floorable,
     Formattable,
@@ -229,14 +230,15 @@ struct SIMD[type: DType, size: Int](
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
 
-    @always_inline("nodebug")
-    fn __init__(inout self, *, other: SIMD[type, size]):
-        """Explicitly copy the provided value.
+    # FIXME(MOCO-1291): Can't implement this due to ambiguity.
+    # @always_inline("nodebug")
+    # fn __init__(inout self, *, other: SIMD[type, size]):
+    #    """Explicitly copy the provided value.
 
-        Args:
-            other: The value to copy.
-        """
-        self.__copyinit__(other)
+    #    Args:
+    #        other: The value to copy.
+    #    """
+    #    self.__copyinit__(other)
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
@@ -374,15 +376,21 @@ struct SIMD[type: DType, size: Int](
             ),
         )
 
-        self = __mlir_op.`kgen.undef`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        self = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[
+                `!pop.simd<`, size.value, `, `, type.value, `>`
+            ],
+            value = __mlir_attr[
+                `#kgen.unknown : `,
+                __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
+            ],
         ]()
 
         @parameter
         for i in range(size):
             self[i] = elems[i]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
@@ -1220,6 +1228,19 @@ struct SIMD[type: DType, size: Int](
         return value % self
 
     @always_inline("nodebug")
+    fn __rpow__(self, base: Self) -> Self:
+        """Returns `base ** self`.
+
+        Args:
+            base: The base value.
+
+        Returns:
+            `base ** self`.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return base**self
+
+    @always_inline("nodebug")
     fn __rand__(self, value: Self) -> Self:
         """Returns `value & self`.
 
@@ -1410,7 +1431,7 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes_span()[1:-1])
+            values = StringSlice(unsafe_from_utf8=output.as_bytes()[1:-1])
 
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
@@ -1463,28 +1484,12 @@ struct SIMD[type: DType, size: Int](
                 @parameter
                 if type.is_half_float():
                     alias prefix = "abs.bf16" if type is DType.bfloat16 else "abs.f16"
-
-                    @parameter
-                    if size == 1:
-                        return inlined_assembly[
-                            prefix + " $0, $1;",
-                            Self,
-                            constraints="=h,h",
-                            has_side_effect=False,
-                        ](self)
-
-                    var res = Self()
-
-                    @parameter
-                    for i in range(0, size, 2):
-                        var val = inlined_assembly[
-                            prefix + "x2 $0, $1;",
-                            SIMD[type, 2],
-                            constraints="=r,r",
-                            has_side_effect=False,
-                        ](self.slice[2, offset=i]())
-                        res = res.insert[offset=i](val)
-                    return res
+                    return _call_ptx_intrinsic[
+                        scalar_instruction=prefix,
+                        vector2_instruction = prefix + "x2",
+                        scalar_constraints="=h,h",
+                        vector_constraints="=r,r",
+                    ](self)
                 return llvm_intrinsic["llvm.fabs", Self, has_side_effect=False](
                     self
                 )
@@ -1816,7 +1821,7 @@ struct SIMD[type: DType, size: Int](
         )
 
     @always_inline("nodebug")
-    fn _shuffle_list[
+    fn _shuffle_variadic[
         *mask: Int, output_size: Int = size
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
@@ -1843,11 +1848,19 @@ struct SIMD[type: DType, size: Int](
         fn _convert_variadic_to_pop_array[
             *mask: Int
         ]() -> __mlir_type[`!pop.array<`, output_size.value, `, `, Int, `>`]:
-            var array = __mlir_op.`kgen.undef`[
+            var array = __mlir_op.`kgen.param.constant`[
                 _type = __mlir_type[
                     `!pop.array<`, output_size.value, `, `, Int, `>`
-                ]
+                ],
+                value = __mlir_attr[
+                    `#kgen.unknown : `,
+                    __mlir_type[
+                        `!pop.array<`, output_size.value, `, `, Int, `>`
+                    ],
+                ],
             ]()
+
+            var array_ptr = UnsafePointer.address_of(array)
 
             @parameter
             for idx in range(output_size):
@@ -1857,7 +1870,7 @@ struct SIMD[type: DType, size: Int](
                     "invalid index in the shuffle operation",
                 ]()
                 var ptr = __mlir_op.`pop.array.gep`(
-                    UnsafePointer.address_of(array).address, idx.value
+                    array_ptr.address, idx.value
                 )
                 __mlir_op.`pop.store`(val, ptr)
 
@@ -1877,14 +1890,14 @@ struct SIMD[type: DType, size: Int](
 
     @always_inline("nodebug")
     fn _shuffle_list[
-        output_size: Int, mask: StaticIntTuple[output_size]
+        output_size: Int, mask: StaticTuple[Int, output_size]
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
 
         Parameters:
-            output_size: The size of the output vector.
+            output_size: The output SIMD size.
             mask: The permutation to use in the shuffle.
 
         Args:
@@ -1903,7 +1916,7 @@ struct SIMD[type: DType, size: Int](
             ]()
 
         return __mlir_op.`pop.simd.shuffle`[
-            mask = mask.data.array,
+            mask = mask.array,
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1922,7 +1935,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[*mask](self)
+        return self._shuffle_variadic[*mask](self)
 
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -1940,10 +1953,10 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[*mask](other)
+        return self._shuffle_variadic[*mask](other)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size]](self) -> Self:
+    fn shuffle[mask: IndexList[size, **_]](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
@@ -1955,10 +1968,10 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask](self)
+        return self._shuffle_list[size, mask.as_tuple()](self)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size]](self, other: Self) -> Self:
+    fn shuffle[mask: IndexList[size, **_]](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask
         values must be within `2 * len(self)`.
@@ -1973,7 +1986,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask](other)
+        return self._shuffle_list[size, mask.as_tuple()](other)
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:
@@ -2063,7 +2076,7 @@ struct SIMD[type: DType, size: Int](
             result[i] = self[int(mask[i])]
         return result
 
-    @always_inline("nodebug")
+    @always_inline
     fn slice[
         output_width: Int, /, *, offset: Int = 0
     ](self) -> SIMD[type, output_width]:
@@ -2153,7 +2166,7 @@ struct SIMD[type: DType, size: Int](
         ](self, value, Int64(offset))
 
     @always_inline("nodebug")
-    fn join(self, other: Self) -> SIMD[type, 2 * size]:
+    fn join(self, other: Self) -> SIMD[type, 2 * size] as result:
         """Concatenates the two vectors together.
 
         Args:
@@ -2165,8 +2178,8 @@ struct SIMD[type: DType, size: Int](
 
         @always_inline
         @parameter
-        fn build_indices() -> StaticIntTuple[2 * size]:
-            var indices = StaticIntTuple[2 * size]()
+        fn build_indices() -> StaticTuple[Int, 2 * size]:
+            var indices = StaticTuple[Int, 2 * size](0)
 
             @parameter
             for i in range(2 * size):

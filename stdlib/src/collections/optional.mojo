@@ -322,7 +322,7 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), the program will abort
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         if not self.__bool__():
             abort(".value() on empty Optional")
@@ -339,7 +339,7 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value.unsafe_get[T]()

@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char
+from sys.ffi import c_char, OpaquePointer
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -26,7 +26,7 @@ from python import PythonObject
 
 from utils import (
     Span,
-    StaticIntTuple,
+    IndexList,
     StringRef,
     StringSlice,
     Variant,
@@ -789,13 +789,13 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_span())
+        var length: Int = len(str_slice.as_bytes())
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            src=str_slice.as_bytes_span().unsafe_ptr(),
+            src=str_slice.as_bytes().unsafe_ptr(),
             count=length,
         )
         self = Self(buffer^)
@@ -1269,7 +1269,7 @@ struct String(
             value. This `String` MUST outlive the `Formatter` instance.
         """
 
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[String] = ptr0.bitcast[String]()
 
             # FIXME:
@@ -1387,28 +1387,8 @@ struct String(
         """
         return self.unsafe_ptr().bitcast[c_char]()
 
-    fn as_bytes(self) -> Self._buffer_type:
-        """Retrieves the underlying byte sequence encoding the characters in
-        this string.
-
-        This does not include the trailing null terminator.
-
-        Returns:
-            A sequence containing the encoded characters stored in this string.
-        """
-
-        # TODO(lifetimes): Return a reference rather than a copy
-        var copy = self._buffer
-        var last = copy.pop()
-        debug_assert(
-            last == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-
-        return copy
-
     @always_inline
-    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1433,23 +1413,10 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
     fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes, excluding null terminator.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        return max(len(self._buffer) - 1, 0)
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
         """Get the string length in bytes.
 
         Returns:
@@ -2227,7 +2194,7 @@ struct String(
         debug_assert(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
-        var fillbyte = fillchar.as_bytes_span()[0]
+        var fillbyte = fillchar.as_bytes()[0]
         var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)

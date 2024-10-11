@@ -31,7 +31,7 @@ from sys import (
 )
 from collections import Optional
 from builtin.dtype import _integral_type_of
-from memory.reference import AddressSpace, _GPUAddressSpace
+from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -167,16 +167,27 @@ fn _memcpy_impl(
     if n <= 16:
         if n >= 8:
             var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
-            dest_data.offset(n - ui64_size).bitcast[
-                Int64
-            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
+            dest_data.bitcast[Int64]().store[alignment=1](
+                0, src_data.bitcast[Int64]().load[alignment=1](0)
+            )
+            dest_data.offset(n - ui64_size).bitcast[Int64]().store[alignment=1](
+                0,
+                src_data.offset(n - ui64_size)
+                .bitcast[Int64]()
+                .load[alignment=1](0),
+            )
             return
+
         var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
-        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
-            n - ui32_size
-        ).bitcast[Int32]()[0]
+        dest_data.bitcast[Int32]().store[alignment=1](
+            0, src_data.bitcast[Int32]().load[alignment=1](0)
+        )
+        dest_data.offset(n - ui32_size).bitcast[Int32]().store[alignment=1](
+            0,
+            src_data.offset(n - ui32_size)
+            .bitcast[Int32]()
+            .load[alignment=1](0),
+        )
         return
 
     # TODO (#10566): This branch appears to cause a 12% regression in BERT by

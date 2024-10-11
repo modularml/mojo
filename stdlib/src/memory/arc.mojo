@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Reference-counted smart pointers.
+"""Pointer-counted smart pointers.
 
 Example usage:
 
@@ -22,7 +22,7 @@ p2[]=3
 print(3 == p[])
 ```
 
-Subscripting(`[]`) is done by `Reference`,
+Subscripting(`[]`) is done by `Pointer`,
 in order to ensure that the underlying `Arc` outlive the operation.
 
 It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
@@ -36,7 +36,7 @@ print(Arc(String("ok"))._inner[].payload)
 #........................^ASAP ^already freed
 ```
 
-Always use `Reference` subscripting (`[]`):
+Always use `Pointer` subscripting (`[]`):
 
 ```mojo
 print(Arc(String("ok"))[])
@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -144,13 +144,13 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
     ) -> ref [
         _lit_mut_cast[self_life, result_mutable=True].result
     ] T:
-        """Returns a mutable Reference to the managed value.
+        """Returns a mutable reference to the managed value.
 
         Parameters:
             self_life: The lifetime of self.
 
         Returns:
-            A Reference to the managed value.
+            A reference to the managed value.
         """
         return self._inner[].payload
 
@@ -170,3 +170,25 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             The current amount of references to the pointee.
         """
         return self._inner[].refcount.load()
+
+    fn __is__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at the same object.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at the same object and False otherwise.
+        """
+        return self._inner == rhs._inner
+
+    fn __isnot__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at different objects.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at different objects and False otherwise.
+        """
+        return self._inner != rhs._inner

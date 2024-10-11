@@ -40,7 +40,7 @@ from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
 
 from utils import Span
-from utils.index import StaticIntTuple
+from utils.index import IndexList
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
 
@@ -2217,7 +2217,7 @@ fn factorial(n: Int) -> Int:
     Returns:
         The factorial of the input. Results are undefined for negative inputs.
     """
-    alias table = StaticIntTuple[21](
+    alias table = StaticTuple[Int, 21](
         1,
         1,
         2,

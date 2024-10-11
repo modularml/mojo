@@ -109,6 +109,20 @@ def test_moveinit():
     _ = b2^
 
 
+def test_steal_data():
+    var deleted = False
+
+    var box = Box(ObservableDel(UnsafePointer.address_of(deleted)))
+
+    var ptr = box^.steal_data()
+
+    # Check that `Box` did not deinitialize its pointee.
+    assert_false(deleted)
+
+    ptr.destroy_pointee()
+    ptr.free()
+
+
 def main():
     test_basic_ref()
     test_box_copy_constructor()
@@ -119,3 +133,4 @@ def main():
     test_basic_del()
     test_take()
     test_moveinit()
+    test_steal_data()

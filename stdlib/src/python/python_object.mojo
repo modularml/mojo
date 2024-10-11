@@ -101,6 +101,10 @@ struct _PyIter(Sized):
             self.preparedNextItem = PythonObject(maybeNextItem)
         return current
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         """Return zero to halt iteration.
 
@@ -699,23 +703,21 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         var size = len(args)
-        var tuple_obj = cpython.PyTuple_New(size)
-        for i in range(size):
-            var arg_value = args[i].py_object
-            cpython.Py_IncRef(arg_value)
-            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
-            if result != 0:
-                raise Error("internal error: PyTuple_SetItem failed")
+        var key_obj: PyObjectPtr
+        if size == 1:
+            key_obj = args[0].py_object
+        else:
+            key_obj = cpython.PyTuple_New(size)
+            for i in range(size):
+                var arg_value = args[i].py_object
+                cpython.Py_IncRef(arg_value)
+                var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
+                if result != 0:
+                    raise Error("internal error: PyTuple_SetItem failed")
 
-        var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, "__getitem__"
-        )
-        if callable_obj.is_null():
-            cpython.Py_DecRef(tuple_obj)
-            Python.throw_python_exception_if_error_state(cpython)
-        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
-        cpython.Py_DecRef(callable_obj)
-        cpython.Py_DecRef(tuple_obj)
+        cpython.Py_IncRef(key_obj)
+        var result = cpython.PyObject_GetItem(self.py_object, key_obj)
+        cpython.Py_DecRef(key_obj)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
@@ -726,29 +728,30 @@ struct PythonObject(
             args: The key or keys to set on this object.
             value: The value to set.
         """
-        var size = len(args)
-
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size + 1)
-        for i in range(size):
-            var arg_value = args[i].py_object
-            cpython.Py_IncRef(arg_value)
-            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
-            if result != 0:
-                raise Error("internal error: PyTuple_SetItem failed")
+        var size = len(args)
+        var key_obj: PyObjectPtr
 
+        if size == 1:
+            key_obj = args[0].py_object
+        else:
+            key_obj = cpython.PyTuple_New(size)
+            for i in range(size):
+                var arg_value = args[i].py_object
+                cpython.Py_IncRef(arg_value)
+                var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
+                if result != 0:
+                    raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(key_obj)
         cpython.Py_IncRef(value.py_object)
-        var result2 = cpython.PyTuple_SetItem(tuple_obj, size, value.py_object)
-        if result2 != 0:
-            raise Error("internal error: PyTuple_SetItem failed")
-
-        var callable_obj = cpython.PyObject_GetAttrString(
-            self.py_object, "__setitem__"
+        var result = cpython.PyObject_SetItem(
+            self.py_object, key_obj, value.py_object
         )
-        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
-        cpython.Py_DecRef(callable_obj)
-        cpython.Py_DecRef(tuple_obj)
-        Python.throw_python_exception_if_error_state(cpython)
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
+        cpython.Py_DecRef(key_obj)
+        cpython.Py_DecRef(value.py_object)
 
     fn _call_zero_arg_method(
         self, method_name: StringRef
