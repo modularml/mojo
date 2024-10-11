@@ -66,7 +66,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ]()
         return rebind[type](None)
     else:
@@ -80,7 +80,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ]()
 
 
@@ -123,7 +123,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0)
         return rebind[type](None)
     else:
@@ -136,7 +136,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0)
 
 
@@ -183,7 +183,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1)
         return rebind[type](None)
     else:
@@ -195,7 +195,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1)
 
 
@@ -247,7 +247,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2)
         return rebind[type](None)
     else:
@@ -260,7 +260,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2)
 
 
@@ -316,7 +316,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3)
         return rebind[type](None)
     else:
@@ -329,7 +329,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3)
 
 
@@ -384,7 +384,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4)
         return rebind[type](None)
     else:
@@ -397,7 +397,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4)
 
 
@@ -455,7 +455,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5)
         return rebind[type](None)
     else:
@@ -469,7 +469,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5)
 
 
@@ -530,7 +530,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
         return rebind[type](None)
     else:
@@ -543,7 +543,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 
 
@@ -615,7 +615,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
         return rebind[type](None)
     else:
@@ -628,7 +628,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 
 
@@ -704,7 +704,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
         return rebind[type](None)
     else:
@@ -718,7 +718,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 
 
@@ -799,7 +799,7 @@ fn llvm_intrinsic[
         __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=None,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
         return rebind[type](None)
     else:
@@ -812,7 +812,7 @@ fn llvm_intrinsic[
         return __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = intrin.value,
             _type=type,
-            hasSideEffects = __mlir_attr.false,
+            has_side_effects = __mlir_attr.false,
         ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
 
 
