@@ -331,7 +331,7 @@ struct PythonObject(
         Args:
             none: None.
         """
-        self = Self(none=NoneType(none))
+        self = Self(none=NoneType())
 
     fn __init__(inout self, none: NoneType):
         """Initialize a none value object from a `None` literal.
@@ -339,9 +339,18 @@ struct PythonObject(
         Args:
             none: None.
         """
-        var cpython = _get_global_python_itf().cpython()
+        cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.Py_None()
         cpython.Py_IncRef(self.py_object)
+
+    fn __init__(inout self, value: Bool):
+        """Initialize the object from a bool.
+
+        Args:
+            value: The boolean value.
+        """
+        cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyBool_FromLong(int(value))
 
     fn __init__(inout self, integer: Int):
         """Initialize the object with an integer value.
@@ -349,17 +358,8 @@ struct PythonObject(
         Args:
             integer: The integer value.
         """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(integer)
-
-    fn __init__(inout self, float: Float64):
-        """Initialize the object with an floating-point value.
-
-        Args:
-            float: The float value.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyFloat_FromDouble(float)
+        cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyLong_FromSsize_t(integer)
 
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         """Initialize the object with a generic scalar value. If the scalar
@@ -372,26 +372,17 @@ struct PythonObject(
         Args:
             value: The scalar value.
         """
-        var cpython = _get_global_python_itf().cpython()
+        cpython = _get_global_python_itf().cpython()
 
         @parameter
-        if dt == DType.bool:
-            self.py_object = cpython.toPython(value.__bool__())
+        if dt is DType.bool:
+            self.py_object = cpython.PyBool_FromLong(int(value))
         elif dt.is_integral():
-            var int_val = value.cast[DType.index]().value
-            self.py_object = cpython.toPython(int_val)
+            int_val = value.cast[DType.index]().value
+            self.py_object = cpython.PyLong_FromSsize_t(int_val)
         else:
-            var fp_val = value.cast[DType.float64]()
+            fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val)
-
-    fn __init__(inout self, value: Bool):
-        """Initialize the object from a bool.
-
-        Args:
-            value: The boolean value.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(value)
 
     fn __init__(inout self, value: StringLiteral):
         """Initialize the object from a string literal.
@@ -407,8 +398,8 @@ struct PythonObject(
         Args:
             strref: The string reference.
         """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(strref)
+        cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyUnicode_DecodeUTF8(strref)
 
     fn __init__(inout self, string: String):
         """Initialize the object from a string.
@@ -416,8 +407,10 @@ struct PythonObject(
         Args:
             string: The string value.
         """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(string._strref_dangerous())
+        cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyUnicode_DecodeUTF8(
+            string._strref_dangerous()
+        )
         string._strref_keepalive()
 
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
@@ -1364,7 +1357,9 @@ struct PythonObject(
 
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
-            var key = cpython.toPython(entry[].key._strref_dangerous())
+            var key = cpython.PyUnicode_DecodeUTF8(
+                entry[].key._strref_dangerous()
+            )
             var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object
             )
@@ -1389,15 +1384,6 @@ struct PythonObject(
             )
         return PythonObject(result)
 
-    fn to_float64(self) -> Float64:
-        """Returns a float representation of the object.
-
-        Returns:
-            A floating point value that represents this object.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        return cpython.PyFloat_AsDouble(self.py_object.value)
-
     fn __index__(self) -> Int:
         """Returns an index representation of the object.
 
@@ -1412,8 +1398,26 @@ struct PythonObject(
         Returns:
             An integral value that represents this object.
         """
-        var cpython = _get_global_python_itf().cpython()
-        return cpython.PyLong_AsLong(self.py_object.value)
+        cpython = _get_global_python_itf().cpython()
+        return cpython.PyLong_AsSsize_t(self.py_object)
+
+    fn __float__(self) -> Float64:
+        """Returns a float representation of the object.
+
+        Returns:
+            A floating point value that represents this object.
+        """
+        cpython = _get_global_python_itf().cpython()
+        return cpython.PyFloat_AsDouble(self.py_object)
+
+    @deprecated("Use `float(obj)` instead.")
+    fn to_float64(self) -> Float64:
+        """Returns a float representation of the object.
+
+        Returns:
+            A floating point value that represents this object.
+        """
+        return self.__float__()
 
     fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
         """Convert a Python-owned and managed pointer into a Mojo pointer.
