@@ -383,7 +383,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             The ~self value.
         """
-        return self ^ -1
+        return self ^ Self.MAX
 
     # ===----------------------------------------------------------------------===#
     # In place operations.
