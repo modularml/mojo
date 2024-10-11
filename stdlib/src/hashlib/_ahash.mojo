@@ -73,6 +73,14 @@ fn _read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
 
 
 struct AHasher[key: U256](_Hasher):
+    """Adopted AHash algorithm which produces fast and high quality hash value by
+    implementing `_Hasher` trait.
+
+    References:
+
+    - [AHasher Implementation in Rust](https://github.com/tkaitchuck/aHash)
+    """
+
     var buffer: UInt64
     var pad: UInt64
     var extra_keys: U128
@@ -179,38 +187,3 @@ struct AHasher[key: U256](_Hasher):
         var rot = self.buffer & 63
         var folded = _folded_multiply(self.buffer, self.pad)
         return (folded << rot) | (folded >> (64 - rot))
-
-
-fn hash[
-    key: U256 = U256(0, 0, 0, 0)
-](bytes: UnsafePointer[UInt8], n: Int) -> UInt64:
-    """Hash a byte array using an adopted AHash algorithm.
-
-    References:
-
-    - [Pointer Implementation in Rust](https://github.com/tkaitchuck/aHash)
-
-    ```mojo
-    from random import rand
-    var n = 64
-    var rand_bytes = UnsafePointer[UInt8].alloc(n)
-    rand(rand_bytes, n)
-    _ = hash(rand_bytes, n)
-    ```
-
-    Parameters:
-        key: A key to modify the result of the hash function, defaults to [0, 0, 0, 0].
-
-    Args:
-        bytes: The byte array to hash.
-        n: The length of the byte array.
-
-    Returns:
-        A 64-bit integer hash. This hash is _not_ suitable for
-        cryptographic purposes, but will have good low-bit
-        hash collision statistical properties for common data structures.
-    """
-
-    var hasher = AHasher[key]()
-    hasher._update_with_bytes(bytes, n)
-    return hasher^.finish()

@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import sizeof, bitwidthof, os_is_windows
 
 alias _mIsSigned = UInt8(1)
@@ -27,7 +28,12 @@ alias _mIsFloat = UInt8(1 << 6)
 @value
 @register_passable("trivial")
 struct DType(
-    Stringable, Formattable, Representable, KeyElement, CollectionElementNew
+    Stringable,
+    Formattable,
+    Representable,
+    KeyElement,
+    CollectionElementNew,
+    _HashableWithHasher,
 ):
     """Represents DType and provides methods for working with it."""
 
@@ -297,6 +303,17 @@ struct DType(
             A 64-bit integer hash of this `DType` value.
         """
         return hash(UInt8(self._as_i8()))
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this `DType` value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
     fn is_unsigned(self) -> Bool:

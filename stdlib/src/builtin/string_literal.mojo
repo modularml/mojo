@@ -19,6 +19,7 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -43,6 +44,7 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
+    _HashableWithHasher,
 ):
     """This type represents a string literal.
 
@@ -268,6 +270,17 @@ struct StringLiteral(
             builtin documentation for more details.
         """
         return hash(self.unsafe_ptr(), len(self))
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
 
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.

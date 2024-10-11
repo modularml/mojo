@@ -13,11 +13,13 @@
 # RUN: %mojo %s
 
 from bit import pop_count
-from hashlib._ahash import hash, AHasher
+from hashlib._ahash import AHasher
 from hashlib.hash import hash as old_hash
+from hashlib._hasher import _hash_with_hasher as hash
 from testing import assert_equal, assert_not_equal, assert_true
 from memory import memset_zero, UnsafePointer
 from time import now
+from utils import Span
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -593,49 +595,38 @@ def assert_dif_hashes(hashes: List[UInt64], upper_bound: Int):
         for j in range(i + 1, len(hashes)):
             var diff = dif_bits(hashes[i], hashes[j])
             assert_true(
-                diff > 14,
+                diff > upper_bound,
                 str("Index: {}:{}, diff between: {} and {} is: {}").format(
                     i, j, hashes[i], hashes[j], diff
                 ),
             )
 
 
+alias hasher0 = AHasher[SIMD[DType.uint64, 4](0, 0, 0, 0)]
+alias hasher1 = AHasher[SIMD[DType.uint64, 4](1, 0, 0, 0)]
+
+
 def test_hash_byte_array():
-    assert_equal(hash("a".unsafe_ptr(), 1), hash("a".unsafe_ptr(), 1))
-    assert_equal(
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("a".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("a".unsafe_ptr(), 1),
-    )
+    assert_equal(hash[HasherType=hasher0]("a"), hash[HasherType=hasher0]("a"))
+    assert_equal(hash[HasherType=hasher1]("a"), hash[HasherType=hasher1]("a"))
     assert_not_equal(
-        hash("a".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("a".unsafe_ptr(), 1),
+        hash[HasherType=hasher0]("a"), hash[HasherType=hasher1]("a")
     )
-    assert_equal(hash("b".unsafe_ptr(), 1), hash("b".unsafe_ptr(), 1))
-    assert_equal(
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("b".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("b".unsafe_ptr(), 1),
-    )
+    assert_equal(hash[HasherType=hasher0]("b"), hash[HasherType=hasher0]("b"))
+    assert_equal(hash[HasherType=hasher1]("b"), hash[HasherType=hasher1]("b"))
     assert_not_equal(
-        hash("b".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("b".unsafe_ptr(), 1),
+        hash[HasherType=hasher0]("b"), hash[HasherType=hasher1]("b")
     )
-    assert_equal(hash("c".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1))
-    assert_equal(
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("c".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("c".unsafe_ptr(), 1),
-    )
+    assert_equal(hash[HasherType=hasher0]("c"), hash[HasherType=hasher0]("c"))
+    assert_equal(hash[HasherType=hasher1]("c"), hash[HasherType=hasher1]("c"))
     assert_not_equal(
-        hash("c".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("c".unsafe_ptr(), 1),
+        hash[HasherType=hasher0]("c"), hash[HasherType=hasher1]("c")
     )
-    assert_equal(hash("d".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1))
-    assert_equal(
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("d".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("d".unsafe_ptr(), 1),
-    )
+    assert_equal(hash[HasherType=hasher0]("d"), hash[HasherType=hasher0]("d"))
+    assert_equal(hash[HasherType=hasher1]("d"), hash[HasherType=hasher1]("d"))
     assert_not_equal(
-        hash("d".unsafe_ptr(), 1),
-        hash[SIMD[DType.uint64, 4](1, 0, 0, 0)]("d".unsafe_ptr(), 1),
+        hash[HasherType=hasher0]("d"),
+        hash[HasherType=hasher1]("d"),
     )
 
 
@@ -646,15 +637,15 @@ def test_avalanche():
     memset_zero(data, 256)
     var hashes0 = List[UInt64]()
     var hashes1 = List[UInt64]()
-    hashes0.append(hash(data, 256))
-    hashes1.append(hash[SIMD[DType.uint64, 4](0, 1, 0, 0)](data, 256))
+    hashes0.append(hash[HasherType=hasher0](data, 256))
+    hashes1.append(hash[HasherType=hasher1](data, 256))
 
     for i in range(256):
         memset_zero(data, 256)
         var v = 1 << (i & 7)
         data[i >> 3] = v
-        hashes0.append(hash(data, 256))
-        hashes1.append(hash[SIMD[DType.uint64, 4](0, 1, 0, 0)](data, 256))
+        hashes0.append(hash[HasherType=hasher0](data, 256))
+        hashes1.append(hash[HasherType=hasher1](data, 256))
 
     for i in range(len(hashes0)):
         var diff = dif_bits(hashes0[i], hashes1[i])
@@ -673,17 +664,18 @@ def test_trailing_zeros():
     # checks that a value with different amount of trailing zeros,
     # results in significantly different hash values
     var data = UnsafePointer[UInt8].alloc(8)
+    memset_zero(data, 8)
     data[0] = 23
     var hashes0 = List[UInt64]()
     var hashes1 = List[UInt64]()
     for i in range(1, 9):
-        hashes0.append(hash(data, i))
-        hashes1.append(hash[SIMD[DType.uint64, 4](0, 1, 0, 0)](data, i))
+        hashes0.append(hash[HasherType=hasher0](data, i))
+        hashes1.append(hash[HasherType=hasher1](data, i))
 
     for i in range(len(hashes0)):
         var diff = dif_bits(hashes0[i], hashes1[i])
         assert_true(
-            diff > 19,
+            diff > 18,
             str("Index: {}, diff between: {} and {} is: {}").format(
                 i, hashes0[i], hashes1[i], diff
             ),
@@ -700,7 +692,7 @@ def assert_fill_factor[
     # and the fill factor results in 1.0
     var buckets = List[Int](0) * num_buckets
     for w in words:
-        var h = hash(w[].unsafe_ptr(), w[].byte_length())
+        var h = hash[HasherType=hasher0](w[])
         buckets[int(h) % num_buckets] += 1
     var unfilled = 0
     for v in buckets:

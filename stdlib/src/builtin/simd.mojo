@@ -38,6 +38,7 @@ from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from hashlib.hash import _hash_simd
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
@@ -173,6 +174,7 @@ struct SIMD[type: DType, size: Int](
     Floorable,
     Formattable,
     Hashable,
+    _HashableWithHasher,
     Intable,
     Powable,
     Representable,
@@ -1535,6 +1537,17 @@ struct SIMD[type: DType, size: Int](
             builtin documentation for more details.
         """
         return _hash_simd(self)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this SIMD value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(self)
 
     # ===------------------------------------------------------------------=== #
     # Methods
