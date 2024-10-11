@@ -79,7 +79,10 @@ struct InlineArray[
                 " 'unsafe_uninitialized'."
             ),
         ]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     @always_inline
     fn __init__(inout self, *, unsafe_uninitialized: Bool):
@@ -102,7 +105,10 @@ struct InlineArray[
                 Always set to `True` (it's not actually used inside the constructor).
         """
         _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     fn __init__(
         inout self,
@@ -122,7 +128,10 @@ struct InlineArray[
             unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
         """
 
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
         for i in range(Self.size):
             unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
@@ -137,7 +146,10 @@ struct InlineArray[
             fill: The element to fill each index.
         """
         _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
         @parameter
         for i in range(size):
@@ -168,7 +180,10 @@ struct InlineArray[
 
         debug_assert(len(storage) == size, "Elements must be of length size")
         _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
         # Move each element into the array storage.
         @parameter

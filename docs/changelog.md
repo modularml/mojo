@@ -188,6 +188,10 @@ what we publish.
     print((a[0, 1])) # 2
     ```
 
+- [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
+  [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
+  compared for pointer equivalence using `a is b`.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -256,6 +260,9 @@ what we publish.
 - The `StaticIntTuple` datastructure in the `utils` package has been renamed to
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
+
+- `String.as_bytes()` now returns a `Span[UInt8]` instead of a `List[Int8]`. The
+  old behavior can be achieved by using `List(s.as_bytes())`.
 
 ### ❌ Removed
 
