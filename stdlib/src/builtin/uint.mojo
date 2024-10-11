@@ -376,6 +376,15 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.or`(self.value, rhs.value)
 
+    @always_inline("nodebug")
+    fn __invert__(self) -> UInt:
+        """Return ~self.
+
+        Returns:
+            The ~self value.
+        """
+        return self ^ -1
+
     # ===----------------------------------------------------------------------===#
     # In place operations.
     # ===----------------------------------------------------------------------===#
