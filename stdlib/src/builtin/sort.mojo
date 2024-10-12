@@ -41,7 +41,7 @@ struct _SortWrapper[type: CollectionElement](CollectionElement):
 @always_inline
 fn _insertion_sort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]):
     """Sort the array[start:end] slice"""
@@ -66,7 +66,7 @@ fn _insertion_sort[
 @always_inline
 fn _quicksort_partition_right[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]) -> Int:
     var array = span.unsafe_ptr()
@@ -95,7 +95,7 @@ fn _quicksort_partition_right[
 @always_inline
 fn _quicksort_partition_left[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]) -> Int:
     var array = span.unsafe_ptr()
@@ -121,7 +121,7 @@ fn _quicksort_partition_left[
 
 fn _heap_sort_fix_down[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime], idx: Int):
     var array = span.unsafe_ptr()
@@ -142,7 +142,7 @@ fn _heap_sort_fix_down[
 @always_inline
 fn _heap_sort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]):
     var array = span.unsafe_ptr()
@@ -171,7 +171,7 @@ fn _estimate_initial_height(size: Int) -> Int:
 @always_inline
 fn _delegate_small_sort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]):
     var array = span.unsafe_ptr()
@@ -203,7 +203,7 @@ fn _delegate_small_sort[
 @always_inline
 fn _quicksort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]):
     var array = span.unsafe_ptr()
@@ -264,8 +264,8 @@ fn _quicksort[
 
 fn _merge[
     type: CollectionElement,
-    span_lifetime: ImmutableLifetime,
-    result_lifetime: MutableLifetime, //,
+    span_lifetime: ImmutableOrigin,
+    result_lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](
     span1: Span[type, span_lifetime],
@@ -279,8 +279,8 @@ fn _merge[
 
     Parameters:
         type: Type of the spans.
-        span_lifetime: Lifetime of the input spans.
-        result_lifetime: Lifetime of the result Span.
+        span_lifetime: Origin of the input spans.
+        result_lifetime: Origin of the result Span.
         cmp_fn: Comparison functor of (type, type) capturing [_] -> Bool type.
 
     Args:
@@ -322,8 +322,8 @@ fn _merge[
 
 fn _stable_sort_impl[
     type: CollectionElement,
-    span_life: MutableLifetime,
-    tmp_life: MutableLifetime, //,
+    span_life: MutableOrigin,
+    tmp_life: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, span_life], temp_buff: Span[type, tmp_life]):
     var size = len(span)
@@ -352,7 +352,7 @@ fn _stable_sort_impl[
 
 fn _stable_sort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]):
     var temp_buff = UnsafePointer[type].alloc(len(span))
@@ -371,7 +371,7 @@ fn _stable_sort[
 @always_inline
 fn _partition[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]) -> Int:
     var size = len(span)
@@ -404,7 +404,7 @@ fn _partition[
 
 fn _partition[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](owned span: Span[type, lifetime], owned k: Int):
     while True:
@@ -422,7 +422,7 @@ fn _partition[
 
 fn partition[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (type, type) capturing [_] -> Bool,
 ](span: Span[type, lifetime], k: Int):
     """Partition the input buffer inplace such that first k elements are the
@@ -431,7 +431,7 @@ fn partition[
 
     Parameters:
         type: Type of the underlying data.
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         cmp_fn: Comparison functor of (type, type) capturing [_] -> Bool type.
 
     Args:
@@ -447,7 +447,7 @@ fn partition[
 
 
 fn partition[
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (Int, Int) capturing [_] -> Bool,
 ](span: Span[Int, lifetime], k: Int):
     """Partition the input buffer inplace such that first k elements are the
@@ -455,7 +455,7 @@ fn partition[
     The ordering of the first k elements is undefined.
 
     Parameters:
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         cmp_fn: Comparison functor of (type, type) capturing [_] -> Bool type.
 
     Args:
@@ -472,7 +472,7 @@ fn partition[
 
 fn partition[
     type: DType,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (Scalar[type], Scalar[type]) capturing [_] -> Bool,
 ](span: Span[Scalar[type], lifetime], k: Int):
     """Partition the input buffer inplace such that first k elements are the
@@ -481,7 +481,7 @@ fn partition[
 
     Parameters:
         type: DType of the underlying data.
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         cmp_fn: Comparison functor of (type, type) capturing [_] -> Bool type.
 
     Args:
@@ -506,7 +506,7 @@ fn partition[
 # Junction from public to private API
 fn _sort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
     *,
     stable: Bool = False,
@@ -532,7 +532,7 @@ fn _sort[
 # optional cmp_fn.
 fn sort[
     type: CollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (type, type) capturing [_] -> Bool,
     *,
     stable: Bool = False,
@@ -542,7 +542,7 @@ fn sort[
 
     Parameters:
         type: CollectionElement type of the underlying data.
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         cmp_fn: The comparison function.
         stable: Whether the sort should be stable.
 
@@ -558,7 +558,7 @@ fn sort[
 
 
 fn sort[
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (Int, Int) capturing [_] -> Bool,
     *,
     stable: Bool = False,
@@ -567,7 +567,7 @@ fn sort[
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         cmp_fn: The comparison function.
         stable: Whether the sort should be stable.
 
@@ -584,7 +584,7 @@ fn sort[
 
 fn sort[
     type: DType,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     cmp_fn: fn (Scalar[type], Scalar[type]) capturing [_] -> Bool,
     *,
     stable: Bool = False,
@@ -594,7 +594,7 @@ fn sort[
 
     Parameters:
         type: DType type of the underlying data.
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         cmp_fn: The comparison function.
         stable: Whether the sort should be stable.
 
@@ -612,7 +612,7 @@ fn sort[
 
 
 fn sort[
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     *,
     stable: Bool = False,
 ](span: Span[Int, lifetime]):
@@ -620,7 +620,7 @@ fn sort[
     The function doesn't return anything, the list is updated inplace.
 
     Parameters:
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         stable: Whether the sort should be stable.
 
     Args:
@@ -636,7 +636,7 @@ fn sort[
 
 fn sort[
     type: DType,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     *,
     stable: Bool = False,
 ](span: Span[Scalar[type], lifetime]):
@@ -645,7 +645,7 @@ fn sort[
 
     Parameters:
         type: CollectionElement type of the underlying data.
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         stable: Whether the sort should be stable.
 
     Args:
@@ -661,7 +661,7 @@ fn sort[
 
 fn sort[
     type: ComparableCollectionElement,
-    lifetime: MutableLifetime, //,
+    lifetime: MutableOrigin, //,
     *,
     stable: Bool = False,
 ](span: Span[type, lifetime]):
@@ -669,7 +669,7 @@ fn sort[
 
     Parameters:
         type: The order comparable collection element type.
-        lifetime: Lifetime of span.
+        lifetime: Origin of span.
         stable: Whether the sort should be stable.
 
     Args:

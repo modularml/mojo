@@ -53,7 +53,7 @@ struct UnsafePointer[
     type: AnyType,
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
-    lifetime: Lifetime[True].type = MutableAnyLifetime,
+    lifetime: Origin[True].type = MutableAnyOrigin,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -882,7 +882,7 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        lifetime: Lifetime[True].type = Self.lifetime,
+        lifetime: Origin[True].type = Self.lifetime,
     ](self) -> UnsafePointer[T, address_space, alignment, lifetime]:
         """Bitcasts a UnsafePointer to a different type.
 
@@ -890,7 +890,7 @@ struct UnsafePointer[
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
-            lifetime: Lifetime of the destination pointer.
+            lifetime: Origin of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
@@ -908,7 +908,7 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        lifetime: Lifetime[True].type = Self.lifetime,
+        lifetime: Origin[True].type = Self.lifetime,
     ](self) -> UnsafePointer[Scalar[T], address_space, alignment, lifetime]:
         """Bitcasts a UnsafePointer to a different type.
 
@@ -916,7 +916,7 @@ struct UnsafePointer[
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
-            lifetime: Lifetime of the destination pointer.
+            lifetime: Origin of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,

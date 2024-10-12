@@ -75,13 +75,13 @@ from builtin.tuple import (
 )
 from builtin.type_aliases import (
     AnyTrivialRegType,
-    ImmutableLifetime,
-    MutableLifetime,
-    ImmutableAnyLifetime,
-    MutableAnyLifetime,
-    StaticConstantLifetime,
-    LifetimeSet,
-    Lifetime,
+    ImmutableOrigin,
+    MutableOrigin,
+    ImmutableAnyOrigin,
+    MutableAnyOrigin,
+    StaticConstantOrigin,
+    OriginSet,
+    Origin,
 )
 from builtin.uint import UInt
 from builtin.value import (

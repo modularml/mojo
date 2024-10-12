@@ -122,7 +122,7 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_lifetime: Lifetime[dict_mutability].type,
+    dict_lifetime: Origin[dict_mutability].type,
 ](ref [_]value: _DictValueIter[K, V, dict_lifetime]) -> _DictValueIter[
     K, V, dict_lifetime, False
 ]:
@@ -149,7 +149,7 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_lifetime: Lifetime[dict_mutability].type,
+    dict_lifetime: Origin[dict_mutability].type,
 ](ref [_]value: _DictEntryIter[K, V, dict_lifetime]) -> _DictEntryIter[
     K, V, dict_lifetime, False
 ]:

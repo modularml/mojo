@@ -31,7 +31,7 @@ struct _InlineListIter[
     list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_lifetime: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
