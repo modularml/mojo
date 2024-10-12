@@ -24,16 +24,16 @@ alias ImmutableOrigin = __mlir_type.`!lit.lifetime<0>`
 alias MutableOrigin = __mlir_type.`!lit.lifetime<1>`
 """Mutable origin reference type."""
 
-alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<0>`
+alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.lifetime<0>`
 """The immutable origin that might access any memory value."""
 
-alias MutableAnyOrigin = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<1>`
+alias MutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.lifetime<1>`
 """The mutable origin that might access any memory value."""
 
 # Static constants are a named subset of the global lifetime.
 alias StaticConstantOrigin = __mlir_attr[
-    `#lit.lifetime.field<`,
-    `#lit.static.lifetime : !lit.lifetime<0>`,
+    `#lit.origin.field<`,
+    `#lit.static.origin : !lit.lifetime<0>`,
     `, "__constants__"> : !lit.lifetime<0>`,
 ]
 """An origin for strings and other always-immutable static constants."""
