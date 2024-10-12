@@ -89,7 +89,7 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
 
     Parameters:
         type: Type of value returned upon completion of the coroutine.
-        origins: The lifetime of the coroutine's captures.
+        origins: The origin of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine
@@ -168,7 +168,7 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
 
     Parameters:
         type: Type of value returned upon completion of the coroutine.
-        origins: The lifetime set of the coroutine's captures.
+        origins: The origin set of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine

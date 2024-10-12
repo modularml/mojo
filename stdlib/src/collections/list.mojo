@@ -38,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_lifetime: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -48,21 +48,21 @@ struct _ListIter[
         T: The type of the elements in the list.
         hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
             but it helps performance. Will go away in the future.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T, hint_trivial_type]
 
     var index: Int
-    var src: Pointer[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Pointer[T, list_lifetime]:
+    ) -> Pointer[T, list_origin]:
         @parameter
         if forward:
             self.index += 1

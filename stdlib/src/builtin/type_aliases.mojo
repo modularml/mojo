@@ -30,7 +30,7 @@ alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<0>`
 alias MutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<1>`
 """The mutable origin that might access any memory value."""
 
-# Static constants are a named subset of the global lifetime.
+# Static constants are a named subset of the global origin.
 alias StaticConstantOrigin = __mlir_attr[
     `#lit.origin.field<`,
     `#lit.static.origin : !lit.origin<0>`,
@@ -39,17 +39,17 @@ alias StaticConstantOrigin = __mlir_attr[
 """An origin for strings and other always-immutable static constants."""
 
 alias OriginSet = __mlir_type.`!lit.origin.set`
-"""A set of lifetime parameters."""
+"""A set of origin parameters."""
 
 
 # Helper to build a value of !lit.origin type.
 # TODO: Should be a parametric alias.
 struct Origin[is_mutable: Bool]:
-    """This represents a lifetime reference of potentially parametric type.
+    """This represents a origin reference of potentially parametric type.
     TODO: This should be replaced with a parametric type alias.
 
     Parameters:
-        is_mutable: Whether the lifetime reference is mutable.
+        is_mutable: Whether the origin reference is mutable.
     """
 
     alias type = __mlir_type[
