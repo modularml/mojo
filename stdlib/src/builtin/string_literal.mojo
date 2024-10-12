@@ -290,13 +290,13 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantLifetime]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantOrigin]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[StaticConstantLifetime](
+        return _StringSliceIter[StaticConstantOrigin](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -331,7 +331,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
 
@@ -346,7 +346,7 @@ struct StringLiteral(
         return ptr.bitcast[UInt8]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
@@ -373,7 +373,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, StaticConstantLifetime]:
+    fn as_bytes(self) -> Span[UInt8, StaticConstantOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 
@@ -381,7 +381,7 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, StaticConstantLifetime](
+        return Span[UInt8, StaticConstantOrigin](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )

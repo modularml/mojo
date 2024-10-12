@@ -138,7 +138,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     # to model the mutability and invalidation of the returned reference
     # correctly.
     fn __getitem__[
-        self_life: ImmutableLifetime
+        self_life: ImmutableOrigin
     ](
         ref [self_life]self: Self,
     ) -> ref [

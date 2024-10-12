@@ -264,6 +264,12 @@ what we publish.
 - `String.as_bytes()` now returns a `Span[UInt8]` instead of a `List[Int8]`. The
   old behavior can be achieved by using `List(s.as_bytes())`.
 
+- `Lifetime` and related types has been renamed to `Origin` in the standard
+  library to better clarify that parameters of this type indicate where a
+  reference is derived from, not the more complicated notion of where a variable
+  is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
+  for more information and rationale.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed

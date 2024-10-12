@@ -29,7 +29,7 @@ from builtin.builtin_list import _lit_mut_cast
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: Lifetime[is_mutable].type,
+    lifetime: Origin[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -77,7 +77,7 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: Lifetime[is_mutable].type,
+    lifetime: Origin[is_mutable].type,
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
@@ -238,7 +238,7 @@ struct Span[
 
     @always_inline
     fn copy_from[
-        lifetime: MutableLifetime, //
+        lifetime: MutableOrigin, //
     ](self: Span[T, lifetime], other: Span[T, _]):
         """
         Performs an element wise copy from all elements of `other` into all elements of `self`.
@@ -312,7 +312,7 @@ struct Span[
         """
         return not self == rhs
 
-    fn fill[lifetime: MutableLifetime, //](self: Span[T, lifetime], value: T):
+    fn fill[lifetime: MutableOrigin, //](self: Span[T, lifetime], value: T):
         """
         Fill the memory that a span references with a given value.
 

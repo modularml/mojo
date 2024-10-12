@@ -478,7 +478,7 @@ struct _FixedString[CAP: Int](
         fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
 
-            var str_slice = StringSlice[ImmutableAnyLifetime](
+            var str_slice = StringSlice[ImmutableAnyOrigin](
                 unsafe_from_utf8_strref=strref
             )
 

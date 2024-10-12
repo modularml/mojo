@@ -273,7 +273,7 @@ struct AddressSpace(EqualityComparable):
 struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
-    lifetime: Lifetime[is_mutable].type,
+    lifetime: Origin[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.

@@ -38,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_lifetime: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.

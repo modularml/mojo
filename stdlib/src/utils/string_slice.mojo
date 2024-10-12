@@ -27,7 +27,7 @@ from collections import List
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
-alias StaticString = StringSlice[StaticConstantLifetime]
+alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
 
 
@@ -125,7 +125,7 @@ fn _is_newline_start(
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    lifetime: Lifetime[is_mutable].type,
+    lifetime: Origin[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for StringSlice
@@ -198,7 +198,7 @@ struct _StringSliceIter[
 
 struct StringSlice[
     is_mutable: Bool, //,
-    lifetime: Lifetime[is_mutable].type,
+    lifetime: Origin[is_mutable].type,
 ](Stringable, Sized, Formattable):
     """
     A non-owning view to encoded string data.
@@ -219,7 +219,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self: StringSlice[StaticConstantLifetime], lit: StringLiteral
+        inout self: StringSlice[StaticConstantOrigin], lit: StringLiteral
     ):
         """Construct a new string slice from a string literal.
 
