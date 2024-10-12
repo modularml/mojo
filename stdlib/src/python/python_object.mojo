@@ -179,7 +179,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
     # ===-------------------------------------------------------------------===#
 
     # TODO:
-    #   This should have lifetime, or we should do this with a context
+    #   This should have origin, or we should do this with a context
     #   manager, to prevent use after ASAP destruction.
     fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
         """Get the underlying PyObject pointer.

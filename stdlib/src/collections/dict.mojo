@@ -60,7 +60,7 @@ struct _DictEntryIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
@@ -69,16 +69,16 @@ struct _DictEntryIter[
         dict_mutability: Whether the reference to the dictionary is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_lifetime: The lifetime of the List
+        dict_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     var index: Int
     var seen: Int
-    var src: Pointer[Dict[K, V], dict_lifetime]
+    var src: Pointer[Dict[K, V], dict_origin]
 
     fn __init__(
-        inout self, index: Int, seen: Int, ref [dict_lifetime]dict: Dict[K, V]
+        inout self, index: Int, seen: Int, ref [dict_origin]dict: Dict[K, V]
     ):
         self.index = index
         self.seen = seen
@@ -119,7 +119,7 @@ struct _DictKeyIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
@@ -128,11 +128,11 @@ struct _DictKeyIter[
         dict_mutability: Whether the reference to the vector is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_lifetime: The lifetime of the List
+        dict_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias dict_entry_iter = _DictEntryIter[K, V, dict_lifetime, forward]
+    alias dict_entry_iter = _DictEntryIter[K, V, dict_origin, forward]
 
     var iter: Self.dict_entry_iter
 
@@ -157,7 +157,7 @@ struct _DictValueIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
@@ -167,21 +167,21 @@ struct _DictValueIter[
         dict_mutability: Whether the reference to the vector is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_lifetime: The lifetime of the List
+        dict_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias ref_type = Pointer[V, dict_lifetime]
+    alias ref_type = Pointer[V, dict_origin]
 
-    var iter: _DictEntryIter[K, V, dict_lifetime, forward]
+    var iter: _DictEntryIter[K, V, dict_origin, forward]
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __reversed__(self) -> _DictValueIter[K, V, dict_lifetime, False]:
+    fn __reversed__(self) -> _DictValueIter[K, V, dict_origin, False]:
         var src = self.iter.src
         return _DictValueIter(
-            _DictEntryIter[K, V, dict_lifetime, False](
+            _DictEntryIter[K, V, dict_origin, False](
                 src[]._reserved() - 1, 0, src
             )
         )

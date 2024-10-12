@@ -17,7 +17,7 @@ struct Box[T: AnyType]:
     """A safe, owning, smart pointer.
 
     This smart pointer is designed for cases where there is clear ownership
-    of the underlying data, and restricts access to it through the lifetime
+    of the underlying data, and restricts access to it through the origin
     system such that no more than one mutable alias for the underlying data
     may exist.
 
@@ -110,7 +110,7 @@ struct Box[T: AnyType]:
         # This should have a widening conversion here that allows
         # the mutable ref that is always (potentially unsafely)
         # returned from UnsafePointer to be guarded behind the
-        # aliasing guarantees of the lifetime system here.
+        # aliasing guarantees of the origin system here.
         # All of the magic happens above in the function signature
 
         return self._inner[]

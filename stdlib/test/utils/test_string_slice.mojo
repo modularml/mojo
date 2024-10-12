@@ -154,7 +154,7 @@ fn test_slice_eq() raises:
 
     # eq
 
-    # FIXME: the lifetime of the StringSlice lifetime should be the data in the
+    # FIXME: the origin of the StringSlice origin should be the data in the
     # string, not the string itself.
     # assert_true(str1.as_string_slice().__eq__(str1))
     assert_true(str1.as_string_slice().__eq__(str2))
