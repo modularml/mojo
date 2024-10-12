@@ -356,7 +356,7 @@ fn _stable_sort[
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, lifetime]):
     var temp_buff = UnsafePointer[type].alloc(len(span))
-    var temp_buff_span = Span[type, __lifetime_of(temp_buff)](
+    var temp_buff_span = Span[type, __origin_of(temp_buff)](
         unsafe_ptr=temp_buff, len=len(span)
     )
     _stable_sort_impl[cmp_fn](span, temp_buff_span)

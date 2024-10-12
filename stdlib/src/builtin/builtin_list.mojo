@@ -431,7 +431,7 @@ struct VariadicListMem[
             # cast mutability of self to match the mutability of the element,
             # since that is what we want to use in the ultimate reference and
             # the union overall doesn't matter.
-            _lit_mut_cast[__lifetime_of(self), elt_is_mutable].result,
+            _lit_mut_cast[__origin_of(self), elt_is_mutable].result,
         ].result
     ] element_type:
         """Gets a single element on the variadic list.
@@ -449,7 +449,7 @@ struct VariadicListMem[
 
     fn __iter__(
         self,
-    ) -> _VariadicListMemIter[element_type, lifetime, __lifetime_of(self),]:
+    ) -> _VariadicListMemIter[element_type, lifetime, __origin_of(self),]:
         """Iterate over the list.
 
         Returns:
@@ -458,7 +458,7 @@ struct VariadicListMem[
         return _VariadicListMemIter[
             element_type,
             lifetime,
-            __lifetime_of(self),
+            __origin_of(self),
         ](0, self)
 
 

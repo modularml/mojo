@@ -351,7 +351,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self)]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -361,7 +361,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self), False]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
