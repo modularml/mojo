@@ -27,6 +27,7 @@ from sys import (
     triple_is_nvidia_cuda,
     external_call,
     simdwidthof,
+    simdbitwidth,
     _libc as libc,
 )
 from collections import Optional
@@ -153,6 +154,17 @@ fn _memcpy_impl(
         src_data: The source pointer.
         n: The number of bytes to copy.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias chunk_size = simdbitwidth()
+        var vector_end = _align_down(n, chunk_size)
+        for i in range(0, vector_end, chunk_size):
+            dest_data.store(i, src_data.load[width=chunk_size](i))
+        for i in range(vector_end, n):
+            dest_data.store(i, src_data.load(i))
+        return
+
     if n < 5:
         if n == 0:
             return
@@ -202,16 +214,13 @@ fn _memcpy_impl(
     #    )
     #    return
 
-    var dest_ptr = dest_data.bitcast[Int8]()
-    var src_ptr = src_data.bitcast[Int8]()
-
     # Copy in 32-byte chunks.
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
+        dest_data.store(i, src_data.load[width=chunk_size](i))
     for i in range(vector_end, n):
-        dest_ptr.store(i, src_ptr.load(i))
+        dest_data.store(i, src_data.load(i))
 
 
 @always_inline
