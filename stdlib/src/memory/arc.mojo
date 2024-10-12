@@ -134,7 +134,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
 
     # FIXME: The lifetime returned for this is currently self lifetime, which
     # keeps the Arc object alive as long as there are references into it.  That
-    # said, this isn't really the right modeling, we need hierarchical lifetimes
+    # said, this isn't really the right modeling, we need hierarchical origins
     # to model the mutability and invalidation of the returned reference
     # correctly.
     fn __getitem__[

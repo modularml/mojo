@@ -257,7 +257,7 @@ struct _VariadicListMemIter[
         return len(self.src[]) - self.index
 
 
-# Helper to compute the union of two lifetimes:
+# Helper to compute the union of two origins:
 # TODO: parametric aliases would be nice.
 struct _lit_lifetime_union[
     is_mutable: Bool, //,
@@ -269,7 +269,7 @@ struct _lit_lifetime_union[
         a,
         `,`,
         b,
-        `> : !lit.lifetime<`,
+        `> : !lit.origin<`,
         is_mutable.value,
         `>`,
     ]
@@ -283,7 +283,7 @@ struct _lit_mut_cast[
     alias result = __mlir_attr[
         `#lit.origin.mutcast<`,
         operand,
-        `> : !lit.lifetime<`,
+        `> : !lit.origin<`,
         +result_mutable.value,
         `>`,
     ]

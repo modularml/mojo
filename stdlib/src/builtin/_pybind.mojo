@@ -59,8 +59,8 @@ fn fail_initialization(owned err: Error) -> PythonObject:
 
 alias MutableGlobalLifetime = __mlir_attr[
     `#lit.origin.field<`,
-    `#lit.static.origin : !lit.lifetime<1>`,
-    `, "__python_globals__"> : !lit.lifetime<1>`,
+    `#lit.static.origin : !lit.origin<1>`,
+    `, "__python_globals__"> : !lit.origin<1>`,
 ]
 
 
