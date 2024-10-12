@@ -376,8 +376,14 @@ struct SIMD[type: DType, size: Int](
             ),
         )
 
-        self = __mlir_op.`kgen.undef`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        self = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[
+                `!pop.simd<`, size.value, `, `, type.value, `>`
+            ],
+            value = __mlir_attr[
+                `#kgen.unknown : `,
+                __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
+            ],
         ]()
 
         @parameter
@@ -1222,6 +1228,19 @@ struct SIMD[type: DType, size: Int](
         return value % self
 
     @always_inline("nodebug")
+    fn __rpow__(self, base: Self) -> Self:
+        """Returns `base ** self`.
+
+        Args:
+            base: The base value.
+
+        Returns:
+            `base ** self`.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return base**self
+
+    @always_inline("nodebug")
     fn __rand__(self, value: Self) -> Self:
         """Returns `value & self`.
 
@@ -1412,7 +1431,7 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes_span()[1:-1])
+            values = StringSlice(unsafe_from_utf8=output.as_bytes()[1:-1])
 
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
@@ -1829,10 +1848,16 @@ struct SIMD[type: DType, size: Int](
         fn _convert_variadic_to_pop_array[
             *mask: Int
         ]() -> __mlir_type[`!pop.array<`, output_size.value, `, `, Int, `>`]:
-            var array = __mlir_op.`kgen.undef`[
+            var array = __mlir_op.`kgen.param.constant`[
                 _type = __mlir_type[
                     `!pop.array<`, output_size.value, `, `, Int, `>`
-                ]
+                ],
+                value = __mlir_attr[
+                    `#kgen.unknown : `,
+                    __mlir_type[
+                        `!pop.array<`, output_size.value, `, `, Int, `>`
+                    ],
+                ],
             ]()
 
             var array_ptr = UnsafePointer.address_of(array)
