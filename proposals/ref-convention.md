@@ -83,7 +83,7 @@ You would now use an argument convention:
 ```mojo
 fn __refitem__(ref [_] self, index: Int) -> Reference[
         # This is a bit yuck, but is simplified further below.
-        Self.ElementType, __lifetime_of(self).is_mutable, __lifetime_of(self)
+        Self.ElementType, __origin_of(self).is_mutable, __origin_of(self)
     ]:
 
 # Alternatively, name the Lifetime:

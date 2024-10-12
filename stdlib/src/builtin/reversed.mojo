@@ -79,7 +79,7 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 fn reversed[
     T: CollectionElement
 ](ref [_]value: List[T, *_]) -> _ListIter[
-    T, __type_of(value).hint_trivial_type, __lifetime_of(value), False
+    T, __type_of(value).hint_trivial_type, __origin_of(value), False
 ]:
     """Get a reversed iterator of the input list.
 
@@ -100,7 +100,7 @@ fn reversed[
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
-](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __lifetime_of(value), False]:
+](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.

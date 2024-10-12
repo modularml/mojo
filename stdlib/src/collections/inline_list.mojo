@@ -54,7 +54,7 @@ struct _InlineListIter[
 
     fn __next__(
         inout self,
-    ) -> Pointer[T, __lifetime_of(self.src[][0])]:
+    ) -> Pointer[T, __origin_of(self.src[][0])]:
         @parameter
         if forward:
             self.index += 1
@@ -175,7 +175,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
+    ) -> _InlineListIter[ElementType, capacity, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
