@@ -28,7 +28,7 @@ trait AnyType:
     an instance of the object reaches the end of its lifetime. Hence, only
     non-trivial types may have destructors.
 
-    Any composition of types that have lifetimes is also an object with a
+    Any composition of types that have origins is also an object with a
     lifetime, and the resultant type receives a destructor regardless of whether
     the user explicitly defines one.
 

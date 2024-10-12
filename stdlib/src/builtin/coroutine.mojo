@@ -79,7 +79,7 @@ fn _coro_resume_noop_callback(null: AnyCoroutine):
 
 
 @register_passable
-struct Coroutine[type: AnyType, lifetimes: OriginSet]:
+struct Coroutine[type: AnyType, origins: OriginSet]:
     """Represents a coroutine.
 
     Coroutines can pause execution saving the state of the program (including
@@ -89,7 +89,7 @@ struct Coroutine[type: AnyType, lifetimes: OriginSet]:
 
     Parameters:
         type: Type of value returned upon completion of the coroutine.
-        lifetimes: The lifetime of the coroutine's captures.
+        origins: The lifetime of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine
@@ -158,7 +158,7 @@ struct Coroutine[type: AnyType, lifetimes: OriginSet]:
 
 
 @register_passable
-struct RaisingCoroutine[type: AnyType, lifetimes: OriginSet]:
+struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
     """Represents a coroutine that can raise.
 
     Coroutines can pause execution saving the state of the program (including
@@ -168,7 +168,7 @@ struct RaisingCoroutine[type: AnyType, lifetimes: OriginSet]:
 
     Parameters:
         type: Type of value returned upon completion of the coroutine.
-        lifetimes: The lifetime set of the coroutine's captures.
+        origins: The lifetime set of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine

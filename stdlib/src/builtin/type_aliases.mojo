@@ -18,23 +18,23 @@ These are Mojo built-ins, so you don't need to import them.
 alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
 
-alias ImmutableOrigin = __mlir_type.`!lit.lifetime<0>`
+alias ImmutableOrigin = __mlir_type.`!lit.origin<0>`
 """Immutable origin reference type."""
 
-alias MutableOrigin = __mlir_type.`!lit.lifetime<1>`
+alias MutableOrigin = __mlir_type.`!lit.origin<1>`
 """Mutable origin reference type."""
 
-alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.lifetime<0>`
+alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<0>`
 """The immutable origin that might access any memory value."""
 
-alias MutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.lifetime<1>`
+alias MutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<1>`
 """The mutable origin that might access any memory value."""
 
 # Static constants are a named subset of the global lifetime.
 alias StaticConstantOrigin = __mlir_attr[
     `#lit.origin.field<`,
-    `#lit.static.origin : !lit.lifetime<0>`,
-    `, "__constants__"> : !lit.lifetime<0>`,
+    `#lit.static.origin : !lit.origin<0>`,
+    `, "__constants__"> : !lit.origin<0>`,
 ]
 """An origin for strings and other always-immutable static constants."""
 
@@ -42,7 +42,7 @@ alias OriginSet = __mlir_type.`!lit.origin.set`
 """A set of lifetime parameters."""
 
 
-# Helper to build a value of !lit.lifetime type.
+# Helper to build a value of !lit.origin type.
 # TODO: Should be a parametric alias.
 struct Origin[is_mutable: Bool]:
     """This represents a lifetime reference of potentially parametric type.
@@ -53,7 +53,7 @@ struct Origin[is_mutable: Bool]:
     """
 
     alias type = __mlir_type[
-        `!lit.lifetime<`,
+        `!lit.origin<`,
         is_mutable.value,
         `>`,
     ]
