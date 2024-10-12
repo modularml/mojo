@@ -373,11 +373,11 @@ struct Bool(
         Returns:
             True if the object is false and False otherwise.
         """
-        var true = __mlir_op.`kgen.param.constant`[
-            _type = __mlir_type.`!pop.scalar<bool>`,
-            value = __mlir_attr.`#pop.simd<true> : !pop.scalar<bool>`,
+        var true = __mlir_op.`index.bool.constant`[
+            _type = __mlir_type.i1,
+            value = __mlir_attr.`true : i1`,
         ]()
-        return __mlir_op.`pop.xor`(self._as_scalar_bool(), true)
+        return __mlir_op.`pop.xor`(self.value, true)
 
     @always_inline("nodebug")
     fn __and__(self, rhs: Bool) -> Bool:
@@ -392,9 +392,7 @@ struct Bool(
         Returns:
             `self & rhs`.
         """
-        return __mlir_op.`pop.and`(
-            self._as_scalar_bool(), rhs._as_scalar_bool()
-        )
+        return __mlir_op.`pop.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __iand__(inout self, rhs: Bool):
@@ -430,7 +428,7 @@ struct Bool(
         Returns:
             `self | rhs`.
         """
-        return __mlir_op.`pop.or`(self._as_scalar_bool(), rhs._as_scalar_bool())
+        return __mlir_op.`pop.or`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __ior__(inout self, rhs: Bool):
@@ -466,9 +464,7 @@ struct Bool(
         Returns:
             `self ^ rhs`.
         """
-        return __mlir_op.`pop.xor`(
-            self._as_scalar_bool(), rhs._as_scalar_bool()
-        )
+        return __mlir_op.`pop.xor`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __ixor__(inout self, rhs: Bool):

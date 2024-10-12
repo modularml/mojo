@@ -17,8 +17,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
 from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
@@ -106,12 +107,9 @@ trait Intable:
     `Int`:
 
     ```mojo
-    var foo = Foo(42)
-    print(int(foo) == 42)
-    ```
-
-    ```plaintext
-    True
+    %# from testing import assert_equal
+    foo = Foo(42)
+    assert_equal(int(foo), 42)
     ```
 
     **Note:** If the `__int__()` method can raise an error, use the
@@ -153,13 +151,9 @@ trait IntableRaising:
     `Int`:
 
     ```mojo
-    fn main() raises:
-        var x = Foo(42)
-        print(int(x) == 42)
-    ```
-
-    ```plaintext
-    True
+    %# from testing import assert_equal
+    foo = Foo(42)
+    assert_equal(int(foo), 42)
     ```
     """
 
@@ -322,6 +316,7 @@ struct Int(
         """
         self = other
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct Int from the given index value.
@@ -331,6 +326,7 @@ struct Int(
         """
         self.value = value
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
@@ -338,12 +334,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
@@ -351,12 +348,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
@@ -364,12 +362,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
@@ -378,9 +377,7 @@ struct Int(
             value: The init value.
         """
         self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                value
-            )
+            value
         )
 
     @always_inline("nodebug")
@@ -596,8 +593,8 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
-        div = select(self > 0 & rhs > 0, div, divMod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
+        div = select(self > 0 & rhs > 0, div, div_mod)
         div = select(rhs == 0, 0, div)
         return div
 
@@ -615,9 +612,9 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
         mod = select(
-            self > 0 & rhs > 0, self._positive_rem(denominator), divMod
+            self > 0 & rhs > 0, self._positive_rem(denominator), div_mod
         )
         mod = select(rhs == 0, 0, mod)
         return mod
@@ -1177,9 +1174,9 @@ struct Int(
         Examples:
 
         ```mojo
-        assert_equal(10._decimal_digit_count(), 2)
-
-        assert_equal(-10._decimal_digit_count(), 2)
+        %# from testing import assert_equal
+        assert_equal(Int(10)._decimal_digit_count(), 2)
+        assert_equal(Int(-10)._decimal_digit_count(), 2)
         ```
         .
         """

@@ -15,99 +15,107 @@
 from random import *
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from stdlib.collections import Dict
+from sys import sizeof
+from bit import bit_ceil
+from math import ceil
+from collections import Dict, Optional
+from collections.dict import DictEntry
 
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Data
 # ===----------------------------------------------------------------------===#
-fn make_dict(n: Int) -> Dict[Int, Int]:
-    var dict = Dict[Int, Int]()
-    for i in range(0, n):
-        dict[i] = random.random_si64(0, n).value
-    return dict
-
-
-alias small_n = 10_000
-alias large_n = 500_000
-alias insert_n = small_n // 2
-alias partial_n = small_n // 4
-
-var small = make_dict(small_n)
-var large = make_dict(large_n)
+fn make_dict[size: Int]() -> Dict[Int, Int]:
+    var d = Dict[Int, Int]()
+    for i in range(0, size):
+        d[i] = random.random_si64(0, size).value
+    return d
 
 
 # ===----------------------------------------------------------------------===#
-# Benchmark Dict Ctor
+# Benchmark Dict init
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_ctor(inout b: Bencher) raises:
+fn bench_dict_init(inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
-        var _d: Dict[Int, Int] = Dict[Int, Int]()
+        for _ in range(1000):
+            var d = Dict[Int, Int]()
+            keep(d._entries.data)
+            keep(d._index.data)
 
     b.iter[call_fn]()
 
 
 # ===----------------------------------------------------------------------===#
-# Benchmark Dict Small Insert
+# Benchmark Dict Insert
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_small_insert(inout b: Bencher) raises:
+fn bench_dict_insert[size: Int](inout b: Bencher) raises:
+    """Insert 100 new items."""
+    var items = make_dict[size]()
+
     @always_inline
     @parameter
     fn call_fn() raises:
-        for key in range(small_n, small_n + insert_n):
-            small[key] = random.random_si64(0, small_n).value
+        for key in range(size, size + 100):
+            items[key] = random.random_si64(0, size).value
 
     b.iter[call_fn]()
-    keep(bool(small))
+    keep(bool(items))
 
 
 # ===----------------------------------------------------------------------===#
-# Benchmark Dict Large Insert
+# Benchmark Dict Lookup
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_large_insert(inout b: Bencher) raises:
+fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
+    """Lookup 100 items."""
+    var items = make_dict[size]()
+    var closest_divisor = ceil(100 / size)
+
     @always_inline
     @parameter
     fn call_fn() raises:
-        for key in range(large_n, large_n + insert_n):
-            large[key] = random.random_si64(0, large_n).value
+        @parameter
+        if size < 100:
+            for _ in range(closest_divisor):
+                for key in range(int(100 // closest_divisor)):
+                    var res = items[key]
+                    keep(res)
+        else:
+            for key in range(100):
+                var res = items[key]
+                keep(res)
 
     b.iter[call_fn]()
-    keep(bool(large))
+    keep(bool(items))
 
 
 # ===----------------------------------------------------------------------===#
-# Benchmark Dict Small Lookup
+# Benchmark Dict Memory Footprint
 # ===----------------------------------------------------------------------===#
-@parameter
-fn bench_dict_small_lookup(inout b: Bencher) raises:
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for key in range(0, partial_n):
-            _ = small[key]
-
-    b.iter[call_fn]()
-    keep(bool(small))
 
 
-# ===----------------------------------------------------------------------===#
-# Benchmark Dict Large Lookup
-# ===----------------------------------------------------------------------===#
-@parameter
-fn bench_dict_large_lookup(inout b: Bencher) raises:
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for key in range(0, partial_n):
-            _ = large[key]
+fn total_bytes_used(items: Dict[Int, Int]) -> Int:
+    # the allocated memory by entries:
+    var entry_size = sizeof[Optional[DictEntry[Int, Int]]]()
+    var amnt_bytes = items._entries.capacity * entry_size
+    amnt_bytes += sizeof[Dict[Int, Int]]()
 
-    b.iter[call_fn]()
-    keep(bool(large))
+    # the allocated memory by index table:
+    var reserved = items._reserved()
+    if reserved <= 128:
+        amnt_bytes += sizeof[Int8]() * reserved
+    elif reserved <= 2**16 - 2:
+        amnt_bytes += sizeof[Int16]() * reserved
+    elif reserved <= 2**32 - 2:
+        amnt_bytes += sizeof[Int32]() * reserved
+    else:
+        amnt_bytes += sizeof[Int64]() * reserved
+
+    return amnt_bytes
 
 
 # ===----------------------------------------------------------------------===#
@@ -115,18 +123,73 @@ fn bench_dict_large_lookup(inout b: Bencher) raises:
 # ===----------------------------------------------------------------------===#
 def main():
     seed()
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=100))
-    m.bench_function[bench_dict_ctor](BenchId("bench_dict_ctor"))
-    m.bench_function[bench_dict_small_insert](
-        BenchId("bench_dict_small_insert")
+    var m = Bench(BenchConfig(num_repetitions=1))
+    m.bench_function[bench_dict_init](BenchId("bench_dict_init"))
+    alias sizes = (
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900,
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10_000,
+        20_000,
+        30_000,
+        40_000,
+        50_000,
+        60_000,
+        70_000,
+        80_000,
+        90_000,
+        100_000,
+        200_000,
+        300_000,
+        400_000,
+        500_000,
+        600_000,
+        700_000,
+        800_000,
+        900_000,
+        1_000_000,
     )
-    m.bench_function[bench_dict_large_insert](
-        BenchId("bench_dict_large_insert")
-    )
-    m.bench_function[bench_dict_small_lookup](
-        BenchId("bench_dict_small_lookup")
-    )
-    m.bench_function[bench_dict_large_lookup](
-        BenchId("bench_dict_large_lookup")
-    )
+
+    @parameter
+    for i in range(len(sizes)):
+        alias size = sizes.get[i, Int]()
+        m.bench_function[bench_dict_insert[size]](
+            BenchId("bench_dict_insert[" + str(size) + "]")
+        )
+        m.bench_function[bench_dict_lookup[size]](
+            BenchId("bench_dict_lookup[" + str(size) + "]")
+        )
+
     m.dump_report()
+
+    @parameter
+    for i in range(len(sizes)):
+        alias size = sizes.get[i, Int]()
+        var mem_s = total_bytes_used(make_dict[size]())
+        print(
+            '"bench_dict_memory_size[' + str(size) + ']",' + str(mem_s) + ",0"
+        )

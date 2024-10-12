@@ -331,8 +331,6 @@ fn _try_write_int[
         )
         fmt.write_str(zero)
 
-        _ = zero_buf
-
         return None
 
     # Create a buffer to store the formatted value
@@ -360,7 +358,7 @@ fn _try_write_int[
     var remaining_int = value
 
     @parameter
-    fn process_digits[get_digit_value: fn () capturing -> Scalar[type]]():
+    fn process_digits[get_digit_value: fn () capturing [_] -> Scalar[type]]():
         while remaining_int:
             var digit_value = get_digit_value()
 
@@ -411,6 +409,5 @@ fn _try_write_int[
     )
 
     fmt.write_str(str_slice)
-    _ = buf^
 
     return None

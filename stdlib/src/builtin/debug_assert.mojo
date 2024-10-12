@@ -19,78 +19,272 @@ These are Mojo built-ins, so you don't need to import them.
 from os import abort
 from sys import is_defined, triple_is_nvidia_cuda
 from sys._build import is_debug_build
+from sys.param_env import env_get_string
+from sys.ffi import external_call, c_uint, c_size_t, c_char
+from sys.info import sizeof
+from memory import UnsafePointer
+
 
 from builtin._location import __call_location, _SourceLocation
 
-# Print an error and fail.
-alias _ERROR_ON_ASSERT = is_debug_build() or is_defined[
-    "MOJO_ENABLE_ASSERTIONS"
-]()
+alias defined_mode = env_get_string["ASSERT", "safe"]()
 
-# Print a warning, but do not fail (useful for testing assert behavior).
-alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
+
+@no_inline
+fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
+    constrained[
+        defined_mode in ["none", "warn", "safe", "all"],
+        "-D ASSERT="
+        + defined_mode
+        + " but must be one of: none, warn, safe, all",
+    ]()
+    constrained[
+        assert_mode in ["none", "safe"],
+        "assert_mode=" + assert_mode + " but must be one of: none, safe",
+    ]()
+
+    @parameter
+    if defined_mode == "none" or (triple_is_nvidia_cuda() and cpu_only):
+        return False
+    elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
+        return True
+    else:
+        return defined_mode == assert_mode
 
 
 @always_inline
 fn debug_assert[
-    func: fn () capturing -> Bool, message_type: Stringable
-](message: message_type):
+    assert_mode: StringLiteral = "none", cpu_only: Bool = False
+](cond: Bool, message: StringLiteral):
     """Asserts that the condition is true.
 
-    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
-    builds unless MOJO_ENABLE_ASSERTIONS is defined.
-
-    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
-    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
-    for enabling assertions in the library.
-
     Parameters:
-        func: The function to invoke to check if the assertion holds. Can be used
-            if the function is side-effecting, in which case a debug_assert taking
-            a Bool will evaluate the expression producing the Bool even in release mode.
-        message_type: A type conforming to `Stringable` for the message.
+        assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
 
     Args:
-        message: The message before displaying it on failure.
+        cond: The function to invoke to check if the assertion holds.
+        message: A StringLiteral to print on failure.
+
+
+    Pass in a condition and single StringLiteral to stop execution and
+    show an error on failure:
+
+    ```mojo
+    x = 0
+    debug_assert(x > 0, "x is not more than 0")
+    ```
+
+    By default it's a no-op, you can change the assertion level for example:
+
+    ```sh
+    mojo -D ASSERT=all main.mojo
+    ```
+
+    Assertion modes:
+
+    - none: turn off all assertions for performance at the cost of safety.
+    - warn: print any errors instead of aborting.
+    - safe: standard safety checks that are on even in release builds.
+    - all: turn on all assertions.
+
+    You can set the `assert_mode` to `safe` so the assertion runs even in
+    release builds:
+
+    ```mojo
+    debug_assert[assert_mode="safe"](
+        x > 0, "expected x to be more than 0 but got: ", x
+    )
+    ```
+
+    To ensure that you have no runtime penality from your assertion in release
+    builds, make sure there are no side effects in your message and condition.
+
+    On GPU this will also show the the block and thread idx's on failure.
+    .
     """
 
     @parameter
-    if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
-        debug_assert(func(), message)
+    if _assert_enabled[assert_mode, cpu_only]():
+        if cond:
+            return
+        _debug_assert_msg_literal(message, __call_location())
 
 
 @always_inline
-fn debug_assert[message_type: Stringable](cond: Bool, message: message_type):
+fn debug_assert[
+    cond: fn () capturing [_] -> Bool,
+    assert_mode: StringLiteral = "none",
+    cpu_only: Bool = False,
+    *Ts: Formattable,
+](*messages: *Ts):
     """Asserts that the condition is true.
 
-    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
-    builds unless MOJO_ENABLE_ASSERTIONS is defined.
-
-    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
-    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
-    for enabling assertions in the library.
-
     Parameters:
-        message_type: A type conforming to `Stringable` for the message.
+        cond: The function to invoke to check if the assertion holds.
+        assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
+        Ts: The element types conforming to `Formattable` for the message.
 
     Args:
-        cond: The bool value to assert.
-        message: The message before displaying it on failure.
+        messages: Arguments to convert to a `String` message.
+
+
+    You can pass in multiple args that are `Formattable` to generate a formatted
+    message, by default this will be a no-op:
+
+    ```mojo
+    x = 0
+    debug_assert(x > 0, "expected x to be more than 0 but got: ", x)
+    ```
+
+    You can change the assertion level for example:
+
+    ```sh
+    mojo -D ASSERT=all main.mojo
+    ```
+
+    Assertion modes:
+
+    - none: turn off all assertions for performance at the cost of safety.
+    - warn: print any errors instead of aborting.
+    - safe: standard safety checks that are on even in release builds.
+    - all: turn on all assertions.
+
+    You can set the `assert_mode` to `safe` so the assertion runs even in
+    release builds:
+
+    ```mojo
+    debug_assert[assert_mode="safe"](
+        x > 0, "expected x to be more than 0 but got: ", x
+    )
+    ```
+
+    To ensure that you have no runtime penality from your assertion in release
+    builds, make sure there are no side effects in your message and condition.
+    Take this example:
+
+    ```mojo
+    person = "name: john, age: 50"
+    name = "john"
+    debug_assert(str("name: ") + name == person, "unexpected name")
+    ```
+
+    This will have a runtime penality due to allocating a `String` in the
+    condition even in release builds, you must put the condition inside a
+    closure so it only runs when the assertion is turned on:
+
+    ```mojo
+    fn check_name() capturing -> Bool:
+        return str("name: ") + name == person
+
+    debug_assert[check_name]("unexpected name")
+    ```
+
+    If you need to allocate, and so don't want the assert to ever run on GPU,
+    you can set it to CPU only:
+
+    ```mojo
+    debug_assert[check_name, cpu_only=True]("unexpected name")
+    ```
+    .
     """
 
     @parameter
-    if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
+    if _assert_enabled[assert_mode, cpu_only]():
+        if cond():
+            return
+        _debug_assert_msg(messages, __call_location())
+
+
+@always_inline
+fn debug_assert[
+    assert_mode: StringLiteral = "none",
+    cpu_only: Bool = False,
+    *Ts: Formattable,
+](cond: Bool, *messages: *Ts):
+    """Asserts that the condition is true.
+
+    Parameters:
+        assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
+        Ts: The element types conforming to `Formattable` for the message.
+
+    Args:
+        cond: The bool value to assert.
+        messages: Arguments to convert to a `String` message.
+
+    You can pass in multiple args that are `Formattable` to generate a formatted
+    message, by default this will be a no-op:
+
+    ```mojo
+    x = 0
+    debug_assert(x > 0, "expected x to be more than 0 but got: ", x)
+    ```
+
+    You can change the assertion level for example:
+
+    ```sh
+    mojo -D ASSERT=all main.mojo
+    ```
+
+    Assertion modes:
+
+    - none: turn off all assertions for performance at the cost of safety.
+    - warn: print any errors instead of aborting.
+    - safe: standard safety checks that are on even in release builds.
+    - all: turn on all assertions.
+
+    You can set the `assert_mode` to `safe` so the assertion runs even in
+    release builds:
+
+    ```mojo
+    debug_assert[assert_mode="safe"](
+        x > 0, "expected x to be more than 0 but got: ", x
+    )
+    ```
+
+    To ensure that you have no runtime penality from your assertion in release
+    builds, make sure there are no side effects in your message and condition.
+    Take this example:
+
+    ```mojo
+    person = "name: john, age: 50"
+    name = "john"
+    debug_assert(str("name: ") + name == person, "unexpected name")
+    ```
+
+    This will have a runtime penality due to allocating a `String` in the
+    condition even in release builds, you must put the condition inside a
+    closure so it only runs when the assertion is turned on:
+
+    ```mojo
+    fn check_name() capturing -> Bool:
+        return str("name: ") + name == person
+
+    debug_assert[check_name]("unexpected name")
+    ```
+
+    If you need to allocate, and so don't want the assert to ever run on GPU,
+    you can set it to CPU only:
+
+    ```mojo
+    debug_assert[check_name, cpu_only=True]("unexpected name")
+    ```
+    .
+    """
+
+    @parameter
+    if _assert_enabled[assert_mode, cpu_only]():
         if cond:
             return
-        _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
-            message, __call_location()
-        )
+        _debug_assert_msg(messages, __call_location())
 
 
 @no_inline
-fn _debug_assert_msg[
-    message_type: Stringable, //, *, is_warning: Bool = False
-](msg: message_type, loc: _SourceLocation):
+fn _debug_assert_msg(
+    messages: VariadicPack[_, Formattable, *_], loc: _SourceLocation
+):
     """Aborts with (or prints) the given message and location.
 
     This function is intentionally marked as no_inline to reduce binary size.
@@ -102,17 +296,51 @@ fn _debug_assert_msg[
 
     @parameter
     if triple_is_nvidia_cuda():
-        # On GPUs, assert shouldn't allocate.
+        external_call["__assertfail", NoneType](
+            "debug_assert message must be a single StringLiteral on GPU"
+            .unsafe_cstr_ptr(),
+            loc.file_name.unsafe_cstr_ptr(),
+            c_uint(loc.line),
+            # TODO(MSTDL-962) pass through the funciton name here
+            "kernel".unsafe_cstr_ptr(),
+            c_size_t(sizeof[Int8]()),
+        )
+
+    else:
+        message = String.format_sequence(messages)
 
         @parameter
-        if is_warning:
-            print("Assert Warning")
+        if defined_mode == "warn":
+            print(loc.prefix("Assert Warning: " + message))
         else:
-            abort()
+            abort(loc.prefix("Assert Error: " + message))
+
+
+@no_inline
+fn _debug_assert_msg_literal(message: StringLiteral, loc: _SourceLocation):
+    """Aborts with (or prints) the given message and location.
+
+    This function is intentionally marked as no_inline to reduce binary size.
+
+    Note that it's important that this function doesn't get inlined; otherwise,
+    an indirect recursion of @always_inline functions is possible (e.g. because
+    abort's implementation could use debug_assert)
+    """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        external_call["__assertfail", NoneType](
+            message.unsafe_cstr_ptr(),
+            loc.file_name.unsafe_cstr_ptr(),
+            c_uint(loc.line),
+            # TODO(MSTDL-962) pass through the funciton name here
+            "kernel".unsafe_cstr_ptr(),
+            c_size_t(sizeof[Int8]()),
+        )
     else:
 
         @parameter
-        if is_warning:
-            print(loc.prefix("Assert Warning:"), str(msg))
+        if defined_mode == "warn":
+            print(loc.prefix(str("Assert Warning: ") + message))
         else:
-            abort(loc.prefix("Assert Error: " + str(msg)))
+            abort(loc.prefix(str("Assert Error: ") + message))

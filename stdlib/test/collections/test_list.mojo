@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import List
+from memory import UnsafePointer
 from sys.info import sizeof
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
@@ -293,9 +294,6 @@ def test_list_reverse_move_count():
     assert_equal(vec.data[3].move_count, 3)
     assert_equal(vec.data[4].move_count, 3)
 
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
-
 
 def test_list_insert():
     #
@@ -485,7 +483,7 @@ def test_list_extend_non_trivial():
     v2.append(MoveCounter[String]("Bar"))
     v2.append(MoveCounter[String]("Baz"))
 
-    v1.extend(v2)
+    v1.extend(v2^)
 
     assert_equal(len(v1), 5)
     assert_equal(v1[0].value, "Hello")
@@ -499,9 +497,6 @@ def test_list_extend_non_trivial():
     assert_equal(v1.data[2].move_count, 2)
     assert_equal(v1.data[3].move_count, 2)
     assert_equal(v1.data[4].move_count, 2)
-
-    # Keep v1 alive until after we've done the last `vec.data + N` read.
-    _ = v1^
 
 
 def test_2d_dynamic_list():

@@ -21,8 +21,7 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Reference
-from sys.intrinsics import _type_is_eq
+from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
 
 
@@ -30,7 +29,7 @@ from builtin.builtin_list import _lit_mut_cast
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -52,14 +51,18 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Reference[T, lifetime]:
+    ) -> Pointer[T, lifetime]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[self.index - 1]
+            return Pointer.address_of(self.src[self.index - 1])
         else:
             self.index -= 1
-            return self.src[self.index]
+            return Pointer.address_of(self.src[self.index])
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> Int:
@@ -74,7 +77,7 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
@@ -125,19 +128,16 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int, //
-    ](inout self, ref [lifetime]array: InlineArray[T2, size]):
+        size: Int, //
+    ](inout self, ref [lifetime]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
-            T2: The type of the elements in the span.
             size: The size of the InlineArray.
 
         Args:
             array: The array to which the span refers.
         """
-
-        constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
 
         self._data = UnsafePointer.address_of(array).bitcast[T]()
         self._len = size
@@ -226,15 +226,15 @@ struct Span[
 
         return self._data
 
-    fn as_ref(self) -> Reference[T, lifetime]:
+    fn as_ref(self) -> Pointer[T, lifetime]:
         """
-        Gets a Reference to the first element of this slice.
+        Gets a Pointer to the first element of this slice.
 
         Returns:
-            A Reference pointing at the first element of this slice.
+            A Pointer pointing at the first element of this slice.
         """
 
-        return self._data[0]
+        return Pointer[T, lifetime].address_of(self._data[0])
 
     @always_inline
     fn copy_from[
@@ -261,9 +261,14 @@ struct Span[
         """
         return len(self) > 0
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
         Parameters:
@@ -292,7 +297,7 @@ struct Span[
     @always_inline
     fn __ne__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, lifetime], rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
         Parameters:

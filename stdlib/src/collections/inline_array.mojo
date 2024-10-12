@@ -21,6 +21,7 @@ from collections import InlineArray
 
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
+from memory import UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 # ===----------------------------------------------------------------------===#
@@ -41,7 +42,7 @@ fn _inline_array_construction_checks[size: Int]():
 
 @value
 struct InlineArray[
-    ElementType: CollectionElementNew,
+    ElementType: CollectionElement,
     size: Int,
     *,
     run_destructors: Bool = False,
@@ -78,7 +79,10 @@ struct InlineArray[
                 " 'unsafe_uninitialized'."
             ),
         ]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     @always_inline
     fn __init__(inout self, *, unsafe_uninitialized: Bool):
@@ -101,7 +105,10 @@ struct InlineArray[
                 Always set to `True` (it's not actually used inside the constructor).
         """
         _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     fn __init__(
         inout self,
@@ -121,7 +128,10 @@ struct InlineArray[
             unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
         """
 
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
         for i in range(Self.size):
             unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
@@ -136,12 +146,15 @@ struct InlineArray[
             fill: The element to fill each index.
         """
         _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
         @parameter
         for i in range(size):
             var ptr = UnsafePointer.address_of(self.unsafe_get(i))
-            ptr.init_pointee_explicit_copy(fill)
+            ptr.init_pointee_copy(fill)
 
     @always_inline
     fn __init__(inout self, owned *elems: Self.ElementType):
@@ -153,7 +166,7 @@ struct InlineArray[
 
         self = Self(storage=elems^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(
         inout self,
         *,
@@ -167,17 +180,16 @@ struct InlineArray[
 
         debug_assert(len(storage) == size, "Elements must be of length size")
         _inline_array_construction_checks[size]()
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var eltref: Reference[
-                Self.ElementType, __lifetime_of(self)
-            ] = self.unsafe_get(i)
-            UnsafePointer.address_of(storage[i]).move_pointee_into(
-                UnsafePointer[Self.ElementType].address_of(eltref[])
-            )
+            var eltptr = UnsafePointer.address_of(self.unsafe_get(i))
+            UnsafePointer.address_of(storage[i]).move_pointee_into(eltptr)
 
         # Mark the elements as already destroyed.
         storage._is_owned = False
@@ -193,8 +205,7 @@ struct InlineArray[
 
         for idx in range(size):
             var ptr = self.unsafe_ptr() + idx
-
-            ptr.init_pointee_explicit_copy(other[idx])
+            ptr.init_pointee_copy(other[idx])
 
     fn __copyinit__(inout self, other: Self):
         """Copy construct the array.
@@ -220,11 +231,9 @@ struct InlineArray[
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
-    fn __getitem__(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+    @always_inline
+    fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
+        """Get a `Pointer` to the element at the given index.
 
         Args:
             idx: The index of the item.
@@ -233,14 +242,13 @@ struct InlineArray[
             A reference to the item at the given index.
         """
         var normalized_index = normalize_index["InlineArray"](idx, self)
-
         return self.unsafe_get(normalized_index)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__[
         idx: Int,
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+    ](ref [_]self: Self) -> ref [self] Self.ElementType:
+        """Get a `Pointer` to the element at the given index.
 
         Parameters:
             idx: The index of the item.
@@ -262,7 +270,7 @@ struct InlineArray[
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
 
@@ -275,10 +283,8 @@ struct InlineArray[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    @always_inline
+    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
@@ -296,10 +302,10 @@ struct InlineArray[
         var idx_as_int = index(idx)
         debug_assert(
             0 <= idx_as_int < size,
-            (
-                "Index must be within bounds when using"
-                " `InlineArray.unsafe_get()`."
-            ),
+            " InlineArray.unsafe_get() index out of bounds: ",
+            idx_as_int,
+            " should be less than: ",
+            size,
         )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self._array).address,
@@ -325,7 +331,7 @@ struct InlineArray[
     @always_inline
     fn __contains__[
         T: EqualityComparableCollectionElement, //
-    ](self, value: T) -> Bool:
+    ](self: InlineArray[T, size], value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo
@@ -344,16 +350,9 @@ struct InlineArray[
         Returns:
             True if the value is contained in the array, False otherwise.
         """
-        constrained[
-            _type_is_eq[T, Self.ElementType](),
-            "T must be equal to Self.ElementType",
-        ]()
 
         @parameter
         for i in range(size):
-            if (
-                rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
-                == value
-            ):
+            if self[i] == value:
                 return True
         return False

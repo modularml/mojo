@@ -19,6 +19,7 @@ from collections import InlineArray
 from os import abort
 from collections import Optional
 from sys import sizeof
+from sys.ffi import OpaquePointer
 
 from memory import UnsafePointer, memcpy
 
@@ -278,10 +279,10 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -474,7 +475,7 @@ struct _FixedString[CAP: Int](
         writer.write_str(self.as_string_slice())
 
     fn _unsafe_to_formatter(inout self) -> Formatter:
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
 
             var str_slice = StringSlice[ImmutableAnyLifetime](
@@ -517,10 +518,10 @@ struct _FixedString[CAP: Int](
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 

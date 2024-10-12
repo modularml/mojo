@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Reference-counted smart pointers.
+"""Pointer-counted smart pointers.
 
 Example usage:
 
@@ -22,7 +22,7 @@ p2[]=3
 print(3 == p[])
 ```
 
-Subscripting(`[]`) is done by `Reference`,
+Subscripting(`[]`) is done by `Pointer`,
 in order to ensure that the underlying `Arc` outlive the operation.
 
 It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
@@ -36,7 +36,7 @@ print(Arc(String("ok"))._inner[].payload)
 #........................^ASAP ^already freed
 ```
 
-Always use `Reference` subscripting (`[]`):
+Always use `Pointer` subscripting (`[]`):
 
 ```mojo
 print(Arc(String("ok"))[])
@@ -51,7 +51,7 @@ from memory import UnsafePointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:
-    var refcount: Atomic[DType.int64]
+    var refcount: Atomic[DType.uint64]
     var payload: T
 
     fn __init__(inout self, owned value: T):
@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -129,7 +129,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         references, delete the object and free its memory."""
         if self._inner[].drop_ref():
             # Call inner destructor, then free the memory.
-            (self._inner).destroy_pointee()
+            self._inner.destroy_pointee()
             self._inner.free()
 
     # FIXME: The lifetime returned for this is currently self lifetime, which
@@ -144,13 +144,13 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
     ) -> ref [
         _lit_mut_cast[self_life, result_mutable=True].result
     ] T:
-        """Returns a mutable Reference to the managed value.
+        """Returns a mutable reference to the managed value.
 
         Parameters:
             self_life: The lifetime of self.
 
         Returns:
-            A Reference to the managed value.
+            A reference to the managed value.
         """
         return self._inner[].payload
 
@@ -162,3 +162,33 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         """
         # TODO: consider removing this method.
         return UnsafePointer.address_of(self._inner[].payload)
+
+    fn count(self) -> UInt64:
+        """Count the amount of current references.
+
+        Returns:
+            The current amount of references to the pointee.
+        """
+        return self._inner[].refcount.load()
+
+    fn __is__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at the same object.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at the same object and False otherwise.
+        """
+        return self._inner == rhs._inner
+
+    fn __isnot__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at different objects.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at different objects and False otherwise.
+        """
+        return self._inner != rhs._inner

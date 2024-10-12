@@ -48,7 +48,7 @@ struct Op(Stringable):
     alias ld = 5
     alias st = 6
 
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, other: Op) -> Bool:
         return self.op_code == other.op_code
 
@@ -194,7 +194,7 @@ fn test_vectorize[
 # TODO: move this function to a common module for benchmarking.
 @always_inline
 fn unroll_nested_call[
-    func: fn[List[Int]] () raises capturing -> None,
+    func: fn[List[Int]] () raises capturing [_] -> None,
     count: List[Int],  # TODO: a better datatype to use? e.g., Dim?
     loop_idx: Int = 0,
     index_prev: List[Int] = List[Int](),
@@ -234,7 +234,7 @@ fn unroll_nested_call[
             func[index]()
 
 
-fn bench_compare():
+fn bench_compare() raises:
     alias type = DType.uint8
     alias width = simdwidthof[type]()
     alias unit = Unit.ns

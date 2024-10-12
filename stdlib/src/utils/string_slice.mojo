@@ -24,11 +24,47 @@ from bit import count_leading_zeros
 from utils import Span
 from collections.string import _isspace
 from collections import List
-from memory import memcmp
+from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
-alias StaticString = StringSlice[ImmutableStaticLifetime]
+alias StaticString = StringSlice[StaticConstantLifetime]
 """An immutable static string slice."""
+
+
+fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
+    debug_assert(
+        0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
+    )
+    alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
+    return int((sizes < c).cast[DType.uint8]().reduce_add())
+
+
+fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
+    """Shift unicode to utf8 representation.
+
+    ### Unicode (represented as UInt32 BE) to UTF-8 conversion:
+    - 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa
+        - a
+    - 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb
+        - (a >> 6)  | 0b11000000, b         | 0b10000000
+    - 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc
+        - (a >> 12) | 0b11100000, (b >> 6)  | 0b10000000, c        | 0b10000000
+    - 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc
+    10dddddd
+        - (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000,
+        d | 0b10000000
+    """
+    if num_bytes == 1:
+        ptr[0] = UInt8(c)
+        return
+
+    var shift = 6 * (num_bytes - 1)
+    var mask = UInt8(0xFF) >> (num_bytes + 1)
+    var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
+    ptr[0] = ((c >> shift) & mask) | num_bytes_marker
+    for i in range(1, num_bytes):
+        shift -= 6
+        ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
@@ -46,152 +82,6 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
         - 4 -> start of 4 byte long sequence.
     """
     return count_leading_zeros(~(b & UInt8(0b1111_0000)))
-
-
-fn _validate_utf8_simd_slice[
-    width: Int, remainder: Bool = False
-](ptr: UnsafePointer[UInt8], length: Int, owned iter_len: Int) -> Int:
-    """Internal method to validate utf8, use _is_valid_utf8.
-
-    Parameters:
-        width: The width of the SIMD vector to build for validation.
-        remainder: Whether it is computing the remainder that doesn't fit in the
-            SIMD vector.
-
-    Args:
-        ptr: Pointer to the data.
-        length: The length of the items in the pointer.
-        iter_len: The amount of items to still iterate through.
-
-    Returns:
-        The new amount of items to iterate through that don't fit in the
-            specified width of SIMD vector. If -1 then it is invalid.
-    """
-    # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
-    # and benchmark the difference.
-    var idx = length - iter_len
-    while iter_len >= width or remainder:
-        var d: SIMD[DType.uint8, width]  # use a vector of the specified width
-
-        @parameter
-        if not remainder:
-            d = ptr.load[width=width](idx)
-        else:
-            debug_assert(iter_len > -1, "iter_len must be > -1")
-            d = SIMD[DType.uint8, width](0)
-            for i in range(iter_len):
-                d[i] = ptr[idx + i]
-
-        var is_ascii = d < 0b1000_0000
-        if is_ascii.reduce_and():  # skip all ASCII bytes
-
-            @parameter
-            if not remainder:
-                idx += width
-                iter_len -= width
-                continue
-            else:
-                return 0
-        elif is_ascii[0]:
-            for i in range(1, width):
-                if is_ascii[i]:
-                    continue
-                idx += i
-                iter_len -= i
-                break
-            continue
-
-        var byte_types = _utf8_byte_type(d)
-        var first_byte_type = byte_types[0]
-
-        # byte_type has to match against the amount of continuation bytes
-        alias Vec = SIMD[DType.uint8, 4]
-        alias n4_byte_types = Vec(4, 1, 1, 1)
-        alias n3_byte_types = Vec(3, 1, 1, 0)
-        alias n3_mask = Vec(0b111, 0b111, 0b111, 0)
-        alias n2_byte_types = Vec(2, 1, 0, 0)
-        alias n2_mask = Vec(0b111, 0b111, 0, 0)
-        var byte_types_4 = byte_types.slice[4]()
-        var valid_n4 = (byte_types_4 == n4_byte_types).reduce_and()
-        var valid_n3 = ((byte_types_4 & n3_mask) == n3_byte_types).reduce_and()
-        var valid_n2 = ((byte_types_4 & n2_mask) == n2_byte_types).reduce_and()
-        if not (valid_n4 or valid_n3 or valid_n2):
-            return -1
-
-        # special unicode ranges
-        var b0 = d[0]
-        var b1 = d[1]
-        if first_byte_type == 2 and b0 < UInt8(0b1100_0010):
-            return -1
-        elif b0 == 0xE0 and not (UInt8(0xA0) <= b1 <= UInt8(0xBF)):
-            return -1
-        elif b0 == 0xED and not (UInt8(0x80) <= b1 <= UInt8(0x9F)):
-            return -1
-        elif b0 == 0xF0 and not (UInt8(0x90) <= b1 <= UInt8(0xBF)):
-            return -1
-        elif b0 == 0xF4 and not (UInt8(0x80) <= b1 <= UInt8(0x8F)):
-            return -1
-
-        # amount of bytes evaluated
-        idx += int(first_byte_type)
-        iter_len -= int(first_byte_type)
-
-        @parameter
-        if remainder:
-            break
-    return iter_len
-
-
-fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
-    """Verify that the bytes are valid UTF-8.
-
-    Args:
-        ptr: The pointer to the data.
-        length: The length of the items pointed to.
-
-    Returns:
-        Whether the data is valid UTF-8.
-
-    #### UTF-8 coding format
-    [Table 3-7 page 94](http://www.unicode.org/versions/Unicode6.0.0/ch03.pdf).
-    Well-Formed UTF-8 Byte Sequences
-
-    Code Points        | First Byte | Second Byte | Third Byte | Fourth Byte |
-    :----------        | :--------- | :---------- | :--------- | :---------- |
-    U+0000..U+007F     | 00..7F     |             |            |             |
-    U+0080..U+07FF     | C2..DF     | 80..BF      |            |             |
-    U+0800..U+0FFF     | E0         | ***A0***..BF| 80..BF     |             |
-    U+1000..U+CFFF     | E1..EC     | 80..BF      | 80..BF     |             |
-    U+D000..U+D7FF     | ED         | 80..***9F***| 80..BF     |             |
-    U+E000..U+FFFF     | EE..EF     | 80..BF      | 80..BF     |             |
-    U+10000..U+3FFFF   | F0         | ***90***..BF| 80..BF     | 80..BF      |
-    U+40000..U+FFFFF   | F1..F3     | 80..BF      | 80..BF     | 80..BF      |
-    U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
-    .
-    """
-
-    var iter_len = length
-    if iter_len >= 64 and simdwidthof[DType.uint8]() >= 64:
-        iter_len = _validate_utf8_simd_slice[64](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 32 and simdwidthof[DType.uint8]() >= 32:
-        iter_len = _validate_utf8_simd_slice[32](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 16 and simdwidthof[DType.uint8]() >= 16:
-        iter_len = _validate_utf8_simd_slice[16](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 8:
-        iter_len = _validate_utf8_simd_slice[8](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    if iter_len >= 4:
-        iter_len = _validate_utf8_simd_slice[4](ptr, length, iter_len)
-        if iter_len < 0:
-            return False
-    return _validate_utf8_simd_slice[4, True](ptr, length, iter_len) == 0
 
 
 fn _is_newline_start(
@@ -235,7 +125,7 @@ fn _is_newline_start(
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for StringSlice
@@ -294,6 +184,10 @@ struct _StringSliceIter[
                 unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
             )
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
     fn __len__(self) -> Int:
         @parameter
         if forward:
@@ -304,7 +198,7 @@ struct _StringSliceIter[
 
 struct StringSlice[
     is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: Lifetime[is_mutable].type,
 ](Stringable, Sized, Formattable):
     """
     A non-owning view to encoded string data.
@@ -325,7 +219,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self: StringSlice[ImmutableAnyLifetime], lit: StringLiteral
+        inout self: StringSlice[StaticConstantLifetime], lit: StringLiteral
     ):
         """Construct a new string slice from a string literal.
 
@@ -341,10 +235,10 @@ struct StringSlice[
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
         # TODO(#933): use when llvm intrinsics can be used at compile time
         # debug_assert(
-        #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
+        #     _is_valid_utf8(literal.unsafe_ptr(), literal.byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StringSlice[ImmutableStaticLifetime](
+        self = StaticString(
             unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
         )
 
@@ -457,6 +351,11 @@ struct StringSlice[
         """
         return len(self._slice) > 0
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the lifetime.
+    @__unsafe_disable_nested_lifetime_exclusivity
     fn __eq__(self, rhs: StringSlice) -> Bool:
         """Verify if a string slice is equal to another string slice.
 
@@ -502,6 +401,7 @@ struct StringSlice[
         """
         return self == rhs.as_string_slice()
 
+    @__unsafe_disable_nested_lifetime_exclusivity
     @always_inline
     fn __ne__(self, rhs: StringSlice) -> Bool:
         """Verify if span is not equal to another string slice.
@@ -538,25 +438,23 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(self) -> _StringSliceIter[lifetime]:
         """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[lifetime](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), False]:
+    fn __reversed__(self) -> _StringSliceIter[lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[lifetime, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -565,7 +463,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, lifetime]:
+    fn as_bytes(self) -> Span[UInt8, lifetime]:
         """Get the sequence of encoded bytes as a slice of the underlying string.
 
         Returns:
@@ -591,18 +489,7 @@ struct StringSlice[
             The length of this string slice in bytes.
         """
 
-        return len(self.as_bytes_slice())
-
-    @always_inline
-    @deprecated("use byte_length() instead")
-    fn _byte_length(self) -> Int:
-        """Get the length of this string slice in bytes.
-
-        Returns:
-            The length of this string slice in bytes.
-        """
-
-        return len(self.as_bytes_slice())
+        return len(self.as_bytes())
 
     fn _strref_dangerous(self) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.

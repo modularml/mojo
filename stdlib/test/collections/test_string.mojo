@@ -19,6 +19,7 @@ from collections.string import (
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+from memory import UnsafePointer
 from python import Python
 from testing import (
     assert_equal,
@@ -45,11 +46,14 @@ def test_stringable():
 
 
 def test_repr():
-    # Usual cases
+    # Standard single-byte characters
     assert_equal(String.__repr__("hello"), "'hello'")
     assert_equal(String.__repr__(str(0)), "'0'")
+    assert_equal(String.__repr__("A"), "'A'")
+    assert_equal(String.__repr__(" "), "' '")
+    assert_equal(String.__repr__("~"), "'~'")
 
-    # Escape cases
+    # Special single-byte characters
     assert_equal(String.__repr__("\0"), r"'\x00'")
     assert_equal(String.__repr__("\x06"), r"'\x06'")
     assert_equal(String.__repr__("\x09"), r"'\t'")
@@ -57,12 +61,14 @@ def test_repr():
     assert_equal(String.__repr__("\x0d"), r"'\r'")
     assert_equal(String.__repr__("\x0e"), r"'\x0e'")
     assert_equal(String.__repr__("\x1f"), r"'\x1f'")
-    assert_equal(String.__repr__(" "), "' '")
     assert_equal(String.__repr__("'"), '"\'"')
-    assert_equal(String.__repr__("A"), "'A'")
     assert_equal(String.__repr__("\\"), r"'\\'")
-    assert_equal(String.__repr__("~"), "'~'")
     assert_equal(String.__repr__("\x7f"), r"'\x7f'")
+
+    # Multi-byte characters
+    assert_equal(String.__repr__("Örnsköldsvik"), "'Örnsköldsvik'")  # 2-byte
+    assert_equal(String.__repr__("你好!"), "'你好!'")  # 3-byte
+    assert_equal(String.__repr__("hello 🔥!"), "'hello 🔥!'")  # 4-byte
 
 
 def test_constructors():
@@ -818,6 +824,9 @@ def test_split():
     assert_equal(res6[2], "долор")
     assert_equal(res6[3], "сит")
     assert_equal(res6[4], "амет")
+
+    with assert_raises(contains="Separator cannot be empty."):
+        _ = String("1, 2, 3").split("")
 
 
 def test_splitlines():

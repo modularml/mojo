@@ -15,11 +15,11 @@
 You can import these APIs from the `collections` package. For example:
 
 ```mojo
-from collections.vector import InlinedFixedVector
+from collections import InlinedFixedVector
 ```
 """
 
-from memory import Reference, UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy
 from sys import sizeof
 
 from utils import StaticTuple
@@ -44,6 +44,10 @@ struct _VecIter[
     fn __next__(inout self) -> type:
         self.i += 1
         return deref(self.vec, self.i - 1)
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return self.size - self.i

@@ -18,7 +18,7 @@ Mojo module is a single Mojo source file that includes code suitable for use
 by other files that import it. For example, you can create a module
 to define a struct such as this one:
 
-```{.mojo filename="mymodule.mojo"}
+```mojo title="mymodule.mojo"
 struct MyPair:
     var first: Int
     var second: Int
@@ -38,7 +38,7 @@ Notice that this code has no `main()` function, so you can't execute
 For example, here's how you can import `MyPair` into a file named `main.mojo`
 that's in the same directory as `mymodule.mojo`:
 
-```{.mojo filename="main.mojo"}
+```mojo title="main.mojo"
 from mymodule import MyPair
 
 fn main():
@@ -49,7 +49,7 @@ fn main():
 Alternatively, you can import the whole module and then access its members
 through the module name. For example:
 
-```{.mojo filename="main.mojo"}
+```mojo title="main.mojo"
 import mymodule
 
 fn main():
@@ -59,7 +59,7 @@ fn main():
 
 You can also create an alias for an imported member with `as`, like this:
 
-```{.mojo filename="main.mojo"}
+```mojo title="main.mojo"
 import mymodule as my
 
 fn main():
@@ -111,7 +111,7 @@ struct) and `__init__.mojo` is empty.
 In this case, the `main.mojo` file can now import `MyPair` through the package
 name like this:
 
-```{.mojo filename="main.mojo"}
+```mojo title="main.mojo"
 from mypackage.mymodule import MyPair
 
 fn main():
@@ -148,7 +148,7 @@ mypack.mojopkg
 Because we named the package file different from the directory, we need to fix
 the import statement and it all works the same:
 
-```{.mojo filename="main.mojo"}
+```mojo title="main.mojo"
 from mypack.mymodule import MyPair
 ```
 
@@ -186,14 +186,14 @@ mypackage/
 
 Let's now add the following line in `__init__.mojo`:
 
-```{.mojo filename="__init__.mojo"}
+```mojo title="__init__.mojo"
 from .mymodule import MyPair
 ```
 
 That's all that's in there. Now, we can simplify the import statement in
 `main.mojo` like this:
 
-```{.mojo filename="main.mojo"}
+```mojo title="main.mojo"
 from mypackage import MyPair
 ```
 
@@ -210,7 +210,7 @@ from algorithm.functional import map
 
 However, the `algorithm/__init__.mojo` file also includes these lines:
 
-```{.mojo filename="algorithm/__init__.mojo"}
+```mojo title="algorithm/__init__.mojo"
 from .functional import *
 from .reduction import *
 ```

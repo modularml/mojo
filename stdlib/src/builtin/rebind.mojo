@@ -46,7 +46,7 @@ fn rebind[
 fn rebind[
     src_type: AnyType, //,
     dest_type: AnyType,
-](ref [_]src: src_type) -> ref [__lifetime_of(src)] dest_type:
+](ref [_]src: src_type) -> ref [src] dest_type:
     """Statically assert that a parameter input type `src_type` resolves to the
     same type as a parameter result type `dest_type` after function
     instantiation and "rebind" the input to the result type, returning a
@@ -67,5 +67,5 @@ fn rebind[
         A reference to the value rebound as `dest_type`.
     """
     lit = __get_mvalue_as_litref(src)
-    rebound = rebind[Reference[dest_type, __lifetime_of(src)]._mlir_type](lit)
+    rebound = rebind[Pointer[dest_type, __lifetime_of(src)]._mlir_type](lit)
     return __get_litref_as_mvalue(rebound)

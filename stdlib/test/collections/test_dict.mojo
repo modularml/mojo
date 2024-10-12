@@ -279,10 +279,8 @@ def test_dict_copy_calls_copy_constructor():
 
     # test values copied to new Dict
     var copy = Dict(other=orig)
-    # I _may_ have thoughts about where our performance issues
-    # are coming from :)
-    assert_equal(1, orig["a"].copy_count)
-    assert_equal(2, copy["a"].copy_count)
+    assert_equal(0, orig["a"].copy_count)
+    assert_equal(1, copy["a"].copy_count)
     assert_equal(0, orig._find_ref("a").copy_count)
     assert_equal(1, copy._find_ref("a").copy_count)
 
@@ -582,9 +580,9 @@ fn test_dict_setdefault() raises:
     var some_dict = Dict[String, Int]()
     some_dict["key1"] = 1
     some_dict["key2"] = 2
-    assert_equal(some_dict.setdefault("key1", 0)[], 1)
-    assert_equal(some_dict.setdefault("key2", 0)[], 2)
-    assert_equal(some_dict.setdefault("not_key", 0)[], 0)
+    assert_equal(some_dict.setdefault("key1", 0), 1)
+    assert_equal(some_dict.setdefault("key2", 0), 2)
+    assert_equal(some_dict.setdefault("not_key", 0), 0)
     assert_equal(some_dict["not_key"], 0)
 
     # Check that there is no copy of the default value, so it's performant
@@ -593,11 +591,11 @@ fn test_dict_setdefault() raises:
     var a_def = CopyCounter()
     var b_def = CopyCounter()
     other_dict["a"] = a^
-    assert_equal(1, other_dict["a"].copy_count)
+    assert_equal(0, other_dict["a"].copy_count)
     _ = other_dict.setdefault("a", a_def^)
     _ = other_dict.setdefault("b", b_def^)
-    assert_equal(1, other_dict["a"].copy_count)
-    assert_equal(1, other_dict["b"].copy_count)
+    assert_equal(0, other_dict["a"].copy_count)
+    assert_equal(0, other_dict["b"].copy_count)
 
 
 def main():

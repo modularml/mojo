@@ -39,9 +39,6 @@ def has_not():
 if has_not() or os.getenv("GITHUB_REPOSITORY"):
     config.available_features.add("has_not")
 
-# This makes the OS name available for `REQUIRE` directives, e.g., `# REQUIRES: darwin`.
-config.available_features.add(platform.system().lower())
-
 # test_utils does not contain tests, just source code
 # that we run `mojo package` on to be used by other tests
 config.excludes = ["test_utils"]
@@ -73,7 +70,7 @@ else:
     # In the future, we can do other fancy things like with sanitizers
     # and build type.
     if bool(int(os.environ.get("MOJO_ENABLE_ASSERTIONS_IN_TESTS", 1))):
-        base_mojo_command = "mojo -D MOJO_ENABLE_ASSERTIONS"
+        base_mojo_command = "mojo -D ASSERT=all"
     else:
         print("Running tests with assertions disabled.")
         base_mojo_command = "mojo"

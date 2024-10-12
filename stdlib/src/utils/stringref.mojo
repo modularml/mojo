@@ -19,7 +19,7 @@ from collections.string import _atol, _isspace
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
-from sys.ffi import C_char
+from sys.ffi import c_char
 from sys import simdwidthof
 
 # ===----------------------------------------------------------------------=== #
@@ -90,7 +90,7 @@ struct StringRef(
         self = StringRef(str.unsafe_ptr(), len(str))
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[C_char], len: Int):
+    fn __init__(inout self, ptr: UnsafePointer[c_char], len: Int):
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -123,7 +123,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[C_char]):
+    fn __init__(inout self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `UnsafePointer[UInt8]` instead
@@ -573,6 +573,41 @@ struct StringRef(
         while end > start and _isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
+
+    fn split(self, delimiter: StringRef) raises -> List[StringRef]:
+        """Split the StringRef by a delimiter.
+
+        Args:
+            delimiter: The StringRef to split on.
+
+        Returns:
+            A List of StringRefs containing the input split by the delimiter.
+
+        Raises:
+            Error if an empty delimiter is specified.
+        """
+        if not delimiter:
+            raise Error("empty delimiter not allowed to be passed to split.")
+
+        var output = List[StringRef]()
+        var ptr = self.unsafe_ptr()
+
+        var current_offset = 0
+        while True:
+            var loc = self.find(delimiter, current_offset)
+            # delimiter not found, so add the search slice from where we're currently at
+            if loc == -1:
+                output.append(
+                    StringRef(ptr + current_offset, len(self) - current_offset)
+                )
+                break
+
+            # We found a delimiter, so add the preceding string slice
+            output.append(StringRef(ptr + current_offset, loc - current_offset))
+
+            # Advance our search offset past the delimiter
+            current_offset = loc + len(delimiter)
+        return output
 
     fn startswith(
         self, prefix: StringRef, start: Int = 0, end: Int = -1

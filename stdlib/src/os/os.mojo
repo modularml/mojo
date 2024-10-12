@@ -21,8 +21,9 @@ from os import listdir
 
 from collections import List, InlineArray
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda, external_call
-from sys.ffi import C_char
+from sys.ffi import c_char, OpaquePointer
 
+from memory import UnsafePointer
 from utils import StringRef
 
 from .path import isdir, split
@@ -61,7 +62,7 @@ struct _dirent_linux:
     """Length of the record."""
     var d_type: Int8
     """Type of file."""
-    var name: InlineArray[C_char, Self.MAX_NAME_SIZE]
+    var name: InlineArray[c_char, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
@@ -78,11 +79,11 @@ struct _dirent_macos:
     """Length of the name."""
     var d_type: Int8
     """Type of file."""
-    var name: InlineArray[C_char, Self.MAX_NAME_SIZE]
+    var name: InlineArray[c_char, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
-fn _strnlen(ptr: UnsafePointer[C_char], max: Int) -> Int:
+fn _strnlen(ptr: UnsafePointer[c_char], max: Int) -> Int:
     var offset = 0
     while offset < max and ptr[offset]:
         offset += 1
@@ -92,7 +93,7 @@ fn _strnlen(ptr: UnsafePointer[C_char], max: Int) -> Int:
 struct _DirHandle:
     """Handle to an open directory descriptor opened via opendir."""
 
-    var _handle: UnsafePointer[NoneType]
+    var _handle: OpaquePointer
 
     fn __init__(inout self, path: String) raises:
         """Construct the _DirHandle using the path provided.
@@ -107,7 +108,7 @@ struct _DirHandle:
         if not isdir(path):
             raise "the directory '" + path + "' does not exist"
 
-        self._handle = external_call["opendir", UnsafePointer[NoneType]](
+        self._handle = external_call["opendir", OpaquePointer](
             path.unsafe_ptr()
         )
 

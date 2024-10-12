@@ -77,8 +77,13 @@ fn _create_array[
         ](lst[0])
 
     debug_assert(size == len(lst), "mismatch in the number of elements")
-    var array = __mlir_op.`kgen.undef`[
-        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+
+    var array = __mlir_op.`kgen.param.constant`[
+        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        value = __mlir_attr[
+            `#kgen.unknown : `,
+            __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        ],
     ]()
 
     @parameter
@@ -101,7 +106,7 @@ fn _static_tuple_construction_checks[size: Int]():
     Parameters:
       size: The number of elements.
     """
-    constrained[size > 0, "number of elements in `StaticTuple` must be > 0"]()
+    constrained[size >= 0, "number of elements in `StaticTuple` must be >= 0"]()
 
 
 @value
@@ -124,7 +129,10 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     fn __init__(inout self):
         """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[size]()
-        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self.array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     @always_inline
     fn __init__(inout self, *elems: Self.element_type):
@@ -181,21 +189,6 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         return val
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self.element_type):
-        """Stores a single value into the tuple at the specified index.
-
-        Parameters:
-            index: The index into the tuple.
-
-        Args:
-            val: The value to store.
-        """
-        constrained[index < size]()
-        var tmp = self
-        _set_array_elem[index, size, Self.element_type](val, tmp.array)
-        self = tmp
-
-    @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
@@ -230,4 +223,19 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
             UnsafePointer.address_of(tmp.array).address, idx.value
         )
         UnsafePointer(ptr)[] = val
+        self = tmp
+
+    @always_inline("nodebug")
+    fn __setitem__[index: Int](inout self, val: Self.element_type):
+        """Stores a single value into the tuple at the specified index.
+
+        Parameters:
+            index: The index into the tuple.
+
+        Args:
+            val: The value to store.
+        """
+        constrained[index < size]()
+        var tmp = self
+        _set_array_elem[index, size, Self.element_type](val, tmp.array)
         self = tmp

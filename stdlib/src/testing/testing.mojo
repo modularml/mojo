@@ -16,6 +16,18 @@ You can import these APIs from the `testing` package. For example:
 
 ```mojo
 from testing import assert_true
+
+def main():
+    x = 1
+    y = 2
+    try:
+        assert_true(x==1)
+        assert_true(y==2)
+        assert_true((x+y)==3)
+        print("All assertions succeeded")
+    except e:
+        print("At least one assertion failed:")
+        print(e)
 ```
 """
 from collections import Optional
@@ -93,6 +105,15 @@ trait Testable(EqualityComparable, Stringable):
     pass
 
 
+trait TestableCollectionElement(
+    EqualityComparableCollectionElement,
+    RepresentableCollectionElement,
+):
+    """A trait for elements that can be tested in a collection."""
+
+    pass
+
+
 @always_inline
 fn assert_equal[
     T: Testable
@@ -124,7 +145,7 @@ fn assert_equal[
         )
 
 
-# TODO: Remove the String and SIMD overloads once we have more powerful traits.
+# TODO: Remove the String, SIMD and List overloads once we have more powerful traits.
 @always_inline
 fn assert_equal(
     lhs: String,
@@ -180,6 +201,39 @@ fn assert_equal[
     if any(lhs != rhs):
         raise _assert_cmp_error["`left == right` comparison"](
             str(lhs), str(rhs), msg=msg, loc=location.or_else(__call_location())
+        )
+
+
+@always_inline
+fn assert_equal[
+    T: TestableCollectionElement
+](
+    lhs: List[T],
+    rhs: List[T],
+    msg: String = "",
+    *,
+    location: Optional[_SourceLocation] = None,
+) raises:
+    """Asserts that two lists are equal.
+
+    Parameters:
+        T: A TestableCollectionElement type.
+
+    Args:
+        lhs: The left-hand side list.
+        rhs: The right-hand side list.
+        msg: The message to be printed if the assertion fails.
+        location: The location of the error (default to the `__call_location`).
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    if lhs != rhs:
+        raise _assert_cmp_error["`left == right` comparison"](
+            lhs.__str__(),
+            rhs.__str__(),
+            msg=msg,
+            loc=location.or_else(__call_location()),
         )
 
 
@@ -269,6 +323,39 @@ fn assert_not_equal[
     if all(lhs == rhs):
         raise _assert_cmp_error["`left != right` comparison"](
             str(lhs), str(rhs), msg=msg, loc=location.or_else(__call_location())
+        )
+
+
+@always_inline
+fn assert_not_equal[
+    T: TestableCollectionElement
+](
+    lhs: List[T],
+    rhs: List[T],
+    msg: String = "",
+    *,
+    location: Optional[_SourceLocation] = None,
+) raises:
+    """Asserts that two lists are not equal.
+
+    Parameters:
+        T: A TestableCollectionElement type.
+
+    Args:
+        lhs: The left-hand side list.
+        rhs: The right-hand side list.
+        msg: The message to be printed if the assertion fails.
+        location: The location of the error (default to the `__call_location`).
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    if lhs == rhs:
+        raise _assert_cmp_error["`left != right` comparison"](
+            lhs.__str__(),
+            rhs.__str__(),
+            msg=msg,
+            loc=location.or_else(__call_location()),
         )
 
 

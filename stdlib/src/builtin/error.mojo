@@ -16,9 +16,12 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from sys import alignof, sizeof
+from sys.ffi import c_char
 
 from memory import UnsafePointer, memcpy
 from memory.memory import _free
+
+from utils import StringRef
 
 # ===----------------------------------------------------------------------===#
 # Error
@@ -36,6 +39,10 @@ struct Error(
 ):
     """This type represents an Error."""
 
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
     var data: UnsafePointer[UInt8]
     """A pointer to the beginning of the string data being referenced."""
 
@@ -46,6 +53,10 @@ struct Error(
     to store the ownership value. When loaded_length is negative it indicates
     ownership and a free is executed in the destructor.
     """
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__(inout self):
@@ -126,6 +137,10 @@ struct Error(
             self.data = existing.data
         self.loaded_length = existing.loaded_length
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     fn __bool__(self) -> Bool:
         """Returns True if the error is set and false otherwise.
 
@@ -163,6 +178,20 @@ struct Error(
             A printable representation of the error message.
         """
         return "Error(" + repr(self._message()) + ")"
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be NUL terminated, and not null.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.data.bitcast[c_char]()
 
     fn _message(self) -> String:
         """Converts the Error to string representation.
