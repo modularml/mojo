@@ -38,7 +38,7 @@ alias StaticConstantOrigin = __mlir_attr[
 ]
 """An origin for strings and other always-immutable static constants."""
 
-alias OriginSet = __mlir_type.`!lit.lifetime.set`
+alias OriginSet = __mlir_type.`!lit.origin.set`
 """A set of lifetime parameters."""
 
 
