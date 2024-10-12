@@ -265,7 +265,7 @@ struct _lit_lifetime_union[
     b: Origin[is_mutable].type,
 ]:
     alias result = __mlir_attr[
-        `#lit.lifetime.union<`,
+        `#lit.origin.union<`,
         a,
         `,`,
         b,
@@ -281,7 +281,7 @@ struct _lit_mut_cast[
     result_mutable: Bool,
 ]:
     alias result = __mlir_attr[
-        `#lit.lifetime.mutcast<`,
+        `#lit.origin.mutcast<`,
         operand,
         `> : !lit.lifetime<`,
         +result_mutable.value,
