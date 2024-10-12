@@ -38,6 +38,7 @@ from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from hashlib.hash import _hash_simd
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.format_int import _try_write_int
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
@@ -173,6 +174,7 @@ struct SIMD[type: DType, size: Int](
     Floorable,
     Formattable,
     Hashable,
+    _HashableWithHasher,
     Intable,
     Powable,
     Representable,
@@ -376,8 +378,14 @@ struct SIMD[type: DType, size: Int](
             ),
         )
 
-        self = __mlir_op.`kgen.undef`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        self = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[
+                `!pop.simd<`, size.value, `, `, type.value, `>`
+            ],
+            value = __mlir_attr[
+                `#kgen.unknown : `,
+                __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
+            ],
         ]()
 
         @parameter
@@ -1222,6 +1230,19 @@ struct SIMD[type: DType, size: Int](
         return value % self
 
     @always_inline("nodebug")
+    fn __rpow__(self, base: Self) -> Self:
+        """Returns `base ** self`.
+
+        Args:
+            base: The base value.
+
+        Returns:
+            `base ** self`.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return base**self
+
+    @always_inline("nodebug")
     fn __rand__(self, value: Self) -> Self:
         """Returns `value & self`.
 
@@ -1412,7 +1433,7 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes_span()[1:-1])
+            values = StringSlice(unsafe_from_utf8=output.as_bytes()[1:-1])
 
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
@@ -1516,6 +1537,17 @@ struct SIMD[type: DType, size: Int](
             builtin documentation for more details.
         """
         return _hash_simd(self)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this SIMD value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(self)
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -1829,10 +1861,16 @@ struct SIMD[type: DType, size: Int](
         fn _convert_variadic_to_pop_array[
             *mask: Int
         ]() -> __mlir_type[`!pop.array<`, output_size.value, `, `, Int, `>`]:
-            var array = __mlir_op.`kgen.undef`[
+            var array = __mlir_op.`kgen.param.constant`[
                 _type = __mlir_type[
                     `!pop.array<`, output_size.value, `, `, Int, `>`
-                ]
+                ],
+                value = __mlir_attr[
+                    `#kgen.unknown : `,
+                    __mlir_type[
+                        `!pop.array<`, output_size.value, `, `, Int, `>`
+                    ],
+                ],
             ]()
 
             var array_ptr = UnsafePointer.address_of(array)
@@ -1943,7 +1981,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask._as_index_tuple()](self)
+        return self._shuffle_list[size, mask.as_tuple()](self)
 
     @always_inline("nodebug")
     fn shuffle[mask: IndexList[size, **_]](self, other: Self) -> Self:
@@ -1961,7 +1999,7 @@ struct SIMD[type: DType, size: Int](
             A new vector with the same length as the mask where the value at
             position `i` is `(self + other)[permutation[i]]`.
         """
-        return self._shuffle_list[size, mask._as_index_tuple()](other)
+        return self._shuffle_list[size, mask.as_tuple()](other)
 
     # Not an overload of shuffle because there is ambiguity
     # with fn shuffle[*mask: Int](self, other: Self) -> Self:

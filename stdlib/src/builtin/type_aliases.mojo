@@ -18,42 +18,42 @@ These are Mojo built-ins, so you don't need to import them.
 alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
 
-alias ImmutableLifetime = __mlir_type.`!lit.lifetime<0>`
-"""Immutable lifetime reference type."""
+alias ImmutableOrigin = __mlir_type.`!lit.origin<0>`
+"""Immutable origin reference type."""
 
-alias MutableLifetime = __mlir_type.`!lit.lifetime<1>`
-"""Mutable lifetime reference type."""
+alias MutableOrigin = __mlir_type.`!lit.origin<1>`
+"""Mutable origin reference type."""
 
-alias ImmutableAnyLifetime = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<0>`
-"""The immutable lifetime that might access any memory value."""
+alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<0>`
+"""The immutable origin that might access any memory value."""
 
-alias MutableAnyLifetime = __mlir_attr.`#lit.any.lifetime : !lit.lifetime<1>`
-"""The mutable lifetime that might access any memory value."""
+alias MutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<1>`
+"""The mutable origin that might access any memory value."""
 
-# Static constants are a named subset of the global lifetime.
-alias StaticConstantLifetime = __mlir_attr[
-    `#lit.lifetime.field<`,
-    `#lit.static.lifetime : !lit.lifetime<0>`,
-    `, "__constants__"> : !lit.lifetime<0>`,
+# Static constants are a named subset of the global origin.
+alias StaticConstantOrigin = __mlir_attr[
+    `#lit.origin.field<`,
+    `#lit.static.origin : !lit.origin<0>`,
+    `, "__constants__"> : !lit.origin<0>`,
 ]
-"""A lifetime for strings and other always-immutable static constants."""
+"""An origin for strings and other always-immutable static constants."""
 
-alias LifetimeSet = __mlir_type.`!lit.lifetime.set`
-"""A set of lifetime parameters."""
+alias OriginSet = __mlir_type.`!lit.origin.set`
+"""A set of origin parameters."""
 
 
-# Helper to build a value of !lit.lifetime type.
+# Helper to build a value of !lit.origin type.
 # TODO: Should be a parametric alias.
-struct Lifetime[is_mutable: Bool]:
-    """This represents a lifetime reference of potentially parametric type.
+struct Origin[is_mutable: Bool]:
+    """This represents a origin reference of potentially parametric type.
     TODO: This should be replaced with a parametric type alias.
 
     Parameters:
-        is_mutable: Whether the lifetime reference is mutable.
+        is_mutable: Whether the origin reference is mutable.
     """
 
     alias type = __mlir_type[
-        `!lit.lifetime<`,
+        `!lit.origin<`,
         is_mutable.value,
         `>`,
     ]

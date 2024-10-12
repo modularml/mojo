@@ -89,7 +89,7 @@ what we publish.
 - Added `Python.unsafe_get_python_exception()`, as an efficient low-level
   utility to get the Mojo `Error` equivalent of the current CPython error state.
 
-- The `__type_of(x)` and `__lifetime_of(x)` operators are much more general now:
+- The `__type_of(x)` and `__origin_of(x)` operators are much more general now:
   they allow arbitrary expressions inside of them, allow referring to dynamic
   values in parameter contexts, and even allow referring to raising functions
   in non-raising contexts.  These operations never evaluate their expression, so
@@ -166,9 +166,9 @@ what we publish.
 
 - `ref` argument and result specifiers now allow providing a memory value
   directly in the lifetime specifier, rather than requiring the use of
-  `__lifetime_of`.  It is still fine to use `__lifetime_of` explicitly though,
+  `__origin_of`.  It is still fine to use `__origin_of` explicitly though,
   and this is required when specifying lifetimes for parameters (e.g. to the
-  `Reference` type). For example, this is now valid without `__lifetime_of`:
+  `Reference` type). For example, this is now valid without `__origin_of`:
 
   ```mojo
   fn return_ref(a: String) -> ref [a] String:
@@ -187,6 +187,10 @@ what we publish.
     var a = np.array(PythonObject([1,2,3,1,2,3])).reshape(2,3)
     print((a[0, 1])) # 2
     ```
+
+- [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
+  [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
+  compared for pointer equivalence using `a is b`.
 
 ### 🦋 Changed
 
@@ -257,6 +261,16 @@ what we publish.
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
 
+- `String.as_bytes()` now returns a `Span[UInt8]` instead of a `List[Int8]`. The
+  old behavior can be achieved by using `List(s.as_bytes())`.
+
+- `Lifetime` and related types has been renamed to `Origin` in the standard
+  library to better clarify that parameters of this type indicate where a
+  reference is derived from, not the more complicated notion of where a variable
+  is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
+  for more information and rationale.  As a consequence `__origin_of` is now
+  named `__origin_of`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -272,6 +286,9 @@ what we publish.
 
 - [Issue #3559](https://github.com/modularml/mojo/issues/3559) - VariadicPack
   doesn't extend the lifetimes of the values it references.
+
+- [Issue #3627](https://github.com/modularml/mojo/issues/3627) - Compiler
+  overlooked exclusivity violation caused by `ref [MutableAnyLifetime] T`
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
