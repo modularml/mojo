@@ -184,13 +184,13 @@ struct Span[
         if step < 0:
             step = -step
             var new_len = (start - end + step - 1) // step
-            var dest_ptr = UnsafePointer[T].alloc(new_len)
+            var buff = UnsafePointer[T].alloc(new_len)
             i = 0
             while start > end:
-                dest_ptr[i] = self._data[start]
+                buff[i] = self._data[start]
                 start -= step
                 i += 1
-            return Span[T, lifetime](unsafe_ptr=dest_ptr, len=new_len)
+            return Span[T, lifetime](unsafe_ptr=buff, len=new_len)
 
         var res = Self(
             unsafe_ptr=(self._data + start),
