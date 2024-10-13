@@ -19,7 +19,6 @@ from memory import UnsafePointer
 from hashlib.hash import hash as old_hash
 from hashlib._ahash import (
     AHasher,
-    hash as ahash,
     _folded_multiply,
     _read_small,
     U256,
@@ -27,6 +26,7 @@ from hashlib._ahash import (
     MULTIPLE,
     ROT,
 )
+from hashlib._hasher import _hash_with_hasher
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -618,7 +618,7 @@ fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
     @parameter
     fn call_fn():
         for w in words:
-            var h = ahash(w[].unsafe_ptr(), w[].byte_length())
+            var h = _hash_with_hasher(w[].unsafe_ptr(), w[].byte_length())
             benchmark.keep(h)
 
     b.iter[call_fn]()
@@ -640,7 +640,7 @@ fn bench_long_key_new_hash_function[s: String](inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
-        var h = ahash(s.unsafe_ptr(), s.byte_length())
+        var h = _hash_with_hasher(s.unsafe_ptr(), s.byte_length())
         benchmark.keep(h)
 
     b.iter[call_fn]()
