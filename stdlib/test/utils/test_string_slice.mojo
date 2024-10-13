@@ -395,26 +395,24 @@ def test_count_utf8_continuation_bytes():
     alias b3 = UInt8(0b1110_0000)
     alias b4 = UInt8(0b1111_0000)
 
-    @parameter
-    fn test(amnt: Int, items: List[UInt8]) raises:
-        var p = items.unsafe_ptr()
-        var l = len(items)
-        var span = Span[UInt8, __origin_of(items)](unsafe_ptr=p, len=l)
+    def _test(amnt: Int, items: List[UInt8]):
+        p = items.unsafe_ptr()
+        span = Span[UInt8, __origin_of(items)](unsafe_ptr=p, len=len(items))
         assert_equal(amnt, _count_utf8_continuation_bytes(span))
 
-    test(5, List[UInt8](c, c, c, c, c))
-    test(2, List[UInt8](b2, c, b2, c, b1))
-    test(2, List[UInt8](b2, c, b1, b2, c))
-    test(2, List[UInt8](b2, c, b2, c, b1))
-    test(2, List[UInt8](b2, c, b1, b2, c))
-    test(2, List[UInt8](b1, b2, c, b2, c))
-    test(2, List[UInt8](b3, c, c, b1, b1))
-    test(2, List[UInt8](b1, b1, b3, c, c))
-    test(2, List[UInt8](b1, b3, c, c, b1))
-    test(3, List[UInt8](b1, b4, c, c, c))
-    test(3, List[UInt8](b4, c, c, c, b1))
-    test(3, List[UInt8](b3, c, c, b2, c))
-    test(3, List[UInt8](b2, c, b3, c, c))
+    _test(5, List[UInt8](c, c, c, c, c))
+    _test(2, List[UInt8](b2, c, b2, c, b1))
+    _test(2, List[UInt8](b2, c, b1, b2, c))
+    _test(2, List[UInt8](b2, c, b2, c, b1))
+    _test(2, List[UInt8](b2, c, b1, b2, c))
+    _test(2, List[UInt8](b1, b2, c, b2, c))
+    _test(2, List[UInt8](b3, c, c, b1, b1))
+    _test(2, List[UInt8](b1, b1, b3, c, c))
+    _test(2, List[UInt8](b1, b3, c, c, b1))
+    _test(3, List[UInt8](b1, b4, c, c, c))
+    _test(3, List[UInt8](b4, c, c, c, b1))
+    _test(3, List[UInt8](b3, c, c, b2, c))
+    _test(3, List[UInt8](b2, c, b3, c, c))
 
 
 fn main() raises:
