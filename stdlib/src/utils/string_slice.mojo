@@ -778,7 +778,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     var first_curly: Int
     """The index of an opening brace around a substitution field."""
     var last_curly: Int
-    """The index of an closing brace around a substitution field."""
+    """The index of a closing brace around a substitution field."""
     # TODO: ord("a") conversion flag not supported yet
     var conversion_flag: UInt8
     """The type of conversion for the entry: {ord("s"), ord("r")}."""
@@ -863,9 +863,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             Self._format_entry[len_pos_args](res, e[], auto_arg_index, args)
             offset = e[].last_curly + 1
 
-        if offset < fmt_len:
-            res += _build_slice(ptr, offset, fmt_len)
-
+        res += _build_slice(ptr, offset, fmt_len)
         return res^
 
     @staticmethod
