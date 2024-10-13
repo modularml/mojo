@@ -23,7 +23,16 @@ from os.path import dirname
 from pathlib import Path
 from sys import external_call
 from sys.arg import argv
-from sys.ffi import DLHandle, c_char, c_int, c_uint, OpaquePointer
+from sys.ffi import (
+    DLHandle,
+    OpaquePointer,
+    c_char,
+    c_int,
+    c_long,
+    c_size_t,
+    c_ssize_t,
+    c_uint,
+)
 
 from python.python import _get_global_python_itf
 from python._bindings import Typed_initproc
@@ -610,27 +619,6 @@ struct CPython:
             error += "\n\nMojo/Python interop error, troubleshooting docs at:"
             error += "\n    https://modul.ar/fix-python\n"
             raise error
-
-    # ===-------------------------------------------------------------------===#
-    # None
-    # ===-------------------------------------------------------------------===#
-
-    fn Py_None(inout self) -> PyObjectPtr:
-        """Get a None value, of type NoneType."""
-
-        # Get pointer to the immortal `None` PyObject struct instance.
-        # Note:
-        #   The name of this global is technical a private part of the
-        #   CPython API, but unfortunately the only stable ways to access it are
-        #   macros.
-        var ptr = self.lib.get_symbol[Int8](
-            "_Py_NoneStruct",
-        )
-
-        if not ptr:
-            abort("error: unable to get pointer to CPython `None` struct")
-
-        return PyObjectPtr(ptr)
 
     # ===-------------------------------------------------------------------===#
     # Logging
@@ -1293,27 +1281,37 @@ struct CPython:
         )(list_obj, index)
 
     # ===-------------------------------------------------------------------===#
-    # Primitive type conversions
+    # Concrete Objects
+    # ref: https://docs.python.org/3/c-api/concrete.html
     # ===-------------------------------------------------------------------===#
 
-    fn PyLong_FromLong(inout self, value: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
-            "PyLong_FromLong"
-        )(value)
+    # The None Object
+    # ref: https://docs.python.org/3/c-api/none.html
 
-        self.log(
-            r._get_ptr_as_int(),
-            " NEWREF PyLong_FromLong, refcnt:",
-            self._Py_REFCNT(r),
-            ", value:",
-            value,
-        )
+    # PyObject *Py_None
+    # https://docs.python.org/3/c-api/none.html#c.Py_None
+    fn Py_None(inout self) -> PyObjectPtr:
+        """Get a None value, of type NoneType."""
 
-        self._inc_total_rc()
-        return r
+        # Get pointer to the immortal `None` PyObject struct instance.
+        # Note:
+        #   The name of this global is technical a private part of the
+        #   CPython API, but unfortunately the only stable ways to access it are
+        #   macros.
+        ptr = self.lib.get_symbol[c_char]("_Py_NoneStruct")
 
-    fn PyBool_FromLong(inout self, value: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
+        if not ptr:
+            abort("error: unable to get pointer to CPython `None` struct")
+
+        return PyObjectPtr(ptr)
+
+    # Boolean Objects
+    # ref: https://docs.python.org/3/c-api/bool.html
+
+    # PyObject *PyBool_FromLong(long v)
+    # ref: https://docs.python.org/3/c-api/bool.html#c.PyBool_FromLong
+    fn PyBool_FromLong(inout self, value: c_long) -> PyObjectPtr:
+        r = self.lib.get_function[fn (c_long) -> PyObjectPtr](
             "PyBool_FromLong"
         )(value)
 
@@ -1328,27 +1326,59 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn toPython(inout self, litString: StringRef) -> PyObjectPtr:
-        return self.PyString_FromStringAndSize(litString)
+    # Integer Objects
+    # ref: https://docs.python.org/3/c-api/long.html
 
-    fn toPython(inout self, litInt: Int) -> PyObjectPtr:
-        return self.PyLong_FromLong(litInt.value)
+    # PyObject *PyLong_FromSsize_t(Py_ssize_t v)
+    # ref: https://docs.python.org/3/c-api/long.html#c.PyLong_FromSsize_t
+    fn PyLong_FromSsize_t(inout self, value: c_ssize_t) -> PyObjectPtr:
+        r = self.lib.get_function[fn (c_ssize_t) -> PyObjectPtr](
+            "PyLong_FromSsize_t"
+        )(value)
 
-    fn toPython(inout self, litBool: Bool) -> PyObjectPtr:
-        return self.PyBool_FromLong(1 if litBool else 0)
-
-    fn PyLong_AsLong(inout self, py_object: PyObjectPtr) -> Int:
-        return self.lib.get_function[fn (PyObjectPtr) -> Int]("PyLong_AsLong")(
-            py_object
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyLong_FromSsize_t, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
         )
 
-    fn PyFloat_AsDouble(inout self, py_object: PyObjectPtr) -> Float64:
-        return self.lib.get_function[fn (PyObjectPtr) -> Float64](
-            "PyFloat_AsDouble"
+        self._inc_total_rc()
+        return r
+
+    # PyObject *PyLong_FromSize_t(Py_ssize_t v)
+    # ref: https://docs.python.org/3/c-api/long.html#c.PyLong_FromSize_t
+    fn PyLong_FromSize_t(inout self, value: c_size_t) -> PyObjectPtr:
+        r = self.lib.get_function[fn (c_size_t) -> PyObjectPtr](
+            "PyLong_FromSize_t"
+        )(value)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyLong_FromSize_t, refcnt:",
+            self._Py_REFCNT(r),
+            ", value:",
+            value,
+        )
+
+        self._inc_total_rc()
+        return r
+
+    # Py_ssize_t PyLong_AsSsize_t(PyObject *pylong)
+    # ref: https://docs.python.org/3/c-api/long.html#c.PyLong_AsSsize_t
+    fn PyLong_AsSsize_t(inout self, py_object: PyObjectPtr) -> c_ssize_t:
+        return self.lib.get_function[fn (PyObjectPtr) -> c_ssize_t](
+            "PyLong_AsSsize_t"
         )(py_object)
 
+    # Floating-Point Objects
+    # ref: https://docs.python.org/3/c-api/float.html
+
+    # PyObject *PyFloat_FromDouble(double v)¶
+    # ref: https://docs.python.org/3/c-api/float.html#c.PyFloat_FromDouble
     fn PyFloat_FromDouble(inout self, value: Float64) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Float64) -> PyObjectPtr](
+        r = self.lib.get_function[fn (Float64) -> PyObjectPtr](
             "PyFloat_FromDouble"
         )(value)
 
@@ -1363,42 +1393,34 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyFloat_FromDouble(inout self, value: Float32) -> PyObjectPtr:
-        return self.PyFloat_FromDouble(value.cast[DType.float64]())
+    # double PyFloat_AsDouble(PyObject *pyfloat)
+    # ref: https://docs.python.org/3/c-api/float.html#c.PyFloat_AsDouble
+    fn PyFloat_AsDouble(inout self, py_object: PyObjectPtr) -> Float64:
+        return self.lib.get_function[fn (PyObjectPtr) -> Float64](
+            "PyFloat_AsDouble"
+        )(py_object)
 
-    fn PyBool_FromLong(inout self, value: Bool) -> PyObjectPtr:
-        var long = 0
-        if value:
-            long = 1
-        var r = self.lib.get_function[fn (Int8) -> PyObjectPtr](
-            "PyBool_FromLong"
-        )(Int8(long))
+    # Unicode Objects
+    # https://docs.python.org/3/c-api/unicode.html
 
-        self.log(
-            r._get_ptr_as_int(),
-            " NEWREF PyBool_FromLong, refcnt:",
-            self._Py_REFCNT(r),
-            ", value:",
-            value,
-        )
-
-        self._inc_total_rc()
-        return r
-
-    fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
-        var r = self.lib.get_function[
+    # PyObject *PyUnicode_DecodeUTF8(const char *str, Py_ssize_t size, const char *errors)
+    # ref: https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8
+    fn PyUnicode_DecodeUTF8(inout self, strref: StringRef) -> PyObjectPtr:
+        r = self.lib.get_function[
             fn (
-                UnsafePointer[UInt8],
-                Int,
+                UnsafePointer[c_char],
+                c_ssize_t,
                 UnsafePointer[c_char],
             ) -> PyObjectPtr
-        ](StringRef("PyUnicode_DecodeUTF8"))(
-            strref.data, strref.length, "strict".unsafe_cstr_ptr()
+        ]("PyUnicode_DecodeUTF8")(
+            strref.data.bitcast[Int8](),
+            strref.length,
+            "strict".unsafe_cstr_ptr(),
         )
 
         self.log(
             r._get_ptr_as_int(),
-            " NEWREF PyString_FromStringAndSize, refcnt:",
+            " NEWREF PyUnicode_DecodeUTF8, refcnt:",
             self._Py_REFCNT(r),
             ", str:",
             strref,
@@ -1407,11 +1429,18 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    # const char *PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size)
+    # ref: https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
-        var result = self.lib.get_function[
-            fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[c_char]
-        ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
-        return StringRef(result)
+        s = StringRef()
+        s.data = self.lib.get_function[
+            fn (PyObjectPtr, UnsafePointer[c_ssize_t]) -> UnsafePointer[c_char]
+        ]("PyUnicode_AsUTF8AndSize")(
+            py_object, UnsafePointer.address_of(s.length)
+        ).bitcast[
+            UInt8
+        ]()
+        return s
 
     # ===-------------------------------------------------------------------===#
     # Python Error operations
