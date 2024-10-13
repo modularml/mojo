@@ -314,14 +314,14 @@ fn _try_write_int[
     if value == 0:
         # TODO: Replace with safe digit_chars[:1] syntax.
         # SAFETY:
-        #   This static lifetime is valid as long as we're using a
+        #   This static origin is valid as long as we're using a
         #   `StringLiteral` for `digit_chars`.
         var zero_char = digit_chars_array[0]
 
         # Construct a null-terminated buffer of single-byte char.
         var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
 
-        var zero = StringSlice[ImmutableAnyLifetime](
+        var zero = StringSlice[ImmutableAnyOrigin](
             # TODO(MSTDL-720):
             #   Support printing non-null-terminated strings on GPU and switch
             #   back to this code without a workaround.
@@ -403,7 +403,7 @@ fn _try_write_int[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[__lifetime_of(buf)](
+    var str_slice = StringSlice[__origin_of(buf)](
         unsafe_from_utf8_ptr=buf_ptr,
         len=len,
     )

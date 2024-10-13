@@ -273,7 +273,7 @@ struct AddressSpace(EqualityComparable):
 struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
-    lifetime: Lifetime[is_mutable].type,
+    origin: Origin[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
@@ -281,7 +281,7 @@ struct Pointer[
     Parameters:
         is_mutable: Whether the pointee data may be mutated through this.
         type: Type of the underlying data.
-        lifetime: The lifetime of the pointer.
+        origin: The origin of the pointer.
         address_space: The address space of the pointee data.
     """
 
@@ -289,7 +289,7 @@ struct Pointer[
         `!lit.ref<`,
         type,
         `, `,
-        lifetime,
+        origin,
         `, `,
         address_space._value.value,
         `>`,
@@ -313,9 +313,7 @@ struct Pointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(
-        ref [lifetime, address_space._value.value]value: type
-    ) -> Self:
+    fn address_of(ref [origin, address_space._value.value]value: type) -> Self:
         """Constructs a Pointer from a reference to a value.
 
         Args:
@@ -341,7 +339,7 @@ struct Pointer[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self) -> ref [lifetime, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space._value.value] type:
         """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:
@@ -352,8 +350,8 @@ struct Pointer[
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
     # TODO: replace with a safe model that checks the body of the method for
-    # accesses to the lifetime.
-    @__unsafe_disable_nested_lifetime_exclusivity
+    # accesses to the origin.
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __eq__(self, rhs: Pointer[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are equal.
@@ -368,7 +366,7 @@ struct Pointer[
             rhs[]
         )
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __ne__(self, rhs: Pointer[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are not equal.

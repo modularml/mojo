@@ -340,8 +340,7 @@ struct _UIntZeroStartingRange(UIntSized):
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        # FIXME(KERN-1024): This should be an unsigned comparison!
-        return Int(self.__len__().value) > 0
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> UInt:
@@ -372,8 +371,7 @@ struct _UIntStridedRangeIterator(UIntSized):
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        # FIXME(KERN-1024): This should be an unsigned comparison!
-        return Int(self.__len__().value) > 0
+        return self.__len__() > 0
 
 
 @value
@@ -413,8 +411,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        # FIXME(KERN-1024): This should be an unsigned comparison!
-        return Int(self.__len__().value) > 0
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> UInt:
@@ -454,3 +451,83 @@ fn range(start: UInt, end: UInt, step: UInt = 1) -> _UIntStridedRange:
         The constructed range.
     """
     return _UIntStridedRange(start, end, step)
+
+
+# ===----------------------------------------------------------------------=== #
+# Range Scalar
+# ===----------------------------------------------------------------------=== #
+
+
+@value
+@register_passable("trivial")
+struct _StridedScalarRangeIterator[dtype: DType]:
+    var start: Scalar[dtype]
+    var end: Scalar[dtype]
+    var step: Scalar[dtype]
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        # If the dtype is unsigned, then 'step' cannot be negative.
+        @parameter
+        if dtype.is_unsigned():
+            return self.start < self.end
+        else:
+            if self.step > 0:
+                return self.start < self.end
+            return self.end < self.start
+
+    @always_inline
+    fn __next__(inout self) -> Scalar[dtype]:
+        var result = self.start
+        self.start += self.step
+        return result
+
+
+@value
+@register_passable("trivial")
+struct _StridedScalarRange[dtype: DType]:
+    var start: Scalar[dtype]
+    var end: Scalar[dtype]
+    var step: Scalar[dtype]
+
+    @always_inline
+    fn __iter__(self) -> _StridedScalarRangeIterator[dtype]:
+        return _StridedScalarRangeIterator(self.start, self.end, self.step)
+
+
+@always_inline
+fn range[
+    dtype: DType
+](
+    start: Scalar[dtype], end: Scalar[dtype], step: Scalar[dtype] = 1
+) -> _StridedScalarRange[dtype]:
+    """Constructs a [start; end) Range with a given step.
+
+    Parameters:
+        dtype: The range type.
+
+    Args:
+        start: The start of the range.
+        end: The end of the range.
+        step: The step for the range.  Defaults to 1.
+
+    Returns:
+        The constructed range.
+    """
+    return _StridedScalarRange(start, end, step)
+
+
+@always_inline
+fn range[dtype: DType](end: Scalar[dtype]) -> _StridedScalarRange[dtype]:
+    """Constructs a [0; end) Range with a step = 1.
+
+    Parameters:
+        dtype: The range type.
+
+    Args:
+        end: The end of the range.
+
+    Returns:
+        The constructed range.
+    """
+    return _StridedScalarRange(0, end, 1)

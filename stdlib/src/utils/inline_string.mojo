@@ -269,7 +269,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -279,10 +279,10 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes_span(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -292,7 +292,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, __lifetime_of(self)](
+        return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=len(self),
@@ -478,7 +478,7 @@ struct _FixedString[CAP: Int](
         fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
             var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
 
-            var str_slice = StringSlice[ImmutableAnyLifetime](
+            var str_slice = StringSlice[ImmutableAnyOrigin](
                 unsafe_from_utf8_strref=strref
             )
 
@@ -508,7 +508,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -518,10 +518,10 @@ struct _FixedString[CAP: Int](
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes_span(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -531,7 +531,7 @@ struct _FixedString[CAP: Int](
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, __lifetime_of(self)](
+        return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=self.size,

@@ -79,7 +79,7 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 fn reversed[
     T: CollectionElement
 ](ref [_]value: List[T, *_]) -> _ListIter[
-    T, __type_of(value).hint_trivial_type, __lifetime_of(value), False
+    T, __type_of(value).hint_trivial_type, __origin_of(value), False
 ]:
     """Get a reversed iterator of the input list.
 
@@ -100,7 +100,7 @@ fn reversed[
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
-](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __lifetime_of(value), False]:
+](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
@@ -122,9 +122,9 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_lifetime: Lifetime[dict_mutability].type,
-](ref [_]value: _DictValueIter[K, V, dict_lifetime]) -> _DictValueIter[
-    K, V, dict_lifetime, False
+    dict_origin: Origin[dict_mutability].type,
+](ref [_]value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
+    K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict values.
 
@@ -134,7 +134,7 @@ fn reversed[
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
         dict_mutability: Whether the reference to the dict values is mutable.
-        dict_lifetime: The lifetime of the dict values.
+        dict_origin: The origin of the dict values.
 
     Args:
         value: The dict values to get the reversed iterator of.
@@ -149,9 +149,9 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_lifetime: Lifetime[dict_mutability].type,
-](ref [_]value: _DictEntryIter[K, V, dict_lifetime]) -> _DictEntryIter[
-    K, V, dict_lifetime, False
+    dict_origin: Origin[dict_mutability].type,
+](ref [_]value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
+    K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict items.
 
@@ -161,7 +161,7 @@ fn reversed[
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
         dict_mutability: Whether the reference to the dict items is mutable.
-        dict_lifetime: The lifetime of the dict items.
+        dict_origin: The origin of the dict items.
 
     Args:
         value: The dict items to get the reversed iterator of.
@@ -170,6 +170,6 @@ fn reversed[
         The reversed iterator of the dict items.
     """
     var src = value.src
-    return _DictEntryIter[K, V, dict_lifetime, False](
+    return _DictEntryIter[K, V, dict_origin, False](
         src[]._reserved() - 1, 0, src
     )

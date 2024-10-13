@@ -22,6 +22,8 @@ from sys.ffi import c_char
 from builtin._location import __call_location, _SourceLocation
 from memory import stack_allocation, UnsafePointer
 
+from hashlib._hasher import _HashableWithHasher, _Hasher
+
 from utils import StringRef
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"
@@ -63,6 +65,7 @@ fn _dir_of_current_file_impl(file_name: StringLiteral) raises -> Path:
     return Path(str(file_name)[0:i])
 
 
+@value
 struct Path(
     Stringable,
     Boolable,
@@ -96,23 +99,6 @@ struct Path(
             other: The value to copy.
         """
         self.path = String(other=other.path)
-
-    fn __moveinit__(inout self, owned existing: Self):
-        """Move data of an existing Path into a new one.
-
-        Args:
-            existing: The existing Path.
-        """
-        self.path = existing.path^
-
-    @always_inline
-    fn __copyinit__(inout self, existing: Self):
-        """Copy constructor for the path struct.
-
-        Args:
-          existing: The existing struct to copy from.
-        """
-        self.path = existing.path
 
     fn __truediv__(self, suffix: Self) -> Self:
         """Joins two paths using the system-defined path separator.
@@ -235,6 +221,17 @@ struct Path(
         """
 
         return hash(self.path)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the path string value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher.update(self.path)
 
     fn stat(self) raises -> stat_result:
         """Returns the stat information on the path.

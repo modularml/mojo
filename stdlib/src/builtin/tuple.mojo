@@ -172,7 +172,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
             storage_kgen_ptr
         )
-        # Use an immortal mut reference, which converts to self's lifetime.
+        # Use an immortal mut reference, which converts to self's origin.
         return UnsafePointer(elt_kgen_ptr)[]
 
     # TODO(#38268): Remove this method when references and parameter expressions

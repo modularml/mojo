@@ -24,6 +24,8 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
+from hashlib._hasher import _HashableWithHasher, _Hasher
+
 from utils import (
     Span,
     IndexList,
@@ -686,6 +688,7 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@value
 struct String(
     Sized,
     Stringable,
@@ -698,6 +701,7 @@ struct String(
     ToFormatter,
     CollectionElementNew,
     FloatableRaising,
+    _HashableWithHasher,
 ):
     """Represents a mutable string."""
 
@@ -824,24 +828,6 @@ struct String(
                 unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
             )
         )
-
-    @always_inline
-    fn __copyinit__(inout self, existing: Self):
-        """Creates a deep copy of an existing string.
-
-        Args:
-            existing: The string to copy.
-        """
-        self._buffer = existing._buffer
-
-    @always_inline
-    fn __moveinit__(inout self, owned existing: String):
-        """Move the value of a string.
-
-        Args:
-            existing: The string to move.
-        """
-        self._buffer = existing._buffer^
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
@@ -1136,25 +1122,25 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__(
         ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), False]:
+    ) -> _StringSliceIter[__origin_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -1384,28 +1370,8 @@ struct String(
         """
         return self.unsafe_ptr().bitcast[c_char]()
 
-    fn as_bytes(self) -> Self._buffer_type:
-        """Retrieves the underlying byte sequence encoding the characters in
-        this string.
-
-        This does not include the trailing null terminator.
-
-        Returns:
-            A sequence containing the encoded characters stored in this string.
-        """
-
-        # TODO(lifetimes): Return a reference rather than a copy
-        var copy = self._buffer
-        var last = copy.pop()
-        debug_assert(
-            last == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-
-        return copy
-
     @always_inline
-    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1416,12 +1382,12 @@ struct String(
         """
 
         # Does NOT include the NUL terminator.
-        return Span[UInt8, __lifetime_of(self)](
+        return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1430,7 +1396,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
     fn byte_length(self) -> Int:
@@ -1900,6 +1866,17 @@ struct String(
         """
         return hash(self._strref_dangerous())
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
+
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()
         var val_ptr = val.unsafe_ptr()
@@ -2274,7 +2251,7 @@ struct String(
         debug_assert(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
-        var fillbyte = fillchar.as_bytes_span()[0]
+        var fillbyte = fillchar.as_bytes()[0]
         var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)
