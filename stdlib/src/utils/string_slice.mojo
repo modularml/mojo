@@ -726,21 +726,11 @@ struct StringSlice[
 
 
 # ===----------------------------------------------------------------------===#
-# Format method structures
+# Utils
 # ===----------------------------------------------------------------------===#
 
 
-trait _CurlyEntryFormattable(Stringable, Representable):
-    """This trait is used by the `format()` method to support format specifiers.
-    Currently, it is a composition of both `Stringable` and `Representable`
-    traits i.e. a type to be formatted must implement both. In the future this
-    will be less constrained.
-    """
-
-    pass
-
-
-trait _Stringlike:
+trait _Stringlike(CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -762,6 +752,21 @@ trait _Stringlike:
             The raw pointer to the data.
         """
         ...
+
+
+# ===----------------------------------------------------------------------===#
+# Format method structures
+# ===----------------------------------------------------------------------===#
+
+
+trait _CurlyEntryFormattable(Stringable, Representable):
+    """This trait is used by the `format()` method to support format specifiers.
+    Currently, it is a composition of both `Stringable` and `Representable`
+    traits i.e. a type to be formatted must implement both. In the future this
+    will be less constrained.
+    """
+
+    pass
 
 
 @value
