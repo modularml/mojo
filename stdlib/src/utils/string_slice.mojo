@@ -562,7 +562,7 @@ struct StringSlice[
           The offset of `substr` relative to the beginning of the string.
         """
         # FIXME(#3526): this should return unicode codepoint offsets
-        return self.as_bytes_span().find(substr.as_bytes_span(), start)
+        return self.as_bytes().find(substr.as_bytes(), start)
 
     fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -576,7 +576,7 @@ struct StringSlice[
           The offset of `substr` relative to the beginning of the string.
         """
         # FIXME(#3526): this should return unicode codepoint offsets
-        return self.as_bytes_span().rfind(substr.as_bytes_span(), start)
+        return self.as_bytes().rfind(substr.as_bytes(), start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
