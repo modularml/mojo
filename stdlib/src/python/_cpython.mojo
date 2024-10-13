@@ -85,16 +85,10 @@ struct PyGILState_STATE:
     which is crucial for thread-safe operations in Python.
 
     See https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/pystate.h#L76
-
-    Attributes:
-        current_state (c_int): The current state of the GIL.
-
-    Class Attributes:
-        PyGILState_LOCKED (c_int): Constant representing a locked GIL state.
-        PyGILState_UNLOCKED (c_int): Constant representing an unlocked GIL state.
     """
 
     var current_state: c_int
+    """The current state of the GIL."""
 
     alias PyGILState_LOCKED = c_int(0)
     alias PyGILState_UNLOCKED = c_int(1)
@@ -109,43 +103,103 @@ struct PyThreadState:
 @value
 @register_passable("trivial")
 struct PyKeysValuePair:
+    """Represents a key-value pair in a Python dictionary iteration.
+
+    This struct is used to store the result of iterating over a Python dictionary,
+    containing the key, value, current position, and success status of the iteration.
+    """
+
     var key: PyObjectPtr
+    """The key of the current dictionary item."""
     var value: PyObjectPtr
+    """The value of the current dictionary item."""
     var position: c_int
+    """The current position in the dictionary iteration."""
     var success: Bool
+    """Indicates whether the iteration was successful."""
 
 
 @value
 @register_passable("trivial")
 struct PyObjectPtr:
+    """A pointer to a Python object.
+
+    This struct represents a pointer to a Python object in memory. It provides
+    methods for initialization, null checking, equality comparison, and
+    conversion to integer representation.
+    """
+
     var value: UnsafePointer[Int8]
+    """The raw pointer to the Python object."""
 
     @always_inline
     fn __init__(inout self):
+        """Initialize a null PyObjectPtr."""
         self.value = UnsafePointer[Int8]()
 
     fn is_null(self) -> Bool:
+        """Check if the pointer is null.
+
+        Returns:
+            Bool: True if the pointer is null, False otherwise.
+        """
         return int(self.value) == 0
 
     fn __eq__(self, rhs: PyObjectPtr) -> Bool:
+        """Compare two PyObjectPtr for equality.
+
+        Args:
+            rhs: The right-hand side PyObjectPtr to compare.
+
+        Returns:
+            Bool: True if the pointers are equal, False otherwise.
+        """
         return int(self.value) == int(rhs.value)
 
     fn __ne__(self, rhs: PyObjectPtr) -> Bool:
+        """Compare two PyObjectPtr for inequality.
+
+        Args:
+            rhs: The right-hand side PyObjectPtr to compare.
+
+        Returns:
+            Bool: True if the pointers are not equal, False otherwise.
+        """
         return not (self == rhs)
 
     # TODO: Consider removing this and inlining int(p.value) into callers
     fn _get_ptr_as_int(self) -> Int:
+        """Get the pointer value as an integer.
+
+        Returns:
+            Int: The integer representation of the pointer.
+        """
         return int(self.value)
 
 
 @value
 @register_passable
 struct PythonVersion:
+    """
+    Represents a Python version with major, minor, and patch numbers.
+    """
+
     var major: Int
+    """The major version number."""
     var minor: Int
+    """The minor version number."""
     var patch: Int
+    """The patch version number."""
 
     fn __init__(inout self, version: StringRef):
+        """Initialize a PythonVersion object from a version string.
+
+        Args:
+            version: A string representing the Python version (e.g., "3.9.5").
+
+        The version string is parsed to extract major, minor, and patch numbers.
+        If parsing fails for any component, it defaults to -1.
+        """
         var version_string = String(version)
         var components = InlineArray[Int, 3](-1)
         var start = 0
@@ -180,22 +234,28 @@ fn _py_finalize(lib: DLHandle):
 # Ref https://docs.python.org/3/c-api/structures.html#c.PyMethodDef
 @value
 struct PyMethodDef:
+    """Represents a Python method definition.
+
+    This struct is used to define methods for Python modules or types.
+    """
+
     # ===-------------------------------------------------------------------===#
     # Fields
     # ===-------------------------------------------------------------------===#
 
     var method_name: UnsafePointer[c_char]  # called ml_name in CPython
+    """A pointer to the name of the method as a C string."""
 
     # TODO(MSTDL-887): Support keyword-argument only methods
-    # Pointer to the function to call
     var method_impl: PyCFunction
+    """A function pointer to the implementation of the method."""
 
-    # Flags bits indicating how the call should be constructed.
     # See https://docs.python.org/3/c-api/structures.html#c.PyMethodDef for the various calling conventions
     var method_flags: c_int
+    """Flags indicating how the method should be called."""
 
-    # Points to the contents of the docstring for the module.
     var method_docstring: UnsafePointer[c_char]
+    """A pointer to the docstring for the method as a C string."""
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -225,6 +285,14 @@ struct PyMethodDef:
         func_name: StringLiteral,
         docstring: StringLiteral = "",
     ]() -> Self:
+        """
+        Create a PyMethodDef for a function.
+
+        Parameters:
+            func: The function to wrap.
+            func_name: The name of the function.
+            docstring: The docstring for the function.
+        """
         # TODO(MSTDL-896):
         #   Support a way to get the name of the function from its parameter
         #   type, similar to `get_linkage_name()`?
@@ -244,6 +312,12 @@ fn _null_fn_ptr[T: AnyTrivialRegType]() -> T:
 
 
 struct PyTypeObject:
+    """
+    The C structure of the objects used to describe built-in types.
+
+    See https://docs.python.org/3/c-api/type.html#c.PyTypeObject
+    """
+
     # TODO(MSTDL-877):
     #   Fill this out based on
     #   https://docs.python.org/3/c-api/typeobj.html#pytypeobject-definition
@@ -253,6 +327,12 @@ struct PyTypeObject:
 @value
 @register_passable("trivial")
 struct PyType_Spec:
+    """
+    Structure defining a type’s behavior.
+
+    See https://docs.python.org/3/c-api/type.html#c.PyType_Spec
+    """
+
     var name: UnsafePointer[c_char]
     var basicsize: c_int
     var itemsize: c_int
@@ -263,6 +343,13 @@ struct PyType_Spec:
 @value
 @register_passable("trivial")
 struct PyType_Slot:
+    """
+    Structure defining optional functionality of a type, containing a slot ID
+    and a value pointer.
+
+    See https://docs.python.org/3/c-api/type.html#c.PyType_Slot
+    """
+
     var slot: c_int
     var pfunc: OpaquePointer
 
@@ -289,6 +376,12 @@ struct PyType_Slot:
 
 @value
 struct PyObject(Stringable, Representable, Formattable):
+    """
+    All object types are extensions of this type. This is a type which contains the information Python needs to treat a pointer to an object as an object. In a normal “release” build, it contains only the object’s reference count and a pointer to the corresponding type object. Nothing is actually declared to be a PyObject, but every pointer to a Python object can be cast to a PyObject*.
+
+    See https://docs.python.org/3/c-api/structures.html#c.PyObject
+    """
+
     var object_ref_count: Int
     # FIXME: should we use `PyObjectPtr`?  I don't think so!
     var object_type: UnsafePointer[PyTypeObject]
@@ -340,6 +433,10 @@ struct PyObject(Stringable, Representable, Formattable):
 # Mojo doesn't have macros, so we define it here for ease.
 # Note: `PyModuleDef_HEAD_INIT` defaults all of its members, see https://github.com/python/cpython/blob/833c58b81ebec84dc24ef0507f8c75fe723d9f66/Include/moduleobject.h#L60
 struct PyModuleDef_Base(Stringable, Representable, Formattable):
+    """
+    The initial segment of every `PyObject` in CPython.
+    """
+
     # The initial segment of every `PyObject` in CPython
     var object_base: PyObject
 
@@ -413,18 +510,25 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
         writer.write(")")
 
 
-# Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef_Slot
 @value
 struct PyModuleDef_Slot:
+    """
+    See https://docs.python.org/3/c-api/module.html#c.PyModuleDef_Slot
+    """
+
     var slot: c_int
     var value: OpaquePointer
 
 
-# Ref: https://docs.python.org/3/c-api/module.html#c.PyModuleDef
 struct PyModuleDef(Stringable, Representable, Formattable):
-    # The Python module definition structs that holds all of the information needed
-    # to create a module.  Typically, there is a 1:1 correspondence beteeen a `PyMethodDef`
-    # and a module.
+    """
+    The Python module definition structs that holds all of the information needed
+    to create a module. Typically, there is a 1:1 correspondence between a `PyMethodDef`
+    and a module.
+
+    See https://docs.python.org/3/c-api/module.html#c.PyModuleDef
+    """
+
     var base: PyModuleDef_Base
 
     # See https://docs.python.org/3/c-api/structures.html#c.PyMethodDef
@@ -528,16 +632,26 @@ struct PyModuleDef(Stringable, Representable, Formattable):
 
 
 struct CPython:
+    """
+    A struct that holds the state of the CPython runtime.
+    """
+
     # ===-------------------------------------------------------------------===#
     # Fields
     # ===-------------------------------------------------------------------===#
 
     var lib: DLHandle
+    """The handle to the CPython shared library."""
     var dict_type: PyObjectPtr
+    """The type object for Python dictionaries."""
     var logging_enabled: Bool
+    """Whether logging is enabled."""
     var version: PythonVersion
+    """The version of the Python runtime."""
     var total_ref_count: UnsafePointer[Int]
+    """The total reference count of all Python objects."""
     var init_error: StringRef
+    """An error message if initialization failed."""
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
