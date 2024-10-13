@@ -400,6 +400,9 @@ struct StringLiteral(
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            T: The type of the substring.
+
         Args:
             substr: The substring to find.
             start: The offset from which to find.
@@ -468,6 +471,9 @@ struct StringLiteral(
     ](self, sep: T, maxsplit: Int) raises -> List[String]:
         """Split the string by a separator.
 
+        Parameters:
+            T: The type of the separator.
+
         Args:
             sep: The string to split on.
             maxsplit: The maximum amount of items to split from String.
@@ -491,6 +497,9 @@ struct StringLiteral(
     @always_inline
     fn split[T: _Stringlike](self, sep: T) raises -> List[String]:
         """Split the string by a separator.
+
+        Parameters:
+            T: The type of the separator.
 
         Args:
             sep: The string to split on.
