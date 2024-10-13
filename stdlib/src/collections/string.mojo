@@ -1530,7 +1530,7 @@ struct String(
 
         ```mojo
         # Splitting with maxsplit
-        _ = "1,2,3".split(",", 1) # ['1', '2,3']
+        _ = "1,2,3".split(",", maxsplit=1) # ['1', '2,3']
         ```
         .
         """
@@ -1562,11 +1562,10 @@ struct String(
         return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
 
     @always_inline
-    fn split(self, sep: NoneType, maxsplit: Int) -> List[String]:
+    fn split(self, *, maxsplit: Int) -> List[String]:
         """Split the string by every Whitespace separator.
 
         Args:
-            sep: None.
             maxsplit: The maximum amount of items to split from String.
 
         Returns:
@@ -1580,7 +1579,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=True](self, sep, maxsplit)
+        return _split[enable_maxsplit=True](self, None, maxsplit)
 
     @always_inline
     fn split(self, sep: NoneType = None) -> List[String]:
@@ -1607,7 +1606,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=True](self, sep, -1)
+        return _split[enable_maxsplit=False](self, sep, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
