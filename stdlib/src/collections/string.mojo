@@ -1316,6 +1316,8 @@ struct String(
         elems.each[add_elt]()
         _ = is_first
         return result
+        
+    
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
@@ -1436,7 +1438,7 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1461,7 +1463,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
 
     @always_inline
     fn byte_length(self) -> Int:

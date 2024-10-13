@@ -387,7 +387,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -398,7 +398,7 @@ struct StringLiteral(
         """
 
         # Does NOT include the NUL terminator.
-        return Span[UInt8, __lifetime_of(self)](
+        return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )

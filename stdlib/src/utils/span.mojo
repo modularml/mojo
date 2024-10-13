@@ -30,7 +30,7 @@ trait Spanable:
     The `Spanable` trait denotes a type that can be returned as a immutable byte slice.
     """
 
-    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_span(ref [_]self) -> Span[UInt8, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
