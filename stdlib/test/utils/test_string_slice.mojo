@@ -397,7 +397,7 @@ def test_count_utf8_continuation_bytes():
 
     def _test(amnt: Int, items: List[UInt8]):
         p = items.unsafe_ptr()
-        span = Span[UInt8, __origin_of(items)](unsafe_ptr=p, len=len(items))
+        span = Span[UInt8, StaticConstantOrigin](unsafe_ptr=p, len=len(items))
         assert_equal(amnt, _count_utf8_continuation_bytes(span))
 
     _test(5, List[UInt8](c, c, c, c, c))
