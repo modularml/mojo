@@ -19,6 +19,7 @@ These are Mojo built-ins, so you don't need to import them.
 from os import abort
 from sys import is_defined, triple_is_nvidia_cuda
 from sys._build import is_debug_build
+from sys.intrinsics import assume
 from sys.param_env import env_get_string
 from sys.ffi import external_call, c_uint, c_size_t, c_char
 from sys.info import sizeof
@@ -109,6 +110,8 @@ fn debug_assert[
         if cond:
             return
         _debug_assert_msg_literal(message, __call_location())
+    else:
+        assume(cond)
 
 
 @always_inline
@@ -279,6 +282,8 @@ fn debug_assert[
         if cond:
             return
         _debug_assert_msg(messages, __call_location())
+    else:
+        assume(cond)
 
 
 @no_inline
