@@ -16,6 +16,7 @@
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
@@ -47,6 +48,7 @@ struct StringRef(
     Stringable,
     Formattable,
     Hashable,
+    _HashableWithHasher,
     Boolable,
     Comparable,
 ):
@@ -341,6 +343,17 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.data, self.length)
+
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
@@ -382,7 +395,7 @@ struct StringRef(
 
         # SAFETY:
         #   Safe because our use of this StringSlice does not outlive `self`.
-        var str_slice = StringSlice[ImmutableAnyLifetime](
+        var str_slice = StringSlice[ImmutableAnyOrigin](
             unsafe_from_utf8_strref=self
         )
 
@@ -573,6 +586,41 @@ struct StringRef(
         while end > start and _isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
+
+    fn split(self, delimiter: StringRef) raises -> List[StringRef]:
+        """Split the StringRef by a delimiter.
+
+        Args:
+            delimiter: The StringRef to split on.
+
+        Returns:
+            A List of StringRefs containing the input split by the delimiter.
+
+        Raises:
+            Error if an empty delimiter is specified.
+        """
+        if not delimiter:
+            raise Error("empty delimiter not allowed to be passed to split.")
+
+        var output = List[StringRef]()
+        var ptr = self.unsafe_ptr()
+
+        var current_offset = 0
+        while True:
+            var loc = self.find(delimiter, current_offset)
+            # delimiter not found, so add the search slice from where we're currently at
+            if loc == -1:
+                output.append(
+                    StringRef(ptr + current_offset, len(self) - current_offset)
+                )
+                break
+
+            # We found a delimiter, so add the preceding string slice
+            output.append(StringRef(ptr + current_offset, loc - current_offset))
+
+            # Advance our search offset past the delimiter
+            current_offset = loc + len(delimiter)
+        return output
 
     fn startswith(
         self, prefix: StringRef, start: Int = 0, end: Int = -1

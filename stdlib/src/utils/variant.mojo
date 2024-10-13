@@ -73,7 +73,7 @@ struct Variant[*Ts: CollectionElement](
         - use `isa[T]()` to check what type a variant is
         - use `unsafe_take[T]()` to take a value from the variant
         - use `[T]` to get a value out of a variant
-            - This currently does an extra copy/move until we have lifetimes
+            - This currently does an extra copy/move until we have origins
             - It also temporarily requires the value to be mutable
         - use `set[T](owned new_value: T)` to reset the variant to a new value
 
@@ -208,7 +208,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            A reference to the internal data.
         """
         if not self.isa[T]():
             abort("get: wrong variant type")
@@ -377,7 +377,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            The internal data represented as a `Pointer[T]`.
         """
         debug_assert(self.isa[T](), "get: wrong variant type")
         return self._get_ptr[T]()[]

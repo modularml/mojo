@@ -24,7 +24,7 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticIntTuple
+from utils import unroll, StaticTuple, IndexList
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
@@ -825,22 +825,24 @@ def test_shuffle():
     )
 
     assert_equal(
-        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
+        vec._shuffle_variadic[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](
+            vec
+        ),
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
 
     assert_equal(
-        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        vec._shuffle_list[width, StaticTuple[Int, width](3, 2, 1, 0)](vec),
         SIMD[dtype, width](103, 102, 101, 100),
     )
     assert_equal(
-        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        vec._shuffle_list[width, StaticTuple[Int, width](0, 2, 4, 6)](vec),
         SIMD[dtype, width](100, 102, 100, 102),
     )
 
     assert_equal(
         vec._shuffle_list[
-            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+            2 * width, StaticTuple[Int, 2 * width](7, 6, 5, 4, 3, 2, 1, 0)
         ](vec),
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
@@ -1533,6 +1535,29 @@ def test_powf():
     )
 
 
+def test_rpow():
+    alias F32x4 = SIMD[DType.float32, 4]
+    alias I32x4 = SIMD[DType.int32, 4]
+
+    var f32x4_val = F32x4(0, 1, 2, 3)
+    var i32x4_val = I32x4(0, 1, 2, 3)
+
+    assert_equal(0**i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(2**i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal((-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(Int(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(Int(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(Int(-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(UInt(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(UInt(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+
+    assert_almost_equal(1.0**f32x4_val, F32x4(1.0, 1.0, 1.0, 1.0))
+    assert_almost_equal(2.5**f32x4_val, F32x4(1.0, 2.5, 6.25, 15.625))
+    assert_almost_equal(3.0**f32x4_val, F32x4(1.0, 3.0, 9.0, 27.0))
+
+
 def test_modf():
     var f32 = _modf(Float32(123.5))
     assert_almost_equal(f32[0], 123)
@@ -1807,6 +1832,7 @@ def main():
     test_mod()
     test_pow()
     test_powf()
+    test_rpow()
     test_radd()
     test_reduce()
     test_reduce_bit_count()

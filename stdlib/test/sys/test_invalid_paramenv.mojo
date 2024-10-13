@@ -1,5 +1,5 @@
 # ===----------------------------------------------------------------------=== #
-# Copyright (c) 2023, Modular Inc. All rights reserved.
+# Copyright (c) 2024, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:
 # https://llvm.org/LICENSE.txt
@@ -10,17 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# REQUIRES: has_not
+# RUN: not %mojo -D my_false=blah %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
-# This sample demonstrates some basic Mojo
-# range() and print() functions available in the standard library.
-# It also demonstrates Python interop by importing the simple_interop.py file.
-
-from python import Python
+from sys import env_get_bool
 
 
-def main():
-    print("Hello Mojo 🔥!")
-    for x in range(9, 0, -3):
-        print(x)
-    var test_module = Python.import_module("simple_interop")
-    test_module.test_interop_func()
+# CHECK-FAIL: constraint failed: the boolean environment value is neither `True` nor `False`
+fn main():
+    _ = env_get_bool["my_false"]()

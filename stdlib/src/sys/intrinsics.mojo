@@ -1502,3 +1502,57 @@ struct _RegisterPackType[*a: AnyTrivialRegType]:
             The tuple element at the requested index.
         """
         return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
+
+
+# ===----------------------------------------------------------------------=== #
+# likely
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn likely(val: Bool) -> Bool:
+    """Provides information that the most probable value of `val` is going to be
+    `True`. This information can be used by optimizers.
+
+    Args:
+      val: The input value which is likely to be `True` most of the time.
+
+    Returns:
+      The input value.
+    """
+    return llvm_intrinsic["llvm.expect", Bool](val, True)
+
+
+# ===----------------------------------------------------------------------=== #
+# unlikely
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn unlikely(val: Bool) -> Bool:
+    """Provides information that the most probable value of `val` is going to be
+    `False`. This information can be used by optimizers.
+
+    Args:
+      val: The input value which is likely to be `False` most of the time.
+
+    Returns:
+      The input value.
+    """
+    return llvm_intrinsic["llvm.expect", Bool](val, False)
+
+
+# ===----------------------------------------------------------------------=== #
+# assume
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn assume(val: Bool):
+    """Signals to the optimizer that the condition is always true. This allows
+    the optimizer to optimize the code.
+
+    Args:
+      val: The input value which is assumed to be `True`.
+    """
+    llvm_intrinsic["llvm.assume", NoneType](val)

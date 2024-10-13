@@ -47,6 +47,7 @@ struct _NoneType(CollectionElement, CollectionElementNew):
 # ===----------------------------------------------------------------------===#
 
 
+@value
 struct Optional[T: CollectionElement](
     CollectionElement, CollectionElementNew, Boolable
 ):
@@ -125,22 +126,6 @@ struct Optional[T: CollectionElement](
             other: The Optional to copy.
         """
         self.__copyinit__(other)
-
-    fn __copyinit__(inout self, other: Self):
-        """Copy construct an Optional.
-
-        Args:
-            other: The Optional to copy.
-        """
-        self._value = other._value
-
-    fn __moveinit__(inout self, owned other: Self):
-        """Move this `Optional`.
-
-        Args:
-            other: The `Optional` to move from.
-        """
-        self._value = other._value^
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -322,7 +307,7 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), the program will abort
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         if not self.__bool__():
             abort(".value() on empty Optional")
@@ -339,7 +324,7 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value.unsafe_get[T]()

@@ -10,16 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements `StaticIntTuple` which is commonly used to represent N-D
+"""Implements `IndexList` which is commonly used to represent N-D
 indices.
 
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils import StaticIntTuple
+from utils import IndexList
 ```
 """
 
+from sys import bitwidthof
+from builtin.dtype import _int_type_of_width, _uint_type_of_width
 from builtin.io import _get_dtype_printf_format, _snprintf
 from collections.string import _calc_initial_buffer_size
 
@@ -53,11 +55,8 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
 
 @always_inline
 fn _int_tuple_binary_apply[
-    size: Int,
-    binary_fn: fn (Int, Int) -> Int,
-](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
-    Int, size
-]:
+    binary_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Scalar[type],
+](a: IndexList, b: __type_of(a)) -> __type_of(a):
     """Applies a given element binary function to each pair of corresponding
     elements in two tuples.
 
@@ -65,10 +64,6 @@ fn _int_tuple_binary_apply[
         var a: StaticTuple[Int, size]
         var b: StaticTuple[Int, size]
         var c = _int_tuple_binary_apply[size, Int.add](a, b)
-
-    Parameters:
-        size: Static size of the operand and result tuples.
-        binary_fn: Binary function to apply to tuple elements.
 
     Args:
         a: Tuple containing lhs operands of the elementwise binary function.
@@ -78,24 +73,21 @@ fn _int_tuple_binary_apply[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[Int, size]()
+    var c = __type_of(a)()
 
     @parameter
-    for i in range(size):
+    for i in range(a.size):
         var a_elem = a.__getitem__[i]()
         var b_elem = b.__getitem__[i]()
-        c.__setitem__[i](binary_fn(a_elem, b_elem))
+        c.__setitem__[i](binary_fn[a._int_dtype](a_elem, b_elem))
 
     return c
 
 
 @always_inline
 fn _int_tuple_compare[
-    size: Int,
-    comp_fn: fn (Int, Int) -> Bool,
-](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
-    Bool, size
-]:
+    comp_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Bool,
+](a: IndexList, b: __type_of(a)) -> StaticTuple[Bool, a.size]:
     """Applies a given element compare function to each pair of corresponding
     elements in two tuples and produces a tuple of Bools containing result.
 
@@ -103,10 +95,6 @@ fn _int_tuple_compare[
         var a: StaticTuple[Int, size]
         var b: StaticTuple[Int, size]
         var c = _int_tuple_compare[size, Int.less_than](a, b)
-
-    Parameters:
-        size: Static size of the operand and result tuples.
-        comp_fn: Compare function to apply to tuple elements.
 
     Args:
         a: Tuple containing lhs operands of the elementwise compare function.
@@ -116,22 +104,21 @@ fn _int_tuple_compare[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[Bool, size]()
+    var c = StaticTuple[Bool, a.size]()
 
     @parameter
-    for i in range(size):
-        var a_elem: Int = a.__getitem__[i]()
-        var b_elem: Int = b.__getitem__[i]()
-        c.__setitem__[i](comp_fn(a_elem, b_elem))
+    for i in range(a.size):
+        var a_elem = a.__getitem__[i]()
+        var b_elem = b.__getitem__[i]()
+        c.__setitem__[i](comp_fn[a._int_dtype](a_elem, b_elem))
 
     return c
 
 
 @always_inline
 fn _bool_tuple_reduce[
-    size: Int,
     reduce_fn: fn (Bool, Bool) -> Bool,
-](a: StaticTuple[Bool, size], init: Bool) -> Bool:
+](a: StaticTuple[Bool, _], init: Bool) -> Bool:
     """Reduces the tuple argument with the given reduce function and initial
     value.
 
@@ -140,7 +127,6 @@ fn _bool_tuple_reduce[
         var c = _bool_tuple_reduce[size, _reduce_and_fn](a, True)
 
     Parameters:
-        size: Static size of the operand and result tuples.
         reduce_fn: Reduce function to accumulate tuple elements.
 
     Args:
@@ -154,20 +140,37 @@ fn _bool_tuple_reduce[
     var c: Bool = init
 
     @parameter
-    for i in range(size):
+    for i in range(a.size):
         c = reduce_fn(c, a.__getitem__[i]())
 
     return c
 
 
 # ===----------------------------------------------------------------------===#
-# StaticIntTuple:
+# IndexList:
 # ===----------------------------------------------------------------------===#
+
+
+fn _type_of_width[bitwidth: Int, unsigned: Bool]() -> DType:
+    @parameter
+    if unsigned:
+        return _uint_type_of_width[bitwidth]()
+    else:
+        return _int_type_of_width[bitwidth]()
+
+
+fn _is_unsigned[type: DType]() -> Bool:
+    return type in (DType.uint8, DType.uint16, DType.uint32, DType.uint64)
 
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](
+struct IndexList[
+    size: Int,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](
     Sized,
     Stringable,
     Formattable,
@@ -177,9 +180,17 @@ struct StaticIntTuple[size: Int](
 
     Parameters:
         size: The size of the tuple.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
     """
 
-    var data: StaticTuple[Int, size]
+    alias _int_dtype = _type_of_width[element_bitwidth, unsigned]()
+    """The underlying dtype of the integer element value."""
+
+    alias _int_type = Scalar[Self._int_dtype]
+    """The underlying storage of the integer element value."""
+
+    var data: StaticTuple[Self._int_type, size]
     """The underlying storage of the tuple value."""
 
     @always_inline
@@ -209,7 +220,7 @@ struct StaticIntTuple[size: Int](
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -234,7 +245,7 @@ struct StaticIntTuple[size: Int](
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -259,7 +270,7 @@ struct StaticIntTuple[size: Int](
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -284,7 +295,7 @@ struct StaticIntTuple[size: Int](
 
         debug_assert(
             size == num_elements,
-            "[StaticIntTuple] mismatch in the number of elements",
+            "[IndexList] mismatch in the number of elements",
         )
 
         var tup = Self()
@@ -304,8 +315,10 @@ struct StaticIntTuple[size: Int](
         """
 
         self.data = __mlir_op.`pop.array.repeat`[
-            _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
-        ](elem)
+            _type = __mlir_type[
+                `!pop.array<`, size.value, `, `, Self._int_type, `>`
+            ]
+        ](Self._int_type(elem))
 
     fn __init__(inout self, *, other: Self):
         """Copy constructor.
@@ -313,7 +326,7 @@ struct StaticIntTuple[size: Int](
         Args:
             other: The other tuple to copy from.
         """
-        self.data = StaticTuple[Int, size](other=other.data)
+        self.data = other.data
 
     @always_inline
     fn __init__(inout self, values: VariadicList[Int]):
@@ -322,8 +335,21 @@ struct StaticIntTuple[size: Int](
         Args:
             values: The list of values.
         """
-        constrained[size > 0]()
-        self.data = values
+
+        var num_elements = len(values)
+
+        debug_assert(
+            size == num_elements,
+            "[IndexList] mismatch in the number of elements",
+        )
+
+        var tup = Self()
+
+        @parameter
+        for idx in range(size):
+            tup[idx] = values[idx]
+
+        self = tup
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -333,6 +359,18 @@ struct StaticIntTuple[size: Int](
             The tuple size.
         """
         return size
+
+    @always_inline
+    fn __getitem__[idx: Int](self) -> Int:
+        """Gets an element from the tuple by index.
+
+        Parameters:
+            idx: The element index.
+
+        Returns:
+            The tuple element value.
+        """
+        return int(self.data.__getitem__[idx]())
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
@@ -344,10 +382,22 @@ struct StaticIntTuple[size: Int](
         Returns:
             The tuple element value.
         """
-        return self.data[idx]
+        return int(self.data[idx])
 
     @always_inline("nodebug")
     fn __setitem__[index: Int](inout self, val: Int):
+        """Sets an element in the tuple at the given static index.
+
+        Parameters:
+            index: The element index.
+
+        Args:
+            val: The value to store.
+        """
+        self.data.__setitem__[index](val)
+
+    @always_inline("nodebug")
+    fn __setitem__[index: Int](inout self, val: Self._int_type):
         """Sets an element in the tuple at the given static index.
 
         Parameters:
@@ -370,12 +420,33 @@ struct StaticIntTuple[size: Int](
 
     @always_inline("nodebug")
     fn as_tuple(self) -> StaticTuple[Int, size]:
-        """Converts this StaticIntTuple to StaticTuple.
+        """Converts this IndexList to StaticTuple.
 
         Returns:
             The corresponding StaticTuple object.
         """
-        return self.data
+        var res = StaticTuple[Int, size]()
+
+        @parameter
+        for i in range(size):
+            res[i] = int(self.__getitem__[i]())
+        return res
+
+    @always_inline("nodebug")
+    fn canonicalize(
+        self,
+    ) -> IndexList[
+        size, element_bitwidth = bitwidthof[Int](), unsigned=False
+    ] as result:
+        """Canonicalizes the IndexList.
+
+        Returns:
+            Canonicalizes the object.
+        """
+        return self.cast[
+            element_bitwidth = result.element_bitwidth,
+            unsigned = result.unsigned,
+        ]()
 
     @always_inline
     fn flattened_length(self) -> Int:
@@ -393,7 +464,7 @@ struct StaticIntTuple[size: Int](
         return length
 
     @always_inline
-    fn __add__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __add__(self, rhs: Self) -> Self:
         """Performs element-wise integer add.
 
         Args:
@@ -404,15 +475,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a + b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
-    fn __sub__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __sub__(self, rhs: Self) -> Self:
         """Performs element-wise integer subtract.
 
         Args:
@@ -423,15 +494,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a - b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
-    fn __mul__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __mul__(self, rhs: Self) -> Self:
         """Performs element-wise integer multiply.
 
         Args:
@@ -442,12 +513,12 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a * b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
     fn __floordiv__(self, rhs: Self) -> Self:
@@ -461,12 +532,12 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a // b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
     fn __rfloordiv__(self, rhs: Self) -> Self:
@@ -481,7 +552,7 @@ struct StaticIntTuple[size: Int](
         return rhs // self
 
     @always_inline
-    fn remu(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn remu(self, rhs: Self) -> Self:
         """Performs element-wise integer unsigned modulo.
 
         Args:
@@ -492,15 +563,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Int:
+        fn apply_fn[
+            type: DType
+        ](a: Scalar[type], b: Scalar[type]) -> Scalar[type]:
             return a % b
 
-        return Self {
-            data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
-        }
+        return _int_tuple_binary_apply[apply_fn](self, rhs)
 
     @always_inline
-    fn __eq__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __eq__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple for equality.
 
         The tuples are equal if all corresponding elements are equal.
@@ -513,15 +584,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a == b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __ne__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __ne__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple for non-equality.
 
         The tuples are non-equal if at least one element of LHS isn't equal to
@@ -536,7 +607,7 @@ struct StaticIntTuple[size: Int](
         return not (self == rhs)
 
     @always_inline
-    fn __lt__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __lt__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using LT comparison.
 
         A tuple is less-than another tuple if all corresponding elements of lhs
@@ -552,15 +623,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a < b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __le__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __le__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using LE comparison.
 
         A tuple is less-or-equal than another tuple if all corresponding
@@ -576,15 +647,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a <= b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __gt__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __gt__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using GT comparison.
 
         A tuple is greater-than than another tuple if all corresponding
@@ -600,15 +671,15 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a > b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @always_inline
-    fn __ge__(self, rhs: StaticIntTuple[size]) -> Bool:
+    fn __ge__(self, rhs: Self) -> Bool:
         """Compares this tuple to another tuple using GE comparison.
 
         A tuple is greater-or-equal than another tuple if all corresponding
@@ -624,11 +695,11 @@ struct StaticIntTuple[size: Int](
         """
 
         @always_inline
-        fn apply_fn(a: Int, b: Int) -> Bool:
+        fn apply_fn[type: DType](a: Scalar[type], b: Scalar[type]) -> Bool:
             return a >= b
 
-        return _bool_tuple_reduce[size, _reduce_and_fn](
-            _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
+        return _bool_tuple_reduce[_reduce_and_fn](
+            _int_tuple_compare[apply_fn](self.data, rhs.data), True
         )
 
     @no_inline
@@ -676,12 +747,70 @@ struct StaticIntTuple[size: Int](
         # TODO: Optimize this to avoid the intermediate String allocation.
         writer.write(str(self))
 
+    @always_inline
+    fn cast[
+        type: DType
+    ](self) -> IndexList[
+        size,
+        element_bitwidth = bitwidthof[type](),
+        unsigned = _is_unsigned[type](),
+    ] as result:
+        """Casts to the target DType.
+
+        Parameters:
+            type: The type to cast towards.
+
+        Returns:
+            The list casted to the target type.
+        """
+        constrained[type.is_integral(), "the target type must be integral"]()
+
+        var res = __type_of(result)()
+
+        @parameter
+        for i in range(size):
+            res.data[i] = rebind[__type_of(result.data).element_type](
+                rebind[Scalar[Self._int_dtype]](
+                    self.data.__getitem__[i]()
+                ).cast[result._int_dtype]()
+            )
+        return res
+
+    @always_inline
+    fn cast[
+        *,
+        element_bitwidth: Int = Self.element_bitwidth,
+        unsigned: Bool = Self.unsigned,
+    ](self) -> IndexList[
+        size, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ] as result:
+        """Casts to the target DType.
+
+        Parameters:
+            element_bitwidth: The bitwidth to cast towards.
+            unsigned: The signess of the list.
+
+        Returns:
+            The list casted to the target type.
+        """
+
+        @parameter
+        if (
+            element_bitwidth == Self.element_bitwidth
+            and unsigned == Self.unsigned
+        ):
+            return rebind[__type_of(result)](self)
+
+        return rebind[__type_of(result)](
+            self.cast[_type_of_width[element_bitwidth, unsigned]()]()
+        )
+
 
 # ===----------------------------------------------------------------------===#
 # Factory functions for creating index.
 # ===----------------------------------------------------------------------===#
 @always_inline
-fn Index[T0: Intable](x: T0) -> StaticIntTuple[1]:
+fn Index[T0: Intable](x: T0) -> IndexList[1]:
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -691,26 +820,26 @@ fn Index[T0: Intable](x: T0) -> StaticIntTuple[1]:
         x: The initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[1](int(x))
+    return IndexList[1](int(x))
 
 
 @always_inline
-fn Index(x: UInt) -> StaticIntTuple[1]:
+fn Index(x: UInt) -> IndexList[1]:
     """Constructs a 1-D Index from the given value.
 
     Args:
         x: The initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[1](x.value)
+    return IndexList[1](x.value)
 
 
 @always_inline
-fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> StaticIntTuple[2]:
+fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -722,13 +851,13 @@ fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> StaticIntTuple[2]:
         y: The 2nd initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[2](int(x), int(y))
+    return IndexList[2](int(x), int(y))
 
 
 @always_inline
-fn Index(x: UInt, y: UInt) -> StaticIntTuple[2]:
+fn Index(x: UInt, y: UInt) -> IndexList[2]:
     """Constructs a 2-D Index from the given values.
 
     Args:
@@ -736,15 +865,15 @@ fn Index(x: UInt, y: UInt) -> StaticIntTuple[2]:
         y: The 2nd initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[2](x.value, y.value)
+    return IndexList[2](x.value, y.value)
 
 
 @always_inline
 fn Index[
     T0: Intable, T1: Intable, T2: Intable
-](x: T0, y: T1, z: T2) -> StaticIntTuple[3]:
+](x: T0, y: T1, z: T2) -> IndexList[3]:
     """Constructs a 3-D Index from the given values.
 
     Parameters:
@@ -758,15 +887,15 @@ fn Index[
         z: The 3rd initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[3](int(x), int(y), int(z))
+    return IndexList[3](int(x), int(y), int(z))
 
 
 @always_inline
 fn Index[
     T0: Intable, T1: Intable, T2: Intable, T3: Intable
-](x: T0, y: T1, z: T2, w: T3) -> StaticIntTuple[4]:
+](x: T0, y: T1, z: T2, w: T3) -> IndexList[4]:
     """Constructs a 4-D Index from the given values.
 
     Parameters:
@@ -782,15 +911,15 @@ fn Index[
         w: The 4th initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[4](int(x), int(y), int(z), int(w))
+    return IndexList[4](int(x), int(y), int(z), int(w))
 
 
 @always_inline
 fn Index[
     T0: Intable, T1: Intable, T2: Intable, T3: Intable, T4: Intable
-](x: T0, y: T1, z: T2, w: T3, v: T4) -> StaticIntTuple[5]:
+](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[5]:
     """Constructs a 5-D Index from the given values.
 
     Parameters:
@@ -808,9 +937,9 @@ fn Index[
         v: The 5th initial value.
 
     Returns:
-        The constructed StaticIntTuple.
+        The constructed IndexList.
     """
-    return StaticIntTuple[5](int(x), int(y), int(z), int(w), int(v))
+    return IndexList[5](int(x), int(y), int(z), int(w), int(v))
 
 
 # ===----------------------------------------------------------------------===#
@@ -819,7 +948,7 @@ fn Index[
 
 
 @always_inline
-fn product[size: Int](tuple: StaticIntTuple[size], end_idx: Int) -> Int:
+fn product[size: Int](tuple: IndexList[size], end_idx: Int) -> Int:
     """Computes a product of values in the tuple up to the given index.
 
     Parameters:
@@ -838,7 +967,7 @@ fn product[size: Int](tuple: StaticIntTuple[size], end_idx: Int) -> Int:
 @always_inline
 fn product[
     size: Int
-](tuple: StaticIntTuple[size], start_idx: Int, end_idx: Int) -> Int:
+](tuple: IndexList[size], start_idx: Int, end_idx: Int) -> Int:
     """Computes a product of values in the tuple in the given index range.
 
     Parameters:

@@ -23,7 +23,7 @@ from collections import List
 from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
-from memory import Reference, UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy
 from utils import Span
 
 from .optional import Optional
@@ -38,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -48,28 +48,32 @@ struct _ListIter[
         T: The type of the elements in the list.
         hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
             but it helps performance. Will go away in the future.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T, hint_trivial_type]
 
     var index: Int
-    var src: Reference[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_lifetime]:
+    ) -> Pointer[T, list_origin]:
         @parameter
         if forward:
             self.index += 1
-            return Reference.address_of(self.src[][self.index - 1])
+            return Pointer.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return Reference.address_of(self.src[][self.index])
+            return Pointer.address_of(self.src[][self.index])
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         @parameter
@@ -347,23 +351,23 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self)]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _ListIter(0, Reference.address_of(self))
+        return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self), False]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self), Reference.address_of(self))
+        return _ListIter[forward=False](len(self), Pointer.address_of(self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations

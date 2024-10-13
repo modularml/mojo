@@ -167,7 +167,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), Reference.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
@@ -290,7 +290,7 @@ fn _float_repr[
 
 
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableAnyLifetime](
+    var str_slice = StringSlice[ImmutableAnyOrigin](
         unsafe_from_utf8_strref=strref
     )
 
@@ -299,7 +299,7 @@ fn _put(strref: StringRef, file: FileDescriptor = stdout):
 
 @no_inline
 fn _put[
-    lif: ImmutableLifetime, //
+    lif: ImmutableOrigin, //
 ](x: StringSlice[lif], file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = x.byte_length()

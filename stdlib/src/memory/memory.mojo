@@ -27,11 +27,12 @@ from sys import (
     triple_is_nvidia_cuda,
     external_call,
     simdwidthof,
+    simdbitwidth,
     _libc as libc,
 )
 from collections import Optional
 from builtin.dtype import _integral_type_of
-from memory.reference import AddressSpace, _GPUAddressSpace
+from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -153,6 +154,17 @@ fn _memcpy_impl(
         src_data: The source pointer.
         n: The number of bytes to copy.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        alias chunk_size = simdbitwidth()
+        var vector_end = _align_down(n, chunk_size)
+        for i in range(0, vector_end, chunk_size):
+            dest_data.store(i, src_data.load[width=chunk_size](i))
+        for i in range(vector_end, n):
+            dest_data.store(i, src_data.load(i))
+        return
+
     if n < 5:
         if n == 0:
             return
@@ -167,16 +179,27 @@ fn _memcpy_impl(
     if n <= 16:
         if n >= 8:
             var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
-            dest_data.offset(n - ui64_size).bitcast[
-                Int64
-            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
+            dest_data.bitcast[Int64]().store[alignment=1](
+                0, src_data.bitcast[Int64]().load[alignment=1](0)
+            )
+            dest_data.offset(n - ui64_size).bitcast[Int64]().store[alignment=1](
+                0,
+                src_data.offset(n - ui64_size)
+                .bitcast[Int64]()
+                .load[alignment=1](0),
+            )
             return
+
         var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
-        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
-            n - ui32_size
-        ).bitcast[Int32]()[0]
+        dest_data.bitcast[Int32]().store[alignment=1](
+            0, src_data.bitcast[Int32]().load[alignment=1](0)
+        )
+        dest_data.offset(n - ui32_size).bitcast[Int32]().store[alignment=1](
+            0,
+            src_data.offset(n - ui32_size)
+            .bitcast[Int32]()
+            .load[alignment=1](0),
+        )
         return
 
     # TODO (#10566): This branch appears to cause a 12% regression in BERT by
@@ -191,16 +214,13 @@ fn _memcpy_impl(
     #    )
     #    return
 
-    var dest_ptr = dest_data.bitcast[Int8]()
-    var src_ptr = src_data.bitcast[Int8]()
-
     # Copy in 32-byte chunks.
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
+        dest_data.store(i, src_data.load[width=chunk_size](i))
     for i in range(vector_end, n):
-        dest_ptr.store(i, src_ptr.load(i))
+        dest_data.store(i, src_data.load(i))
 
 
 @always_inline
@@ -223,8 +243,8 @@ fn memcpy[
     """
     var n = count * sizeof[dest.type]()
     _memcpy_impl(
-        dest.bitcast[Int8, lifetime=MutableAnyLifetime](),
-        src.bitcast[Int8, lifetime=MutableAnyLifetime](),
+        dest.bitcast[Int8, origin=MutableAnyOrigin](),
+        src.bitcast[Int8, origin=MutableAnyOrigin](),
         n,
     )
 

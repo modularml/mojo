@@ -261,7 +261,7 @@ fn pop_count[
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_not[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
@@ -417,7 +417,7 @@ fn bit_ceil(val: Int) -> Int:
     return 1 << bit_width(val - 1)
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_ceil[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
@@ -453,7 +453,7 @@ fn bit_ceil[
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_floor
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_floor(val: Int) -> Int:
     """Computes the largest power of 2 that is less than or equal to the input
     value. Any integral value less than or equal to 0 will be floored to 0.
@@ -470,7 +470,7 @@ fn bit_floor(val: Int) -> Int:
     return 1 << (bit_width(val) - 1)
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_floor[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:

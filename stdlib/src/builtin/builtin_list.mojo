@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory import Reference, UnsafePointer
+from memory import Pointer, UnsafePointer
 
 
 # ===----------------------------------------------------------------------===#
@@ -39,7 +39,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, owned *args: *Ts):
         """Construct the list literal from the given values.
 
@@ -48,7 +48,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         """
         self.storage = Tuple(storage=args^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Copy construct the tuple.
 
@@ -70,7 +70,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
         """Get the list length.
 
@@ -83,7 +83,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn get[i: Int, T: CollectionElement](self) -> ref [self.storage] T:
         """Get a list element at the given index.
 
@@ -100,7 +100,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __contains__[
         T: EqualityComparableCollectionElement
     ](self, value: T) -> Bool:
@@ -138,6 +138,10 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
     fn __next__(inout self) -> type:
         self.index += 1
         return self.src[self.index - 1]
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return len(self.src) - self.index
@@ -214,54 +218,58 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 struct _VariadicListMemIter[
     elt_is_mutable: Bool, //,
     elt_type: AnyType,
-    elt_lifetime: Lifetime[elt_is_mutable].type,
-    list_lifetime: ImmutableLifetime,
+    elt_origin: Origin[elt_is_mutable].type,
+    list_origin: ImmutableOrigin,
 ]:
     """Iterator for VariadicListMem.
 
     Parameters:
         elt_is_mutable: Whether the elements in the list are mutable.
         elt_type: The type of the elements in the list.
-        elt_lifetime: The lifetime of the elements.
-        list_lifetime: The lifetime of the VariadicListMem.
+        elt_origin: The origin of the elements.
+        list_origin: The origin of the VariadicListMem.
     """
 
-    alias variadic_list_type = VariadicListMem[elt_type, elt_lifetime]
+    alias variadic_list_type = VariadicListMem[elt_type, elt_origin]
 
     var index: Int
-    var src: Reference[Self.variadic_list_type, list_lifetime]
+    var src: Pointer[Self.variadic_list_type, list_origin]
 
     fn __init__(
-        inout self, index: Int, ref [list_lifetime]list: Self.variadic_list_type
+        inout self, index: Int, ref [list_origin]list: Self.variadic_list_type
     ):
         self.index = index
-        self.src = Reference.address_of(list)
+        self.src = Pointer.address_of(list)
 
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
         self.index += 1
         # TODO: Need to make this return a dereferenced reference, not a
         # reference that must be deref'd by the user.
         return rebind[Self.variadic_list_type.reference_type](
-            Reference.address_of(self.src[][self.index - 1])
+            Pointer.address_of(self.src[][self.index - 1])
         )
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
 
 
-# Helper to compute the union of two lifetimes:
+# Helper to compute the union of two origins:
 # TODO: parametric aliases would be nice.
-struct _lit_lifetime_union[
+struct _lit_origin_union[
     is_mutable: Bool, //,
-    a: Lifetime[is_mutable].type,
-    b: Lifetime[is_mutable].type,
+    a: Origin[is_mutable].type,
+    b: Origin[is_mutable].type,
 ]:
     alias result = __mlir_attr[
-        `#lit.lifetime.union<`,
+        `#lit.origin.union<`,
         a,
         `,`,
         b,
-        `> : !lit.lifetime<`,
+        `> : !lit.origin<`,
         is_mutable.value,
         `>`,
     ]
@@ -269,13 +277,13 @@ struct _lit_lifetime_union[
 
 struct _lit_mut_cast[
     is_mutable: Bool, //,
-    operand: Lifetime[is_mutable].type,
+    operand: Origin[is_mutable].type,
     result_mutable: Bool,
 ]:
     alias result = __mlir_attr[
-        `#lit.lifetime.mutcast<`,
+        `#lit.origin.mutcast<`,
         operand,
-        `> : !lit.lifetime<`,
+        `> : !lit.origin<`,
         +result_mutable.value,
         `>`,
     ]
@@ -284,7 +292,7 @@ struct _lit_mut_cast[
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
-    lifetime: Lifetime[elt_is_mutable].type,
+    origin: Origin[elt_is_mutable].type,
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes references to the elements in a
@@ -294,10 +302,10 @@ struct VariadicListMem[
         elt_is_mutable: True if the elements of the list are mutable for an
                         inout or owned argument.
         element_type: The type of the elements in the list.
-        lifetime: The reference lifetime of the underlying elements.
+        origin: The reference origin of the underlying elements.
     """
 
-    alias reference_type = Reference[element_type, lifetime]
+    alias reference_type = Pointer[element_type, origin]
     alias _mlir_ref_type = Self.reference_type._mlir_type
     alias _mlir_type = __mlir_type[
         `!kgen.variadic<`, Self._mlir_ref_type, `, borrow_in_mem>`
@@ -418,12 +426,12 @@ struct VariadicListMem[
     fn __getitem__(
         self, idx: Int
     ) -> ref [
-        _lit_lifetime_union[
-            lifetime,
+        _lit_origin_union[
+            origin,
             # cast mutability of self to match the mutability of the element,
             # since that is what we want to use in the ultimate reference and
             # the union overall doesn't matter.
-            _lit_mut_cast[__lifetime_of(self), elt_is_mutable].result,
+            _lit_mut_cast[__origin_of(self), elt_is_mutable].result,
         ].result
     ] element_type:
         """Gets a single element on the variadic list.
@@ -441,7 +449,7 @@ struct VariadicListMem[
 
     fn __iter__(
         self,
-    ) -> _VariadicListMemIter[element_type, lifetime, __lifetime_of(self),]:
+    ) -> _VariadicListMemIter[element_type, origin, __origin_of(self),]:
         """Iterate over the list.
 
         Returns:
@@ -449,8 +457,8 @@ struct VariadicListMem[
         """
         return _VariadicListMemIter[
             element_type,
-            lifetime,
-            __lifetime_of(self),
+            origin,
+            __origin_of(self),
         ](0, self)
 
 
@@ -465,7 +473,7 @@ alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 @value
 struct _LITRefPackHelper[
     is_mutable: Bool, //,
-    lifetime: Lifetime[is_mutable].type,
+    origin: Origin[is_mutable].type,
     address_space: __mlir_type.index,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
@@ -479,7 +487,7 @@ struct _LITRefPackHelper[
         `> `,
         element_types,
         `, `,
-        lifetime,
+        origin,
         `, `,
         address_space,
         `>`,
@@ -535,7 +543,7 @@ struct _LITRefPackHelper[
 @register_passable
 struct VariadicPack[
     elt_is_mutable: __mlir_type.i1, //,
-    lifetime: Lifetime[Bool {value: elt_is_mutable}].type,
+    origin: Origin[Bool {value: elt_is_mutable}].type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
 ](Sized):
@@ -545,7 +553,7 @@ struct VariadicPack[
     Parameters:
         elt_is_mutable: True if the elements of the list are mutable for an
                         inout or owned argument pack.
-        lifetime: The reference lifetime of the underlying elements.
+        origin: The reference origin of the underlying elements.
         element_trait: The trait that each element of the pack conforms to.
         element_types: The list of types held by the argument pack.
     """
@@ -556,7 +564,7 @@ struct VariadicPack[
         `> `,
         element_types,
         `, `,
-        lifetime,
+        origin,
         `>`,
     ]
 
@@ -632,14 +640,14 @@ struct VariadicPack[
     @always_inline
     fn __getitem__[
         index: Int
-    ](self) -> ref [Self.lifetime] element_types[index.value]:
+    ](self) -> ref [Self.origin] element_types[index.value]:
         """Return a reference to an element of the pack.
 
         Parameters:
             index: The element of the pack to return.
 
         Returns:
-            A reference to the element.  The Reference's mutability follows the
+            A reference to the element.  The Pointer's mutability follows the
             mutability of the pack argument convention.
         """
         litref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](

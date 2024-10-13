@@ -52,9 +52,8 @@ fn _default_alignment[type: DType, width: Int = 1]() -> Int:
 struct UnsafePointer[
     type: AnyType,
     address_space: AddressSpace = AddressSpace.GENERIC,
-    exclusive: Bool = False,
     alignment: Int = _default_alignment[type](),
-    lifetime: Lifetime[True].type = MutableAnyLifetime,
+    origin: Origin[True].type = MutableAnyOrigin,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -69,9 +68,8 @@ struct UnsafePointer[
     Parameters:
         type: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
-        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
         alignment: The minimum alignment of this pointer known statically.
-        lifetime: The lifetime of the memory being addressed.
+        origin: The origin of the memory being addressed.
     """
 
     # ===-------------------------------------------------------------------===#
@@ -144,9 +142,8 @@ struct UnsafePointer[
     ) -> UnsafePointer[
         type,
         address_space,
-        False,
         1,
-        # TODO: Propagate lifetime of the argument.
+        # TODO: Propagate origin of the argument.
     ] as result:
         """Gets the address of the argument.
 
@@ -164,7 +161,7 @@ struct UnsafePointer[
     @always_inline
     fn alloc(
         count: Int,
-    ) -> UnsafePointer[type, AddressSpace.GENERIC, exclusive, alignment]:
+    ) -> UnsafePointer[type, AddressSpace.GENERIC, alignment]:
         """Allocate an array with specified or default alignment.
 
         Args:
@@ -184,7 +181,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__(
         self,
-    ) -> ref [lifetime, address_space._value.value] type:
+    ) -> ref [origin, address_space._value.value] type:
         """Return a reference to the underlying data.
 
         Returns:
@@ -192,10 +189,10 @@ struct UnsafePointer[
         """
 
         # We're unsafe, so we can have unsafe things.
-        alias _ref_type = Reference[type, lifetime, address_space]
+        alias _ref_type = Pointer[type, origin, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[type, address_space, False, alignment, lifetime](
+                UnsafePointer[type, address_space, alignment, origin](
                     self
                 ).address
             )
@@ -219,7 +216,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__[
         IntLike: IntLike, //
-    ](self, offset: IntLike) -> ref [lifetime, address_space._value.value] type:
+    ](self, offset: IntLike) -> ref [origin, address_space._value.value] type:
         """Return a reference to the underlying data, offset by the given index.
 
         Parameters:
@@ -290,8 +287,8 @@ struct UnsafePointer[
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
     # TODO: replace with a safe model that checks the body of the method for
-    # accesses to the lifetime.
-    @__unsafe_disable_nested_lifetime_exclusivity
+    # accesses to the origin.
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are equal.
@@ -304,7 +301,7 @@ struct UnsafePointer[
         """
         return int(self) == int(rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are not equal.
@@ -317,7 +314,7 @@ struct UnsafePointer[
         """
         return not (self == rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower address than rhs.
@@ -330,7 +327,7 @@ struct UnsafePointer[
         """
         return int(self) < int(rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __le__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower than or equal
@@ -344,7 +341,7 @@ struct UnsafePointer[
         """
         return int(self) <= int(rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher address than rhs.
@@ -357,7 +354,7 @@ struct UnsafePointer[
         """
         return int(self) > int(rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __ge__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher than or equal
@@ -430,7 +427,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn as_noalias_ptr(
         self,
-    ) -> UnsafePointer[type, address_space, True, alignment, lifetime]:
+    ) -> UnsafePointer[type, address_space, alignment, origin]:
         """Cast the pointer to a new pointer that is known not to locally alias
         any other pointer. In other words, the pointer transitively does not
         alias any other memory value declared in the local function context.
@@ -885,17 +882,15 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        lifetime: Lifetime[True].type = Self.lifetime,
-    ](self) -> UnsafePointer[
-        T, address_space, Self.exclusive, alignment, lifetime
-    ]:
+        origin: Origin[True].type = Self.origin,
+    ](self) -> UnsafePointer[T, address_space, alignment, origin]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
-            lifetime: Lifetime of the destination pointer.
+            origin: Origin of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
@@ -913,17 +908,15 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        lifetime: Lifetime[True].type = Self.lifetime,
-    ](self) -> UnsafePointer[
-        Scalar[T], address_space, Self.exclusive, alignment, lifetime
-    ]:
+        origin: Origin[True].type = Self.origin,
+    ](self) -> UnsafePointer[Scalar[T], address_space, alignment, origin]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
-            lifetime: Lifetime of the destination pointer.
+            origin: Origin of the destination pointer.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
@@ -956,7 +949,7 @@ struct UnsafePointer[
         The pointer must not be null, and the pointer memory location is assumed
         to contain a valid initialized instance of `T`.
 
-        This performs a _consuming_ move, ending the lifetime of the value stored
+        This performs a _consuming_ move, ending the origin of the value stored
         in this pointer memory location. Subsequent reads of this pointer are
         not valid. If a new valid value is stored using `init_pointee_move()`, then
         reading from this pointer becomes valid again.

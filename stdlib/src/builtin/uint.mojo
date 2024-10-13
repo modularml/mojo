@@ -17,13 +17,15 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
-from builtin.hash import _hash_simd
+from builtin._documentation import doc_private
+from hashlib.hash import _hash_simd
+from hashlib._hasher import _HashableWithHasher, _Hasher
 
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(IntLike):
+struct UInt(IntLike, _HashableWithHasher):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -56,6 +58,7 @@ struct UInt(IntLike):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct UInt from the given index value.
@@ -64,6 +67,18 @@ struct UInt(IntLike):
             value: The init value.
         """
         self.value = value
+
+    @doc_private
+    @always_inline("nodebug")
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+        """Construct UInt from the given Index value.
+
+        Args:
+            value: The init value.
+        """
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+            value
+        )
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
@@ -143,6 +158,17 @@ struct UInt(IntLike):
         """
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.uint64](self))
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this uint value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(UInt64(self))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: UInt) -> Bool:

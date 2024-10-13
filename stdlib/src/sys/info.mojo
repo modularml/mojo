@@ -565,6 +565,22 @@ fn sizeof[
 
     Returns:
         The size of the type in bytes.
+
+    Example:
+    ```mojo
+    from sys.info import sizeof
+    def main():
+        print(
+            sizeof[UInt8]() == 1,
+            sizeof[UInt16]() == 2,
+            sizeof[Int32]() == 4,
+            sizeof[Float64]() == 8,
+            sizeof[
+                SIMD[DType.uint8, 4]
+            ]() == 4,
+        )
+    ```
+    Note: `align_of` is in same module.
     """
     alias mlir_type = __mlir_attr[
         `#kgen.param.expr<rebind, #kgen.type<!kgen.paramref<`,
@@ -779,7 +795,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     var err = external_call["sysctlbyname", Int32](
         "kern.osproductversion".unsafe_cstr_ptr(),
         buf.data,
-        Reference.address_of(buf_len),
+        Pointer.address_of(buf_len),
         OpaquePointer(),
         Int(0),
     )
