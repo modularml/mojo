@@ -1316,8 +1316,6 @@ struct String(
         elems.each[add_elt]()
         _ = is_first
         return result
-        
-    
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
@@ -1332,29 +1330,27 @@ struct String(
             The joined string.
         """
 
-        # TODO(#3403): the renaming of the following method from join to fast_join and
-        # the _type_is_eq() call is a hack needed to avoid the following error:
-        # "ambiguous call to 'join', each candidate requires 0 implicit conversions,
-        # disambiguate with an explicit cast"
+        # TODO(#3403): Simplify this when the linked conditional conformance feature is added.
+        # Runs a faster algorithm if the concrete types are able to be converted to a span.
         @parameter
         if _type_is_eq[T, String]():
             return self.fast_join(rebind[List[String]](elems))
         elif _type_is_eq[T, StringLiteral]():
             return self.fast_join(rebind[List[StringLiteral]](elems))
-        # elif _type_is_eq[T, StringSlice](): # FIXME(#3597): once StringSlice conforms to CollectionElement trait
-        #     return self.fast_join(rebind[List[StringSlice]](elems))
+        # if _type_is_eq[T, StringSlice](): # FIXME(#3597): once StringSlice conforms to CollectionElement trait
+        # return self.fast_join(rebind[List[StringSlice]](elems))
+        else:
+            var result: String = ""
+            var is_first = True
 
-        var result: String = ""
-        var is_first = True
+            for e in elems:
+                if is_first:
+                    is_first = False
+                else:
+                    result += self
+                result += str(e[])
 
-        for e in elems:
-            if is_first:
-                is_first = False
-            else:
-                result += self
-            result += str(e[])
-
-        return result
+            return result
 
     fn fast_join[
         T: SizedSpanableCollectionElement, //,
