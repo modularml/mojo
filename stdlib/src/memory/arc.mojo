@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -132,13 +132,13 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             self._inner.destroy_pointee()
             self._inner.free()
 
-    # FIXME: The lifetime returned for this is currently self lifetime, which
+    # FIXME: The origin returned for this is currently self origin, which
     # keeps the Arc object alive as long as there are references into it.  That
-    # said, this isn't really the right modeling, we need hierarchical lifetimes
+    # said, this isn't really the right modeling, we need hierarchical origins
     # to model the mutability and invalidation of the returned reference
     # correctly.
     fn __getitem__[
-        self_life: ImmutableLifetime
+        self_life: ImmutableOrigin
     ](
         ref [self_life]self: Self,
     ) -> ref [
@@ -147,7 +147,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         """Returns a mutable reference to the managed value.
 
         Parameters:
-            self_life: The lifetime of self.
+            self_life: The origin of self.
 
         Returns:
             A reference to the managed value.
@@ -170,3 +170,25 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             The current amount of references to the pointee.
         """
         return self._inner[].refcount.load()
+
+    fn __is__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at the same object.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at the same object and False otherwise.
+        """
+        return self._inner == rhs._inner
+
+    fn __isnot__(self, rhs: Self) -> Bool:
+        """Returns True if the two Arcs point at different objects.
+
+        Args:
+            rhs: The other Arc.
+
+        Returns:
+            True if the two Arcs point at different objects and False otherwise.
+        """
+        return self._inner != rhs._inner

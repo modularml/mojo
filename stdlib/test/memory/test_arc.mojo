@@ -26,6 +26,16 @@ def test_basic():
     assert_equal(3, p[])
 
 
+def test_is():
+    var p = Arc(3)
+    var p2 = p
+    var p3 = Arc(3)
+    assert_true(p is p2)
+    assert_false(p is not p2)
+    assert_false(p is p3)
+    assert_true(p is not p3)
+
+
 def test_deleter_not_called_until_no_references():
     var deleted = False
     var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
@@ -69,6 +79,7 @@ def test_count():
 
 def main():
     test_basic()
+    test_is()
     test_deleter_not_called_until_no_references()
     test_deleter_not_called_until_no_references_explicit_copy()
     test_count()
