@@ -481,12 +481,8 @@ struct StringLiteral(
         Examples:
 
         ```mojo
-        # Splitting a space
-        _ = String("hello world").split(" ") # ["hello", "world"]
-        # Splitting adjacent separators
-        _ = String("hello,,world").split(",") # ["hello", "", "world"]
         # Splitting with maxsplit
-        _ = String("1,2,3").split(",", 1) # ['1', '2,3']
+        _ = "1,2,3".split(",", 1) # ['1', '2,3']
         ```
         .
         """
@@ -509,9 +505,9 @@ struct StringLiteral(
 
         ```mojo
         # Splitting a space
-        _ = String("hello world").split(" ") # ["hello", "world"]
+        _ = "hello world".split(" ") # ["hello", "world"]
         # Splitting adjacent separators
-        _ = String("hello,,world").split(",") # ["hello", "", "world"]
+        _ = "hello,,world".split(",") # ["hello", "", "world"]
         ```
         .
         """
@@ -531,15 +527,8 @@ struct StringLiteral(
         Examples:
 
         ```mojo
-        # Splitting an empty string or filled with whitespaces
-        _ = String("      ").split() # []
-        _ = String("").split() # []
-        # Splitting a string with leading, trailing, and middle whitespaces
-        _ = String("      hello    world     ").split() # ["hello", "world"]
-        # Splitting adjacent universal newlines:
-        _ = String(
-            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
-        ).split()  # ["hello", "world"]
+        # Splitting with maxsplit
+        _ = "1     2  3".split(maxsplit=1) # ['1', '2  3']
         ```
         .
         """
@@ -559,12 +548,12 @@ struct StringLiteral(
 
         ```mojo
         # Splitting an empty string or filled with whitespaces
-        _ = String("      ").split() # []
-        _ = String("").split() # []
+        _ = "      ".split() # []
+        _ = "".split() # []
         # Splitting a string with leading, trailing, and middle whitespaces
-        _ = String("      hello    world     ").split() # ["hello", "world"]
+        _ = "      hello    world     ".split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
-        _ = String(
+        _ = (
             "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
         ).split()  # ["hello", "world"]
         ```
