@@ -79,6 +79,21 @@ alias newfunc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
 @value
 @register_passable("trivial")
 struct PyGILState_STATE:
+    """Represents the state of the Python Global Interpreter Lock (GIL).
+
+    This struct is used to store and manage the state of the GIL,
+    which is crucial for thread-safe operations in Python.
+
+    See https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/pystate.h#L76
+
+    Attributes:
+        current_state (c_int): The current state of the GIL.
+
+    Class Attributes:
+        PyGILState_LOCKED (c_int): Constant representing a locked GIL state.
+        PyGILState_UNLOCKED (c_int): Constant representing an unlocked GIL state.
+    """
+
     var current_state: c_int
 
     alias PyGILState_LOCKED = c_int(0)
