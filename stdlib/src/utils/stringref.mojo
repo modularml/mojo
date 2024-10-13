@@ -240,7 +240,7 @@ struct StringRef(
         Returns:
           True if the string contains the substring.
         """
-        alias S = StringSlice[ImmutableAnyLifetime]
+        alias S = StringSlice[StaticConstantOrigin]
         var s_slice = S(unsafe_from_utf8_strref=self)
         return s_slice.find(S(unsafe_from_utf8_strref=substr)) != -1
 
@@ -445,7 +445,7 @@ struct StringRef(
         var offset = 0
 
         while True:
-            alias S = StringSlice[ImmutableAnyLifetime]
+            alias S = StringSlice[StaticConstantOrigin]
             var pos = S(unsafe_from_utf8_strref=self).find(
                 S(unsafe_from_utf8_strref=substr), offset
             )
@@ -538,7 +538,7 @@ struct StringRef(
         var ptr = self.unsafe_ptr()
 
         var current_offset = 0
-        alias S = StringSlice[ImmutableAnyLifetime]
+        alias S = StringSlice[StaticConstantOrigin]
         var self_slice = S(unsafe_from_utf8_strref=self)
         var delim_slice = S(unsafe_from_utf8_strref=delimiter)
         while True:
@@ -572,7 +572,7 @@ struct StringRef(
           True if the self[start:end] is prefixed by the input prefix.
         """
         if end == -1:
-            alias S = StringSlice[ImmutableAnyLifetime]
+            alias S = StringSlice[StaticConstantOrigin]
             var s = S(unsafe_from_utf8_strref=self)
             return s.find(S(unsafe_from_utf8_strref=prefix), start) == start
         return StringRef(self.unsafe_ptr() + start, end - start).startswith(
@@ -594,7 +594,7 @@ struct StringRef(
         if len(suffix) > len(self):
             return False
         if end == -1:
-            alias S = StringSlice[ImmutableAnyLifetime]
+            alias S = StringSlice[StaticConstantOrigin]
             return S(unsafe_from_utf8_strref=self).rfind(
                 S(unsafe_from_utf8_strref=suffix), start
             ) + len(suffix) == len(self)
