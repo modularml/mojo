@@ -23,7 +23,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.string_slice import _split, _Stringlike
 from collections.string import _atol, _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
@@ -396,18 +396,21 @@ struct StringLiteral(
 
         writer.write_str(self.as_string_slice())
 
-    fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
+    fn find[T: _Stringlike](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
         Args:
-          substr: The substring to find.
-          start: The offset from which to find.
+            substr: The substring to find.
+            start: The offset from which to find.
 
         Returns:
-          The offset of `substr` relative to the beginning of the string.
+            The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).find(substr, start=start)
+        var sub = StringSlice[__origin_of(substr)](
+            unsafe_from_utf8_ptr=substr.unsafe_ptr(), len=substr.byte_length()
+        )
+        return self.as_string_slice().find(sub, start)
 
     fn rfind(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -459,38 +462,68 @@ struct StringLiteral(
 
         return result
 
-    fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
-        """Split the string literal by a separator.
+    @always_inline
+    fn split[
+        T: _Stringlike
+    ](self, sep: T, maxsplit: Int) raises -> List[String]:
+        """Split the string by a separator.
 
         Args:
             sep: The string to split on.
             maxsplit: The maximum amount of items to split from String.
-                Defaults to unlimited.
 
         Returns:
             A List of Strings containing the input split by the separator.
+
+        Raises:
+            If the separator is empty.
 
         Examples:
 
         ```mojo
         # Splitting a space
-        _ = "hello world".split(" ") # ["hello", "world"]
+        _ = String("hello world").split(" ") # ["hello", "world"]
         # Splitting adjacent separators
-        _ = "hello,,world".split(",") # ["hello", "", "world"]
+        _ = String("hello,,world").split(",") # ["hello", "", "world"]
         # Splitting with maxsplit
-        _ = "1,2,3".split(",", 1) # ['1', '2,3']
+        _ = String("1,2,3").split(",", 1) # ['1', '2,3']
         ```
         .
         """
-        return str(self).split(sep, maxsplit)
+        return _split[enable_maxsplit=True](self, sep, maxsplit)
 
-    fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
-        """Split the string literal by every whitespace separator.
+    @always_inline
+    fn split[T: _Stringlike](self, sep: T) raises -> List[String]:
+        """Split the string by a separator.
+
+        Args:
+            sep: The string to split on.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Raises:
+            If the separator is empty.
+
+        Examples:
+
+        ```mojo
+        # Splitting a space
+        _ = String("hello world").split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = String("hello,,world").split(",") # ["hello", "", "world"]
+        ```
+        .
+        """
+        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
+
+    @always_inline
+    fn split(self, sep: NoneType, maxsplit: Int) -> List[String]:
+        """Split the string by every Whitespace separator.
 
         Args:
             sep: None.
-            maxsplit: The maximum amount of items to split from string. Defaults
-                to unlimited.
+            maxsplit: The maximum amount of items to split from String.
 
         Returns:
             A List of Strings containing the input split by the separator.
@@ -499,18 +532,45 @@ struct StringLiteral(
 
         ```mojo
         # Splitting an empty string or filled with whitespaces
-        _ = "      ".split() # []
-        _ = "".split() # []
-
+        _ = String("      ").split() # []
+        _ = String("").split() # []
         # Splitting a string with leading, trailing, and middle whitespaces
-        _ = "      hello    world     ".split() # ["hello", "world"]
+        _ = String("      hello    world     ").split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
-        _ = "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world".split()
-        # ["hello", "world"]
+        _ = String(
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+        ).split()  # ["hello", "world"]
         ```
         .
         """
-        return str(self).split(sep, maxsplit)
+        return _split[enable_maxsplit=True](self, sep, maxsplit)
+
+    @always_inline
+    fn split(self, sep: NoneType = None) -> List[String]:
+        """Split the string by every Whitespace separator.
+
+        Args:
+            sep: None.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = String("      ").split() # []
+        _ = String("").split() # []
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = String("      hello    world     ").split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        _ = String(
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+        ).split()  # ["hello", "world"]
+        ```
+        .
+        """
+        return _split[enable_maxsplit=True](self, sep, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string literal at line boundaries. This corresponds to Python's
