@@ -578,7 +578,8 @@ struct StringSlice[
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
+
+        if substr.byte_length() == 0:
             return 0
 
         if self.byte_length() < substr.byte_length() + start:
@@ -811,7 +812,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait _Stringlike(CollectionElement, CollectionElementNew):
+trait _Stringlike:
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
