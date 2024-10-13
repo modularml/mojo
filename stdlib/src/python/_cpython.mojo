@@ -108,7 +108,7 @@ struct PyThreadState:
 
 @value
 @register_passable("trivial")
-struct PyKeyValuePair:
+struct PyKeysValuePair:
     var key: PyObjectPtr
     var value: PyObjectPtr
     var position: c_int
@@ -783,7 +783,7 @@ struct CPython:
     # ref: https://docs.python.org/3/c-api/dict.html#c.PyDict_Next
     fn PyDict_Next(
         inout self, dictionary: PyObjectPtr, p: Int
-    ) -> PyKeyValuePair:
+    ) -> PyKeysValuePair:
         var key = UnsafePointer[Int8]()
         var value = UnsafePointer[Int8]()
         var v = p
@@ -821,7 +821,7 @@ struct CPython:
         )
 
         _ = v
-        return PyKeyValuePair {
+        return PyKeysValuePair {
             key: key,
             value: value,
             position: position.take_pointee(),
