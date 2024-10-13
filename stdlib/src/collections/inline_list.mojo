@@ -31,7 +31,7 @@ struct _InlineListIter[
     list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
@@ -40,21 +40,21 @@ struct _InlineListIter[
         list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
         capacity: The maximum number of elements that the list can hold.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = InlineList[T, capacity]
 
     var index: Int
-    var src: Pointer[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Pointer[T, __lifetime_of(self.src[][0])]:
+    ) -> Pointer[T, __origin_of(self.src[][0])]:
         @parameter
         if forward:
             self.index += 1
@@ -175,7 +175,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
+    ) -> _InlineListIter[ElementType, capacity, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
