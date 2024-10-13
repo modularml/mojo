@@ -397,7 +397,7 @@ def test_count_utf8_continuation_bytes():
 
     @parameter
     fn test(amnt: Int, items: List[UInt8]) raises:
-        var span = Span[UInt8, ImmutableAnyLifetime](items)
+        var span = Span[UInt8, StaticConstantOrigin](items)
         assert_equal(amnt, _count_utf8_continuation_bytes(span))
 
     test(5, List[UInt8](c, c, c, c, c))
