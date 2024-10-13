@@ -851,8 +851,8 @@ trait _Stringlike:
 
 
 fn _split[
-    T: _Stringlike, //, enable_maxsplit: Bool
-](src_str: String, sep: T, maxsplit: Int) raises -> List[String]:
+    T0: _Stringlike, T1: _Stringlike, //, enable_maxsplit: Bool
+](src_str: T0, sep: T1, maxsplit: Int) raises -> List[String]:
     var items = _split_impl[enable_maxsplit=enable_maxsplit](
         src_str, sep, maxsplit
     )
@@ -864,11 +864,9 @@ fn _split[
 
 
 # FIXME(#3597): once StringSlice conforms to collection element trait
-# fn _split[
+# fn _split_slice[
 #     T: _Stringlike, //, enable_maxsplit: Bool
-# ](src_str: StringSlice, sep: T, maxsplit: Int) raises -> List[
-#     __type_of(src_str)
-# ]:
+# ](src_str: StringSlice, sep: T, maxsplit: Int) raises -> List[StringSlice]:
 #     var items = _split_impl[enable_maxsplit=enable_maxsplit](
 #         src_str, sep, maxsplit
 #     )
@@ -880,8 +878,8 @@ fn _split[
 
 
 fn _split[
-    enable_maxsplit: Bool
-](src_str: String, sep: NoneType, maxsplit: Int) -> List[String]:
+    T: _Stringlike, //, enable_maxsplit: Bool
+](src_str: T, sep: NoneType, maxsplit: Int) -> List[String]:
     var items = _split_impl[enable_maxsplit=enable_maxsplit](src_str, maxsplit)
     var output = List[String](capacity=len(items))
     alias S = StringSlice[StaticConstantOrigin]
@@ -891,11 +889,9 @@ fn _split[
 
 
 # FIXME(#3597): once StringSlice conforms to collection element trait
-# fn _split[
+# fn _split_slice[
 #     enable_maxsplit: Bool
-# ](src_str: StringSlice, sep: NoneType, maxsplit: Int) -> List[
-#     __type_of(src_str)
-# ]:
+# ](src_str: StringSlice, sep: NoneType, maxsplit: Int) -> List[StringSlice]:
 #     var items = _split_impl[enable_maxsplit=enable_maxsplit](src_str, maxsplit)
 #     alias S = StringSlice[__origin_of(src_str)]
 #     var output = List[S](capacity=len(items))
