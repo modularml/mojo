@@ -850,7 +850,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var res = String(buf^)
         var offset = 0
         var ptr = fmt_src.unsafe_ptr()
-        alias S = StringSlice[ImmutableAnyLifetime]
+        alias S = StringSlice[StaticConstantOrigin]
 
         @always_inline("nodebug")
         fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
@@ -969,7 +969,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         inout raised_kwarg_field: Optional[String],
         inout total_estimated_entry_byte_width: Int,
     ) raises -> Bool:
-        alias S = StringSlice[ImmutableAnyLifetime]
+        alias S = StringSlice[StaticConstantOrigin]
 
         @always_inline("nodebug")
         fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
