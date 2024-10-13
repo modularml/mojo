@@ -173,11 +173,9 @@ struct _StringSliceIter[
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        self.continuation_bytes = _count_utf8_continuation_bytes(
-            Span[UInt8, ImmutableAnyLifetime](
-                unsafe_ptr=self.ptr, len=self.length
-            )
-        )
+        alias S = Span[UInt8, StaticConstantOrigin]
+        var s = S(unsafe_ptr=self.ptr, len=self.length)
+        self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
     fn __iter__(self) -> Self:
         return self
@@ -350,11 +348,9 @@ struct StringSlice[
             The length in Unicode codepoints.
         """
         var b_len = self.byte_length()
-        return b_len - _count_utf8_continuation_bytes(
-            Span[UInt8, ImmutableAnyLifetime](
-                unsafe_ptr=self.unsafe_ptr(), len=b_len
-            )
-        )
+        alias S = Span[UInt8, StaticConstantOrigin]
+        var s = S(unsafe_ptr=self.unsafe_ptr(), len=b_len)
+        return b_len - _count_utf8_continuation_bytes(s)
 
     fn format_to(self, inout writer: Formatter):
         """
