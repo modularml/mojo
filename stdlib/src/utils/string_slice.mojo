@@ -730,7 +730,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait _Stringlike(CollectionElement, CollectionElementNew):
+trait _Stringlike:
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
