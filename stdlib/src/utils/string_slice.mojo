@@ -571,6 +571,9 @@ struct StringSlice[
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            T: The type of the substring.
+
         Args:
           substr: The substring to find.
           start: The offset from which to find.
