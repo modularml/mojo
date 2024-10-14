@@ -41,6 +41,7 @@ struct StringLiteral(
     IntableRaising,
     KeyElement,
     Representable,
+    Sized,
     Stringable,
     FloatableRaising,
     BytesCollectionElement,
