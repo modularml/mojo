@@ -1445,7 +1445,6 @@ struct String(
             This does not include the trailing null terminator.
         """
 
-        # Does NOT include the NUL terminator.
         return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )

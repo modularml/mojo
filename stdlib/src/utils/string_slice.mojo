@@ -21,7 +21,7 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils import Span
+from utils.span import Span, AsBytes
 from collections.string import _isspace
 from collections import List
 from memory import memcmp, UnsafePointer
@@ -480,7 +480,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, origin]:
+    fn as_bytes(ref [_]self) -> Span[UInt8, origin]:
         """Get the sequence of encoded bytes as a slice of the underlying string.
 
         Returns:
@@ -809,7 +809,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait _Stringlike:
+trait _Stringlike:  # (AsBytes): # FIXME: StringSlice does not conform to trait '_Stringlike'
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -831,18 +831,6 @@ trait _Stringlike:
             The raw pointer to the data.
         """
         ...
-
-    # FIXME: 'StringLiteral' does not conform to trait '_Stringlike'
-    # fn as_bytes(self) -> Span[UInt8, *_]:
-    #     """Returns a contiguous slice of the bytes owned by this string.
-
-    #     Returns:
-    #         A contiguous slice pointing to the bytes owned by this string.
-
-    #     Notes:
-    #         This does not include the trailing null terminator.
-    #     """
-    #     ...
 
     fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at

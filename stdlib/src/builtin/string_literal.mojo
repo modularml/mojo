@@ -398,10 +398,8 @@ struct StringLiteral(
             This does not include the trailing null terminator.
         """
 
-        # Does NOT include the NUL terminator.
         return Span[UInt8, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
         )
 
     fn format_to(self, inout writer: Formatter):

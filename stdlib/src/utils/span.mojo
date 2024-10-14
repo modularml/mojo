@@ -26,16 +26,17 @@ from builtin.builtin_list import _lit_mut_cast
 
 
 trait AsBytes:
-    """
-    The `AsBytes` trait denotes a type that can be returned as a immutable byte
-    span.
+    """The `AsBytes` trait denotes a type that can be returned as a immutable
+    byte span.
     """
 
+    # FIXME: the trait should be parametric ImmutableAnyOrigin
+    # fn as_bytes(ref [_]self) -> Span[UInt8, *_]:
     fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
