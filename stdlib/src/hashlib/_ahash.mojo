@@ -34,9 +34,17 @@ fn _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
     Returns:
         A value which is similar in its bitpattern to result of a folded multply.
     """
-    var b1 = lhs * byte_swap(rhs)
-    var b2 = byte_swap(lhs) * (~rhs)
-    return b1 ^ byte_swap(b2)
+    l = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
+        lhs.value
+    )
+    r = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
+        rhs.value
+    )
+    m = __mlir_op.`pop.mul`(l, r)
+    res = SIMD[DType.uint64, 2](
+        __mlir_op.`pop.bitcast`[_type = __mlir_type.`!pop.simd<2, ui64>`](m)
+    )
+    return res[0] ^ res[1]
 
 
 @always_inline
@@ -152,7 +160,6 @@ struct AHasher[key: U256](_Hasher):
         Args:
             new_data: Value used for update.
         """
-        var v64: SIMD[DType.uint64, new_data.size]
 
         @parameter
         if new_data.type.is_floating_point():
@@ -186,4 +193,4 @@ struct AHasher[key: U256](_Hasher):
         """
         var rot = self.buffer & 63
         var folded = _folded_multiply(self.buffer, self.pad)
-        return (folded << rot) | (folded >> (64 - rot))
+        return (folded << rot) | (folded >> ((64 - rot) & 63))
