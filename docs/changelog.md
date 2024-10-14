@@ -222,9 +222,6 @@ what we publish.
 
 - The VS Code extension now allows selecting a default SDK when multiple are available.
 
-- `String.as_bytes_slice()` is renamed to `String.as_bytes_span()` since it
-  returns a `Span` and not a `StringSlice`.
-
 - The flag for turning on asserts has changed, e.g. to enable all checks:
 
   ```bash
@@ -261,8 +258,10 @@ what we publish.
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
 
-- `String.as_bytes()` now returns a `Span[UInt8]` instead of a `List[Int8]`. The
-  old behavior can be achieved by using `List(s.as_bytes())`.
+- A new trait has been added `AsBytes` to enable taking a `Span[UInt8]` of a
+  type with `s.as_bytes()`. `String.as_bytes` and `String.as_bytes_slice` have
+  been consolidated under `s.as_bytes` to return a `Span[UInt8]`, you can convert
+  it to a `List` if you require a copy with `List(s.as_bytes())`.
 
 - `Lifetime` and related types has been renamed to `Origin` in the standard
   library to better clarify that parameters of this type indicate where a
