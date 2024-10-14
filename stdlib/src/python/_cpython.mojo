@@ -1028,7 +1028,6 @@ struct CPython:
         var module_api_version = 1013
         return create_module_fn(module_def_ptr, module_api_version)
 
-    # int PyModule_AddFunctions(PyObject *module, PyMethodDef *functions)
     fn PyModule_AddFunctions(
         inout self,
         mod: PyObjectPtr,
@@ -1037,6 +1036,7 @@ struct CPython:
         """See https://docs.python.org/3/c-api/module.html#c.PyModule_AddFunctions.
         """
 
+        # int PyModule_AddFunctions(PyObject *module, PyMethodDef *functions)
         var add_functions_fn = self.lib.get_function[
             fn (PyObjectPtr, UnsafePointer[PyMethodDef]) -> c_int
         ]("PyModule_AddFunctions")
@@ -1086,7 +1086,6 @@ struct CPython:
     # Python Evaluation
     # ===-------------------------------------------------------------------===#
 
-    # int PyRun_SimpleString(const char *command)
     fn PyRun_SimpleString(inout self, strref: StringRef) -> Bool:
         """Executes the given Python code.
 
@@ -1099,6 +1098,7 @@ struct CPython:
             `True` if the code executed successfully or `False` if the code
             raised an exception.
         """
+        # int PyRun_SimpleString(const char *command)
         var status = self.lib.get_function[fn (UnsafePointer[UInt8]) -> c_int](
             StringRef("PyRun_SimpleString")
         )(strref.data)
@@ -1183,7 +1183,6 @@ struct CPython:
     # Python Object operations
     # ===-------------------------------------------------------------------===#
 
-    # int Py_Is(PyObject *x, PyObject *y)
     fn Py_Is(
         inout self,
         rhs: PyObjectPtr,
@@ -1192,6 +1191,7 @@ struct CPython:
         """See https://docs.python.org/3/c-api/structures.html#c.Py_Is."""
 
         if self.version.minor >= 10:
+            # int Py_Is(PyObject *x, PyObject *y)
             var r = self.lib.get_function[
                 fn (PyObjectPtr, PyObjectPtr) -> c_int
             ]("Py_Is")(rhs, lhs)
@@ -1288,13 +1288,13 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    # int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
     fn PyObject_SetAttrString(
         inout self, obj: PyObjectPtr, name: StringRef, new_value: PyObjectPtr
     ) -> c_int:
         """See https://docs.python.org/3/c-api/object.html#c.PyObject_SetAttrString.
         """
 
+        # int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
         var r = self.lib.get_function[
             fn (PyObjectPtr, UnsafePointer[UInt8], PyObjectPtr) -> c_int
         ]("PyObject_SetAttrString")(obj, name.data, new_value)
@@ -1358,13 +1358,13 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    # int PyObject_IsTrue(PyObject *o)
     fn PyObject_IsTrue(
         inout self,
         obj: PyObjectPtr,
     ) -> c_int:
         """See https://docs.python.org/3/c-api/object.html#c.PyObject_IsTrue."""
 
+        # int PyObject_IsTrue(PyObject *o)
         return self.lib.get_function[fn (PyObjectPtr) -> c_int](
             "PyObject_IsTrue"
         )(obj)
@@ -1442,7 +1442,6 @@ struct CPython:
             fn (PyObjectPtr, Py_ssize_t) -> PyObjectPtr
         ]("PyTuple_GetItem")(tuple, pos)
 
-    # int PyTuple_SetItem(PyObject *p, Py_ssize_t pos, PyObject *o)
     fn PyTuple_SetItem(
         inout self,
         tuple_obj: PyObjectPtr,
@@ -1454,6 +1453,7 @@ struct CPython:
         # PyTuple_SetItem steals the reference - the element object will be
         # destroyed along with the tuple
         self._dec_total_rc()
+        # int PyTuple_SetItem(PyObject *p, Py_ssize_t pos, PyObject *o)
         return self.lib.get_function[
             fn (PyObjectPtr, Int, PyObjectPtr) -> c_int
         ](StringRef("PyTuple_SetItem"))(tuple_obj, index, element)
@@ -1799,10 +1799,10 @@ struct CPython:
             self._inc_total_rc()
         return next_obj
 
-    # int PyIter_Check(PyObject *o)
     fn PyIter_Check(inout self, obj: PyObjectPtr) -> Bool:
         """See https://docs.python.org/3/c-api/iter.html#c.PyIter_Check."""
 
+        # int PyIter_Check(PyObject *o)
         var follows_iter_protocol = self.lib.get_function[
             fn (PyObjectPtr) -> c_int
         ]("PyIter_Check")(obj)
