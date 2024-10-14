@@ -267,7 +267,7 @@ what we publish.
   library to better clarify that parameters of this type indicate where a
   reference is derived from, not the more complicated notion of where a variable
   is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
-  for more information and rationale.  As a consequence `__origin_of` is now
+  for more information and rationale.  As a consequence `__lifetime_of` is now
   named `__origin_of`.
 
 ### ❌ Removed
