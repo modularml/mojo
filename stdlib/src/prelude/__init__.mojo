@@ -113,6 +113,7 @@ from builtin.simd import (
     Float16,
     Float32,
     Float64,
+    Byte,
     SIMD,
 )
 from builtin.type_aliases import AnyTrivialRegType
