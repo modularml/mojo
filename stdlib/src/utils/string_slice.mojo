@@ -455,13 +455,13 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(self) -> _StringSliceIter[origin]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over elements of the string slice, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[origin](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -648,9 +648,7 @@ struct StringSlice[
         return True
 
     @always_inline
-    fn split[
-        T: _Stringlike, //
-    ](self, sep: T, maxsplit: Int) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -663,21 +661,21 @@ struct StringSlice[
         Returns:
             A List of Strings containing the input split by the separator.
 
-        Raises:
-            If the separator is empty.
-
         Examples:
 
         ```mojo
         # Splitting with maxsplit
         _ = "1,2,3".split(",", maxsplit=1) # ['1', '2,3']
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",", maxsplit=1) # ['', '1,2,3,']
+        _ = "123".split("", maxsplit=1) # ['', '123']
         ```
         .
         """
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -689,9 +687,6 @@ struct StringSlice[
         Returns:
             A List of Strings containing the input split by the separator.
 
-        Raises:
-            If the separator is empty.
-
         Examples:
 
         ```mojo
@@ -699,6 +694,9 @@ struct StringSlice[
         _ = "hello world".split(" ") # ["hello", "world"]
         # Splitting adjacent separators
         _ = "hello,,world".split(",") # ["hello", "", "world"]
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",") # ['', '1', '2', '3', '']
+        _ = "123".split("") # ['', '1', '2', '3', '']
         ```
         .
         """
@@ -848,10 +846,18 @@ trait _Stringlike:  # (AsBytes): # FIXME: StringSlice does not conform to trait 
         """
         ...
 
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+        """Return an iterator over the string.
+
+        Returns:
+            An iterator over the string.
+        """
+        ...
+
 
 fn _split[
     T0: _Stringlike, T1: _Stringlike, //, enable_maxsplit: Bool
-](src_str: T0, sep: T1, maxsplit: Int) raises -> List[String]:
+](src_str: T0, sep: T1, maxsplit: Int) -> List[String]:
     var items = _split_impl[enable_maxsplit=enable_maxsplit](
         src_str, sep, maxsplit
     )
@@ -904,10 +910,20 @@ fn _split[
 # FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
     T0: _Stringlike, T1: _Stringlike, //, enable_maxsplit: Bool
-](src_str: T0, sep: T1, maxsplit: Int) raises -> List[
+](src_str: T0, sep: T1, maxsplit: Int) -> List[
     Span[UInt8, StaticConstantOrigin]
 ] as output:
     alias Sp = Span[UInt8, StaticConstantOrigin]
+    var sep_len = sep.byte_length()
+    if sep_len == 0:
+        var iterator = src_str.__iter__()
+        output = __type_of(output)(capacity=len(iterator) + 2)
+        output.append(rebind[Sp]("".as_bytes()))
+        for s in iterator:
+            output.append(rebind[Sp](s.as_bytes()))
+        output.append(rebind[Sp]("".as_bytes()))
+        return
+
     alias prealloc = 16  # guessing, Python's implementation uses 12
     var amnt = prealloc
 
@@ -919,9 +935,6 @@ fn _split_impl[
     var lhs = 0
     var rhs = 0
     var items = 0
-    var sep_len = sep.byte_length()
-    if sep_len == 0:
-        raise Error("Separator cannot be empty.")
     var ptr = src_str.unsafe_ptr()
     # var str_span = src_str.as_bytes() # FIXME(#3295)
 

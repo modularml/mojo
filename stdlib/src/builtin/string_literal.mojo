@@ -291,13 +291,13 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantOrigin]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[StaticConstantOrigin](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -472,9 +472,7 @@ struct StringLiteral(
         return str(self).join(elems)
 
     @always_inline
-    fn split[
-        T: _Stringlike, //
-    ](self, sep: T, maxsplit: Int) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -487,21 +485,21 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by the separator.
 
-        Raises:
-            If the separator is empty.
-
         Examples:
 
         ```mojo
         # Splitting with maxsplit
         _ = "1,2,3".split(",", maxsplit=1) # ['1', '2,3']
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",", maxsplit=1) # ['', '1,2,3,']
+        _ = "123".split("", maxsplit=1) # ['', '123']
         ```
         .
         """
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -513,9 +511,6 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by the separator.
 
-        Raises:
-            If the separator is empty.
-
         Examples:
 
         ```mojo
@@ -523,6 +518,9 @@ struct StringLiteral(
         _ = "hello world".split(" ") # ["hello", "world"]
         # Splitting adjacent separators
         _ = "hello,,world".split(",") # ["hello", "", "world"]
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",") # ['', '1', '2', '3', '']
+        _ = "123".split("") # ['', '1', '2', '3', '']
         ```
         .
         """

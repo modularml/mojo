@@ -1575,9 +1575,7 @@ struct String(
         return self.as_string_slice().isspace()
 
     @always_inline
-    fn split[
-        T: _Stringlike, //
-    ](self, sep: T, maxsplit: Int) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -1590,21 +1588,21 @@ struct String(
         Returns:
             A List of Strings containing the input split by the separator.
 
-        Raises:
-            If the separator is empty.
-
         Examples:
 
         ```mojo
         # Splitting with maxsplit
         _ = "1,2,3".split(",", maxsplit=1) # ['1', '2,3']
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",", maxsplit=1) # ['', '1,2,3,']
+        _ = "123".split("", maxsplit=1) # ['', '123']
         ```
         .
         """
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -1616,9 +1614,6 @@ struct String(
         Returns:
             A List of Strings containing the input split by the separator.
 
-        Raises:
-            If the separator is empty.
-
         Examples:
 
         ```mojo
@@ -1626,6 +1621,9 @@ struct String(
         _ = "hello world".split(" ") # ["hello", "world"]
         # Splitting adjacent separators
         _ = "hello,,world".split(",") # ["hello", "", "world"]
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",") # ['', '1', '2', '3', '']
+        _ = "123".split("") # ['', '1', '2', '3', '']
         ```
         .
         """

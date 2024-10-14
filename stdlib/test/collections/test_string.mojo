@@ -754,9 +754,6 @@ def test_split():
     assert_true(len(String("  ").split(" ")) == 3)
     assert_true(len(String("   ").split(" ")) == 4)
 
-    with assert_raises():
-        _ = String("").split("")
-
     # Split in middle
     var d1 = String("n")
     var in1 = String("faang")
@@ -833,8 +830,10 @@ def test_split():
     assert_equal(res7[2], " долор сит а")
     assert_equal(res7[3], "ет")
 
-    with assert_raises(contains="Separator cannot be empty."):
-        _ = String("1, 2, 3").split("")
+    assert_equal("123".split(""), List[String]("", "1", "2", "3", ""))
+    assert_equal("".join("123".split("")), "123")
+    assert_equal(",1,2,3,".split(","), "123".split(""))
+    assert_equal(",".join("123".split("")), ",1,2,3,")
 
 
 def test_splitlines():
