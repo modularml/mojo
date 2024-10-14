@@ -856,9 +856,10 @@ fn _split[
         src_str, sep, maxsplit
     )
     var output = List[String](capacity=len(items))
-    alias S = StringSlice[StaticConstantOrigin]
-    for item in items:
-        output.append(S(unsafe_from_utf8_ptr=item[][0], len=item[][1]))
+    # TODO: some fancy custom allocator since we know the exact length of each
+    for itm in items:
+        var sp = rebind[Span[UInt8, __origin_of(src_str)]](itm[])
+        output.append(StringSlice[__origin_of(src_str)](unsafe_from_utf8=sp))
     return output^
 
 
@@ -872,7 +873,7 @@ fn _split[
 #     alias S = StringSlice[__origin_of(src_str)]
 #     var output = List[S](capacity=len(items))
 #     for item in items:
-#         output.append(S(unsafe_from_utf8_ptr=item[][0], len=item[][1]))
+#         output.append(S(unsafe_from_utf8=item[]))
 #     return output^
 
 
@@ -881,9 +882,10 @@ fn _split[
 ](src_str: T, sep: NoneType, maxsplit: Int) -> List[String]:
     var items = _split_impl[enable_maxsplit=enable_maxsplit](src_str, maxsplit)
     var output = List[String](capacity=len(items))
-    alias S = StringSlice[StaticConstantOrigin]
-    for item in items:
-        output.append(S(unsafe_from_utf8_ptr=item[][0], len=item[][1]))
+    # TODO: some fancy custom allocator since we know the exact length of each
+    for itm in items:
+        var sp = rebind[Span[UInt8, __origin_of(src_str)]](itm[])
+        output.append(StringSlice[__origin_of(src_str)](unsafe_from_utf8=sp))
     return output^
 
 
@@ -895,22 +897,24 @@ fn _split[
 #     alias S = StringSlice[__origin_of(src_str)]
 #     var output = List[S](capacity=len(items))
 #     for item in items:
-#         output.append(S(unsafe_from_utf8_ptr=item[][0], len=item[][1]))
+#         output.append(S(unsafe_from_utf8=item[]))
 #     return output^
 
 
+# FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
     T0: _Stringlike, T1: _Stringlike, //, enable_maxsplit: Bool
 ](src_str: T0, sep: T1, maxsplit: Int) raises -> List[
-    Tuple[UnsafePointer[UInt8], Int]
-]:
+    Span[UInt8, StaticConstantOrigin]
+] as output:
+    alias Sp = Span[UInt8, StaticConstantOrigin]
     alias prealloc = 16  # guessing, Python's implementation uses 12
     var amnt = prealloc
 
     @parameter
     if enable_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
-    var output = List[Tuple[UnsafePointer[UInt8], Int]](capacity=amnt)
+    output = __type_of(output)(capacity=amnt)
     var str_byte_len = src_str.byte_length()
     var lhs = 0
     var rhs = 0
@@ -930,22 +934,24 @@ fn _split_impl[
             rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
-        output.append((ptr + lhs, rhs - lhs))
+        output.append(Sp(unsafe_ptr=ptr + lhs, len=rhs - lhs))
         lhs = rhs + sep_len
 
-    return output^
 
-
+# FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
     T: _Stringlike, //, enable_maxsplit: Bool
-](src_str: T, maxsplit: Int) -> List[Tuple[UnsafePointer[UInt8], Int]]:
+](src_str: T, maxsplit: Int) -> List[
+    Span[UInt8, StaticConstantOrigin]
+] as output:
+    alias Sp = Span[UInt8, StaticConstantOrigin]
     alias prealloc = 16  # guessing, Python's implementation uses 12
     var amnt = prealloc
 
     @parameter
     if enable_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
-    var output = List[Tuple[UnsafePointer[UInt8], Int]](capacity=amnt)
+    output = __type_of(output)(capacity=amnt)
     var str_byte_len = src_str.byte_length()
     var lhs = 0
     var rhs = 0
@@ -979,7 +985,5 @@ fn _split_impl[
             rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
-        output.append((ptr + lhs, rhs - lhs))
+        output.append(Sp(unsafe_ptr=ptr + lhs, len=rhs - lhs))
         lhs = rhs
-
-    return output^
