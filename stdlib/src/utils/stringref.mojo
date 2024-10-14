@@ -16,6 +16,7 @@
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
@@ -47,6 +48,7 @@ struct StringRef(
     Stringable,
     Formattable,
     Hashable,
+    _HashableWithHasher,
     Boolable,
     Comparable,
 ):
@@ -341,6 +343,17 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.data, self.length)
+
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
@@ -382,7 +395,7 @@ struct StringRef(
 
         # SAFETY:
         #   Safe because our use of this StringSlice does not outlive `self`.
-        var str_slice = StringSlice[ImmutableAnyLifetime](
+        var str_slice = StringSlice[ImmutableAnyOrigin](
             unsafe_from_utf8_strref=self
         )
 

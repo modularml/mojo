@@ -19,6 +19,7 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -43,6 +44,8 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
+    BytesCollectionElement,
+    _HashableWithHasher,
 ):
     """This type represents a string literal.
 
@@ -269,6 +272,17 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
+
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.
 
@@ -277,13 +291,13 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantLifetime]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantOrigin]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[StaticConstantLifetime](
+        return _StringSliceIter[StaticConstantOrigin](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -318,6 +332,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
 
@@ -331,6 +346,8 @@ struct StringLiteral(
         #   return type.
         return ptr.bitcast[UInt8]()
 
+    @always_inline
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
@@ -357,7 +374,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes_span(self) -> Span[UInt8, StaticConstantLifetime]:
+    fn as_bytes(self) -> Span[UInt8, StaticConstantOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 
@@ -365,7 +382,24 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, StaticConstantLifetime](
+        return Span[UInt8, StaticConstantOrigin](
+            unsafe_ptr=self.unsafe_ptr(),
+            len=self.byte_length(),
+        )
+
+    @always_inline
+    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        # Does NOT include the NUL terminator.
+        return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
@@ -431,17 +465,7 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        var result: String = ""
-        var is_first = True
-
-        for e in elems:
-            if is_first:
-                is_first = False
-            else:
-                result += self
-            result += str(e[])
-
-        return result
+        return str(self).join(elems)
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.
