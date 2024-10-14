@@ -348,8 +348,10 @@ def test_split():
     assert_true(len("  ".split(" ")) == 3)
     assert_true(len("   ".split(" ")) == 4)
 
-    with assert_raises():
-        _ = "".split("")
+    assert_equal("123".split(""), List[String]("", "1", "2", "3", ""))
+    assert_equal("".join("123".split("")), "123")
+    assert_equal(",1,2,3,".split(","), "123".split(""))
+    assert_equal(",".join("123".split("")), ",1,2,3,")
 
     # Matches should be properly split in multiple case
     var d2 = " "
