@@ -196,12 +196,12 @@ struct _StringSliceIter[
             return self.index - self.continuation_bytes
 
 
+@value
 struct StringSlice[
     is_mutable: Bool, //,
     origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable):
-    """
-    A non-owning view to encoded string data.
+](Stringable, Sized, Formattable, CollectionElement, CollectionElementNew):
+    """A non-owning view to encoded string data.
 
     TODO:
     The underlying string data is guaranteed to be encoded using UTF-8.
@@ -306,6 +306,15 @@ struct StringSlice[
         )
 
         self._slice = byte_slice
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided `StringSlice`.
+
+        Args:
+            other: The `StringSlice` to copy.
+        """
+        self._slice = other._slice
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
