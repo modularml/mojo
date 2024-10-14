@@ -1465,7 +1465,7 @@ struct String(
         """
         return substr._strref_dangerous() in self._strref_dangerous()
 
-    fn find[T: _Stringlike](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -1515,7 +1515,7 @@ struct String(
 
     @always_inline
     fn split[
-        T: _Stringlike
+        T: _Stringlike, //
     ](self, sep: T, maxsplit: Int) raises -> List[String]:
         """Split the string by a separator.
 
@@ -1543,7 +1543,7 @@ struct String(
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike](self, sep: T) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T) raises -> List[String]:
         """Split the string by a separator.
 
         Parameters:

@@ -567,7 +567,7 @@ struct StringSlice[
         # and use something smarter.
         return StringSlice(unsafe_from_utf8=self._slice[abs_start:])
 
-    fn find[T: _Stringlike](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -649,7 +649,7 @@ struct StringSlice[
 
     @always_inline
     fn split[
-        T: _Stringlike
+        T: _Stringlike, //
     ](self, sep: T, maxsplit: Int) raises -> List[String]:
         """Split the string by a separator.
 
@@ -677,7 +677,7 @@ struct StringSlice[
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike](self, sep: T) raises -> List[String]:
+    fn split[T: _Stringlike, //](self, sep: T) raises -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -844,7 +844,7 @@ trait _Stringlike:
     #     """
     #     ...
 
-    fn find[T: _Stringlike](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
