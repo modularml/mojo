@@ -24,6 +24,9 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
+from sys.intrinsics import _type_is_eq
+from hashlib._hasher import _HashableWithHasher, _Hasher
+
 from utils import (
     Span,
     IndexList,
@@ -685,9 +688,11 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@value
 struct String(
     Sized,
     Stringable,
+    AsBytes,
     Representable,
     IntableRaising,
     KeyElement,
@@ -697,6 +702,7 @@ struct String(
     ToFormatter,
     CollectionElementNew,
     FloatableRaising,
+    _HashableWithHasher,
 ):
     """Represents a mutable string."""
 
@@ -789,13 +795,13 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_span())
+        var length: Int = len(str_slice.as_bytes())
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            src=str_slice.as_bytes_span().unsafe_ptr(),
+            src=str_slice.as_bytes().unsafe_ptr(),
             count=length,
         )
         self = Self(buffer^)
@@ -827,24 +833,6 @@ struct String(
                 unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
             )
         )
-
-    @always_inline
-    fn __copyinit__(inout self, existing: Self):
-        """Creates a deep copy of an existing string.
-
-        Args:
-            existing: The string to copy.
-        """
-        self._buffer = existing._buffer
-
-    @always_inline
-    fn __moveinit__(inout self, owned existing: String):
-        """Move the value of a string.
-
-        Args:
-            existing: The string to move.
-        """
-        self._buffer = existing._buffer^
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
@@ -1139,25 +1127,25 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__(
         ref [_]self,
-    ) -> _StringSliceIter[__lifetime_of(self), False]:
+    ) -> _StringSliceIter[__origin_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -1300,7 +1288,7 @@ struct String(
             curr += self + str(elems[i])
         return curr
 
-    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+    fn join[*Types: Formattable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1314,15 +1302,16 @@ struct String(
         """
 
         var result: String = ""
+        var formatter = result._unsafe_to_formatter()
         var is_first = True
 
         @parameter
-        fn add_elt[T: Stringable](a: T):
+        fn add_elt[T: Formattable](a: T):
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(a)
+                self.format_to(formatter)
+            a.format_to(formatter)
 
         elems.each[add_elt]()
         _ = is_first
@@ -1340,17 +1329,76 @@ struct String(
         Returns:
             The joined string.
         """
-        var result: String = ""
-        var is_first = True
 
-        for e in elems:
+        # TODO(#3403): Simplify this when the linked conditional conformance
+        # feature is added.  Runs a faster algorithm if the concrete types are
+        # able to be converted to a span of bytes.
+        @parameter
+        if _type_is_eq[T, String]():
+            return self.fast_join(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self.fast_join(rebind[List[StringLiteral]](elems))
+        # FIXME(#3597): once StringSlice conforms to CollectionElement trait:
+        # if _type_is_eq[T, StringSlice]():
+        # return self.fast_join(rebind[List[StringSlice]](elems))
+        else:
+            var result: String = ""
+            var is_first = True
+
+            for e in elems:
+                if is_first:
+                    is_first = False
+                else:
+                    result += self
+                result += str(e[])
+
+            return result
+
+    fn fast_join[
+        T: BytesCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var n_elems = len(elems)
+        if n_elems == 0:
+            return String("")
+        var len_self = self.byte_length()
+        var len_elems = 0
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
+        for e_ref in elems:
+            len_elems += len(e_ref[].as_bytes())
+        var capacity = len_self * (n_elems - 1) + len_elems
+        var buf = Self._buffer_type(capacity=capacity)
+        var self_ptr = self.unsafe_ptr()
+        var ptr = buf.unsafe_ptr()
+        var offset = 0
+        var i = 0
+        var is_first = True
+        while i < n_elems:
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(e[])
-
-        return result
+                memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
+                offset += len_self
+            var e = elems[i].as_bytes()
+            var e_len = len(e)
+            memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
+            offset += e_len
+            i += 1
+        buf.size = capacity
+        buf.append(0)
+        return String(buf^)
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -1387,28 +1435,8 @@ struct String(
         """
         return self.unsafe_ptr().bitcast[c_char]()
 
-    fn as_bytes(self) -> Self._buffer_type:
-        """Retrieves the underlying byte sequence encoding the characters in
-        this string.
-
-        This does not include the trailing null terminator.
-
-        Returns:
-            A sequence containing the encoded characters stored in this string.
-        """
-
-        # TODO(lifetimes): Return a reference rather than a copy
-        var copy = self._buffer
-        var last = copy.pop()
-        debug_assert(
-            last == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-
-        return copy
-
     @always_inline
-    fn as_bytes_span(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1419,12 +1447,12 @@ struct String(
         """
 
         # Does NOT include the NUL terminator.
-        return Span[UInt8, __lifetime_of(self)](
+        return Span[UInt8, __origin_of(self)](
             unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1433,7 +1461,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes_span())
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
     fn byte_length(self) -> Int:
@@ -1839,6 +1867,17 @@ struct String(
         """
         return hash(self._strref_dangerous())
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
+
     fn _interleave(self, val: String) -> String:
         var res = Self._buffer_type()
         var val_ptr = val.unsafe_ptr()
@@ -2214,7 +2253,7 @@ struct String(
         debug_assert(
             len(fillchar) == 1, "fill char needs to be a one byte literal"
         )
-        var fillbyte = fillchar.as_bytes_span()[0]
+        var fillbyte = fillchar.as_bytes()[0]
         var buffer = Self._buffer_type(capacity=width + 1)
         buffer.resize(width, fillbyte)
         buffer.append(0)

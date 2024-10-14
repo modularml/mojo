@@ -3137,7 +3137,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   [`Copyable`](/mojo/stdlib/builtin/value/Copyable), and
   [`CollectionElement`](/mojo/stdlib/builtin/value/CollectionElement).
 
-- A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
+- A new magic `__origin_of(expr)` call will yield the lifetime of a memory
   value.  We hope and expect that this will eventually be replaced by
   `Reference(expr).lifetime` as the parameter system evolves, but this is
   important in the meantime for use in function signatures.

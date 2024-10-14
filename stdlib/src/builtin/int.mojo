@@ -20,6 +20,7 @@ from collections import KeyElement
 from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from hashlib.hash import _hash_simd
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
@@ -286,6 +287,7 @@ struct Int(
     KeyElement,
     Roundable,
     IntLike,
+    _HashableWithHasher,
 ):
     """This type represents an integer value."""
 
@@ -593,8 +595,8 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
-        div = select(self > 0 & rhs > 0, div, divMod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
+        div = select(self > 0 & rhs > 0, div, div_mod)
         div = select(rhs == 0, 0, div)
         return div
 
@@ -612,9 +614,9 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
         mod = select(
-            self > 0 & rhs > 0, self._positive_rem(denominator), divMod
+            self > 0 & rhs > 0, self._positive_rem(denominator), div_mod
         )
         mod = select(rhs == 0, 0, mod)
         return mod
@@ -1111,6 +1113,17 @@ struct Int(
         """
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.int64](self))
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this int value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(Int64(self))
 
     # ===-------------------------------------------------------------------===#
     # Methods

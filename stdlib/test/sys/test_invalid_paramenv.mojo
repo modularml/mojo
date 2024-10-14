@@ -10,15 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the utils package."""
+# REQUIRES: has_not
+# RUN: not %mojo -D my_false=blah %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
-from .index import Index, IndexList, product
-from .inline_string import InlineString
-from .loop import unroll
-from .span import AsBytes, Span
-from .static_tuple import StaticTuple
-from .stringref import StringRef
-from .string_slice import StaticString, StringSlice
-from .variant import Variant
-from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
-from .format import Formatter, Formattable
+from sys import env_get_bool
+
+
+# CHECK-FAIL: constraint failed: the boolean environment value is neither `True` nor `False`
+fn main():
+    _ = env_get_bool["my_false"]()
