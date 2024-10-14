@@ -858,9 +858,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         var auto_arg_index = 0
         for e in entries:
-            debug_assert(offset < fmt_len, "offset >= self.byte_length()")
+            debug_assert(offset < fmt_len, "offset >= fmt_src.byte_length()")
             res += _build_slice(ptr, offset, e[].first_curly)
-            Self._format_entry[len_pos_args](res, e[], auto_arg_index, args)
+            e[]._format_entry[len_pos_args](res, auto_arg_index, args)
             offset = e[].last_curly + 1
 
         res += _build_slice(ptr, offset, fmt_len)
@@ -1034,12 +1034,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 return True
         return False
 
-    @staticmethod
     fn _format_entry[
         len_pos_args: Int
-    ](
-        inout res: String, e: Self, inout auto_idx: Int, args: Self._args_t
-    ) raises:
+    ](self, inout res: String, inout auto_idx: Int, args: Self._args_t) raises:
         # TODO(#3403 and/or #3252): this function should be able to use
         # Formatter syntax when the type implements it, since it will give great
         # performance benefits. This also needs to be able to check if the given
@@ -1058,8 +1055,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                     var type_impls_str = True  # TODO
                     var type_impls_formatter_repr = True  # TODO
                     var type_impls_formatter_str = True  # TODO
-                    var flag = e.conversion_flag
-                    var empty = flag == 0 and not e.format_spec
+                    var flag = self.conversion_flag
+                    var empty = flag == 0 and not self.format_spec
 
                     var data: String
                     if empty and type_impls_formatter_str:
@@ -1080,8 +1077,8 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                         data = repr(args[i])
                     elif flag == `r` and type_impls_repr:
                         data = repr(args[i])
-                    elif e.format_spec:
-                        e.format_spec.value().stringify(res, args[i])
+                    elif self.format_spec:
+                        self.format_spec.value().stringify(res, args[i])
                         return
                     else:
                         alias argnum = "Argument number: "
@@ -1090,16 +1087,16 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                         var flg = String(List[UInt8](flag, 0))
                         raise Error(argnum + str(i) + does_not + needed + flg)
 
-                    if e.format_spec:
-                        e.format_spec.value().format_string(res, data)
+                    if self.format_spec:
+                        self.format_spec.value().format_string(res, data)
                     else:
                         res += data
 
-        if e.is_escaped_brace():
-            res += "}" if e.field[Bool] else "{"
-        elif e.is_manual_indexing():
-            _format(e.field[Int])
-        elif e.is_automatic_indexing():
+        if self.is_escaped_brace():
+            res += "}" if self.field[Bool] else "{"
+        elif self.is_manual_indexing():
+            _format(self.field[Int])
+        elif self.is_automatic_indexing():
             _format(auto_idx)
             auto_idx += 1
 
