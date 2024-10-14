@@ -46,13 +46,8 @@ jobs:
       - name: Download Magic CLI
         run: |
           curl -ssL https://magic.modular.com/cfba4c92-2390-4b86-93de-04b2f47114d5 | bash
-
           # Add magic to PATH
           echo "$HOME/.modular/bin" >> $GITHUB_PATH
-
-          # Pin magic to older version to avoid HTTP timeouts and/or client certificate errors
-          # that manifest as a result of uv/python package solvers from Magic 0.3.0.
-          "$HOME/.modular/bin/magic" self-update --version 0.2.3
 
       - name: Install build tools (Linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
