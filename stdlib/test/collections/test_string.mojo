@@ -1338,17 +1338,20 @@ def test_string_iter():
         "álO",
         "етйувтсвардЗ",
     )
-    var utf8_sequence_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    var items_amount_characters = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
     for item_idx in range(len(items)):
         var item = items[item_idx]
-        var utf8_sequence_len = 0
+        var ptr = item.unsafe_ptr()
+        var amnt_characters = 0
         var byte_idx = 0
         for v in item:
             var byte_len = v.byte_length()
-            assert_equal(item[byte_idx : byte_idx + byte_len], v)
+            for i in range(byte_len):
+                assert_equal(ptr[byte_idx + i], v.unsafe_ptr()[i])
             byte_idx += byte_len
-            utf8_sequence_len += 1
-        assert_equal(utf8_sequence_len, utf8_sequence_lengths[item_idx])
+            amnt_characters += 1
+
+        assert_equal(amnt_characters, items_amount_characters[item_idx])
         var concat = String("")
         for v in item.__reversed__():
             concat += v
