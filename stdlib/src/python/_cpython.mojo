@@ -56,6 +56,7 @@ alias Py_tp_dealloc = 52
 alias Py_tp_init = 60
 alias Py_tp_methods = 64
 alias Py_tp_new = 65
+alias Py_tp_repr = 66
 
 alias Py_TPFLAGS_DEFAULT = 0
 
@@ -70,6 +71,8 @@ alias PyCFunction = fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
 alias METH_VARARGS = 0x1
 
 alias destructor = fn (PyObjectPtr) -> None
+
+alias reprfunc = fn (PyObjectPtr) -> PyObjectPtr
 
 alias initproc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> c_int
 alias newfunc = fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
@@ -316,6 +319,10 @@ struct PyType_Slot:
     @staticmethod
     fn tp_methods(methods: UnsafePointer[PyMethodDef]) -> Self:
         return PyType_Slot(Py_tp_methods, rebind[OpaquePointer](methods))
+
+    @staticmethod
+    fn tp_repr(func: reprfunc) -> Self:
+        return PyType_Slot(Py_tp_repr, rebind[OpaquePointer](func))
 
     @staticmethod
     fn null() -> Self:
