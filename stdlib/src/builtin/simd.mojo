@@ -98,6 +98,9 @@ alias Float32 = Scalar[DType.float32]
 alias Float64 = Scalar[DType.float64]
 """Represents a 64-bit floating point value."""
 
+alias Byte = UInt8
+"""Represents a byte (backed by an 8-bit unsigned integer)."""
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #

@@ -18,7 +18,7 @@ from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, bitcast
-from memory.memory import _memcmp_impl_unconstrained
+from memory.memory import _memcmp_impl
 from utils import StringSlice
 from sys.ffi import c_char
 from sys import simdwidthof
@@ -260,7 +260,7 @@ struct StringRef(
         Returns:
           True if the strings do not match and False otherwise.
         """
-        return len(self) != len(rhs) or _memcmp_impl_unconstrained(
+        return len(self) != len(rhs) or _memcmp_impl(
             self.data, rhs.data, len(self)
         )
 
@@ -277,7 +277,7 @@ struct StringRef(
         """
         var len1 = len(self)
         var len2 = len(rhs)
-        return int(len1 < len2) > _memcmp_impl_unconstrained(
+        return int(len1 < len2) > _memcmp_impl(
             self.data, rhs.data, min(len1, len2)
         )
 
