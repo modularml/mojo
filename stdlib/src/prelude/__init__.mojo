@@ -75,13 +75,13 @@ from builtin.tuple import (
 )
 from builtin.type_aliases import (
     AnyTrivialRegType,
-    ImmutableLifetime,
-    MutableLifetime,
-    ImmutableAnyLifetime,
-    MutableAnyLifetime,
-    StaticConstantLifetime,
-    LifetimeSet,
-    Lifetime,
+    ImmutableOrigin,
+    MutableOrigin,
+    ImmutableAnyOrigin,
+    MutableAnyOrigin,
+    StaticConstantOrigin,
+    OriginSet,
+    Origin,
 )
 from builtin.uint import UInt
 from builtin.value import (
@@ -91,6 +91,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
+    BytesCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -131,4 +132,4 @@ from collections.string import (
 )
 from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
-from utils import Formattable, Formatter
+from utils import AsBytes, Formattable, Formatter

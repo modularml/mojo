@@ -132,13 +132,13 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
             self._inner.destroy_pointee()
             self._inner.free()
 
-    # FIXME: The lifetime returned for this is currently self lifetime, which
+    # FIXME: The origin returned for this is currently self origin, which
     # keeps the Arc object alive as long as there are references into it.  That
-    # said, this isn't really the right modeling, we need hierarchical lifetimes
+    # said, this isn't really the right modeling, we need hierarchical origins
     # to model the mutability and invalidation of the returned reference
     # correctly.
     fn __getitem__[
-        self_life: ImmutableLifetime
+        self_life: ImmutableOrigin
     ](
         ref [self_life]self: Self,
     ) -> ref [
@@ -147,7 +147,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
         """Returns a mutable reference to the managed value.
 
         Parameters:
-            self_life: The lifetime of self.
+            self_life: The origin of self.
 
         Returns:
             A reference to the managed value.
