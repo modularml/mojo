@@ -20,7 +20,7 @@ from utils._utf8_validation import _is_valid_utf8
 
 fn test_string_literal_byte_span() raises:
     alias string: StringLiteral = "Hello"
-    alias slc = string.as_bytes_span()
+    alias slc = string.as_bytes()
 
     assert_equal(len(slc), 5)
     assert_equal(slc[0], ord("H"))
@@ -32,7 +32,7 @@ fn test_string_literal_byte_span() raises:
 
 fn test_string_byte_span() raises:
     var string = String("Hello")
-    var str_slice = string.as_bytes_span()
+    var str_slice = string.as_bytes()
 
     assert_equal(len(str_slice), 5)
     assert_equal(str_slice[0], ord("H"))
@@ -154,7 +154,7 @@ fn test_slice_eq() raises:
 
     # eq
 
-    # FIXME: the lifetime of the StringSlice lifetime should be the data in the
+    # FIXME: the origin of the StringSlice origin should be the data in the
     # string, not the string itself.
     # assert_true(str1.as_string_slice().__eq__(str1))
     assert_true(str1.as_string_slice().__eq__(str2))

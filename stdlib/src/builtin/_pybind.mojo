@@ -58,14 +58,14 @@ fn fail_initialization(owned err: Error) -> PythonObject:
 
 
 alias MutableGlobalLifetime = __mlir_attr[
-    `#lit.lifetime.field<`,
-    `#lit.static.lifetime : !lit.lifetime<1>`,
-    `, "__python_globals__"> : !lit.lifetime<1>`,
+    `#lit.origin.field<`,
+    `#lit.static.origin : !lit.origin<1>`,
+    `, "__python_globals__"> : !lit.origin<1>`,
 ]
 
 
 # FIXME(MOCO-1308): Workaround crash by adding explicit `alignment=1`.
-alias PyGlobalPtr = UnsafePointer[lifetime=MutableGlobalLifetime, alignment=1]
+alias PyGlobalPtr = UnsafePointer[origin=MutableGlobalLifetime, alignment=1]
 
 
 @always_inline
@@ -79,7 +79,7 @@ fn global_alloc[T: AnyType, len: Int]() -> PyGlobalPtr[T]:
 
 fn pointer_bitcast[
     To: AnyType
-](ptr: Pointer) -> Pointer[To, ptr.lifetime, ptr.address_space, *_, **_] as out:
+](ptr: Pointer) -> Pointer[To, ptr.origin, ptr.address_space, *_, **_] as out:
     return __type_of(out)(
         _mlir_value=__mlir_op.`lit.ref.from_pointer`[
             _type = __type_of(out)._mlir_type
