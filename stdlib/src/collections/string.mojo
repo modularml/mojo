@@ -1069,7 +1069,7 @@ struct String(
         var rhs_len = len(rhs)
         var lhs_ptr = lhs.unsafe_ptr()
         var rhs_ptr = rhs.unsafe_ptr()
-        alias S = StringSlice[ImmutableAnyLifetime]
+        alias S = StringSlice[ImmutableAnyOrigin]
         if lhs_len == 0:
             return String(S(unsafe_from_utf8_ptr=rhs_ptr, len=rhs_len))
         elif rhs_len == 0:
@@ -1096,7 +1096,7 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](self.as_bytes_span(), other.as_bytes_span())
+        return Self._add[True](self.as_bytes(), other.as_bytes())
 
     @always_inline
     fn __add__(self, other: StringLiteral) -> String:
@@ -1108,7 +1108,7 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[False](self.as_bytes_span(), other.as_bytes_span())
+        return Self._add[False](self.as_bytes(), other.as_bytes())
 
     @always_inline
     fn __add__(self, other: StringSlice) -> String:
@@ -1120,7 +1120,7 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[False](self.as_bytes_span(), other.as_bytes_span())
+        return Self._add[False](self.as_bytes(), other.as_bytes())
 
     @always_inline
     fn __radd__(self, other: String) -> String:
@@ -1132,7 +1132,7 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](other.as_bytes_span(), self.as_bytes_span())
+        return Self._add[True](other.as_bytes(), self.as_bytes())
 
     @always_inline
     fn __radd__(self, other: StringLiteral) -> String:
@@ -1144,7 +1144,7 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](other.as_bytes_span(), self.as_bytes_span())
+        return Self._add[True](other.as_bytes(), self.as_bytes())
 
     @always_inline
     fn __radd__(self, other: StringSlice) -> String:
@@ -1156,14 +1156,14 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](other.as_bytes_span(), self.as_bytes_span())
+        return Self._add[True](other.as_bytes(), self.as_bytes())
 
     fn _iadd[has_null: Bool](inout self, other: Span[UInt8]):
         var s_len = self.byte_length()
         var o_len = len(other)
         var o_ptr = other.unsafe_ptr()
         if s_len == 0:
-            alias S = StringSlice[ImmutableAnyLifetime]
+            alias S = StringSlice[ImmutableAnyOrigin]
             self = String(S(unsafe_from_utf8_ptr=o_ptr, len=o_len))
             return
         elif o_len == 0:
@@ -1185,7 +1185,7 @@ struct String(
         Args:
             other: The string to append.
         """
-        self._iadd[True](other.as_bytes_span())
+        self._iadd[True](other.as_bytes())
 
     @always_inline
     fn __iadd__(inout self, other: StringLiteral):
@@ -1194,7 +1194,7 @@ struct String(
         Args:
             other: The string to append.
         """
-        self._iadd[False](other.as_bytes_span())
+        self._iadd[False](other.as_bytes())
 
     @always_inline
     fn __iadd__(inout self, other: StringSlice):
@@ -1203,7 +1203,7 @@ struct String(
         Args:
             other: The string to append.
         """
-        self._iadd[False](other.as_bytes_span())
+        self._iadd[False](other.as_bytes())
 
     @always_inline
     fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
