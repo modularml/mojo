@@ -256,34 +256,44 @@ fn memcpy[
 
 @always_inline("nodebug")
 fn _memset_impl[
-    address_space: AddressSpace
-](ptr: UnsafePointer[UInt8, address_space], value: UInt8, count: Int):
-    alias simd_width = simdwidthof[UInt8]()
+    type: DType, address_space: AddressSpace
+](
+    ptr: UnsafePointer[Scalar[type], address_space],
+    value: Scalar[type],
+    count: Int,
+):
+    alias simd_width = simdwidthof[Scalar[type]]()
     var vector_end = _align_down(count, simd_width)
 
     for i in range(0, vector_end, simd_width):
-        ptr.store(i, SIMD[DType.uint8, simd_width](value))
+        ptr.store(i, SIMD[type, simd_width](value))
 
     for i in range(vector_end, count):
         ptr.store(i, value)
 
 
 @always_inline
-fn memset[
-    type: AnyType, address_space: AddressSpace
-](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
+fn memset[type: Copyable](ptr: UnsafePointer[type], value: type, count: Int):
     """Fills memory with the given value.
 
     Parameters:
         type: The element dtype.
-        address_space: The address space of the pointer.
 
     Args:
         ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_impl(ptr.bitcast[UInt8](), value, count * sizeof[type]())
+    alias dt = DType.get_dtype[type]()
+
+    @parameter
+    if dt is not DType.invalid:
+        var p = ptr.bitcast[Scalar[dt]]()
+        _memset_impl[dt](p, rebind[Scalar[dt]](value), count)
+    # FIXME(#3581): `elif is_trivial(type) and bitwidth[type]() in (64, 32, 16, 8): ...` bitcast to a DType and do op
+    else:
+        for i in range(count):
+            (ptr + i).init_pointee_copy(value)
 
 
 # ===----------------------------------------------------------------------===#
@@ -305,7 +315,7 @@ fn memset_zero[
         ptr: UnsafePointer to the beginning of the memory block to fill.
         count: Number of elements to fill (in elements, not bytes).
     """
-    memset(ptr, 0, count)
+    _memset_impl(ptr.bitcast[DType.uint8](), UInt8(0), count * sizeof[type]())
 
 
 @always_inline
