@@ -2025,9 +2025,9 @@ struct SIMD[type: DType, size: Int](
         which is an unrolled for loop.
 
         The pseudocode of this function is:
-        ```mojo
-        var result = SIMD[Self.type, mask_size]()
-        for i in range(0, mask_size):
+        ```
+        result = SIMD[Self.type, mask_size]()
+        for i in range(mask_size):
             result[i] = self[int(mask[i])]
         ```
 
