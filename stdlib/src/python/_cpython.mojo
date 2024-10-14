@@ -17,7 +17,7 @@ Documentation for these functions can be found online at:
   <https://docs.python.org/3/c-api/stable.html#contents-of-limited-api>
 """
 
-from collections import InlineArray
+from collections import InlineArray, Optional
 from os import getenv, setenv, abort
 from os.path import dirname
 from pathlib import Path
@@ -153,6 +153,31 @@ struct PyObjectPtr:
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
+
+    fn try_cast_to_mojo_value[
+        T: Pythonable,
+    ](
+        owned self,
+        # TODO: Make this part of the trait bound
+        expected_type_name: StringLiteral,
+    ) -> Optional[UnsafePointer[T]]:
+        var cpython = _get_global_python_itf().cpython()
+
+        var type = cpython.Py_TYPE(self)
+
+        var type_name = PythonObject(cpython.PyType_GetName(type))
+
+        # FIXME(MSTDL-978):
+        #   Improve this check. We should do something conceptually equivalent
+        #   to:
+        #       type == T.python_type_object
+        #   where:
+        #       trait Pythonable:
+        #           var python_type_object: PyTypeObject
+        if type_name == PythonObject(expected_type_name):
+            return self.unchecked_cast_to_mojo_value[T]()
+        else:
+            return None
 
     fn unchecked_cast_to_mojo_object[
         T: Pythonable
@@ -970,6 +995,28 @@ struct CPython:
     # Python Type operations
     # ===-------------------------------------------------------------------===#
 
+    fn Py_TYPE(inout self, ob_raw: PyObjectPtr) -> UnsafePointer[PyTypeObject]:
+        """Get the PyTypeObject field of a Python object."""
+
+        # Note:
+        #   The `Py_TYPE` function is a `static` function in the C API, so
+        #   we can't call it directly. Instead we reproduce its (trivial)
+        #   behavior here.
+        # TODO(MSTDL-977):
+        #   Investigate doing this without hard-coding private API details.
+
+        # TODO(MSTDL-950): Should use something like `addr_of!`
+        return ob_raw.unsized_obj_ptr[].object_type
+
+    fn PyType_GetName(
+        inout self, type: UnsafePointer[PyTypeObject]
+    ) -> PyObjectPtr:
+        var func = self.lib.get_function[
+            fn (UnsafePointer[PyTypeObject]) -> PyObjectPtr
+        ]("PyType_GetName")
+
+        return func(type)
+
     fn PyType_FromSpec(
         inout self, spec: UnsafePointer[PyType_Spec]
     ) -> PyObjectPtr:
@@ -1359,6 +1406,8 @@ struct CPython:
         #   The name of this global is technical a private part of the
         #   CPython API, but unfortunately the only stable ways to access it are
         #   macros.
+        # TODO(MSTDL-977):
+        #   Investigate doing this without hard-coding private API details.
         ptr = self.lib.get_symbol[PyObject]("_Py_NoneStruct")
 
         if not ptr:

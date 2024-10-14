@@ -18,6 +18,8 @@ from sys.info import sizeof
 
 from os import abort
 
+from collections import Optional
+
 from python import PythonObject, TypedPythonObject
 from python.python import _get_global_python_itf
 from python._cpython import (
@@ -280,3 +282,88 @@ fn create_wrapper_function[
     #   `@always_inline`?
     # Call the non-`raises` overload of `create_wrapper_function`.
     return create_wrapper_function[wrapper]()
+
+
+fn check_arguments_arity(
+    func_name: StringLiteral,
+    arity: Int,
+    args: TypedPythonObject["Tuple"],
+) raises:
+    """Raise an error if the provided argument count does not match the expected
+    function arity.
+
+    If this function returns normally (without raising), then the argument
+    count is exactly equal to the expected arity.
+    """
+
+    var arg_count = len(args)
+
+    # The error messages raised below are intended to be similar to the
+    # equivalent errors in Python.
+    if arg_count != arity:
+        if arg_count < arity:
+            var missing_arg_count = arity - arg_count
+
+            raise Error(
+                String.format(
+                    "TypeError: {}() missing {} required positional {}",
+                    func_name,
+                    missing_arg_count,
+                    _pluralize(missing_arg_count, "argument", "arguments"),
+                )
+            )
+        else:
+            raise Error(
+                String.format(
+                    "TypeError: {}() takes {} positional {} but {} were given",
+                    func_name,
+                    arity,
+                    _pluralize(arity, "argument", "arguments"),
+                    arg_count,
+                )
+            )
+
+
+fn check_argument_type[
+    T: Pythonable,
+](
+    func_name: StringLiteral,
+    type_name_id: StringLiteral,
+    obj: PythonObject,
+) raises -> UnsafePointer[T]:
+    """Raise an error if the provided Python object does not contain a wrapped
+    instance of the Mojo `T` type.
+    """
+
+    var opt: Optional[UnsafePointer[T]] = obj.py_object.try_cast_to_mojo_value[
+        T
+    ](type_name_id)
+
+    if not opt:
+        var cpython = _get_global_python_itf().cpython()
+
+        var actual_type = cpython.Py_TYPE(obj.unsafe_as_py_object_ptr())
+        var actual_type_name = PythonObject(cpython.PyType_GetName(actual_type))
+
+        raise Error(
+            String.format(
+                "TypeError: {}() expected Mojo '{}' type argument, got '{}'",
+                func_name,
+                type_name_id,
+                str(actual_type_name),
+            )
+        )
+
+    # SAFETY: We just validated that this Optional is not empty.
+    return opt.unsafe_take()
+
+
+fn _pluralize(
+    count: Int,
+    singular: StringLiteral,
+    plural: StringLiteral,
+) -> StringLiteral:
+    if count == 1:
+        return singular
+    else:
+        return plural
