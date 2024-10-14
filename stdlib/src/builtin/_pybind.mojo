@@ -41,7 +41,7 @@ fn create_pybind_module[name: StringLiteral]() raises -> PyModule:
 fn pyobj_destroy_as[T: AnyType](pyobj: PyObjectPtr):
     # TODO(MSTDL-633): Is this always safe? Wrap in GIL, because this could
     # evaluate arbitrary code?
-    pyobj.value.bitcast[T]().destroy_pointee()
+    pyobj.unsized_obj_ptr.bitcast[T]().destroy_pointee()
 
 
 fn fail_initialization(owned err: Error) -> PythonObject:

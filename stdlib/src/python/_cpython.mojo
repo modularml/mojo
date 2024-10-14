@@ -35,7 +35,7 @@ from sys.ffi import (
 )
 
 from python.python import _get_global_python_itf
-from python._bindings import Typed_initproc
+from python._bindings import Typed_initproc, PyMojoObject, Pythonable
 
 from memory import UnsafePointer
 
@@ -103,24 +103,74 @@ struct PyKeyValuePair:
 @value
 @register_passable("trivial")
 struct PyObjectPtr:
-    var value: UnsafePointer[Int8]
+    """Equivalent to `PyObject*` in C.
+
+    It is crucial that this type has the same size and alignment as `PyObject*`
+    for FFI ABI correctness.
+    """
+
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
+    var unsized_obj_ptr: UnsafePointer[PyObject]
+
+    """Raw pointer to the underlying PyObject struct instance.
+
+    It is not valid to read or write a `PyObject` directly from this pointer.
+
+    This is because `PyObject` is an "unsized" or "incomplete" type: typically,
+    any allocation containing a `PyObject` contains additional fields holding
+    information specific to that Python object instance, e.g. containing its
+    "true" value.
+
+    The value behind this pointer is only safe to interact with directly when
+    it has been downcasted to a concrete Python object type backing struct, in
+    a context where the user has ensured the object value is of that type.
+    """
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__(inout self):
-        self.value = UnsafePointer[Int8]()
+        self.unsized_obj_ptr = UnsafePointer[PyObject]()
 
-    fn is_null(self) -> Bool:
-        return int(self.value) == 0
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     fn __eq__(self, rhs: PyObjectPtr) -> Bool:
-        return int(self.value) == int(rhs.value)
+        return int(self.unsized_obj_ptr) == int(rhs.unsized_obj_ptr)
 
     fn __ne__(self, rhs: PyObjectPtr) -> Bool:
         return not (self == rhs)
 
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn unchecked_cast_to_mojo_object[
+        T: Pythonable
+    ](owned self) -> UnsafePointer[PyMojoObject[T]]:
+        """Assume that this Python object contains a wrapped Mojo value."""
+        return self.unsized_obj_ptr.bitcast[PyMojoObject[T]]()
+
+    fn unchecked_cast_to_mojo_value[
+        T: Pythonable
+    ](owned self) -> UnsafePointer[T]:
+        var mojo_obj_ptr = self.unchecked_cast_to_mojo_object[T]()
+
+        # TODO(MSTDL-950): Should use something like `addr_of!`
+        return UnsafePointer[T].address_of(mojo_obj_ptr[].mojo_value)
+
+    fn is_null(self) -> Bool:
+        return int(self.unsized_obj_ptr) == 0
+
     # TODO: Consider removing this and inlining int(p.value) into callers
     fn _get_ptr_as_int(self) -> Int:
-        return int(self.value)
+        return int(self.unsized_obj_ptr)
 
 
 @value
@@ -680,7 +730,20 @@ struct CPython:
     fn _Py_REFCNT(inout self, ptr: PyObjectPtr) -> Int:
         if ptr._get_ptr_as_int() == 0:
             return -1
-        return int(ptr.value.load())
+        # NOTE:
+        #   The "obvious" way to write this would be:
+        #       return ptr.unsized_obj_ptr[].object_ref_count
+        #   However, that is not valid, because, as the name suggest, a PyObject
+        #   is an "unsized" or "incomplete" type, meaning that a pointer to an
+        #   instance of that type doesn't point at the entire allocation of the
+        #   underlying "concrete" object instance.
+        #
+        #   To avoid concerns about whether that's UB or not in Mojo, this
+        #   this by just assumes the first field will be the ref count, and
+        #   treats the object pointer "as if" it was a pointer to just the first
+        #   field.
+        # TODO(MSTDL-950): Should use something like `addr_of!`
+        return ptr.unsized_obj_ptr.bitcast[Int]()[]
 
     # ===-------------------------------------------------------------------===#
     # Python GIL and threading
@@ -769,24 +832,22 @@ struct CPython:
     fn PyDict_Next(
         inout self, dictionary: PyObjectPtr, p: Int
     ) -> PyKeyValuePair:
-        var key = UnsafePointer[Int8]()
-        var value = UnsafePointer[Int8]()
+        var key = PyObjectPtr()
+        var value = PyObjectPtr()
         var v = p
         var position = UnsafePointer[Int].address_of(v)
-        var value_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(value)
-        var key_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(key)
         var result = self.lib.get_function[
             fn (
                 PyObjectPtr,
-                UnsafePointer[Int],
-                UnsafePointer[UnsafePointer[Int8]],
-                UnsafePointer[UnsafePointer[Int8]],
+                UnsafePointer[Py_ssize_t],
+                UnsafePointer[PyObjectPtr],
+                UnsafePointer[PyObjectPtr],
             ) -> c_int
         ]("PyDict_Next")(
             dictionary,
             position,
-            key_ptr,
-            value_ptr,
+            UnsafePointer.address_of(key),
+            UnsafePointer.address_of(value),
         )
 
         self.log(
@@ -796,11 +857,11 @@ struct CPython:
             "refcnt:",
             self._Py_REFCNT(dictionary),
             " key: ",
-            PyObjectPtr {value: key}._get_ptr_as_int(),
+            key._get_ptr_as_int(),
             ", refcnt(key):",
             self._Py_REFCNT(key),
             "value:",
-            PyObjectPtr {value: value}._get_ptr_as_int(),
+            value._get_ptr_as_int(),
             "refcnt(value)",
             self._Py_REFCNT(value),
         )
@@ -837,10 +898,9 @@ struct CPython:
         return r
 
     fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
-        var value = self.lib.get_function[
-            fn (UnsafePointer[UInt8]) -> UnsafePointer[Int8]
-        ]("PyImport_AddModule")(name.data)
-        return PyObjectPtr {value: value}
+        return self.lib.get_function[fn (UnsafePointer[c_char]) -> PyObjectPtr](
+            "PyImport_AddModule"
+        )(name.unsafe_ptr().bitcast[c_char]())
 
     fn PyModule_Create(
         inout self,
@@ -896,7 +956,7 @@ struct CPython:
     fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
         var value = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyModule_GetDict"
-        )(name.value)
+        )(name)
         return value
 
     # ===-------------------------------------------------------------------===#
@@ -942,13 +1002,11 @@ struct CPython:
         locals: PyObjectPtr,
         run_mode: Int,
     ) -> PyObjectPtr:
-        var result = PyObjectPtr(
-            self.lib.get_function[
-                fn (
-                    UnsafePointer[UInt8], Int32, PyObjectPtr, PyObjectPtr
-                ) -> UnsafePointer[Int8]
-            ]("PyRun_String")(strref.data, Int32(run_mode), globals, locals)
-        )
+        var result = self.lib.get_function[
+            fn (
+                UnsafePointer[UInt8], Int32, PyObjectPtr, PyObjectPtr
+            ) -> PyObjectPtr
+        ]("PyRun_String")(strref.data, Int32(run_mode), globals, locals)
 
         self.log(
             result._get_ptr_as_int(),
@@ -969,13 +1027,9 @@ struct CPython:
         globals: PyObjectPtr,
         locals: PyObjectPtr,
     ) -> PyObjectPtr:
-        var result = PyObjectPtr(
-            self.lib.get_function[
-                fn (
-                    PyObjectPtr, PyObjectPtr, PyObjectPtr
-                ) -> UnsafePointer[Int8]
-            ]("PyEval_EvalCode")(co, globals, locals)
-        )
+        var result = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PyEval_EvalCode")(co, globals, locals)
         self._inc_total_rc()
         return result
 
@@ -1298,7 +1352,7 @@ struct CPython:
         #   The name of this global is technical a private part of the
         #   CPython API, but unfortunately the only stable ways to access it are
         #   macros.
-        ptr = self.lib.get_symbol[c_char]("_Py_NoneStruct")
+        ptr = self.lib.get_symbol[PyObject]("_Py_NoneStruct")
 
         if not ptr:
             abort("error: unable to get pointer to CPython `None` struct")
@@ -1456,23 +1510,22 @@ struct CPython:
         return not value.is_null()
 
     fn PyErr_Fetch(inout self) -> PyObjectPtr:
-        var type = UnsafePointer[Int8]()
-        var value = UnsafePointer[Int8]()
-        var traceback = UnsafePointer[Int8]()
+        var type = PyObjectPtr()
+        var value = PyObjectPtr()
+        var traceback = PyObjectPtr()
 
-        var type_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(type)
-        var value_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(value)
-        var traceback_ptr = UnsafePointer[UnsafePointer[Int8]].address_of(
-            traceback
-        )
         var func = self.lib.get_function[
             fn (
-                UnsafePointer[UnsafePointer[Int8]],
-                UnsafePointer[UnsafePointer[Int8]],
-                UnsafePointer[UnsafePointer[Int8]],
+                UnsafePointer[PyObjectPtr],
+                UnsafePointer[PyObjectPtr],
+                UnsafePointer[PyObjectPtr],
             ) -> None
-        ]("PyErr_Fetch")(type_ptr, value_ptr, traceback_ptr)
-        var r = PyObjectPtr {value: value}
+        ]("PyErr_Fetch")(
+            UnsafePointer.address_of(type),
+            UnsafePointer.address_of(value),
+            UnsafePointer.address_of(traceback),
+        )
+        var r = value
 
         self.log(
             r._get_ptr_as_int(),

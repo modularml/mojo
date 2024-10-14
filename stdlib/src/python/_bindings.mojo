@@ -58,13 +58,6 @@ struct PyMojoObject[T: Pythonable]:
     var mojo_value: T
 
     @staticmethod
-    fn unsafe_cast_obj(obj_raw_ptr: PyObjectPtr) -> UnsafePointer[T]:
-        var mojo_obj_ptr = obj_raw_ptr.value.bitcast[PyMojoObject[T]]()
-
-        # TODO(MSTDL-950): Should use something like `addr_of!`
-        return UnsafePointer[T].address_of(mojo_obj_ptr[].mojo_value)
-
-    @staticmethod
     fn python_type_object[
         type_name: StringLiteral,
     ](owned methods: List[PyMethodDef]) raises -> TypedPythonObject["Type"]:
@@ -105,7 +98,7 @@ struct PyMojoObject[T: Pythonable]:
         #   ownership of this pointer?
         var type_obj = cpython.PyType_FromSpec(Box(type_spec).steal_data())
 
-        if not type_obj.value:
+        if type_obj.is_null():
             Python.throw_python_exception_if_error_state(cpython)
             return abort[TypedPythonObject["Type"]](
                 "expected to raise after getting NULL type object"
@@ -149,9 +142,9 @@ fn create_empty_init_wrapper[T: Pythonable]() -> Typed_initproc:
             if len(args) != 0 or keyword_args != PyObjectPtr():
                 raise "unexpected arguments passed to default initializer function of wrapped Mojo type"
 
-            var obj_ptr: UnsafePointer[T] = PyMojoObject[T].unsafe_cast_obj(
-                py_self
-            )
+            var obj_ptr: UnsafePointer[
+                T
+            ] = py_self.unchecked_cast_to_mojo_value[T]()
 
             # ------------------------------------------------
             # Call the user-provided initialization function.
@@ -177,9 +170,9 @@ fn create_empty_init_wrapper[T: Pythonable]() -> Typed_initproc:
 
 fn create_dealloc_wrapper[T: Pythonable]() -> destructor:
     fn wrapper(py_self: PyObjectPtr):
-        var self_ptr: UnsafePointer[T] = PyMojoObject[T].unsafe_cast_obj(
-            py_self
-        )
+        var self_ptr: UnsafePointer[T] = py_self.unchecked_cast_to_mojo_value[
+            T
+        ]()
 
         # TODO(MSTDL-633):
         #   Is this always safe? Wrap in GIL, because this could
