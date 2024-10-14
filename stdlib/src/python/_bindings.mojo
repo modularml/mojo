@@ -45,7 +45,7 @@ alias Typed_initproc = fn (
 ) -> c_int
 
 
-trait Pythonable(Defaultable):
+trait Pythonable(Defaultable, Representable):
     """Represents a Mojo type that can be used from Python."""
 
     pass
@@ -76,6 +76,7 @@ struct PyMojoObject[T: Pythonable]:
             ),
             PyType_Slot.tp_init(empty_tp_init_wrapper[T]),
             PyType_Slot.tp_dealloc(tp_dealloc_wrapper[T]),
+            PyType_Slot.tp_repr(tp_repr_wrapper[T]),
         )
 
         if methods:
@@ -177,6 +178,14 @@ fn tp_dealloc_wrapper[T: Pythonable](py_self: PyObjectPtr):
     #   evaluate arbitrary code?
     # Destroy this `Person` instance.
     self_ptr.destroy_pointee()
+
+
+fn tp_repr_wrapper[T: Pythonable](py_self: PyObjectPtr) -> PyObjectPtr:
+    var self_ptr: UnsafePointer[T] = py_self.unchecked_cast_to_mojo_value[T]()
+
+    var repr_str: String = repr(self_ptr[])
+
+    return PythonObject(string=repr_str).steal_data()
 
 
 # ===-----------------------------------------------------------------------===#
