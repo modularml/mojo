@@ -706,6 +706,7 @@ struct String(
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
+    _Stringlike,
 ):
     """Represents a mutable string."""
 

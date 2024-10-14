@@ -46,6 +46,7 @@ struct StringLiteral(
     FloatableRaising,
     BytesCollectionElement,
     _HashableWithHasher,
+    _Stringlike,
 ):
     """This type represents a string literal.
 

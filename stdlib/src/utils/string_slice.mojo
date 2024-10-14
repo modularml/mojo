@@ -216,7 +216,7 @@ struct _StringSliceIter[
 struct StringSlice[
     is_mutable: Bool, //,
     origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable):
+](Stringable, Sized, Formattable, _Stringlike):
     """
     A non-owning view to encoded string data.
 
@@ -465,13 +465,13 @@ struct StringSlice[
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(self) -> _StringSliceIter[origin, False]:
+    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringSliceIter[origin, forward=False](
+        return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
