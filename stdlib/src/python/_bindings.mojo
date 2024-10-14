@@ -74,29 +74,31 @@ struct PyMojoObject[T: Pythonable]:
             PyType_Slot.tp_new(
                 cpython.lib.get_function[newfunc]("PyType_GenericNew")
             ),
-            PyType_Slot.tp_init(create_empty_init_wrapper[T]()),
-            PyType_Slot.tp_dealloc(create_dealloc_wrapper[T]()),
-            # FIXME: Avoid leaking the methods data pointer in this way.
-            PyType_Slot.tp_methods(methods.steal_data()),
-            # Zeroed item terminator
-            PyType_Slot.null(),
+            PyType_Slot.tp_init(empty_tp_init_wrapper[T]),
+            PyType_Slot.tp_dealloc(tp_dealloc_wrapper[T]),
         )
 
+        if methods:
+            # FIXME: Avoid leaking the methods data pointer in this way.
+            slots.append(PyType_Slot.tp_methods(methods.steal_data()))
+
+        # Zeroed item terminator
+        slots.append(PyType_Slot.null())
+
         var type_spec = PyType_Spec {
+            # FIXME(MOCO-1306): This should be `T.__name__`.
             name: type_name.unsafe_cstr_ptr(),
             basicsize: sizeof[PyMojoObject[T]](),
             itemsize: 0,
             flags: Py_TPFLAGS_DEFAULT,
-            # FIXME: Don't leak this pointer, use globals instead.
-            slots: slots.steal_data(),
+            # Note: This pointer is only "borrowed" by PyType_FromSpec.
+            slots: slots.unsafe_ptr(),
         }
 
         # Construct a Python 'type' object from our type spec.
-        # FIXME:
-        #   We heap allocate the type specification metadata.
-        #   Who owns this pointer? Or does Python not actually take
-        #   ownership of this pointer?
-        var type_obj = cpython.PyType_FromSpec(Box(type_spec).steal_data())
+        var type_obj = cpython.PyType_FromSpec(
+            UnsafePointer.address_of(type_spec)
+        )
 
         if type_obj.is_null():
             Python.throw_python_exception_if_error_state(cpython)
@@ -124,63 +126,57 @@ struct PyMojoObject[T: Pythonable]:
 #
 # This function creates that wrapper function, and returns a pointer pointer to
 # it.
-fn create_empty_init_wrapper[T: Pythonable]() -> Typed_initproc:
-    """Create Python-compatible wrapper around a Mojo initializer function.
+fn empty_tp_init_wrapper[
+    T: Pythonable
+](
+    py_self: PyObjectPtr,
+    args: TypedPythonObject["Tuple"],
+    keyword_args: PyObjectPtr,
+) -> c_int:
+    """Python-compatible wrapper around a Mojo initializer function.
 
     Parameters:
         T: The wrapped Mojo type.
     """
 
-    fn wrapper(
-        py_self: PyObjectPtr,
-        args: TypedPythonObject["Tuple"],
-        keyword_args: PyObjectPtr,
-    ) -> c_int:
-        var cpython = _get_global_python_itf().cpython()
+    var cpython = _get_global_python_itf().cpython()
 
-        try:
-            if len(args) != 0 or keyword_args != PyObjectPtr():
-                raise "unexpected arguments passed to default initializer function of wrapped Mojo type"
+    try:
+        if len(args) != 0 or keyword_args != PyObjectPtr():
+            raise "unexpected arguments passed to default initializer function of wrapped Mojo type"
 
-            var obj_ptr: UnsafePointer[
-                T
-            ] = py_self.unchecked_cast_to_mojo_value[T]()
-
-            # ------------------------------------------------
-            # Call the user-provided initialization function.
-            # ------------------------------------------------
-
-            # TODO(MSTDL-950): Avoid forming ref through uninit pointee.
-            T.__init__(obj_ptr[])
-
-            return 0
-        except e:
-            # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
-            var error_type = cpython.get_error_global("PyExc_ValueError")
-
-            cpython.PyErr_SetString(
-                error_type,
-                e.unsafe_cstr_ptr(),
-            )
-
-            return -1
-
-    return wrapper
-
-
-fn create_dealloc_wrapper[T: Pythonable]() -> destructor:
-    fn wrapper(py_self: PyObjectPtr):
-        var self_ptr: UnsafePointer[T] = py_self.unchecked_cast_to_mojo_value[
+        var obj_ptr: UnsafePointer[T] = py_self.unchecked_cast_to_mojo_value[
             T
         ]()
 
-        # TODO(MSTDL-633):
-        #   Is this always safe? Wrap in GIL, because this could
-        #   evaluate arbitrary code?
-        # Destroy this `Person` instance.
-        self_ptr.destroy_pointee()
+        # ------------------------------------------------
+        # Call the user-provided initialization function.
+        # ------------------------------------------------
 
-    return wrapper
+        # TODO(MSTDL-950): Avoid forming ref through uninit pointee.
+        T.__init__(obj_ptr[])
+
+        return 0
+    except e:
+        # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
+        var error_type = cpython.get_error_global("PyExc_ValueError")
+
+        cpython.PyErr_SetString(
+            error_type,
+            e.unsafe_cstr_ptr(),
+        )
+
+        return -1
+
+
+fn tp_dealloc_wrapper[T: Pythonable](py_self: PyObjectPtr):
+    var self_ptr: UnsafePointer[T] = py_self.unchecked_cast_to_mojo_value[T]()
+
+    # TODO(MSTDL-633):
+    #   Is this always safe? Wrap in GIL, because this could
+    #   evaluate arbitrary code?
+    # Destroy this `Person` instance.
+    self_ptr.destroy_pointee()
 
 
 # ===-----------------------------------------------------------------------===#
