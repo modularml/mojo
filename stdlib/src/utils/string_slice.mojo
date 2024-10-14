@@ -860,7 +860,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         for e in entries:
             debug_assert(offset < fmt_len, "offset >= fmt_src.byte_length()")
             res += _build_slice(ptr, offset, e[].first_curly)
-            e[]._format_entry[len_pos_args](res, auto_arg_index, args)
+            e[]._format_entry[len_pos_args](res, args, auto_arg_index)
             offset = e[].last_curly + 1
 
         res += _build_slice(ptr, offset, fmt_len)
@@ -1036,7 +1036,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     fn _format_entry[
         len_pos_args: Int
-    ](self, inout res: String, inout auto_idx: Int, args: Self._args_t) raises:
+    ](self, inout res: String, args: Self._args_t, inout auto_idx: Int) raises:
         # TODO(#3403 and/or #3252): this function should be able to use
         # Formatter syntax when the type implements it, since it will give great
         # performance benefits. This also needs to be able to check if the given
