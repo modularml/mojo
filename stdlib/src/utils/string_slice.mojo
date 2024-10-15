@@ -216,7 +216,7 @@ struct _StringSliceIter[
 struct StringSlice[
     is_mutable: Bool, //,
     origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable, _Stringlike):
+](Stringable, Sized, Formattable, Stringlike, AsBytesWrite):
     """
     A non-owning view to encoded string data.
 
@@ -606,7 +606,7 @@ struct StringSlice[
         # and use something smarter.
         return StringSlice(unsafe_from_utf8=self._slice[abs_start:])
 
-    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -687,7 +687,7 @@ struct StringSlice[
         return True
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
+    fn split[T: Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -714,7 +714,7 @@ struct StringSlice[
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T) -> List[String]:
+    fn split[T: Stringlike, //](self, sep: T) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -846,7 +846,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait _Stringlike(AsBytesRead):
+trait Stringlike(AsBytesRead):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -869,7 +869,7 @@ trait _Stringlike(AsBytesRead):
         """
         ...
 
-    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -895,7 +895,7 @@ trait _Stringlike(AsBytesRead):
 
 
 fn _split[
-    T0: _Stringlike, T1: _Stringlike, //, enable_maxsplit: Bool
+    T0: Stringlike, T1: Stringlike, //, enable_maxsplit: Bool
 ](src_str: T0, sep: T1, maxsplit: Int) -> List[String]:
     var items = _split_impl[enable_maxsplit=enable_maxsplit](
         src_str, sep, maxsplit
@@ -910,7 +910,7 @@ fn _split[
 
 # FIXME(#3597): once StringSlice conforms to collection element trait
 # fn _split_slice[
-#     T: _Stringlike, //, enable_maxsplit: Bool
+#     T: Stringlike, //, enable_maxsplit: Bool
 # ](src_str: StringSlice, sep: T, maxsplit: Int) raises -> List[StringSlice]:
 #     var items = _split_impl[enable_maxsplit=enable_maxsplit](
 #         src_str, sep, maxsplit
@@ -923,7 +923,7 @@ fn _split[
 
 
 fn _split[
-    T: _Stringlike, //, enable_maxsplit: Bool
+    T: Stringlike, //, enable_maxsplit: Bool
 ](src_str: T, sep: NoneType, maxsplit: Int) -> List[String]:
     var items = _split_impl[enable_maxsplit=enable_maxsplit](src_str, maxsplit)
     var output = List[String](capacity=len(items))
@@ -948,7 +948,7 @@ fn _split[
 
 # FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
-    T0: _Stringlike, T1: _Stringlike, //, enable_maxsplit: Bool
+    T0: Stringlike, T1: Stringlike, //, enable_maxsplit: Bool
 ](src_str: T0, sep: T1, maxsplit: Int) -> List[
     Span[UInt8, StaticConstantOrigin]
 ] as output:
@@ -992,7 +992,7 @@ fn _split_impl[
 
 # FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
-    T: _Stringlike, //, enable_maxsplit: Bool
+    T: Stringlike, //, enable_maxsplit: Bool
 ](src_str: T, maxsplit: Int) -> List[
     Span[UInt8, StaticConstantOrigin]
 ] as output:

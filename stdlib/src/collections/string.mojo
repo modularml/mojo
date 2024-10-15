@@ -27,16 +27,9 @@ from python import PythonObject
 from sys.intrinsics import _type_is_eq
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
-from utils import (
-    Span,
-    IndexList,
-    StringRef,
-    StringSlice,
-    Variant,
-    Formattable,
-    Formatter,
-)
-from utils.format import ToFormatter
+from utils import IndexList, StringRef, StringSlice, Variant
+from utils.span import Span, AsBytesWrite
+from utils.format import Formatter, Formattable, ToFormatter
 from utils.string_slice import (
     _utf8_byte_type,
     _StringSliceIter,
@@ -44,7 +37,7 @@ from utils.string_slice import (
     _shift_unicode_to_utf8,
     _utf8_first_byte_sequence_length,
     _split,
-    _Stringlike,
+    Stringlike,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -706,7 +699,8 @@ struct String(
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
-    _Stringlike,
+    Stringlike,
+    AsBytesWrite,
 ):
     """Represents a mutable string."""
 
@@ -1563,7 +1557,7 @@ struct String(
         """
         return substr._strref_dangerous() in self._strref_dangerous()
 
-    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -1612,7 +1606,7 @@ struct String(
         return self.as_string_slice().isspace()
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
+    fn split[T: Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -1639,7 +1633,7 @@ struct String(
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T) -> List[String]:
+    fn split[T: Stringlike, //](self, sep: T) -> List[String]:
         """Split the string by a separator.
 
         Parameters:

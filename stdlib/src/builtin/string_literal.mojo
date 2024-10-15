@@ -23,7 +23,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.string_slice import _split, _Stringlike
+from utils.string_slice import _split, Stringlike
 from collections.string import _atol, _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
@@ -46,7 +46,7 @@ struct StringLiteral(
     FloatableRaising,
     BytesCollectionElement,
     _HashableWithHasher,
-    _Stringlike,
+    Stringlike,
 ):
     """This type represents a string literal.
 
@@ -431,7 +431,7 @@ struct StringLiteral(
 
         writer.write_str(self.as_string_slice())
 
-    fn find[T: _Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -491,7 +491,7 @@ struct StringLiteral(
         return str(self).join(elems)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
+    fn split[T: Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
@@ -518,7 +518,7 @@ struct StringLiteral(
         return _split[enable_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: _Stringlike, //](self, sep: T) -> List[String]:
+    fn split[T: Stringlike, //](self, sep: T) -> List[String]:
         """Split the string by a separator.
 
         Parameters:
