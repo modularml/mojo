@@ -445,9 +445,7 @@ struct StringLiteral(
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        alias S = StringSlice[__origin_of(substr)]
-        var sub = S(unsafe_from_utf8=substr.as_bytes_read())
-        return self.as_string_slice().find(sub, start)
+        return self.as_string_slice().find(substr, start)
 
     fn rfind(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
