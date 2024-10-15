@@ -27,17 +27,18 @@ from python import PythonObject
 from sys.intrinsics import _type_is_eq
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
-from utils import IndexList, StringRef, StringSlice, Variant
+from utils import IndexList, StringRef, Variant
 from utils.span import Span, AsBytesWrite
 from utils.format import Formatter, Formattable, ToFormatter
 from utils.string_slice import (
+    StringSlice,
+    Stringlike,
     _utf8_byte_type,
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
     _shift_unicode_to_utf8,
     _utf8_first_byte_sequence_length,
     _split,
-    Stringlike,
 )
 
 # ===----------------------------------------------------------------------=== #
