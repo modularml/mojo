@@ -50,6 +50,9 @@ trait AsBytesWrite:
     fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
         """Returns a contiguous slice of bytes.
 
+        Parameters:
+            O: The Origin of the bytes.
+
         Returns:
             A contiguous slice pointing to bytes.
 
@@ -66,6 +69,9 @@ trait AsBytesRead:
 
     fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
         """Returns a contiguous slice of bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
 
         Returns:
             A contiguous slice pointing to bytes.

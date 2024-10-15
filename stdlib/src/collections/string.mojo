@@ -1454,6 +1454,9 @@ struct String(
     fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
         """Returns a contiguous slice of the bytes owned by this string.
 
+        Parameters:
+            O: The Origin of the bytes.
+
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
 
@@ -1468,6 +1471,9 @@ struct String(
     @always_inline
     fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
         """Returns a contiguous slice of the bytes owned by this string.
+
+        Parameters:
+            O: The Origin of the bytes.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
