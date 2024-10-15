@@ -19,6 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
+from builtin._documentation import doc_private
 from sys import alignof, sizeof, triple_is_nvidia_cuda
 from sys.intrinsics import (
     _mlirtype_is_eq,
@@ -102,6 +103,7 @@ struct UnsafePointer[
         """Create a null pointer."""
         self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
+    @doc_private
     @always_inline
     fn __init__(inout self, value: Self._mlir_type):
         """Create a pointer with the input value.
