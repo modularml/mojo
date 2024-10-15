@@ -810,7 +810,7 @@ struct IndexList[
 # Factory functions for creating index.
 # ===----------------------------------------------------------------------===#
 @always_inline
-fn Index[T0: Intable](x: T0) -> IndexList[1]:
+fn Index[T0: Intable, //](x: T0) -> IndexList[1]:
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -839,7 +839,7 @@ fn Index(x: UInt) -> IndexList[1]:
 
 
 @always_inline
-fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
+fn Index[T0: Intable, T1: Intable, //](x: T0, y: T1) -> IndexList[2]:
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -872,7 +872,7 @@ fn Index(x: UInt, y: UInt) -> IndexList[2]:
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable
+    T0: Intable, T1: Intable, T2: Intable, //
 ](x: T0, y: T1, z: T2) -> IndexList[3]:
     """Constructs a 3-D Index from the given values.
 
@@ -894,7 +894,7 @@ fn Index[
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable, T3: Intable
+    T0: Intable, T1: Intable, T2: Intable, T3: Intable, //
 ](x: T0, y: T1, z: T2, w: T3) -> IndexList[4]:
     """Constructs a 4-D Index from the given values.
 
@@ -918,7 +918,7 @@ fn Index[
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable, T3: Intable, T4: Intable
+    T0: Intable, T1: Intable, T2: Intable, T3: Intable, T4: Intable, //
 ](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[5]:
     """Constructs a 5-D Index from the given values.
 
