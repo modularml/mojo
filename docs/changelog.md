@@ -175,6 +175,11 @@ what we publish.
       return a
   ```
 
+- `Slice.step` is now an `Optional[Int]`, matching the optionality of
+  `slice.step` in Python.
+  ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
+   [@bgreni](https://github.com/bgreni))
+
 - `StringRef` now implements `split()` which can be used to split a
   `StringRef` into a `List[StringRef]` by a delimiter.
   ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
