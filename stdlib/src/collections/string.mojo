@@ -1458,10 +1458,7 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-
-        return Span[UInt8, O](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return self.as_bytes()
 
     @always_inline
     fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
@@ -1476,10 +1473,7 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-
-        return Span[UInt8, O](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return self.as_bytes()
 
     @always_inline
     fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
