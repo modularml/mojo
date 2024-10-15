@@ -19,6 +19,7 @@ from python import PythonObject
 ```
 """
 
+from builtin._documentation import doc_private
 from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
@@ -328,6 +329,7 @@ struct PythonObject(
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, none: NoneType._mlir_type):
         """Initialize a none value object from a `None` literal.
 
