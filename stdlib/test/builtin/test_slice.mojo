@@ -19,7 +19,7 @@ def test_none_end_folds():
     var all_def_slice = slice(0, None, 1)
     assert_equal(all_def_slice.start.value(), 0)
     assert_true(all_def_slice.end is None)
-    assert_equal(all_def_slice.step, 1)
+    assert_equal(all_def_slice.step.value(), 1)
 
 
 # This requires parameter inference of StartT.
@@ -74,11 +74,11 @@ def test_slice_stringable():
     var s = SliceStringable()
     assert_equal(s[2::-1], "slice(2, None, -1)")
     assert_equal(s[1:-1:2], "slice(1, -1, 2)")
-    assert_equal(s[:-1], "slice(None, -1, 1)")
-    assert_equal(s[::], "slice(None, None, 1)")
+    assert_equal(s[:-1], "slice(None, -1, None)")
+    assert_equal(s[::], "slice(None, None, None)")
     assert_equal(s[::4], "slice(None, None, 4)")
     assert_equal(repr(slice(None, 2, 3)), "slice(None, 2, 3)")
-    assert_equal(repr(slice(10)), "slice(None, 10, 1)")
+    assert_equal(repr(slice(10)), "slice(None, 10, None)")
 
 
 def test_slice_eq():
