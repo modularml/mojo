@@ -102,6 +102,7 @@ struct Optional[T: CollectionElement](
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -435,6 +436,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 

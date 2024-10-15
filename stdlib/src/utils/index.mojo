@@ -187,6 +187,7 @@ struct StaticIntTuple[size: Int](
         """Constructs a static int tuple of the given size."""
         self = 0
 
+    @doc_private
     @always_inline
     fn __init__(inout self, value: __mlir_type.index):
         """Constructs a sized 1 static int tuple of given the element value.

@@ -96,6 +96,7 @@ struct UnsafePointer[
         """Create a null pointer."""
         self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
+    @doc_private
     @always_inline
     fn __init__(inout self, value: Self._mlir_type):
         """Create a pointer with the input value.

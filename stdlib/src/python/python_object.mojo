@@ -140,6 +140,7 @@ struct PythonObject(
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, none: NoneType._mlir_type):
         """Initialize a none value object from a `None` literal.
 

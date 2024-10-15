@@ -128,6 +128,7 @@ struct Bool(
         """
         self.value = other.value
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.i1):
         """Construct a Bool value given a __mlir_type.i1 value.
@@ -137,6 +138,7 @@ struct Bool(
         """
         self.value = value
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<bool>`):
         """Construct a Bool value given a `!pop.scalar<bool>` value.

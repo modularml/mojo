@@ -170,6 +170,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
         """
         self = value
 
+    @doc_private
     @always_inline
     fn __init__(inout self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
@@ -310,6 +311,7 @@ struct VariadicListMem[
     # ===-------------------------------------------------------------------===#
 
     # Provide support for borrowed variadic arguments.
+    @doc_private
     @always_inline
     fn __init__(inout self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
@@ -564,6 +566,7 @@ struct VariadicPack[
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
+    @doc_private
     @always_inline
     fn __init__(inout self, value: Self._mlir_type, is_owned: Bool):
         """Constructs a VariadicPack from the internal representation.
