@@ -1447,7 +1447,37 @@ struct String(
         """
 
         return Span[UInt8, __origin_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
+    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
+    fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
         )
 
     @always_inline
@@ -1675,7 +1705,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=False](self, sep, -1)
+        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's

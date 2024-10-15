@@ -21,7 +21,7 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils.span import Span, AsBytes
+from utils.span import Span, AsBytesRead, AsBytesWrite
 from collections.string import _isspace
 from collections import List
 from memory import memcmp, UnsafePointer
@@ -489,6 +489,36 @@ struct StringSlice[
         return self._slice
 
     @always_inline
+    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
+    fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Gets a pointer to the first element of this string slice.
 
@@ -747,7 +777,7 @@ struct StringSlice[
         ```
         .
         """
-        return _split[enable_maxsplit=False](self, sep, -1)
+        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
@@ -807,7 +837,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait _Stringlike:  # (AsBytes): # FIXME: StringSlice does not conform to trait '_Stringlike'
+trait _Stringlike(AsBytesRead):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -936,7 +966,7 @@ fn _split_impl[
     var rhs = 0
     var items = 0
     var ptr = src_str.unsafe_ptr()
-    # var str_span = src_str.as_bytes() # FIXME(#3295)
+    # var str_span = src_str.as_bytes_read() # FIXME(#3295)
 
     while lhs <= str_byte_len:
         rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span
