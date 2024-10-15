@@ -192,6 +192,10 @@ what we publish.
   [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
   compared for pointer equivalence using `a is b`.
 
+- There is now a [`Byte`](/mojo/stdlib/builtin/simd/Byte) alias to better
+  express intent when working with a pack of bits.
+  ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraos](https://github.com/soraros)).
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
