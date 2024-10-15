@@ -42,26 +42,6 @@ trait AsBytes:
         ...
 
 
-trait AsBytesWrite:
-    """The `AsBytesWrite` trait denotes a type that can be returned as a mutable
-    byte span.
-    """
-
-    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
-        """Returns a mutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            A mutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-        ...
-
-
 trait AsBytesRead:
     """The `AsBytesRead` trait denotes a type that can be returned as an
     immutable byte span.
@@ -75,6 +55,26 @@ trait AsBytesRead:
 
         Returns:
             An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+
+trait AsBytesWrite(AsBytesRead):
+    """The `AsBytesWrite` trait denotes a type that can be returned as a mutable
+    byte span.
+    """
+
+    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
+        """Returns a mutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            A mutable contiguous slice pointing to the bytes.
 
         Notes:
             This does not include the trailing null terminator.

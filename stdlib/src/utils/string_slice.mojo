@@ -976,6 +976,7 @@ fn _split_impl[
     var items = 0
     var ptr = src_str.unsafe_ptr()
     # var str_span = src_str.as_bytes_read() # FIXME(#3295)
+    # var sep_span = sep.as_bytes_read() # FIXME(#3295)
 
     while lhs <= str_byte_len:
         rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span
