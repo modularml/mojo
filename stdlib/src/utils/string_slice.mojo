@@ -621,27 +621,27 @@ struct StringSlice[
           The offset of `substr` relative to the beginning of the string.
         """
 
-        if substr.byte_length() == 0:
+        var sub = substr.as_bytes_read()
+        var sub_len = len(sub)
+        if sub_len == 0:
             return 0
 
-        if self.byte_length() < substr.byte_length() + start:
+        var s_span = self.as_bytes_read()
+        if len(s_span) < sub_len + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
+        var haystack = self._from_start(start).as_bytes_read()
 
         var loc = stringref._memmem(
-            haystack_str.unsafe_ptr(),
-            haystack_str.byte_length(),
-            substr.unsafe_ptr(),
-            substr.byte_length(),
+            haystack.unsafe_ptr(), len(haystack), sub.unsafe_ptr(), sub_len
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self.unsafe_ptr())
+        return int(loc) - int(s_span.unsafe_ptr())
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
@@ -850,25 +850,6 @@ trait Stringlike(AsBytesRead):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
-    fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        ...
-
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        ...
-
     fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
@@ -953,7 +934,7 @@ fn _split_impl[
     Span[UInt8, StaticConstantOrigin]
 ] as output:
     alias Sp = Span[UInt8, StaticConstantOrigin]
-    var sep_len = sep.byte_length()
+    var sep_len = len(sep.as_bytes_read())
     if sep_len == 0:
         var iterator = src_str.__iter__()
         output = __type_of(output)(capacity=len(iterator) + 2)
@@ -970,11 +951,11 @@ fn _split_impl[
     if enable_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    var str_byte_len = src_str.byte_length()
+    var str_byte_len = len(src_str.as_bytes_read())
     var lhs = 0
     var rhs = 0
     var items = 0
-    var ptr = src_str.unsafe_ptr()
+    var ptr = src_str.as_bytes_read().unsafe_ptr()
     # var str_span = src_str.as_bytes_read() # FIXME(#3295)
     # var sep_span = sep.as_bytes_read() # FIXME(#3295)
 
@@ -1005,11 +986,11 @@ fn _split_impl[
     if enable_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    var str_byte_len = src_str.byte_length()
+    var str_byte_len = len(src_str.as_bytes_read())
     var lhs = 0
     var rhs = 0
     var items = 0
-    var ptr = src_str.unsafe_ptr()
+    var ptr = src_str.as_bytes_read().unsafe_ptr()
     alias S = StringSlice[StaticConstantOrigin]
 
     @always_inline("nodebug")

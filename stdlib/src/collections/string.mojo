@@ -1566,9 +1566,8 @@ struct String(
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        var sub = StringSlice[__origin_of(substr)](
-            unsafe_from_utf8_ptr=substr.unsafe_ptr(), len=substr.byte_length()
-        )
+        alias S = StringSlice[__origin_of(substr)]
+        var sub = S(unsafe_from_utf8=substr.as_bytes_read())
         return self.as_string_slice().find(sub, start)
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
