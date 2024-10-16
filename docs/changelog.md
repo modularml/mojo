@@ -187,11 +187,18 @@ what we publish.
 - Support for multi-dimensional indexing for `PythonObject`
   ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
 
+- Support for multi-dimensional indexing and slicing for `PythonObject`
+  (PRs  [#3549](https://github.com/modularml/mojo/pull/3549),
+  [#3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
+
     ```mojo
     var np = Python.import_module("numpy")
-    var a = np.array(PythonObject([1,2,3,1,2,3])).reshape(2,3)
+    var a = np.array(PythonObject([1,2,3,4,5,6])).reshape(2,3)
     print((a[0, 1])) # 2
-    ```
+    print((a[1][::-1])) # [6 5 4]
+   ```
+
+  Note, that the syntax, `a[1, ::-1]`, is currently not supported.
 
 - [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
   [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be

@@ -1755,6 +1755,33 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PySlice_FromSlice(inout self, slice: Slice) -> PyObjectPtr:
+        # Convert Mojo Slice to Python slice parameters
+        # Note: Deliberately avoid using `span.indices()` here and instead pass
+        # the Slice parameters directly to Python. Python's C implementation
+        # already handles such conditions, allowing Python to apply its own slice
+        # handling.
+        var py_start = self.Py_None()
+        var py_stop = self.Py_None()
+        var py_step = self.Py_None()
+
+        if slice.start:
+            py_start = self.PyLong_FromSsize_t(c_ssize_t(slice.start.value()))
+        if slice.end:
+            py_stop = self.PyLong_FromSsize_t(c_ssize_t(slice.end.value()))
+        if slice.end:
+            py_step = self.PyLong_FromSsize_t(c_ssize_t(slice.step.value()))
+
+        var py_slice = self.PySlice_New(py_start, py_stop, py_step)
+
+        if py_start != self.Py_None():
+            self.Py_DecRef(py_start)
+        if py_stop != self.Py_None():
+            self.Py_DecRef(py_stop)
+        self.Py_DecRef(py_step)
+
+        return py_slice
+
     # const char *PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size)
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         """See https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize.
@@ -1913,3 +1940,31 @@ struct CPython:
             fn (PyObjectPtr) -> c_int
         ]("PySequence_Check")(obj)
         return follows_seq_protocol != 0
+
+    # ===-------------------------------------------------------------------===#
+    # Python Slice Creation
+    # ===-------------------------------------------------------------------===#
+
+    # PyObject *PySlice_New(PyObject *start, PyObject *stop, PyObject *step)
+    # ref: https://docs.python.org/3/c-api/slice.html#c.PySlice_New
+    fn PySlice_New(
+        inout self, start: PyObjectPtr, stop: PyObjectPtr, step: PyObjectPtr
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PySlice_New")(start, stop, step)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PySlice_New, refcnt:",
+            self._Py_REFCNT(r),
+            ", start:",
+            start._get_ptr_as_int(),
+            ", stop:",
+            stop._get_ptr_as_int(),
+            ", step:",
+            step._get_ptr_as_int(),
+        )
+
+        self._inc_total_rc()
+        return r
