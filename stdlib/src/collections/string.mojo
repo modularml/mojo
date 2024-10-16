@@ -1390,7 +1390,6 @@ struct String(
             a.format_to(formatter)
 
         elems.each[add_elt]()
-        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
