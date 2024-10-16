@@ -42,6 +42,8 @@ from utils.string_slice import (
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
     _shift_unicode_to_utf8,
+    _FormatCurlyEntry,
+    _CurlyEntryFormattable,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -748,7 +750,7 @@ struct String(
             impl: The buffer.
         """
         debug_assert(
-            impl[-1] == 0,
+            len(impl) > 0 and impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
         # We make a backup because steal_data() will clear size and capacity.
@@ -2095,22 +2097,20 @@ struct String(
             return self[: -suffix.byte_length()]
         return self
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
-
-        For example, `int("19")` returns `19`. If the given string cannot be
-        parsed as an integer value, an error is raised. For example, `int("hi")`
-        raises an error.
+        If the string cannot be parsed as an int, an error is raised.
 
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
         return atol(self)
 
+    @always_inline
     fn __float__(self) raises -> Float64:
-        """Parses the string as a float point number and returns that value.
-
-        If the string cannot be parsed as a float, an error is raised.
+        """Parses the string as a float point number and returns that value. If
+        the string cannot be parsed as a float, an error is raised.
 
         Returns:
             A float value that represents the string, or otherwise raises.
@@ -2140,84 +2140,31 @@ struct String(
             )
         return String(buf^)
 
-    fn format[*Ts: StringRepresentable](self, *args: *Ts) raises -> String:
-        """Format a template with *args.
-
-        Example of manual indexing:
-
-        ```mojo
-        print(
-            String("{0} {1} {0}").format(
-                "Mojo", 1.125
-            )
-        ) #Mojo 1.125 Mojo
-        ```
-
-        Example of automatic indexing:
-
-        ```mojo
-        var x = String("{} {}").format(
-            True, "hello world"
-        )
-        print(x) #True hello world
-        ```
+    @always_inline
+    fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
+        """Format a template with `*args`.
 
         Args:
             args: The substitution values.
 
         Parameters:
-            Ts: The types of the substitution values.
-              Are required to implement `Stringable`.
+            Ts: The types of substitution values that implement `Representable`
+                and `Stringable` (to be changed and made more flexible).
 
         Returns:
             The template with the given values substituted.
 
+        Examples:
+
+        ```mojo
+        # Manual indexing:
+        print(String("{0} {1} {0}").format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print(String("{} {}").format(True, "hello world")) # True hello world
+        ```
+        .
         """
-        alias num_pos_args = len(VariadicList(Ts))
-        var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
-
-        var res: String = ""
-        var pos_in_self = 0
-
-        var current_automatic_arg_index = 0
-        for e in entries:
-            debug_assert(
-                pos_in_self < self.byte_length(),
-                "pos_in_self >= self.byte_length()",
-            )
-            res += self[pos_in_self : e[].first_curly]
-
-            if e[].is_escaped_brace():
-                res += "}" if e[].field[Bool] else "{"
-
-            if e[].is_manual_indexing():
-
-                @parameter
-                for i in range(num_pos_args):
-                    if i == e[].field[Int]:
-                        if e[].conversion_flag == "r":
-                            res += repr(args[i])
-                        else:
-                            res += str(args[i])
-
-            if e[].is_automatic_indexing():
-
-                @parameter
-                for i in range(num_pos_args):
-                    if i == current_automatic_arg_index:
-                        if e[].conversion_flag == "r":
-                            res += repr(args[i])
-                        else:
-                            res += str(args[i])
-
-                current_automatic_arg_index += 1
-
-            pos_in_self = e[].last_curly + 1
-
-        if pos_in_self < self.byte_length():
-            res += self[pos_in_self : self.byte_length()]
-
-        return res^
+        return _FormatCurlyEntry.format(self, args)
 
     fn isdigit(self) -> Bool:
         """A string is a digit string if all characters in the string are digits
@@ -2461,244 +2408,3 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
         return 64 + 1
     else:
         return 128 + 1  # Add 1 for the terminator
-
-
-# ===----------------------------------------------------------------------===#
-# Format method structures
-# ===----------------------------------------------------------------------===#
-
-
-trait StringRepresentable(Stringable, Representable):
-    """The `StringRepresentable` trait denotes a trait composition of the
-    `Stringable` and `Representable` traits.
-
-    This trait is used by the `format()` method to support both `{!s}` (or `{}`)
-    and `{!r}` format specifiers. It allows the method to handle types that
-    can be formatted using both their string representation and their
-    more detailed representation.
-
-    Types implementing this trait must provide both `__str__()` and `__repr__()`
-    methods as defined in `Stringable` and `Representable` traits respectively.
-    """
-
-    pass
-
-
-@value
-struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
-    """
-    Internally used by the `format()` method.
-
-    Specifically to structure fields.
-
-    Does not contain any substitution values.
-
-    """
-
-    var first_curly: Int
-    """The index of an opening brace around a substitution field."""
-
-    var last_curly: Int
-    """The index of an closing brace around a substitution field."""
-
-    var conversion_flag: String
-    """Store the format specifier (e.g., 'r' for repr)."""
-
-    alias _FieldVariantType = Variant[
-        String,  # kwargs indexing (`{field_name}`)
-        Int,  # args manual indexing (`{3}`)
-        NoneType,  # args automatic indexing (`{}`)
-        Bool,  # for escaped curlies ('{{')
-    ]
-    var field: Self._FieldVariantType
-    """Store the substitution field."""
-
-    fn __init__(inout self, *, other: Self):
-        self.first_curly = other.first_curly
-        self.last_curly = other.last_curly
-        self.conversion_flag = other.conversion_flag
-        self.field = Self._FieldVariantType(other=other.field)
-
-    fn is_escaped_brace(ref [_]self) -> Bool:
-        return self.field.isa[Bool]()
-
-    fn is_kwargs_field(ref [_]self) -> Bool:
-        return self.field.isa[String]()
-
-    fn is_automatic_indexing(ref [_]self) -> Bool:
-        return self.field.isa[NoneType]()
-
-    fn is_manual_indexing(ref [_]self) -> Bool:
-        return self.field.isa[Int]()
-
-    @staticmethod
-    fn create_entries(
-        format_src: String, len_pos_args: Int
-    ) raises -> List[Self]:
-        """Used internally by the `format()` method.
-
-        Args:
-            format_src: The "format" part provided by the user.
-            len_pos_args: The len of *args
-
-        Returns:
-            A `List` of structured field entries.
-
-        Purpose of the `Variant` `Self.field`:
-
-        - `Int` for manual indexing
-            (value field contains `0`)
-
-        - `NoneType` for automatic indexing
-            (value field contains `None`)
-
-        - `String` for **kwargs indexing
-            (value field contains `foo`)
-
-        - `Bool` for escaped curlies
-            (value field contains False for `{` or True for '}')
-        """
-        var manual_indexing_count = 0
-        var automatic_indexing_count = 0
-        var raised_manual_index = Optional[Int](None)
-        var raised_automatic_index = Optional[Int](None)
-        var raised_kwarg_field = Optional[String](None)
-        alias supported_conversion_flags = (
-            String("s"),  # __str__
-            String("r"),  # __repr__
-        )
-
-        var entries = List[Self]()
-        var start = Optional[Int](None)
-        var skip_next = False
-        for i in range(format_src.byte_length()):
-            if skip_next:
-                skip_next = False
-                continue
-            if format_src[i] == "{":
-                if start:
-                    # already one there.
-                    if i - start.value() == 1:
-                        # python escapes double curlies
-                        var current_entry = Self(
-                            first_curly=start.value(),
-                            last_curly=i,
-                            field=False,
-                            conversion_flag="",
-                        )
-                        entries.append(current_entry^)
-                        start = None
-                        continue
-                    raise (
-                        "there is a single curly { left unclosed or unescaped"
-                    )
-                else:
-                    start = i
-                continue
-            if format_src[i] == "}":
-                if start:
-                    var start_value = start.value()
-                    var current_entry = Self(
-                        first_curly=start_value,
-                        last_curly=i,
-                        field=NoneType(),
-                        conversion_flag="",
-                    )
-
-                    if i - start_value != 1:
-                        var field = format_src[start_value + 1 : i]
-                        var exclamation_index = field.find("!")
-
-                        # TODO: Future implementation of format specifiers
-                        # When implementing format specifiers, modify this section to handle:
-                        # replacement_field ::= "{" [field_name] ["!" conversion] [":" format_spec] "}"
-                        # this will involve:
-                        # 1. finding a colon ':' after the conversion flag (if present)
-                        # 2. extracting the format_spec if a colon is found
-                        # 3. adjusting the field and conversion_flag parsing accordingly
-
-                        if exclamation_index != -1:
-                            if exclamation_index + 1 < len(field):
-                                var conversion_flag: String = field[
-                                    exclamation_index + 1 :
-                                ]
-                                if (
-                                    conversion_flag
-                                    not in supported_conversion_flags
-                                ):
-                                    raise 'Conversion flag "' + conversion_flag + '" not recognised.'
-                                current_entry.conversion_flag = conversion_flag
-                            else:
-                                raise "Empty conversion flag."
-
-                            field = field[:exclamation_index]
-
-                        if (
-                            field == ""
-                        ):  # an empty field, so it's automatic indexing
-                            if automatic_indexing_count >= len_pos_args:
-                                raised_automatic_index = (
-                                    automatic_indexing_count
-                                )
-                                break
-                            automatic_indexing_count += 1
-                        else:
-                            try:
-                                # field is a number for manual indexing:
-                                var number = int(field)
-                                current_entry.field = number
-                                if number >= len_pos_args or number < 0:
-                                    raised_manual_index = number
-                                    break
-                                manual_indexing_count += 1
-                            except e:
-                                debug_assert(
-                                    "not convertible to integer" in str(e),
-                                    "Not the expected error from atol",
-                                )
-                                # field is an keyword for **kwargs:
-                                current_entry.field = field
-                                raised_kwarg_field = field
-                                break
-
-                    else:
-                        # automatic indexing
-                        # current_entry.field is already None
-                        if automatic_indexing_count >= len_pos_args:
-                            raised_automatic_index = automatic_indexing_count
-                            break
-                        automatic_indexing_count += 1
-                    entries.append(current_entry^)
-                    start = None
-                else:
-                    # python escapes double curlies
-                    if (i + 1) < format_src.byte_length():
-                        if format_src[i + 1] == "}":
-                            var curren_entry = Self(
-                                first_curly=i,
-                                last_curly=i + 1,
-                                field=True,
-                                conversion_flag="",
-                            )
-                            entries.append(curren_entry^)
-                            skip_next = True
-                            continue
-                    # if it is not an escaped one, it is an error
-                    raise (
-                        "there is a single curly } left unclosed or unescaped"
-                    )
-
-        if raised_automatic_index:
-            raise "Automatic indexing require more args in *args"
-        if raised_kwarg_field:
-            raise "Index " + raised_kwarg_field.value() + " not in kwargs"
-        if manual_indexing_count and automatic_indexing_count:
-            raise "Cannot both use manual and automatic indexing"
-        if raised_manual_index:
-            raise (
-                "Index " + str(raised_manual_index.value()) + " not in *args"
-            )
-        if start:
-            raise "there is a single curly { left unclosed or unescaped"
-
-        return entries^
