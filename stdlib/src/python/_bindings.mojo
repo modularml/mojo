@@ -163,9 +163,7 @@ fn empty_tp_init_wrapper[
     except e:
         # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
         var error_type = cpython.get_error_global("PyExc_ValueError")
-
-            cpython.PyErr_SetString(error_type, c_char_ptr(e))
-
+        cpython.PyErr_SetString(error_type, c_char_ptr(e))
         return -1
 
 
