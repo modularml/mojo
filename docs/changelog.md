@@ -175,6 +175,11 @@ what we publish.
       return a
   ```
 
+- `Slice.step` is now an `Optional[Int]`, matching the optionality of
+  `slice.step` in Python.
+  ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
+   [@bgreni](https://github.com/bgreni))
+
 - `StringRef` now implements `split()` which can be used to split a
   `StringRef` into a `List[StringRef]` by a delimiter.
   ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
@@ -191,6 +196,10 @@ what we publish.
 - [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
   [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
   compared for pointer equivalence using `a is b`.
+
+- There is now a [`Byte`](/mojo/stdlib/builtin/simd/Byte) alias to better
+  express intent when working with a pack of bits.
+  ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraos](https://github.com/soraros)).
 
 ### 🦋 Changed
 
@@ -267,7 +276,7 @@ what we publish.
   library to better clarify that parameters of this type indicate where a
   reference is derived from, not the more complicated notion of where a variable
   is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
-  for more information and rationale.  As a consequence `__origin_of` is now
+  for more information and rationale.  As a consequence `__lifetime_of` is now
   named `__origin_of`.
 
 ### ❌ Removed

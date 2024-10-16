@@ -22,6 +22,7 @@ from utils import IndexList
 
 from sys import bitwidthof
 from builtin.dtype import _int_type_of_width, _uint_type_of_width
+from builtin._documentation import doc_private
 from builtin.io import _get_dtype_printf_format, _snprintf
 from collections.string import _calc_initial_buffer_size
 
@@ -198,6 +199,7 @@ struct IndexList[
         """Constructs a static int tuple of the given size."""
         self = 0
 
+    @doc_private
     @always_inline
     fn __init__(inout self, value: __mlir_type.index):
         """Constructs a sized 1 static int tuple of given the element value.
@@ -810,11 +812,20 @@ struct IndexList[
 # Factory functions for creating index.
 # ===----------------------------------------------------------------------===#
 @always_inline
-fn Index[T0: Intable](x: T0) -> IndexList[1]:
+fn Index[
+    T0: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0) -> IndexList[
+    1, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 1-D Index from the given value.
 
     Parameters:
         T0: The type of the 1st argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The initial value.
@@ -822,29 +833,47 @@ fn Index[T0: Intable](x: T0) -> IndexList[1]:
     Returns:
         The constructed IndexList.
     """
-    return IndexList[1](int(x))
+    return __type_of(result)(int(x))
 
 
 @always_inline
-fn Index(x: UInt) -> IndexList[1]:
+fn Index[
+    *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
+](x: UInt) -> IndexList[
+    1, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 1-D Index from the given value.
 
+    Parameters:
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
+
     Args:
         x: The initial value.
 
     Returns:
         The constructed IndexList.
     """
-    return IndexList[1](x.value)
+    return __type_of(result)(int(x))
 
 
 @always_inline
-fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
+fn Index[
+    T0: Intable,
+    T1: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1) -> IndexList[
+    2, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 2-D Index from the given values.
 
     Parameters:
         T0: The type of the 1st argument.
         T1: The type of the 2nd argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -853,33 +882,50 @@ fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
     Returns:
         The constructed IndexList.
     """
-    return IndexList[2](int(x), int(y))
-
-
-@always_inline
-fn Index(x: UInt, y: UInt) -> IndexList[2]:
-    """Constructs a 2-D Index from the given values.
-
-    Args:
-        x: The 1st initial value.
-        y: The 2nd initial value.
-
-    Returns:
-        The constructed IndexList.
-    """
-    return IndexList[2](x.value, y.value)
+    return __type_of(result)(int(x), int(y))
 
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable
-](x: T0, y: T1, z: T2) -> IndexList[3]:
+    *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
+](x: UInt, y: UInt) -> IndexList[
+    2, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
+    """Constructs a 2-D Index from the given values.
+
+    Parameters:
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
+
+    Args:
+        x: The 1st initial value.
+        y: The 2nd initial value.
+
+    Returns:
+        The constructed IndexList.
+    """
+    return __type_of(result)(int(x), int(y))
+
+
+@always_inline
+fn Index[
+    T0: Intable,
+    T1: Intable,
+    T2: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1, z: T2) -> IndexList[
+    3, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 3-D Index from the given values.
 
     Parameters:
         T0: The type of the 1st argument.
         T1: The type of the 2nd argument.
         T2: The type of the 3rd argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -889,13 +935,21 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return IndexList[3](int(x), int(y), int(z))
+    return __type_of(result)(int(x), int(y), int(z))
 
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable, T3: Intable
-](x: T0, y: T1, z: T2, w: T3) -> IndexList[4]:
+    T0: Intable,
+    T1: Intable,
+    T2: Intable,
+    T3: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1, z: T2, w: T3) -> IndexList[
+    4, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 4-D Index from the given values.
 
     Parameters:
@@ -903,6 +957,8 @@ fn Index[
         T1: The type of the 2nd argument.
         T2: The type of the 3rd argument.
         T3: The type of the 4th argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -913,13 +969,22 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return IndexList[4](int(x), int(y), int(z), int(w))
+    return __type_of(result)(int(x), int(y), int(z), int(w))
 
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable, T3: Intable, T4: Intable
-](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[5]:
+    T0: Intable,
+    T1: Intable,
+    T2: Intable,
+    T3: Intable,
+    T4: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[
+    5, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 5-D Index from the given values.
 
     Parameters:
@@ -928,6 +993,8 @@ fn Index[
         T2: The type of the 3rd argument.
         T3: The type of the 4th argument.
         T4: The type of the 5th argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -939,7 +1006,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return IndexList[5](int(x), int(y), int(z), int(w), int(v))
+    return __type_of(result)(int(x), int(y), int(z), int(w), int(v))
 
 
 # ===----------------------------------------------------------------------===#

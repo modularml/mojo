@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 
 
@@ -57,6 +58,7 @@ struct IntLiteral(
         """Default constructor."""
         self.value = __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
