@@ -24,6 +24,7 @@ from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
+from sys.intrinsics import _type_is_eq
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
 from utils import (
@@ -691,6 +692,7 @@ fn isprintable(c: UInt8) -> Bool:
 struct String(
     Sized,
     Stringable,
+    AsBytes,
     Representable,
     IntableRaising,
     KeyElement,
@@ -1061,6 +1063,30 @@ struct String(
         """
         return not (self < rhs)
 
+    @staticmethod
+    fn _add[rhs_has_null: Bool](lhs: Span[UInt8], rhs: Span[UInt8]) -> String:
+        var lhs_len = len(lhs)
+        var rhs_len = len(rhs)
+        var lhs_ptr = lhs.unsafe_ptr()
+        var rhs_ptr = rhs.unsafe_ptr()
+        alias S = StringSlice[ImmutableAnyOrigin]
+        if lhs_len == 0:
+            return String(S(unsafe_from_utf8_ptr=rhs_ptr, len=rhs_len))
+        elif rhs_len == 0:
+            return String(S(unsafe_from_utf8_ptr=lhs_ptr, len=lhs_len))
+        var sum_len = lhs_len + rhs_len
+        var buffer = Self._buffer_type(capacity=sum_len + 1)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, lhs_ptr, lhs_len)
+        memcpy(ptr + lhs_len, rhs_ptr, rhs_len + int(rhs_has_null))
+        buffer.size = sum_len + 1
+
+        @parameter
+        if not rhs_has_null:
+            ptr[sum_len] = 0
+        return Self(buffer^)
+
+    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -1070,26 +1096,31 @@ struct String(
         Returns:
             The new constructed string.
         """
-        if not self:
-            return other
-        if not other:
-            return self
-        var self_len = self.byte_length()
-        var other_len = other.byte_length()
-        var total_len = self_len + other_len
-        var buffer = Self._buffer_type()
-        buffer.resize(total_len + 1, 0)
-        memcpy(
-            buffer.data,
-            self.unsafe_ptr(),
-            self_len,
-        )
-        memcpy(
-            buffer.data + self_len,
-            other.unsafe_ptr(),
-            other_len + 1,  # Also copy the terminator
-        )
-        return Self(buffer^)
+        return Self._add[True](self.as_bytes(), other.as_bytes())
+
+    @always_inline
+    fn __add__(self, other: StringLiteral) -> String:
+        """Creates a string by appending a string literal at the end.
+
+        Args:
+            other: The string literal to append.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[False](self.as_bytes(), other.as_bytes())
+
+    @always_inline
+    fn __add__(self, other: StringSlice) -> String:
+        """Creates a string by appending a string slice at the end.
+
+        Args:
+            other: The string slice to append.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[False](self.as_bytes(), other.as_bytes())
 
     @always_inline
     fn __radd__(self, other: String) -> String:
@@ -1101,32 +1132,81 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return other + self
+        return Self._add[True](other.as_bytes(), self.as_bytes())
 
+    @always_inline
+    fn __radd__(self, other: StringLiteral) -> String:
+        """Creates a string by prepending another string literal to the start.
+
+        Args:
+            other: The string to prepend.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[True](other.as_bytes(), self.as_bytes())
+
+    @always_inline
+    fn __radd__(self, other: StringSlice) -> String:
+        """Creates a string by prepending another string slice to the start.
+
+        Args:
+            other: The string to prepend.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[True](other.as_bytes(), self.as_bytes())
+
+    fn _iadd[has_null: Bool](inout self, other: Span[UInt8]):
+        var s_len = self.byte_length()
+        var o_len = len(other)
+        var o_ptr = other.unsafe_ptr()
+        if s_len == 0:
+            alias S = StringSlice[ImmutableAnyOrigin]
+            self = String(S(unsafe_from_utf8_ptr=o_ptr, len=o_len))
+            return
+        elif o_len == 0:
+            return
+        var sum_len = s_len + o_len
+        self._buffer.reserve(sum_len + 1)
+        var s_ptr = self.unsafe_ptr()
+        memcpy(s_ptr + s_len, o_ptr, o_len + int(has_null))
+        self._buffer.size = sum_len + 1
+
+        @parameter
+        if not has_null:
+            s_ptr[sum_len] = 0
+
+    @always_inline
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
         Args:
             other: The string to append.
         """
-        if not self:
-            self = other
-            return
-        if not other:
-            return
-        var self_len = self.byte_length()
-        var other_len = other.byte_length()
-        var total_len = self_len + other_len
-        self._buffer.resize(total_len + 1, 0)
-        # Copy the data alongside the terminator.
-        memcpy(
-            dest=self.unsafe_ptr() + self_len,
-            src=other.unsafe_ptr(),
-            count=other_len + 1,
-        )
+        self._iadd[True](other.as_bytes())
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
-        """Iterate over elements of the string, returning immutable references.
+    @always_inline
+    fn __iadd__(inout self, other: StringLiteral):
+        """Appends another string literal to this string.
+
+        Args:
+            other: The string to append.
+        """
+        self._iadd[False](other.as_bytes())
+
+    @always_inline
+    fn __iadd__(inout self, other: StringSlice):
+        """Appends another string slice to this string.
+
+        Args:
+            other: The string to append.
+        """
+        self._iadd[False](other.as_bytes())
+
+    fn __iter__(self) -> _StringSliceIter[__origin_of(self)]:
+        """Iterate over the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
@@ -1135,9 +1215,7 @@ struct String(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[__origin_of(self), False]:
+    fn __reversed__(self) -> _StringSliceIter[__origin_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
@@ -1286,7 +1364,7 @@ struct String(
             curr += self + str(elems[i])
         return curr
 
-    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+    fn join[*Types: Formattable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1300,15 +1378,16 @@ struct String(
         """
 
         var result: String = ""
+        var formatter = result._unsafe_to_formatter()
         var is_first = True
 
         @parameter
-        fn add_elt[T: Stringable](a: T):
+        fn add_elt[T: Formattable](a: T):
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(a)
+                self.format_to(formatter)
+            a.format_to(formatter)
 
         elems.each[add_elt]()
         _ = is_first
@@ -1326,17 +1405,76 @@ struct String(
         Returns:
             The joined string.
         """
-        var result: String = ""
-        var is_first = True
 
-        for e in elems:
+        # TODO(#3403): Simplify this when the linked conditional conformance
+        # feature is added.  Runs a faster algorithm if the concrete types are
+        # able to be converted to a span of bytes.
+        @parameter
+        if _type_is_eq[T, String]():
+            return self.fast_join(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self.fast_join(rebind[List[StringLiteral]](elems))
+        # FIXME(#3597): once StringSlice conforms to CollectionElement trait:
+        # if _type_is_eq[T, StringSlice]():
+        # return self.fast_join(rebind[List[StringSlice]](elems))
+        else:
+            var result: String = ""
+            var is_first = True
+
+            for e in elems:
+                if is_first:
+                    is_first = False
+                else:
+                    result += self
+                result += str(e[])
+
+            return result
+
+    fn fast_join[
+        T: BytesCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var n_elems = len(elems)
+        if n_elems == 0:
+            return String("")
+        var len_self = self.byte_length()
+        var len_elems = 0
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
+        for e_ref in elems:
+            len_elems += len(e_ref[].as_bytes())
+        var capacity = len_self * (n_elems - 1) + len_elems
+        var buf = Self._buffer_type(capacity=capacity)
+        var self_ptr = self.unsafe_ptr()
+        var ptr = buf.unsafe_ptr()
+        var offset = 0
+        var i = 0
+        var is_first = True
+        while i < n_elems:
             if is_first:
                 is_first = False
             else:
-                result += self
-            result += str(e[])
-
-        return result
+                memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
+                offset += len_self
+            var e = elems[i].as_bytes()
+            var e_len = len(e)
+            memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
+            offset += e_len
+            i += 1
+        buf.size = capacity
+        buf.append(0)
+        return String(buf^)
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -1411,7 +1549,8 @@ struct String(
         Notes:
             This does not include the trailing null terminator in the count.
         """
-        return max(len(self._buffer) - 1, 0)
+        var length = len(self._buffer)
+        return length - int(length > 0)
 
     fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.

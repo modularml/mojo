@@ -28,6 +28,24 @@ from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 
 
+trait AsBytes:
+    """
+    The `AsBytes` trait denotes a type that can be returned as a immutable byte
+    span.
+    """
+
+    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+
 @value
 struct _SpanIter[
     is_mutable: Bool, //,
