@@ -30,7 +30,7 @@ trait AsBytes:
     span.
     """
 
-    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of bytes.
 
         Returns:
@@ -47,7 +47,7 @@ trait AsBytesRead:
     immutable byte span.
     """
 
-    fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
         """Returns an immutable contiguous slice of the bytes.
 
         Parameters:
@@ -67,7 +67,7 @@ trait AsBytesWrite(AsBytesRead):
     byte span.
     """
 
-    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
+    fn as_bytes_write[O: MutableOrigin, //](ref [O]self) -> Span[Byte, O]:
         """Returns a mutable contiguous slice of the bytes.
 
         Parameters:

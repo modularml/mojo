@@ -1200,21 +1200,21 @@ struct String(
         """
         self._iadd[False](other.as_bytes())
 
-    fn __iter__(self) -> _StringSliceIter[__origin_of(self)]:
-        """Iterate over the string, returning immutable references.
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+        """Iterate over the string unicode characters.
 
         Returns:
-            An iterator of references to the string elements.
+            An iterator of references to the string unicode characters.
         """
         return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(self) -> _StringSliceIter[__origin_of(self), False]:
-        """Iterate backwards over the string, returning immutable references.
+    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
+        """Iterate backwards over the string unicode characters.
 
         Returns:
-            A reversed iterator of references to the string elements.
+            A reversed iterator of references to the string unicode characters.
         """
         return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
@@ -1522,7 +1522,7 @@ struct String(
         )
 
     @always_inline
-    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
+    fn as_bytes_write[O: MutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
         """Returns a mutable contiguous slice of the bytes.
 
         Parameters:
@@ -1537,7 +1537,7 @@ struct String(
         return self.as_bytes()
 
     @always_inline
-    fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
         """Returns an immutable contiguous slice of the bytes.
 
         Parameters:
@@ -1699,7 +1699,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=True](self, sep, maxsplit)
+        return _split[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
 
     @always_inline
     fn split[T: Stringlike, //](self, sep: T) -> List[String]:
@@ -1727,7 +1727,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
+        return _split[has_maxsplit=False, has_sep=True](self, sep, -1)
 
     @always_inline
     fn split(self, *, maxsplit: Int) -> List[String]:
@@ -1747,7 +1747,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=True](self, None, maxsplit)
+        return _split[has_maxsplit=True, has_sep=False](self, None, maxsplit)
 
     @always_inline
     fn split(self, sep: NoneType = None) -> List[String]:
@@ -1774,7 +1774,7 @@ struct String(
         ```
         .
         """
-        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
+        return _split[has_maxsplit=False, has_sep=False](self, None, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's

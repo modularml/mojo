@@ -23,7 +23,7 @@ from utils import StringSlice
 from bit import count_leading_zeros
 from utils.span import Span, AsBytesRead, AsBytesWrite
 from collections.string import _isspace
-from collections import List
+from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 
@@ -239,10 +239,15 @@ struct _StringSliceIter[
 
 
 @value
-struct StringSlice[
-    is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable, CollectionElement, CollectionElementNew, Stringlike, AsBytesWrite):
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+    Stringable,
+    Sized,
+    Formattable,
+    CollectionElement,
+    CollectionElementNew,
+    Stringlike,
+    AsBytesWrite,
+):
     """A non-owning view to encoded string data.
 
     TODO:
@@ -490,20 +495,20 @@ struct StringSlice[
         return not self == rhs
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
-        """Iterate over elements of the string slice, returning immutable references.
+        """Iterate over the string unicode characters.
 
         Returns:
-            An iterator of references to the string elements.
+            An iterator of references to the string unicode characters.
         """
         return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
-        """Iterate backwards over the string, returning immutable references.
+        """Iterate backwards over the string unicode characters.
 
         Returns:
-            A reversed iterator of references to the string elements.
+            A reversed iterator of references to the string unicode characters.
         """
         return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
@@ -526,7 +531,7 @@ struct StringSlice[
         return self._slice
 
     @always_inline
-    fn as_bytes_write[O: MutableOrigin](ref [O]self) -> Span[UInt8, O]:
+    fn as_bytes_write[O: MutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
         """Returns a mutable contiguous slice of the bytes.
 
         Parameters:
@@ -544,7 +549,7 @@ struct StringSlice[
         )
 
     @always_inline
-    fn as_bytes_read[O: ImmutableOrigin](ref [O]self) -> Span[UInt8, O]:
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
         """Returns an immutable contiguous slice of the bytes.
 
         Parameters:
@@ -722,11 +727,14 @@ struct StringSlice[
         return True
 
     @always_inline
-    fn split[T: Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
+    fn split[
+        T: Stringlike, O: ImmutableOrigin, //
+    ](ref [O]self, sep: T, maxsplit: Int) -> List[StringSlice[O]]:
         """Split the string by a separator.
 
         Parameters:
             T: The type of the separator.
+            O: The origin of the stringslice.
 
         Args:
             sep: The string to split on.
@@ -746,14 +754,17 @@ struct StringSlice[
         ```
         .
         """
-        return _split[enable_maxsplit=True](self, sep, maxsplit)
+        return _split_sl[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: Stringlike, //](self, sep: T) -> List[String]:
+    fn split[
+        T: Stringlike, O: ImmutableOrigin, //
+    ](ref [O]self, sep: T) -> List[StringSlice[O]]:
         """Split the string by a separator.
 
         Parameters:
             T: The type of the separator.
+            O: The origin of the stringslice.
 
         Args:
             sep: The string to split on.
@@ -774,11 +785,16 @@ struct StringSlice[
         ```
         .
         """
-        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
+        return _split_sl[has_maxsplit=False, has_sep=True](self, sep, -1)
 
     @always_inline
-    fn split(self, *, maxsplit: Int) -> List[String]:
+    fn split[
+        O: ImmutableOrigin, //
+    ](ref [O]self, *, maxsplit: Int) -> List[StringSlice[O]]:
         """Split the string by every Whitespace separator.
+
+        Parameters:
+            O: The origin of the stringslice.
 
         Args:
             maxsplit: The maximum amount of items to split from String.
@@ -794,11 +810,16 @@ struct StringSlice[
         ```
         .
         """
-        return _split[enable_maxsplit=True](self, None, maxsplit)
+        return _split_sl[has_maxsplit=True, has_sep=False](self, None, maxsplit)
 
     @always_inline
-    fn split(self, sep: NoneType = None) -> List[String]:
+    fn split[
+        O: ImmutableOrigin, //
+    ](ref [O]self, sep: NoneType = None) -> List[StringSlice[O]]:
         """Split the string by every Whitespace separator.
+
+        Parameters:
+            O: The origin of the stringslice.
 
         Args:
             sep: None.
@@ -821,7 +842,7 @@ struct StringSlice[
         ```
         .
         """
-        return _split[enable_maxsplit=False](self, sep, maxsplit=-1)
+        return _split_sl[has_maxsplit=False, has_sep=False](self, sep, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
@@ -881,7 +902,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytesRead):
+trait Stringlike(AsBytesRead, CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -902,88 +923,76 @@ trait Stringlike(AsBytesRead):
         ...
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
-        """Return an iterator over the string.
+        """Iterate over the string unicode characters.
 
         Returns:
-            An iterator over the string.
+            An iterator of references to the string unicode characters.
         """
         ...
 
 
 fn _split[
-    T0: Stringlike, T1: Stringlike, //, enable_maxsplit: Bool
-](src_str: T0, sep: T1, maxsplit: Int) -> List[String]:
-    var items = _split_impl[enable_maxsplit=enable_maxsplit](
-        src_str, sep, maxsplit
-    )
+    T0: Stringlike, //,
+    has_maxsplit: Bool,
+    has_sep: Bool,
+    T1: Stringlike = StringLiteral,
+](src_str: T0, sep: Optional[T1], maxsplit: Int) -> List[String]:
+    var items: List[Span[Byte, __origin_of(src_str)]]
+
+    @parameter
+    if has_sep:
+        items = _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+    else:
+        items = _split_impl[has_maxsplit](src_str, maxsplit)
     var output = List[String](capacity=len(items))
     # TODO: some fancy custom allocator since we know the exact length of each
-    for itm in items:
-        var sp = rebind[Span[UInt8, __origin_of(src_str)]](itm[])
-        output.append(StringSlice[__origin_of(src_str)](unsafe_from_utf8=sp))
+    for item in items:
+        output.append(String(StringSlice(unsafe_from_utf8=item[])))
     return output^
 
 
-# FIXME(#3597): once StringSlice conforms to collection element trait
-# fn _split_slice[
-#     T: Stringlike, //, enable_maxsplit: Bool
-# ](src_str: StringSlice, sep: T, maxsplit: Int) raises -> List[StringSlice]:
-#     var items = _split_impl[enable_maxsplit=enable_maxsplit](
-#         src_str, sep, maxsplit
-#     )
-#     alias S = StringSlice[__origin_of(src_str)]
-#     var output = List[S](capacity=len(items))
-#     for item in items:
-#         output.append(S(unsafe_from_utf8=item[]))
-#     return output^
+fn _split_sl[
+    O: ImmutableOrigin, //,
+    has_maxsplit: Bool,
+    has_sep: Bool,
+    T: Stringlike = StringLiteral,
+](ref [O]src_str: StringSlice, sep: Optional[T], maxsplit: Int) -> List[
+    StringSlice[O]
+]:
+    var items: List[Span[Byte, O]]
 
-
-fn _split[
-    T: Stringlike, //, enable_maxsplit: Bool
-](src_str: T, sep: NoneType, maxsplit: Int) -> List[String]:
-    var items = _split_impl[enable_maxsplit=enable_maxsplit](src_str, maxsplit)
-    var output = List[String](capacity=len(items))
-    # TODO: some fancy custom allocator since we know the exact length of each
-    for itm in items:
-        var sp = rebind[Span[UInt8, __origin_of(src_str)]](itm[])
-        output.append(StringSlice[__origin_of(src_str)](unsafe_from_utf8=sp))
+    @parameter
+    if has_sep:
+        items = _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+    else:
+        items = _split_impl[has_maxsplit](src_str, maxsplit)
+    var output = List[StringSlice[O]](capacity=len(items))
+    for item in items:
+        output.append(StringSlice(unsafe_from_utf8=item[]))
     return output^
 
 
-# FIXME(#3597): once StringSlice conforms to collection element trait
-# fn _split_slice[
-#     enable_maxsplit: Bool
-# ](src_str: StringSlice, sep: NoneType, maxsplit: Int) -> List[StringSlice]:
-#     var items = _split_impl[enable_maxsplit=enable_maxsplit](src_str, maxsplit)
-#     alias S = StringSlice[__origin_of(src_str)]
-#     var output = List[S](capacity=len(items))
-#     for item in items:
-#         output.append(S(unsafe_from_utf8=item[]))
-#     return output^
-
-
-# FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
-    T0: Stringlike, T1: Stringlike, //, enable_maxsplit: Bool
-](src_str: T0, sep: T1, maxsplit: Int) -> List[
-    Span[UInt8, StaticConstantOrigin]
-] as output:
-    alias Sp = Span[UInt8, StaticConstantOrigin]
+    T0: Stringlike,
+    T1: Stringlike,
+    O: ImmutableOrigin, //,
+    has_maxsplit: Bool,
+](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
     var sep_len = len(sep.as_bytes_read())
     if sep_len == 0:
         var iterator = src_str.__iter__()
         output = __type_of(output)(capacity=len(iterator) + 2)
-        output.append(rebind[Sp]("".as_bytes()))
+        output.append(rebind[Span[Byte, O]]("".as_bytes_read()))
         for s in iterator:
-            output.append(rebind[Sp](s.as_bytes()))
-        output.append(rebind[Sp]("".as_bytes()))
+            output.append(rebind[Span[Byte, O]](s.as_bytes_read()))
+        output.append(rebind[Span[Byte, O]]("".as_bytes_read()))
         return
 
     alias prealloc = 16  # guessing, Python's implementation uses 12
     var amnt = prealloc
 
     @parameter
-    if enable_maxsplit:
+    if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
     var str_byte_len = len(src_str.as_bytes_read())
@@ -995,30 +1004,26 @@ fn _split_impl[
     # var sep_span = sep.as_bytes_read() # FIXME(#3295)
 
     while lhs <= str_byte_len:
-        rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span
+        rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span and sep_span
         rhs += int(rhs == -1) * (str_byte_len + 1)  # if not found go to end
 
         @parameter
-        if enable_maxsplit:
+        if has_maxsplit:
             rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
-        output.append(Sp(unsafe_ptr=ptr + lhs, len=rhs - lhs))
+        output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
         lhs = rhs + sep_len
 
 
-# FIXME: should return List[Span[UInt8, __origin_of(src_str)]] this is a hack
 fn _split_impl[
-    T: Stringlike, //, enable_maxsplit: Bool
-](src_str: T, maxsplit: Int) -> List[
-    Span[UInt8, StaticConstantOrigin]
-] as output:
-    alias Sp = Span[UInt8, StaticConstantOrigin]
+    T: Stringlike, O: ImmutableOrigin, //, has_maxsplit: Bool
+](ref [O]src_str: T, maxsplit: Int) -> List[Span[Byte, O]] as output:
     alias prealloc = 16  # guessing, Python's implementation uses 12
     var amnt = prealloc
 
     @parameter
-    if enable_maxsplit:
+    if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
     var str_byte_len = len(src_str.as_bytes_read())
@@ -1029,7 +1034,7 @@ fn _split_impl[
     alias S = StringSlice[StaticConstantOrigin]
 
     @always_inline("nodebug")
-    fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
+    fn _build_slice(p: UnsafePointer[Byte], start: Int, end: Int) -> S:
         return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
     while lhs <= str_byte_len:
@@ -1050,9 +1055,9 @@ fn _split_impl[
             rhs += s.byte_length()
 
         @parameter
-        if enable_maxsplit:
+        if has_maxsplit:
             rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
-        output.append(Sp(unsafe_ptr=ptr + lhs, len=rhs - lhs))
+        output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
         lhs = rhs
