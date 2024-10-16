@@ -1355,6 +1355,7 @@ struct String(
         """
         pass
 
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
@@ -1364,6 +1365,7 @@ struct String(
         return self._buffer.data
 
     @deprecated("Use `sys.ffi.c_char_ptr()` instead.")
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
