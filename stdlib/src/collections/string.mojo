@@ -1391,6 +1391,7 @@ struct String(
 
         elems.each[add_elt]()
         _ = is_first
+        _ = formatter^
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
