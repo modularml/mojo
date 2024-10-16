@@ -419,11 +419,9 @@ fn exp2[
     if type not in (DType.float32, DType.float64):
         return exp2(x.cast[DType.float32]()).cast[type]()
 
-    alias integral_type = FPUtils[type].integral_type
-
     var xc = x.clamp(-126, 126)
 
-    var m = xc.cast[integral_type]()
+    var m = xc.cast[__type_of(x.to_bits()).type]()
 
     xc -= m.cast[type]()
 
@@ -437,11 +435,9 @@ fn exp2[
             1.33336498402e-3,
         ),
     ](xc)
-
-    return (
-        r._float_to_bits[integral_type]()
-        + (m << FPUtils[type].mantissa_width())
-    )._bits_to_float[type]()
+    return __type_of(r)(
+        from_bits=(r.to_bits() + (m << FPUtils[type].mantissa_width()))
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -505,11 +501,9 @@ fn _ldexp_impl[
         return res
 
     alias integral_type = FPUtils[type].integral_type
-    var m: SIMD[integral_type, simd_width] = (
-        exp.cast[integral_type]() + FPUtils[type].exponent_bias()
-    )
+    var m = exp.cast[integral_type]() + FPUtils[type].exponent_bias()
 
-    return x * (m << FPUtils[type].mantissa_width())._bits_to_float[type]()
+    return x * __type_of(x)(from_bits=m << FPUtils[type].mantissa_width())
 
 
 @always_inline
@@ -630,8 +624,8 @@ fn exp[
 
 @always_inline
 fn _frexp_mask1[
-    simd_width: Int, type: DType, integral_type: DType
-]() -> SIMD[integral_type, simd_width]:
+    simd_width: Int, type: DType
+]() -> SIMD[_integral_type_of[type](), simd_width]:
     @parameter
     if type is DType.float16:
         return 0x7C00
@@ -646,8 +640,8 @@ fn _frexp_mask1[
 
 @always_inline
 fn _frexp_mask2[
-    simd_width: Int, type: DType, integral_type: DType
-]() -> SIMD[integral_type, simd_width]:
+    simd_width: Int, type: DType
+]() -> SIMD[_integral_type_of[type](), simd_width]:
     @parameter
     if type is DType.float16:
         return 0x3800
@@ -682,22 +676,20 @@ fn frexp[
     """
     # Based on the implementation in boost/simd/arch/common/simd/function/ifrexp.hpp
     constrained[type.is_floating_point(), "must be a floating point value"]()
-    alias integral_type = _integral_type_of[type]()
-    alias zero = SIMD[type, simd_width](0)
+    alias T = SIMD[type, simd_width]
+    alias zero = T(0)
     alias max_exponent = FPUtils[type].max_exponent() - 2
     alias mantissa_width = FPUtils[type].mantissa_width()
-    var mask1 = _frexp_mask1[simd_width, type, integral_type]()
-    var mask2 = _frexp_mask2[simd_width, type, integral_type]()
-    var x_int = x._float_to_bits[integral_type]()
+    var mask1 = _frexp_mask1[simd_width, type]()
+    var mask2 = _frexp_mask2[simd_width, type]()
+    var x_int = x.to_bits()
     var selector = x != zero
     var exp = selector.select(
         (((mask1 & x_int) >> mantissa_width) - max_exponent).cast[type](),
         zero,
     )
-    var frac = selector.select(
-        ((x_int & ~mask1) | mask2)._bits_to_float[type](), zero
-    )
-    return StaticTuple[SIMD[type, simd_width], 2](frac, exp)
+    var frac = selector.select(T(from_bits=x_int & ~mask1 | mask2), zero)
+    return StaticTuple[size=2](frac, exp)
 
 
 # ===----------------------------------------------------------------------=== #
