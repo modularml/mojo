@@ -15,7 +15,7 @@
 from .index import Index, IndexList, product
 from .inline_string import InlineString
 from .loop import unroll
-from .span import AsBytes, Span
+from .span import Span, AsBytes, AsBytesRead
 from .static_tuple import StaticTuple
 from .stringref import StringRef
 from .string_slice import StaticString, StringSlice

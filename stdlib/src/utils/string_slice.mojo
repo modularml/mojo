@@ -661,6 +661,20 @@ struct StringSlice[
         _ = next_line, unicode_line_sep, unicode_paragraph_sep
         return True
 
+    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        return str(self).join(elems)
+
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines](

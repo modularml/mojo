@@ -23,7 +23,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.span import AsBytesRead
 from collections.string import _atol, _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
@@ -36,6 +36,7 @@ from collections.string import _atol, _StringSliceIter
 struct StringLiteral(
     Boolable,
     Comparable,
+    CollectionElement,
     CollectionElementNew,
     Formattable,
     IntableRaising,
@@ -44,7 +45,7 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
-    BytesCollectionElement,
+    AsBytesRead,
     _HashableWithHasher,
 ):
     """This type represents a string literal.
