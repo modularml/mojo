@@ -303,6 +303,16 @@ struct StringLiteral(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantOrigin, False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator over the string.
+        """
+        return _StringSliceIter[StaticConstantOrigin, False](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
     fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
 

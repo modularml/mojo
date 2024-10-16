@@ -19,6 +19,8 @@ from memory import Pointer
 ```
 """
 
+from builtin._documentation import doc_private
+
 # TODO: This is kept for compatibility, remove this in the future.
 alias Reference = Pointer[*_]
 
@@ -302,6 +304,7 @@ struct Pointer[
     # Initializers
     # ===------------------------------------------------------------------===#
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, *, _mlir_value: Self._mlir_type):
         """Constructs a Pointer from its MLIR prepresentation.

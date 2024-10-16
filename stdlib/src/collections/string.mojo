@@ -1065,6 +1065,30 @@ struct String(
         """
         return not (self < rhs)
 
+    @staticmethod
+    fn _add[rhs_has_null: Bool](lhs: Span[UInt8], rhs: Span[UInt8]) -> String:
+        var lhs_len = len(lhs)
+        var rhs_len = len(rhs)
+        var lhs_ptr = lhs.unsafe_ptr()
+        var rhs_ptr = rhs.unsafe_ptr()
+        alias S = StringSlice[ImmutableAnyOrigin]
+        if lhs_len == 0:
+            return String(S(unsafe_from_utf8_ptr=rhs_ptr, len=rhs_len))
+        elif rhs_len == 0:
+            return String(S(unsafe_from_utf8_ptr=lhs_ptr, len=lhs_len))
+        var sum_len = lhs_len + rhs_len
+        var buffer = Self._buffer_type(capacity=sum_len + 1)
+        var ptr = buffer.unsafe_ptr()
+        memcpy(ptr, lhs_ptr, lhs_len)
+        memcpy(ptr + lhs_len, rhs_ptr, rhs_len + int(rhs_has_null))
+        buffer.size = sum_len + 1
+
+        @parameter
+        if not rhs_has_null:
+            ptr[sum_len] = 0
+        return Self(buffer^)
+
+    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -1074,26 +1098,31 @@ struct String(
         Returns:
             The new constructed string.
         """
-        if not self:
-            return other
-        if not other:
-            return self
-        var self_len = self.byte_length()
-        var other_len = other.byte_length()
-        var total_len = self_len + other_len
-        var buffer = Self._buffer_type()
-        buffer.resize(total_len + 1, 0)
-        memcpy(
-            buffer.data,
-            self.unsafe_ptr(),
-            self_len,
-        )
-        memcpy(
-            buffer.data + self_len,
-            other.unsafe_ptr(),
-            other_len + 1,  # Also copy the terminator
-        )
-        return Self(buffer^)
+        return Self._add[True](self.as_bytes(), other.as_bytes())
+
+    @always_inline
+    fn __add__(self, other: StringLiteral) -> String:
+        """Creates a string by appending a string literal at the end.
+
+        Args:
+            other: The string literal to append.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[False](self.as_bytes(), other.as_bytes())
+
+    @always_inline
+    fn __add__(self, other: StringSlice) -> String:
+        """Creates a string by appending a string slice at the end.
+
+        Args:
+            other: The string slice to append.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[False](self.as_bytes(), other.as_bytes())
 
     @always_inline
     fn __radd__(self, other: String) -> String:
@@ -1105,32 +1134,81 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return other + self
+        return Self._add[True](other.as_bytes(), self.as_bytes())
 
+    @always_inline
+    fn __radd__(self, other: StringLiteral) -> String:
+        """Creates a string by prepending another string literal to the start.
+
+        Args:
+            other: The string to prepend.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[True](other.as_bytes(), self.as_bytes())
+
+    @always_inline
+    fn __radd__(self, other: StringSlice) -> String:
+        """Creates a string by prepending another string slice to the start.
+
+        Args:
+            other: The string to prepend.
+
+        Returns:
+            The new constructed string.
+        """
+        return Self._add[True](other.as_bytes(), self.as_bytes())
+
+    fn _iadd[has_null: Bool](inout self, other: Span[UInt8]):
+        var s_len = self.byte_length()
+        var o_len = len(other)
+        var o_ptr = other.unsafe_ptr()
+        if s_len == 0:
+            alias S = StringSlice[ImmutableAnyOrigin]
+            self = String(S(unsafe_from_utf8_ptr=o_ptr, len=o_len))
+            return
+        elif o_len == 0:
+            return
+        var sum_len = s_len + o_len
+        self._buffer.reserve(sum_len + 1)
+        var s_ptr = self.unsafe_ptr()
+        memcpy(s_ptr + s_len, o_ptr, o_len + int(has_null))
+        self._buffer.size = sum_len + 1
+
+        @parameter
+        if not has_null:
+            s_ptr[sum_len] = 0
+
+    @always_inline
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
         Args:
             other: The string to append.
         """
-        if not self:
-            self = other
-            return
-        if not other:
-            return
-        var self_len = self.byte_length()
-        var other_len = other.byte_length()
-        var total_len = self_len + other_len
-        self._buffer.resize(total_len + 1, 0)
-        # Copy the data alongside the terminator.
-        memcpy(
-            dest=self.unsafe_ptr() + self_len,
-            src=other.unsafe_ptr(),
-            count=other_len + 1,
-        )
+        self._iadd[True](other.as_bytes())
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
-        """Iterate over elements of the string, returning immutable references.
+    @always_inline
+    fn __iadd__(inout self, other: StringLiteral):
+        """Appends another string literal to this string.
+
+        Args:
+            other: The string to append.
+        """
+        self._iadd[False](other.as_bytes())
+
+    @always_inline
+    fn __iadd__(inout self, other: StringSlice):
+        """Appends another string slice to this string.
+
+        Args:
+            other: The string to append.
+        """
+        self._iadd[False](other.as_bytes())
+
+    fn __iter__(self) -> _StringSliceIter[__origin_of(self)]:
+        """Iterate over the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
@@ -1139,9 +1217,7 @@ struct String(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref [_]self,
-    ) -> _StringSliceIter[__origin_of(self), False]:
+    fn __reversed__(self) -> _StringSliceIter[__origin_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
@@ -1475,7 +1551,8 @@ struct String(
         Notes:
             This does not include the trailing null terminator in the count.
         """
-        return max(len(self._buffer) - 1, 0)
+        var length = len(self._buffer)
+        return length - int(length > 0)
 
     fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
