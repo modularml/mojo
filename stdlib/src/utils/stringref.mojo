@@ -516,9 +516,6 @@ struct StringRef(
             end -= 1
         return StringRef(ptr + start, end - start)
 
-    # FIXME: look at string's split and copy it to StringSlice
-    # Delete this after as it does not conform to Python's behavior and we don't
-    # want to keep using StringRef. I'll do it in another PR, this is a reminder
     fn split(self, delimiter: StringRef) raises -> List[StringRef]:
         """Split the StringRef by a delimiter.
 
