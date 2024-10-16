@@ -69,7 +69,7 @@ trait FloatableRaising:
     For example:
 
     ```mojo
-    from stdlib.utils import Variant
+    from utils import Variant
 
     @value
     struct MaybeFloat(FloatableRaising):
