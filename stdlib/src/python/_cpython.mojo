@@ -1783,7 +1783,9 @@ struct CPython:
         return py_slice
 
     # const char *PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size)
-    fn PyUnicode_AsUTF8AndSize(inout self, py_object_ptr: PyObjectPtr) -> StringRef:
+    fn PyUnicode_AsUTF8AndSize(
+        inout self, py_object_ptr: PyObjectPtr
+    ) -> StringRef:
         """See https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize.
         """
 
