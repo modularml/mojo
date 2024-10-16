@@ -15,6 +15,6 @@
 from .arc import Arc
 from .box import Box
 from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
-from .pointer import AddressSpace, Pointer, Reference
+from .pointer import AddressSpace, Pointer
 from .unsafe import bitcast
 from .unsafe_pointer import UnsafePointer
