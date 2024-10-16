@@ -69,8 +69,10 @@ trait FloatableRaising:
     For example:
 
     ```mojo
+    from stdlib.utils import Variant
+
     @value
-    struct MaybeFloat(FloatableRasing):
+    struct MaybeFloat(FloatableRaising):
         var value: Variant[Float64, NoneType]
 
         fn __float__(self) raises -> Float64:
