@@ -42,10 +42,6 @@ jobs:
           # Add magic to PATH
           echo "$HOME/.modular/bin" >> $GITHUB_PATH
 
-          # Pin magic to older version to avoid HTTP timeouts and/or client certificate errors
-          # that manifest as a result of uv/python package solvers from Magic 0.3.0.
-          "$HOME/.modular/bin/magic" self-update --version 0.2.3
-
       - name: Install pre-commit
         run: |
           pip install pre-commit

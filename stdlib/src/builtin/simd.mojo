@@ -98,6 +98,9 @@ alias Float32 = Scalar[DType.float32]
 alias Float64 = Scalar[DType.float64]
 """Represents a 64-bit floating point value."""
 
+alias Byte = UInt8
+"""Represents a byte (backed by an 8-bit unsigned integer)."""
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -934,6 +937,9 @@ struct SIMD[type: DType, size: Int](
         """
         constrained[type.is_integral(), "must be an integral type"]()
         debug_assert(all(rhs >= 0), "unhandled negative value")
+        debug_assert(
+            all(rhs < bitwidthof[type]()), "unhandled value greater than size"
+        )
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -951,6 +957,9 @@ struct SIMD[type: DType, size: Int](
         """
         constrained[type.is_integral(), "must be an integral type"]()
         debug_assert(all(rhs >= 0), "unhandled negative value")
+        debug_assert(
+            all(rhs < bitwidthof[type]()), "unhandled value greater than size"
+        )
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -2025,9 +2034,9 @@ struct SIMD[type: DType, size: Int](
         which is an unrolled for loop.
 
         The pseudocode of this function is:
-        ```mojo
-        var result = SIMD[Self.type, mask_size]()
-        for i in range(0, mask_size):
+        ```
+        result = SIMD[Self.type, mask_size]()
+        for i in range(mask_size):
             result[i] = self[int(mask[i])]
         ```
 

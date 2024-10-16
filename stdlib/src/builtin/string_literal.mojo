@@ -44,6 +44,7 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
+    BytesCollectionElement,
     _HashableWithHasher,
 ):
     """This type represents a string literal.
@@ -300,6 +301,16 @@ struct StringLiteral(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantOrigin, False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator over the string.
+        """
+        return _StringSliceIter[StaticConstantOrigin, False](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
     fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
 
@@ -387,6 +398,23 @@ struct StringLiteral(
             len=self.byte_length(),
         )
 
+    @always_inline
+    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        # Does NOT include the NUL terminator.
+        return Span[UInt8, __origin_of(self)](
+            unsafe_ptr=self.unsafe_ptr(),
+            len=self.byte_length(),
+        )
+
     fn format_to(self, inout writer: Formatter):
         """
         Formats this string literal to the provided formatter.
@@ -448,17 +476,7 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        var result: String = ""
-        var is_first = True
-
-        for e in elems:
-            if is_first:
-                is_first = False
-            else:
-                result += self
-            result += str(e[])
-
-        return result
+        return str(self).join(elems)
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.

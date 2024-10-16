@@ -175,6 +175,11 @@ what we publish.
       return a
   ```
 
+- `Slice.step` is now an `Optional[Int]`, matching the optionality of
+  `slice.step` in Python.
+  ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
+   [@bgreni](https://github.com/bgreni))
+
 - `StringRef` now implements `split()` which can be used to split a
   `StringRef` into a `List[StringRef]` by a delimiter.
   ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
@@ -191,6 +196,10 @@ what we publish.
 - [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
   [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
   compared for pointer equivalence using `a is b`.
+
+- There is now a [`Byte`](/mojo/stdlib/builtin/simd/Byte) alias to better
+  express intent when working with a pack of bits.
+  ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraos](https://github.com/soraros)).
 
 ### 🦋 Changed
 
@@ -221,9 +230,6 @@ what we publish.
   and so on.
 
 - The VS Code extension now allows selecting a default SDK when multiple are available.
-
-- `String.as_bytes_slice()` is renamed to `String.as_bytes_span()` since it
-  returns a `Span` and not a `StringSlice`.
 
 - The flag for turning on asserts has changed, e.g. to enable all checks:
 
@@ -261,14 +267,16 @@ what we publish.
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
 
-- `String.as_bytes()` now returns a `Span[UInt8]` instead of a `List[Int8]`. The
-  old behavior can be achieved by using `List(s.as_bytes())`.
+- A new trait has been added `AsBytes` to enable taking a `Span[UInt8]` of a
+  type with `s.as_bytes()`. `String.as_bytes` and `String.as_bytes_slice` have
+  been consolidated under `s.as_bytes` to return a `Span[UInt8]`, you can convert
+  it to a `List` if you require a copy with `List(s.as_bytes())`.
 
 - `Lifetime` and related types has been renamed to `Origin` in the standard
   library to better clarify that parameters of this type indicate where a
   reference is derived from, not the more complicated notion of where a variable
   is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
-  for more information and rationale.  As a consequence `__origin_of` is now
+  for more information and rationale.  As a consequence `__lifetime_of` is now
   named `__origin_of`.
 
 ### ❌ Removed
