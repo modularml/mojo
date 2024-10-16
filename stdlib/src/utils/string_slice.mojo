@@ -661,6 +661,92 @@ struct StringSlice[
         _ = next_line, unicode_line_sep, unicode_paragraph_sep
         return True
 
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        # TODO(#3403): Simplify this when the linked conditional conformance
+        # feature is added.  Runs a faster algorithm if the concrete types are
+        # able to be converted to a span of bytes.
+
+        @parameter
+        if _type_is_eq[T, String]():
+            return self.join_bytes(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self.join_bytes(rebind[List[StringLiteral]](elems))
+        elif _type_is_eq[T, StringSlice[__origin_of(elems)]]():
+            return self.join_bytes(
+                rebind[List[StringSlice[__origin_of(elems)]]](elems)
+            )
+        else:
+            var result: String = ""
+            var is_first = True
+
+            for e in elems:
+                if is_first:
+                    is_first = False
+                else:
+                    result += self
+                result += str(e[])
+
+            return result
+
+    fn join_bytes[
+        T: BytesReadCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        var n_elems = len(elems)
+        if n_elems == 0:
+            return String("")
+        var s_len = self.byte_length()
+        var len_elems = 0
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
+        for e_ref in elems:
+            len_elems += len(e_ref[].as_bytes_read())
+        var capacity = s_len * (n_elems - 1) + len_elems
+        var buf = Self._buffer_type(capacity=capacity)
+        var s_ptr = self.unsafe_ptr()
+        var b_ptr = buf.unsafe_ptr()
+        var offset = 0
+        var i = 0
+        var not_first = False
+        while i < n_elems:
+            memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
+            offset += s_len * int(not_first)
+            not_first = True
+            var e = elems[i].as_bytes_read()
+            var e_len = len(e)
+            memcpy(dest=b_ptr + offset, src=e.unsafe_ptr(), count=e_len)
+            offset += e_len
+            i += 1
+        buf.size = capacity
+        b_ptr[capacity] = 0
+        return String(buf^)
+
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines](

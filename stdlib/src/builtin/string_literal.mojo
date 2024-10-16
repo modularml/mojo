@@ -23,7 +23,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Formattable, Formatter
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.span import AsBytesRead
 from collections.string import _atol, _StringSliceIter
 
 # ===----------------------------------------------------------------------===#
@@ -36,6 +36,7 @@ from collections.string import _atol, _StringSliceIter
 struct StringLiteral(
     Boolable,
     Comparable,
+    CollectionElement,
     CollectionElementNew,
     Formattable,
     IntableRaising,
@@ -44,7 +45,7 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
-    BytesCollectionElement,
+    AsBytesRead,
     _HashableWithHasher,
 ):
     """This type represents a string literal.
@@ -463,7 +464,9 @@ struct StringLiteral(
         """
         return __mlir_op.`pop.string.replace`(self.value, old.value, new.value)
 
-    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -475,7 +478,23 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        return str(self).join(elems)
+        return self.as_string_slice.join(elems)
+
+    fn join_bytes[
+        T: BytesReadCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        return self.as_string_slice().join_bytes(elems)
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.

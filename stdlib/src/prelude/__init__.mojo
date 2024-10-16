@@ -91,7 +91,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
-    BytesCollectionElement,
+    BytesReadCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -133,4 +133,4 @@ from collections.string import (
 )
 from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
-from utils import AsBytes, Formattable, Formatter
+from utils import AsBytes, AsBytesRead, Formattable, Formatter
