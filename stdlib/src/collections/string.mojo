@@ -1393,7 +1393,9 @@ struct String(
         _ = is_first
         return result
 
-    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1405,32 +1407,7 @@ struct String(
         Returns:
             The joined string.
         """
-
-        # TODO(#3403): Simplify this when the linked conditional conformance
-        # feature is added.  Runs a faster algorithm if the concrete types are
-        # able to be converted to a span of bytes.
-
-        @parameter
-        if _type_is_eq[T, String]():
-            return self.join_bytes(rebind[List[String]](elems))
-        elif _type_is_eq[T, StringLiteral]():
-            return self.join_bytes(rebind[List[StringLiteral]](elems))
-        elif _type_is_eq[T, StringSlice[__origin_of(elems)]]():
-            return self.join_bytes(
-                rebind[List[StringSlice[__origin_of(elems)]]](elems)
-            )
-        else:
-            var result: String = ""
-            var is_first = True
-
-            for e in elems:
-                if is_first:
-                    is_first = False
-                else:
-                    result += self
-                result += str(e[])
-
-            return result
+        return self.as_string_slice.join(elems)
 
     fn join_bytes[
         T: BytesReadCollectionElement, //,
@@ -1446,37 +1423,7 @@ struct String(
         Returns:
             The joined string.
         """
-        var n_elems = len(elems)
-        if n_elems == 0:
-            return String("")
-        var len_self = self.byte_length()
-        var len_elems = 0
-        # Calculate the total size of the elements to join beforehand
-        # to prevent alloc syscalls as we know the buffer size.
-        # This can hugely improve the performance on large lists
-        for e_ref in elems:
-            len_elems += len(e_ref[].as_bytes_read())
-        var capacity = len_self * (n_elems - 1) + len_elems
-        var buf = Self._buffer_type(capacity=capacity)
-        var self_ptr = self.unsafe_ptr()
-        var ptr = buf.unsafe_ptr()
-        var offset = 0
-        var i = 0
-        var is_first = True
-        while i < n_elems:
-            if is_first:
-                is_first = False
-            else:
-                memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
-                offset += len_self
-            var e = elems[i].as_bytes_read()
-            var e_len = len(e)
-            memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
-            offset += e_len
-            i += 1
-        buf.size = capacity
-        buf.unsafe_set(capacity, 0)
-        return String(buf^)
+        return self.as_string_slice().join_bytes(elems)
 
     fn _strref_dangerous(self) -> StringRef:
         """

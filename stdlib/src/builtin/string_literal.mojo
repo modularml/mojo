@@ -464,7 +464,9 @@ struct StringLiteral(
         """
         return __mlir_op.`pop.string.replace`(self.value, old.value, new.value)
 
-    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -476,7 +478,23 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        return str(self).join(elems)
+        return self.as_string_slice.join(elems)
+
+    fn join_bytes[
+        T: BytesReadCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        return self.as_string_slice().join_bytes(elems)
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.
