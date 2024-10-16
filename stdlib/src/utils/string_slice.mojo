@@ -730,7 +730,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait _Stringlike:
+trait Stringlike:
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -840,7 +840,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[Int]()
 
     @staticmethod
-    fn format[T: _Stringlike](fmt_src: T, args: Self._args_t) raises -> String:
+    fn format[T: Stringlike](fmt_src: T, args: Self._args_t) raises -> String:
         alias len_pos_args = __type_of(args).__len__()
         entries, size_estimation = Self._create_entries(fmt_src, len_pos_args)
         var fmt_len = fmt_src.byte_length()
@@ -868,7 +868,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     @staticmethod
     fn _create_entries[
-        T: _Stringlike
+        T: Stringlike
     ](fmt_src: T, len_pos_args: Int) raises -> (List[Self], Int):
         """Returns a list of entries and its total estimated entry byte width.
         """
@@ -955,7 +955,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return entries^, total_estimated_entry_byte_width
 
     fn _handle_field_and_break[
-        T: _Stringlike
+        T: Stringlike
     ](
         inout self,
         fmt_src: T,
