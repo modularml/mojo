@@ -336,6 +336,10 @@ detailed information in the following sections:
 
     If the user enters "Mojo" it returns "Hello, Mojo!"
 
+    There is a known issue when running the `input()` function with JIT
+    compilation (see issue
+    [#3479](https://github.com/modularml/mojo/issues/3479)).
+
   - [`print()`](/mojo/stdlib/builtin/io/print) now requires that its arguments
     conform to the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait.
     This enables efficient stream-based writing by default, avoiding unnecessary

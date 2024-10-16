@@ -33,7 +33,7 @@ If you have encountered any bugs with current Mojo behavior, please
 
 If you have ideas about how to improve the core Mojo features, we prefer that
 you first look for similar topics or start a new conversation about it
-in our [GitHub Discussions](https://github.com/modularml/mojo/discussions).
+on [Discord](https://discord.gg/modular).
 
 We also consider Mojo to be a new member of the Python family, so if you
 have suggestions to improve the experience with Python, we encourage
@@ -66,7 +66,7 @@ subsumed by more general features if time and care were given to broader
 evaluation.
 
 - Third, the Python community should tackle some of these ideas first. It is
-important to us that Mojo be a good member of the Python family (a "Python++"),
+important to us that Mojo be a good member of the Python family,
 not just a language with Pythonic syntax. As such, we don't want to needlessly
 diverge from Python evolution: adding a bunch of features could lead to
 problems down the road if Python makes incompatible decisions. Such a future
@@ -82,83 +82,6 @@ superset. We are happy with this approach because the Python community is
 better equipped to evaluate these features, they have mature code bases to
 evaluate them with, and they have processes and infrastructure for making
 structured language evolution features.
-
-## Mojo SDK known issues
-
-The Mojo SDK is still in early development
-and currently only available for Ubuntu Linux and macOS (Apple silicon)
-systems. Here are some of the notable issues that we plan to fix:
-
-- Missing native support for Windows, Intel Macs, and Linux distributions
-  other than Ubuntu. Currently, we support Ubuntu systems with x86-64
-  processors and Apple Silicon macOS. Support for more Linux distributions
-  (including Debian and RHEL) and Windows is in progress.
-
-- Modular CLI install might fail and require `modular clean` before you
-  re-install.
-
-  If it asks you to perform auth, run `modular auth <MODULAR_AUTH>` and use the
-  `MODULAR_AUTH` value shown for the `curl` command on [the download
-  page](https://developer.modular.com/download).
-
-- If you attempt to uninstall Mojo with `modular uninstall`, your subsequent
-  attempt to install Mojo might fail with an HTTP 500 error code. If so, run
-  `modular clean` and try again.
-
-- Mojo REPL might hang (become unresponsive for more than 10 seconds) when
-  interpreting an expression if your system has 4 GiB or less RAM. If you
-  encounter this issue, please report it with your system specs.
-
-Additionally, we're aware of some issues that we might not be able to solve,
-but we mention them here with some more information:
-
-- When installing Mojo, if you receive the error,
-  `failed to reach URL https://cas.modular.com`, it could be because your
-  network connection is behind a firewall. Try updating your firewall settings
-  to allow access to these end points: `https://packages.modular.com` and
-  `https://cas.modular.com`. Then retry with `modular clean` and
-  `modular install mojo`.
-
-- When installing Mojo, if you receive the error,
-  `gpg: no valid OpenGPG data found`, this is likely because you are located
-  outside our supported geographies. Due to US export control restrictions, we
-  are unable to provide access to Mojo to users situated in specific countries.
-
-- If using Windows Subsystem for Linux (WSL), you might face issues with WSL 1.
-  We recommend you upgrade to WSL 2. To check the version, run `wsl -l -v`. If
-  you're running WSL 1, refer to the
-  [WSL upgrade instructions](https://learn.microsoft.com/en-us/windows/wsl/install#upgrade-version-from-wsl-1-to-wsl-2).
-
-- When installing on macOS (Apple silicon), the Modular CLI install might fail
-  with the message:
-
-  ```plaintext
-  modular: The arm64 architecture is required for this software.
-  ```
-
-  This occurs because Apple's Rosetta x86 emulation is active. Check the
-  following:
-
-  - Right click on the terminal application you use (for example,
-    `Terminal.app`), click **Get Info**, and make sure the **Open in Rosetta**
-    checkbox is not selected.
-
-  - Run the following command:
-
-    ```bash
-    brew config | grep Rosetta
-    ```
-
-    If the output shows `Rosetta 2: True`, the x86 version of Homebrew is
-    installed.
-    [Uninstall and reinstall Homebrew](https://github.com/homebrew/install#uninstall-homebrew)
-    before retrying the Modular installation.
-
-    **Note:** Before uninstalling Homebrew, verify that you don't have other
-    projects specifically depending on the x86 version of Homebrew.
-
-You can see other [reported issues on
-GitHub](https://github.com/modularml/mojo/issues).
 
 ## Small independent features
 
@@ -188,7 +111,7 @@ to use right now.
 
 ## Traits support
 
-As of v0.6.0 Mojo has basic support for
+Mojo has basic support for
 [traits](/mojo/manual/traits). Traits allow you
 to specify a set of requirements for types to implement. Types can implement
 those requirements to *conform to* the trait. Traits allow you to write
@@ -384,9 +307,11 @@ fn generic_simd[nelts: Int](x: SIMD[DType.float32, nelts]):
 ### Scoping and mutability of statement variables
 
 Python programmers understand that local variables are implicitly declared and
-scoped at the function level. As the programming manual explains, this feature
-is supported in Mojo only inside `def` functions. However, there are some
-nuances to Python's implicit declaration rules that Mojo does not match 1-to-1.
+scoped at the function level. As the Mojo Manual explains, this is supported in
+Mojo for
+[implicitly-declared variables](/mojo/manual/variables#implicitly-declared-variables).
+However, there are some nuances to Python's implicit declaration rules that Mojo
+does not match 1-to-1.
 
 For example, the scope of `for` loop iteration variables and caught exceptions
 in `except` statements is limited to the next indentation block, for both `def`
@@ -411,25 +336,6 @@ With `NameError: name 'i' is not defined`, because the definition of `i` is a
 dynamic characteristic of the function. Mojo's lifetime tracker is intentionally
 simple (so lifetimes are easy to use!), and cannot reason that `i` would be
 defined even when the loop bounds are constant.
-
-Also stated in the programming manual: in `def` functions, the function
-arguments are mutable and re-assignable, whereas in `fn`, function arguments are
-rvalues and cannot be re-assigned. The same logic extends to statement
-variables, like `for` loop iteration variables or caught exceptions:
-
-```mojo
-def foo():
-    try:
-        bad_function():
-    except e:
-        e = Error() # ok: we can overwrite 'e'
-
-fn bar():
-    try:
-        bad_function():
-    except e:
-        e = Error() # error: 'e' is not mutable
-```
 
 ### Name scoping of nested function declarations
 
