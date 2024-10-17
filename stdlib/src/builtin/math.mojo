@@ -359,7 +359,10 @@ trait Roundable:
         var im: Float64
 
         fn __round__(self) -> Self:
-            return Self(round(re), round(im))
+            return Self(round(self.re), round(self.im))
+
+        fn __round__(self, ndigits: Int) -> Self:
+            return Self(round(self.re, ndigits), round(self.im, ndigits))
     ```
     """
 
