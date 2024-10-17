@@ -174,7 +174,7 @@ struct IndexList[
 ](
     Sized,
     Stringable,
-    Formattable,
+    Writable,
     Comparable,
 ):
     """A base struct that implements size agnostic index functions.
@@ -738,12 +738,15 @@ struct IndexList[
         return buf^
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this int tuple to the provided formatter.
+        Formats this int tuple to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Optimize this to avoid the intermediate String allocation.

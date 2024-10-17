@@ -16,7 +16,7 @@
 
 @value
 @register_passable("trivial")
-struct _SourceLocation(Formattable, Stringable):
+struct _SourceLocation(Writable, Stringable):
     """Type to carry file name, line, and column information."""
 
     var line: Int
@@ -42,12 +42,15 @@ struct _SourceLocation(Formattable, Stringable):
         """
         return "At " + str(self) + ": " + str(msg)
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats the source location to the provided formatter.
+        Formats the source location to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write(self.file_name, ":", self.line, ":", self.col)
 

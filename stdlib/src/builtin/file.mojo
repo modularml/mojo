@@ -411,7 +411,7 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), data.byte_length())
 
-    fn write(self, data: Span[UInt8, _]) raises:
+    fn write(self, data: Span[Byte, _]) raises:
         """Write a borrowed sequence of data to the file.
 
         Args:

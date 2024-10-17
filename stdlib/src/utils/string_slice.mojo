@@ -31,7 +31,7 @@ alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
 
 
-fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
+fn _count_utf8_continuation_bytes(span: Span[Byte]) -> Int:
     alias sizes = (256, 128, 64, 32, 16, 8)
     var ptr = span.unsafe_ptr()
     var num_bytes = len(span)
@@ -173,7 +173,7 @@ struct _StringSliceIter[
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        alias S = Span[UInt8, StaticConstantOrigin]
+        alias S = Span[Byte, StaticConstantOrigin]
         var s = S(unsafe_ptr=self.ptr, len=self.length)
         self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
@@ -225,8 +225,9 @@ struct _StringSliceIter[
 struct StringSlice[
     is_mutable: Bool, //,
     origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable, CollectionElement, CollectionElementNew):
-    """A non-owning view to encoded string data.
+](Stringable, Sized, Writable, CollectionElement, CollectionElementNew):
+    """
+    A non-owning view to encoded string data.
 
     TODO:
     The underlying string data is guaranteed to be encoded using UTF-8.
@@ -236,7 +237,7 @@ struct StringSlice[
         origin: The origin of the underlying string data.
     """
 
-    var _slice: Span[UInt8, origin]
+    var _slice: Span[Byte, origin]
 
     # ===------------------------------------------------------------------===#
     # Initializers
@@ -268,7 +269,7 @@ struct StringSlice[
         )
 
     @always_inline
-    fn __init__(inout self, *, owned unsafe_from_utf8: Span[UInt8, origin]):
+    fn __init__(inout self, *, owned unsafe_from_utf8: Span[Byte, origin]):
         """Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
 
         Safety:
@@ -294,7 +295,7 @@ struct StringSlice[
         """
         var strref = unsafe_from_utf8_strref
 
-        var byte_slice = Span[UInt8, origin](
+        var byte_slice = Span[Byte, origin](
             unsafe_ptr=strref.unsafe_ptr(),
             len=len(strref),
         )
@@ -322,7 +323,7 @@ struct StringSlice[
               UTF-8.
             len: The number of bytes of encoded data.
         """
-        var byte_slice = Span[UInt8, origin](
+        var byte_slice = Span[Byte, origin](
             unsafe_ptr=unsafe_from_utf8_ptr,
             len=len,
         )
@@ -358,18 +359,21 @@ struct StringSlice[
             The length in Unicode codepoints.
         """
         var b_len = self.byte_length()
-        alias S = Span[UInt8, StaticConstantOrigin]
+        alias S = Span[Byte, StaticConstantOrigin]
         var s = S(unsafe_ptr=self.unsafe_ptr(), len=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this string slice to the provided formatter.
+        Formats this string slice to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
-        writer.write_str(str_slice=self)
+        writer.write_bytes(self.as_bytes())
 
     fn __bool__(self) -> Bool:
         """Check if a string slice is non-empty.
@@ -517,7 +521,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, origin]:
+    fn as_bytes(self) -> Span[Byte, origin]:
         """Get the sequence of encoded bytes of the underlying string.
 
         Returns:
@@ -1095,19 +1099,19 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
                     var data: String
                     if empty and type_impls_formatter_str:
-                        data = str(args[i])  # TODO: use formatter and return
+                        data = str(args[i])  # TODO: use writer and return
                     elif empty and type_impls_str:
                         data = str(args[i])
                     elif flag == `s` and type_impls_formatter_str:
                         if empty:
-                            # TODO: use formatter and return
+                            # TODO: use writer and return
                             pass
                         data = str(args[i])
                     elif flag == `s` and type_impls_str:
                         data = str(args[i])
                     elif flag == `r` and type_impls_formatter_repr:
                         if empty:
-                            # TODO: use formatter and return
+                            # TODO: use writer and return
                             pass
                         data = repr(args[i])
                     elif flag == `r` and type_impls_repr:
@@ -1217,8 +1221,8 @@ struct _FormatSpec:
     precision is not allowed for integer presentation types.
     """
     var type: UInt8
-    """Determines how the data should be presented. 
-    
+    """Determines how the data should be presented.
+
     The available integer presentation types are:
 
     | Option | Meaning|
@@ -1240,7 +1244,7 @@ struct _FormatSpec:
     In addition to the above presentation types, integers can be formatted with
     the floating-point presentation types listed below (except 'n' and None).
     When doing so, float() is used to convert the integer to a floating-point
-    number before formatting. 
+    number before formatting.
 
     The available presentation types for float and Decimal values are:
 

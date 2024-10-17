@@ -19,6 +19,7 @@ from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char, OpaquePointer
+from utils import StaticString
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -33,10 +34,9 @@ from utils import (
     StringRef,
     StringSlice,
     Variant,
-    Formattable,
-    Formatter,
+    Writable,
+    Writer,
 )
-from utils.format import ToFormatter
 from utils.string_slice import (
     _utf8_byte_type,
     _StringSliceIter,
@@ -700,8 +700,8 @@ struct String(
     KeyElement,
     Comparable,
     Boolable,
-    Formattable,
-    ToFormatter,
+    Writable,
+    Writer,
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
@@ -840,25 +840,55 @@ struct String(
     # Factory dunders
     # ===------------------------------------------------------------------=== #
 
-    @staticmethod
-    @no_inline
-    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
         """
-        Construct a string by concatenating a sequence of formattable arguments.
+        Write a byte span to this String.
 
         Args:
-            args: A sequence of formattable arguments.
+            bytes: The byte span to write to this String. Must NOT be
+              null terminated.
+        """
+        self._iadd[True](bytes)
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this Writer.
+        """
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+    @staticmethod
+    @no_inline
+    fn format_sequence[
+        *Ts: Writable
+    ](*args: *Ts, sep: StaticString = "", end: StaticString = "") -> Self:
+        """
+        Construct a string by concatenating a sequence of Writable arguments.
+
+        Args:
+            args: A sequence of Writable arguments.
+            sep: The separator used between elements.
+            end: The String to write after printing the elements.
 
         Parameters:
             Ts: The types of the arguments to format. Each type must be satisfy
-                `Formattable`.
+                `Writable`.
 
         Returns:
             A string formed by formatting the argument sequence.
 
         Examples:
 
-        Construct a String from several `Formattable` arguments:
+        Construct a String from several `Writable` arguments:
 
         ```mojo
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
@@ -873,12 +903,24 @@ struct String(
 
     @staticmethod
     @no_inline
-    fn format_sequence(args: VariadicPack[_, Formattable, *_]) -> Self:
+    fn format_sequence[
+        *Ts: Writable
+    ](
+        args: VariadicPack[_, Writable, *Ts],
+        sep: StaticString = "",
+        end: StaticString = "",
+    ) -> Self:
         """
-        Construct a string directly from a variadic pack.
+        Construct a string by passing a variadic pack.
 
         Args:
-            args: A VariadicPack of formattable arguments.
+            args: A VariadicPack of Writable arguments.
+            sep: The separator used between elements.
+            end: The String to write after printing the elements.
+
+        Parameters:
+            Ts: The types of the arguments to format. Each type must be satisfy
+                `Writable`.
 
         Returns:
             A string formed by formatting the VariadicPack.
@@ -887,7 +929,7 @@ struct String(
 
         ```mojo
         fn variadic_pack_to_string[
-            *Ts: Formattable,
+            *Ts: Writable,
         ](*args: *Ts) -> String:
             return String.format_sequence(args)
 
@@ -899,14 +941,18 @@ struct String(
         """
 
         var output = String()
-        var writer = output._unsafe_to_formatter()
 
         @parameter
-        fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
+        fn write_arg[i: Int, T: Writable](arg: T):
+            output.write(arg)
 
-        args.each[write_arg]()
-        _ = writer^
+            @parameter
+            if i < len(VariadicList(Ts)) - 1:
+                output.write(sep)
+
+        args.each_idx[write_arg]()
+
+        output.write(end)
 
         return output^
 
@@ -1066,7 +1112,7 @@ struct String(
         return not (self < rhs)
 
     @staticmethod
-    fn _add[rhs_has_null: Bool](lhs: Span[UInt8], rhs: Span[UInt8]) -> String:
+    fn _add[rhs_has_null: Bool](lhs: Span[Byte], rhs: Span[Byte]) -> String:
         var lhs_len = len(lhs)
         var rhs_len = len(rhs)
         var lhs_ptr = lhs.unsafe_ptr()
@@ -1160,7 +1206,7 @@ struct String(
         """
         return Self._add[True](other.as_bytes(), self.as_bytes())
 
-    fn _iadd[has_null: Bool](inout self, other: Span[UInt8]):
+    fn _iadd[has_null: Bool](inout self, other: Span[Byte]):
         var s_len = self.byte_length()
         var o_len = len(other)
         var o_ptr = other.unsafe_ptr()
@@ -1316,38 +1362,18 @@ struct String(
     # Methods
     # ===------------------------------------------------------------------=== #
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this string to the provided formatter.
+        Formats this string to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
-        writer.write_str(self.as_string_slice())
-
-    fn _unsafe_to_formatter(inout self) -> Formatter:
-        """
-        Constructs a formatter that will write to this mutable string.
-
-        Safety:
-            The returned `Formatter` holds a mutable pointer to this `String`
-            value. This `String` MUST outlive the `Formatter` instance.
-        """
-
-        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
-            var ptr: UnsafePointer[String] = ptr0.bitcast[String]()
-
-            # FIXME:
-            #   String.__iadd__ currently only accepts a String, meaning this
-            #   RHS will allocate unnecessarily.
-            ptr[] += strref
-
-        return Formatter(
-            write_to_string,
-            # Arg data
-            UnsafePointer.address_of(self).bitcast[NoneType](),
-        )
+        writer.write_bytes(self.as_bytes())
 
     fn join(self, *elems: Int) -> String:
         """Joins the elements from the tuple using the current string as a
@@ -1366,7 +1392,7 @@ struct String(
             curr += self + str(elems[i])
         return curr
 
-    fn join[*Types: Formattable](self, *elems: *Types) -> String:
+    fn join[*Types: Writable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -1379,21 +1405,19 @@ struct String(
             The joined string.
         """
 
-        var result: String = ""
-        var formatter = result._unsafe_to_formatter()
+        var result = String()
         var is_first = True
 
         @parameter
-        fn add_elt[T: Formattable](a: T):
+        fn add_elt[T: Writable](a: T):
             if is_first:
                 is_first = False
             else:
-                self.format_to(formatter)
-            a.format_to(formatter)
+                result.write(self)
+            result.write(a)
 
         elems.each[add_elt]()
         _ = is_first
-        _ = formatter^
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
@@ -1515,7 +1539,7 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1526,7 +1550,7 @@ struct String(
         """
 
         # Does NOT include the NUL terminator.
-        return Span[UInt8, __origin_of(self)](
+        return Span[Byte, __origin_of(self)](
             unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )
 

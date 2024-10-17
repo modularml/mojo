@@ -234,7 +234,7 @@ struct PythonObject(
     KeyElement,
     SizedRaising,
     Stringable,
-    Formattable,
+    Writable,
     _HashableWithHasher,
 ):
     """A Python object."""
@@ -1515,12 +1515,15 @@ struct PythonObject(
         _ = python_str
         return mojo_str
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this Python object to the provided formatter.
+        Formats this Python object to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Avoid this intermediate String allocation, if possible.

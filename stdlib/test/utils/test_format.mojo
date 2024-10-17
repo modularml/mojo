@@ -14,27 +14,27 @@
 
 from testing import assert_equal
 
-from utils import Formattable, Formatter
+from utils import Writable, Writer
 from utils.inline_string import _FixedString
 
 
 fn main() raises:
-    test_formatter_of_string()
+    test_writer_of_string()
     test_string_format_seq()
     test_stringable_based_on_format()
 
-    test_formatter_of_fixed_string()
+    test_writer_of_fixed_string()
 
-    test_formatter_write_int_padded()
+    test_write_int_padded()
 
 
 @value
-struct Point(Formattable, Stringable):
+struct Point(Writable, Stringable):
     var x: Int
     var y: Int
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         writer.write("Point(", self.x, ", ", self.y, ")")
 
     @no_inline
@@ -42,21 +42,19 @@ struct Point(Formattable, Stringable):
         return String.format_sequence(self)
 
 
-fn test_formatter_of_string() raises:
+fn test_writer_of_string() raises:
     #
-    # Test format_to(String)
+    # Test write_to(String)
     #
     var s1 = String()
-    var s1_fmt = Formatter(s1)
-    Point(2, 7).format_to(s1_fmt)
+    Point(2, 7).write_to(s1)
     assert_equal(s1, "Point(2, 7)")
 
     #
-    # Test fmt.write(String, ..)
+    # Test writer.write(String, ..)
     #
     var s2 = String()
-    var s2_fmt = Formatter(s2)
-    s2_fmt.write(Point(3, 8))
+    s2.write(Point(3, 8))
     assert_equal(s2, "Point(3, 8)")
 
 
@@ -75,22 +73,20 @@ fn test_stringable_based_on_format() raises:
     assert_equal(str(Point(10, 11)), "Point(10, 11)")
 
 
-fn test_formatter_of_fixed_string() raises:
+fn test_writer_of_fixed_string() raises:
     var s1 = _FixedString[100]()
-    var s1_fmt = Formatter(s1)
-    s1_fmt.write("Hello, World!")
+    s1.write("Hello, World!")
     assert_equal(str(s1), "Hello, World!")
 
 
-fn test_formatter_write_int_padded() raises:
+fn test_write_int_padded() raises:
     var s1 = String()
-    var s1_fmt = Formatter(s1)
 
-    s1_fmt._write_int_padded(5, width=5)
+    Int(5).write_padded(s1, width=5)
 
     assert_equal(s1, "    5")
 
-    s1_fmt._write_int_padded(123, width=5)
+    Int(123).write_padded(s1, width=5)
 
     assert_equal(s1, "    5  123")
 
@@ -99,8 +95,7 @@ fn test_formatter_write_int_padded() raises:
     # ----------------------------------
 
     var s2 = String()
-    var s2_fmt = Formatter(s2)
 
-    s2_fmt._write_int_padded(12345, width=3)
+    Int(12345).write_padded(s2, width=3)
 
     assert_equal(s2, "12345")

@@ -124,11 +124,14 @@ struct UInt(IntLike, _HashableWithHasher):
         return String.format_sequence(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Formats this integer to the provided formatter.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Formats this integer to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(UInt64(self))
