@@ -18,7 +18,7 @@ from hashlib._ahash import AHasher
 from hashlib.hash import hash as old_hash
 from hashlib._hasher import _hash_with_hasher as hash
 from testing import assert_equal, assert_not_equal, assert_true
-from memory import memset_zero, UnsafePointer
+from memory import memset_zero, stack_allocation
 from time import now
 from utils import Span
 
@@ -576,7 +576,7 @@ you, утра, боль, хорошие, пришёл, открой, брось,
 fn gen_word_pairs[words: String = words_en]() -> List[String]:
     var result = List[String]()
     try:
-        var list = words.split(",")
+        var list = words.split(", ")
         for w in list:
             var w1 = w[].strip()
             for w in list:
@@ -636,7 +636,7 @@ def test_hash_byte_array():
 def test_avalanche():
     # test that values which differ just in one bit,
     # produce significatly different hash values
-    var data = UnsafePointer[UInt8].alloc(256)
+    var data = stack_allocation[256, UInt8]()
     memset_zero(data, 256)
     var hashes0 = List[UInt64]()
     var hashes1 = List[UInt64]()
@@ -666,7 +666,7 @@ def test_avalanche():
 def test_trailing_zeros():
     # checks that a value with different amount of trailing zeros,
     # results in significantly different hash values
-    var data = UnsafePointer[UInt8].alloc(8)
+    var data = stack_allocation[8, UInt8]()
     memset_zero(data, 8)
     data[0] = 23
     var hashes0 = List[UInt64]()

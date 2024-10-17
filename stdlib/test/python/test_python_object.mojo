@@ -410,6 +410,8 @@ fn test_none() raises:
 
 
 fn test_getitem_raises() raises:
+    custom_indexable = Python.import_module("custom_indexable")
+
     var a = PythonObject(2)
     with assert_raises(contains="'int' object is not subscriptable"):
         _ = a[0]
@@ -434,43 +436,23 @@ fn test_getitem_raises() raises:
     with assert_raises(contains="'NoneType' object is not subscriptable"):
         _ = d[0, 0]
 
-    with_get = Python.evaluate(
-        """type('WithGetItem', (), {
-            '__getitem__': lambda self, key: 
-                'Keys: {0}'.format(", ".join(map(str, key))) if isinstance(key, tuple) 
-                else 'Key: {0}'.format(key)
-         })()"""
-    )
+    with_get = custom_indexable.WithGetItem()
     assert_equal("Key: 0", str(with_get[0]))
     assert_equal("Keys: 0, 0", str(with_get[0, 0]))
     assert_equal("Keys: 0, 0, 0", str(with_get[0, 0, 0]))
 
-    var without_get = Python.evaluate(
-        "type('WithOutGetItem', (), {'__str__': lambda self: \"SomeString\"})()"
-    )
-    with assert_raises(contains="'WithOutGetItem' object is not subscriptable"):
+    var without_get = custom_indexable.Simple()
+    with assert_raises(contains="'Simple' object is not subscriptable"):
         _ = without_get[0]
 
-    with assert_raises(contains="'WithOutGetItem' object is not subscriptable"):
+    with assert_raises(contains="'Simple' object is not subscriptable"):
         _ = without_get[0, 0]
 
-    var with_get_exception = Python.evaluate(
-        "type('WithGetItemException', (), {'__getitem__': lambda self, key: (_"
-        ' for _ in ()).throw(ValueError("Custom error")),})()'
-    )
-
+    var with_get_exception = custom_indexable.WithGetItemException()
     with assert_raises(contains="Custom error"):
         _ = with_get_exception[1]
 
-    with_2d = Python.evaluate(
-        """type('With2D', (), {
-            '__init__': lambda self: setattr(self, 'data', [[1, 2, 3], [4, 5, 6]]),
-            '__getitem__': lambda self, key: (
-                self.data[key[0]][key[1]] if isinstance(key, tuple)
-                else self.data[key]
-            )
-        })()"""
-    )
+    with_2d = custom_indexable.With2DGetItem()
     assert_equal("[1, 2, 3]", str(with_2d[0]))
     assert_equal(2, with_2d[0, 1])
     assert_equal(6, with_2d[1, 2])
@@ -479,13 +461,14 @@ fn test_getitem_raises() raises:
         _ = with_2d[0, 4]
 
     with assert_raises(contains="list index out of range"):
-        _ = with_2d[2, 0]
+        _ = with_2d[3, 0]
 
     with assert_raises(contains="list index out of range"):
-        _ = with_2d[2]
+        _ = with_2d[3]
 
 
 def test_setitem_raises():
+    custom_indexable = Python.import_module("custom_indexable")
     t = Python.evaluate("(1,2,3)")
     with assert_raises(
         contains="'tuple' object does not support item assignment"
@@ -502,19 +485,94 @@ def test_setitem_raises():
     ):
         s[3] = "xy"
 
-    custom = Python.evaluate(
-        """type('Custom', (), {
-        '__init__': lambda self: None,
-    })()"""
-    )
+    with_out = custom_indexable.Simple()
     with assert_raises(
-        contains="'Custom' object does not support item assignment"
+        contains="'Simple' object does not support item assignment"
     ):
-        custom[0] = 0
+        with_out[0] = 0
 
     d = Python.evaluate("{}")
     with assert_raises(contains="unhashable type: 'list'"):
         d[[1, 2, 3]] = 5
+
+
+fn test_py_slice() raises:
+    custom_indexable = Python.import_module("custom_indexable")
+    var a = PythonObject([1, 2, 3, 4, 5])
+    assert_equal("[2, 3]", str(a[1:3]))
+    assert_equal("[1, 2, 3, 4, 5]", str(a[:]))
+    assert_equal("[1, 2, 3]", str(a[:3]))
+    assert_equal("[3, 4, 5]", str(a[2:]))
+    assert_equal("[1, 3, 5]", str(a[::2]))
+    assert_equal("[2, 4]", str(a[1::2]))
+    assert_equal("[4, 5]", str(a[-2:]))
+    assert_equal("[1, 2, 3]", str(a[:-2]))
+    assert_equal("[5, 4, 3, 2, 1]", str(a[::-1]))
+    assert_equal("[1, 2, 3, 4, 5]", str(a[-10:10]))  # out of bounds
+    assert_equal("[1, 2, 3, 4, 5]", str(a[::]))
+    assert_equal("[1, 2, 3, 4, 5]", str(a[:100]))
+    assert_equal("[]", str(a[5:]))
+    assert_equal("[5, 4, 3, 2]", str(a[:-5:-1]))
+
+    var b = Python.evaluate("[i for i in range(1000)]")
+    assert_equal("[0, 250, 500, 750]", str(b[::250]))
+    with assert_raises(contains="slice step cannot be zero"):
+        _ = b[::0]
+    # Negative cases such as `b[1.3:10]` or `b["1":10]` are handled by parser
+    # which would normally throw a TypeError in Python
+
+    var s = PythonObject("Hello, World!")
+    assert_equal("Hello", str(s[:5]))
+    assert_equal("World!", str(s[7:]))
+    assert_equal("!dlroW ,olleH", str(s[::-1]))
+    assert_equal("Hello, World!", str(s[:]))
+    assert_equal("Hlo ol!", str(s[::2]))
+    assert_equal("Hlo ol!", str(s[None:None:2]))
+
+    var t = PythonObject((1, 2, 3, 4, 5))
+    assert_equal("(2, 3, 4)", str(t[1:4]))
+    assert_equal("(4, 3, 2)", str(t[3:0:-1]))
+
+    var empty = PythonObject([])
+    assert_equal("[]", str(empty[:]))
+    assert_equal("[]", str(empty[1:2:3]))
+
+    # TODO: enable this test.  Currently it fails with error: unhashable type: 'slice'
+    # var d = Python.dict()
+    # d["a"] = 1
+    # d["b"] = 2
+    # with assert_raises(contains="slice(1, 3, None)"):
+    #     _ = d[1:3]
+
+    var custom = custom_indexable.Sliceable()
+    assert_equal("slice(1, 3, None)", str(custom[1:3]))
+
+    var i = PythonObject(1)
+    with assert_raises(contains="'int' object is not subscriptable"):
+        _ = i[0:1]
+
+    with_2d = custom_indexable.With2DGetItem()
+    assert_equal("[1, 2]", str(with_2d[0, PythonObject(Slice(0, 2))]))
+    assert_equal("[1, 2]", str(with_2d[0][0:2]))
+
+    assert_equal("[4, 5, 6]", str(with_2d[PythonObject(Slice(0, 2)), 1]))
+    assert_equal("[4, 5, 6]", str(with_2d[0:2][1]))
+
+    assert_equal(
+        "[[1, 2, 3], [4, 5, 6]]", str(with_2d[PythonObject(Slice(0, 2))])
+    )
+    assert_equal("[[1, 2, 3], [4, 5, 6]]", str(with_2d[0:2]))
+    assert_equal("[[1, 3], [4, 6]]", str(with_2d[0:2, ::2]))
+
+    assert_equal(
+        "[6, 5, 4]", str(with_2d[1, PythonObject(Slice(None, None, -1))])
+    )
+    assert_equal("[6, 5, 4]", str(with_2d[1][::-1]))
+
+    assert_equal("[7, 9]", str(with_2d[2][::2]))
+
+    with assert_raises(contains="list index out of range"):
+        _ = with_2d[0:1][4]
 
 
 def main():
@@ -533,3 +591,4 @@ def main():
     test_nested_object()
     test_getitem_raises()
     test_setitem_raises()
+    test_py_slice()
