@@ -313,8 +313,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             The string representation of the set.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output
 
     @no_inline
@@ -329,16 +328,18 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return self.__str__()
 
-    fn format_to[
+    fn write_to[
+        W: Writer,
         U: RepresentableKeyElement,
-    ](self: Set[U], inout writer: Formatter):
-        """Write Set string representation to a `Formatter`.
+    ](self: Set[U], inout writer: W):
+        """Write Set string representation to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("{")
         var written = 0

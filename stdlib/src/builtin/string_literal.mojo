@@ -21,7 +21,7 @@ from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
-from utils import Formattable, Formatter
+from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 
 from utils.string_slice import (
@@ -41,7 +41,7 @@ struct StringLiteral(
     Boolable,
     Comparable,
     CollectionElementNew,
-    Formattable,
+    Writable,
     IntableRaising,
     KeyElement,
     Representable,
@@ -386,7 +386,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, StaticConstantOrigin]:
+    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 
@@ -394,13 +394,13 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, StaticConstantOrigin](
+        return Span[Byte, StaticConstantOrigin](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -409,9 +409,8 @@ struct StringLiteral(
         Notes:
             This does not include the trailing null terminator.
         """
-
         # Does NOT include the NUL terminator.
-        return Span[UInt8, __origin_of(self)](
+        return Span[Byte, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
@@ -442,15 +441,18 @@ struct StringLiteral(
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this string literal to the provided formatter.
+        Formats this string literal to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
-        writer.write_str(self.as_string_slice())
+        writer.write(self.as_string_slice())
 
     fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at

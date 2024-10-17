@@ -31,7 +31,6 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, StaticString, StringSlice
-from utils import Formattable, Formatter
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -341,13 +340,13 @@ fn _put[
 
 @no_inline
 fn print[
-    *Ts: Formattable
+    *Ts: Writable
 ](
     *values: *Ts,
     sep: StaticString = " ",
     end: StaticString = "\n",
     flush: Bool = False,
-    file: FileDescriptor = stdout,
+    owned file: FileDescriptor = stdout,
 ):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
@@ -363,10 +362,10 @@ fn print[
         file: The output stream.
     """
 
-    var writer = Formatter(fd=file)
+    var writer = file
 
     @parameter
-    fn print_with_separator[i: Int, T: Formattable](value: T):
+    fn print_with_separator[i: Int, T: Writable](value: T):
         writer.write(value)
 
         @parameter

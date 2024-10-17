@@ -237,18 +237,18 @@ fn _format_int[
     digit_chars: StaticString = _DEFAULT_DIGIT_CHARS,
     prefix: StaticString = "",
 ) raises -> String:
-    var string = String()
-    var fmt = string._unsafe_to_formatter()
+    var output = String()
 
-    _write_int(fmt, value, radix, digit_chars=digit_chars, prefix=prefix)
+    _write_int(output, value, radix, digit_chars=digit_chars, prefix=prefix)
 
-    return string^
+    return output^
 
 
 fn _write_int[
-    type: DType, //,
+    type: DType,
+    W: Writer,
 ](
-    inout fmt: Formatter,
+    inout writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,
@@ -257,16 +257,17 @@ fn _write_int[
     prefix: StaticString = "",
 ) raises:
     var err = _try_write_int(
-        fmt, value, radix, digit_chars=digit_chars, prefix=prefix
+        writer, value, radix, digit_chars=digit_chars, prefix=prefix
     )
     if err:
         raise err.value()
 
 
 fn _try_write_int[
-    type: DType, //,
+    type: DType,
+    W: Writer,
 ](
-    inout fmt: Formatter,
+    inout writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,
@@ -305,11 +306,11 @@ fn _try_write_int[
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.write_str("-")
+        writer.write("-")
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.
-    fmt.write_str(prefix)
+    writer.write(prefix)
 
     if value == 0:
         # TODO: Replace with safe digit_chars[:1] syntax.
@@ -329,7 +330,7 @@ fn _try_write_int[
             unsafe_from_utf8_ptr=zero_buf.unsafe_ptr(),
             len=1,
         )
-        fmt.write_str(zero)
+        writer.write(zero)
 
         return None
 
@@ -408,6 +409,6 @@ fn _try_write_int[
         len=len,
     )
 
-    fmt.write_str(str_slice)
+    writer.write(str_slice)
 
     return None

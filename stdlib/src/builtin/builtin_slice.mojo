@@ -23,7 +23,7 @@ struct Slice(
     Stringable,
     EqualityComparable,
     Representable,
-    Formattable,
+    Writable,
     CollectionElementNew,
 ):
     """Represents a slice expression.
@@ -102,8 +102,7 @@ struct Slice(
             The string representation of the span.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output
 
     @no_inline
@@ -116,11 +115,14 @@ struct Slice(
         return self.__str__()
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Write Slice string representation to a `Formatter`.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Write Slice string representation to a `Writer`.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         @parameter

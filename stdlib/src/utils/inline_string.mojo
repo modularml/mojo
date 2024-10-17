@@ -24,7 +24,6 @@ from sys.ffi import OpaquePointer
 from memory import UnsafePointer, memcpy
 
 from utils import StringSlice, Variant
-from utils.format import ToFormatter
 
 # ===----------------------------------------------------------------------===#
 # InlineString
@@ -282,7 +281,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self: Self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -292,7 +291,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, __origin_of(self)](
+        return Span[Byte, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=len(self),
@@ -308,8 +307,8 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
 struct _FixedString[CAP: Int](
     Sized,
     Stringable,
-    Formattable,
-    ToFormatter,
+    Writable,
+    Writer,
     CollectionElement,
     CollectionElementNew,
 ):
@@ -369,27 +368,26 @@ struct _FixedString[CAP: Int](
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
-    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+    fn format_sequence[*Ts: Writable](*args: *Ts) -> Self:
         """
-        Construct a string by concatenating a sequence of formattable arguments.
+        Construct a string by concatenating a sequence of Writable arguments.
 
         Args:
-            args: A sequence of formattable arguments.
+            args: A sequence of Writable arguments.
 
         Parameters:
             Ts: The types of the arguments to format. Each type must be satisfy
-              `Formattable`.
+              `Writable`.
 
         Returns:
             A string formed by formatting the argument sequence.
         """
 
         var output = Self()
-        var writer = output._unsafe_to_formatter()
 
         @parameter
-        fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(output)
 
         args.each[write_arg]()
 
@@ -422,7 +420,7 @@ struct _FixedString[CAP: Int](
         Args:
             str_slice: The string to append.
         """
-        var err = self._iadd_non_raising(str_slice)
+        var err = self._iadd_non_raising(str_slice._slice)
         if err:
             raise err.value()
 
@@ -443,16 +441,16 @@ struct _FixedString[CAP: Int](
 
     fn _iadd_non_raising(
         inout self,
-        str_slice: StringSlice[_],
+        bytes: Span[Byte, _],
     ) -> Optional[Error]:
-        var total_len = len(self) + str_slice.byte_length()
+        var total_len = len(self) + len(bytes)
 
         # Ensure there is sufficient capacity to append `str_slice`
         if total_len > CAP:
             return Optional(
                 Error(
                     "Insufficient capacity to append len="
-                    + str(str_slice.byte_length())
+                    + str(len(bytes))
                     + " string to len="
                     + str(len(self))
                     + " FixedString with capacity="
@@ -463,41 +461,43 @@ struct _FixedString[CAP: Int](
         # Append the bytes from `str_slice` at the end of the current string
         memcpy(
             dest=self.buffer.unsafe_ptr() + len(self),
-            src=str_slice.unsafe_ptr(),
-            count=str_slice.byte_length(),
+            src=bytes.unsafe_ptr(),
+            count=len(bytes),
         )
 
         self.size = total_len
 
         return None
 
-    fn format_to(self, inout writer: Formatter):
-        writer.write_str(self.as_string_slice())
+    fn write_to[W: Writer](self, inout writer: W):
+        writer.write_bytes(self.as_bytes())
 
-    fn _unsafe_to_formatter(inout self) -> Formatter:
-        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
-            var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
+    @always_inline
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
+        """
+        Write a byte span to this String.
 
-            var str_slice = StringSlice[ImmutableAnyOrigin](
-                unsafe_from_utf8_strref=strref
-            )
+        Args:
+            bytes: The byte span to write to this String. Must NOT be
+              null terminated.
+        """
+        _ = self._iadd_non_raising(bytes)
 
-            # FIXME(#37990):
-            #   Use `ptr[] += str_slice` and remove _iadd_non_raising after
-            #   "failed to fold operation lit.try" is fixed.
-            # try:
-            #     ptr[] += str_slice
-            # except e:
-            #     abort("error formatting to FixedString: " + str(e))
-            var err = ptr[]._iadd_non_raising(str_slice)
-            if err:
-                abort("error formatting to FixedString: " + str(err.value()))
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
 
-        return Formatter(
-            write_to_string,
-            # Arg data
-            UnsafePointer.address_of(self).bitcast[NoneType](),
-        )
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this Writer.
+        """
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
 
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
@@ -521,7 +521,7 @@ struct _FixedString[CAP: Int](
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self: Self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -531,7 +531,7 @@ struct _FixedString[CAP: Int](
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, __origin_of(self)](
+        return Span[Byte, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=self.size,

@@ -21,4 +21,4 @@ from .stringref import StringRef
 from .string_slice import StaticString, StringSlice
 from .variant import Variant
 from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
-from .format import Formatter, Formattable
+from .write import Writer, Writable

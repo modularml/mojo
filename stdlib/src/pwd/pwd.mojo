@@ -39,11 +39,14 @@ struct Passwd(Stringable):
     var pw_shell: String
     """Shell program."""
 
-    fn format_to(self, inout writer: Formatter):
-        """Formats this string to the provided formatter.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Formats this string to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("pwd.struct_passwd(pw_name='", self.pw_name)
         writer.write("', pw_passwd='", self.pw_passwd)

@@ -274,9 +274,9 @@ what we publish.
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
 
-- A new trait has been added `AsBytes` to enable taking a `Span[UInt8]` of a
+- A new trait has been added `AsBytes` to enable taking a `Span[Byte]` of a
   type with `s.as_bytes()`. `String.as_bytes` and `String.as_bytes_slice` have
-  been consolidated under `s.as_bytes` to return a `Span[UInt8]`, you can convert
+  been consolidated under `s.as_bytes` to return a `Span[Byte]`, you can convert
   it to a `List` if you require a copy with `List(s.as_bytes())`.
 
 - `Lifetime` and related types has been renamed to `Origin` in the standard

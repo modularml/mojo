@@ -29,26 +29,24 @@ from utils.stringref import _align_down, _memchr, _memmem
 # Benchmarks
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_formatter_int[n: Int](inout b: Bencher) raises:
+fn bench_writer_int[n: Int](inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
         var s1 = String()
-        var s1_fmt = Formatter(s1)
-        Int(n).format_to(s1_fmt)
+        s1.write(n)
         _ = s1^
 
     b.iter[call_fn]()
 
 
 @parameter
-fn bench_formatter_simd[n: Int](inout b: Bencher) raises:
+fn bench_writer_simd[n: Int](inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
         var s1 = String()
-        var s1_fmt = Formatter(s1)
-        SIMD[DType.int32, simdwidthof[DType.int32]()](n).format_to(s1_fmt)
+        s1.write(SIMD[DType.int32, simdwidthof[DType.int32]()](n))
         _ = s1^
 
     b.iter[call_fn]()
@@ -59,12 +57,12 @@ fn bench_formatter_simd[n: Int](inout b: Bencher) raises:
 # ===----------------------------------------------------------------------===#
 def main():
     var m = Bench(BenchConfig(num_repetitions=1))
-    m.bench_function[bench_formatter_int[42]](BenchId("bench_formatter_int_42"))
-    m.bench_function[bench_formatter_int[2**64]](
-        BenchId("bench_formatter_int_2**64")
+    m.bench_function[bench_writer_int[42]](BenchId("bench_writer_int_42"))
+    m.bench_function[bench_writer_int[2**64]](
+        BenchId("bench_writer_int_2**64")
     )
-    m.bench_function[bench_formatter_simd[42]](BenchId("bench_formatter_simd"))
-    m.bench_function[bench_formatter_simd[2**16]](
-        BenchId("bench_formatter_simd_2**16")
+    m.bench_function[bench_writer_simd[42]](BenchId("bench_writer_simd"))
+    m.bench_function[bench_writer_simd[2**16]](
+        BenchId("bench_writer_simd_2**16")
     )
     m.dump_report()

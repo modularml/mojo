@@ -69,7 +69,7 @@ fn _dir_of_current_file_impl(file_name: StringLiteral) raises -> Path:
 struct Path(
     Stringable,
     Boolable,
-    Formattable,
+    Writable,
     CollectionElement,
     CollectionElementNew,
     PathLike,
@@ -153,12 +153,15 @@ struct Path(
         """
         return self.path.byte_length() > 0
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this path to the provided formatter.
+        Formats this path to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(self.path)
