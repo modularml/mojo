@@ -774,13 +774,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
     @always_inline
     fn split[
-        T: Stringlike, O: ImmutableOrigin, //
-    ](ref [O]self, sep: T, maxsplit: Int) -> List[StringSlice[O]]:
+        T: Stringlike, //
+    ](self, sep: T, maxsplit: Int) -> List[StringSlice[ImmutableAnyOrigin]]:
         """Split the string by a separator.
 
         Parameters:
             T: The type of the separator.
-            O: The origin of the stringslice.
 
         Args:
             sep: The string to split on.
@@ -804,13 +803,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
     @always_inline
     fn split[
-        T: Stringlike, O: ImmutableOrigin, //
-    ](ref [O]self, sep: T) -> List[StringSlice[O]]:
+        T: Stringlike, //
+    ](self, sep: T) -> List[StringSlice[ImmutableAnyOrigin]]:
         """Split the string by a separator.
 
         Parameters:
             T: The type of the separator.
-            O: The origin of the stringslice.
 
         Args:
             sep: The string to split on.
@@ -834,13 +832,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return _split_sl[has_maxsplit=False, has_sep=True](self, sep, -1)
 
     @always_inline
-    fn split[
-        O: ImmutableOrigin, //
-    ](ref [O]self, *, maxsplit: Int) -> List[StringSlice[O]]:
+    fn split(self, *, maxsplit: Int) -> List[StringSlice[ImmutableAnyOrigin]]:
         """Split the string by every Whitespace separator.
-
-        Parameters:
-            O: The origin of the stringslice.
 
         Args:
             maxsplit: The maximum amount of items to split from String.
@@ -859,13 +852,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return _split_sl[has_maxsplit=True, has_sep=False](self, None, maxsplit)
 
     @always_inline
-    fn split[
-        O: ImmutableOrigin, //
-    ](ref [O]self, sep: NoneType = None) -> List[StringSlice[O]]:
+    fn split(
+        self, sep: NoneType = None
+    ) -> List[StringSlice[ImmutableAnyOrigin]]:
         """Split the string by every Whitespace separator.
-
-        Parameters:
-            O: The origin of the stringslice.
 
         Args:
             sep: None.
@@ -1017,24 +1007,28 @@ fn _split[
 
 
 fn _split_sl[
-    O: ImmutableOrigin, //,
     has_maxsplit: Bool,
     has_sep: Bool,
     T: Stringlike = StringLiteral,
-](ref [O]src_str: StringSlice, sep: Optional[T], maxsplit: Int) -> List[
-    StringSlice[O]
-]:
-    var items: List[Span[Byte, O]]
+](src_str: StringSlice, sep: Optional[T], maxsplit: Int) -> List[
+    StringSlice[ImmutableAnyOrigin]
+] as output:
+    var items: List[Span[Byte, src_str.origin]]
 
     @parameter
     if has_sep:
-        items = _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+        items = rebind[__type_of(items)](
+            _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+        )
     else:
-        items = _split_impl[has_maxsplit](src_str, maxsplit)
-    var output = List[StringSlice[O]](capacity=len(items))
+        items = rebind[__type_of(items)](
+            _split_impl[has_maxsplit](src_str, maxsplit)
+        )
+
+    output = __type_of(output)(capacity=len(items))
     for item in items:
-        output.append(StringSlice(unsafe_from_utf8=item[]))
-    return output^
+        v = rebind[Span[Byte, ImmutableAnyOrigin]](item[])
+        output.append(StringSlice[ImmutableAnyOrigin](unsafe_from_utf8=v))
 
 
 fn _split_impl[

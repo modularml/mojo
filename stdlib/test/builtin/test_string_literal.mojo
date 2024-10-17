@@ -317,66 +317,87 @@ def test_center():
 
 
 def test_split():
-    var d = "hello world".split()
-    assert_true(len(d) == 2)
-    assert_true(d[0] == "hello")
-    assert_true(d[1] == "world")
-    d = "hello \t\n\n\v\fworld".split("\n")
-    assert_true(len(d) == 3)
-    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+    fn st(value: StringLiteral) -> StringLiteral:
+        return value
+
+    # Should add all whitespace-like chars as one
+    # test all unicode separators
+    # 0 is to build a String with null terminator
+    # alias next_line = List[UInt8](0xC2, 0x85, 0)
+    # """TODO: \\x85"""
+    # alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    # """TODO: \\u2028"""
+    # alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    # """TODO: \\u2029"""
+    # TODO add line and paragraph separator as StringLiteral once unicode
+    # escape secuences are accepted
+    univ_sep_var = (
+        st(" ")
+        + st("\t")
+        + st("\n")
+        + st("\r")
+        + st("\v")
+        + st("\f")
+        + st("\x1c")
+        + st("\x1d")
+        + st("\x1e")
+        # + st(next_line)
+        # + st(unicode_line_sep)
+        # + st(unicode_paragraph_sep)
+    )
+    s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
+    assert_equal(s.split(), List[String]("hello", "world"))
 
     # should split into empty strings between separators
-    d = "1,,,3".split(",")
-    assert_true(len(d) == 4)
-    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
-    d = "abababaaba".split("aba")
-    assert_true(len(d) == 4)
-    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+    assert_equal(st("1,,,3").split(","), List[String]("1", "", "", "3"))
+    assert_equal(st(",,,").split(","), List[String]("", "", "", ""))
+    assert_equal(st(" a b ").split(" "), List[String]("", "a", "b", ""))
+    assert_equal(st("abababaaba").split("aba"), List[String]("", "b", "", ""))
+    assert_true(len(st("").split()) == 0)
+    assert_true(len(st(" ").split()) == 0)
+    assert_true(len(st("").split(" ")) == 1)
+    assert_true(len(st(",").split(",")) == 2)
+    assert_true(len(st(" ").split(" ")) == 2)
+    assert_true(len(st("").split("")) == 2)
+    assert_true(len(st("  ").split(" ")) == 3)
+    assert_true(len(st("   ").split(" ")) == 4)
 
     # should split into maxsplit + 1 items
-    d = "1,2,3".split(",", 0)
-    assert_true(len(d) == 1)
-    assert_true(d[0] == "1,2,3")
-    d = "1,2,3".split(",", 1)
-    assert_true(len(d) == 2)
-    assert_true(d[0] == "1" and d[1] == "2,3")
+    assert_equal(st("1,2,3").split(",", 0), List[String]("1,2,3"))
+    assert_equal(st("1,2,3").split(",", 1), List[String]("1", "2,3"))
 
-    assert_true(len("".split()) == 0)
-    assert_true(len(" ".split()) == 0)
-    assert_true(len("".split(" ")) == 1)
-    assert_true(len(" ".split(" ")) == 2)
-    assert_true(len("  ".split(" ")) == 3)
-    assert_true(len("   ".split(" ")) == 4)
-
-    assert_equal("123".split(""), List[String]("", "1", "2", "3", ""))
-    assert_equal("".join("123".split("")), "123")
-    assert_equal(",1,2,3,".split(","), "123".split(""))
-    assert_equal(",".join("123".split("")), ",1,2,3,")
-
-    # Matches should be properly split in multiple case
-    var d2 = " "
-    var in2 = "modcon is coming soon"
-    var res2 = in2.split(d2)
-    assert_equal(len(res2), 4)
-    assert_equal(res2[0], "modcon")
-    assert_equal(res2[1], "is")
-    assert_equal(res2[2], "coming")
-    assert_equal(res2[3], "soon")
+    # Split in middle
+    assert_equal(st("faang").split(st("n")), List[String]("faa", "g"))
 
     # No match from the delimiter
-    var d3 = "x"
-    var in3 = "hello world"
-    var res3 = in3.split(d3)
-    assert_equal(len(res3), 1)
-    assert_equal(res3[0], "hello world")
+    assert_equal(st("hello world").split(st("x")), List[String]("hello world"))
 
     # Multiple character delimiter
-    var d4 = "ll"
-    var in4 = "hello"
-    var res4 = in4.split(d4)
-    assert_equal(len(res4), 2)
-    assert_equal(res4[0], "he")
-    assert_equal(res4[1], "o")
+    assert_equal(st("hello").split(st("ll")), List[String]("he", "o"))
+
+    res = List[String]("", "bb", "", "", "", "bbb", "")
+    assert_equal(st("abbaaaabbba").split("a"), res)
+    assert_equal(st("abbaaaabbba").split("a", 8), res)
+    s1 = st("abbaaaabbba").split("a", 5)
+    assert_equal(s1, List[String]("", "bb", "", "", "", "bbba"))
+    assert_equal(st("aaa").split("a", 0), List[String]("aaa"))
+    assert_equal(st("a").split("a"), List[String]("", ""))
+    assert_equal(st("1,2,3").split("3", 0), List[String]("1,2,3"))
+    assert_equal(st("1,2,3").split("3", 1), List[String]("1,2,", ""))
+    assert_equal(st("1,2,3,3").split("3", 2), List[String]("1,2,", ",", ""))
+    assert_equal(st("1,2,3,3,3").split("3", 2), List[String]("1,2,", ",", ",3"))
+
+    assert_equal(st("Hello 🔥!").split(), List[String]("Hello", "🔥!"))
+
+    s2 = st("Лорем ипсум долор сит амет").split(" ")
+    assert_equal(s2, List[String]("Лорем", "ипсум", "долор", "сит", "амет"))
+    s3 = st("Лорем ипсум долор сит амет").split("м")
+    assert_equal(s3, List[String]("Лоре", " ипсу", " долор сит а", "ет"))
+
+    assert_equal(st("123").split(""), List[String]("", "1", "2", "3", ""))
+    assert_equal("".join(st("123").split("")), "123")
+    assert_equal(st(",1,2,3,").split(","), st("123").split(""))
+    assert_equal(",".join(st("123").split("")), ",1,2,3,")
 
 
 def test_splitlines():

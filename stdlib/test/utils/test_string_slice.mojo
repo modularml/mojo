@@ -415,6 +415,103 @@ def test_count_utf8_continuation_bytes():
     _test(3, List[UInt8](b2, c, b3, c, c))
 
 
+def test_split():
+    alias S = StringSlice[StaticConstantOrigin]
+
+    fn st(value: StringLiteral) -> StringSlice[ImmutableAnyOrigin]:
+        return rebind[StringSlice[ImmutableAnyOrigin]](StringSlice(value))
+
+    # FIXME: remove once StringSlice conforms to TestableCollectionElement
+    fn _assert_equal(
+        l1: List[StringSlice[ImmutableAnyOrigin]], l2: List[S]
+    ) raises:
+        assert_equal(len(l1), len(l2))
+        for i in range(len(l1)):
+            assert_equal(str(l1[i]), str(l2[i]))
+
+    # Should add all whitespace-like chars as one
+    # test all unicode separators
+    # 0 is to build a String with null terminator
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as StringLiteral once unicode
+    # escape secuences are accepted
+    univ_sep_var = (
+        String(" ")
+        + String("\t")
+        + String("\n")
+        + String("\r")
+        + String("\v")
+        + String("\f")
+        + String("\x1c")
+        + String("\x1d")
+        + String("\x1e")
+        + String(next_line).as_string_slice()
+        + String(unicode_line_sep).as_string_slice()
+        + String(unicode_paragraph_sep).as_string_slice()
+    )
+    s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
+    sl = rebind[S](s.as_string_slice())
+    _assert_equal(sl.split(), List[S]("hello", "world"))
+
+    # should split into empty strings between separators
+    _assert_equal(st("1,,,3").split(","), List[S]("1", "", "", "3"))
+    _assert_equal(st(",,,").split(","), List[S]("", "", "", ""))
+    _assert_equal(st(" a b ").split(" "), List[S]("", "a", "b", ""))
+    _assert_equal(st("abababaaba").split("aba"), List[S]("", "b", "", ""))
+    assert_true(len(st("").split()) == 0)
+    assert_true(len(st(" ").split()) == 0)
+    assert_true(len(st("").split(" ")) == 1)
+    assert_true(len(st(",").split(",")) == 2)
+    assert_true(len(st(" ").split(" ")) == 2)
+    assert_true(len(st("").split("")) == 2)
+    assert_true(len(st("  ").split(" ")) == 3)
+    assert_true(len(st("   ").split(" ")) == 4)
+
+    # should split into maxsplit + 1 items
+    _assert_equal(st("1,2,3").split(",", 0), List[S]("1,2,3"))
+    _assert_equal(st("1,2,3").split(",", 1), List[S]("1", "2,3"))
+
+    # Split in middle
+    _assert_equal(st("faang").split(st("n")), List[S]("faa", "g"))
+
+    # No match from the delimiter
+    _assert_equal(st("hello world").split(st("x")), List[S]("hello world"))
+
+    # Multiple character delimiter
+    _assert_equal(st("hello").split(st("ll")), List[S]("he", "o"))
+
+    res = List[S]("", "bb", "", "", "", "bbb", "")
+    _assert_equal(st("abbaaaabbba").split("a"), res)
+    _assert_equal(st("abbaaaabbba").split("a", 8), res)
+    s1 = st("abbaaaabbba").split("a", 5)
+    _assert_equal(s1, List[S]("", "bb", "", "", "", "bbba"))
+    _assert_equal(st("aaa").split("a", 0), List[S]("aaa"))
+    _assert_equal(st("a").split("a"), List[S]("", ""))
+    _assert_equal(st("1,2,3").split("3", 0), List[S]("1,2,3"))
+    _assert_equal(st("1,2,3").split("3", 1), List[S]("1,2,", ""))
+    _assert_equal(st("1,2,3,3").split("3", 2), List[S]("1,2,", ",", ""))
+    _assert_equal(st("1,2,3,3,3").split("3", 2), List[S]("1,2,", ",", ",3"))
+
+    _assert_equal(st("Hello 🔥!").split(), List[S]("Hello", "🔥!"))
+
+    s2 = st("Лорем ипсум долор сит амет").split(" ")
+    _assert_equal(s2, List[S]("Лорем", "ипсум", "долор", "сит", "амет"))
+    s3 = st("Лорем ипсум долор сит амет").split("м")
+    _assert_equal(s3, List[S]("Лоре", " ипсу", " долор сит а", "ет"))
+
+    _assert_equal(st("123").split(""), List[S]("", "1", "2", "3", ""))
+    assert_equal("".join(st("123").split("")), "123")
+    _assert_equal(
+        st(",1,2,3,").split(","), rebind[List[S]](st("123").split(""))
+    )
+    assert_equal(",".join(st("123").split("")), ",1,2,3,")
+
+
 fn main() raises:
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -432,3 +529,4 @@ fn main() raises:
     test_combination_10_good_utf8_sequences()
     test_combination_10_good_10_bad_utf8_sequences()
     test_count_utf8_continuation_bytes()
+    test_split()
