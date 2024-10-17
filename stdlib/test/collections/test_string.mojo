@@ -1003,26 +1003,15 @@ def test_upper():
 
 def test_isspace():
     # checking true cases
-    assert_true(_is_ascii_space(ord(" ")))
-    assert_true(_is_ascii_space(ord("\n")))
-    assert_true(_is_ascii_space("\n"))
-    assert_true(_is_ascii_space(ord("\t")))
-    assert_true(_is_ascii_space(ord("\r")))
-    assert_true(_is_ascii_space(ord("\v")))
-    assert_true(_is_ascii_space(ord("\f")))
-    assert_true(_is_ascii_space(ord("\x1d")))
-    assert_true(_is_ascii_space(ord("\x1e")))
-    assert_true(_is_ascii_space(ord("\x1f")))
+    for item in List(" ", "\n", "\t", "\r", "\v", "\f", "\x1d", "\x1e", "\x1f"):
+        assert_true(_is_ascii_space(ord(item[])))
 
     # Checking false cases
-    assert_false(_is_ascii_space(ord("a")))
-    assert_false(_is_ascii_space(ord("u")))
-    assert_false(_is_ascii_space(ord("s")))
-    assert_false(_is_ascii_space(ord("t")))
-    assert_false(_is_ascii_space(ord("i")))
-    assert_false(_is_ascii_space(ord("n")))
-    assert_false(_is_ascii_space(ord("z")))
-    assert_false(_is_ascii_space(ord(".")))
+    symbols = List("!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "-", "_")
+    letters = List("a", "e", "i", "o", "u", "c", "d", "f", "g", "h", "j", "k")
+    numbers = List("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+    for item in symbols + letters + numbers:
+        assert_false(_is_ascii_space(ord(item[])))
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator

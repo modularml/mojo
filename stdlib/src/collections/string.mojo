@@ -310,7 +310,8 @@ fn _is_ascii_lowercase(span: Span[Byte]) -> Bool:
 
 
 fn _is_ascii_space(c: Byte) -> Bool:
-    """Determines whether the given character is an ASCII whitespace character.
+    """Determines whether the given character is an ASCII whitespace character:
+    `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e"`.
 
     Args:
         c: The character to check.
@@ -319,9 +320,7 @@ fn _is_ascii_space(c: Byte) -> Bool:
         True if the character is one of the ASCII whitespace characters.
 
     Notes:
-        This only respects ASCII whitespace, i.e. only if the character
-        specified is one of " \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e". For semantics
-        similar to Python, use `String.isspace()`.
+        For semantics similar to Python, use `String.isspace()`.
     """
 
     # NOTE: a global LUT doesn't work at compile time so we can't use it here.
