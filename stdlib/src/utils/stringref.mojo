@@ -15,7 +15,7 @@
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from collections.string import _atol, _isspace
+from collections.string import _atol, _is_ascii_space
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
@@ -581,9 +581,9 @@ struct StringRef(
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
+        while start < end and _is_ascii_space(ptr[start]):
             start += 1
-        while end > start and _isspace(ptr[end - 1]):
+        while end > start and _is_ascii_space(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
 

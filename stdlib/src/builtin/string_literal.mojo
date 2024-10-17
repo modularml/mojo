@@ -232,7 +232,8 @@ struct StringLiteral(
 
     @no_inline
     fn __str__(self) -> String:
-        """Convert the string literal to a string.
+        """Gets this `StringLiteral` as a standard `String`. You don't need to
+        call this method directly, use `str("...")` instead.
 
         Returns:
             A new string.
@@ -253,16 +254,22 @@ struct StringLiteral(
         string._buffer = buffer^
         return string
 
-    @no_inline
     fn __repr__(self) -> String:
-        """Return a representation of the `StringLiteral` instance.
-
-        You don't need to call this method directly, use `repr("...")` instead.
+        """Return a representation of the string instance. You don't need to
+        call this method directly, use `repr("...")` instead.
 
         Returns:
             A new representation of the string.
         """
-        return self.__str__().__repr__()
+        return ascii(self)
+
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object.
+
+        Returns:
+            A new string containing the ASCII representation of the object.
+        """
+        return ascii(self)
 
     fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.

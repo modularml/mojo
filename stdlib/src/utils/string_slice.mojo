@@ -22,7 +22,7 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils import Span
-from collections.string import _isspace, _atol, _atof
+from collections.string import _is_ascii_space, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
@@ -31,30 +31,16 @@ alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
 
 
-fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
-    alias sizes = (256, 128, 64, 32, 16, 8)
-    var ptr = span.unsafe_ptr()
-    var num_bytes = len(span)
-    var amnt: Int = 0
-    var processed = 0
+@always_inline
+fn _is_continuation_byte[
+    w: Int, //
+](vec: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    return (vec & 0b1100_0000) == 0b1000_0000
 
-    @parameter
-    for i in range(len(sizes)):
-        alias s = sizes.get[i, Int]()
 
-        @parameter
-        if simdwidthof[DType.uint8]() >= s:
-            var rest = num_bytes - processed
-            for _ in range(rest // s):
-                var vec = (ptr + processed).load[width=s]()
-                var comp = (vec & 0b1100_0000) == 0b1000_0000
-                amnt += int(comp.cast[DType.uint8]().reduce_add())
-                processed += s
-
-    for i in range(num_bytes - processed):
-        amnt += int((ptr[processed + i] & 0b1100_0000) == 0b1000_0000)
-
-    return amnt
+@always_inline
+fn _count_utf8_continuation_bytes(span: Span[Byte]) -> Int:
+    return span.count[_is_continuation_byte]()
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
@@ -133,7 +119,7 @@ fn _is_newline_start(
             if memcmp(ptr, rn.unsafe_ptr(), 2) == 0:
                 return True, 2
             _ = rn
-        return ptr[0] != ` ` and _isspace(ptr[0]), 1
+        return ptr[0] != ` ` and _is_ascii_space(ptr[0]), 1
     elif val == 2 and read_ahead > 1:
         var comp = memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
         _ = next_line
@@ -342,14 +328,32 @@ struct StringSlice[
     # Trait implementations
     # ===------------------------------------------------------------------===#
 
-    @no_inline
     fn __str__(self) -> String:
-        """Gets this slice as a standard `String`.
+        """Gets this slice as a standard `String`. You don't need to
+        call this method directly, use `str("...")` instead.
 
         Returns:
             The string representation of the slice.
         """
         return String(str_slice=self)
+
+    fn __repr__(self) -> String:
+        """Return a representation of the string instance. You don't need to
+        call this method directly, use `repr("...")` instead.
+
+        Returns:
+            A new representation of the string.
+        """
+        return ascii(self)
+
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
+
+        Returns:
+            A new string containing the ASCII representation of the object.
+        """
+        return ascii(self)
 
     fn __len__(self) -> Int:
         """Nominally returns the _length in Unicode codepoints_ (not bytes!).
@@ -691,7 +695,7 @@ struct StringSlice[
         for s in self:
             var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
-            if no_null_len == 1 and _isspace(ptr[0]):
+            if no_null_len == 1 and _is_ascii_space(ptr[0]):
                 continue
             elif (
                 no_null_len == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0

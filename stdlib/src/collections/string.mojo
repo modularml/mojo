@@ -21,7 +21,7 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char, OpaquePointer
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, stack_allocation
 from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
@@ -137,12 +137,17 @@ fn chr(c: Int) -> String:
         return String(String._buffer_type(c, 0))
 
     var num_bytes = _unicode_codepoint_utf8_byte_length(c)
-    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
+    var p: UnsafePointer[UInt8]
+    if num_bytes == 2:
+        p = stack_allocation[3, UInt8]()
+    elif num_bytes == 3:
+        p = stack_allocation[4, UInt8]()
+    else:
+        p = stack_allocation[5, UInt8]()
     _shift_unicode_to_utf8(p, c, num_bytes)
     # TODO: decide whether to use replacement char (�) or raise ValueError
     # if not _is_valid_utf8(p, num_bytes):
     #     debug_assert(False, "Invalid Unicode code point")
-    #     p.free()
     #     return chr(0xFFFD)
     p[num_bytes] = 0
     return String(ptr=p, len=num_bytes + 1)
@@ -153,52 +158,63 @@ fn chr(c: Int) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _chr_ascii(c: UInt8) -> String:
-    """Returns a string based on the given ASCII code point.
+@always_inline
+fn isdigit(c: Byte) -> Bool:
+    """Determines whether the given character is a digit: [0, 9].
 
     Args:
-        c: An integer that represents a code point.
+        c: The character to check.
 
     Returns:
-        A string containing a single character based on the given code point.
+        True if the character is a digit.
     """
-    return String(String._buffer_type(c, 0))
-
-
-fn _repr_ascii(c: UInt8) -> String:
-    """Returns a printable representation of the given ASCII code point.
-
-    Args:
-        c: An integer that represents a code point.
-
-    Returns:
-        A string containing a representation of the given code point.
-    """
-    alias ord_tab = ord("\t")
-    alias ord_new_line = ord("\n")
-    alias ord_carriage_return = ord("\r")
-    alias ord_back_slash = ord("\\")
-
-    if c == ord_back_slash:
-        return r"\\"
-    elif isprintable(c):
-        return _chr_ascii(c)
-    elif c == ord_tab:
-        return r"\t"
-    elif c == ord_new_line:
-        return r"\n"
-    elif c == ord_carriage_return:
-        return r"\r"
-    else:
-        var uc = c.cast[DType.uint8]()
-        if uc < 16:
-            return hex(uc, prefix=r"\x0")
-        else:
-            return hex(uc, prefix=r"\x")
+    alias `0` = Byte(ord("0"))
+    alias `9` = Byte(ord("9"))
+    return `0` <= c <= `9`
 
 
 @always_inline
-fn ascii(value: String) -> String:
+fn _is_ascii_printable_vec[
+    w: Int, //
+](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    alias ` ` = Byte(ord(" "))
+    alias `~` = Byte(ord("~"))
+    return ` ` <= v <= `~`
+
+
+@always_inline
+fn isprintable(v: SIMD[DType.uint8]) -> Bool:
+    """Determines whether the given characters are ASCII printable.
+
+    Args:
+        v: The characters to check.
+
+    Returns:
+        True if the characters are printable, otherwise False.
+    """
+    return _is_ascii_printable_vec(v).reduce_and()
+
+
+@always_inline
+fn isprintable(span: Span[Byte]) -> Bool:
+    """Determines whether the given characters are ASCII printable.
+
+    Args:
+        v: The characters to check.
+
+    Returns:
+        True if the characters are printable, otherwise False.
+    """
+    return span.count[_is_ascii_printable_vec]() == len(span)
+
+
+trait _HasAscii:
+    fn __ascii__(self) -> String:
+        ...
+
+
+@always_inline
+fn ascii[T: _HasAscii](value: T) -> String:
     """Get the ASCII representation of the object.
 
     Args:
@@ -207,19 +223,130 @@ fn ascii(value: String) -> String:
     Returns:
         A string containing the ASCII representation of the object.
     """
-    alias ord_squote = ord("'")
-    var result = String()
-    var use_dquote = False
+    return value.__ascii__()
 
-    for idx in range(len(value._buffer) - 1):
-        var char = value._buffer[idx]
-        result += _repr_ascii(char)
-        use_dquote = use_dquote or (char == ord_squote)
 
-    if use_dquote:
-        return '"' + result + '"'
-    else:
-        return "'" + result + "'"
+fn ascii[T: Stringlike, //](value: T) -> String:
+    """Get the ASCII representation of the object.
+
+    Parameters:
+        T: The Stringlike type.
+
+    Args:
+        value: The object to get the ASCII representation of.
+
+    Returns:
+        A string containing the ASCII representation of the object.
+    """
+
+    alias `'` = UInt8(ord("'"))
+    alias `\\` = UInt8(ord("\\"))
+    alias `x` = UInt8(ord("x"))
+
+    span = value.as_bytes_read()
+    span_len = len(span)
+    non_printable_chars = span_len - span.count[_is_ascii_printable_vec]()
+    hex_prefix = non_printable_chars * 3
+    b_len = value.byte_length()
+    result = String(String._buffer_type(capacity=b_len + hex_prefix + 3))
+
+    use_dquote = False
+    v_ptr, r_ptr = value.unsafe_ptr(), result.unsafe_ptr()
+    v_idx, r_idx = 0, 0
+
+    for i in range(span_len):
+        char = v_ptr[v_idx]
+        use_dquote = use_dquote or (char == `'`)
+        if isprintable(char):
+            r_ptr[r_idx] = char
+        else:
+            r_ptr[r_idx] = `\\`
+            r_ptr[r_idx + 1] = `x`
+            r_ptr[r_idx + 2] = char // 16
+            r_ptr[r_idx + 3] = char % 16
+            r_idx += 3
+        v_idx += 1
+        r_idx += 1
+
+    return '"' + result + '"' if use_dquote else "'" + result + "'"
+
+
+@always_inline
+fn _is_ascii_uppercase_vec[
+    w: Int, //
+](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    alias `A` = Byte(ord("A"))
+    alias `Z` = Byte(ord("Z"))
+    return `A` <= c <= `Z`
+
+
+@always_inline
+fn _is_ascii_uppercase(v: SIMD[DType.uint8]) -> Bool:
+    return _is_ascii_uppercase_vec(v).reduce_and()
+
+
+@always_inline
+fn _is_ascii_uppercase(span: Span[Byte]) -> Bool:
+    return span.count[_is_ascii_uppercase_vec]() == len(span)
+
+
+@always_inline
+fn _is_ascii_lowercase_vec[
+    w: Int, //
+](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    alias `a` = Byte(ord("a"))
+    alias `z` = Byte(ord("z"))
+    return `a` <= v <= `z`
+
+
+@always_inline
+fn _is_ascii_lowercase(v: SIMD[DType.uint8]) -> Bool:
+    return _is_ascii_lowercase_vec(v).reduce_and()
+
+
+@always_inline
+fn _is_ascii_lowercase(span: Span[Byte]) -> Bool:
+    return span.count[_is_ascii_lowercase_vec]() == len(span)
+
+
+fn _is_ascii_space(c: Byte) -> Bool:
+    """Determines whether the given character is an ASCII whitespace character.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is one of the ASCII whitespace characters.
+
+    Notes:
+        This only respects ASCII whitespace, i.e. only if the character
+        specified is one of " \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e". For semantics
+        similar to Python, use `String.isspace()`.
+    """
+
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
+    alias ` ` = Byte(ord(" "))
+    alias `\t` = Byte(ord("\t"))
+    alias `\n` = Byte(ord("\n"))
+    alias `\r` = Byte(ord("\r"))
+    alias `\f` = Byte(ord("\f"))
+    alias `\v` = Byte(ord("\v"))
+    alias `\x1c` = Byte(ord("\x1c"))
+    alias `\x1d` = Byte(ord("\x1d"))
+    alias `\x1e` = Byte(ord("\x1e"))
+
+    # This compiles to something very clever that's even faster than a LUT.
+    return (
+        c == ` `
+        or c == `\t`
+        or c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -249,7 +376,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if _isspace(buff[pos]):
+        if _is_ascii_space(buff[pos]):
             continue
 
         if str_ref[pos] == "-":
@@ -327,13 +454,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif _isspace(ord_current):
+        elif _is_ascii_space(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not _isspace(buff[pos + 1]):
+        if pos + 1 < str_len and not _is_ascii_space(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -347,7 +474,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not _isspace(buff[pos]):
+            if not _is_ascii_space(buff[pos]):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -536,34 +663,14 @@ fn atof(str: String) raises -> Float64:
 
 
 # ===----------------------------------------------------------------------=== #
-# isdigit
-# ===----------------------------------------------------------------------=== #
-
-
-fn isdigit(c: UInt8) -> Bool:
-    """Determines whether the given character is a digit [0-9].
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a digit.
-    """
-    alias ord_0 = ord("0")
-    alias ord_9 = ord("9")
-    return ord_0 <= int(c) <= ord_9
-
-
-# ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
 fn isupper(c: UInt8) -> Bool:
-    """Determines whether the given character is an uppercase character.
-
-    This currently only respects the default "C" locale, i.e. returns True iff
-    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
+    """Determines whether the given character is an ASCII uppercase character:
+    `"ABCDEFGHIJKLMNOPQRSTUVWXYZ"`.
 
     Args:
         c: The character to check.
@@ -574,22 +681,15 @@ fn isupper(c: UInt8) -> Bool:
     return _is_ascii_uppercase(c)
 
 
-fn _is_ascii_uppercase(c: UInt8) -> Bool:
-    alias ord_a = ord("A")
-    alias ord_z = ord("Z")
-    return ord_a <= int(c) <= ord_z
-
-
 # ===----------------------------------------------------------------------=== #
 # islower
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
 fn islower(c: UInt8) -> Bool:
-    """Determines whether the given character is an lowercase character.
-
-    This currently only respects the default "C" locale, i.e. returns True iff
-    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
+    """Determines whether the given character is an ASCII lowercase character:
+    `"abcdefghijklmnopqrstuvwxyz"`.
 
     Args:
         c: The character to check.
@@ -598,91 +698,6 @@ fn islower(c: UInt8) -> Bool:
         True if the character is lowercase.
     """
     return _is_ascii_lowercase(c)
-
-
-fn _is_ascii_lowercase(c: UInt8) -> Bool:
-    alias ord_a = ord("a")
-    alias ord_z = ord("z")
-    return ord_a <= int(c) <= ord_z
-
-
-# ===----------------------------------------------------------------------=== #
-# _isspace
-# ===----------------------------------------------------------------------=== #
-
-
-fn _isspace(c: String) -> Bool:
-    """Determines whether the given character is a whitespace character.
-
-    This only respects the default "C" locale, i.e. returns True only if the
-    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
-    to Python, use `String.isspace()`.
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True iff the character is one of the whitespace characters listed above.
-    """
-    return _isspace(ord(c))
-
-
-fn _isspace(c: UInt8) -> Bool:
-    """Determines whether the given character is a whitespace character.
-
-    This only respects the default "C" locale, i.e. returns True only if the
-    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
-    to Python, use `String.isspace()`.
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True iff the character is one of the whitespace characters listed above.
-    """
-
-    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
-    alias ` ` = UInt8(ord(" "))
-    alias `\t` = UInt8(ord("\t"))
-    alias `\n` = UInt8(ord("\n"))
-    alias `\r` = UInt8(ord("\r"))
-    alias `\f` = UInt8(ord("\f"))
-    alias `\v` = UInt8(ord("\v"))
-    alias `\x1c` = UInt8(ord("\x1c"))
-    alias `\x1d` = UInt8(ord("\x1d"))
-    alias `\x1e` = UInt8(ord("\x1e"))
-
-    # This compiles to something very clever that's even faster than a LUT.
-    return (
-        c == ` `
-        or c == `\t`
-        or c == `\n`
-        or c == `\r`
-        or c == `\f`
-        or c == `\v`
-        or c == `\x1c`
-        or c == `\x1d`
-        or c == `\x1e`
-    )
-
-
-# ===----------------------------------------------------------------------=== #
-# isprintable
-# ===----------------------------------------------------------------------=== #
-
-
-fn isprintable(c: UInt8) -> Bool:
-    """Determines whether the given character is a printable character.
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a printable character, otherwise False.
-    """
-    alias ord_space = ord(" ")
-    alias ord_tilde = ord("~")
-    return ord_space <= int(c) <= ord_tilde
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1261,48 +1276,32 @@ struct String(
     fn __str__(self) -> String:
         """Gets the string itself.
 
-        This method ensures that you can pass a `String` to a method that
-        takes a `Stringable` value.
-
         Returns:
             The string itself.
+
+        Notes:
+            This method ensures that you can pass a `String` to a method that
+            takes a `Stringable` value.
         """
         return self
 
     fn __repr__(self) -> String:
-        """Return a Mojo-compatible representation of the `String` instance.
+        """Return a representation of the string instance. You don't need to
+        call this method directly, use `repr("...")` instead.
 
         Returns:
             A new representation of the string.
         """
-        var result = String()
-        var use_dquote = False
-        for s in self:
-            use_dquote = use_dquote or (s == "'")
+        return ascii(self)
 
-            if s == "\\":
-                result += r"\\"
-            elif s == "\t":
-                result += r"\t"
-            elif s == "\n":
-                result += r"\n"
-            elif s == "\r":
-                result += r"\r"
-            else:
-                var codepoint = ord(s)
-                if isprintable(codepoint):
-                    result += s
-                elif codepoint < 0x10:
-                    result += hex(codepoint, prefix=r"\x0")
-                elif codepoint < 0x20 or codepoint == 0x7F:
-                    result += hex(codepoint, prefix=r"\x")
-                else:  # multi-byte character
-                    result += s
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
 
-        if use_dquote:
-            return '"' + result + '"'
-        else:
-            return "'" + result + "'"
+        Returns:
+            A string containing the ASCII representation of the object.
+        """
+        return ascii(self)
 
     fn __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).
@@ -1899,7 +1898,7 @@ struct String(
         #     if not s.isspace():
         #         break
         #     r_idx -= 1
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
+        while r_idx > 0 and _is_ascii_space(self._buffer.unsafe_get(r_idx - 1)):
             r_idx -= 1
         return self[:r_idx]
 
@@ -1931,7 +1930,7 @@ struct String(
         #     if not s.isspace():
         #         break
         #     l_idx += 1
-        while l_idx < self.byte_length() and _isspace(
+        while l_idx < self.byte_length() and _is_ascii_space(
             self._buffer.unsafe_get(l_idx)
         ):
             l_idx += 1
@@ -2229,10 +2228,7 @@ struct String(
         Returns:
             True if all characters are printable else False.
         """
-        for c in self:
-            if not isprintable(ord(c)):
-                return False
-        return True
+        return isprintable(self.as_bytes())
 
     fn rjust(self, width: Int, fillchar: StringLiteral = " ") -> String:
         """Returns the string right justified in a string of specified width.

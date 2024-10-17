@@ -331,8 +331,7 @@ struct Span[
         return not self == rhs
 
     fn fill[origin: MutableOrigin, //](self: Span[T, origin], value: T):
-        """
-        Fill the memory that a span references with a given value.
+        """Fill the memory that a span references with a given value.
 
         Parameters:
             origin: The inferred mutable origin of the data within the Span.
@@ -344,8 +343,7 @@ struct Span[
             element[] = value
 
     fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
-        """
-        Return an immutable version of this span.
+        """Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
@@ -353,3 +351,39 @@ struct Span[
         return Span[T, _lit_mut_cast[origin, False].result](
             unsafe_ptr=self._data, len=self._len
         )
+
+    fn count[
+        D: DType, w: Int, //, func: fn (SIMD[D, w]) -> SIMD[DType.bool, w]
+    ](self: Span[Scalar[D]]) -> Int:
+        """Count the amount of times the function returns True.
+
+        Parameters:
+            D: The DType.
+            w: The width.
+            func: The function to evaluate.
+
+        Returns:
+            The amount of times the function returns True.
+        """
+        alias sizes = (256, 128, 64, 32, 16, 8)
+        ptr = self.unsafe_ptr()
+        num_bytes = len(self)
+        amnt = 0
+        processed = 0
+
+        @parameter
+        for i in range(len(sizes)):
+            alias s = sizes.get[i, Int]()
+
+            @parameter
+            if simdwidthof[D]() >= s:
+                rest = num_bytes - processed
+                for _ in range(rest // s):
+                    var vec = (ptr + processed).load[width=s]()
+                    amnt += int(func(vec).cast[D]().reduce_add())
+                    processed += s
+
+        for i in range(num_bytes - processed):
+            amnt += int(func(ptr[processed + i]))
+
+        return amnt
