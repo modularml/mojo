@@ -21,7 +21,7 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils import Span
+from utils.span import Span, AsBytesRead, AsBytesWrite
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
@@ -57,6 +57,7 @@ fn _count_utf8_continuation_bytes(span: Span[UInt8]) -> Int:
     return amnt
 
 
+@always_inline
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     debug_assert(
         0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
@@ -93,6 +94,22 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
+@always_inline
+fn _utf8_first_byte_sequence_length(b: UInt8) -> Int:
+    """Get the length of the sequence starting with given byte. Do note that
+    this does not work correctly if given a continuation byte."""
+    debug_assert(
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
+    )
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
+
+
+@always_inline("nodebug")
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
 
@@ -222,10 +239,15 @@ struct _StringSliceIter[
 
 
 @value
-struct StringSlice[
-    is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable, CollectionElement, CollectionElementNew):
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+    Stringable,
+    Sized,
+    Formattable,
+    CollectionElement,
+    CollectionElementNew,
+    Stringlike,
+    AsBytesWrite,
+):
     """A non-owning view to encoded string data.
 
     TODO:
@@ -472,23 +494,23 @@ struct StringSlice[
         """
         return not self == rhs
 
-    fn __iter__(self) -> _StringSliceIter[origin]:
-        """Iterate over the string, returning immutable references.
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+        """Iterate over the string unicode characters.
 
         Returns:
-            An iterator of references to the string elements.
+            An iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[origin](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(self) -> _StringSliceIter[origin, False]:
-        """Iterate backwards over the string, returning immutable references.
+    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
+        """Iterate backwards over the string unicode characters.
 
         Returns:
-            A reversed iterator of references to the string elements.
+            A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[origin, forward=False](
+        return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -517,13 +539,52 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, origin]:
-        """Get the sequence of encoded bytes of the underlying string.
+    fn as_bytes(ref [_]self) -> Span[UInt8, origin]:
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A slice containing the underlying sequence of encoded bytes.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
         return self._slice
+
+    @always_inline
+    fn as_bytes_write[O: MutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
+        """Returns a mutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            A mutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -631,9 +692,12 @@ struct StringSlice[
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
+
+        Parameters:
+            T: The type of the substring.
 
         Args:
           substr: The substring to find.
@@ -642,27 +706,28 @@ struct StringSlice[
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
+
+        var sub = substr.as_bytes_read()
+        var sub_len = len(sub)
+        if sub_len == 0:
             return 0
 
-        if self.byte_length() < substr.byte_length() + start:
+        var s_span = self.as_bytes_read()
+        if len(s_span) < sub_len + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
+        var haystack = self._from_start(start).as_bytes_read()
 
         var loc = stringref._memmem(
-            haystack_str.unsafe_ptr(),
-            haystack_str.byte_length(),
-            substr.unsafe_ptr(),
-            substr.byte_length(),
+            haystack.unsafe_ptr(), len(haystack), sub.unsafe_ptr(), sub_len
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self.unsafe_ptr())
+        return int(loc) - int(s_span.unsafe_ptr())
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
@@ -706,6 +771,114 @@ struct StringSlice[
                 return False
         _ = next_line, unicode_line_sep, unicode_paragraph_sep
         return True
+
+    @always_inline
+    fn split[
+        T: Stringlike, //
+    ](self, sep: T, maxsplit: Int) -> List[StringSlice[ImmutableAnyOrigin]]:
+        """Split the string by a separator.
+
+        Parameters:
+            T: The type of the separator.
+
+        Args:
+            sep: The string to split on.
+            maxsplit: The maximum amount of items to split from String.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting with maxsplit
+        _ = "1,2,3".split(",", maxsplit=1) # ['1', '2,3']
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",", maxsplit=1) # ['', '1,2,3,']
+        _ = "123".split("", maxsplit=1) # ['', '123']
+        ```
+        .
+        """
+        return _split_sl[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
+
+    @always_inline
+    fn split[
+        T: Stringlike, //
+    ](self, sep: T) -> List[StringSlice[ImmutableAnyOrigin]]:
+        """Split the string by a separator.
+
+        Parameters:
+            T: The type of the separator.
+
+        Args:
+            sep: The string to split on.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting a space
+        _ = "hello world".split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = "hello,,world".split(",") # ["hello", "", "world"]
+        # Splitting with starting or ending separators
+        _ = ",1,2,3,".split(",") # ['', '1', '2', '3', '']
+        _ = "123".split("") # ['', '1', '2', '3', '']
+        ```
+        .
+        """
+        return _split_sl[has_maxsplit=False, has_sep=True](self, sep, -1)
+
+    @always_inline
+    fn split(self, *, maxsplit: Int) -> List[StringSlice[ImmutableAnyOrigin]]:
+        """Split the string by every Whitespace separator.
+
+        Args:
+            maxsplit: The maximum amount of items to split from String.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting with maxsplit
+        _ = "1     2  3".split(maxsplit=1) # ['1', '2  3']
+        ```
+        .
+        """
+        return _split_sl[has_maxsplit=True, has_sep=False](self, None, maxsplit)
+
+    @always_inline
+    fn split(
+        self, sep: NoneType = None
+    ) -> List[StringSlice[ImmutableAnyOrigin]]:
+        """Split the string by every Whitespace separator.
+
+        Args:
+            sep: None.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = "      ".split() # []
+        _ = "".split() # []
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = "      hello    world     ".split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        _ = (
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+        ).split()  # ["hello", "world"]
+        ```
+        .
+        """
+        return _split_sl[has_maxsplit=False, has_sep=False](self, sep, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
@@ -765,7 +938,7 @@ struct StringSlice[
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike:
+trait Stringlike(AsBytesRead, CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -787,6 +960,166 @@ trait Stringlike:
             The raw pointer to the data.
         """
         ...
+
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+        """Finds the offset of the first occurrence of `substr` starting at
+        `start`. If not found, returns -1.
+
+        Parameters:
+            T: The type of the substring.
+
+        Args:
+            substr: The substring to find.
+            start: The offset from which to find.
+
+        Returns:
+            The offset of `substr` relative to the beginning of the string.
+        """
+        ...
+
+    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+        """Iterate over the string unicode characters.
+
+        Returns:
+            An iterator of references to the string unicode characters.
+        """
+        ...
+
+
+fn _split[
+    T0: Stringlike, //,
+    has_maxsplit: Bool,
+    has_sep: Bool,
+    T1: Stringlike = StringLiteral,
+](src_str: T0, sep: Optional[T1], maxsplit: Int) -> List[String]:
+    var items: List[Span[Byte, __origin_of(src_str)]]
+
+    @parameter
+    if has_sep:
+        items = _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+    else:
+        items = _split_impl[has_maxsplit](src_str, maxsplit)
+    var output = List[String](capacity=len(items))
+    # TODO: some fancy custom allocator since we know the exact length of each
+    for item in items:
+        output.append(String(StringSlice(unsafe_from_utf8=item[])))
+    return output^
+
+
+fn _split_sl[
+    has_maxsplit: Bool,
+    has_sep: Bool,
+    T: Stringlike = StringLiteral,
+](src_str: StringSlice, sep: Optional[T], maxsplit: Int) -> List[
+    StringSlice[ImmutableAnyOrigin]
+] as output:
+    var items: List[Span[Byte, src_str.origin]]
+
+    @parameter
+    if has_sep:
+        items = rebind[__type_of(items)](
+            _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+        )
+    else:
+        items = rebind[__type_of(items)](
+            _split_impl[has_maxsplit](src_str, maxsplit)
+        )
+
+    output = __type_of(output)(capacity=len(items))
+    for item in items:
+        v = rebind[Span[Byte, ImmutableAnyOrigin]](item[])
+        output.append(StringSlice[ImmutableAnyOrigin](unsafe_from_utf8=v))
+
+
+fn _split_impl[
+    T0: Stringlike,
+    T1: Stringlike,
+    O: ImmutableOrigin, //,
+    has_maxsplit: Bool,
+](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
+    var sep_len = len(sep.as_bytes_read())
+    if sep_len == 0:
+        var iterator = src_str.__iter__()
+        output = __type_of(output)(capacity=len(iterator) + 2)
+        output.append(rebind[Span[Byte, O]]("".as_bytes_read()))
+        for s in iterator:
+            output.append(rebind[Span[Byte, O]](s.as_bytes_read()))
+        output.append(rebind[Span[Byte, O]]("".as_bytes_read()))
+        return
+
+    alias prealloc = 16  # guessing, Python's implementation uses 12
+    var amnt = prealloc
+
+    @parameter
+    if has_maxsplit:
+        amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
+    output = __type_of(output)(capacity=amnt)
+    var str_byte_len = len(src_str.as_bytes_read())
+    var lhs = 0
+    var rhs = 0
+    var items = 0
+    var ptr = src_str.as_bytes_read().unsafe_ptr()
+    # var str_span = src_str.as_bytes_read() # FIXME(#3295)
+    # var sep_span = sep.as_bytes_read() # FIXME(#3295)
+
+    while lhs <= str_byte_len:
+        rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span and sep_span
+        rhs += int(rhs == -1) * (str_byte_len + 1)  # if not found go to end
+
+        @parameter
+        if has_maxsplit:
+            rhs += int(items == maxsplit) * (str_byte_len - rhs)
+            items += 1
+
+        output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
+        lhs = rhs + sep_len
+
+
+fn _split_impl[
+    T: Stringlike, O: ImmutableOrigin, //, has_maxsplit: Bool
+](ref [O]src_str: T, maxsplit: Int) -> List[Span[Byte, O]] as output:
+    alias prealloc = 16  # guessing, Python's implementation uses 12
+    var amnt = prealloc
+
+    @parameter
+    if has_maxsplit:
+        amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
+    output = __type_of(output)(capacity=amnt)
+    var str_byte_len = len(src_str.as_bytes_read())
+    var lhs = 0
+    var rhs = 0
+    var items = 0
+    var ptr = src_str.as_bytes_read().unsafe_ptr()
+    alias S = StringSlice[StaticConstantOrigin]
+
+    @always_inline("nodebug")
+    fn _build_slice(p: UnsafePointer[Byte], start: Int, end: Int) -> S:
+        return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+
+    while lhs <= str_byte_len:
+        # Python adds all "whitespace chars" as one separator
+        # if no separator was specified
+        for s in _build_slice(ptr, lhs, str_byte_len):
+            if not s.isspace():
+                break
+            lhs += s.byte_length()
+        # if it went until the end of the String, then it should be sliced
+        # until the start of the whitespace which was already appended
+        if lhs == str_byte_len:
+            break
+        rhs = lhs + _utf8_first_byte_sequence_length(ptr[lhs])
+        for s in _build_slice(ptr, rhs, str_byte_len):
+            if s.isspace():
+                break
+            rhs += s.byte_length()
+
+        @parameter
+        if has_maxsplit:
+            rhs += int(items == maxsplit) * (str_byte_len - rhs)
+            items += 1
+
+        output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
+        lhs = rhs
 
 
 # ===----------------------------------------------------------------------===#
