@@ -489,7 +489,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Example usage:
 
         ```mojo
-        var x = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+        from collections import Dict
+
+        var x = Dict[Int, Int](power_of_two_initial_capacity = 1024)
         # Insert (2/3 of 1024) entries without reallocation.
         ```
 
@@ -688,6 +690,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
+        from collections import Dict
+
         var my_dict = Dict[Int, Float64]()
         my_dict[1] = 1.1
         my_dict[2] = 2.2
@@ -899,6 +903,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
         access the key and value as attributes ie.
 
         ```mojo
+        from collections import Dict
+
+        var dict = Dict[String, Int]()
+        dict["a"] = 1
+        dict["b"] = 2
+
         for e in dict.items():
             print(e[].key, e[].value)
         ```
@@ -1243,6 +1253,12 @@ struct OwnedKwargsDict[V: CollectionElement](
         access the key and value as attributes ie.
 
         ```mojo
+        from collections import Dict
+
+        var dict = Dict[String, Int]()
+        dict["a"] = 1
+        dict["b"] = 2
+
         for e in dict.items():
             print(e[].key, e[].value)
         ```
