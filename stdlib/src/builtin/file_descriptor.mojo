@@ -18,12 +18,13 @@ For example, here's how to print to a file
 
 ```mojo
 var f = open("my_file.txt", "r")
-print("hello", file=f)
+print("hello", file=f^)
 f.close()
 ```
 
 """
 from utils import Span
+from builtin.io import _printf
 from sys.ffi import external_call, OpaquePointer
 from sys.info import triple_is_nvidia_cuda
 from memory import UnsafePointer
@@ -61,15 +62,11 @@ struct FileDescriptor(Writer):
         Args:
             bytes: The byte span to write to this file.
         """
+        var len_bytes = len(bytes)
 
         @parameter
         if triple_is_nvidia_cuda():
-            var tmp = 0
-            var arg_ptr = UnsafePointer.address_of(tmp)
-            # TODO: Debug assert to check bytes written when GPU print calls are buffered
-            _ = external_call["vprintf", Int32](
-                bytes.unsafe_ptr(), arg_ptr.bitcast[OpaquePointer]()
-            )
+            _printf["%*s"](len_bytes, bytes.unsafe_ptr())
         else:
             written = external_call["write", Int32](
                 self.value, bytes.unsafe_ptr(), len(bytes)
@@ -93,7 +90,7 @@ struct FileDescriptor(Writer):
         """
 
         @parameter
-        fn write_arg[i: Int, T: Writable](arg: T):
+        fn write_arg[T: Writable](arg: T):
             arg.write_to(self)
 
-        args.each_idx[write_arg]()
+        args.each[write_arg]()

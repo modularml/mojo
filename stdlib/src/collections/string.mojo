@@ -19,7 +19,7 @@ from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char, OpaquePointer
-from utils import StaticString
+from utils import StaticString, write_args
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -898,8 +898,9 @@ struct String(
         ```
         .
         """
-
-        return Self.write(args)
+        var output = String()
+        write_args(output, args, sep=sep, end=end)
+        return output^
 
     @staticmethod
     @no_inline
@@ -939,21 +940,8 @@ struct String(
         ```
         .
         """
-
         var output = String()
-
-        @parameter
-        fn write_arg[i: Int, T: Writable](arg: T):
-            output.write(arg)
-
-            @parameter
-            if i < len(VariadicList(Ts)) - 1:
-                output.write(sep)
-
-        args.each_idx[write_arg]()
-
-        output.write(end)
-
+        write_args(output, args, sep=sep, end=end)
         return output^
 
     @staticmethod
