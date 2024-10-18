@@ -20,12 +20,13 @@ from utils import StringSlice
 ```
 """
 
-from bit import count_leading_zeros
+from bit import count_leading_zeros, bit_ceil
 from utils.span import Span, AsBytesRead, AsBytesWrite
 from collections.string import _isspace, _atol, _atof
-from collections import List, Optional
-from memory import memcmp, UnsafePointer
+from collections import List, Optional, Dict
+from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
+from os import abort
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -986,24 +987,98 @@ trait Stringlike(AsBytesRead, CollectionElement, CollectionElementNew):
         ...
 
 
+fn _to_string[
+    T: CollectionElement, //,
+    len_fn: fn (T) -> Int,
+    unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
+](items: List[T]) -> List[String]:
+    i_len = len(items)
+    i_ptr = items.unsafe_ptr()
+    output = List[String](capacity=i_len)
+    # TODO: try other approaches for memory allocation
+    # TODO: once we have argsort benchmark this other approach:
+    # argsort by getting the length of the span from biggest to smallest
+    # allocate in that order in one loop
+    # append the new instances in original order in another loop
+
+    for i in range(i_len):
+        og_len = len_fn(i_ptr[i])
+        f_len = og_len + 1  # null terminator
+        og_ptr = unsafe_ptr_fn(i_ptr[i])
+        cap = bit_ceil(f_len)
+        p = UnsafePointer[Byte].alloc(cap)
+        memcpy(p, og_ptr, og_len)
+        p[og_len] = 0
+        buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=cap)
+        output.append(String(buf^))
+    return output^
+
+
+@always_inline
+fn to_string[
+    O: ImmutableOrigin, //
+](items: List[StringSlice[O]]) -> List[String]:
+    """Create a list of Strings copying the existing data. This overallocates
+    in most cases in exchange for better speed overall.
+
+    Parameters:
+        O: The origin of the data.
+
+    Args:
+        items: The List of string slices.
+
+    Returns:
+        The list of created strings.
+    """
+
+    fn unsafe_ptr_fn(v: StringSlice[O]) -> UnsafePointer[Byte]:
+        return v.unsafe_ptr()
+
+    fn len_fn(v: StringSlice[O]) -> Int:
+        return v.byte_length()
+
+    return _to_string[len_fn, unsafe_ptr_fn](items)
+
+
+@always_inline
+fn to_string[
+    O: ImmutableOrigin, //
+](items: List[Span[Byte, O]]) -> List[String]:
+    """Create a list of Strings copying the existing data. This overallocates
+    in most cases in exchange for better speed overall.
+
+    Parameters:
+        O: The origin of the data.
+
+    Args:
+        items: The List of Bytes.
+
+    Returns:
+        The list of created strings.
+    """
+
+    fn unsafe_ptr_fn(v: Span[Byte, O]) -> UnsafePointer[Byte]:
+        return v.unsafe_ptr()
+
+    fn len_fn(v: Span[Byte, O]) -> Int:
+        return len(v)
+
+    return _to_string[len_fn, unsafe_ptr_fn](items)
+
+@always_inline
 fn _split[
     T0: Stringlike, //,
     has_maxsplit: Bool,
     has_sep: Bool,
     T1: Stringlike = StringLiteral,
 ](src_str: T0, sep: Optional[T1], maxsplit: Int) -> List[String]:
-    var items: List[Span[Byte, __origin_of(src_str)]]
-
     @parameter
     if has_sep:
-        items = _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+        return to_string(
+            _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
+        )
     else:
-        items = _split_impl[has_maxsplit](src_str, maxsplit)
-    var output = List[String](capacity=len(items))
-    # TODO: some fancy custom allocator since we know the exact length of each
-    for item in items:
-        output.append(String(StringSlice(unsafe_from_utf8=item[])))
-    return output^
+        return to_string(_split_impl[has_maxsplit](src_str, maxsplit))
 
 
 fn _split_sl[
