@@ -64,7 +64,7 @@ struct Passwd(Stringable):
         Returns:
           A compact string of the Passwd struct.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -73,7 +73,7 @@ struct Passwd(Stringable):
         Returns:
           A compact string representation of Passwd struct.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
 
 fn getpwuid(uid: Int) raises -> Passwd:

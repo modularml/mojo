@@ -368,7 +368,7 @@ struct _FixedString[CAP: Int](
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
-    fn format_sequence[*Ts: Writable](*args: *Ts) -> Self:
+    fn write[*Ts: Writable](*args: *Ts) -> Self:
         """
         Construct a string by concatenating a sequence of Writable arguments.
 
