@@ -15,6 +15,18 @@ from os import abort
 from builtin._documentation import doc_private
 
 
+@always_inline
+fn _forget[T: AnyType](owned value: T):
+    # Avoids running the destructor.
+    __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(value))
+
+
+@always_inline
+fn _uninit[T: AnyType]() -> T as value:
+    # Returns uninitialized data.
+    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(value))
+
+
 struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     """A memory location that may or may not be initialized.
 
@@ -31,17 +43,14 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         ElementType: The type of the element to store.
     """
 
-    alias type = __mlir_type[`!pop.array<1, `, Self.ElementType, `>`]
-    var _array: Self.type
+    var _data: ElementType
 
     @always_inline
     fn __init__(inout self):
         """The memory is now considered uninitialized."""
-        self._array = __mlir_op.`kgen.param.constant`[
-            _type = Self.type,
-            value = __mlir_attr[`#kgen.unknown : `, Self.type],
-        ]()
+        self._data = _uninit[ElementType]()
 
+    # TODO: allows conformance to CollectionElement for use in collections
     @doc_private
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -74,9 +83,27 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             value: The value to initialize the memory with.
         """
-        self = UnsafeMaybeUninitialized[MovableType]()
-        self.write(value^)
+        self._data = value^
 
+    @always_inline
+    fn __init__[
+        CopyableType: ExplicitlyCopyable
+    ](
+        inout self: UnsafeMaybeUninitialized[CopyableType],
+        *,
+        value: CopyableType,
+    ):
+        """The memory is now considered initialized.
+
+        Parameters:
+            CopyableType: The type of the element to store.
+
+        Args:
+            value: The value to initialize the memory with.
+        """
+        self._data = CopyableType(other=value)
+
+    # TODO: allows conformance to CollectionElement for use in collections
     @always_inline
     fn __copyinit__(inout self, other: Self):
         """Copy another object.
@@ -113,24 +140,10 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        self.unsafe_ptr().init_pointee_explicit_copy(other.assume_initialized())
+        _forget(self._data^)
+        self._data = CopyableType(other=other._data)
 
-    @always_inline
-    fn copy_from[
-        CopyableType: ExplicitlyCopyable
-    ](inout self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType):
-        """Copy another object.
-
-        This function assumes that the current memory is uninitialized.
-
-        Parameters:
-            CopyableType: The type object to copy.
-
-        Args:
-            other: The object to copy.
-        """
-        self.unsafe_ptr().init_pointee_explicit_copy(other)
-
+    # TODO: allows conformance to CollectionElement for use in collections
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
         """Move another object.
@@ -169,48 +182,9 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to move.
         """
-        self.move_from(other.unsafe_ptr())
-
-    @always_inline
-    fn move_from[
-        MovableType: Movable
-    ](
-        inout self: UnsafeMaybeUninitialized[MovableType],
-        other: UnsafePointer[MovableType],
-    ):
-        """Move another object.
-
-        This function assumes that the current memory is uninitialized
-        and the other object is initialized memory.
-
-        After the function is called, the `other` object is considered uninitialized.
-
-        Parameters:
-            MovableType: The type object to move.
-
-        Args:
-            other: The pointer to the object to move.
-        """
-        other.move_pointee_into(self.unsafe_ptr())
-
-    @always_inline
-    fn write[
-        MovableType: Movable
-    ](
-        inout self: UnsafeMaybeUninitialized[MovableType],
-        owned value: MovableType,
-    ):
-        """Write a value into an uninitialized memory location.
-
-        Calling this method assumes that the memory is uninitialized.
-
-        Parameters:
-            MovableType: The type of the element to store.
-
-        Args:
-            value: The value to write.
-        """
-        self.unsafe_ptr().init_pointee_move(value^)
+        _forget(self._data^)
+        self._data = other._data^
+        other._data = _uninit[MovableType]()
 
     @always_inline
     fn assume_initialized(
@@ -223,19 +197,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Returns:
             A reference to the internal value.
         """
-        return self.unsafe_ptr()[]
-
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:
-        """Get a pointer to the underlying element.
-
-        Note that this method does not assumes that the memory is initialized
-        or not. It can always be called.
-
-        Returns:
-            A pointer to the underlying element.
-        """
-        return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
+        return UnsafePointer.address_of(self._data)[]
 
     @always_inline
     fn assume_initialized_destroy(inout self):
@@ -244,7 +206,8 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Calling this method assumes that the memory is initialized.
 
         """
-        self.unsafe_ptr().destroy_pointee()
+        ElementType.__del__(self._data^)
+        self._data = _uninit[ElementType]()
 
     @always_inline
     fn __del__(owned self):
@@ -254,4 +217,4 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         If the memory was initialized, the caller should
         use `assume_initialized_destroy` before.
         """
-        pass
+        _forget(self._data^)
