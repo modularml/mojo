@@ -452,7 +452,7 @@ struct PyType_Slot:
 
 
 @value
-struct PyObject(Stringable, Representable, Formattable):
+struct PyObject(Stringable, Representable, Writable):
     """
     All object types are extensions of this type. This is a type which contains the information Python needs to treat a pointer to an object as an object. In a normal “release” build, it contains only the object’s reference count and a pointer to the corresponding type object. Nothing is actually declared to be a PyObject, but every pointer to a Python object can be cast to a PyObject*.
 
@@ -476,7 +476,7 @@ struct PyObject(Stringable, Representable, Formattable):
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -491,12 +491,15 @@ struct PyObject(Stringable, Representable, Formattable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats to the provided formatter.
+        Formats to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("PyObject(")
@@ -509,7 +512,7 @@ struct PyObject(Stringable, Representable, Formattable):
 # Ref2: https://pyo3.rs/main/doc/pyo3/ffi/struct.pymoduledef_base
 # Mojo doesn't have macros, so we define it here for ease.
 # Note: `PyModuleDef_HEAD_INIT` defaults all of its members, see https://github.com/python/cpython/blob/833c58b81ebec84dc24ef0507f8c75fe723d9f66/Include/moduleobject.h#L60
-struct PyModuleDef_Base(Stringable, Representable, Formattable):
+struct PyModuleDef_Base(Stringable, Representable, Writable):
     # The initial segment of every `PyObject` in CPython
     var object_base: PyObject
 
@@ -552,7 +555,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -567,12 +570,15 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats to the provided formatter.
+        Formats to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("PyModuleDef_Base(")
@@ -593,7 +599,7 @@ struct PyModuleDef_Slot:
     var value: OpaquePointer
 
 
-struct PyModuleDef(Stringable, Representable, Formattable):
+struct PyModuleDef(Stringable, Representable, Writable):
     """
     The Python module definition structs that holds all of the information needed
     to create a module.
@@ -667,7 +673,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -682,12 +688,15 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats to the provided formatter.
+        Formats to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("PyModuleDef(")
@@ -826,7 +835,7 @@ struct CPython:
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn log[*Ts: Formattable](self, *args: *Ts):
+    fn log[*Ts: Writable](self, *args: *Ts):
         """If logging is enabled, print the given arguments as a log message.
 
         Parameters:
@@ -842,7 +851,7 @@ struct CPython:
         #   Once Mojo argument splatting is supported, this should just
         #   be: `print(*args)`
         @parameter
-        fn print_arg[T: Formattable](arg: T):
+        fn print_arg[T: Writable](arg: T):
             print(arg, sep="", end="", flush=False)
 
         args.each[print_arg]()

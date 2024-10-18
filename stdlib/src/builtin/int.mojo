@@ -27,7 +27,7 @@ from collections.string import (
     _calc_initial_buffer_size_int64,
 )
 
-from utils import Formattable, Formatter
+from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
 from sys import triple_is_nvidia_cuda, bitwidthof
@@ -180,7 +180,7 @@ trait IntLike(
     Ceilable,
     Comparable,
     Floorable,
-    Formattable,
+    Writable,
     Powable,
     Stringable,
     Truncable,
@@ -1092,7 +1092,7 @@ struct Int(
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -1129,15 +1129,37 @@ struct Int(
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this integer to the provided formatter.
+        Formats this integer to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(Int64(self))
+
+    fn write_padded[W: Writer](self, inout writer: W, width: Int):
+        """Write the int right-aligned to a set padding.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+            width: The amount to pad to the left.
+        """
+        var int_width = self._decimal_digit_count()
+
+        # TODO: Assumes user wants right-aligned content.
+        if int_width < width:
+            for _ in range(width - int_width):
+                writer.write(" ")
+
+        writer.write(self)
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

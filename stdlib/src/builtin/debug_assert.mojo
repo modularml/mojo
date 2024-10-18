@@ -116,7 +116,7 @@ fn debug_assert[
     cond: fn () capturing [_] -> Bool,
     assert_mode: StringLiteral = "none",
     cpu_only: Bool = False,
-    *Ts: Formattable,
+    *Ts: Writable,
 ](*messages: *Ts):
     """Asserts that the condition is true.
 
@@ -124,13 +124,13 @@ fn debug_assert[
         cond: The function to invoke to check if the assertion holds.
         assert_mode: Determines when the assert is turned on.
         cpu_only: If true, only run the assert on CPU.
-        Ts: The element types conforming to `Formattable` for the message.
+        Ts: The element types conforming to `Writable` for the message.
 
     Args:
         messages: Arguments to convert to a `String` message.
 
 
-    You can pass in multiple args that are `Formattable` to generate a formatted
+    You can pass in multiple args that are `Writable` to generate a formatted
     message, by default this will be a no-op:
 
     ```mojo
@@ -201,20 +201,20 @@ fn debug_assert[
 fn debug_assert[
     assert_mode: StringLiteral = "none",
     cpu_only: Bool = False,
-    *Ts: Formattable,
+    *Ts: Writable,
 ](cond: Bool, *messages: *Ts):
     """Asserts that the condition is true.
 
     Parameters:
         assert_mode: Determines when the assert is turned on.
         cpu_only: If true, only run the assert on CPU.
-        Ts: The element types conforming to `Formattable` for the message.
+        Ts: The element types conforming to `Writable` for the message.
 
     Args:
         cond: The bool value to assert.
         messages: Arguments to convert to a `String` message.
 
-    You can pass in multiple args that are `Formattable` to generate a formatted
+    You can pass in multiple args that are `Writable` to generate a formatted
     message, by default this will be a no-op:
 
     ```mojo
@@ -283,7 +283,7 @@ fn debug_assert[
 
 @no_inline
 fn _debug_assert_msg(
-    messages: VariadicPack[_, Formattable, *_], loc: _SourceLocation
+    messages: VariadicPack[_, Writable, *_], loc: _SourceLocation
 ):
     """Aborts with (or prints) the given message and location.
 
@@ -307,7 +307,7 @@ fn _debug_assert_msg(
         )
 
     else:
-        message = String.format_sequence(messages)
+        message = String.write(messages)
 
         @parameter
         if defined_mode == "warn":
