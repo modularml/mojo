@@ -42,7 +42,7 @@ struct IntLiteral(
     # Fields
     alias _mlir_type = __mlir_type.`!kgen.int_literal`
 
-    var value: Self._mlir_type
+    var _value: Self._mlir_type
     """The underlying storage for the integer value."""
 
     alias _one = IntLiteral(
@@ -56,7 +56,7 @@ struct IntLiteral(
     @always_inline("nodebug")
     fn __init__(inout self):
         """Default constructor."""
-        self.value = __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
+        self._value = __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
 
     @doc_private
     @always_inline("nodebug")
@@ -66,7 +66,7 @@ struct IntLiteral(
         Args:
             value: The init value.
         """
-        self.value = value
+        self._value = value
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -84,7 +84,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred lt>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __le__(self, rhs: Self) -> Bool:
@@ -99,7 +99,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred le>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -113,7 +113,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred eq>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
@@ -127,7 +127,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred ne>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Bool:
@@ -141,7 +141,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred gt>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __ge__(self, rhs: Self) -> Bool:
@@ -156,7 +156,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred ge>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __pos__(self) -> Self:
@@ -212,7 +212,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind add>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -228,7 +228,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind sub>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -244,7 +244,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     # TODO: implement __pow__
@@ -265,7 +265,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind floordiv>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -284,7 +284,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mod>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -303,7 +303,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind lshift>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -322,7 +322,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind rshift>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -338,7 +338,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind and>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -354,7 +354,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind xor>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -370,7 +370,7 @@ struct IntLiteral(
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind or>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     # ===----------------------------------------------------------------------===#
@@ -620,7 +620,7 @@ struct IntLiteral(
         """
         return __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.index, treatIndexAsUnsigned = __mlir_attr.unit
-        ](self.value)
+        ](self._value)
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self:
@@ -715,7 +715,7 @@ struct IntLiteral(
         Returns:
             The bit width.
         """
-        return __mlir_op.`kgen.int_literal.bit_width`(self.value)
+        return __mlir_op.`kgen.int_literal.bit_width`(self._value)
 
     @always_inline("nodebug")
     fn __as_mlir_index(self) -> __mlir_type.index:
@@ -725,5 +725,5 @@ struct IntLiteral(
             The corresponding __mlir_type.index value.
         """
         return __mlir_op.`kgen.int_literal.convert`[_type = __mlir_type.index](
-            self.value
+            self._value
         )
