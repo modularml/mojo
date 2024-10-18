@@ -375,7 +375,10 @@ struct StringRef(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        var str_slice = StringSlice[ImmutableAnyOrigin](
+            unsafe_from_utf8_strref=self
+        )
+        return _atol(str_slice)
 
     @always_inline
     fn __len__(self) -> Int:

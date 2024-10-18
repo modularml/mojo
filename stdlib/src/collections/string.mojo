@@ -227,7 +227,7 @@ fn ascii(value: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
+fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
     """Implementation of `atol` for StringRef inputs.
 
     Please see its docstring for details.
@@ -354,7 +354,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     return result
 
 
-fn _atol_error(base: Int, str_ref: StringRef) -> String:
+fn _atol_error(base: Int, str_ref: StringSlice[_]) -> String:
     return (
         "String is not convertible to integer with base "
         + str(base)
@@ -364,7 +364,7 @@ fn _atol_error(base: Int, str_ref: StringRef) -> String:
     )
 
 
-fn _identify_base(str_ref: StringRef, start: Int) -> Tuple[Int, Int]:
+fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
     var length = len(str_ref)
     # just 1 digit, assume base 10
     if start == (length - 1):
@@ -415,14 +415,14 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
-    return _atol(str._strref_dangerous(), base)
+    return _atol(str.as_string_slice(), base)
 
 
-fn _atof_error(str_ref: StringRef) -> Error:
+fn _atof_error(str_ref: StringSlice[_]) -> Error:
     return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
-fn _atof(str_ref: StringRef) raises -> Float64:
+fn _atof(str_ref: StringSlice[_]) raises -> Float64:
     """Implementation of `atof` for StringRef inputs.
 
     Please see its docstring for details.
@@ -532,7 +532,7 @@ fn atof(str: String) raises -> Float64:
     Returns:
         An floating point value that represents the string, or otherwise raises.
     """
-    return _atof(str._strref_dangerous())
+    return _atof(str.as_string_slice())
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1073,7 +1073,7 @@ struct String(
             True if this String is strictly less than the RHS String and False
             otherwise.
         """
-        return self._strref_dangerous() < rhs._strref_dangerous()
+        return self.as_string_slice() < rhs.as_string_slice()
 
     @always_inline
     fn __le__(self, rhs: String) -> Bool:
@@ -1630,7 +1630,7 @@ struct String(
         Returns:
           True if the string contains the substring.
         """
-        return substr._strref_dangerous() in self._strref_dangerous()
+        return substr.as_string_slice() in self.as_string_slice()
 
     fn find(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
@@ -1658,8 +1658,8 @@ struct String(
           The offset of `substr` relative to the beginning of the string.
         """
 
-        return self._strref_dangerous().rfind(
-            substr._strref_dangerous(), start=start
+        return self.as_string_slice().rfind(
+            substr.as_string_slice(), start=start
         )
 
     fn isspace(self) -> Bool:
@@ -1969,7 +1969,7 @@ struct String(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        return hash(self._strref_dangerous())
+        return hash(self.as_string_slice())
 
     fn __hash__[H: _Hasher](self, inout hasher: H):
         """Updates hasher with the underlying bytes.
@@ -2033,7 +2033,9 @@ struct String(
 
         return copy
 
-    fn startswith(self, prefix: String, start: Int = 0, end: Int = -1) -> Bool:
+    fn startswith(
+        ref [_]self, prefix: String, start: Int = 0, end: Int = -1
+    ) -> Bool:
         """Checks if the string starts with the specified prefix between start
         and end positions. Returns True if found and False otherwise.
 
@@ -2046,13 +2048,14 @@ struct String(
           True if the self[start:end] is prefixed by the input prefix.
         """
         if end == -1:
-            return StringRef(
-                self.unsafe_ptr() + start, self.byte_length() - start
-            ).startswith(prefix._strref_dangerous())
+            return StringSlice[__origin_of(self)](
+                unsafe_from_utf8_ptr=self.unsafe_ptr() + start,
+                len=self.byte_length() - start,
+            ).startswith(prefix.as_string_slice())
 
-        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
-            prefix._strref_dangerous()
-        )
+        return StringSlice[__origin_of(self)](
+            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+        ).startswith(prefix.as_string_slice())
 
     fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
         """Checks if the string end with the specified suffix between start
@@ -2067,13 +2070,14 @@ struct String(
           True if the self[start:end] is suffixed by the input suffix.
         """
         if end == -1:
-            return StringRef(
-                self.unsafe_ptr() + start, self.byte_length() - start
-            ).endswith(suffix._strref_dangerous())
+            return StringSlice[__origin_of(self)](
+                unsafe_from_utf8_ptr=self.unsafe_ptr() + start,
+                len=self.byte_length() - start,
+            ).endswith(suffix.as_string_slice())
 
-        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
-            suffix._strref_dangerous()
-        )
+        return StringSlice[__origin_of(self)](
+            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+        ).endswith(suffix.as_string_slice())
 
     fn removeprefix(self, prefix: String, /) -> String:
         """Returns a new string with the prefix removed if it was present.
