@@ -384,7 +384,7 @@ struct PythonObject(
         if dt is DType.bool:
             self.py_object = cpython.PyBool_FromLong(int(value))
         elif dt.is_integral():
-            int_val = value.cast[DType.index]().value
+            int_val = value.cast[DType.index]()._value
             self.py_object = cpython.PyLong_FromSsize_t(int_val)
         else:
             fp_val = value.cast[DType.float64]()

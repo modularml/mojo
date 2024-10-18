@@ -1802,10 +1802,10 @@ struct object(
     @always_inline
     fn _convert_index_to_int(i: object) raises -> Int:
         if i._value.is_bool():
-            return i._value.convert_bool_to_int().get_as_int().value
+            return i._value.convert_bool_to_int().get_as_int()._value
         elif not i._value.is_int():
             raise Error("TypeError: string indices must be integers")
-        return i._value.get_as_int().value
+        return i._value.get_as_int()._value
 
     @always_inline
     fn __getitem__(self, i: object) raises -> object:
@@ -1831,7 +1831,7 @@ struct object(
             var char = self._value.get_as_string().data[index]
             impl.data.init_pointee_move(char)
             return _ObjectImpl(impl)
-        return self._value.get_list_element(i._value.get_as_int().value)
+        return self._value.get_list_element(i._value.get_as_int()._value)
 
     @always_inline
     fn __getitem__(self, *index: object) raises -> object:
