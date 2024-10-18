@@ -30,7 +30,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 
 from utils import IndexList, StringRef, Variant
 from utils.span import Span, AsBytesWrite
-from utils.format import Writer, Writable, ToFormatter
+from utils.write import Writer, Writable
 from utils.string_slice import (
     StringSlice,
     Stringlike,

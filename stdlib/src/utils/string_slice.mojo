@@ -924,39 +924,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         return int(loc) - int(self.unsafe_ptr())
 
-    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
-        """Finds the offset of the last occurrence of `substr` starting at
-        `start`. If not found, returns -1.
-
-        Args:
-          substr: The substring to find.
-          start: The offset from which to find.
-
-        Returns:
-          The offset of `substr` relative to the beginning of the string.
-        """
-        if not substr:
-            return len(self)
-
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = _memrmem(
-            haystack_str.unsafe_ptr(),
-            len(haystack_str),
-            substr.unsafe_ptr(),
-            len(substr),
-        )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(s_span.unsafe_ptr())
-
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
@@ -1291,6 +1258,7 @@ fn to_string[
         return len(v)
 
     return _to_string[len_fn, unsafe_ptr_fn](items)
+
 
 @always_inline
 fn _split[
