@@ -298,7 +298,7 @@ struct SIMD[type: DType, size: Int](
 
         var tn1 = __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.si128
-        ](value.value)
+        ](value._value)
         var t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<si128>`
         ](tn1)
