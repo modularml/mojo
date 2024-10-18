@@ -39,7 +39,7 @@ struct Point(Writable, Stringable):
 
     @no_inline
     fn __str__(self) -> String:
-        return String.format_sequence(self)
+        return String.write(self)
 
 
 fn test_writer_of_string() raises:
@@ -59,13 +59,13 @@ fn test_writer_of_string() raises:
 
 
 fn test_string_format_seq() raises:
-    var s1 = String.format_sequence("Hello, ", "World!")
+    var s1 = String.write("Hello, ", "World!")
     assert_equal(s1, "Hello, World!")
 
-    var s2 = String.format_sequence("point = ", Point(2, 7))
+    var s2 = String.write("point = ", Point(2, 7))
     assert_equal(s2, "point = Point(2, 7)")
 
-    var s3 = String.format_sequence()
+    var s3 = String.write()
     assert_equal(s3, "")
 
 

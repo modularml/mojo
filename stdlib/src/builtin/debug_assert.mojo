@@ -307,7 +307,7 @@ fn _debug_assert_msg(
         )
 
     else:
-        message = String.format_sequence(messages)
+        message = String.write(messages)
 
         @parameter
         if defined_mode == "warn":

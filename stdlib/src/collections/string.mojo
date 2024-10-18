@@ -868,7 +868,7 @@ struct String(
 
     @staticmethod
     @no_inline
-    fn format_sequence[
+    fn write[
         *Ts: Writable
     ](*args: *Ts, sep: StaticString = "", end: StaticString = "") -> Self:
         """
@@ -891,7 +891,7 @@ struct String(
         Construct a String from several `Writable` arguments:
 
         ```mojo
-        var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
+        var string = String.write(1, ", ", 2.0, ", ", "three")
         print(string) # "1, 2.0, three"
         %# from testing import assert_equal
         %# assert_equal(string, "1, 2.0, three")
@@ -899,11 +899,11 @@ struct String(
         .
         """
 
-        return Self.format_sequence(args)
+        return Self.write(args)
 
     @staticmethod
     @no_inline
-    fn format_sequence[
+    fn write[
         *Ts: Writable
     ](
         args: VariadicPack[_, Writable, *Ts],
@@ -931,7 +931,7 @@ struct String(
         fn variadic_pack_to_string[
             *Ts: Writable,
         ](*args: *Ts) -> String:
-            return String.format_sequence(args)
+            return String.write(args)
 
         string = variadic_pack_to_string(1, ", ", 2.0, ", ", "three")
         %# from testing import assert_equal

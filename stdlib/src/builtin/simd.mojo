@@ -1423,7 +1423,7 @@ struct SIMD[type: DType, size: Int](
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -1639,7 +1639,7 @@ struct SIMD[type: DType, size: Int](
         self.write_to[use_scientific_notation=False](writer)
 
     # This overload is required to keep SIMD compliant with the Writable
-    # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
+    # trait, and the call to `String.write(self)` in SIMD.__str__ will
     # fail to compile.
     @no_inline
     fn write_to[

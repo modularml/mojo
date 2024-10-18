@@ -31,7 +31,7 @@ def test_repr():
 
 
 def test_format_to():
-    assert_equal(String.format_sequence(NoneType()), "None")
+    assert_equal(String.write(NoneType()), "None")
 
 
 struct FromNone:

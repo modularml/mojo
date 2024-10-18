@@ -393,7 +393,7 @@ struct StringRef(
         Returns:
             A new string.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn write_to[W: Writer](self, inout writer: W):

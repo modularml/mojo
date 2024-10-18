@@ -639,7 +639,7 @@ struct _ObjectImpl(
         Returns:
             The String representation of the object.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     # ===------------------------------------------------------------------=== #
     # List Functions
@@ -992,7 +992,7 @@ struct object(
         Returns:
             The String representation of the object.
         """
-        return String.format_sequence(self._value)
+        return String.write(self._value)
 
     @no_inline
     fn __repr__(self) -> String:

@@ -142,7 +142,7 @@ struct Path(
         Returns:
           A string representation of the path.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @always_inline
     fn __bool__(self) -> Bool:
