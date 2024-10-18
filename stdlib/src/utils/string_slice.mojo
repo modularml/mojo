@@ -1193,7 +1193,7 @@ fn _to_string[
     # TODO: once we have argsort benchmark this other approach:
     # argsort by getting the length of the span from biggest to smallest
     # allocate in that order in one loop
-    # append the new instances in original order in another loop
+    # memcpy and append the new instances in original order in another loop
 
     for i in range(i_len):
         og_len = len_fn(i_ptr[i])
