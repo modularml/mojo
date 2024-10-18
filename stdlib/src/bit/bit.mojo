@@ -283,7 +283,7 @@ fn bit_not[
     """
     constrained[type.is_integral(), "must be integral"]()
     var neg_one = SIMD[type, width](-1)
-    return __mlir_op.`pop.simd.xor`(val.value, neg_one.value)
+    return __mlir_op.`pop.simd.xor`(val._value, neg_one._value)
 
 
 # ===----------------------------------------------------------------------===#

@@ -35,10 +35,10 @@ fn _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
         A value which is similar in its bitpattern to result of a folded multply.
     """
     l = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
-        lhs.value
+        lhs._value
     )
     r = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
-        rhs.value
+        rhs._value
     )
     m = __mlir_op.`pop.mul`(l, r)
     res = SIMD[DType.uint64, 2](

@@ -466,7 +466,7 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_GetFD",
             Int64,
         ](self.handle)
-        return Int(i64_res.value)
+        return Int(i64_res._value)
 
 
 fn open[

@@ -260,7 +260,7 @@ fn _float_repr[
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    var n = _snprintf[fmt](buffer, size, x.value)
+    var n = _snprintf[fmt](buffer, size, x._value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n
