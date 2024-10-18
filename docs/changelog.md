@@ -238,6 +238,62 @@ what we publish.
 
 - The VS Code extension now allows selecting a default SDK when multiple are available.
 
+- The `Formatter` struct has changed to a `Writer` trait to enable buffered IO,
+  increasing print and file writing perf to the same speed as C. It's now more
+  general purpose and can write any `Span[Byte]`. To align with this the
+  `Formattable` trait is now named `Writable`, and the `String.format_sequence`
+  static methods to initialize a new `String` have been renamed to
+  `String.write`. Here's an example of using all the changes:
+
+  ```mojo
+  from utils import Span
+
+  @value
+  struct NewString(Writer, Writable):
+      var s: String
+
+      # Writer requirement to write a Span of Bytes
+      fn write_bytes(inout self, bytes: Span[Byte, _]):
+          self.s._iadd[False](bytes)
+
+      # Writer requirement to take multiple args
+      fn write[*Ts: Writable](inout self, *args: *Ts):
+          @parameter
+          fn write_arg[T: Writable](arg: T):
+              arg.write_to(self)
+
+          args.each[write_arg]()
+
+      # Also make it Writable to allow `print` to write the inner String
+      fn write_to[W: Writer](self, inout writer: W):
+          writer.write(self.s)
+
+
+  @value
+  struct Point(Writable):
+      var x: Int
+      var y: Int
+
+      # Pass multiple args to the Writer. The Int and StringLiteral types call
+      # `writer.write_bytes` in their own `write_to` implementations.
+      fn write_to[W: Writer](self, inout writer: W):
+          writer.write("Point(", self.x, ", ", self.y, ")")
+
+      # Enable conversion to a String using `str(point)`
+      fn __str__(self) -> String:
+          return String.write(self)
+
+
+  fn main():
+      var point = Point(1, 2)
+      var new_string = NewString(str(point))
+      new_string.write("\n", Point(3, 4))
+      print(new_string)
+  ```
+
+  Point(1, 2)
+  Point(3, 4)
+
 - The flag for turning on asserts has changed, e.g. to enable all checks:
 
   ```bash
