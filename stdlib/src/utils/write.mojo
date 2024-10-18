@@ -35,50 +35,53 @@ trait Writer:
     from utils import Span
 
     @value
-    struct NewString(Writer):
+    struct NewString(Writer, Writable):
         var s: String
 
-        # Enable a type to write its data members as a `Byte[Span]`
+        # Writer requirement to write a Span of Bytes
         fn write_bytes(inout self, bytes: Span[Byte, _]):
-            # If your Writer needs to store the number of bytes being written,
-            # you can use e.g. `self.bytes_written += len(str_slice)` here.
             self.s._iadd[False](bytes)
 
-        # Enable passing multiple args that implement `write_to`, which
-        # themselves may have calls to `write` with variadic args:
+        # Writer requirement to take multiple args
         fn write[*Ts: Writable](inout self, *args: *Ts):
-            # Loop through the args, running all their `write_to` functions:
             @parameter
             fn write_arg[T: Writable](arg: T):
                 arg.write_to(self)
+
             args.each[write_arg]()
+
+        # Also make it Writable to allow `print` to write the inner String
+        fn write_to[W: Writer](self, inout writer: W):
+            writer.write(self.s)
+
 
     @value
     struct Point(Writable):
         var x: Int
         var y: Int
 
+        # Pass multiple args to the Writer. The Int and StringLiteral types
+        # call `writer.write_bytes` in their own `write_to` implementations.
         fn write_to[W: Writer](self, inout writer: W):
-            # Write a single `Span[Byte]`:
-            var string = "Point"
-            writer.write_bytes(string.as_bytes())
+            writer.write("Point(", self.x, ", ", self.y, ")")
 
-            # Write the Ints and StringLiterals in a single call, they also
-            # implement `write_to`, which implements how to write themselves as
-            # a `Byte[Span]`:
-            writer.write("(", self.x, ", ", self.y, ")")
+        # Enable conversion to a String using `str(point)`
+        fn __str__(self) -> String:
+            return String.write(self)
 
-    var output = NewString(String())
-    var point = Point(2, 4)
 
-    output.write(point)
-    print(output.s)
+    fn main():
+        var point = Point(1, 2)
+        var new_string = NewString(str(point))
+        new_string.write("\\n", Point(3, 4))
+        print(new_string)
     ```
 
     Output:
 
     ```plaintext
-    Point(2, 4)
+    Point(1, 2)
+    Point(3, 4)
     ```
     """
 
