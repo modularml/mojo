@@ -25,4 +25,6 @@ from .bit import (
     pop_count,
     rotate_bits_left,
     rotate_bits_right,
+    bin,
+    hex,
 )
