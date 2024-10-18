@@ -211,7 +211,6 @@ struct Error(
         return String(StringRef(self.data, length))
 
 
-@export("__mojo_debugger_raise_hook")
 fn __mojo_debugger_raise_hook():
     """This function is used internally by the Mojo Debugger."""
     pass
