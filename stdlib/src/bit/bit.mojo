@@ -19,8 +19,10 @@ from bit import count_leading_zeros
 ```
 """
 
+from memory import bitcast, unpack_bits
 from sys import llvm_intrinsic, sizeof
 from sys.info import bitwidthof
+from utils import Span
 
 # ===----------------------------------------------------------------------===#
 # count_leading_zeros
@@ -654,3 +656,73 @@ fn rotate_bits_right[
         return llvm_intrinsic["llvm.fshr", __type_of(x), has_side_effect=False](
             x, x, SIMD[type, width](shift)
         )
+
+
+# ===----------------------------------------------------------------------===#
+# bin and hex
+# ===----------------------------------------------------------------------===#
+
+
+fn bin[dtype: DType, //](x: Scalar[dtype]) -> String:
+    """Converts a scalar to a binary string.
+
+    Parameters:
+        dtype: The data type of the input scalar.
+
+    Args:
+        x: The input scalar value.
+
+    Returns:
+        A binary string representation of the input scalar value.
+    """
+    alias len = dtype.bitwidth() + 1
+    var buff = String._buffer_type(capacity=len)
+    _write_bin(x, buff)
+    buff.size = len
+    return String(impl=buff)
+
+
+@always_inline
+fn _write_bin(x: Scalar, s: Span[Byte, _]):
+    alias `0` = ord("0")
+    var bytes = unpack_bits(bit_reverse(x)).cast[DType.uint8]()
+    s.unsafe_ptr().store(bytes + `0`)
+
+
+# fmt: off
+alias _table = SIMD[DType.uint8, 16](
+    ord("0"), ord("1"), ord("2"), ord("3"), ord("4"), ord("5"), ord("6"), ord("7"),
+    ord("8"), ord("9"), ord("a"), ord("b"), ord("c"), ord("d"), ord("e"), ord("f"),
+)
+# fmt: on
+
+
+fn hex[dtype: DType, //](x: Scalar[dtype]) -> String:
+    """Converts a scalar to a hexadecimal string.
+
+    Parameters:
+        dtype: The data type of the input scalar.
+
+    Args:
+        x: The input scalar value.
+
+    Returns:
+        A hexadecimal string representation of the input scalar value.
+    """
+    alias len = dtype.sizeof() * 2 + 1
+    var buff = String._buffer_type(capacity=len)
+    _write_hex(x, buff)
+    buff.size = len
+    return String(impl=buff)
+
+
+@always_inline
+fn _write_hex(x: Scalar, s: Span[Byte, _]):
+    @parameter
+    if x.type.sizeof() == 1:
+        r = x
+    else:
+        r = byte_swap(x)
+    var bytes = bitcast[DType.uint8, x.type.sizeof()](r)
+    var nibbles = (bytes >> 4).interleave(bytes & 0xF)
+    s.unsafe_ptr().store(_table._dynamic_shuffle(nibbles))
