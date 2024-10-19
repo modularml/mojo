@@ -337,7 +337,6 @@ struct SIMD[type: DType, size: Int](
         Args:
             value: The input value.
         """
-        _simd_construction_checks[type, size]()
         self.value = value
 
     @always_inline("nodebug")

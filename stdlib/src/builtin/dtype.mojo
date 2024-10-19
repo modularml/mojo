@@ -229,20 +229,20 @@ struct DType(
         return self.value
 
     @staticmethod
+    @always_inline("nodebug")
     fn _from_ui8(ui8: __mlir_type.ui8) -> DType:
         return __mlir_op.`pop.dtype.from_ui8`(ui8)
 
     @staticmethod
-    fn _from_ui8(ui8: __mlir_type.`!pop.scalar<ui8>`) -> DType:
-        return DType._from_ui8(
-            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui8](ui8)
+    @always_inline("nodebug")
+    fn _from_ui8(ui8: UInt8) -> DType:
+        return Self._from_ui8(
+            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui8](ui8.value)
         )
 
     @always_inline("nodebug")
-    fn _as_i8(
-        self,
-    ) -> __mlir_type.`!pop.scalar<ui8>`:
-        var val = __mlir_op.`pop.dtype.to_ui8`(self.value)
+    fn _as_ui8(self) -> UInt8:
+        val = __mlir_op.`pop.dtype.to_ui8`(self.value)
         return __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<ui8>`
         ](val)
@@ -281,9 +281,7 @@ struct DType(
         Returns:
             True if the DTypes are the same and False otherwise.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-            self._as_i8(), rhs._as_i8()
-        )
+        return self._as_ui8() == rhs._as_ui8()
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: DType) -> Bool:
@@ -295,9 +293,7 @@ struct DType(
         Returns:
             False if the DTypes are the same and True otherwise.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-            self._as_i8(), rhs._as_i8()
-        )
+        return self._as_ui8() != rhs._as_ui8()
 
     fn __hash__(self) -> UInt:
         """Return a 64-bit hash for this `DType` value.
@@ -305,7 +301,7 @@ struct DType(
         Returns:
             A 64-bit integer hash of this `DType` value.
         """
-        return hash(UInt8(self._as_i8()))
+        return hash(self._as_ui8())
 
     fn __hash__[H: _Hasher](self, inout hasher: H):
         """Updates hasher with this `DType` value.
@@ -316,7 +312,7 @@ struct DType(
         Args:
             hasher: The hasher instance.
         """
-        hasher._update_with_simd(UInt8(self._as_i8()))
+        hasher._update_with_simd(self._as_ui8())
 
     @always_inline("nodebug")
     fn is_unsigned(self) -> Bool:
@@ -327,12 +323,7 @@ struct DType(
         """
         if not self.is_integral():
             return False
-        return Bool(
-            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned.value),
-                UInt8(0).value,
-            )
-        )
+        return (self._as_ui8() & _mIsSigned) == 0
 
     @always_inline("nodebug")
     fn is_signed(self) -> Bool:
@@ -345,12 +336,7 @@ struct DType(
             return True
         if not self.is_integral():
             return False
-        return Bool(
-            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned.value),
-                UInt8(0).value,
-            )
-        )
+        return (self._as_ui8() & _mIsSigned) != 0
 
     @always_inline("nodebug")
     fn _is_non_index_integral(self) -> Bool:
@@ -359,12 +345,7 @@ struct DType(
         Returns:
             Returns True if the input type parameter is a non-index integer.
         """
-        return Bool(
-            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsInteger.value),
-                UInt8(0).value,
-            )
-        )
+        return (self._as_ui8() & _mIsInteger) != 0
 
     @always_inline("nodebug")
     fn is_integral(self) -> Bool:
@@ -387,12 +368,7 @@ struct DType(
         """
         if self.is_integral():
             return False
-        return Bool(
-            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsFloat.value),
-                UInt8(0).value,
-            )
-        )
+        return (self._as_ui8() & _mIsFloat) != 0
 
     @always_inline("nodebug")
     fn is_float8(self) -> Bool:
@@ -436,23 +412,7 @@ struct DType(
         """
 
         if self._is_non_index_integral():
-            return int(
-                UInt8(
-                    __mlir_op.`pop.shl`(
-                        UInt8(1).value,
-                        __mlir_op.`pop.sub`(
-                            __mlir_op.`pop.shr`(
-                                __mlir_op.`pop.simd.and`(
-                                    self._as_i8(), _mIsNotInteger.value
-                                ),
-                                UInt8(1).value,
-                            ),
-                            UInt8(3).value,
-                        ),
-                    )
-                )
-            )
-
+            return int((((self._as_ui8() & _mIsNotInteger) >> 1) - 3) << 1)
         if self == DType.bool:
             return sizeof[DType.bool]()
         if self == DType.index:
