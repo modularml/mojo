@@ -1181,7 +1181,7 @@ trait Stringlike(AsBytesRead, CollectionElement, CollectionElementNew):
         ...
 
 
-fn _to_string[
+fn _to_string_list[
     T: CollectionElement, //,
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
@@ -1209,7 +1209,7 @@ fn _to_string[
 
 
 @always_inline
-fn to_string[
+fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[StringSlice[O]]) -> List[String]:
     """Create a list of Strings copying the existing data. This overallocates
@@ -1231,11 +1231,11 @@ fn to_string[
     fn len_fn(v: StringSlice[O]) -> Int:
         return v.byte_length()
 
-    return _to_string[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[len_fn, unsafe_ptr_fn](items)
 
 
 @always_inline
-fn to_string[
+fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[Span[Byte, O]]) -> List[String]:
     """Create a list of Strings copying the existing data. This overallocates
@@ -1257,7 +1257,7 @@ fn to_string[
     fn len_fn(v: Span[Byte, O]) -> Int:
         return len(v)
 
-    return _to_string[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[len_fn, unsafe_ptr_fn](items)
 
 
 @always_inline
@@ -1269,11 +1269,11 @@ fn _split[
 ](src_str: T0, sep: Optional[T1], maxsplit: Int) -> List[String]:
     @parameter
     if has_sep:
-        return to_string(
+        return to_string_list(
             _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
         )
     else:
-        return to_string(_split_impl[has_maxsplit](src_str, maxsplit))
+        return to_string_list(_split_impl[has_maxsplit](src_str, maxsplit))
 
 
 fn _split_sl[
