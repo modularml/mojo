@@ -208,6 +208,12 @@ what we publish.
   express intent when working with a pack of bits.
   ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraos](https://github.com/soraros)).
 
+- The VS Code extension now supports setting [data breakpoints](https://code.visualstudio.com/docs/editor/debugging#_data-breakpoints)
+  as well as [function breakpoints](https://code.visualstudio.com/docs/editor/debugging#_function-breakpoints).
+
+- The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
+  `b my_module::main`.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -364,3 +370,6 @@ what we publish.
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
+
+- The VS Code extension now downloads its private copy of the MAX SDK in a way
+  that prevents ETXTBSY errors on Linux.
