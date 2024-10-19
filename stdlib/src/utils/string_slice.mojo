@@ -1194,15 +1194,19 @@ fn _to_string_list[
     # argsort by getting the length of the span from biggest to smallest
     # allocate in that order in one loop
     # memcpy and append the new instances in original order in another loop
+    allocs = List[(UnsafePointer[Byte], Int, Int)](capacity=i_len)
+    allocs.size = i_len
 
     for i in range(i_len):
         og_len = len_fn(i_ptr[i])
-        f_len = og_len + 1  # null terminator
+        cap = bit_ceil(og_len + 1)  # null terminator
+        allocs.unsafe_set(i, (UnsafePointer[Byte].alloc(cap), og_len, cap))
+
+    for i in range(i_len):
         og_ptr = unsafe_ptr_fn(i_ptr[i])
-        cap = bit_ceil(f_len)
-        p = UnsafePointer[Byte].alloc(cap)
+        p, og_len, cap = allocs.unsafe_get(i)
         memcpy(p, og_ptr, og_len)
-        p[og_len] = 0
+        p[og_len], f_len = Byte(0), og_len + 1  # null terminator
         buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=cap)
         output.append(String(buf^))
     return output^
