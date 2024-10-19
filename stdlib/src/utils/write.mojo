@@ -12,8 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 """Establishes the contract between `Writer` and `Writable` types."""
 
-# ===----------------------------------------------------------------------===#
-# Writer
+from collections import InlineArray
+from memory import memcpy, UnsafePointer
+
+
 # ===----------------------------------------------------------------------===#
 
 
@@ -33,50 +35,53 @@ trait Writer:
     from utils import Span
 
     @value
-    struct NewString(Writer):
+    struct NewString(Writer, Writable):
         var s: String
 
-        # Enable a type to write its data members as a `Byte[Span]`
+        # Writer requirement to write a Span of Bytes
         fn write_bytes(inout self, bytes: Span[Byte, _]):
-            # If your Writer needs to store the number of bytes being written,
-            # you can use e.g. `self.bytes_written += len(str_slice)` here.
             self.s._iadd[False](bytes)
 
-        # Enable passing multiple args that implement `write_to`, which
-        # themselves may have calls to `write` with variadic args:
+        # Writer requirement to take multiple args
         fn write[*Ts: Writable](inout self, *args: *Ts):
-            # Loop through the args, running all their `write_to` functions:
             @parameter
             fn write_arg[T: Writable](arg: T):
                 arg.write_to(self)
+
             args.each[write_arg]()
+
+        # Also make it Writable to allow `print` to write the inner String
+        fn write_to[W: Writer](self, inout writer: W):
+            writer.write(self.s)
+
 
     @value
     struct Point(Writable):
         var x: Int
         var y: Int
 
+        # Pass multiple args to the Writer. The Int and StringLiteral types
+        # call `writer.write_bytes` in their own `write_to` implementations.
         fn write_to[W: Writer](self, inout writer: W):
-            # Write a single `Span[Byte]`:
-            var string = "Point"
-            writer.write_bytes(string.as_bytes())
+            writer.write("Point(", self.x, ", ", self.y, ")")
 
-            # Write the Ints and StringLiterals in a single call, they also
-            # implement `write_to`, which implements how to write themselves as
-            # a `Byte[Span]`:
-            writer.write("(", self.x, ", ", self.y, ")")
+        # Enable conversion to a String using `str(point)`
+        fn __str__(self) -> String:
+            return String.write(self)
 
-    var output = NewString(String())
-    var point = Point(2, 4)
 
-    output.write(point)
-    print(output.s)
+    fn main():
+        var point = Point(1, 2)
+        var new_string = NewString(str(point))
+        new_string.write("\\n", Point(3, 4))
+        print(new_string)
     ```
 
     Output:
 
     ```plaintext
-    Point(2, 4)
+    Point(1, 2)
+    Point(3, 4)
     ```
     """
 
@@ -107,7 +112,7 @@ trait Writer:
         #     arg.write_to(self)
         # args.each[write_arg]()
         #
-        # To only have to implement `write_str` to make a type a valid Writer
+        # To only have to implement `write_bytes` to make a type a valid Writer
 
 
 # ===----------------------------------------------------------------------===#
@@ -146,3 +151,164 @@ trait Writable:
             writer: The type conforming to `Writable`.
         """
         ...
+
+
+# ===----------------------------------------------------------------------===#
+# Utils
+# ===----------------------------------------------------------------------===#
+
+
+fn write_args[
+    W: Writer, *Ts: Writable
+](
+    inout writer: W,
+    args: VariadicPack[_, Writable, *Ts],
+    *,
+    sep: StaticString = "",
+    end: StaticString = "",
+):
+    """
+    Add seperators and end characters when writing variadics into a `Writer`.
+
+    Parameters:
+        W: The type of the `Writer` to write to.
+        Ts: The types of each arg to write. Each type must satisfy `Writable`.
+
+    Args:
+        writer: The `Writer` to write to.
+        args: A VariadicPack of Writable arguments.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
+
+    Example
+
+    ```mojo
+    import sys
+    from utils import write_args
+
+    fn variadic_pack_function[*Ts: Writable](
+        *args: *Ts, sep: StringLiteral, end: StringLiteral
+    ):
+        var stdout = sys.stdout
+        write_args(stdout, args, sep=sep, end=end)
+
+    variadic_pack_function(3, "total", "args", sep=",", end="[end]")
+    ```
+
+    ```
+    3, total, args[end]
+    ```
+    .
+    """
+
+    @parameter
+    fn print_with_separator[i: Int, T: Writable](value: T):
+        value.write_to(writer)
+
+        @parameter
+        if i < len(VariadicList(Ts)) - 1:
+            sep.write_to(writer)
+
+    args.each_idx[print_with_separator]()
+    if end:
+        end.write_to(writer)
+
+
+trait MovableWriter(Movable, Writer):
+    """Allows moving a Writer into a buffer."""
+
+    ...
+
+
+struct _WriteBuffer[W: MovableWriter, //, capacity: Int](Writer):
+    var data: InlineArray[UInt8, capacity]
+    var pos: Int
+    var writer: W
+
+    fn __init__(inout self, owned writer: W):
+        self.data = InlineArray[UInt8, capacity](unsafe_uninitialized=True)
+        self.pos = 0
+        self.writer = writer^
+
+    fn flush(inout self):
+        self.writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](
+                unsafe_ptr=self.data.unsafe_ptr(), len=self.pos
+            )
+        )
+        self.pos = 0
+
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
+        len_bytes = len(bytes)
+        # If empty then return
+        if len_bytes == 0:
+            return
+        # If span is too large to fit in buffer, write directly and return
+        if len_bytes > capacity:
+            self.flush()
+            self.writer.write_bytes(bytes)
+            return
+        # If buffer would overflow, flush writer and reset pos to 0.
+        if self.pos + len_bytes > capacity:
+            self.flush()
+        # Continue writing to buffer
+        memcpy(self.data.unsafe_ptr() + self.pos, bytes.unsafe_ptr(), len_bytes)
+        self.pos += len_bytes
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+
+fn write_buffered[
+    buffer_size: Int, W: MovableWriter, *Ts: Writable
+](
+    owned writer: W,
+    args: VariadicPack[_, Writable, *Ts],
+    *,
+    sep: StaticString = "",
+    end: StaticString = "",
+):
+    """
+    Use a buffer on the stack to minimize expensive calls to the writer. When
+    the buffer would overflow it writes to the `writer` passed in. You can also
+    add seperators between the args, and end characters.
+
+
+    Parameters:
+        buffer_size: How many bytes to write to a buffer before writing out.
+        W: The type of the `Writer` to write to.
+        Ts: The types of each arg to write. Each type must satisfy `Writable`.
+
+    Args:
+        writer: The `Writer` to write to.
+        args: A VariadicPack of Writable arguments.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
+
+    Example
+
+    ```mojo
+    import sys
+    from utils import write_buffered
+
+    fn print_err_buffered[*Ts: Writable](
+        *args: *Ts, sep: StringLiteral, end: StringLiteral
+    ):
+        var stdout = sys.stderr
+        write_buffered[buffer_size=4096](stdout, args, sep=sep, end=end)
+
+    print_err_buffered(3, "total", "args", sep=",", end="[end]")
+    ```
+
+    ```
+    3, total, args[end]
+    ```
+    .
+    """
+    var buffer = _WriteBuffer[buffer_size](writer^)
+    write_args(buffer, args, sep=sep, end=end)
+    buffer.flush()
