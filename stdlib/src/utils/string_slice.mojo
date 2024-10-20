@@ -597,7 +597,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     @always_inline
     fn strip(self) -> StringSlice[origin]:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
+        This only takes C spaces into account: " \\t\\n\\r\\v\\f".
 
         For example, `"  mojo  "` returns `"mojo"`.
 
@@ -905,20 +905,20 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             alias `\n` = UInt8(ord("\n"))
             alias `\x1c` = UInt8(ord("\x1c"))
             alias `\x1e` = UInt8(ord("\x1e"))
-            var no_null_len = s.byte_length()
-            var ptr = s.unsafe_ptr()
+            no_null_len = s.byte_length()
+            ptr = s.unsafe_ptr()
             if no_null_len == 1:
-                var v = ptr[0]
+                v = ptr[0]
                 return `\t` <= v <= `\x1e` and not (`\r` < v < `\x1c`)
             elif no_null_len == 2:
-                var v0 = ptr[0]
-                var v1 = ptr[1]
+                v0 = ptr[0]
+                v1 = ptr[1]
                 next_line = v0 == 0xC2 and v1 == 0x85  # next line: \x85
                 r_n = v0 == `\r` and v1 == `\n`
                 return next_line or r_n
             elif no_null_len == 3:
                 # unicode line sep or paragraph sep: \u2028 , \u2029
-                var v2 = ptr[2]
+                v2 = ptr[2]
                 lastbyte = v2 == 0xA8 or v2 == 0xA9
                 return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
             return False

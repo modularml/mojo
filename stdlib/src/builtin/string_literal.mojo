@@ -554,7 +554,7 @@ struct StringLiteral(
         # Splitting a string with leading, trailing, and middle whitespaces
         _ = "      hello    world     ".split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
-        _ = "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world".split()
+        _ = "hello \\t\\n\\r\\v\\f\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world".split()
         # ["hello", "world"]
         ```
         .

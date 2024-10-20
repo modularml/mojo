@@ -616,7 +616,7 @@ fn _isspace(c: String) -> Bool:
     """Determines whether the given character is a whitespace character.
 
     This only respects the default "C" locale, i.e. returns True only if the
-    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    character specified is one of " \\t\\n\\r\\v\\f". For semantics similar
     to Python, use `String.isspace()`.
 
     Args:
@@ -632,7 +632,7 @@ fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
     This only respects the default "C" locale, i.e. returns True only if the
-    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    character specified is one of " \\t\\n\\r\\v\\f". For semantics similar
     to Python, use `String.isspace()`.
 
     Args:
@@ -1656,7 +1656,7 @@ struct String(
         python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\r\\v\\f\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
             True if the whole String is made up of whitespace characters
@@ -1743,7 +1743,7 @@ struct String(
         _ = String("      hello    world     ").split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
         _ = String(
-            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+            "hello \\t\\n\\r\\v\\f\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
         ).split()  # ["hello", "world"]
         ```
         .
