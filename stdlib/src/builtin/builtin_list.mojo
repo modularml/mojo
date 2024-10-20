@@ -518,6 +518,7 @@ struct _LITRefPackHelper[
     ]
 
     # This rebinds `in_pack` to the equivalent `!kgen.pack` with kgen pointers.
+    @always_inline("nodebug")
     fn get_as_kgen_pack(self) -> Self.kgen_pack_with_pointer_type:
         return rebind[Self.kgen_pack_with_pointer_type](self.storage)
 
@@ -534,6 +535,7 @@ struct _LITRefPackHelper[
     ]
 
     # This returns the stored KGEN pack after loading all of the elements.
+    @always_inline("nodebug")
     fn get_loaded_kgen_pack(self) -> Self.loaded_kgen_pack_type:
         return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
 
@@ -579,7 +581,7 @@ struct VariadicPack[
     # ===-------------------------------------------------------------------===#
 
     @doc_private
-    @always_inline
+    @always_inline("nodebug")
     fn __init__(inout self, value: Self._mlir_type, is_owned: Bool):
         """Constructs a VariadicPack from the internal representation.
 
@@ -590,7 +592,7 @@ struct VariadicPack[
         self._value = value
         self._is_owned = is_owned
 
-    @always_inline
+    @always_inline("nodebug")
     fn __del__(owned self):
         """Destructor that releases elements if owned."""
 
