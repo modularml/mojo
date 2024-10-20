@@ -924,6 +924,21 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         return int(loc) - int(self.unsafe_ptr())
 
+    fn _isspace(self) -> Bool:
+        # sorry for readability, but this has less overhead than memcmp
+        # this is highly performance sensitive code
+        var no_null_len = self.byte_length()
+        var ptr = self.unsafe_ptr()
+        if no_null_len == 1:
+            return _isspace(ptr[0])
+        elif no_null_len == 2:
+            return ptr[0] == 0xC2 and ptr[1] == 0x85  # next_line: \x85
+        elif no_null_len == 3:
+            # unicode line sep or paragraph sep: \u2028 , \u2029
+            lastbyte = ptr[2] == 0xA8 or ptr[2] == 0xA9
+            return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
+        return False
+
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
@@ -936,36 +951,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 listed above, otherwise False.
         """
 
-        if self.byte_length() == 0:
-            return False
-
-        # TODO add line and paragraph separator as stringliteral
-        # once Unicode escape sequences are accepted
-        var next_line = List[UInt8](0xC2, 0x85)
-        """TODO: \\x85"""
-        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
-        """TODO: \\u2028"""
-        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
-        """TODO: \\u2029"""
-
         for s in self:
-            var no_null_len = s.byte_length()
-            var ptr = s.unsafe_ptr()
-            if no_null_len == 1 and _isspace(ptr[0]):
-                continue
-            elif (
-                no_null_len == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
-            ):
-                continue
-            elif no_null_len == 3 and (
-                memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
-                or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
-            ):
-                continue
-            else:
+            if not s._isspace():
                 return False
-        _ = next_line, unicode_line_sep, unicode_paragraph_sep
-        return True
+        return self.byte_length() != 0
 
     @always_inline
     fn split[
@@ -1189,25 +1178,15 @@ fn _to_string_list[
     i_len = len(items)
     i_ptr = items.unsafe_ptr()
     output = List[String](capacity=i_len)
-    # TODO: try other approaches for memory allocation
-    # TODO: once we have argsort benchmark this other approach:
-    # argsort by getting the length of the span from biggest to smallest
-    # allocate in that order in one loop
-    # memcpy and append the new instances in original order in another loop
-    allocs = List[(UnsafePointer[Byte], Int, Int)](capacity=i_len)
-    allocs.size = i_len
 
     for i in range(i_len):
         og_len = len_fn(i_ptr[i])
-        cap = bit_ceil(og_len + 1)  # null terminator
-        allocs.unsafe_set(i, (UnsafePointer[Byte].alloc(cap), og_len, cap))
-
-    for i in range(i_len):
+        f_len = og_len + 1
+        p = UnsafePointer[Byte].alloc(f_len)
         og_ptr = unsafe_ptr_fn(i_ptr[i])
-        p, og_len, cap = allocs.unsafe_get(i)
         memcpy(p, og_ptr, og_len)
-        p[og_len], f_len = Byte(0), og_len + 1  # null terminator
-        buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=cap)
+        p[og_len] = 0  # null terminator
+        buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=f_len)
         output.append(String(buf^))
     return output^
 
@@ -1216,8 +1195,7 @@ fn _to_string_list[
 fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[StringSlice[O]]) -> List[String]:
-    """Create a list of Strings copying the existing data. This overallocates
-    in most cases in exchange for better speed overall.
+    """Create a list of Strings copying the existing data.
 
     Parameters:
         O: The origin of the data.
@@ -1242,8 +1220,7 @@ fn to_string_list[
 fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[Span[Byte, O]]) -> List[String]:
-    """Create a list of Strings copying the existing data. This overallocates
-    in most cases in exchange for better speed overall.
+    """Create a list of Strings copying the existing data.
 
     Parameters:
         O: The origin of the data.
@@ -1374,7 +1351,7 @@ fn _split_impl[
         # Python adds all "whitespace chars" as one separator
         # if no separator was specified
         for s in _build_slice(ptr, lhs, str_byte_len):
-            if not s.isspace():
+            if not s._isspace():
                 break
             lhs += s.byte_length()
         # if it went until the end of the String, then it should be sliced
@@ -1383,7 +1360,7 @@ fn _split_impl[
             break
         rhs = lhs + _utf8_first_byte_sequence_length(ptr[lhs])
         for s in _build_slice(ptr, rhs, str_byte_len):
-            if s.isspace():
+            if s._isspace():
                 break
             rhs += s.byte_length()
 
