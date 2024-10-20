@@ -933,7 +933,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         Parameters:
             single_character: Whether to evaluate the stringslice as a single
-                character (avoids overhead when already iterating).
+                unicode character (avoids overhead when already iterating).
 
         Returns:
             True if the whole StringSlice is made up of whitespace characters
@@ -942,7 +942,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         fn _is_space_char(s: StringSlice) -> Bool:
             # sorry for readability, but this has less overhead than memcmp
-            # this is highly performance sensitive code
+            # highly performance sensitive code, benchmark before touching
             var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
             if no_null_len == 1:
@@ -1145,7 +1145,7 @@ trait Stringlike(AsBytesRead, CollectionElement, CollectionElementNew):
         """
         ...
 
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Byte]:
         """Get raw pointer to the underlying data.
 
         Returns:
