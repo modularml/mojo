@@ -249,9 +249,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(
-        inout self: StringSlice[StaticConstantOrigin], lit: StringLiteral
-    ):
+    fn __init__(inout self: StaticString, lit: StringLiteral):
         """Construct a new string slice from a string literal.
 
         Args:
@@ -264,14 +262,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         #   StringLiteral is guaranteed to use UTF-8 encoding.
         # FIXME(MSTDL-160):
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
-        # TODO(#933): use when llvm intrinsics can be used at compile time
+        # FIXME: this gets practically stuck at compile time
         # debug_assert(
-        #     _is_valid_utf8(literal.unsafe_ptr(), literal.byte_length()),
+        #     _is_valid_utf8(lit.as_bytes()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
-        self = StaticString(
-            unsafe_from_utf8_ptr=lit.unsafe_ptr(), len=lit.byte_length()
-        )
+        self = StaticString(unsafe_from_utf8=lit.as_bytes())
 
     @always_inline
     fn __init__(inout self, *, owned unsafe_from_utf8: Span[Byte, origin]):
@@ -343,6 +339,23 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             other: The `StringSlice` to copy.
         """
         self._slice = other._slice
+
+    fn __init__[
+        O: ImmutableOrigin, //
+    ](inout self: StringSlice[O], ref [O]value: String):
+        """Construct an immutable StringSlice.
+
+        Parameters:
+            O: The immutable origin.
+
+        Args:
+            value: The string value.
+        """
+
+        debug_assert(
+            _is_valid_utf8(value.as_bytes()), "value is not valid utf8"
+        )
+        self = StringSlice[O](unsafe_from_utf8=value.as_bytes())
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -610,6 +623,24 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             A slice containing the underlying sequence of encoded bytes.
         """
         return self._slice
+
+    @always_inline
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[Byte, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -968,14 +999,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             offset = eol_start + eol_length
 
         return output^
-
-    @staticmethod
-    fn read[O: ImmutableOrigin, T: Stringlike, //](value: T) -> StringSlice[O]:
-        debug_assert(
-            _is_valid_utf8(value.unsafe_ptr(), value.byte_length()),
-            "value to read is not valid utf8",
-        )
-        return StringSlice[O](unsafe_from_utf8=value.as_bytes_read())
 
 
 # ===----------------------------------------------------------------------===#

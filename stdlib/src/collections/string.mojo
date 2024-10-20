@@ -1556,20 +1556,6 @@ struct String(
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_string_slice_read[O: ImmutableOrigin](ref [O]self) -> StringSlice[O]:
-        """Returns an immuteable string slice of the data owned by this string.
-
-        Returns:
-            An immutable string slice pointing to the data owned by this string.
-        """
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in String so this is actually
-        #   guaranteed to be valid.
-        return rebind[StringSlice[O]](
-            StringSlice(unsafe_from_utf8=self.as_bytes())
-        )
-
-    @always_inline
     fn byte_length(self) -> Int:
         """Get the string length in bytes.
 

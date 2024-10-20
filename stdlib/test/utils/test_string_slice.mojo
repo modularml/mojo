@@ -205,8 +205,8 @@ fn test_utf8_validation() raises:
      ظهرت نسخ جديدة ومختلفة من نص لوريم إيبسوم، أحياناً عن طريق
      الصدفة، وأحياناً عن عمد كإدخال بعض العبارات الفكاهية إليها.
     """
-    assert_true(_is_valid_utf8(text.unsafe_ptr(), text.byte_length()))
-    assert_true(_is_valid_utf8(text.unsafe_ptr(), text.byte_length()))
+    assert_true(_is_valid_utf8(text.as_bytes()))
+    assert_true(_is_valid_utf8(text.as_bytes()))
 
     var positive = List[List[UInt8]](
         List[UInt8](0x0),
@@ -226,8 +226,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0xF4, 0x8F, 0x88, 0xAA),
     )
     for item in positive:
-        assert_true(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
-        assert_true(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_true(_is_valid_utf8(Span(item[])))
+        assert_true(_is_valid_utf8(Span(item[])))
     var negative = List[List[UInt8]](
         List[UInt8](0x80),
         List[UInt8](0xBF),
@@ -256,8 +256,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
     )
     for item in negative:
-        assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
-        assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_false(_is_valid_utf8(Span(item[])))
+        assert_false(_is_valid_utf8(Span(item[])))
 
 
 def test_find():
@@ -335,7 +335,7 @@ alias BAD_SEQUENCES = List[String](
 
 
 fn validate_utf8(slice: String) -> Bool:
-    return _is_valid_utf8(slice.unsafe_ptr(), slice.byte_length())
+    return _is_valid_utf8(slice.as_bytes())
 
 
 def test_good_utf8_sequences():
@@ -416,38 +416,40 @@ def test_count_utf8_continuation_bytes():
 
 
 def test_splitlines():
-    alias L = List[StringSlice[ImmutableAnyOrigin]]
+    alias S = StringSlice[StaticConstantOrigin]
+    alias L = List[StringSlice[StaticConstantOrigin]]
 
     # FIXME: remove once StringSlice conforms to TestableCollectionElement
     fn _assert_equal[
-        O: ImmutableOrigin = StaticConstantOrigin
-    ](l1: List[StringSlice[O]], l2: L) raises:
+        O1: ImmutableOrigin, O2: ImmutableOrigin
+    ](l1: List[StringSlice[O1]], l2: List[StringSlice[O2]]) raises:
         assert_equal(len(l1), len(l2))
         for i in range(len(l1)):
             assert_equal(str(l1[i]), str(l2[i]))
 
-    fn sl(value: StringLiteral) -> StringSlice[ImmutableAnyOrigin]:
-        return rebind[StringSlice[ImmutableAnyOrigin]](value.as_string_slice())
+    # FIXME: remove once StringSlice conforms to TestableCollectionElement
+    fn _assert_equal[
+        O1: ImmutableOrigin
+    ](l1: List[StringSlice[O1]], l2: List[String]) raises:
+        assert_equal(len(l1), len(l2))
+        for i in range(len(l1)):
+            assert_equal(str(l1[i]), l2[i])
 
-    fn sl(value: String) -> StringSlice[ImmutableAnyOrigin]:
-        return rebind[StringSlice[ImmutableAnyOrigin]](value.as_string_slice())
-
-    alias S = StringSlice[StaticConstantOrigin]
     # Test with no line breaks
-    _assert_equal(S("hello world").splitlines(), L(sl("hello world")))
+    _assert_equal(S("hello world").splitlines(), L("hello world"))
 
     # Test with line breaks
-    _assert_equal(S("hello\nworld").splitlines(), L(sl("hello"), sl("world")))
-    _assert_equal(S("hello\rworld").splitlines(), L(sl("hello"), sl("world")))
-    _assert_equal(S("hello\r\nworld").splitlines(), L(sl("hello"), sl("world")))
+    _assert_equal(S("hello\nworld").splitlines(), L("hello", "world"))
+    _assert_equal(S("hello\rworld").splitlines(), L("hello", "world"))
+    _assert_equal(S("hello\r\nworld").splitlines(), L("hello", "world"))
 
     # Test with multiple different line breaks
     s1 = S("hello\nworld\r\nmojo\rlanguage\r\n")
-    hello_mojo = L(sl("hello"), sl("world"), sl("mojo"), sl("language"))
+    hello_mojo = L("hello", "world", "mojo", "language")
     _assert_equal(s1.splitlines(), hello_mojo)
     _assert_equal(
         s1.splitlines(keepends=True),
-        L(sl("hello\n"), sl("world\r\n"), sl("mojo\r"), sl("language\r\n")),
+        L("hello\n", "world\r\n", "mojo\r", "language\r\n"),
     )
 
     # Test with an empty string
@@ -457,7 +459,7 @@ def test_splitlines():
     _assert_equal(s2.splitlines(), hello_mojo)
     _assert_equal(
         s2.splitlines(keepends=True),
-        L(sl("hello\v"), sl("world\f"), sl("mojo\x1c"), sl("language\x1d")),
+        L("hello\v", "world\f", "mojo\x1c", "language\x1d"),
     )
 
     # test \x1c \x1d \x1e
@@ -465,7 +467,7 @@ def test_splitlines():
     _assert_equal(s3.splitlines(), hello_mojo)
     _assert_equal(
         s3.splitlines(keepends=True),
-        L(sl("hello\x1c"), sl("world\x1d"), sl("mojo\x1e"), sl("language\x1e")),
+        L("hello\x1c", "world\x1d", "mojo\x1e", "language\x1e"),
     )
 
     # test \x85 \u2028 \u2029
@@ -476,31 +478,13 @@ def test_splitlines():
     var unicode_paragraph_sep = String(List[UInt8](0xE2, 0x80, 0xA9, 0))
     """TODO: \\u2029"""
 
-    # FIXME: this should be in a loop but there is a weird lifetime bug
-    u = next_line
-    item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
-    s = StringSlice.read(item)
-    _assert_equal(s.splitlines(), hello_mojo)
-    h, w = sl("hello" + u), sl("world" + u)
-    m, l = sl("mojo" + u), sl("language" + u)
-    slices = L(h, w, m, l)
-    _assert_equal(s.splitlines(keepends=True), slices)
-    u = unicode_line_sep
-    item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
-    s = StringSlice.read(item)
-    _assert_equal(s.splitlines(), hello_mojo)
-    h, w = sl("hello" + u), sl("world" + u)
-    m, l = sl("mojo" + u), sl("language" + u)
-    slices = L(h, w, m, l)
-    _assert_equal(s.splitlines(keepends=True), slices)
-    u = unicode_paragraph_sep
-    item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
-    s = StringSlice.read(item)
-    _assert_equal(s.splitlines(), hello_mojo)
-    h, w = sl("hello" + u), sl("world" + u)
-    m, l = sl("mojo" + u), sl("language" + u)
-    slices = L(h, w, m, l)
-    _assert_equal(s.splitlines(keepends=True), slices)
+    for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
+        u = i[]
+        item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
+        s = StringSlice(item)
+        _assert_equal(s.splitlines(), hello_mojo)
+        items = List("hello" + u, "world" + u, "mojo" + u, "language" + u)
+        _assert_equal(s.splitlines(keepends=True), items)
 
 
 fn main() raises:
