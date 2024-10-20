@@ -21,16 +21,33 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Reference, UnsafePointer
-from sys.intrinsics import _type_is_eq
+from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
+
+
+trait AsBytes:
+    """
+    The `AsBytes` trait denotes a type that can be returned as a immutable byte
+    span.
+    """
+
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
 
 
 @value
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: Lifetime[is_mutable].type,
+    origin: Origin[is_mutable].type,
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -38,12 +55,12 @@ struct _SpanIter[
     Parameters:
         is_mutable: Whether the reference to the span is mutable.
         T: The type of the elements in the span.
-        lifetime: The lifetime of the Span.
+        origin: The origin of the Span.
         forward: The iteration direction. `False` is backwards.
     """
 
     var index: Int
-    var src: Span[T, lifetime]
+    var src: Span[T, origin]
 
     @always_inline
     fn __iter__(self) -> Self:
@@ -52,14 +69,18 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Reference[T, lifetime]:
+    ) -> Pointer[T, origin]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[self.index - 1]
+            return Pointer.address_of(self.src[self.index - 1])
         else:
             self.index -= 1
-            return self.src[self.index]
+            return Pointer.address_of(self.src[self.index])
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> Int:
@@ -74,14 +95,14 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    lifetime: Lifetime[is_mutable].type,
+    origin: Origin[is_mutable].type,
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
     Parameters:
         is_mutable: Whether the span is mutable.
         T: The type of the elements in the span.
-        lifetime: The lifetime of the Span.
+        origin: The origin of the Span.
     """
 
     # Field
@@ -114,7 +135,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
-    fn __init__(inout self, ref [lifetime]list: List[T, *_]):
+    fn __init__(inout self, ref [origin]list: List[T, *_]):
         """Construct a Span from a List.
 
         Args:
@@ -125,19 +146,16 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElement, size: Int, //
-    ](inout self, ref [lifetime]array: InlineArray[T2, size]):
+        size: Int, //
+    ](inout self, ref [origin]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
-            T2: The type of the elements in the span.
             size: The size of the InlineArray.
 
         Args:
             array: The array to which the span refers.
         """
-
-        constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
 
         self._data = UnsafePointer.address_of(array).bitcast[T]()
         self._len = size
@@ -147,7 +165,7 @@ struct Span[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> ref [lifetime] T:
+    fn __getitem__(self, idx: Int) -> ref [origin] T:
         """Get a reference to an element in the span.
 
         Args:
@@ -191,7 +209,7 @@ struct Span[
         return res
 
     @always_inline
-    fn __iter__(self) -> _SpanIter[T, lifetime]:
+    fn __iter__(self) -> _SpanIter[T, origin]:
         """Get an iterator over the elements of the span.
 
         Returns:
@@ -226,25 +244,25 @@ struct Span[
 
         return self._data
 
-    fn as_ref(self) -> Reference[T, lifetime]:
+    fn as_ref(self) -> Pointer[T, origin]:
         """
-        Gets a Reference to the first element of this slice.
+        Gets a Pointer to the first element of this slice.
 
         Returns:
-            A Reference pointing at the first element of this slice.
+            A Pointer pointing at the first element of this slice.
         """
 
-        return self._data[0]
+        return Pointer[T, origin].address_of(self._data[0])
 
     @always_inline
     fn copy_from[
-        lifetime: MutableLifetime, //
-    ](self: Span[T, lifetime], other: Span[T, _]):
+        origin: MutableOrigin, //
+    ](self: Span[T, origin], other: Span[T, _]):
         """
         Performs an element wise copy from all elements of `other` into all elements of `self`.
 
         Parameters:
-            lifetime: The inferred mutable lifetime of the data within the Span.
+            origin: The inferred mutable origin of the data within the Span.
 
         Args:
             other: The Span to copy all elements from.
@@ -261,9 +279,14 @@ struct Span[
         """
         return len(self) > 0
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the origin.
+    @__unsafe_disable_nested_origin_exclusivity
     fn __eq__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, origin], rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
         Parameters:
@@ -292,7 +315,7 @@ struct Span[
     @always_inline
     fn __ne__[
         T: EqualityComparableCollectionElement, //
-    ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
+    ](self: Span[T, origin], rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
         Parameters:
@@ -307,12 +330,12 @@ struct Span[
         """
         return not self == rhs
 
-    fn fill[lifetime: MutableLifetime, //](self: Span[T, lifetime], value: T):
+    fn fill[origin: MutableOrigin, //](self: Span[T, origin], value: T):
         """
         Fill the memory that a span references with a given value.
 
         Parameters:
-            lifetime: The inferred mutable lifetime of the data within the Span.
+            origin: The inferred mutable origin of the data within the Span.
 
         Args:
             value: The value to assign to each element.
@@ -320,13 +343,13 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn get_immutable(self) -> Span[T, _lit_mut_cast[lifetime, False].result]:
+    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
         """
         Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
-        return Span[T, _lit_mut_cast[lifetime, False].result](
+        return Span[T, _lit_mut_cast[origin, False].result](
             unsafe_ptr=self._data, len=self._len
         )

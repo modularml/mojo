@@ -26,7 +26,7 @@ There are a few main tools in this module:
 """
 
 import random
-from sys.ffi import _get_global
+from sys.ffi import _get_global, OpaquePointer
 from sys import simdwidthof, bitwidthof
 from collections import InlineArray
 
@@ -52,15 +52,15 @@ fn _HASH_SECRET() -> UInt:
 
 
 fn _initialize_hash_secret(
-    payload: UnsafePointer[NoneType],
-) -> UnsafePointer[NoneType]:
+    payload: OpaquePointer,
+) -> OpaquePointer:
     var secret = random.random_ui64(0, UInt64.MAX)
     var data = UnsafePointer[Int].alloc(1)
     data[] = int(secret)
     return data.bitcast[NoneType]()
 
 
-fn _destroy_hash_secret(p: UnsafePointer[NoneType]):
+fn _destroy_hash_secret(p: OpaquePointer):
     p.free()
 
 
@@ -265,7 +265,6 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
         memset_zero(ptr + r, stride - r)  # set the rest to 0
         var last_value = ptr.bitcast[Scalar[type]]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
-        _ = remaining^  # We make sure the array lives long enough.
 
     # Now finally, hash the final SIMD vector state.
     return _hash_simd(hash_data)

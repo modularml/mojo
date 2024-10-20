@@ -276,6 +276,7 @@ def test_bit_not_simd():
 
 
 def test_is_power_of_two():
+    assert_equal(is_power_of_two(Int.MIN), False)
     assert_equal(is_power_of_two(-(2**59)), False)
     assert_equal(is_power_of_two(-1), False)
     assert_equal(is_power_of_two(0), False)
@@ -285,6 +286,7 @@ def test_is_power_of_two():
     assert_equal(is_power_of_two(4), True)
     assert_equal(is_power_of_two(5), False)
     assert_equal(is_power_of_two(2**59), True)
+    assert_equal(is_power_of_two(Int.MAX), False)
 
 
 def test_is_power_of_two_simd():
@@ -321,6 +323,8 @@ def test_is_power_of_two_simd():
         is_power_of_two(var4),
         SIMD[DType.bool, simd_width](False, False, False, True),
     )
+
+    assert_equal(is_power_of_two(Int64.MIN), False)
 
 
 def test_bit_width():
@@ -447,10 +451,14 @@ def test_rotate_bits_int():
     assert_equal(rotate_bits_left[0](104), 104)
     assert_equal(rotate_bits_left[2](104), 416)
     assert_equal(rotate_bits_left[-2](104), 26)
+    assert_equal(rotate_bits_left[8](104), 26624)
+    assert_equal(rotate_bits_left[-8](104), 7493989779944505344)
 
     assert_equal(rotate_bits_right[0](104), 104)
     assert_equal(rotate_bits_right[2](104), 26)
     assert_equal(rotate_bits_right[-2](104), 416)
+    assert_equal(rotate_bits_right[8](104), 7493989779944505344)
+    assert_equal(rotate_bits_right[-8](104), 26624)
 
 
 def test_rotate_bits_simd():

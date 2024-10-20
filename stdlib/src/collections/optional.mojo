@@ -31,6 +31,7 @@ print(d)  # prints 2
 ```
 """
 
+from builtin._documentation import doc_private
 from os import abort
 from utils import Variant
 
@@ -47,6 +48,7 @@ struct _NoneType(CollectionElement, CollectionElementNew):
 # ===----------------------------------------------------------------------===#
 
 
+@value
 struct Optional[T: CollectionElement](
     CollectionElement, CollectionElementNew, Boolable
 ):
@@ -102,6 +104,7 @@ struct Optional[T: CollectionElement](
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -125,22 +128,6 @@ struct Optional[T: CollectionElement](
             other: The Optional to copy.
         """
         self.__copyinit__(other)
-
-    fn __copyinit__(inout self, other: Self):
-        """Copy construct an Optional.
-
-        Args:
-            other: The Optional to copy.
-        """
-        self._value = other._value
-
-    fn __moveinit__(inout self, owned other: Self):
-        """Move this `Optional`.
-
-        Args:
-            other: The `Optional` to move from.
-        """
-        self._value = other._value^
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -267,8 +254,7 @@ struct Optional[T: CollectionElement](
             A string representation of the Optional.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output
 
     # TODO: Include the Parameter type in the string as well.
@@ -285,23 +271,23 @@ struct Optional[T: CollectionElement](
             A verbose string representation of the Optional.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        writer.write("Optional(")
-        self.format_to(writer)
-        writer.write(")")
+        output.write("Optional(")
+        self.write_to(output)
+        output.write(")")
         return output
 
-    fn format_to[
-        U: RepresentableCollectionElement, //
-    ](self: Optional[U], inout writer: Formatter):
-        """Write Optional string representation to a `Formatter`.
+    fn write_to[
+        W: Writer, U: RepresentableCollectionElement, //
+    ](self: Optional[U], inout writer: W):
+        """Write Optional string representation to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the elements in the list. Must implement the
               traits `Representable` and `CollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         if self:
             writer.write(repr(self.value()))
@@ -313,7 +299,7 @@ struct Optional[T: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
+    fn value(ref [_]self: Self) -> ref [self._value] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -322,7 +308,7 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), the program will abort
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         if not self.__bool__():
             abort(".value() on empty Optional")
@@ -330,7 +316,7 @@ struct Optional[T: CollectionElement](
         return self.unsafe_value()
 
     @always_inline
-    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self._value)] T:
+    fn unsafe_value(ref [_]self: Self) -> ref [self._value] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -339,10 +325,10 @@ struct Optional[T: CollectionElement](
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Returns:
-            A reference to the contained data of the option as a Reference[T].
+            A reference to the contained data of the option as a Pointer[T].
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.unsafe_get[T]()[]
+        return self._value.unsafe_get[T]()
 
     fn take(inout self) -> T:
         """Move the value out of the Optional.
@@ -435,6 +421,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 

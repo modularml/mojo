@@ -1502,3 +1502,85 @@ struct _RegisterPackType[*a: AnyTrivialRegType]:
             The tuple element at the requested index.
         """
         return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
+
+
+# ===----------------------------------------------------------------------=== #
+# expect
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn expect[T: AnyTrivialRegType, //, expected_val: T](val: T) -> T:
+    """Provides information about expected (the most probable) value of `val`,
+    which can be used by optimizers.
+
+    Constraints:
+        Only work with integer types.
+
+    Parameters:
+        T: The type of the input value.
+        expected_val: The expected value of `val`.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The input value.
+    """
+    return llvm_intrinsic["llvm.expect", T, has_side_effect=False](
+        val, expected_val
+    )
+
+
+# ===----------------------------------------------------------------------=== #
+# likely
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn likely(val: Bool) -> Bool:
+    """Provides information that the most probable value of `val` is going to be
+    `True`. This information can be used by optimizers.
+
+    Args:
+        val: The input value which is likely to be `True` most of the time.
+
+    Returns:
+        The input value.
+    """
+    return expect[True](val)
+
+
+# ===----------------------------------------------------------------------=== #
+# unlikely
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn unlikely(val: Bool) -> Bool:
+    """Provides information that the most probable value of `val` is going to be
+    `False`. This information can be used by optimizers.
+
+    Args:
+        val: The input value which is likely to be `False` most of the time.
+
+    Returns:
+        The input value.
+    """
+    return expect[False](val)
+
+
+# ===----------------------------------------------------------------------=== #
+# assume
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn assume(val: Bool):
+    """Signals to the optimizer that the condition is always true. This allows
+    the optimizer to optimize the code.
+
+    Args:
+      val: The input value which is assumed to be `True`.
+    """
+    llvm_intrinsic["llvm.assume", NoneType](val)

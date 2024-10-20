@@ -36,7 +36,6 @@ from builtin.file_descriptor import FileDescriptor
 from builtin.float_literal import FloatLiteral
 from builtin.floatable import Floatable, FloatableRaising, float
 from builtin.format_int import bin, hex, oct
-from builtin.hash import hash, Hashable
 from builtin.identifiable import Identifiable, StringableIdentifiable
 from builtin.int import (
     Int,
@@ -76,13 +75,13 @@ from builtin.tuple import (
 )
 from builtin.type_aliases import (
     AnyTrivialRegType,
-    ImmutableLifetime,
-    MutableLifetime,
-    ImmutableAnyLifetime,
-    MutableAnyLifetime,
-    StaticConstantLifetime,
-    LifetimeSet,
-    Lifetime,
+    ImmutableOrigin,
+    MutableOrigin,
+    ImmutableAnyOrigin,
+    MutableAnyOrigin,
+    StaticConstantOrigin,
+    OriginSet,
+    Origin,
 )
 from builtin.uint import UInt
 from builtin.value import (
@@ -92,6 +91,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
+    BytesCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -113,6 +113,7 @@ from builtin.simd import (
     Float16,
     Float32,
     Float64,
+    Byte,
     SIMD,
 )
 from builtin.type_aliases import AnyTrivialRegType
@@ -130,5 +131,6 @@ from collections.string import (
     islower,
     isprintable,
 )
-from memory import Reference, AddressSpace
-from utils import Formattable, Formatter
+from hashlib.hash import hash, Hashable
+from memory import Pointer, AddressSpace
+from utils import AsBytes, Writable, Writer

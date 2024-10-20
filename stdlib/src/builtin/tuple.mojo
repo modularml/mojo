@@ -59,7 +59,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     fn __init__(
         inout self,
         *,
-        owned storage: VariadicPack[_, CollectionElement, element_types],
+        owned storage: VariadicPack[_, CollectionElement, *element_types],
     ):
         """Construct the tuple from a low-level internal representation.
 
@@ -155,7 +155,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] element_types[idx.value]:
+    ](ref [_]self: Self) -> ref [self] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -172,13 +172,13 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
             storage_kgen_ptr
         )
-        # Use an immortal mut reference, which converts to self's lifetime.
+        # Use an immortal mut reference, which converts to self's origin.
         return UnsafePointer(elt_kgen_ptr)[]
 
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> ref [__lifetime_of(self)] T:
+    fn get[i: Int, T: CollectionElement](ref [_]self) -> ref [self] T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:
@@ -188,10 +188,12 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
+        return rebind[T](self[i])
 
     @always_inline("nodebug")
-    fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
+    fn __contains__[
+        T: EqualityComparableCollectionElement
+    ](self, value: T) -> Bool:
         """Return whether the tuple contains the specified value.
 
         For example:
@@ -217,8 +219,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
             @parameter
             if _type_is_eq[element_types[i], T]():
-                var elt_ptr = UnsafePointer.address_of(self[i]).bitcast[T]()
-                if elt_ptr[] == value:
+                if self.get[i, T]() == value:
                     return True
 
         return False

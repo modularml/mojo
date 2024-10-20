@@ -19,6 +19,7 @@ from sys import (
     strided_load,
     strided_store,
 )
+from sys.intrinsics import likely, unlikely, assume
 
 from memory import UnsafePointer, memset_zero
 from testing import assert_equal
@@ -37,7 +38,7 @@ def test_compressed_store():
     assert_equal(vector.load[width=4](0), F32x4(2.0, 3.0, 0.0, 0.0))
 
     # Just clear the buffer.
-    vector.store[width=4](0, 0)
+    vector.store(0, SIMD[DType.float32, 4](0))
 
     var val = F32x4(0.0, 1.0, 3.0, 0.0)
     compressed_store(val, vector, val != 0)
@@ -121,9 +122,20 @@ fn test_strided_store() raises:
     vector.free()
 
 
+def test_likely_unlikely():
+    assert_equal(likely(True), True)
+    assert_equal(unlikely(True), True)
+
+
+def test_assume():
+    assume(True)
+
+
 def main():
     test_compressed_store()
     test_masked_load()
     test_masked_store()
     test_strided_load()
     test_strided_store()
+    test_likely_unlikely()
+    test_assume()

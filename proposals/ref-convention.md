@@ -83,7 +83,7 @@ You would now use an argument convention:
 ```mojo
 fn __refitem__(ref [_] self, index: Int) -> Reference[
         # This is a bit yuck, but is simplified further below.
-        Self.ElementType, __lifetime_of(self).is_mutable, __lifetime_of(self)
+        Self.ElementType, __origin_of(self).is_mutable, __origin_of(self)
     ]:
 
 # Alternatively, name the Lifetime:
@@ -134,7 +134,7 @@ example:
 
 ```mojo
 fn __refitem__(ref [_] self, index: Int)
-    -> ref [__lifetime_of(self)] Self.ElementType:
+    -> ref [self] Self.ElementType:
 
 # Hopefully someday we'll have a Lifetime type:
 fn __refitem__(ref [_] self, index: Int)
@@ -174,7 +174,7 @@ becomes:
 
 ```mojo
 fn __getitem__(ref [_] self, index: Int)
-    -> ref [__lifetime_of(self)] Self.ElementType:
+    -> ref [self] Self.ElementType:
 ```
 
 Note: Neither `inout` nor `borrowed` are allowed in a result position. The

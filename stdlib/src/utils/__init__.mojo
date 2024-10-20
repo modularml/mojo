@@ -12,13 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the utils package."""
 
-from .index import Index, StaticIntTuple, product
+from .index import Index, IndexList, product
 from .inline_string import InlineString
 from .loop import unroll
-from .span import Span
+from .span import AsBytes, Span
 from .static_tuple import StaticTuple
 from .stringref import StringRef
 from .string_slice import StaticString, StringSlice
 from .variant import Variant
 from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
-from .format import Formatter, Formattable
+from .write import Writer, Writable, write_args, write_buffered
