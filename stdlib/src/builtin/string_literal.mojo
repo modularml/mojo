@@ -28,6 +28,7 @@ from utils.string_slice import (
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
+    to_string_list,
 )
 
 # ===----------------------------------------------------------------------===#
@@ -386,6 +387,20 @@ struct StringLiteral(
         )
 
     @always_inline
+    fn as_string_slice_read[O: ImmutableOrigin](ref [O]self) -> StringSlice[O]:
+        """Returns an immuteable string slice of the data owned by this string.
+
+        Returns:
+            An immutable string slice pointing to the data owned by this string.
+        """
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return rebind[StringSlice[O]](
+            StringSlice(unsafe_from_utf8=self.as_bytes())
+        )
+
+    @always_inline
     fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
@@ -562,9 +577,9 @@ struct StringLiteral(
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string literal at line boundaries. This corresponds to Python's
-        [universal newlines](
+        [universal newlines:](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -572,7 +587,7 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return self.as_string_slice().splitlines(keepends)
+        return to_string_list(self.as_string_slice().splitlines(keepends))
 
     fn count(self, substr: String) -> Int:
         """Return the number of non-overlapping occurrences of substring

@@ -24,9 +24,10 @@ from bit import count_leading_zeros
 from utils import Span
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer
+from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
 from memory.memory import _memcmp_impl_unconstrained
+from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -146,44 +147,6 @@ fn _memrmem[
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             return haystack + i
     return UnsafePointer[Scalar[type]]()
-
-
-fn _is_newline_start(
-    ptr: UnsafePointer[UInt8], read_ahead: Int = 1
-) -> (Bool, Int):
-    """Returns if the first item in the pointer is the start of
-    a newline sequence, and its length.
-    """
-    # TODO add line and paragraph separator as StringLiteral
-    # once Unicode escape sequences are accepted
-    alias ` ` = UInt8(ord(" "))
-    var rn = "\r\n"
-    var next_line = List[UInt8](0xC2, 0x85)
-    """TODO: \\x85"""
-    var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
-    """TODO: \\u2028"""
-    var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
-    """TODO: \\u2029"""
-
-    var val = _utf8_byte_type(ptr[0])
-    if val == 0:
-        if read_ahead > 1:
-            if memcmp(ptr, rn.unsafe_ptr(), 2) == 0:
-                return True, 2
-            _ = rn
-        return ptr[0] != ` ` and _isspace(ptr[0]), 1
-    elif val == 2 and read_ahead > 1:
-        var comp = memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
-        _ = next_line
-        return comp, 2
-    elif val == 3 and read_ahead > 2:
-        var comp = (
-            memcmp(ptr, unicode_line_sep.unsafe_ptr(), 3) == 0
-            or memcmp(ptr, unicode_paragraph_sep.unsafe_ptr(), 3) == 0
-        )
-        _ = unicode_line_sep, unicode_paragraph_sep
-        return comp, 3
-    return False, 1
 
 
 @value
@@ -867,7 +830,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\r\\v\\f\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
             True if the whole StringSlice is made up of whitespace characters
@@ -905,11 +868,64 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         _ = next_line, unicode_line_sep, unicode_paragraph_sep
         return True
 
-    fn splitlines(self, keepends: Bool = False) -> List[String]:
-        """Split the string at line boundaries. This corresponds to Python's
-        [universal newlines](
+    fn isnewline[single_character: Bool = False](self) -> Bool:
+        """Determines whether every character in the given StringSlice is a
+        python newline character. This corresponds to Python's
+        [universal newlines:](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+
+        Parameters:
+            single_character: Whether to evaluate the stringslice as a single
+                unicode character (avoids overhead when already iterating).
+
+        Returns:
+            True if the whole StringSlice is made up of whitespace characters
+                listed above, otherwise False.
+        """
+
+        fn _is_newline_char(s: StringSlice) -> Bool:
+            # sorry for readability, but this has less overhead than memcmp
+            # highly performance sensitive code, benchmark before touching
+            alias `\t` = UInt8(ord("\t"))
+            alias `\r` = UInt8(ord("\r"))
+            alias `\n` = UInt8(ord("\n"))
+            alias `\x1c` = UInt8(ord("\x1c"))
+            alias `\x1e` = UInt8(ord("\x1e"))
+            var no_null_len = s.byte_length()
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1:
+                var v = ptr[0]
+                return `\t` <= v <= `\x1e` and not (`\r` < v < `\x1c`)
+            elif no_null_len == 2:
+                var v0 = ptr[0]
+                var v1 = ptr[1]
+                next_line = v0 == 0xC2 and v1 == 0x85  # next line: \x85
+                r_n = v0 == `\r` and v1 == `\n`
+                return next_line or r_n
+            elif no_null_len == 3:
+                # unicode line sep or paragraph sep: \u2028 , \u2029
+                var v2 = ptr[2]
+                lastbyte = v2 == 0xA8 or v2 == 0xA9
+                return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
+            return False
+
+        @parameter
+        if single_character:
+            return _is_newline_char(self)
+        else:
+            for s in self:
+                if not _is_newline_char(s):
+                    return False
+            return self.byte_length() != 0
+
+    fn splitlines[
+        O: ImmutableOrigin, //
+    ](self: StringSlice[O], keepends: Bool = False) -> List[StringSlice[O]]:
+        """Split the string at line boundaries. This corresponds to Python's
+        [universal newlines:](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -917,45 +933,49 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        var output = List[String]()
-        var length = self.byte_length()
-        var current_offset = 0
-        var ptr = self.unsafe_ptr()
 
-        while current_offset < length:
-            var eol_location = length - current_offset
-            var eol_length = 0
-            var curr_ptr = ptr.offset(current_offset)
+        alias `\r` = UInt8(ord("\r"))
+        alias `\n` = UInt8(ord("\n"))
+        output = List[StringSlice[O]](capacity=128)  # guessing
+        ptr = self.unsafe_ptr()
+        length = self.byte_length()
+        offset = 0
 
-            for i in range(current_offset, length):
-                var read_ahead = 3 if i < length - 2 else (
-                    2 if i < length - 1 else 1
-                )
-                var res = _is_newline_start(ptr.offset(i), read_ahead)
-                if res[0]:
-                    eol_location = i - current_offset
-                    eol_length = res[1]
+        while offset < length:
+            eol_start = offset
+            eol_length = 0
+            iterator = Self(
+                unsafe_from_utf8_ptr=ptr + offset, len=length - offset
+            ).__iter__()
+
+            while eol_start < length:
+                char = iterator.__next__()
+                c_len = char.byte_length()
+                if char.isnewline[single_character=True]():
+                    if c_len == 1 and char.unsafe_ptr()[0] == `\r`:
+                        next_char = iterator.__next__()
+                        if next_char.byte_length() == 1:
+                            isnewline = next_char.unsafe_ptr()[0] == `\n`
+                            eol_length = 1 + int(isnewline)
+                            break
+                    eol_length = c_len
                     break
+                eol_start += c_len
 
-            var str_len: Int
-            var end_of_string = False
-            if current_offset >= length:
-                end_of_string = True
-                str_len = 0
-            elif keepends:
-                str_len = eol_location + eol_length
-            else:
-                str_len = eol_location
-
-            output.append(
-                String(Self(unsafe_from_utf8_ptr=curr_ptr, len=str_len))
-            )
-
-            if end_of_string:
-                break
-            current_offset += eol_location + eol_length
+            str_len = eol_start - offset + int(keepends) * eol_length
+            s = Self(unsafe_from_utf8_ptr=ptr + offset, len=str_len)
+            output.append(rebind[StringSlice[O]](s))
+            offset = eol_start + eol_length
 
         return output^
+
+    @staticmethod
+    fn read[O: ImmutableOrigin, T: Stringlike, //](value: T) -> StringSlice[O]:
+        debug_assert(
+            _is_valid_utf8(value.unsafe_ptr(), value.byte_length()),
+            "value to read is not valid utf8",
+        )
+        return StringSlice[O](unsafe_from_utf8=value.as_bytes_read())
 
 
 # ===----------------------------------------------------------------------===#
@@ -985,6 +1005,71 @@ trait Stringlike:
             The raw pointer to the data.
         """
         ...
+
+
+fn _to_string_list[
+    T: CollectionElement, //,
+    len_fn: fn (T) -> Int,
+    unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
+](items: List[T]) -> List[String]:
+    i_len = len(items)
+    i_ptr = items.unsafe_ptr()
+    out_ptr = UnsafePointer[String].alloc(i_len)
+
+    for i in range(i_len):
+        og_len = len_fn(i_ptr[i])
+        f_len = og_len + 1  # null terminator
+        p = UnsafePointer[Byte].alloc(f_len)
+        og_ptr = unsafe_ptr_fn(i_ptr[i])
+        memcpy(p, og_ptr, og_len)
+        p[og_len] = 0  # null terminator
+        buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=f_len)
+        (out_ptr + i).init_pointee_move(String(buf^))
+    return List[String](unsafe_pointer=out_ptr, size=i_len, capacity=i_len)
+
+
+@always_inline
+fn to_string_list[
+    O: ImmutableOrigin, //
+](items: List[StringSlice[O]]) -> List[String]:
+    """Create a list of Strings copying the existing data.
+    Parameters:
+        O: The origin of the data.
+    Args:
+        items: The List of string slices.
+    Returns:
+        The list of created strings.
+    """
+
+    fn unsafe_ptr_fn(v: StringSlice[O]) -> UnsafePointer[Byte]:
+        return v.unsafe_ptr()
+
+    fn len_fn(v: StringSlice[O]) -> Int:
+        return v.byte_length()
+
+    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+
+
+@always_inline
+fn to_string_list[
+    O: ImmutableOrigin, //
+](items: List[Span[Byte, O]]) -> List[String]:
+    """Create a list of Strings copying the existing data.
+    Parameters:
+        O: The origin of the data.
+    Args:
+        items: The List of Bytes.
+    Returns:
+        The list of created strings.
+    """
+
+    fn unsafe_ptr_fn(v: Span[Byte, O]) -> UnsafePointer[Byte]:
+        return v.unsafe_ptr()
+
+    fn len_fn(v: Span[Byte, O]) -> Int:
+        return len(v)
+
+    return _to_string_list[len_fn, unsafe_ptr_fn](items)
 
 
 # ===----------------------------------------------------------------------===#

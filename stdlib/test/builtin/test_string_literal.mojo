@@ -378,63 +378,41 @@ def test_split():
 
 
 def test_splitlines():
+    alias L = List[String]
     # Test with no line breaks
-    var in1 = "hello world"
-    var res1 = in1.splitlines()
-    assert_equal(len(res1), 1)
-    assert_equal(res1[0], "hello world")
+    assert_equal("hello world".splitlines(), L("hello world"))
 
-    # Test with \n line break
-    var in2 = "hello\nworld"
-    var res2 = in2.splitlines()
-    assert_equal(len(res2), 2)
-    assert_equal(res2[0], "hello")
-    assert_equal(res2[1], "world")
-
-    # Test with \r\n line break
-    var in3 = "hello\r\nworld"
-    var res3 = in3.splitlines()
-    assert_equal(len(res3), 2)
-    assert_equal(res3[0], "hello")
-    assert_equal(res3[1], "world")
-
-    # Test with \r line break
-    var in4 = "hello\rworld"
-    var res4 = in4.splitlines()
-    assert_equal(len(res4), 2)
-    assert_equal(res4[0], "hello")
-    assert_equal(res4[1], "world")
+    # Test with line breaks
+    assert_equal("hello\nworld".splitlines(), L("hello", "world"))
+    assert_equal("hello\rworld".splitlines(), L("hello", "world"))
+    assert_equal("hello\r\nworld".splitlines(), L("hello", "world"))
 
     # Test with multiple different line breaks
-    var in5 = "hello\nworld\r\nmojo\rlanguage"
-    var res5 = in5.splitlines()
-    assert_equal(len(res5), 4)
-    assert_equal(res5[0], "hello")
-    assert_equal(res5[1], "world")
-    assert_equal(res5[2], "mojo")
-    assert_equal(res5[3], "language")
-
-    # Test with keepends=True
-    var res6 = in5.splitlines(keepends=True)
-    assert_equal(len(res6), 4)
-    assert_equal(res6[0], "hello\n")
-    assert_equal(res6[1], "world\r\n")
-    assert_equal(res6[2], "mojo\r")
-    assert_equal(res6[3], "language")
+    s1 = "hello\nworld\r\nmojo\rlanguage\r\n"
+    hello_mojo = L("hello", "world", "mojo", "language")
+    assert_equal(s1.splitlines(), hello_mojo)
+    assert_equal(
+        s1.splitlines(keepends=True),
+        L("hello\n", "world\r\n", "mojo\r", "language\r\n"),
+    )
 
     # Test with an empty string
-    var in7 = ""
-    var res7 = in7.splitlines()
-    assert_equal(len(res7), 0)
+    assert_equal("".splitlines(), L())
+    # test \v \f \x1c \x1d
+    s2 = "hello\vworld\fmojo\x1clanguage\x1d"
+    assert_equal(s2.splitlines(), hello_mojo)
+    assert_equal(
+        s2.splitlines(keepends=True),
+        L("hello\v", "world\f", "mojo\x1c", "language\x1d"),
+    )
 
-    # test with keepends=True
-    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
-    var res10 = in8.splitlines(keepends=True)
-    assert_equal(len(res10), 4)
-    assert_equal(res10[0], "hello\v")
-    assert_equal(res10[1], "world\f")
-    assert_equal(res10[2], "mojo\x1c")
-    assert_equal(res10[3], "language\x1d")
+    # test \x1c \x1d \x1e
+    s3 = "hello\x1cworld\x1dmojo\x1elanguage\x1e"
+    assert_equal(s3.splitlines(), hello_mojo)
+    assert_equal(
+        s3.splitlines(keepends=True),
+        L("hello\x1c", "world\x1d", "mojo\x1e", "language\x1e"),
+    )
 
 
 def test_float_conversion():

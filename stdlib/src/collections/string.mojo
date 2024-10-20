@@ -44,6 +44,7 @@ from utils.string_slice import (
     _shift_unicode_to_utf8,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
+    to_string_list,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -1555,6 +1556,20 @@ struct String(
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
+    fn as_string_slice_read[O: ImmutableOrigin](ref [O]self) -> StringSlice[O]:
+        """Returns an immuteable string slice of the data owned by this string.
+
+        Returns:
+            An immutable string slice pointing to the data owned by this string.
+        """
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return rebind[StringSlice[O]](
+            StringSlice(unsafe_from_utf8=self.as_bytes())
+        )
+
+    @always_inline
     fn byte_length(self) -> Int:
         """Get the string length in bytes.
 
@@ -1792,9 +1807,9 @@ struct String(
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
-        [universal newlines](
+        [universal newlines:](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -1802,7 +1817,7 @@ struct String(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return self.as_string_slice().splitlines(keepends)
+        return to_string_list(self.as_string_slice().splitlines(keepends))
 
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`
