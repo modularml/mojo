@@ -924,37 +924,45 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         return int(loc) - int(self.unsafe_ptr())
 
-    fn _isspace(self) -> Bool:
-        # sorry for readability, but this has less overhead than memcmp
-        # this is highly performance sensitive code
-        var no_null_len = self.byte_length()
-        var ptr = self.unsafe_ptr()
-        if no_null_len == 1:
-            return _isspace(ptr[0])
-        elif no_null_len == 2:
-            return ptr[0] == 0xC2 and ptr[1] == 0x85  # next_line: \x85
-        elif no_null_len == 3:
-            # unicode line sep or paragraph sep: \u2028 , \u2029
-            lastbyte = ptr[2] == 0xA8 or ptr[2] == 0xA9
-            return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
-        return False
-
-    fn isspace(self) -> Bool:
+    fn isspace[single_character: Bool = False](self) -> Bool:
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
+        Parameters:
+            single_character: Whether to evaluate the stringslice as a single
+                character (avoids overhead when already iterating).
+
         Returns:
             True if the whole StringSlice is made up of whitespace characters
                 listed above, otherwise False.
         """
 
-        for s in self:
-            if not s._isspace():
-                return False
-        return self.byte_length() != 0
+        fn _is_space_char(s: StringSlice) -> Bool:
+            # sorry for readability, but this has less overhead than memcmp
+            # this is highly performance sensitive code
+            var no_null_len = s.byte_length()
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1:
+                return _isspace(ptr[0])
+            elif no_null_len == 2:
+                return ptr[0] == 0xC2 and ptr[1] == 0x85  # next_line: \x85
+            elif no_null_len == 3:
+                # unicode line sep or paragraph sep: \u2028 , \u2029
+                lastbyte = ptr[2] == 0xA8 or ptr[2] == 0xA9
+                return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
+            return False
+
+        @parameter
+        if single_character:
+            return _is_space_char(self)
+        else:
+            for s in self:
+                if not _is_space_char(s):
+                    return False
+            return self.byte_length() != 0
 
     @always_inline
     fn split[
@@ -1351,7 +1359,7 @@ fn _split_impl[
         # Python adds all "whitespace chars" as one separator
         # if no separator was specified
         for s in _build_slice(ptr, lhs, str_byte_len):
-            if not s._isspace():
+            if not s.isspace[single_character=True]():
                 break
             lhs += s.byte_length()
         # if it went until the end of the String, then it should be sliced
@@ -1360,7 +1368,7 @@ fn _split_impl[
             break
         rhs = lhs + _utf8_first_byte_sequence_length(ptr[lhs])
         for s in _build_slice(ptr, rhs, str_byte_len):
-            if s._isspace():
+            if s.isspace[single_character=True]():
                 break
             rhs += s.byte_length()
 
