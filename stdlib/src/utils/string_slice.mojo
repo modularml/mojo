@@ -1041,10 +1041,13 @@ fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[StringSlice[O]]) -> List[String]:
     """Create a list of Strings copying the existing data.
+
     Parameters:
         O: The origin of the data.
+
     Args:
         items: The List of string slices.
+
     Returns:
         The list of created strings.
     """
@@ -1063,10 +1066,13 @@ fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[Span[Byte, O]]) -> List[String]:
     """Create a list of Strings copying the existing data.
+
     Parameters:
         O: The origin of the data.
+
     Args:
         items: The List of Bytes.
+
     Returns:
         The list of created strings.
     """
