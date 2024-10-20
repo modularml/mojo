@@ -994,8 +994,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 eol_start += c_len
 
             str_len = eol_start - offset + int(keepends) * eol_length
-            s = Self(unsafe_from_utf8_ptr=ptr + offset, len=str_len)
-            output.append(rebind[StringSlice[O]](s))
+            s = StringSlice[O](unsafe_from_utf8_ptr=ptr + offset, len=str_len)
+            output.append(s^)
             offset = eol_start + eol_length
 
         return output^
