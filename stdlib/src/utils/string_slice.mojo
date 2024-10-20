@@ -27,7 +27,7 @@ from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
 from memory.memory import _memcmp_impl_unconstrained
-from os import abort
+
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
