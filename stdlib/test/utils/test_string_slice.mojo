@@ -422,9 +422,9 @@ def test_split():
         return rebind[StringSlice[ImmutableAnyOrigin]](StringSlice(value))
 
     # FIXME: remove once StringSlice conforms to TestableCollectionElement
-    fn _assert_equal(
-        l1: List[StringSlice[ImmutableAnyOrigin]], l2: List[S]
-    ) raises:
+    fn _assert_equal[
+        O: ImmutableOrigin
+    ](l1: List[StringSlice[O]], l2: List[S]) raises:
         assert_equal(len(l1), len(l2))
         for i in range(len(l1)):
             assert_equal(str(l1[i]), str(l2[i]))
