@@ -597,7 +597,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     @always_inline
     fn strip(self) -> StringSlice[origin]:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\v\\f".
+        This only takes C spaces into account: " \\t\\n\\v\\f\\r".
 
         For example, `"  mojo  "` returns `"mojo"`.
 
@@ -843,7 +843,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\v\\f\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
             True if the whole StringSlice is made up of whitespace characters
