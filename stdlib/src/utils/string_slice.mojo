@@ -66,6 +66,22 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     return int((sizes < c).cast[DType.uint8]().reduce_add())
 
 
+@always_inline
+fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
+    """Get the length of the sequence starting with given byte. Do note that
+    this does not work correctly if given a continuation byte."""
+
+    debug_assert(
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
+    )
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
+
+
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
     """Shift unicode to utf8 representation.
 
@@ -201,11 +217,11 @@ struct _StringSliceIter[
     """
 
     var index: Int
-    var ptr: UnsafePointer[UInt8]
+    var ptr: UnsafePointer[Byte]
     var length: Int
 
     fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+        inout self, *, unsafe_pointer: UnsafePointer[Byte], length: Int
     ):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
@@ -217,16 +233,14 @@ struct _StringSliceIter[
     fn __next__(inout self) -> StringSlice[origin]:
         @parameter
         if forward:
-            var byte_len = _utf8_first_byte_sequence_length(
-                self.ptr[self.index]
-            )
+            byte_len = _utf8_first_byte_sequence_length(self.ptr[self.index])
             self.index += byte_len
             return StringSlice[origin](
                 unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
                 len=byte_len,
             )
         else:
-            var byte_len = 1
+            byte_len = 1
             while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
                 byte_len += 1
             self.index -= byte_len
@@ -239,15 +253,16 @@ struct _StringSliceIter[
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
-        alias S = Span[UInt8, ImmutableAnyLifetime]
-        alias count = _count_utf8_continuation_bytes
+        alias S = Span[UInt8, ImmutableAnyOrigin]
+        alias _count = _count_utf8_continuation_bytes
 
         @parameter
         if forward:
-            var amnt = count(S(unsafe_ptr=self.ptr, len=self.index))
-            return self.length - self.index - amnt
+            remaining = self.length - self.index
+            cont = _count(S(unsafe_ptr=self.ptr + self.index, len=remaining))
+            return remaining - cont
         else:
-            return self.index - count(S(unsafe_ptr=self.ptr, len=self.index))
+            return self.index - _count(S(unsafe_ptr=self.ptr, len=self.index))
 
 
 @value
