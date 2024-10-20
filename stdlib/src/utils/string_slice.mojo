@@ -1185,18 +1185,18 @@ fn _to_string_list[
 ](items: List[T]) -> List[String]:
     i_len = len(items)
     i_ptr = items.unsafe_ptr()
-    output = List[String](capacity=i_len)
+    out_ptr = UnsafePointer[String].alloc(i_len)
 
     for i in range(i_len):
         og_len = len_fn(i_ptr[i])
-        f_len = og_len + 1
+        f_len = og_len + 1  # null terminator
         p = UnsafePointer[Byte].alloc(f_len)
         og_ptr = unsafe_ptr_fn(i_ptr[i])
         memcpy(p, og_ptr, og_len)
         p[og_len] = 0  # null terminator
         buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=f_len)
-        output.append(String(buf^))
-    return output^
+        (out_ptr + i).init_pointee_move(String(buf^))
+    return List[String](unsafe_pointer=out_ptr, size=i_len, capacity=i_len)
 
 
 @always_inline
@@ -1284,10 +1284,17 @@ fn _split_sl[
             _split_impl[has_maxsplit](src_str, maxsplit)
         )
 
-    output = __type_of(output)(capacity=len(items))
+    i_len = len(items)
+    out_ptr = UnsafePointer[StringSlice[ImmutableAnyOrigin]].alloc(i_len)
+    i = 0
     for item in items:
         v = rebind[Span[Byte, ImmutableAnyOrigin]](item[])
-        output.append(StringSlice[ImmutableAnyOrigin](unsafe_from_utf8=v))
+        s = StringSlice[ImmutableAnyOrigin](unsafe_from_utf8=v^)
+        (out_ptr + i).init_pointee_move(s^)
+        i += 1
+    output = __type_of(output)(
+        unsafe_pointer=out_ptr, size=i_len, capacity=i_len
+    )
 
 
 fn _split_impl[
@@ -1296,30 +1303,39 @@ fn _split_impl[
     O: ImmutableOrigin, //,
     has_maxsplit: Bool,
 ](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
-    var sep_len = len(sep.as_bytes_read())
+    sep_len = len(sep.as_bytes_read())
     if sep_len == 0:
-        var iterator = src_str.__iter__()
-        output = __type_of(output)(capacity=len(iterator) + 2)
-        output.append(rebind[Span[Byte, O]]("".as_bytes_read()))
+        iterator = src_str.__iter__()
+        i_len = len(iterator) + 2
+        out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
+        out_ptr.init_pointee_move(rebind[Span[Byte, O]]("".as_bytes_read()))
+        i = 1
         for s in iterator:
-            output.append(rebind[Span[Byte, O]](s.as_bytes_read()))
-        output.append(rebind[Span[Byte, O]]("".as_bytes_read()))
+            sp = rebind[Span[Byte, O]](s.as_bytes_read())
+            (out_ptr + i).init_pointee_move(sp^)
+            i += 1
+        (out_ptr + i).init_pointee_move(
+            rebind[Span[Byte, O]]("".as_bytes_read())
+        )
+        output = __type_of(output)(
+            unsafe_pointer=out_ptr, size=i_len, capacity=i_len
+        )
         return
 
-    alias prealloc = 16  # guessing, Python's implementation uses 12
-    var amnt = prealloc
+    alias prealloc = 32  # guessing, Python's implementation uses 12
+    amnt = prealloc
 
     @parameter
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    var str_byte_len = len(src_str.as_bytes_read())
-    var lhs = 0
-    var rhs = 0
-    var items = 0
-    var ptr = src_str.as_bytes_read().unsafe_ptr()
-    # var str_span = src_str.as_bytes_read() # FIXME(#3295)
-    # var sep_span = sep.as_bytes_read() # FIXME(#3295)
+    str_byte_len = len(src_str.as_bytes_read())
+    lhs = 0
+    rhs = 0
+    items = 0
+    ptr = src_str.as_bytes_read().unsafe_ptr()
+    # str_span = src_str.as_bytes_read() # FIXME(#3295)
+    # sep_span = sep.as_bytes_read() # FIXME(#3295)
 
     while lhs <= str_byte_len:
         rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span and sep_span
@@ -1337,18 +1353,18 @@ fn _split_impl[
 fn _split_impl[
     T: Stringlike, O: ImmutableOrigin, //, has_maxsplit: Bool
 ](ref [O]src_str: T, maxsplit: Int) -> List[Span[Byte, O]] as output:
-    alias prealloc = 16  # guessing, Python's implementation uses 12
-    var amnt = prealloc
+    alias prealloc = 32  # guessing, Python's implementation uses 12
+    amnt = prealloc
 
     @parameter
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    var str_byte_len = len(src_str.as_bytes_read())
-    var lhs = 0
-    var rhs = 0
-    var items = 0
-    var ptr = src_str.as_bytes_read().unsafe_ptr()
+    str_byte_len = len(src_str.as_bytes_read())
+    lhs = 0
+    rhs = 0
+    items = 0
+    ptr = src_str.as_bytes_read().unsafe_ptr()
     alias S = StringSlice[StaticConstantOrigin]
 
     @always_inline("nodebug")
