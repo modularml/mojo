@@ -20,10 +20,10 @@ from utils import StringSlice
 ```
 """
 
-from bit import count_leading_zeros, bit_ceil
+from bit import count_leading_zeros
 from utils.span import Span, AsBytesRead, AsBytesWrite
 from collections.string import _isspace, _atol, _atof
-from collections import List, Optional, Dict
+from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
 from memory.memory import _memcmp_impl_unconstrained
