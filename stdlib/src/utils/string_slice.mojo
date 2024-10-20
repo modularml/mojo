@@ -625,24 +625,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return self._slice
 
     @always_inline
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
-        """Returns an immutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            An immutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-
-        return Span[Byte, O](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
-
-    @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Gets a pointer to the first element of this string slice.
 
