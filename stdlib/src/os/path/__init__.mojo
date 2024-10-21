@@ -22,4 +22,6 @@ from .path import (
     join,
     split,
     lexists,
+    normpath,
+    splitroot,
 )
