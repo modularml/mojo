@@ -36,25 +36,24 @@ fn llvm_intrinsic[
     type: AnyTrivialRegType,
     *types: AnyType,
     has_side_effect: Bool = True,
-](*arguments: *types) -> type:
-    """Calls an LLVM intrinsic with no arguments.
-
-    Calls an LLVM intrinsic with the name intrin and return type type.
+](*args: *types) -> type:
+    """Calls an LLVM intrinsic with the name intrin and return type `type`.
 
     Parameters:
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      types: The argument types for the function.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
+        intrin: The name of the llvm intrinsic.
+        type: The return type of the intrinsic.
+        types: The argument types for the function.
+        has_side_effect: If `True` the intrinsic will have side effects,
+            otherwise its pure.
 
     Args:
-      arguments: The arguments to the function.
+        args: The arguments to the function.
 
     Returns:
-      The result of calling the llvm intrinsic with no arguments.
+        The result of calling the llvm intrinsic with no arguments.
     """
 
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = args._get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
