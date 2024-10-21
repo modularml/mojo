@@ -208,7 +208,7 @@ struct _StringSliceIter[
     origin: Origin[is_mutable].type,
     forward: Bool = True,
 ]:
-    """Iterator for StringSlice
+    """Iterator for StringSlice over unicode characters.
 
     Parameters:
         is_mutable: Whether the slice is mutable.
@@ -250,7 +250,7 @@ struct _StringSliceIter[
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        return self.__len__() > 0
+        return self.index < self.length
 
     fn __len__(self) -> Int:
         alias S = Span[UInt8, ImmutableAnyOrigin]
