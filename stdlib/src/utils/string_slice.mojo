@@ -1317,13 +1317,12 @@ fn _split_impl[
         iterator = src_str.__iter__()
         i_len = len(iterator) + 2
         out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
-        out_ptr.init_pointee_move(src_str.as_bytes_read()[:0])
+        out_ptr[0] = src_str.as_bytes_read()[0:0]
         i = 1
         for s in iterator:
-            sp = rebind[Span[Byte, O]](s.as_bytes_read())
-            (out_ptr + i).init_pointee_move(sp^)
+            out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes_read())
             i += 1
-        (out_ptr + i).init_pointee_move(src_str.as_bytes_read()[:0])
+        out_ptr[i] = src_str.as_bytes_read()[-1:-1]
         output = __type_of(output)(
             unsafe_pointer=out_ptr, size=i_len, capacity=i_len
         )
