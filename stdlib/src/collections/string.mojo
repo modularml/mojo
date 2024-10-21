@@ -311,7 +311,7 @@ fn _is_ascii_lowercase(span: Span[Byte]) -> Bool:
 
 fn _is_ascii_space(c: Byte) -> Bool:
     """Determines whether the given character is an ASCII whitespace character:
-    `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e"`.
+    `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
     Args:
         c: The character to check.
