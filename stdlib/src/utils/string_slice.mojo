@@ -250,7 +250,11 @@ struct _StringSliceIter[
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        return self.index < self.length
+        @parameter
+        if forward:
+            return self.index < self.length
+        else:
+            return self.index > 0
 
     fn __len__(self) -> Int:
         alias S = Span[UInt8, ImmutableAnyOrigin]
