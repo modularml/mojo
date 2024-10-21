@@ -187,11 +187,18 @@ what we publish.
 - Support for multi-dimensional indexing for `PythonObject`
   ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
 
+- Support for multi-dimensional indexing and slicing for `PythonObject`
+  (PRs  [#3549](https://github.com/modularml/mojo/pull/3549),
+  [#3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
+
     ```mojo
     var np = Python.import_module("numpy")
-    var a = np.array(PythonObject([1,2,3,1,2,3])).reshape(2,3)
+    var a = np.array(PythonObject([1,2,3,4,5,6])).reshape(2,3)
     print((a[0, 1])) # 2
-    ```
+    print((a[1][::-1])) # [6 5 4]
+   ```
+
+  Note, that the syntax, `a[1, ::-1]`, is currently not supported.
 
 - [`Arc`](/mojo/stdlib/memory/arc/Arc) now implements
   [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
@@ -200,6 +207,12 @@ what we publish.
 - There is now a [`Byte`](/mojo/stdlib/builtin/simd/Byte) alias to better
   express intent when working with a pack of bits.
   ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraos](https://github.com/soraros)).
+
+- The VS Code extension now supports setting [data breakpoints](https://code.visualstudio.com/docs/editor/debugging#_data-breakpoints)
+  as well as [function breakpoints](https://code.visualstudio.com/docs/editor/debugging#_function-breakpoints).
+
+- The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
+  `b my_module::main`.
 
 ### 🦋 Changed
 
@@ -230,6 +243,62 @@ what we publish.
   and so on.
 
 - The VS Code extension now allows selecting a default SDK when multiple are available.
+
+- The `Formatter` struct has changed to a `Writer` trait to enable buffered IO,
+  increasing print and file writing perf to the same speed as C. It's now more
+  general purpose and can write any `Span[Byte]`. To align with this the
+  `Formattable` trait is now named `Writable`, and the `String.format_sequence`
+  static methods to initialize a new `String` have been renamed to
+  `String.write`. Here's an example of using all the changes:
+
+  ```mojo
+  from utils import Span
+
+  @value
+  struct NewString(Writer, Writable):
+      var s: String
+
+      # Writer requirement to write a Span of Bytes
+      fn write_bytes(inout self, bytes: Span[Byte, _]):
+          self.s._iadd[False](bytes)
+
+      # Writer requirement to take multiple args
+      fn write[*Ts: Writable](inout self, *args: *Ts):
+          @parameter
+          fn write_arg[T: Writable](arg: T):
+              arg.write_to(self)
+
+          args.each[write_arg]()
+
+      # Also make it Writable to allow `print` to write the inner String
+      fn write_to[W: Writer](self, inout writer: W):
+          writer.write(self.s)
+
+
+  @value
+  struct Point(Writable):
+      var x: Int
+      var y: Int
+
+      # Pass multiple args to the Writer. The Int and StringLiteral types call
+      # `writer.write_bytes` in their own `write_to` implementations.
+      fn write_to[W: Writer](self, inout writer: W):
+          writer.write("Point(", self.x, ", ", self.y, ")")
+
+      # Enable conversion to a String using `str(point)`
+      fn __str__(self) -> String:
+          return String.write(self)
+
+
+  fn main():
+      var point = Point(1, 2)
+      var new_string = NewString(str(point))
+      new_string.write("\n", Point(3, 4))
+      print(new_string)
+  ```
+
+  Point(1, 2)
+  Point(3, 4)
 
 - The flag for turning on asserts has changed, e.g. to enable all checks:
 
@@ -267,9 +336,9 @@ what we publish.
   `IndexList`. The datastructure now allows one to specify the index bitwidth of
   the elements along with whether the underlying indices are signed or unsigned.
 
-- A new trait has been added `AsBytes` to enable taking a `Span[UInt8]` of a
+- A new trait has been added `AsBytes` to enable taking a `Span[Byte]` of a
   type with `s.as_bytes()`. `String.as_bytes` and `String.as_bytes_slice` have
-  been consolidated under `s.as_bytes` to return a `Span[UInt8]`, you can convert
+  been consolidated under `s.as_bytes` to return a `Span[Byte]`, you can convert
   it to a `List` if you require a copy with `List(s.as_bytes())`.
 
 - `Lifetime` and related types has been renamed to `Origin` in the standard
@@ -301,3 +370,6 @@ what we publish.
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
+
+- The VS Code extension now downloads its private copy of the MAX SDK in a way
+  that prevents ETXTBSY errors on Linux.

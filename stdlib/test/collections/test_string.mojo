@@ -10,10 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %bare-mojo %s
+# RUN: %mojo %s
 
-# TODO: Replace %bare-mojo with %mojo
-# when  https://github.com/modularml/mojo/issues/2751 is fixed.
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -1398,49 +1396,35 @@ def test_format_args():
     with assert_raises(contains="Index first not in kwargs"):
         _ = String("A {first} B {second}").format(1, 2)
 
-    assert_equal(
-        String(" {} , {} {} !").format(
-            "Hello",
-            "Beautiful",
-            "World",
-        ),
-        " Hello , Beautiful World !",
-    )
+    var s = String(" {} , {} {} !").format("Hello", "Beautiful", "World")
+    assert_equal(s, " Hello , Beautiful World !")
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    fn curly(c: StringLiteral) -> StringLiteral:
+        return "there is a single curly " + c + " left unclosed or unescaped"
+
+    with assert_raises(contains=curly("{")):
         _ = String("{ {}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{ {0}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{}{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("{}}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{} {").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("}").format(1)
+
+    with assert_raises(contains=""):
+        _ = String("{}").format()
 
     assert_equal(String("}}").format(), "}")
     assert_equal(String("{{").format(), "{")
@@ -1471,13 +1455,8 @@ def test_format_args():
     output = String(vinput).format()
     assert_equal(len(output), 0)
 
-    assert_equal(
-        String("{0} {1} ❤️‍🔥 {1} {0}").format(
-            "🔥",
-            "Mojo",
-        ),
-        "🔥 Mojo ❤️‍🔥 Mojo 🔥",
-    )
+    var res = "🔥 Mojo ❤️‍🔥 Mojo 🔥"
+    assert_equal(String("{0} {1} ❤️‍🔥 {1} {0}").format("🔥", "Mojo"), res)
 
     assert_equal(String("{0} {1}").format(True, 1.125), "True 1.125")
 
@@ -1503,6 +1482,7 @@ def test_format_conversion_flags():
     assert_equal(String("{} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{!s} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
+    assert_equal(String("{0!s} {0!r}").format(a, "Mojo2"), "Mojo 'Mojo'")
 
     var b = 21.1
     assert_true(
@@ -1633,6 +1613,13 @@ def test_float_conversion():
         _ = float(String("not a float"))
 
 
+def test_slice_contains():
+    assert_true(String("hello world").as_string_slice().__contains__("world"))
+    assert_false(
+        String("hello world").as_string_slice().__contains__("not-found")
+    )
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1688,3 +1675,4 @@ def main():
     test_ljust()
     test_center()
     test_float_conversion()
+    test_slice_contains()

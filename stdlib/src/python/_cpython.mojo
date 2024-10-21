@@ -450,7 +450,7 @@ struct PyType_Slot:
 
 
 @value
-struct PyObject(Stringable, Representable, Formattable):
+struct PyObject(Stringable, Representable, Writable):
     """
     All object types are extensions of this type. This is a type which contains the information Python needs to treat a pointer to an object as an object. In a normal “release” build, it contains only the object’s reference count and a pointer to the corresponding type object. Nothing is actually declared to be a PyObject, but every pointer to a Python object can be cast to a PyObject*.
 
@@ -474,7 +474,7 @@ struct PyObject(Stringable, Representable, Formattable):
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -489,12 +489,15 @@ struct PyObject(Stringable, Representable, Formattable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats to the provided formatter.
+        Formats to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("PyObject(")
@@ -507,7 +510,7 @@ struct PyObject(Stringable, Representable, Formattable):
 # Ref2: https://pyo3.rs/main/doc/pyo3/ffi/struct.pymoduledef_base
 # Mojo doesn't have macros, so we define it here for ease.
 # Note: `PyModuleDef_HEAD_INIT` defaults all of its members, see https://github.com/python/cpython/blob/833c58b81ebec84dc24ef0507f8c75fe723d9f66/Include/moduleobject.h#L60
-struct PyModuleDef_Base(Stringable, Representable, Formattable):
+struct PyModuleDef_Base(Stringable, Representable, Writable):
     # The initial segment of every `PyObject` in CPython
     var object_base: PyObject
 
@@ -550,7 +553,7 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -565,12 +568,15 @@ struct PyModuleDef_Base(Stringable, Representable, Formattable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats to the provided formatter.
+        Formats to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("PyModuleDef_Base(")
@@ -591,7 +597,7 @@ struct PyModuleDef_Slot:
     var value: OpaquePointer
 
 
-struct PyModuleDef(Stringable, Representable, Formattable):
+struct PyModuleDef(Stringable, Representable, Writable):
     """
     The Python module definition structs that holds all of the information needed
     to create a module.
@@ -665,7 +671,7 @@ struct PyModuleDef(Stringable, Representable, Formattable):
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -680,12 +686,15 @@ struct PyModuleDef(Stringable, Representable, Formattable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats to the provided formatter.
+        Formats to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("PyModuleDef(")
@@ -824,7 +833,7 @@ struct CPython:
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn log[*Ts: Formattable](self, *args: *Ts):
+    fn log[*Ts: Writable](self, *args: *Ts):
         """If logging is enabled, print the given arguments as a log message.
 
         Parameters:
@@ -840,7 +849,7 @@ struct CPython:
         #   Once Mojo argument splatting is supported, this should just
         #   be: `print(*args)`
         @parameter
-        fn print_arg[T: Formattable](arg: T):
+        fn print_arg[T: Writable](arg: T):
             print(arg, sep="", end="", flush=False)
 
         args.each[print_arg]()
@@ -1753,6 +1762,33 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PySlice_FromSlice(inout self, slice: Slice) -> PyObjectPtr:
+        # Convert Mojo Slice to Python slice parameters
+        # Note: Deliberately avoid using `span.indices()` here and instead pass
+        # the Slice parameters directly to Python. Python's C implementation
+        # already handles such conditions, allowing Python to apply its own slice
+        # handling.
+        var py_start = self.Py_None()
+        var py_stop = self.Py_None()
+        var py_step = self.Py_None()
+
+        if slice.start:
+            py_start = self.PyLong_FromSsize_t(c_ssize_t(slice.start.value()))
+        if slice.end:
+            py_stop = self.PyLong_FromSsize_t(c_ssize_t(slice.end.value()))
+        if slice.end:
+            py_step = self.PyLong_FromSsize_t(c_ssize_t(slice.step.value()))
+
+        var py_slice = self.PySlice_New(py_start, py_stop, py_step)
+
+        if py_start != self.Py_None():
+            self.Py_DecRef(py_start)
+        if py_stop != self.Py_None():
+            self.Py_DecRef(py_stop)
+        self.Py_DecRef(py_step)
+
+        return py_slice
+
     # const char *PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *size)
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         """See https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize.
@@ -1911,3 +1947,31 @@ struct CPython:
             fn (PyObjectPtr) -> c_int
         ]("PySequence_Check")(obj)
         return follows_seq_protocol != 0
+
+    # ===-------------------------------------------------------------------===#
+    # Python Slice Creation
+    # ===-------------------------------------------------------------------===#
+
+    # PyObject *PySlice_New(PyObject *start, PyObject *stop, PyObject *step)
+    # ref: https://docs.python.org/3/c-api/slice.html#c.PySlice_New
+    fn PySlice_New(
+        inout self, start: PyObjectPtr, stop: PyObjectPtr, step: PyObjectPtr
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PySlice_New")(start, stop, step)
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PySlice_New, refcnt:",
+            self._Py_REFCNT(r),
+            ", start:",
+            start._get_ptr_as_int(),
+            ", stop:",
+            stop._get_ptr_as_int(),
+            ", step:",
+            step._get_ptr_as_int(),
+        )
+
+        self._inc_total_rc()
+        return r

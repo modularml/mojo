@@ -174,7 +174,7 @@ struct IndexList[
 ](
     Sized,
     Stringable,
-    Formattable,
+    Writable,
     Comparable,
 ):
     """A base struct that implements size agnostic index functions.
@@ -738,12 +738,15 @@ struct IndexList[
         return buf^
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this int tuple to the provided formatter.
+        Formats this int tuple to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Optimize this to avoid the intermediate String allocation.
@@ -1015,7 +1018,7 @@ fn Index[
 
 
 @always_inline
-fn product[size: Int](tuple: IndexList[size], end_idx: Int) -> Int:
+fn product[size: Int](tuple: IndexList[size, **_], end_idx: Int) -> Int:
     """Computes a product of values in the tuple up to the given index.
 
     Parameters:
@@ -1034,7 +1037,7 @@ fn product[size: Int](tuple: IndexList[size], end_idx: Int) -> Int:
 @always_inline
 fn product[
     size: Int
-](tuple: IndexList[size], start_idx: Int, end_idx: Int) -> Int:
+](tuple: IndexList[size, **_], start_idx: Int, end_idx: Int) -> Int:
     """Computes a product of values in the tuple in the given index range.
 
     Parameters:
