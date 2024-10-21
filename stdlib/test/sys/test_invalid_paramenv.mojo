@@ -10,34 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# REQUIRES: has_not
+# RUN: not %mojo -D my_false=blah %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
-from utils import Writable, Writer
-import sys
-
-
-fn main() raises:
-    test_write_to_stdout()
+from sys import env_get_bool
 
 
-@value
-struct Point(Writable):
-    var x: Int
-    var y: Int
-
-    fn write_to[W: Writer](self, inout writer: W):
-        writer.write("Point(", self.x, ", ", self.y, ")")
-
-
-# CHECK-LABEL: test_write_to_stdout
-fn test_write_to_stdout():
-    print("== test_write_to_stdout")
-
-    var stdout = sys.stdout
-
-    # CHECK: Hello, World!
-    stdout.write("Hello, World!")
-
-    # CHECK: point = Point(1, 1)
-    var point = Point(1, 1)
-    stdout.write("point = ", point)
+# CHECK-FAIL: constraint failed: the boolean environment value is neither `True` nor `False`
+fn main():
+    _ = env_get_bool["my_false"]()

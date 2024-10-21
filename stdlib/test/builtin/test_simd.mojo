@@ -1535,6 +1535,29 @@ def test_powf():
     )
 
 
+def test_rpow():
+    alias F32x4 = SIMD[DType.float32, 4]
+    alias I32x4 = SIMD[DType.int32, 4]
+
+    var f32x4_val = F32x4(0, 1, 2, 3)
+    var i32x4_val = I32x4(0, 1, 2, 3)
+
+    assert_equal(0**i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(2**i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal((-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(Int(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(Int(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(Int(-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(UInt(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(UInt(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+
+    assert_almost_equal(1.0**f32x4_val, F32x4(1.0, 1.0, 1.0, 1.0))
+    assert_almost_equal(2.5**f32x4_val, F32x4(1.0, 2.5, 6.25, 15.625))
+    assert_almost_equal(3.0**f32x4_val, F32x4(1.0, 3.0, 9.0, 27.0))
+
+
 def test_modf():
     var f32 = _modf(Float32(123.5))
     assert_almost_equal(f32[0], 123)
@@ -1782,6 +1805,23 @@ def test_float_conversion():
     assert_almost_equal(float(UInt64(36)), 36.0)
 
 
+def test_reversed():
+    fn test[D: DType]() raises:
+        assert_equal(SIMD[D, 4](1, 2, 3, 4).reversed(), SIMD[D, 4](4, 3, 2, 1))
+
+    test[DType.uint8]()
+    test[DType.uint16]()
+    test[DType.uint32]()
+    test[DType.uint64]()
+    test[DType.int8]()
+    test[DType.int16]()
+    test[DType.int32]()
+    test[DType.int64]()
+    test[DType.float16]()
+    test[DType.float32]()
+    test[DType.float64]()
+
+
 def main():
     test_abs()
     test_add()
@@ -1809,6 +1849,7 @@ def main():
     test_mod()
     test_pow()
     test_powf()
+    test_rpow()
     test_radd()
     test_reduce()
     test_reduce_bit_count()
@@ -1836,4 +1877,5 @@ def main():
     test_contains()
     test_comparison()
     test_float_conversion()
+    test_reversed()
     # TODO: add tests for __and__, __or__, anc comparison operators

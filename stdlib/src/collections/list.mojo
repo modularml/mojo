@@ -38,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -48,21 +48,21 @@ struct _ListIter[
         T: The type of the elements in the list.
         hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
             but it helps performance. Will go away in the future.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T, hint_trivial_type]
 
     var index: Int
-    var src: Pointer[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Pointer[T, list_lifetime]:
+    ) -> Pointer[T, list_origin]:
         @parameter
         if forward:
             self.index += 1
@@ -351,7 +351,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self)]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -361,7 +361,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self), False]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
@@ -416,21 +416,21 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             A string representation of the list.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output^
 
     @no_inline
-    fn format_to[
-        U: RepresentableCollectionElement, //
-    ](self: List[U, *_], inout writer: Formatter):
-        """Write `my_list.__str__()` to a `Formatter`.
+    fn write_to[
+        W: Writer, U: RepresentableCollectionElement, //
+    ](self: List[U, *_], inout writer: W):
+        """Write `my_list.__str__()` to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("[")
         for i in range(len(self)):

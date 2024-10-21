@@ -14,6 +14,7 @@
 from bit import byte_swap
 from bit import rotate_bits_left
 from memory import UnsafePointer
+from ._hasher import _Hasher, _HashableWithHasher
 
 alias U256 = SIMD[DType.uint64, 4]
 alias U128 = SIMD[DType.uint64, 2]
@@ -33,13 +34,21 @@ fn _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
     Returns:
         A value which is similar in its bitpattern to result of a folded multply.
     """
-    var b1 = lhs * byte_swap(rhs)
-    var b2 = byte_swap(lhs) * (~rhs)
-    return b1 ^ byte_swap(b2)
+    l = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
+        lhs.value
+    )
+    r = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
+        rhs.value
+    )
+    m = __mlir_op.`pop.mul`(l, r)
+    res = SIMD[DType.uint64, 2](
+        __mlir_op.`pop.bitcast`[_type = __mlir_type.`!pop.simd<2, ui64>`](m)
+    )
+    return res[0] ^ res[1]
 
 
 @always_inline
-fn read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
+fn _read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
     """Produce a `SIMD[DType.uint64, 2]` value from data which is smaller than or equal to `8` bytes.
 
     Args:
@@ -71,18 +80,22 @@ fn read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
             return U128(0, 0)
 
 
-struct AHasher:
+struct AHasher[key: U256](_Hasher):
+    """Adopted AHash algorithm which produces fast and high quality hash value by
+    implementing `_Hasher` trait.
+
+    References:
+
+    - [AHasher Implementation in Rust](https://github.com/tkaitchuck/aHash)
+    """
+
     var buffer: UInt64
     var pad: UInt64
     var extra_keys: U128
 
-    fn __init__(inout self, key: U256):
-        """Initialize the hasher with a key.
-
-        Args:
-            key: Modifier for the computation of the final hash value.
-        """
-        var pi_key = key ^ U256(
+    fn __init__(inout self):
+        """Initialize the hasher."""
+        alias pi_key = key ^ U256(
             0x243F_6A88_85A3_08D3,
             0x1319_8A2E_0370_7344,
             0xA409_3822_299F_31D0,
@@ -93,7 +106,16 @@ struct AHasher:
         self.extra_keys = U128(pi_key[2], pi_key[3])
 
     @always_inline
-    fn large_update(inout self, new_data: U128):
+    fn _update(inout self, new_data: UInt64):
+        """Update the buffer value with new data.
+
+        Args:
+            new_data: Value used for update.
+        """
+        self.buffer = _folded_multiply(new_data ^ self.buffer, MULTIPLE)
+
+    @always_inline
+    fn _large_update(inout self, new_data: U128):
         """Update the buffer value with new data.
 
         Args:
@@ -103,19 +125,7 @@ struct AHasher:
         var combined = _folded_multiply(xored[0], xored[1])
         self.buffer = rotate_bits_left[ROT]((self.buffer + self.pad) ^ combined)
 
-    @always_inline
-    fn finish(self) -> UInt64:
-        """Computes the hash value based on all the previously provided data.
-
-        Returns:
-            Final hash value.
-        """
-        var rot = self.buffer & 63
-        var folded = _folded_multiply(self.buffer, self.pad)
-        return (folded << rot) | (folded >> (64 - rot))
-
-    @always_inline
-    fn write(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
         """Consume provided data to update the internal buffer.
 
         Args:
@@ -128,53 +138,59 @@ struct AHasher:
                 var tail = data.offset(length - 16).bitcast[
                     DType.uint64
                 ]().load[width=2]()
-                self.large_update(tail)
+                self._large_update(tail)
                 var offset = 0
                 while length - offset > 16:
                     var block = data.offset(offset).bitcast[
                         DType.uint64
                     ]().load[width=2]()
-                    self.large_update(block)
+                    self._large_update(block)
                     offset += 16
             else:
                 var a = data.bitcast[DType.uint64]().load()
                 var b = data.offset(length - 8).bitcast[DType.uint64]().load()
-                self.large_update(U128(a, b))
+                self._large_update(U128(a, b))
         else:
-            var value = read_small(data, length)
-            self.large_update(value)
+            var value = _read_small(data, length)
+            self._large_update(value)
 
+    fn _update_with_simd(inout self, new_data: SIMD[_, _]):
+        """Update the buffer value with new data.
 
-fn hash[
-    key: U256 = U256(0, 0, 0, 0)
-](bytes: UnsafePointer[UInt8], n: Int) -> UInt:
-    """Hash a byte array using an adopted AHash algorithm.
+        Args:
+            new_data: Value used for update.
+        """
 
-    References:
+        @parameter
+        if new_data.type.is_floating_point():
+            v64 = new_data._float_to_bits[DType.uint64]()
+        else:
+            v64 = new_data.cast[DType.uint64]()
 
-    - [Pointer Implementation in Rust](https://github.com/tkaitchuck/aHash)
+        @parameter
+        if v64.size == 1:
+            self._update(v64[0])
+        else:
 
-    ```mojo
-    from random import rand
-    var n = 64
-    var rand_bytes = UnsafePointer[UInt8].alloc(n)
-    rand(rand_bytes, n)
-    _ = hash(rand_bytes, n)
-    ```
+            @parameter
+            for i in range(0, v64.size, 2):
+                self._large_update(U128(v64[i], v64[i + 1]))
 
-    Parameters:
-        key: A key to modify the result of the hash function, defaults to [0, 0, 0, 0].
+    fn update[T: _HashableWithHasher](inout self, value: T):
+        """Update the buffer value with new hashable value.
 
-    Args:
-        bytes: The byte array to hash.
-        n: The length of the byte array.
+        Args:
+            value: Value used for update.
+        """
+        value.__hash__(self)
 
-    Returns:
-        A 64-bit integer hash. This hash is _not_ suitable for
-        cryptographic purposes, but will have good low-bit
-        hash collision statistical properties for common data structures.
-    """
+    @always_inline
+    fn finish(owned self) -> UInt64:
+        """Computes the hash value based on all the previously provided data.
 
-    var hasher = AHasher(key)
-    hasher.write(bytes, n)
-    return UInt(int(hasher.finish()))
+        Returns:
+            Final hash value.
+        """
+        var rot = self.buffer & 63
+        var folded = _folded_multiply(self.buffer, self.pad)
+        return (folded << rot) | (folded >> ((64 - rot) & 63))

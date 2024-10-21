@@ -20,9 +20,9 @@ from utils import Variant
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
   if x.isa[String]():
-    return x[String][]
+    return x[String]
   # x.isa[Int]()
-  return str(x[Int])[]
+  return str(x[Int])
 
 # They have to be mutable for now, and implement CollectionElement
 var an_int = IntOrString(4)
@@ -73,7 +73,7 @@ struct Variant[*Ts: CollectionElement](
         - use `isa[T]()` to check what type a variant is
         - use `unsafe_take[T]()` to take a value from the variant
         - use `[T]` to get a value out of a variant
-            - This currently does an extra copy/move until we have lifetimes
+            - This currently does an extra copy/move until we have origins
             - It also temporarily requires the value to be mutable
         - use `set[T](owned new_value: T)` to reset the variant to a new value
 
@@ -83,9 +83,9 @@ struct Variant[*Ts: CollectionElement](
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
-            return x[String][]
+            return x[String]
         # x.isa[Int]()
-        return str(x[Int][])
+        return str(x[Int])
 
     # They have to be mutable for now, and implement CollectionElement
     var an_int = IntOrString(4)

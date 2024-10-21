@@ -25,13 +25,14 @@ from sys import (
 from sys._libc import dup, fclose, fdopen, fflush
 from sys.ffi import OpaquePointer
 
+from utils import Span, write_buffered, write_args
+from collections import InlineArray
 from builtin.builtin_list import _LITRefPackHelper
 from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
-from memory import UnsafePointer
+from memory import UnsafePointer, memcpy
 
 from utils import StringRef, StaticString, StringSlice
-from utils import Formattable, Formatter
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -290,7 +291,7 @@ fn _float_repr[
 
 
 fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableAnyLifetime](
+    var str_slice = StringSlice[ImmutableAnyOrigin](
         unsafe_from_utf8_strref=strref
     )
 
@@ -299,7 +300,7 @@ fn _put(strref: StringRef, file: FileDescriptor = stdout):
 
 @no_inline
 fn _put[
-    lif: ImmutableLifetime, //
+    lif: ImmutableOrigin, //
 ](x: StringSlice[lif], file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = x.byte_length()
@@ -341,13 +342,13 @@ fn _put[
 
 @no_inline
 fn print[
-    *Ts: Formattable
+    *Ts: Writable
 ](
     *values: *Ts,
     sep: StaticString = " ",
     end: StaticString = "\n",
     flush: Bool = False,
-    file: FileDescriptor = stdout,
+    owned file: FileDescriptor = stdout,
 ):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
@@ -363,23 +364,13 @@ fn print[
         file: The output stream.
     """
 
-    var writer = Formatter(fd=file)
-
+    # TODO: Implement a float formatter for GPU to enable buffering to global
+    # memory. PTX isn't able to call snprintf to format floats.
     @parameter
-    fn print_with_separator[i: Int, T: Formattable](value: T):
-        writer.write(value)
-
-        @parameter
-        if i < len(VariadicList(Ts)) - 1:
-            writer.write(sep)
-
-    values.each_idx[print_with_separator]()
-
-    writer.write(end)
-
-    # TODO: What is a flush function that works on CUDA?
-    @parameter
-    if not triple_is_nvidia_cuda():
+    if triple_is_nvidia_cuda():
+        write_args(file, values, sep=sep, end=end)
+    else:
+        write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
         if flush:
             _flush(file=file)
 
