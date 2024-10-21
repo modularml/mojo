@@ -38,11 +38,12 @@ struct StringRef(
     CollectionElement,
     CollectionElementNew,
     Stringable,
-    Formattable,
+    Writable,
     Hashable,
     _HashableWithHasher,
     Boolable,
     Comparable,
+    AsBytes,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -203,6 +204,16 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous Span of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+        return Span[Byte, __origin_of(self)](
+            unsafe_ptr=self.data, len=self.length
+        )
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
@@ -358,7 +369,10 @@ struct StringRef(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        var str_slice = StringSlice[ImmutableAnyOrigin](
+            unsafe_from_utf8_strref=self
+        )
+        return _atol(str_slice)
 
     @always_inline
     fn __len__(self) -> Int:
@@ -376,24 +390,26 @@ struct StringRef(
         Returns:
             A new string.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this StringRef to the provided formatter.
+        Formats this StringRef to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
-
         # SAFETY:
-        #   Safe because our use of this StringSlice does not outlive `self`.
-        var str_slice = StringSlice[ImmutableAnyOrigin](
-            unsafe_from_utf8_strref=self
+        #   Safe because our use of this Span does not outlive `self`.
+        writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](
+                unsafe_ptr=self.unsafe_ptr(), len=len(self)
+            )
         )
-
-        writer.write_str(str_slice)
 
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.

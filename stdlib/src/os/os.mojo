@@ -249,13 +249,13 @@ fn abort[result: AnyType = NoneType._mlir_type]() -> result:
 
 @no_inline
 fn abort[
-    result: AnyType = NoneType._mlir_type, *, formattable: Formattable
-](message: formattable) -> result:
+    result: AnyType = NoneType._mlir_type, *, W: Writable
+](message: W) -> result:
     """Calls a target dependent trap instruction if available.
 
     Parameters:
         result: The result type.
-        formattable: The Formattable type.
+        W: The Writable type.
 
     Args:
         message: The message to include when aborting.
