@@ -66,6 +66,22 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     return int((sizes < c).cast[DType.uint8]().reduce_add())
 
 
+@always_inline
+fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
+    """Get the length of the sequence starting with given byte. Do note that
+    this does not work correctly if given a continuation byte."""
+
+    debug_assert(
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
+    )
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
+
+
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
     """Shift unicode to utf8 representation.
 
@@ -192,7 +208,7 @@ struct _StringSliceIter[
     origin: Origin[is_mutable].type,
     forward: Bool = True,
 ]:
-    """Iterator for StringSlice
+    """Iterator for StringSlice over unicode characters.
 
     Parameters:
         is_mutable: Whether the slice is mutable.
@@ -201,19 +217,15 @@ struct _StringSliceIter[
     """
 
     var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
+    var ptr: UnsafePointer[Byte]
     var length: Int
 
     fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+        inout self, *, unsafe_pointer: UnsafePointer[Byte], length: Int
     ):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        alias S = Span[Byte, StaticConstantOrigin]
-        var s = S(unsafe_ptr=self.ptr, len=self.length)
-        self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
     fn __iter__(self) -> Self:
         return self
@@ -221,27 +233,16 @@ struct _StringSliceIter[
     fn __next__(inout self) -> StringSlice[origin]:
         @parameter
         if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index])
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = _utf8_first_byte_sequence_length(self.ptr[self.index])
             self.index += byte_len
             return StringSlice[origin](
                 unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
                 len=byte_len,
             )
         else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = self.ptr[self.index - byte_len]
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = 1
+            while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
+                byte_len += 1
             self.index -= byte_len
             return StringSlice[origin](
                 unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
@@ -249,14 +250,23 @@ struct _StringSliceIter[
 
     @always_inline
     fn __hasmore__(self) -> Bool:
-        return self.__len__() > 0
-
-    fn __len__(self) -> Int:
         @parameter
         if forward:
-            return self.length - self.index - self.continuation_bytes
+            return self.index < self.length
         else:
-            return self.index - self.continuation_bytes
+            return self.index > 0
+
+    fn __len__(self) -> Int:
+        alias S = Span[UInt8, ImmutableAnyOrigin]
+        alias _count = _count_utf8_continuation_bytes
+
+        @parameter
+        if forward:
+            remaining = self.length - self.index
+            cont = _count(S(unsafe_ptr=self.ptr + self.index, len=remaining))
+            return remaining - cont
+        else:
+            return self.index - _count(S(unsafe_ptr=self.ptr, len=self.index))
 
 
 @value
