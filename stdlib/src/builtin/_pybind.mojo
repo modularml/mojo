@@ -26,7 +26,16 @@ from python._cpython import (
     PyType_Spec,
     CPython,
 )
-from python._bindings import Pythonable, PyMojoObject
+from python._bindings import (
+    Pythonable,
+    PyMojoObject,
+    create_wrapper_function,
+    check_argument_type,
+    # Imported for use by the compiler
+    check_arguments_arity,
+)
+
+from collections import Optional
 
 alias PyModule = TypedPythonObject["Module"]
 
@@ -85,3 +94,31 @@ fn gen_pytype_wrapper[
     Python.add_object(
         pointer_bitcast[PyModule](Pointer.address_of(module))[], name, type_obj
     )
+
+
+fn add_wrapper_to_module[
+    wrapper_func: fn (
+        PythonObject, TypedPythonObject["Tuple"]
+    ) raises -> PythonObject,
+    func_name: StringLiteral,
+](inout module_obj: PythonObject) raises:
+    var module = TypedPythonObject["Module"](unsafe_unchecked_from=module_obj)
+    Python.add_functions(
+        module,
+        List[PyMethodDef](
+            PyMethodDef.function[
+                create_wrapper_function[wrapper_func](), func_name
+            ]()
+        ),
+    )
+
+
+fn check_and_get_arg[
+    T: Pythonable
+](
+    func_name: StringLiteral,
+    type_name_id: StringLiteral,
+    py_args: TypedPythonObject["Tuple"],
+    index: Int,
+) raises -> UnsafePointer[T]:
+    return check_argument_type[T](func_name, type_name_id, py_args[index])

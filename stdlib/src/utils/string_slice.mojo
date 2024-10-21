@@ -26,6 +26,7 @@ from collections.string import _is_ascii_space, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
+from memory.memory import _memcmp_impl_unconstrained
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -96,6 +97,43 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     return count_leading_zeros(~(b & UInt8(0b1111_0000)))
 
 
+@always_inline
+fn _memrchr[
+    type: DType
+](
+    source: UnsafePointer[Scalar[type]], char: Scalar[type], len: Int
+) -> UnsafePointer[Scalar[type]]:
+    if not len:
+        return UnsafePointer[Scalar[type]]()
+    for i in reversed(range(len)):
+        if source[i] == char:
+            return source + i
+    return UnsafePointer[Scalar[type]]()
+
+
+@always_inline
+fn _memrmem[
+    type: DType
+](
+    haystack: UnsafePointer[Scalar[type]],
+    haystack_len: Int,
+    needle: UnsafePointer[Scalar[type]],
+    needle_len: Int,
+) -> UnsafePointer[Scalar[type]]:
+    if not needle_len:
+        return haystack
+    if needle_len > haystack_len:
+        return UnsafePointer[Scalar[type]]()
+    if needle_len == 1:
+        return _memrchr[type](haystack, needle[0], haystack_len)
+    for i in reversed(range(haystack_len - needle_len + 1)):
+        if haystack[i] != needle[0]:
+            continue
+        if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
+            return haystack + i
+    return UnsafePointer[Scalar[type]]()
+
+
 fn _is_newline_start(
     ptr: UnsafePointer[UInt8], read_ahead: Int = 1
 ) -> (Bool, Int):
@@ -159,7 +197,7 @@ struct _StringSliceIter[
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        alias S = Span[UInt8, StaticConstantOrigin]
+        alias S = Span[Byte, StaticConstantOrigin]
         var s = S(unsafe_ptr=self.ptr, len=self.length)
         self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
@@ -208,11 +246,16 @@ struct _StringSliceIter[
 
 
 @value
-struct StringSlice[
-    is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
-](Stringable, Sized, Formattable, CollectionElement, CollectionElementNew):
-    """A non-owning view to encoded string data.
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+    Stringable,
+    Sized,
+    Writable,
+    CollectionElement,
+    CollectionElementNew,
+    Hashable,
+):
+    """
+    A non-owning view to encoded string data.
 
     TODO:
     The underlying string data is guaranteed to be encoded using UTF-8.
@@ -222,7 +265,7 @@ struct StringSlice[
         origin: The origin of the underlying string data.
     """
 
-    var _slice: Span[UInt8, origin]
+    var _slice: Span[Byte, origin]
 
     # ===------------------------------------------------------------------===#
     # Initializers
@@ -254,7 +297,7 @@ struct StringSlice[
         )
 
     @always_inline
-    fn __init__(inout self, *, owned unsafe_from_utf8: Span[UInt8, origin]):
+    fn __init__(inout self, *, owned unsafe_from_utf8: Span[Byte, origin]):
         """Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
 
         Safety:
@@ -280,7 +323,7 @@ struct StringSlice[
         """
         var strref = unsafe_from_utf8_strref
 
-        var byte_slice = Span[UInt8, origin](
+        var byte_slice = Span[Byte, origin](
             unsafe_ptr=strref.unsafe_ptr(),
             len=len(strref),
         )
@@ -308,7 +351,7 @@ struct StringSlice[
               UTF-8.
             len: The number of bytes of encoded data.
         """
-        var byte_slice = Span[UInt8, origin](
+        var byte_slice = Span[Byte, origin](
             unsafe_ptr=unsafe_from_utf8_ptr,
             len=len,
         )
@@ -362,18 +405,21 @@ struct StringSlice[
             The length in Unicode codepoints.
         """
         var b_len = self.byte_length()
-        alias S = Span[UInt8, StaticConstantOrigin]
+        alias S = Span[Byte, StaticConstantOrigin]
         var s = S(unsafe_ptr=self.unsafe_ptr(), len=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this string slice to the provided formatter.
+        Formats this string slice to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
-        writer.write_str(str_slice=self)
+        writer.write_bytes(self.as_bytes())
 
     fn __bool__(self) -> Bool:
         """Check if a string slice is non-empty.
@@ -382,6 +428,16 @@ struct StringSlice[
            True if a string slice is non-empty, False otherwise.
         """
         return len(self._slice) > 0
+
+    fn __hash__(self) -> UInt:
+        """Hash the underlying buffer using builtin hash.
+
+        Returns:
+            A 64-bit hash value. This value is _not_ suitable for cryptographic
+            uses. Its intended usage is for data structures. See the `hash`
+            builtin documentation for more details.
+        """
+        return hash(self._slice._data, self._slice._len)
 
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
@@ -476,6 +532,23 @@ struct StringSlice[
         """
         return not self == rhs
 
+    @always_inline
+    fn __lt__(self, rhs: StringSlice) -> Bool:
+        """Compare this StringSlice to the RHS using LT comparison.
+
+        Args:
+            rhs: The other StringSlice to compare against.
+
+        Returns:
+            True if this string is strictly less than the RHS string and False
+            otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+        return int(len1 < len2) > _memcmp_impl_unconstrained(
+            self.unsafe_ptr(), rhs.unsafe_ptr(), min(len1, len2)
+        )
+
     fn __iter__(self) -> _StringSliceIter[origin]:
         """Iterate over the string, returning immutable references.
 
@@ -496,6 +569,35 @@ struct StringSlice[
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
+        """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
+
+        Args:
+            idx: The index value.
+
+        Returns:
+            A new string containing the character at the specified position.
+        """
+        # TODO(#933): implement this for unicode when we support llvm intrinsic evaluation at compile time
+        var buf = String._buffer_type(capacity=1)
+        buf.append(self._slice[idx])
+        buf.append(0)
+        return String(buf^)
+
+    fn __contains__(ref [_]self, substr: StringSlice[_]) -> Bool:
+        """Returns True if the substring is contained within the current string.
+
+        Args:
+          substr: The substring to check.
+
+        Returns:
+          True if the string contains the substring.
+        """
+        return self.find(substr) != -1
+
     @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
@@ -504,7 +606,7 @@ struct StringSlice[
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self._strref_dangerous())
+        return _atol(self)
 
     @always_inline
     fn __float__(self) raises -> Float64:
@@ -514,14 +616,35 @@ struct StringSlice[
         Returns:
             A float value that represents the string, or otherwise raises.
         """
-        return _atof(self._strref_dangerous())
+        return _atof(self)
 
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, origin]:
+    fn strip(self) -> StringSlice[origin]:
+        """Gets a StringRef with leading and trailing whitespaces removed.
+        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
+
+        For example, `"  mojo  "` returns `"mojo"`.
+
+        Returns:
+            A StringRef with leading and trailing whitespaces removed.
+        """
+        var start: Int = 0
+        var end: Int = len(self)
+        var ptr = self.unsafe_ptr()
+        while start < end and _isspace(ptr[start]):
+            start += 1
+        while end > start and _isspace(ptr[end - 1]):
+            end -= 1
+        return StringSlice[origin](
+            unsafe_from_utf8_ptr=ptr + start, len=end - start
+        )
+
+    @always_inline
+    fn as_bytes(self) -> Span[Byte, origin]:
         """Get the sequence of encoded bytes of the underlying string.
 
         Returns:
@@ -566,6 +689,48 @@ struct StringSlice[
         without the string getting deallocated early.
         """
         pass
+
+    fn startswith(
+        self, prefix: StringSlice[_], start: Int = 0, end: Int = -1
+    ) -> Bool:
+        """Checks if the StringRef starts with the specified prefix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          prefix: The prefix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is prefixed by the input prefix.
+        """
+        if end == -1:
+            return self.find(prefix, start) == start
+        return StringSlice[__origin_of(self)](
+            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+        ).startswith(prefix)
+
+    fn endswith(
+        self, suffix: StringSlice[_], start: Int = 0, end: Int = -1
+    ) -> Bool:
+        """Checks if the StringRef end with the specified suffix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          suffix: The suffix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is suffixed by the input suffix.
+        """
+        if len(suffix) > len(self):
+            return False
+        if end == -1:
+            return self.rfind(suffix, start) + len(suffix) == len(self)
+        return StringSlice[__origin_of(self)](
+            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+        ).endswith(suffix)
 
     fn _from_start(self, start: Int) -> Self:
         """Gets the `StringSlice` pointing to the substring after the specified
@@ -635,7 +800,7 @@ struct StringSlice[
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
+    fn find(ref [_]self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -661,6 +826,39 @@ struct StringSlice[
             haystack_str.byte_length(),
             substr.unsafe_ptr(),
             substr.byte_length(),
+        )
+
+        if not loc:
+            return -1
+
+        return int(loc) - int(self.unsafe_ptr())
+
+    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
+        """Finds the offset of the last occurrence of `substr` starting at
+        `start`. If not found, returns -1.
+
+        Args:
+          substr: The substring to find.
+          start: The offset from which to find.
+
+        Returns:
+          The offset of `substr` relative to the beginning of the string.
+        """
+        if not substr:
+            return len(self)
+
+        if len(self) < len(substr) + start:
+            return -1
+
+        # The substring to search within, offset from the beginning if `start`
+        # is positive, and offset from the end if `start` is negative.
+        var haystack_str = self._from_start(start)
+
+        var loc = _memrmem(
+            haystack_str.unsafe_ptr(),
+            len(haystack_str),
+            substr.unsafe_ptr(),
+            len(substr),
         )
 
         if not loc:
@@ -1099,19 +1297,19 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
                     var data: String
                     if empty and type_impls_formatter_str:
-                        data = str(args[i])  # TODO: use formatter and return
+                        data = str(args[i])  # TODO: use writer and return
                     elif empty and type_impls_str:
                         data = str(args[i])
                     elif flag == `s` and type_impls_formatter_str:
                         if empty:
-                            # TODO: use formatter and return
+                            # TODO: use writer and return
                             pass
                         data = str(args[i])
                     elif flag == `s` and type_impls_str:
                         data = str(args[i])
                     elif flag == `r` and type_impls_formatter_repr:
                         if empty:
-                            # TODO: use formatter and return
+                            # TODO: use writer and return
                             pass
                         data = repr(args[i])
                     elif flag == `r` and type_impls_repr:
@@ -1221,8 +1419,8 @@ struct _FormatSpec:
     precision is not allowed for integer presentation types.
     """
     var type: UInt8
-    """Determines how the data should be presented. 
-    
+    """Determines how the data should be presented.
+
     The available integer presentation types are:
 
     | Option | Meaning|
@@ -1244,7 +1442,7 @@ struct _FormatSpec:
     In addition to the above presentation types, integers can be formatted with
     the floating-point presentation types listed below (except 'n' and None).
     When doing so, float() is used to convert the integer to a floating-point
-    number before formatting. 
+    number before formatting.
 
     The available presentation types for float and Decimal values are:
 

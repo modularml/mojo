@@ -31,7 +31,7 @@ trait AsBytes:
     span.
     """
 
-    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:

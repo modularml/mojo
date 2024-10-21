@@ -1604,6 +1604,13 @@ def test_float_conversion():
         _ = float(String("not a float"))
 
 
+def test_slice_contains():
+    assert_true(String("hello world").as_string_slice().__contains__("world"))
+    assert_false(
+        String("hello world").as_string_slice().__contains__("not-found")
+    )
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1659,3 +1666,4 @@ def main():
     test_ljust()
     test_center()
     test_float_conversion()
+    test_slice_contains()
