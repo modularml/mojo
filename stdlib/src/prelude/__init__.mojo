@@ -113,6 +113,7 @@ from builtin.simd import (
     Float16,
     Float32,
     Float64,
+    Byte,
     SIMD,
 )
 from builtin.type_aliases import AnyTrivialRegType
@@ -132,4 +133,4 @@ from collections.string import (
 )
 from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
-from utils import AsBytes, Formattable, Formatter
+from utils import AsBytes, Writable, Writer
