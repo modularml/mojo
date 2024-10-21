@@ -26,6 +26,16 @@ from python._cpython import (
     PyType_Spec,
     CPython,
 )
+from python._bindings import (
+    Pythonable,
+    PyMojoObject,
+    create_wrapper_function,
+    check_argument_type,
+    # Imported for use by the compiler
+    check_arguments_arity,
+)
+
+from collections import Optional
 
 alias PyModule = TypedPythonObject["Module"]
 
@@ -36,12 +46,6 @@ fn get_cpython() -> CPython:
 
 fn create_pybind_module[name: StringLiteral]() raises -> PyModule:
     return Python.create_module(name)
-
-
-fn pyobj_destroy_as[T: AnyType](pyobj: PyObjectPtr):
-    # TODO(MSTDL-633): Is this always safe? Wrap in GIL, because this could
-    # evaluate arbitrary code?
-    pyobj.value.bitcast[T]().destroy_pointee()
 
 
 fn fail_initialization(owned err: Error) -> PythonObject:
@@ -55,26 +59,6 @@ fn fail_initialization(owned err: Error) -> PythonObject:
     )
     _ = err^
     return PythonObject(PyObjectPtr())
-
-
-alias MutableGlobalLifetime = __mlir_attr[
-    `#lit.origin.field<`,
-    `#lit.static.origin : !lit.origin<1>`,
-    `, "__python_globals__"> : !lit.origin<1>`,
-]
-
-
-# FIXME(MOCO-1308): Workaround crash by adding explicit `alignment=1`.
-alias PyGlobalPtr = UnsafePointer[origin=MutableGlobalLifetime, alignment=1]
-
-
-@always_inline
-fn global_alloc[T: AnyType, len: Int]() -> PyGlobalPtr[T]:
-    return __mlir_op.`pop.global_alloc`[
-        name = "pyglobal".value,
-        count = len.value,
-        _type = __mlir_type[`!kgen.pointer<`, T, `>`],
-    ]()
 
 
 fn pointer_bitcast[
@@ -92,42 +76,17 @@ fn pointer_bitcast[
 
 
 fn gen_pytype_wrapper[
-    T: AnyType, name: StringLiteral
+    T: Pythonable,
+    name: StringLiteral,
 ](inout module: PythonObject) raises:
-    cpython = get_cpython()
-
     # TODO(MOCO-1301): Add support for member method generation.
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
-
-    # Zeroed item as terminator
-    methods = global_alloc[PyMethodDef, 1]()
-    methods[0] = PyMethodDef()
-
     # TODO(MOCO-1307): Add support for constructor generation.
-    slots = global_alloc[PyType_Slot, 3]()
-    slots[0] = PyType_Slot(
-        cp.Py_tp_new, cpython.lib.get_symbol[NoneType]("PyType_GenericNew")
-    )
-    alias dtor = pyobj_destroy_as[T]
-    slots[1] = PyType_Slot(
-        cp.Py_tp_dealloc,
-        __mlir_op.`pop.pointer.bitcast`[_type = OpaquePointer._mlir_type](dtor),
-    )
-    slots[2] = PyType_Slot.null()
 
-    spec = global_alloc[PyType_Spec, 1]()
-    spec.init_pointee_move(
-        PyType_Spec {
-            # FIXME(MOCO-1306): This should be `T.__name__`.
-            name: name.unsafe_cstr_ptr(),
-            basicsize: sizeof[T](),
-            itemsize: 0,
-            flags: cp.Py_TPFLAGS_DEFAULT,
-            slots: slots,
-        }
+    var type_obj = PyMojoObject[T].python_type_object[name](
+        methods=List[PyMethodDef](),
     )
 
-    type_obj = cpython.PyType_FromSpec(spec)
     # FIXME(MSTDL-957): We should have APIs that explicitly take a `CPython`
     # instance so that callers can pass it around instead of performing a lookup
     # each time.
@@ -135,3 +94,31 @@ fn gen_pytype_wrapper[
     Python.add_object(
         pointer_bitcast[PyModule](Pointer.address_of(module))[], name, type_obj
     )
+
+
+fn add_wrapper_to_module[
+    wrapper_func: fn (
+        PythonObject, TypedPythonObject["Tuple"]
+    ) raises -> PythonObject,
+    func_name: StringLiteral,
+](inout module_obj: PythonObject) raises:
+    var module = TypedPythonObject["Module"](unsafe_unchecked_from=module_obj)
+    Python.add_functions(
+        module,
+        List[PyMethodDef](
+            PyMethodDef.function[
+                create_wrapper_function[wrapper_func](), func_name
+            ]()
+        ),
+    )
+
+
+fn check_and_get_arg[
+    T: Pythonable
+](
+    func_name: StringLiteral,
+    type_name_id: StringLiteral,
+    py_args: TypedPythonObject["Tuple"],
+    index: Int,
+) raises -> UnsafePointer[T]:
+    return check_argument_type[T](func_name, type_name_id, py_args[index])

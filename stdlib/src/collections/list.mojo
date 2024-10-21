@@ -416,21 +416,21 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             A string representation of the list.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output^
 
     @no_inline
-    fn format_to[
-        U: RepresentableCollectionElement, //
-    ](self: List[U, *_], inout writer: Formatter):
-        """Write `my_list.__str__()` to a `Formatter`.
+    fn write_to[
+        W: Writer, U: RepresentableCollectionElement, //
+    ](self: List[U, *_], inout writer: W):
+        """Write `my_list.__str__()` to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("[")
         for i in range(len(self)):

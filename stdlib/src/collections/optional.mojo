@@ -31,6 +31,7 @@ print(d)  # prints 2
 ```
 """
 
+from builtin._documentation import doc_private
 from os import abort
 from utils import Variant
 
@@ -103,6 +104,7 @@ struct Optional[T: CollectionElement](
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -252,8 +254,7 @@ struct Optional[T: CollectionElement](
             A string representation of the Optional.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output
 
     # TODO: Include the Parameter type in the string as well.
@@ -270,23 +271,23 @@ struct Optional[T: CollectionElement](
             A verbose string representation of the Optional.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        writer.write("Optional(")
-        self.format_to(writer)
-        writer.write(")")
+        output.write("Optional(")
+        self.write_to(output)
+        output.write(")")
         return output
 
-    fn format_to[
-        U: RepresentableCollectionElement, //
-    ](self: Optional[U], inout writer: Formatter):
-        """Write Optional string representation to a `Formatter`.
+    fn write_to[
+        W: Writer, U: RepresentableCollectionElement, //
+    ](self: Optional[U], inout writer: W):
+        """Write Optional string representation to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the elements in the list. Must implement the
               traits `Representable` and `CollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         if self:
             writer.write(repr(self.value()))
@@ -420,6 +421,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 

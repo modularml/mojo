@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from math import gcd
 from sys import (
     compressed_store,
     masked_load,
@@ -28,6 +29,11 @@ alias F32x4 = SIMD[DType.float32, 4]
 alias F32x8 = SIMD[DType.float32, 8]
 alias iota_4 = F32x4(0.0, 1.0, 2.0, 3.0)
 alias iota_8 = F32x8(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0)
+
+
+def test_intrinsic_comp_eval():
+    alias res = gcd(5, 4)
+    assert_equal(res, gcd(5, 4))
 
 
 def test_compressed_store():
@@ -132,6 +138,7 @@ def test_assume():
 
 
 def main():
+    test_intrinsic_comp_eval()
     test_compressed_store()
     test_masked_load()
     test_masked_store()
