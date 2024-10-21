@@ -65,5 +65,5 @@ from .intrinsics import (
     strided_load,
     strided_store,
 )
-from .param_env import env_get_int, env_get_string, is_defined
+from .param_env import env_get_int, env_get_string, env_get_bool, is_defined
 from .terminate import exit

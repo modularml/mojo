@@ -41,7 +41,7 @@ trait Ceilable:
         var im: Float64
 
         fn __ceil__(self) -> Self:
-            return Self(ceil(re), ceil(im))
+            return Self(ceil(self.re), ceil(self.im))
     ```
     """
 
@@ -78,7 +78,7 @@ trait Floorable:
         var im: Float64
 
         fn __floor__(self) -> Self:
-            return Self(floor(re), floor(im))
+            return Self(floor(self.re), floor(self.im))
     ```
     """
 

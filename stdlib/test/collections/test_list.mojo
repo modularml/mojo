@@ -903,7 +903,7 @@ def inner_test_list_dtor():
     l.append(DtorCounter())
     assert_equal(g_dtor_count, 0)
 
-    l.__del__()
+    l^.__del__()
     assert_equal(g_dtor_count, 1)
 
 

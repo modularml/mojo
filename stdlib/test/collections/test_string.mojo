@@ -10,10 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %bare-mojo %s
+# RUN: %mojo %s
 
-# TODO: Replace %bare-mojo with %mojo
-# when  https://github.com/modularml/mojo/issues/2751 is fixed.
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -29,7 +27,7 @@ from testing import (
     assert_true,
 )
 
-from utils import StringRef
+from utils import StringRef, StringSlice
 
 
 @value
@@ -193,6 +191,19 @@ def test_add():
     assert_equal("abc is a string", str(s8) + str(s9))
 
 
+def test_add_string_slice():
+    var s1 = String("123")
+    var s2 = StringSlice("abc")
+    var s3: StringLiteral = "abc"
+    assert_equal("123abc", s1 + s2)
+    assert_equal("123abc", s1 + s3)
+    assert_equal("abc123", s2 + s1)
+    assert_equal("abc123", s3 + s1)
+    s1 += s2
+    s1 += s3
+    assert_equal("123abcabc", s1)
+
+
 def test_string_join():
     var sep = String(",")
     var s0 = String("abc")
@@ -214,6 +225,9 @@ def test_string_join():
 
     var s5 = String(",").join(List[UInt8](1))
     assert_equal(s5, "1")
+
+    var s6 = String(",").join(List[String]("1", "2", "3"))
+    assert_equal(s6, "1,2,3")
 
 
 def test_string_literal_join():
@@ -1335,17 +1349,20 @@ def test_string_iter():
         "álO",
         "етйувтсвардЗ",
     )
-    var utf8_sequence_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    var items_amount_characters = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
     for item_idx in range(len(items)):
         var item = items[item_idx]
-        var utf8_sequence_len = 0
+        var ptr = item.unsafe_ptr()
+        var amnt_characters = 0
         var byte_idx = 0
         for v in item:
             var byte_len = v.byte_length()
-            assert_equal(item[byte_idx : byte_idx + byte_len], v)
+            for i in range(byte_len):
+                assert_equal(ptr[byte_idx + i], v.unsafe_ptr()[i])
             byte_idx += byte_len
-            utf8_sequence_len += 1
-        assert_equal(utf8_sequence_len, utf8_sequence_lengths[item_idx])
+            amnt_characters += 1
+
+        assert_equal(amnt_characters, items_amount_characters[item_idx])
         var concat = String("")
         for v in item.__reversed__():
             concat += v
@@ -1379,49 +1396,35 @@ def test_format_args():
     with assert_raises(contains="Index first not in kwargs"):
         _ = String("A {first} B {second}").format(1, 2)
 
-    assert_equal(
-        String(" {} , {} {} !").format(
-            "Hello",
-            "Beautiful",
-            "World",
-        ),
-        " Hello , Beautiful World !",
-    )
+    var s = String(" {} , {} {} !").format("Hello", "Beautiful", "World")
+    assert_equal(s, " Hello , Beautiful World !")
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    fn curly(c: StringLiteral) -> StringLiteral:
+        return "there is a single curly " + c + " left unclosed or unescaped"
+
+    with assert_raises(contains=curly("{")):
         _ = String("{ {}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{ {0}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{}{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("{}}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{} {").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("}").format(1)
+
+    with assert_raises(contains=""):
+        _ = String("{}").format()
 
     assert_equal(String("}}").format(), "}")
     assert_equal(String("{{").format(), "{")
@@ -1452,13 +1455,8 @@ def test_format_args():
     output = String(vinput).format()
     assert_equal(len(output), 0)
 
-    assert_equal(
-        String("{0} {1} ❤️‍🔥 {1} {0}").format(
-            "🔥",
-            "Mojo",
-        ),
-        "🔥 Mojo ❤️‍🔥 Mojo 🔥",
-    )
+    var res = "🔥 Mojo ❤️‍🔥 Mojo 🔥"
+    assert_equal(String("{0} {1} ❤️‍🔥 {1} {0}").format("🔥", "Mojo"), res)
 
     assert_equal(String("{0} {1}").format(True, 1.125), "True 1.125")
 
@@ -1484,6 +1482,7 @@ def test_format_conversion_flags():
     assert_equal(String("{} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{!s} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
+    assert_equal(String("{0!s} {0!r}").format(a, "Mojo2"), "Mojo 'Mojo'")
 
     var b = 21.1
     assert_true(
@@ -1614,12 +1613,20 @@ def test_float_conversion():
         _ = float(String("not a float"))
 
 
+def test_slice_contains():
+    assert_true(String("hello world").as_string_slice().__contains__("world"))
+    assert_false(
+        String("hello world").as_string_slice().__contains__("not-found")
+    )
+
+
 def main():
     test_constructors()
     test_copy()
     test_equality_operators()
     test_comparison_operators()
     test_add()
+    test_add_string_slice()
     test_stringable()
     test_repr()
     test_string_join()
@@ -1668,3 +1675,4 @@ def main():
     test_ljust()
     test_center()
     test_float_conversion()
+    test_slice_contains()
