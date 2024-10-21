@@ -19,6 +19,7 @@ from python import PythonObject
 ```
 """
 
+from builtin._documentation import doc_private
 from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
@@ -29,6 +30,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
+from sys.ffi import c_ssize_t
 
 
 struct _PyIter(Sized):
@@ -232,7 +234,7 @@ struct PythonObject(
     KeyElement,
     SizedRaising,
     Stringable,
-    Formattable,
+    Writable,
     _HashableWithHasher,
 ):
     """A Python object."""
@@ -328,6 +330,7 @@ struct PythonObject(
     # TODO(MSTDL-715):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
+    @doc_private
     fn __init__(inout self, none: NoneType._mlir_type):
         """Initialize a none value object from a `None` literal.
 
@@ -500,6 +503,14 @@ struct PythonObject(
 
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
+
+    fn __init__(inout self, slice: Slice):
+        """Initialize the object from a Mojo Slice.
+
+        Args:
+            slice: The dictionary value.
+        """
+        self.py_object = _slice_to_py_object_ptr(slice)
 
     fn __init__(inout self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
@@ -723,6 +734,35 @@ struct PythonObject(
                 var arg_value = args[i].py_object
                 cpython.Py_IncRef(arg_value)
                 var result = cpython.PyTuple_SetItem(key_obj, i, arg_value)
+                if result != 0:
+                    raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(key_obj)
+        var result = cpython.PyObject_GetItem(self.py_object, key_obj)
+        cpython.Py_DecRef(key_obj)
+        Python.throw_python_exception_if_error_state(cpython)
+        return PythonObject(result)
+
+    fn __getitem__(self, *args: Slice) raises -> PythonObject:
+        """Return the sliced value for the given Slice or Slices.
+
+        Args:
+            args: The Slice or Slices to apply to this object.
+
+        Returns:
+            The sliced value corresponding to the given Slice(s) for this object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var size = len(args)
+        var key_obj: PyObjectPtr
+
+        if size == 1:
+            key_obj = _slice_to_py_object_ptr(args[0])
+        else:
+            key_obj = cpython.PyTuple_New(size)
+            for i in range(size):
+                var slice_obj = _slice_to_py_object_ptr(args[i])
+                var result = cpython.PyTuple_SetItem(key_obj, i, slice_obj)
                 if result != 0:
                     raise Error("internal error: PyTuple_SetItem failed")
 
@@ -1475,13 +1515,60 @@ struct PythonObject(
         _ = python_str
         return mojo_str
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this Python object to the provided formatter.
+        Formats this Python object to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Avoid this intermediate String allocation, if possible.
         writer.write(str(self))
+
+
+# ===-----------------------------------------------------------------------===#
+# Helper functions
+# ===-----------------------------------------------------------------------===#
+
+
+fn _slice_to_py_object_ptr(slice: Slice) -> PyObjectPtr:
+    """Convert Mojo Slice to Python slice parameters.
+
+    Deliberately avoids using `span.indices()` here and instead passes
+    the Slice parameters directly to Python. Python's C implementation
+    already handles such conditions, allowing Python to apply its own slice
+    handling and error handling.
+
+
+    Args:
+        slice: A Mojo slice object to be converted.
+
+    Returns:
+        PyObjectPtr: The pointer to the Python slice.
+
+    """
+    cpython = _get_global_python_itf().cpython()
+    var py_start = cpython.Py_None()
+    var py_stop = cpython.Py_None()
+    var py_step = cpython.Py_None()
+
+    if slice.start:
+        py_start = cpython.PyLong_FromSsize_t(c_ssize_t(slice.start.value()))
+    if slice.end:
+        py_stop = cpython.PyLong_FromSsize_t(c_ssize_t(slice.end.value()))
+    if slice.step:
+        py_step = cpython.PyLong_FromSsize_t(c_ssize_t(slice.step.value()))
+
+    var py_slice = cpython.PySlice_New(py_start, py_stop, py_step)
+
+    if py_start != cpython.Py_None():
+        cpython.Py_DecRef(py_start)
+    if py_stop != cpython.Py_None():
+        cpython.Py_DecRef(py_stop)
+    cpython.Py_DecRef(py_step)
+
+    return py_slice

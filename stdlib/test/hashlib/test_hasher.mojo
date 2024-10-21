@@ -140,7 +140,7 @@ def test_with_ahasher():
         SomeHashableStruct(42), SomeHashableStruct(10), List[UInt8](1, 2, 3)
     )
     var hash_value = _hash_with_hasher(hashable1)
-    assert_equal(hash_value, 12427888534629009331)
+    assert_equal(hash_value, 7948090191592501094)
     var hashable2 = ComplexHashableStructWithListAndWideSIMD(
         SomeHashableStruct(42),
         SomeHashableStruct(10),
@@ -148,21 +148,21 @@ def test_with_ahasher():
         SIMD[DType.uint32, 4](1, 2, 3, 4),
     )
     hash_value = _hash_with_hasher(hashable2)
-    assert_equal(hash_value, 9463003097190363949)
+    assert_equal(hash_value, 1754891767834419861)
 
 
 def test_hash_hashable_with_hasher_types():
-    assert_equal(_hash_with_hasher(DType.uint64), 5919096275431609211)
-    assert_equal(_hash_with_hasher(""), 12914568033466041247)
-    assert_equal(_hash_with_hasher(str("")), 12914568033466041247)
-    assert_equal(_hash_with_hasher(StringRef("")), 12914568033466041247)
-    assert_equal(_hash_with_hasher(Int(-123)), 7309790389124252133)
-    assert_equal(_hash_with_hasher(UInt(123)), 11416101997646518198)
+    assert_equal(_hash_with_hasher(DType.uint64), 6529703120343940753)
+    assert_equal(_hash_with_hasher(""), 11583516797109448887)
+    assert_equal(_hash_with_hasher(str("")), 11583516797109448887)
+    assert_equal(_hash_with_hasher(StringRef("")), 11583516797109448887)
+    assert_equal(_hash_with_hasher(Int(-123)), 4720193641311814362)
+    assert_equal(_hash_with_hasher(UInt(123)), 4498397628805512285)
     assert_equal(
         _hash_with_hasher(SIMD[DType.float16, 4](0.1, -0.1, 12, 0)),
-        236488340994185196,
+        3806818604433176740,
     )
-    assert_equal(_hash_with_hasher(Path("/tmp")), 862170317972693446)
+    assert_equal(_hash_with_hasher(Path("/tmp")), 16491058316913697698)
     # Hash value of PythonObject is randomized by default
     # can be deterministic if env var PYTHONHASHSEED is set
     assert_true(_hash_with_hasher(PythonObject("hello")) != 0)

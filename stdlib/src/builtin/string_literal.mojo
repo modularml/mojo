@@ -21,10 +21,14 @@ from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
-from utils import Formattable, Formatter
+from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from collections.string import _atol, _StringSliceIter
+from utils.string_slice import (
+    _StringSliceIter,
+    _FormatCurlyEntry,
+    _CurlyEntryFormattable,
+)
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -37,7 +41,7 @@ struct StringLiteral(
     Boolable,
     Comparable,
     CollectionElementNew,
-    Formattable,
+    Writable,
     IntableRaising,
     KeyElement,
     Representable,
@@ -206,27 +210,25 @@ struct StringLiteral(
         """
         return len(self) != 0
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
-
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        If the string cannot be parsed as an int, an error is raised.
 
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return int(self.as_string_slice())
 
+    @always_inline
     fn __float__(self) raises -> Float64:
-        """Parses the string as a float point number and returns that value.
-
-        If the string cannot be parsed as a float, an error is raised.
+        """Parses the string as a float point number and returns that value. If
+        the string cannot be parsed as a float, an error is raised.
 
         Returns:
             A float value that represents the string, or otherwise raises.
         """
-        return atof(self)
+        return float(self.as_string_slice())
 
     @no_inline
     fn __str__(self) -> String:
@@ -298,6 +300,16 @@ struct StringLiteral(
             An iterator over the string.
         """
         return _StringSliceIter[StaticConstantOrigin](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantOrigin, False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator over the string.
+        """
+        return _StringSliceIter[StaticConstantOrigin, False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -374,7 +386,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, StaticConstantOrigin]:
+    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 
@@ -382,13 +394,13 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, StaticConstantOrigin](
+        return Span[Byte, StaticConstantOrigin](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[UInt8, __origin_of(self)]:
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -397,22 +409,50 @@ struct StringLiteral(
         Notes:
             This does not include the trailing null terminator.
         """
-
         # Does NOT include the NUL terminator.
-        return Span[UInt8, __origin_of(self)](
+        return Span[Byte, __origin_of(self)](
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
 
-    fn format_to(self, inout writer: Formatter):
-        """
-        Formats this string literal to the provided formatter.
+    @always_inline
+    fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
+        """Format a template with `*args`.
 
         Args:
-            writer: The formatter to write to.
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of substitution values that implement `Representable`
+                and `Stringable` (to be changed and made more flexible).
+
+        Returns:
+            The template with the given values substituted.
+
+        Examples:
+
+        ```mojo
+        # Manual indexing:
+        print("{0} {1} {0}".format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print("{} {}".format(True, "hello world")) # True hello world
+        ```
+        .
+        """
+        return _FormatCurlyEntry.format(self, args)
+
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Formats this string literal to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
         """
 
-        writer.write_str(self.as_string_slice())
+        writer.write(self.as_string_slice())
 
     fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at

@@ -98,6 +98,9 @@ alias Float32 = Scalar[DType.float32]
 alias Float64 = Scalar[DType.float64]
 """Represents a 64-bit floating point value."""
 
+alias Byte = UInt8
+"""Represents a byte (backed by an 8-bit unsigned integer)."""
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -172,7 +175,7 @@ struct SIMD[type: DType, size: Int](
     # CollectionElementNew,
     Floatable,
     Floorable,
-    Formattable,
+    Writable,
     Hashable,
     _HashableWithHasher,
     Intable,
@@ -934,6 +937,9 @@ struct SIMD[type: DType, size: Int](
         """
         constrained[type.is_integral(), "must be an integral type"]()
         debug_assert(all(rhs >= 0), "unhandled negative value")
+        debug_assert(
+            all(rhs < bitwidthof[type]()), "unhandled value greater than size"
+        )
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -951,6 +957,9 @@ struct SIMD[type: DType, size: Int](
         """
         constrained[type.is_integral(), "must be an integral type"]()
         debug_assert(all(rhs >= 0), "unhandled negative value")
+        debug_assert(
+            all(rhs < bitwidthof[type]()), "unhandled value greater than size"
+        )
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1414,7 +1423,7 @@ struct SIMD[type: DType, size: Int](
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -1425,8 +1434,7 @@ struct SIMD[type: DType, size: Int](
         """
 
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to[use_scientific_notation=True](writer)
+        self.write_to[use_scientific_notation=True](output)
 
         var values = output.as_string_slice()
 
@@ -1618,54 +1626,60 @@ struct SIMD[type: DType, size: Int](
             ](self.value)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this SIMD value to the provided formatter.
-
-        Args:
-            writer: The formatter to write to.
-        """
-        self.format_to[use_scientific_notation=False](writer)
-
-    # This overload is required to keep SIMD compliant with the Formattable
-    # trait, and the call to `String.format_sequence(self)` in SIMD.__str__ will
-    # fail to compile.
-    @no_inline
-    fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
-        """
-        Formats this SIMD value to the provided formatter.
+        Formats this SIMD value to the provided Writer.
 
         Parameters:
-            use_scientific_notation: Whether floats should use scientific notation.
-                This parameter does not apply to integer types.
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
+        """
+        self.write_to[use_scientific_notation=False](writer)
+
+    # This overload is required to keep SIMD compliant with the Writable
+    # trait, and the call to `String.write(self)` in SIMD.__str__ will
+    # fail to compile.
+    @no_inline
+    fn write_to[
+        W: Writer, use_scientific_notation: Bool
+    ](self, inout writer: W):
+        """
+        Formats this SIMD value to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+            use_scientific_notation: Whether floats should use scientific
+                notation. This parameter does not apply to integer types.
+
+        Args:
+            writer: The object to write to.
         """
 
         # Print an opening `[`.
         @parameter
         if size > 1:
-            writer.write_str("[")
+            writer.write("[")
 
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                writer.write_str(", ")
+                writer.write(", ")
 
             @parameter
             if triple_is_nvidia_cuda():
                 # FIXME(MSTDL-406):
                 #   The uses of `printf` below prints "out of band" with the
-                #   `Formatter` passed in, meaning this will only work if
-                #   `Formatter` is an unbuffered wrapper around printf (which
-                #   Formatter.stdout currently is by default).
+                #   `Writer` passed in, meaning this will only work if
+                #   `Writer` is an unbuffered wrapper around printf (which
+                #   Writer.stdout currently is by default).
                 #
                 #   This is a workaround to permit debug formatting of
                 #   floating-point values on GPU, where printing to stdout
-                #   is the only way the Formatter framework is currently
+                #   is the only way the Writer framework is currently
                 #   used.
 
                 @parameter
@@ -1700,7 +1714,7 @@ struct SIMD[type: DType, size: Int](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            writer.write_str("]")
+            writer.write("]")
 
     @always_inline
     fn _bits_to_float[dest_type: DType](self) -> SIMD[dest_type, size]:
@@ -2025,9 +2039,9 @@ struct SIMD[type: DType, size: Int](
         which is an unrolled for loop.
 
         The pseudocode of this function is:
-        ```mojo
-        var result = SIMD[Self.type, mask_size]()
-        for i in range(0, mask_size):
+        ```
+        result = SIMD[Self.type, mask_size]()
+        for i in range(mask_size):
             result[i] = self[int(mask[i])]
         ```
 
@@ -2767,6 +2781,32 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
 
+    fn reversed(self) -> Self:
+        """Reverses the SIMD vector by indexes.
+
+        Returns:
+            The by index reversed vector.
+
+        Examples:
+        ```mojo
+        print(SIMD[DType.uint8, 4](1, 2, 3, 4).reversed()) # [4, 3, 2, 1]
+        ```
+        .
+        """
+
+        fn build_idx() -> IndexList[size]:
+            var values = IndexList[size]()
+            var idx = 0
+
+            @parameter
+            for i in reversed(range(size)):
+                values[idx] = i
+                idx += 1
+            return values
+
+        alias idx = build_idx()
+        return self.shuffle[mask=idx]()
+
 
 fn _pshuf_or_tbl1(
     lookup_table: SIMD[DType.uint8, 16], indices: SIMD[DType.uint8, 16]
@@ -3082,12 +3122,15 @@ fn _simd_apply[
 
 
 # ===----------------------------------------------------------------------=== #
+# Scalar Formatting
+# ===----------------------------------------------------------------------=== #
 
 
 fn _format_scalar[
-    dtype: DType, //,
+    dtype: DType,
+    W: Writer, //,
     float_format: StringLiteral = "%.17g",
-](inout writer: Formatter, value: Scalar[dtype]):
+](inout writer: W, value: Scalar[dtype]):
     # Stack allocate enough bytes to store any formatted Scalar value of any
     # type.
     alias size: Int = _calc_format_buffer_size[dtype]()
@@ -3102,11 +3145,8 @@ fn _format_scalar[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var span = Span[UInt8](buf)[:wrote]
-
-    var str_slice = StringSlice(unsafe_from_utf8=span)
-
-    writer.write_str(str_slice)
+    var span = Span[Byte](buf)[:wrote]
+    writer.write_bytes(span)
 
 
 # ===----------------------------------------------------------------------=== #
