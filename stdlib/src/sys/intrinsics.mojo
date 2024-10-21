@@ -21,7 +21,6 @@ from sys import PrefetchLocality
 
 from .info import sizeof, triple_is_nvidia_cuda
 from ._assembly import inlined_assembly
-from builtin.builtin_list import _LITRefPackHelper
 import math
 
 from memory import AddressSpace, UnsafePointer
