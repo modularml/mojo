@@ -18,14 +18,12 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
 from builtin._documentation import doc_private
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
 
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(IntLike, _HashableWithHasher):
+struct UInt(IntLike, Hashable):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -151,18 +149,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return "UInt(" + str(self) + ")"
 
-    fn __hash__(self) -> UInt:
-        """Hash the UInt using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        # TODO(MOCO-636): switch to DType.index
-        return _hash_simd(Scalar[DType.uint64](self))
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, inout hasher: H):
         """Updates hasher with this uint value.
 
         Parameters:

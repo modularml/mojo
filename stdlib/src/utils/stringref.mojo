@@ -16,7 +16,6 @@
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
-from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
@@ -48,7 +47,6 @@ struct StringRef(
     Stringable,
     Writable,
     Hashable,
-    _HashableWithHasher,
     Boolable,
     Comparable,
     AsBytes,
@@ -344,17 +342,7 @@ struct StringRef(
         """
         return len(self) != 0
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.data, self.length)
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, inout hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
