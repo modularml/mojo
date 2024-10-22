@@ -691,14 +691,17 @@ trait _Iterator:
 #     fn __has_more__(self) -> Bool:
 #         ...
 
+#     fn __bool__(self) -> Bool:
+#         return self.__has_more__()
+
 
 # trait _Iterable[T: AnyType]:
 #     fn __iter__(ref [_]self) -> _Iterator[T]:
 #         ...
 
 
-# fn iter[T: AnyType, I: _Iterable[T]](value: T) -> _Iterator[T]:
-#     ...
+# fn iter[T: _Iterable](ref [_]value: T) -> _Iterator[T]:
+#     return value.__iter__()
 
 
 fn iter[T: _Iterator](value: T) -> T:
