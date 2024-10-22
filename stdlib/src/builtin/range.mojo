@@ -761,8 +761,6 @@ fn iter[
 ](ref [_]value: Dict[K, V]) -> _DictKeyIter[K, V, __origin_of(value)]:
     """Get an iterator of the input dict.
 
-    **Note**: iterators are currently non-raising.
-
     Parameters:
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
