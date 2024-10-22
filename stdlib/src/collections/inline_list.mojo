@@ -64,7 +64,7 @@ struct _InlineListIter[
             return Pointer.address_of(self.src[][self.index])
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -76,7 +76,7 @@ struct _InlineListIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 # TODO: Provide a smarter default for the capacity.

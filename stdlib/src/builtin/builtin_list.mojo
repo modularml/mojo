@@ -141,7 +141,7 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
         return self.src[self.index - 1]
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -149,7 +149,7 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 @register_passable("trivial")
@@ -256,7 +256,7 @@ struct _VariadicListMemIter[
         )
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -264,7 +264,7 @@ struct _VariadicListMemIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 # Helper to compute the union of two origins:

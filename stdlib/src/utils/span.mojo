@@ -79,7 +79,7 @@ struct _SpanIter[
             return Pointer.address_of(self.src[self.index])
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -92,7 +92,7 @@ struct _SpanIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 @value

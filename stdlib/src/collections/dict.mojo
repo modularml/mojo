@@ -107,7 +107,7 @@ struct _DictEntryIter[
                 return Pointer.address_of(opt_entry_ref[].value())
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -115,7 +115,7 @@ struct _DictEntryIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 @value
@@ -149,7 +149,7 @@ struct _DictKeyIter[
         return Pointer.address_of(self.iter.__next__()[].key)
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -157,7 +157,7 @@ struct _DictKeyIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 @value
@@ -203,7 +203,7 @@ struct _DictValueIter[
         )
 
     @always_inline
-    fn __has_more__(self) -> Bool:
+    fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -211,7 +211,7 @@ struct _DictValueIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__has_more__()
+        return self.__hasmore__()
 
 
 @value
