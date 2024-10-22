@@ -17,8 +17,7 @@
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from bit import byte_swap, rotate_bits_left
 from memory import UnsafePointer
-from hashlib.hash import hash as old_hash
-from hashlib._ahash import (
+from hashlib.ahash import (
     AHasher,
     _folded_multiply,
     _read_small,
@@ -27,7 +26,7 @@ from hashlib._ahash import (
     MULTIPLE,
     ROT,
 )
-from hashlib._hasher import _hash_with_hasher
+from hashlib.fnv1a import Fnv1a
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -598,50 +597,25 @@ fn gen_word_pairs[words: String = words_en]() -> List[String]:
 # Benchmarks
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_small_keys[s: String](inout b: Bencher) raises:
+fn bench_small_keys[s: String, H: Hasher](inout b: Bencher) raises:
     var words = gen_word_pairs[s]()
 
     @always_inline
     @parameter
     fn call_fn():
         for w in words:
-            var h = old_hash(w[])
+            var h = hash[HasherType=H](w[])
             benchmark.keep(h)
 
     b.iter[call_fn]()
 
 
 @parameter
-fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
-    var words = gen_word_pairs[s]()
-
+fn bench_long_key[s: String, H: Hasher](inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
-        for w in words:
-            var h = _hash_with_hasher(w[].unsafe_ptr(), w[].byte_length())
-            benchmark.keep(h)
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_long_key[s: String](inout b: Bencher) raises:
-    @always_inline
-    @parameter
-    fn call_fn():
-        var h = old_hash(s)
-        benchmark.keep(h)
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_long_key_new_hash_function[s: String](inout b: Bencher) raises:
-    @always_inline
-    @parameter
-    fn call_fn():
-        var h = _hash_with_hasher(s.unsafe_ptr(), s.byte_length())
+        var h = hash[HasherType=H](s)
         benchmark.keep(h)
 
     b.iter[call_fn]()
@@ -651,64 +625,93 @@ fn bench_long_key_new_hash_function[s: String](inout b: Bencher) raises:
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
+    alias ahasher = AHasher[SIMD[DType.uint64, 4](0)]
     var m = Bench(BenchConfig(num_repetitions=1))
-    m.bench_function[bench_small_keys[words_ar]](BenchId("bench_small_keys_ar"))
-    m.bench_function[bench_small_keys_new_hash_function[words_ar]](
-        BenchId("bench_small_keys_new_ar")
+    m.bench_function[bench_small_keys[words_ar, ahasher]](
+        BenchId("bench_small_keys_ar_ahash")
     )
-    m.bench_function[bench_small_keys[words_el]](BenchId("bench_small_keys_el"))
-    m.bench_function[bench_small_keys_new_hash_function[words_el]](
-        BenchId("bench_small_keys_new_el")
+    m.bench_function[bench_small_keys[words_el, ahasher]](
+        BenchId("bench_small_keys_el_ahash")
     )
-    m.bench_function[bench_small_keys[words_en]](BenchId("bench_small_keys_en"))
-    m.bench_function[bench_small_keys_new_hash_function[words_en]](
-        BenchId("bench_small_keys_new_en")
+    m.bench_function[bench_small_keys[words_en, ahasher]](
+        BenchId("bench_small_keys_en_ahash")
     )
-    m.bench_function[bench_small_keys[words_he]](BenchId("bench_small_keys_he"))
-    m.bench_function[bench_small_keys_new_hash_function[words_he]](
-        BenchId("bench_small_keys_new_he")
+    m.bench_function[bench_small_keys[words_he, ahasher]](
+        BenchId("bench_small_keys_he_ahash")
     )
-    m.bench_function[bench_small_keys[words_lv]](BenchId("bench_small_keys_lv"))
-    m.bench_function[bench_small_keys_new_hash_function[words_lv]](
-        BenchId("bench_small_keys_new_lv")
+    m.bench_function[bench_small_keys[words_lv, ahasher]](
+        BenchId("bench_small_keys_lv_ahash")
     )
-    m.bench_function[bench_small_keys[words_pl]](BenchId("bench_small_keys_pl"))
-    m.bench_function[bench_small_keys_new_hash_function[words_pl]](
-        BenchId("bench_small_keys_new_pl")
+    m.bench_function[bench_small_keys[words_pl, ahasher]](
+        BenchId("bench_small_keys_pl_ahash")
     )
-    m.bench_function[bench_small_keys[words_ru]](BenchId("bench_small_keys_ru"))
-    m.bench_function[bench_small_keys_new_hash_function[words_ru]](
-        BenchId("bench_small_keys_new_ru")
+    m.bench_function[bench_small_keys[words_ru, ahasher]](
+        BenchId("bench_small_keys_ru_ahash")
     )
 
-    m.bench_function[bench_long_key[words_ar]](BenchId("bench_long_key_ar"))
-    m.bench_function[bench_long_key_new_hash_function[words_ar]](
-        BenchId("bench_long_key_new_ar")
+    m.bench_function[bench_small_keys[words_ar, Fnv1a]](
+        BenchId("bench_small_keys_ar_fnv1a")
     )
-    m.bench_function[bench_long_key[words_el]](BenchId("bench_long_key_el"))
-    m.bench_function[bench_long_key_new_hash_function[words_el]](
-        BenchId("bench_long_key_new_el")
+    m.bench_function[bench_small_keys[words_el, Fnv1a]](
+        BenchId("bench_small_keys_el_fnv1a")
     )
-    m.bench_function[bench_long_key[words_en]](
-        BenchId("bench_long_key_keys_en")
+    m.bench_function[bench_small_keys[words_en, Fnv1a]](
+        BenchId("bench_small_keys_en_fnv1a")
     )
-    m.bench_function[bench_long_key_new_hash_function[words_en]](
-        BenchId("bench_long_key_new_en")
+    m.bench_function[bench_small_keys[words_he, Fnv1a]](
+        BenchId("bench_small_keys_he_fnv1a")
     )
-    m.bench_function[bench_long_key[words_he]](BenchId("bench_long_key_he"))
-    m.bench_function[bench_long_key_new_hash_function[words_he]](
-        BenchId("bench_long_key_new_he")
+    m.bench_function[bench_small_keys[words_lv, Fnv1a]](
+        BenchId("bench_small_keys_lv_fnv1a")
     )
-    m.bench_function[bench_long_key[words_lv]](BenchId("bench_long_key_lv"))
-    m.bench_function[bench_long_key_new_hash_function[words_lv]](
-        BenchId("bench_long_key_new_lv")
+    m.bench_function[bench_small_keys[words_pl, Fnv1a]](
+        BenchId("bench_small_keys_pl_fnv1a")
     )
-    m.bench_function[bench_long_key[words_pl]](BenchId("bench_long_key_pl"))
-    m.bench_function[bench_long_key_new_hash_function[words_pl]](
-        BenchId("bench_long_key_new_pl")
+    m.bench_function[bench_small_keys[words_ru, Fnv1a]](
+        BenchId("bench_small_keys_ru_fnv1a")
     )
-    m.bench_function[bench_long_key[words_ru]](BenchId("bench_long_key_ru"))
-    m.bench_function[bench_long_key_new_hash_function[words_ru]](
-        BenchId("bench_long_key_new_ru")
+
+    m.bench_function[bench_long_key[words_ar, ahasher]](
+        BenchId("bench_long_key_ar_ahash")
+    )
+    m.bench_function[bench_long_key[words_el, ahasher]](
+        BenchId("bench_long_key_el_ahash")
+    )
+    m.bench_function[bench_long_key[words_en, ahasher]](
+        BenchId("bench_long_key_keys_en_ahash")
+    )
+    m.bench_function[bench_long_key[words_he, ahasher]](
+        BenchId("bench_long_key_he_ahash")
+    )
+    m.bench_function[bench_long_key[words_lv, ahasher]](
+        BenchId("bench_long_key_lv_ahash")
+    )
+    m.bench_function[bench_long_key[words_pl, ahasher]](
+        BenchId("bench_long_key_pl_ahash")
+    )
+    m.bench_function[bench_long_key[words_ru, ahasher]](
+        BenchId("bench_long_key_ru_ahash")
+    )
+
+    m.bench_function[bench_long_key[words_ar, Fnv1a]](
+        BenchId("bench_long_key_ar_fnv1a")
+    )
+    m.bench_function[bench_long_key[words_el, Fnv1a]](
+        BenchId("bench_long_key_el_fnv1a")
+    )
+    m.bench_function[bench_long_key[words_en, Fnv1a]](
+        BenchId("bench_long_key_keys_en_fnv1a")
+    )
+    m.bench_function[bench_long_key[words_he, Fnv1a]](
+        BenchId("bench_long_key_he_fnv1a")
+    )
+    m.bench_function[bench_long_key[words_lv, Fnv1a]](
+        BenchId("bench_long_key_lv_fnv1a")
+    )
+    m.bench_function[bench_long_key[words_pl, Fnv1a]](
+        BenchId("bench_long_key_pl_fnv1a")
+    )
+    m.bench_function[bench_long_key[words_ru, Fnv1a]](
+        BenchId("bench_long_key_ru_fnv1a")
     )
     m.dump_report()

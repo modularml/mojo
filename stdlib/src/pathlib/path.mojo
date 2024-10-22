@@ -22,8 +22,6 @@ from sys.ffi import c_char
 from builtin._location import __call_location, _SourceLocation
 from memory import stack_allocation, UnsafePointer
 
-from hashlib._hasher import _HashableWithHasher, _Hasher
-
 from utils import StringRef
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"
@@ -216,16 +214,7 @@ struct Path(
         """
         return not self == other
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying path string using builtin hash.
-
-        Returns:
-            An integer value containing the hash of the path string.
-        """
-
-        return hash(self.path)
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, inout hasher: H):
         """Updates hasher with the path string value.
 
         Parameters:
