@@ -63,8 +63,6 @@ trait ReversibleRange:
 fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     """Get a reversed iterator of the input range.
 
-    **Note**: iterators are currently non-raising.
-
     Parameters:
         T: The type conforming to ReversibleRange.
 
@@ -84,8 +82,6 @@ fn reversed[
 ]:
     """Get a reversed iterator of the input list.
 
-    **Note**: iterators are currently non-raising.
-
     Parameters:
         T: The type of the elements in the list.
 
@@ -103,8 +99,6 @@ fn reversed[
     V: CollectionElement,
 ](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
     """Get a reversed iterator of the input dict.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
@@ -128,8 +122,6 @@ fn reversed[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict values.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
@@ -156,8 +148,6 @@ fn reversed[
 ]:
     """Get a reversed iterator of the input dict items.
 
-    **Note**: iterators are currently non-raising.
-
     Parameters:
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
@@ -181,6 +171,9 @@ fn reversed[
     T: Stringlike
 ](ref [_]value: T) -> _StringSliceIter[__origin_of(value), forward=False]:
     """Return a reversed iterator.
+
+    Parameters:
+        T: The Stringlike type.
 
     Args:
         value: The iterable value.
