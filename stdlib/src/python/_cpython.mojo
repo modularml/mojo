@@ -39,7 +39,7 @@ from python._bindings import Typed_initproc, PyMojoObject, Pythonable
 
 from memory import UnsafePointer
 
-from utils import StringRef
+from utils import StringRef, StringSlice
 
 
 # ===-----------------------------------------------------------------------===#
@@ -1759,6 +1759,33 @@ struct CPython:
             self._Py_REFCNT(r),
             ", str:",
             strref,
+        )
+
+        self._inc_total_rc()
+        return r
+
+    fn PyUnicode_DecodeUTF8(inout self, strslice: StringSlice) -> PyObjectPtr:
+        """See https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8.
+        """
+        # return self.PyUnicode_DecodeUTF8(StringRef(strslice.unsafe_ptr(), strslice.byte_length()))
+        r = self.lib.get_function[
+            fn (
+                UnsafePointer[c_char],
+                c_ssize_t,
+                UnsafePointer[c_char],
+            ) -> PyObjectPtr
+        ]("PyUnicode_DecodeUTF8")(
+            strslice.unsafe_ptr().bitcast[Int8](),
+            strslice.byte_length(),
+            "strict".unsafe_cstr_ptr(),
+        )
+
+        self.log(
+            r._get_ptr_as_int(),
+            " NEWREF PyUnicode_DecodeUTF8, refcnt:",
+            self._Py_REFCNT(r),
+            ", str:",
+            strslice,
         )
 
         self._inc_total_rc()

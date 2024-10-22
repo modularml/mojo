@@ -414,10 +414,7 @@ struct PythonObject(
             string: The string value.
         """
         cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyUnicode_DecodeUTF8(
-            string._strref_dangerous()
-        )
-        string._strref_keepalive()
+        self.py_object = cpython.PyUnicode_DecodeUTF8(string.as_string_slice())
 
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
@@ -1416,7 +1413,7 @@ struct PythonObject(
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
             var key = cpython.PyUnicode_DecodeUTF8(
-                entry[].key._strref_dangerous()
+                entry[].key.as_string_slice()
             )
             var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object
