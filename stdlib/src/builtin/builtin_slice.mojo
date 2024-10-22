@@ -23,7 +23,7 @@ struct Slice(
     Stringable,
     EqualityComparable,
     Representable,
-    Formattable,
+    Writable,
     CollectionElementNew,
 ):
     """Represents a slice expression.
@@ -40,14 +40,19 @@ struct Slice(
     ```
     """
 
+    # Fields
     var start: Optional[Int]
     """The starting index of the slice."""
     var end: Optional[Int]
     """The end index of the slice."""
-    var step: Int
+    var step: Optional[Int]
     """The step increment value of the slice."""
 
-    @always_inline("nodebug")
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
     fn __init__(inout self, start: Int, end: Int):
         """Construct slice given the start and end values.
 
@@ -57,9 +62,9 @@ struct Slice(
         """
         self.start = start
         self.end = end
-        self.step = 1
+        self.step = None
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(
         inout self,
         start: Optional[Int],
@@ -75,7 +80,7 @@ struct Slice(
         """
         self.start = start
         self.end = end
-        self.step = step.or_else(1)
+        self.step = step
 
     fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the Slice.
@@ -85,6 +90,10 @@ struct Slice(
         """
         self.__init__(start=other.start, end=other.end, step=other.step)
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @no_inline
     fn __str__(self) -> String:
         """Gets the string representation of the span.
@@ -93,8 +102,7 @@ struct Slice(
             The string representation of the span.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output
 
     @no_inline
@@ -107,11 +115,14 @@ struct Slice(
         return self.__str__()
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Write Slice string representation to a `Formatter`.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Write Slice string representation to a `Writer`.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         @parameter
@@ -126,10 +137,10 @@ struct Slice(
         writer.write(", ")
         write_optional(self.end)
         writer.write(", ")
-        writer.write(repr(self.step))
+        write_optional(self.step)
         writer.write(")")
 
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -146,7 +157,7 @@ struct Slice(
             and self.step == other.step
         )
 
-    @always_inline("nodebug")
+    @always_inline
     fn __ne__(self, other: Self) -> Bool:
         """Compare this slice to the other.
 
@@ -169,20 +180,20 @@ struct Slice(
         Negative indices are wrapped using the length of the container.
         ```mojo
         s = slice(0, -1, 1)
-        s.indices(5) # returns (0, 4, 1)
+        i = s.indices(5) # returns (0, 4, 1)
         ```
 
         None indices are defaulted to the start or the end of the container
         based on whether `step` is positive or negative.
         ```mojo
         s = slice(None, None, 1)
-        s.indices(5) # returns (0, 5, 1)
+        i = s.indices(5) # returns (0, 5, 1)
         ```
 
         Out of bounds indices are clamped using the size of the container.
         ```mojo
         s = slice(20)
-        s.indices(5) # returns (0, 5, 1)
+        i = s.indices(5) # returns (0, 5, 1)
         ```
 
         Args:
@@ -191,7 +202,7 @@ struct Slice(
         Returns:
             A tuple containing three integers for start, end, and step.
         """
-        var step = self.step
+        var step = self.step.or_else(1)
 
         var start = self.start
         var end = self.end
@@ -218,7 +229,12 @@ struct Slice(
         return (start.value(), end.value(), step)
 
 
-@always_inline("nodebug")
+# ===-----------------------------------------------------------------------===#
+# Slice constructor functions
+# ===-----------------------------------------------------------------------===#
+
+
+@always_inline
 fn slice(end: Int) -> Slice:
     """Construct slice given the end value.
 
@@ -231,7 +247,7 @@ fn slice(end: Int) -> Slice:
     return Slice(None, end, None)
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(start: Int, end: Int) -> Slice:
     """Construct slice given the start and end values.
 
@@ -245,7 +261,7 @@ fn slice(start: Int, end: Int) -> Slice:
     return Slice(start, end)
 
 
-@always_inline("nodebug")
+@always_inline
 fn slice(
     start: Optional[Int], end: Optional[Int], step: Optional[Int]
 ) -> Slice:

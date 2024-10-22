@@ -1059,7 +1059,7 @@ Big themes for this release:
       var first: Int
       var second: Int
 
-      fn get_first_ref(inout self) -> ref[__lifetime_of(self)] Int:
+      fn get_first_ref(inout self) -> ref [self] Int:
           return self.first
 
   fn show_mutation():
@@ -1557,7 +1557,7 @@ Big themes for this release:
 - [`SIMD`](/mojo/stdlib/builtin/simd/SIMD) type:
 
   - Added [`SIMD.shuffle()`](/mojo/stdlib/builtin/simd/SIMD#shuffle) with
-    `StaticIntTuple` mask.
+    `IndexList` mask.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315))
 
   - [`SIMD.__bool__()`](/mojo/stdlib/builtin/simd/SIMD#__bool__) is constrained
@@ -3137,7 +3137,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   [`Copyable`](/mojo/stdlib/builtin/value/Copyable), and
   [`CollectionElement`](/mojo/stdlib/builtin/value/CollectionElement).
 
-- A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
+- A new magic `__origin_of(expr)` call will yield the lifetime of a memory
   value.  We hope and expect that this will eventually be replaced by
   `Reference(expr).lifetime` as the parameter system evolves, but this is
   important in the meantime for use in function signatures.
@@ -4393,7 +4393,7 @@ the previous "read to EOF" behavior when size is negative.
 - [`TensorShape`](/mojo/stdlib/tensor/tensor_shape) and
   [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape) now have constructors
   that take [`DynamicVector[Int]`](/mojo/stdlib/collections/list/List)
-  and [`StaticIntTuple`](/mojo/stdlib/utils/index_/StaticIntTuple) to
+  and [`IndexList`](/mojo/stdlib/utils/index_/IndexList) to
   initialize shapes.
 
 - The [`String`](/mojo/stdlib/collections/string/String) type now has the

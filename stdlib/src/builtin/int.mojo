@@ -17,15 +17,17 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
+from builtin._documentation import doc_private
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.hash import _hash_simd
+from hashlib.hash import _hash_simd
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
 
-from utils import Formattable, Formatter
+from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
 from sys import triple_is_nvidia_cuda, bitwidthof
@@ -106,12 +108,9 @@ trait Intable:
     `Int`:
 
     ```mojo
-    var foo = Foo(42)
-    print(int(foo) == 42)
-    ```
-
-    ```plaintext
-    True
+    %# from testing import assert_equal
+    foo = Foo(42)
+    assert_equal(int(foo), 42)
     ```
 
     **Note:** If the `__int__()` method can raise an error, use the
@@ -153,13 +152,9 @@ trait IntableRaising:
     `Int`:
 
     ```mojo
-    fn main() raises:
-        var x = Foo(42)
-        print(int(x) == 42)
-    ```
-
-    ```plaintext
-    True
+    %# from testing import assert_equal
+    foo = Foo(42)
+    assert_equal(int(foo), 42)
     ```
     """
 
@@ -185,7 +180,7 @@ trait IntLike(
     Ceilable,
     Comparable,
     Floorable,
-    Formattable,
+    Writable,
     Powable,
     Stringable,
     Truncable,
@@ -292,6 +287,7 @@ struct Int(
     KeyElement,
     Roundable,
     IntLike,
+    _HashableWithHasher,
 ):
     """This type represents an integer value."""
 
@@ -322,6 +318,7 @@ struct Int(
         """
         self = other
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct Int from the given index value.
@@ -331,6 +328,7 @@ struct Int(
         """
         self.value = value
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
@@ -338,12 +336,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
@@ -351,12 +350,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
@@ -364,12 +364,13 @@ struct Int(
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self = Self(
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
+    @doc_private
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
@@ -378,9 +379,7 @@ struct Int(
             value: The init value.
         """
         self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                value
-            )
+            value
         )
 
     @always_inline("nodebug")
@@ -596,8 +595,8 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
-        div = select(self > 0 & rhs > 0, div, divMod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
+        div = select(self > 0 & rhs > 0, div, div_mod)
         div = select(rhs == 0, 0, div)
         return div
 
@@ -615,9 +614,9 @@ struct Int(
         var div: Int = self._positive_div(denominator)
 
         var mod = self - div * rhs
-        var divMod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
+        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
         mod = select(
-            self > 0 & rhs > 0, self._positive_rem(denominator), divMod
+            self > 0 & rhs > 0, self._positive_rem(denominator), div_mod
         )
         mod = select(rhs == 0, 0, mod)
         return mod
@@ -1093,7 +1092,7 @@ struct Int(
             A string representation.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -1115,19 +1114,52 @@ struct Int(
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.int64](self))
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this int value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(Int64(self))
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this integer to the provided formatter.
+        Formats this integer to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(Int64(self))
+
+    fn write_padded[W: Writer](self, inout writer: W, width: Int):
+        """Write the int right-aligned to a set padding.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+            width: The amount to pad to the left.
+        """
+        var int_width = self._decimal_digit_count()
+
+        # TODO: Assumes user wants right-aligned content.
+        if int_width < width:
+            for _ in range(width - int_width):
+                writer.write(" ")
+
+        writer.write(self)
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
@@ -1177,9 +1209,9 @@ struct Int(
         Examples:
 
         ```mojo
-        assert_equal(10._decimal_digit_count(), 2)
-
-        assert_equal(-10._decimal_digit_count(), 2)
+        %# from testing import assert_equal
+        assert_equal(Int(10)._decimal_digit_count(), 2)
+        assert_equal(Int(-10)._decimal_digit_count(), 2)
         ```
         .
         """

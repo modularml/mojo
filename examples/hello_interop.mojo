@@ -22,7 +22,5 @@ def main():
     print("Hello Mojo 🔥!")
     for x in range(9, 0, -3):
         print(x)
-    Python.add_to_path(".")
-    Python.add_to_path("./examples")
     var test_module = Python.import_module("simple_interop")
     test_module.test_interop_func()

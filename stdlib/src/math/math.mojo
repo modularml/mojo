@@ -40,7 +40,7 @@ from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
 
 from utils import Span
-from utils.index import StaticIntTuple
+from utils.index import IndexList
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
 
@@ -2217,7 +2217,7 @@ fn factorial(n: Int) -> Int:
     Returns:
         The factorial of the input. Results are undefined for negative inputs.
     """
-    alias table = StaticIntTuple[21](
+    alias table = StaticTuple[Int, 21](
         1,
         1,
         2,
@@ -2368,7 +2368,21 @@ fn _call_ptx_intrinsic_scalar[
         Scalar[type],
         constraints=constraints,
         has_side_effect=False,
-    ](arg).cast[type]()
+    ](arg)
+
+
+fn _call_ptx_intrinsic_scalar[
+    type: DType, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg0: Scalar[type], arg1: Scalar[type]) -> Scalar[type]:
+    return inlined_assembly[
+        instruction + " $0, $1, $2;",
+        Scalar[type],
+        constraints=constraints,
+        has_side_effect=False,
+    ](arg0, arg1)
 
 
 fn _call_ptx_intrinsic[
@@ -2419,7 +2433,40 @@ fn _call_ptx_intrinsic[
                 SIMD[type, 2],
                 constraints=vector_constraints,
                 has_side_effect=False,
-            ](arg).cast[type]()
+            ](arg.slice[2, offset=i]())
+        )
+
+    return res
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    scalar_instruction: StringLiteral,
+    vector2_instruction: StringLiteral,
+    scalar_constraints: StringLiteral,
+    vector_constraints: StringLiteral,
+](arg0: SIMD[type, simd_width], arg1: SIMD[type, simd_width]) -> SIMD[
+    type, simd_width
+]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=scalar_instruction, constraints=scalar_constraints
+        ](arg0[0], arg1[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(0, simd_width, 2):
+        res = res.insert[offset=i](
+            inlined_assembly[
+                vector2_instruction + " $0, $1; $2;",
+                SIMD[type, 2],
+                constraints=vector_constraints,
+                has_side_effect=False,
+            ](arg0.slice[2, offset=i](), arg1.slice[2, offset=i]())
         )
 
     return res

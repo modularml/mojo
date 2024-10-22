@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import sizeof, bitwidthof, os_is_windows
 
 alias _mIsSigned = UInt8(1)
@@ -27,7 +28,12 @@ alias _mIsFloat = UInt8(1 << 6)
 @value
 @register_passable("trivial")
 struct DType(
-    Stringable, Formattable, Representable, KeyElement, CollectionElementNew
+    Stringable,
+    Writable,
+    Representable,
+    KeyElement,
+    CollectionElementNew,
+    _HashableWithHasher,
 ):
     """Represents DType and provides methods for working with it."""
 
@@ -57,6 +63,14 @@ struct DType(
     """Represents a signed integer type whose bitwidth is 64."""
     alias uint64 = DType(__mlir_attr.`#kgen.dtype.constant<ui64> : !kgen.dtype`)
     """Represents an unsigned integer type whose bitwidth is 64."""
+    alias float8e5m2 = DType(
+        __mlir_attr.`#kgen.dtype.constant<f8e5m2> : !kgen.dtype`
+    )
+    """Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+    alias float8e4m3 = DType(
+        __mlir_attr.`#kgen.dtype.constant<f8e4m3> : !kgen.dtype`
+    )
+    """Represents a FP8E4M3 floating point format whose bitwidth is 8."""
     alias bfloat16 = DType(
         __mlir_attr.`#kgen.dtype.constant<bf16> : !kgen.dtype`
     )
@@ -116,6 +130,10 @@ struct DType(
             return DType.uint64
         elif str == String("index"):
             return DType.index
+        elif str == String("float8e5m2"):
+            return DType.float8e5m2
+        elif str == String("float8e4m3"):
+            return DType.float8e4m3
         elif str == String("bfloat16"):
             return DType.bfloat16
         elif str == String("float16"):
@@ -139,51 +157,58 @@ struct DType(
             The name of the dtype.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this dtype to the provided formatter.
+        Formats this dtype to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         if self == DType.bool:
-            return writer.write_str("bool")
+            return writer.write("bool")
         if self == DType.int8:
-            return writer.write_str("int8")
+            return writer.write("int8")
         if self == DType.uint8:
-            return writer.write_str("uint8")
+            return writer.write("uint8")
         if self == DType.int16:
-            return writer.write_str("int16")
+            return writer.write("int16")
         if self == DType.uint16:
-            return writer.write_str("uint16")
+            return writer.write("uint16")
         if self == DType.int32:
-            return writer.write_str("int32")
+            return writer.write("int32")
         if self == DType.uint32:
-            return writer.write_str("uint32")
+            return writer.write("uint32")
         if self == DType.int64:
-            return writer.write_str("int64")
+            return writer.write("int64")
         if self == DType.uint64:
-            return writer.write_str("uint64")
+            return writer.write("uint64")
         if self == DType.index:
-            return writer.write_str("index")
+            return writer.write("index")
+        if self == DType.float8e5m2:
+            return writer.write("float8e5m2")
+        if self == DType.float8e4m3:
+            return writer.write("float8e4m3")
         if self == DType.bfloat16:
-            return writer.write_str("bfloat16")
+            return writer.write("bfloat16")
         if self == DType.float16:
-            return writer.write_str("float16")
+            return writer.write("float16")
         if self == DType.float32:
-            return writer.write_str("float32")
+            return writer.write("float32")
         if self == DType.tensor_float32:
-            return writer.write_str("tensor_float32")
+            return writer.write("tensor_float32")
         if self == DType.float64:
-            return writer.write_str("float64")
+            return writer.write("float64")
         if self == DType.invalid:
-            return writer.write_str("invalid")
+            return writer.write("invalid")
 
-        return writer.write_str("<<unknown>>")
+        return writer.write("<<unknown>>")
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
@@ -282,6 +307,17 @@ struct DType(
         """
         return hash(UInt8(self._as_i8()))
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this `DType` value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(UInt8(self._as_i8()))
+
     @always_inline("nodebug")
     fn is_unsigned(self) -> Bool:
         """Returns True if the type parameter is unsigned and False otherwise.
@@ -293,7 +329,7 @@ struct DType(
             return False
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-                __mlir_op.`pop.and`(self._as_i8(), _mIsSigned.value),
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned.value),
                 UInt8(0).value,
             )
         )
@@ -311,7 +347,7 @@ struct DType(
             return False
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(self._as_i8(), _mIsSigned.value),
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned.value),
                 UInt8(0).value,
             )
         )
@@ -325,7 +361,7 @@ struct DType(
         """
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(self._as_i8(), _mIsInteger.value),
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsInteger.value),
                 UInt8(0).value,
             )
         )
@@ -353,10 +389,21 @@ struct DType(
             return False
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(self._as_i8(), _mIsFloat.value),
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsFloat.value),
                 UInt8(0).value,
             )
         )
+
+    @always_inline("nodebug")
+    fn is_float8(self) -> Bool:
+        """Returns True if the type is a 8bit-precision floating point type,
+        e.g. either float8e5m2 or float8e4m3.
+
+        Returns:
+            True if the type is a 8bit-precision float, false otherwise.
+        """
+
+        return self in (DType.float8e5m2, DType.float8e4m3)
 
     @always_inline("nodebug")
     fn is_half_float(self) -> Bool:
@@ -395,7 +442,7 @@ struct DType(
                         UInt8(1).value,
                         __mlir_op.`pop.sub`(
                             __mlir_op.`pop.shr`(
-                                __mlir_op.`pop.and`(
+                                __mlir_op.`pop.simd.and`(
                                     self._as_i8(), _mIsNotInteger.value
                                 ),
                                 UInt8(1).value,
@@ -410,6 +457,10 @@ struct DType(
             return sizeof[DType.bool]()
         if self == DType.index:
             return sizeof[DType.index]()
+        if self == DType.float8e5m2:
+            return sizeof[DType.float8e5m2]()
+        if self == DType.float8e4m3:
+            return sizeof[DType.float8e4m3]()
         if self == DType.bfloat16:
             return sizeof[DType.bfloat16]()
         if self == DType.float16:
@@ -581,7 +632,11 @@ fn _integral_type_of[type: DType]() -> DType:
         return type
 
     @parameter
-    if type is DType.bfloat16 or type is DType.float16:
+    if type.is_float8():
+        return DType.int8
+
+    @parameter
+    if type.is_half_float():
         return DType.int16
 
     @parameter
@@ -610,7 +665,11 @@ fn _unsigned_integral_type_of[type: DType]() -> DType:
         return _uint_type_of_width[bitwidthof[type]()]()
 
     @parameter
-    if type is DType.bfloat16 or type is DType.float16:
+    if type.is_float8():
+        return DType.uint8
+
+    @parameter
+    if type.is_half_float():
         return DType.uint16
 
     @parameter
@@ -636,7 +695,9 @@ fn _scientific_notation_digits[type: DType]() -> StringLiteral:
     constrained[type.is_floating_point(), "expected floating point type"]()
 
     @parameter
-    if type is DType.bfloat16 or type is DType.float16:
+    if type.is_float8():
+        return "2"
+    elif type.is_half_float():
         return "4"
     elif type is DType.float32 or type is DType.tensor_float32:
         return "8"
@@ -650,7 +711,14 @@ fn _scientific_notation_digits[type: DType]() -> StringLiteral:
 # ===-------------------------------------------------------------------===#
 
 
+@parameter
+@always_inline
 fn _int_type_of_width[width: Int]() -> DType:
+    constrained[
+        width == 8 or width == 16 or width == 32 or width == 64,
+        "width must be either 8, 16, 32, or 64",
+    ]()
+
     @parameter
     if width == 8:
         return DType.int8
@@ -659,7 +727,6 @@ fn _int_type_of_width[width: Int]() -> DType:
     elif width == 32:
         return DType.int32
     else:
-        constrained[width == 64]()
         return DType.int64
 
 
@@ -668,7 +735,14 @@ fn _int_type_of_width[width: Int]() -> DType:
 # ===-------------------------------------------------------------------===#
 
 
+@parameter
+@always_inline
 fn _uint_type_of_width[width: Int]() -> DType:
+    constrained[
+        width == 8 or width == 16 or width == 32 or width == 64,
+        "width must be either 8, 16, 32, or 64",
+    ]()
+
     @parameter
     if width == 8:
         return DType.uint8
@@ -677,7 +751,6 @@ fn _uint_type_of_width[width: Int]() -> DType:
     elif width == 32:
         return DType.uint32
     else:
-        constrained[width == 64]()
         return DType.uint64
 
 

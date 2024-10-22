@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import Dict, List
 from sys.intrinsics import _type_is_eq
+from sys.ffi import OpaquePointer
 
 from memory import Arc, memcmp, memcpy, UnsafePointer
 
@@ -84,7 +85,7 @@ struct _RefCountedList:
 @register_passable("trivial")
 struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    var lst: UnsafePointer[NoneType]
+    var lst: OpaquePointer
     """The reference to the list."""
 
     @always_inline
@@ -255,7 +256,7 @@ struct _ObjectImpl(
     CollectionElementNew,
     Stringable,
     Representable,
-    Formattable,
+    Writable,
 ):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
@@ -563,7 +564,7 @@ struct _ObjectImpl(
         else:
             lhs = lhs.convert_bool_to_int()
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """Performs conversion to string according to Python
         semantics.
         """
@@ -638,7 +639,7 @@ struct _ObjectImpl(
         Returns:
             The String representation of the object.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     # ===------------------------------------------------------------------=== #
     # List Functions
@@ -692,7 +693,7 @@ struct _ObjectImpl(
 
 
 struct object(
-    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Formattable
+    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Writable
 ):
     """Represents an object without a concrete type.
 
@@ -815,7 +816,7 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
@@ -971,14 +972,17 @@ struct object(
         """
         return self.__bool__()
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """Performs conversion to string according to Python
         semantics.
 
+        Parameters:
+            W: A type conforming to the Writable trait.
+
         Args:
-            writer: The Formatter to write to.
+            writer: The Writer to write to.
         """
-        self._value.format_to(writer)
+        self._value.write_to(writer)
 
     @no_inline
     fn __str__(self) -> String:
@@ -988,7 +992,7 @@ struct object(
         Returns:
             The String representation of the object.
         """
-        return String.format_sequence(self._value)
+        return String.write(self._value)
 
     @no_inline
     fn __repr__(self) -> String:

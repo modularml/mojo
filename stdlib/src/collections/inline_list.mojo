@@ -31,7 +31,7 @@ struct _InlineListIter[
     list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
@@ -40,28 +40,32 @@ struct _InlineListIter[
         list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
         capacity: The maximum number of elements that the list can hold.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = InlineList[T, capacity]
 
     var index: Int
-    var src: Reference[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, __lifetime_of(self.src[][0])]:
+    ) -> Pointer[T, __origin_of(self.src[][0])]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[][self.index - 1]
+            return Pointer.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return self.src[][self.index]
+            return Pointer.address_of(self.src[][self.index])
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         @parameter
@@ -129,8 +133,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     @always_inline
     fn __getitem__(
         ref [_]self: Self, owned idx: Int
-    ) -> ref [__lifetime_of(self._array)] Self.ElementType:
-        """Get a `Reference` to the element at the given index.
+    ) -> ref [self._array] Self.ElementType:
+        """Get a `Pointer` to the element at the given index.
 
         Args:
             idx: The index of the item.
@@ -171,13 +175,13 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
+    ) -> _InlineListIter[ElementType, capacity, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _InlineListIter(0, self)
+        return _InlineListIter(0, Pointer.address_of(self))
 
     fn __contains__[
         C: EqualityComparableCollectionElement, //
@@ -202,8 +206,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         constrained[
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
-        for i in self:
-            if value == rebind[Reference[C, __lifetime_of(self)]](i)[]:
+        for e in self:
+            if rebind[C](e[]) == value:
                 return True
         return False
 
@@ -235,9 +239,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         ]()
 
         var count = 0
-        for elem in self:
-            if value == rebind[Reference[C, __lifetime_of(self)]](elem)[]:
-                count += 1
+        for e in self:
+            count += int(rebind[C](e[]) == value)
         return count
 
     fn append(inout self, owned value: ElementType):

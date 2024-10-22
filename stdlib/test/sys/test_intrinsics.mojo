@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from math import gcd
 from sys import (
     compressed_store,
     masked_load,
@@ -19,6 +20,7 @@ from sys import (
     strided_load,
     strided_store,
 )
+from sys.intrinsics import likely, unlikely, assume
 
 from memory import UnsafePointer, memset_zero
 from testing import assert_equal
@@ -29,6 +31,11 @@ alias iota_4 = F32x4(0.0, 1.0, 2.0, 3.0)
 alias iota_8 = F32x8(0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0)
 
 
+def test_intrinsic_comp_eval():
+    alias res = gcd(5, 4)
+    assert_equal(res, gcd(5, 4))
+
+
 def test_compressed_store():
     var vector = UnsafePointer[Float32]().alloc(5)
     memset_zero(vector, 5)
@@ -37,7 +44,7 @@ def test_compressed_store():
     assert_equal(vector.load[width=4](0), F32x4(2.0, 3.0, 0.0, 0.0))
 
     # Just clear the buffer.
-    vector.store[width=4](0, 0)
+    vector.store(0, SIMD[DType.float32, 4](0))
 
     var val = F32x4(0.0, 1.0, 3.0, 0.0)
     compressed_store(val, vector, val != 0)
@@ -121,9 +128,21 @@ fn test_strided_store() raises:
     vector.free()
 
 
+def test_likely_unlikely():
+    assert_equal(likely(True), True)
+    assert_equal(unlikely(True), True)
+
+
+def test_assume():
+    assume(True)
+
+
 def main():
+    test_intrinsic_comp_eval()
     test_compressed_store()
     test_masked_load()
     test_masked_store()
     test_strided_load()
     test_strided_store()
+    test_likely_unlikely()
+    test_assume()

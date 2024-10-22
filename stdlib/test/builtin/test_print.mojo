@@ -19,7 +19,7 @@ from tempfile import NamedTemporaryFile
 from testing import assert_equal
 
 from builtin._location import __call_location, _SourceLocation
-from utils import StaticIntTuple, StringRef
+from utils import IndexList, StringRef
 
 
 @always_inline
@@ -109,7 +109,7 @@ def test_print():
         checker.check_line_starts_with("> 99.90000")
         print(">", float64, file=checker.stream())
         checker.check_line_starts_with("> -129.29018")
-        print(">", StaticIntTuple[3](1, 2, 3), file=checker.stream())
+        print(">", IndexList[3](1, 2, 3), file=checker.stream())
         checker.check_line_starts_with("> (1, 2, 3)")
 
         print(">", 9223372036854775806, file=checker.stream())

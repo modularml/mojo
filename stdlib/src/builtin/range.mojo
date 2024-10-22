@@ -29,7 +29,7 @@ from utils._select import _select_register_value as select
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@always_inline
 fn _sign(x: Int) -> Int:
     var result = 0
     result = select(x > 0, 1, result)
@@ -47,12 +47,12 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var curr: Int
     var end: Int
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, end: Int):
         self.curr = max(0, end)
         self.end = self.curr
 
-    @always_inline("nodebug")
+    @always_inline
     fn __iter__(self) -> Self:
         return self
 
@@ -62,16 +62,20 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
         self.curr -= 1
         return self.end - curr
 
-    @always_inline("nodebug")
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
     fn __len__(self) -> Int:
         return self.curr
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         debug_assert(idx < self.__len__(), "index out of range")
         return index(idx)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, -1, -1)
 
@@ -82,7 +86,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     var start: Int
     var end: Int
 
-    @always_inline("nodebug")
+    @always_inline
     fn __iter__(self) -> Self:
         return self
 
@@ -92,16 +96,20 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
         self.start += 1
         return start
 
-    @always_inline("nodebug")
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
     fn __len__(self) -> Int:
         return max(0, self.end - self.start)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + index(idx)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
@@ -128,6 +136,10 @@ struct _StridedRangeIterator(Sized):
         self.start += self.step
         return result
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
 
 @value
 @register_passable("trivial")
@@ -136,23 +148,27 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var end: Int
     var step: Int
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, start: Int, end: Int):
         self.start = start
         self.end = end
         self.step = 1
 
-    @always_inline("nodebug")
+    @always_inline
     fn __iter__(self) -> _StridedRangeIterator:
         return _StridedRangeIterator(self.start, self.end, self.step)
 
-    @always_inline("nodebug")
+    @always_inline
     fn __next__(inout self) -> Int:
         var result = self.start
         self.start += self.step
         return result
 
-    @always_inline("nodebug")
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
     fn __len__(self) -> Int:
         # If the step is positive we want to check that the start is smaller
         # than the end, if the step is negative we want to check the reverse.
@@ -169,12 +185,12 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         # return 0 without a branch.
         return ceildiv(select(cnd, 0, numerator), select(cnd, 1, denominator))
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Int:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + index(idx) * self.step
 
-    @always_inline("nodebug")
+    @always_inline
     fn __reversed__(self) -> _StridedRange:
         var shifted_end = self.end - _sign(self.step)
         var start = shifted_end - ((shifted_end - self.start) % self.step)
@@ -183,7 +199,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         return range(start, end, step)
 
 
-@always_inline("nodebug")
+@always_inline
 fn range[type: Intable](end: type) -> _ZeroStartingRange:
     """Constructs a [0; end) Range.
 
@@ -215,7 +231,7 @@ fn range[type: IntableRaising](end: type) raises -> _ZeroStartingRange:
     return _ZeroStartingRange(int(end))
 
 
-@always_inline("nodebug")
+@always_inline
 fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     """Constructs a [start; end) Range.
 
@@ -233,7 +249,7 @@ fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     return _SequentialRange(int(start), int(end))
 
 
-@always_inline("nodebug")
+@always_inline
 fn range[
     t0: IntableRaising, t1: IntableRaising
 ](start: t0, end: t1) raises -> _SequentialRange:
@@ -323,6 +339,10 @@ struct _UIntZeroStartingRange(UIntSized):
         return self.end - curr
 
     @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
     fn __len__(self) -> UInt:
         return self.curr
 
@@ -349,6 +369,10 @@ struct _UIntStridedRangeIterator(UIntSized):
         self.start += self.step
         return result
 
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
 
 @value
 @register_passable("trivial")
@@ -357,7 +381,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     var end: UInt
     var step: UInt
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(inout self, start: UInt, end: UInt, step: UInt):
         self.start = start
         self.end = end
@@ -384,6 +408,10 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
         var result = self.start
         self.start += self.step
         return result
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     @always_inline
     fn __len__(self) -> UInt:
@@ -423,3 +451,177 @@ fn range(start: UInt, end: UInt, step: UInt = 1) -> _UIntStridedRange:
         The constructed range.
     """
     return _UIntStridedRange(start, end, step)
+
+
+# ===----------------------------------------------------------------------=== #
+# Range Scalar
+# ===----------------------------------------------------------------------=== #
+
+
+@register_passable("trivial")
+struct _ZeroStartingScalarRange[type: DType]:
+    var curr: Scalar[type]
+    var end: Scalar[type]
+
+    @always_inline
+    fn __init__(inout self, end: Scalar[type]):
+        self.curr = max(0, end)
+        self.end = self.curr
+
+    @always_inline
+    fn __iter__(self) -> Self:
+        return self
+
+    @always_inline
+    fn __next__(inout self) -> Scalar[type]:
+        var curr = self.curr
+        self.curr -= 1
+        return self.end - curr
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
+    fn __len__(self) -> Scalar[type]:
+        return self.curr
+
+    @always_inline
+    fn __getitem__(self, idx: Scalar[type]) -> Scalar[type]:
+        debug_assert(idx < self.__len__(), "index out of range")
+        return idx
+
+    @always_inline
+    fn __reversed__(self) -> _StridedScalarRange[type]:
+        constrained[
+            not type.is_unsigned(), "cannot reverse an unsigned range"
+        ]()
+        return range(self.end - 1, Scalar[type](-1), Scalar[type](-1))
+
+
+@value
+@register_passable("trivial")
+struct _SequentialScalarRange[type: DType]:
+    var start: Scalar[type]
+    var end: Scalar[type]
+
+    @always_inline
+    fn __iter__(self) -> Self:
+        return self
+
+    @always_inline
+    fn __next__(inout self) -> Scalar[type]:
+        var start = self.start
+        self.start += 1
+        return start
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
+
+    @always_inline
+    fn __len__(self) -> Scalar[type]:
+        return max(0, self.end - self.start)
+
+    @always_inline
+    fn __getitem__(self, idx: Scalar[type]) -> Scalar[type]:
+        debug_assert(idx < self.__len__(), "index out of range")
+        return self.start + idx
+
+    @always_inline
+    fn __reversed__(self) -> _StridedRange:
+        return range(self.end - 1, self.start - 1, -1)
+
+
+@value
+@register_passable("trivial")
+struct _StridedScalarRangeIterator[type: DType]:
+    var start: Scalar[type]
+    var end: Scalar[type]
+    var step: Scalar[type]
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        # If the type is unsigned, then 'step' cannot be negative.
+        @parameter
+        if type.is_unsigned():
+            return self.start < self.end
+        else:
+            if self.step > 0:
+                return self.start < self.end
+            return self.end < self.start
+
+    @always_inline
+    fn __next__(inout self) -> Scalar[type]:
+        var result = self.start
+        self.start += self.step
+        return result
+
+
+@value
+@register_passable("trivial")
+struct _StridedScalarRange[type: DType]:
+    var start: Scalar[type]
+    var end: Scalar[type]
+    var step: Scalar[type]
+
+    @always_inline
+    fn __iter__(self) -> _StridedScalarRangeIterator[type]:
+        return _StridedScalarRangeIterator(self.start, self.end, self.step)
+
+
+@always_inline
+fn range[type: DType, //](end: Scalar[type]) -> _ZeroStartingScalarRange[type]:
+    """Constructs a [start; end) Range with a given step.
+
+    Parameters:
+        type: The range type.
+
+    Args:
+        end: The end of the range.
+
+    Returns:
+        The constructed range.
+    """
+    return _ZeroStartingScalarRange(end)
+
+
+@always_inline
+fn range[
+    type: DType, //
+](start: Scalar[type], end: Scalar[type]) -> _SequentialScalarRange[type]:
+    """Constructs a [start; end) Range with a given step.
+
+    Parameters:
+        type: The range type.
+
+    Args:
+        start: The start of the range.
+        end: The end of the range.
+
+    Returns:
+        The constructed range.
+    """
+    return _SequentialScalarRange(start, end)
+
+
+@always_inline
+fn range[
+    type: DType, //
+](
+    start: Scalar[type], end: Scalar[type], step: Scalar[type]
+) -> _StridedScalarRange[type]:
+    """Constructs a [start; end) Range with a given step.
+
+    Parameters:
+        type: The range type.
+
+    Args:
+        start: The start of the range.
+        end: The end of the range.
+        step: The step for the range.  Defaults to 1.
+
+    Returns:
+        The constructed range.
+    """
+    return _StridedScalarRange(start, end, step)

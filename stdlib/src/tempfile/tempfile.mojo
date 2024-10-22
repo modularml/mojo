@@ -23,6 +23,7 @@ import os
 import sys
 from collections import Optional, List
 from pathlib import Path
+from utils import Span, write_buffered
 
 alias TMP_MAX = 10_000
 
@@ -260,7 +261,25 @@ struct TemporaryDirectory:
 
 
 struct NamedTemporaryFile:
-    """A handle to a temporary file."""
+    """A handle to a temporary file.
+
+    Example:
+    ```mojo
+    from tempfile import NamedTemporaryFile
+    from pathlib import Path
+    def main():
+        var p: Path
+        with NamedTemporaryFile(mode="rw") as f:
+            p = f.name
+            f.write("Hello world!")
+            f.seek(0)
+            print(
+                f.read() == "Hello world!"
+            )
+        print(str(p), p.exists()) #Removed by default
+    ```
+    Note: `NamedTemporaryFile.__init__` document the arguments.
+    """
 
     var _file_handle: FileHandle
     """The underlying file handle."""
@@ -383,13 +402,27 @@ struct NamedTemporaryFile:
         """
         return self._file_handle.seek(offset, whence)
 
-    fn write(self, data: String) raises:
-        """Write the data to the file.
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
 
         Args:
-            data: The data to write to the file.
+            args: Sequence of arguments to write to this Writer.
         """
-        self._file_handle.write(data)
+        var file = FileDescriptor(self._file_handle._get_raw_fd())
+        write_buffered[buffer_size=4096](file, args)
+
+    @always_inline
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
+        """
+        Write a span of bytes to the file.
+
+        Args:
+            bytes: The byte span to write to this file.
+        """
+        self._file_handle.write_bytes(bytes)
 
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context.
