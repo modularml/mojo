@@ -82,6 +82,10 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, -1, -1)
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 @value
 @register_passable("trivial")
@@ -116,6 +120,10 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 @value
 @register_passable("trivial")
@@ -142,6 +150,10 @@ struct _StridedRangeIterator(Sized):
     @always_inline
     fn __has_more__(self) -> Bool:
         return self.__len__() > 0
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 @value
@@ -200,6 +212,10 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         var end = self.start - self.step
         var step = -self.step
         return range(start, end, step)
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 @always_inline
@@ -354,6 +370,10 @@ struct _UIntZeroStartingRange(UIntSized):
         debug_assert(idx < self.__len__(), "index out of range")
         return idx
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 @value
 @register_passable("trivial")
@@ -375,6 +395,10 @@ struct _UIntStridedRangeIterator(UIntSized):
     @always_inline
     fn __has_more__(self) -> Bool:
         return self.__len__() > 0
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 @value
@@ -426,6 +450,10 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     fn __getitem__(self, idx: UInt) -> UInt:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + idx * self.step
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 @always_inline
