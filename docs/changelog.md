@@ -214,6 +214,9 @@ what we publish.
 - The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
   `b my_module::main`.
 
+- The VS Code extension now allows cancelling the installation of its private
+  MAX SDK.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -373,3 +376,6 @@ what we publish.
 
 - The VS Code extension now downloads its private copy of the MAX SDK in a way
   that prevents ETXTBSY errors on Linux.
+
+- The VS Code extension now allows invoking a mojo formatter from SDK
+  installations that contain white spaces in their path.
