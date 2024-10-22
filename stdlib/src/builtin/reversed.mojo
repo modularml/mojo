@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Dict
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
+from utils.string_slice import _StringSliceIter, StringSlice, Stringlike
 
 from .range import _StridedRange
 
@@ -173,3 +174,18 @@ fn reversed[
     return _DictEntryIter[K, V, dict_origin, False](
         src[]._reserved() - 1, 0, src
     )
+
+
+@always_inline
+fn reversed[
+    T: Stringlike
+](ref [_]value: T) -> _StringSliceIter[__origin_of(value), forward=False]:
+    """Return a reversed iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's reversed Iterator.
+    """
+    return value.__reversed__()

@@ -23,6 +23,9 @@ from python import (
 )  # TODO: remove this and fixup downstream imports
 from math import ceildiv
 from utils._select import _select_register_value as select
+from utils.string_slice import StringSlice, _StringSliceIter, Stringlike
+from collections.list import _ListIter
+from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -63,7 +66,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
         return self.end - curr
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -97,7 +100,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
         return start
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -137,7 +140,7 @@ struct _StridedRangeIterator(Sized):
         return result
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
 
@@ -165,7 +168,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         return result
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -339,7 +342,7 @@ struct _UIntZeroStartingRange(UIntSized):
         return self.end - curr
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -370,7 +373,7 @@ struct _UIntStridedRangeIterator(UIntSized):
         return result
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
 
@@ -410,7 +413,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
         return result
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -479,7 +482,7 @@ struct _ZeroStartingScalarRange[type: DType]:
         return self.end - curr
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -497,6 +500,10 @@ struct _ZeroStartingScalarRange[type: DType]:
             not type.is_unsigned(), "cannot reverse an unsigned range"
         ]()
         return range(self.end - 1, Scalar[type](-1), Scalar[type](-1))
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 @value
@@ -516,7 +523,7 @@ struct _SequentialScalarRange[type: DType]:
         return start
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     @always_inline
@@ -532,6 +539,10 @@ struct _SequentialScalarRange[type: DType]:
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 @value
 @register_passable("trivial")
@@ -541,7 +552,7 @@ struct _StridedScalarRangeIterator[type: DType]:
     var step: Scalar[type]
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         # If the type is unsigned, then 'step' cannot be negative.
         @parameter
         if type.is_unsigned():
@@ -556,6 +567,10 @@ struct _StridedScalarRangeIterator[type: DType]:
         var result = self.start
         self.start += self.step
         return result
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 @value
@@ -625,3 +640,183 @@ fn range[
         The constructed range.
     """
     return _StridedScalarRange(start, end, step)
+
+
+# ===----------------------------------------------------------------------=== #
+# Utils
+# ===----------------------------------------------------------------------=== #
+
+
+trait _Iterator:
+    fn __iter__(self) -> Self:
+        ...
+
+
+# TODO: this is the goal
+# trait _Iterator[T: AnyType]:
+#     fn __iter__(self) -> Self:
+#         ...
+
+#     fn __next__(inout self) -> T:
+#         ...
+
+#     fn __has_more__(self) -> Bool:
+#         ...
+
+
+# trait _Iterable[T: AnyType]:
+#     fn __iter__(ref [_]self) -> _Iterator[T]:
+#         ...
+
+
+# fn iter[T: AnyType, I: _Iterable[T]](value: T) -> _Iterator[T]:
+#     ...
+
+# fn bool[T: AnyType, I: _Iterator[T]](value: I) -> Bool:
+#     return value.__has_more__()
+
+
+fn iter[T: _Iterator](value: T) -> T:
+    """Get an iterator from the iterator.
+
+    Parameters:
+        T: The type conforming to _Iterator.
+
+    Args:
+        value: The value to get the iterator of.
+
+    Returns:
+        The iterator of the value.
+    """
+    return value.__iter__()
+
+
+fn iter[
+    T: DType
+](value: _StridedScalarRange[T]) -> _StridedScalarRangeIterator[T]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()
+
+
+@always_inline
+fn iter[
+    T: CollectionElement
+](
+    ref [_]value: List[T, *_],
+) -> _ListIter[
+    T, __type_of(value).hint_trivial_type, __origin_of(value)
+]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()
+
+
+fn iter[
+    K: KeyElement,
+    V: CollectionElement,
+](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
+    """Get an iterator of the input dict.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+
+    Args:
+        value: The dict to get the iterator of.
+
+    Returns:
+        The iterator of the dict keys.
+    """
+    return value.__reversed__()
+
+
+fn iter[
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: Bool,
+    dict_origin: Origin[dict_mutability].type,
+](ref [_]value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
+    K, V, dict_origin
+]:
+    """Get an iterator of the input dict values.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+        dict_mutability: Whether the reference to the dict values is mutable.
+        dict_origin: The origin of the dict values.
+
+    Args:
+        value: The dict values to get the iterator of.
+
+    Returns:
+        The iterator of the dict values.
+    """
+    return value.__iter__()
+
+
+fn iter[
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: Bool,
+    dict_origin: Origin[dict_mutability].type,
+](ref [_]value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
+    K, V, dict_origin
+]:
+    """Get an iterator of the input dict items.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+        dict_mutability: Whether the reference to the dict items is mutable.
+        dict_origin: The origin of the dict items.
+
+    Args:
+        value: The dict items to get the iterator of.
+
+    Returns:
+        The iterator of the dict items.
+    """
+    var src = value.src
+    return _DictEntryIter[K, V, dict_origin](src[]._reserved() - 1, 0, src)
+
+
+@always_inline
+fn iter[T: Stringlike](ref [_]value: T) -> _StringSliceIter[__origin_of(value)]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()

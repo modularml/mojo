@@ -62,7 +62,7 @@ from builtin.math import (
 )
 from builtin.none import NoneType
 from builtin.object import Attr, object
-from builtin.range import range
+from builtin.range import range, iter
 from builtin.rebind import rebind
 from builtin.repr import Representable, repr
 from builtin.reversed import ReversibleRange, reversed

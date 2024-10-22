@@ -72,7 +72,7 @@ struct _ListIter[
             return Pointer.address_of(self.src[][self.index])
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -81,6 +81,10 @@ struct _ListIter[
             return len(self.src[]) - self.index
         else:
             return self.index
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
 
 
 struct List[T: CollectionElement, hint_trivial_type: Bool = False](

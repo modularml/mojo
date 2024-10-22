@@ -64,7 +64,7 @@ struct _InlineListIter[
             return Pointer.address_of(self.src[][self.index])
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:

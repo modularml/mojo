@@ -46,7 +46,7 @@ struct _VecIter[
         return deref(self.vec, self.i - 1)
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_more__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
