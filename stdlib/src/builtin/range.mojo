@@ -672,9 +672,6 @@ trait _Iterator:
 # fn iter[T: AnyType, I: _Iterable[T]](value: T) -> _Iterator[T]:
 #     ...
 
-# fn bool[T: AnyType, I: _Iterator[T]](value: I) -> Bool:
-#     return value.__has_more__()
-
 
 fn iter[T: _Iterator](value: T) -> T:
     """Get an iterator from the iterator.
