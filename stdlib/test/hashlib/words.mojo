@@ -10,19 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo-no-debug %s -t
-# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
-# the -t flag. Remember to replace it again before pushing any code.
-
-from benchmark import Bench, BenchConfig, Bencher, BenchId
-from bit import byte_swap, rotate_bits_left
-from memory import UnsafePointer
-from hashlib.ahash import (
-    AHasher,
-    _folded_multiply,
-    _read_small,
-)
-from hashlib.fnv1a import Fnv1a
+# RUN: %mojo %s
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -578,136 +566,16 @@ you, утра, боль, хорошие, пришёл, открой, брось,
 fn gen_word_pairs[words: String = words_en]() -> List[String]:
     var result = List[String]()
     try:
-        var list = words.split(",")
+        var list = words.split(", ")
         for w in list:
-            var w1 = str(w[].strip())
+            var w1 = w[].strip()
             for w in list:
                 var w2 = w[].strip()
-                result.append(w1 + " " + w2)
+                result.append(str(w1) + " " + w2)
     except:
         pass
     return result
 
 
-# ===-----------------------------------------------------------------------===#
-# Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_small_keys[s: String, H: Hasher](mut b: Bencher) raises:
-    var words = gen_word_pairs[s]()
-
-    @always_inline
-    @parameter
-    fn call_fn():
-        for w in words:
-            var h = hash[HasherType=H](w[])
-            benchmark.keep(h)
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_long_key[s: String, H: Hasher](mut b: Bencher) raises:
-    @always_inline
-    @parameter
-    fn call_fn():
-        var h = hash[HasherType=H](s)
-        benchmark.keep(h)
-
-    b.iter[call_fn]()
-
-
-# ===-----------------------------------------------------------------------===#
-# Benchmark Main
-# ===-----------------------------------------------------------------------===#
 def main():
-    alias ahasher = AHasher[SIMD[DType.uint64, 4](0)]
-    var m = Bench(BenchConfig(num_repetitions=1))
-    m.bench_function[bench_small_keys[words_ar, ahasher]](
-        BenchId("bench_small_keys_ar_ahash")
-    )
-    m.bench_function[bench_small_keys[words_el, ahasher]](
-        BenchId("bench_small_keys_el_ahash")
-    )
-    m.bench_function[bench_small_keys[words_en, ahasher]](
-        BenchId("bench_small_keys_en_ahash")
-    )
-    m.bench_function[bench_small_keys[words_he, ahasher]](
-        BenchId("bench_small_keys_he_ahash")
-    )
-    m.bench_function[bench_small_keys[words_lv, ahasher]](
-        BenchId("bench_small_keys_lv_ahash")
-    )
-    m.bench_function[bench_small_keys[words_pl, ahasher]](
-        BenchId("bench_small_keys_pl_ahash")
-    )
-    m.bench_function[bench_small_keys[words_ru, ahasher]](
-        BenchId("bench_small_keys_ru_ahash")
-    )
-
-    m.bench_function[bench_small_keys[words_ar, Fnv1a]](
-        BenchId("bench_small_keys_ar_fnv1a")
-    )
-    m.bench_function[bench_small_keys[words_el, Fnv1a]](
-        BenchId("bench_small_keys_el_fnv1a")
-    )
-    m.bench_function[bench_small_keys[words_en, Fnv1a]](
-        BenchId("bench_small_keys_en_fnv1a")
-    )
-    m.bench_function[bench_small_keys[words_he, Fnv1a]](
-        BenchId("bench_small_keys_he_fnv1a")
-    )
-    m.bench_function[bench_small_keys[words_lv, Fnv1a]](
-        BenchId("bench_small_keys_lv_fnv1a")
-    )
-    m.bench_function[bench_small_keys[words_pl, Fnv1a]](
-        BenchId("bench_small_keys_pl_fnv1a")
-    )
-    m.bench_function[bench_small_keys[words_ru, Fnv1a]](
-        BenchId("bench_small_keys_ru_fnv1a")
-    )
-
-    m.bench_function[bench_long_key[words_ar, ahasher]](
-        BenchId("bench_long_key_ar_ahash")
-    )
-    m.bench_function[bench_long_key[words_el, ahasher]](
-        BenchId("bench_long_key_el_ahash")
-    )
-    m.bench_function[bench_long_key[words_en, ahasher]](
-        BenchId("bench_long_key_keys_en_ahash")
-    )
-    m.bench_function[bench_long_key[words_he, ahasher]](
-        BenchId("bench_long_key_he_ahash")
-    )
-    m.bench_function[bench_long_key[words_lv, ahasher]](
-        BenchId("bench_long_key_lv_ahash")
-    )
-    m.bench_function[bench_long_key[words_pl, ahasher]](
-        BenchId("bench_long_key_pl_ahash")
-    )
-    m.bench_function[bench_long_key[words_ru, ahasher]](
-        BenchId("bench_long_key_ru_ahash")
-    )
-
-    m.bench_function[bench_long_key[words_ar, Fnv1a]](
-        BenchId("bench_long_key_ar_fnv1a")
-    )
-    m.bench_function[bench_long_key[words_el, Fnv1a]](
-        BenchId("bench_long_key_el_fnv1a")
-    )
-    m.bench_function[bench_long_key[words_en, Fnv1a]](
-        BenchId("bench_long_key_keys_en_fnv1a")
-    )
-    m.bench_function[bench_long_key[words_he, Fnv1a]](
-        BenchId("bench_long_key_he_fnv1a")
-    )
-    m.bench_function[bench_long_key[words_lv, Fnv1a]](
-        BenchId("bench_long_key_lv_fnv1a")
-    )
-    m.bench_function[bench_long_key[words_pl, Fnv1a]](
-        BenchId("bench_long_key_pl_fnv1a")
-    )
-    m.bench_function[bench_long_key[words_ru, Fnv1a]](
-        BenchId("bench_long_key_ru_fnv1a")
-    )
-    m.dump_report()
+    pass

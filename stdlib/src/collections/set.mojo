@@ -21,7 +21,7 @@ from .dict import (
 )
 
 
-struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
+struct Set[T: KeyElement](Sized, Comparable, Boolable):
     """A set data type.
 
     O(1) average-case amortized add, remove, and membership check.
@@ -289,21 +289,6 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             The number of elements in the set.
         """
         return len(self._data)
-
-    fn __hash__(self) -> UInt:
-        """A hash value of the elements in the set.
-
-        The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).
-
-        Returns:
-            A hash value of the set suitable for non-cryptographic purposes.
-        """
-        var hash_value = 0
-        # Hash combination needs to be commutative so iteration order
-        # doesn't impact the hash value.
-        for e in self:
-            hash_value ^= hash(e[])
-        return hash_value
 
     @no_inline
     fn __str__[U: RepresentableKeyElement](self: Set[U]) -> String:

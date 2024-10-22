@@ -11,10 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Implements the [AHash](https://github.com/tkaitchuck/aHash) algorithm as a Hasher type."""
+
 from bit import byte_swap, rotate_bits_left
 from memory import UnsafePointer
-
-from ._hasher import _HashableWithHasher, _Hasher
+from .hasher import Hasher, Hashable
 
 alias U256 = SIMD[DType.uint64, 4]
 alias U128 = SIMD[DType.uint64, 2]
@@ -24,26 +25,29 @@ alias ROT = 23
 
 @always_inline
 fn _folded_multiply(lhs: UInt64, rhs: UInt64) -> UInt64:
-    """A fast function to emulate a folded multiply of two 64 bit uints.
-    Used because we don't have UInt128 type.
+    """A folded multiply of two 64 bit uints.
+    The arguments are upcasted to unsigned 128 bit and multiplied.
+    The resulting value is split into two 64 bit unsigned values
+    which are folded (xored) into one 64 bit value.
 
     Args:
         lhs: 64 bit uint.
         rhs: 64 bit uint.
 
     Returns:
-        A value which is similar in its bitpattern to result of a folded multply.
+        A result of a folded multply.
     """
-    l = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
+    var l = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
         lhs.value
     )
-    r = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
+    var r = __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<ui128>`](
         rhs.value
     )
-    m = __mlir_op.`pop.mul`(l, r)
-    res = SIMD[DType.uint64, 2](
+    var m = __mlir_op.`pop.mul`(l, r)
+    var res = SIMD[DType.uint64, 2](
         __mlir_op.`pop.bitcast`[_type = __mlir_type.`!pop.simd<2, ui64>`](m)
     )
+
     return res[0] ^ res[1]
 
 
@@ -84,18 +88,25 @@ fn _read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
             return U128(0, 0)
 
 
-struct AHasher[key: U256](_Hasher):
+struct AHasher[key: U256](Hasher):
     """Adopted AHash algorithm which produces fast and high quality hash value by
-    implementing `_Hasher` trait.
+    implementing `Hasher` trait.
+
+    Parameters:
+        key: Key to influence the computed hash value.
 
     References:
 
     - [AHasher Implementation in Rust](https://github.com/tkaitchuck/aHash)
+
     """
 
     var buffer: UInt64
+    """Holds the intermediate hash value."""
     var pad: UInt64
+    """Value used to pad the hash value."""
     var extra_keys: U128
+    """Value used for hash value computation."""
 
     fn __init__(out self):
         """Initialize the hasher."""
@@ -182,8 +193,11 @@ struct AHasher[key: U256](_Hasher):
             for i in range(0, v64.size, 2):
                 self._large_update(U128(v64[i], v64[i + 1]))
 
-    fn update[T: _HashableWithHasher](mut self, value: T):
+    fn update[T: Hashable](mut self, value: T):
         """Update the buffer value with new hashable value.
+
+        Parameters:
+            T: Hashable type.
 
         Args:
             value: Value used for update.

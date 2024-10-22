@@ -20,8 +20,6 @@ from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from hashlib.hash import _hash_simd
 from math import Ceilable, CeilDivable, Floorable, Truncable
 from sys import bitwidthof
 
@@ -306,7 +304,6 @@ struct Int(
     KeyElement,
     Roundable,
     IntLike,
-    _HashableWithHasher,
 ):
     """This type represents an integer value."""
 
@@ -1130,18 +1127,7 @@ struct Int(
         """
         return str(self)
 
-    fn __hash__(self) -> UInt:
-        """Hash the int using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        # TODO(MOCO-636): switch to DType.index
-        return _hash_simd(Scalar[DType.int64](self))
-
-    fn __hash__[H: _Hasher](self, mut hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         """Updates hasher with this int value.
 
         Parameters:

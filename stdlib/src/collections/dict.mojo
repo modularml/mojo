@@ -216,7 +216,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         V: The value type of the dict.
     """
 
-    var hash: Int
+    var hash: UInt64
     """`key.__hash__()`, stored so hashing isn't re-computed during dict lookup."""
     var key: K
     """The unique key for the entry."""
@@ -319,7 +319,7 @@ struct _DictIndex:
     fn __moveinit__(out self, owned existing: Self):
         self.data = existing.data
 
-    fn get_index(self, reserved: Int, slot: Int) -> Int:
+    fn get_index(self, reserved: Int, slot: UInt64) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
             return int(data.load(slot & (reserved - 1)))
@@ -333,7 +333,7 @@ struct _DictIndex:
             var data = self.data.bitcast[Int64]()
             return int(data.load(slot & (reserved - 1)))
 
-    fn set_index(mut self, reserved: Int, slot: Int, value: Int):
+    fn set_index(mut self, reserved: Int, slot: UInt64, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
             return data.store(slot & (reserved - 1), value)
@@ -774,7 +774,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var hash = hash(key)
         var found: Bool
-        var slot: Int
+        var slot: UInt64
         var index: Int
         found, slot, index = self._find_index(hash, key)
         if found:
@@ -839,7 +839,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var hash = hash(key)
         var found: Bool
-        var slot: Int
+        var slot: UInt64
         var index: Int
         found, slot, index = self._find_index(hash, key)
         if found:
@@ -972,7 +972,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if not safe_context:
             self._maybe_resize()
         var found: Bool
-        var slot: Int
+        var slot: UInt64
         var index: Int
         found, slot, index = self._find_index(entry.hash, entry.key)
 
@@ -982,30 +982,30 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self.size += 1
             self._n_entries += 1
 
-    fn _get_index(self, slot: Int) -> Int:
+    fn _get_index(self, slot: UInt64) -> Int:
         return self._index.get_index(self._reserved(), slot)
 
-    fn _set_index(mut self, slot: Int, index: Int):
+    fn _set_index(mut self, slot: UInt64, index: Int):
         return self._index.set_index(self._reserved(), slot, index)
 
-    fn _next_index_slot(self, mut slot: Int, mut perturb: UInt64):
+    fn _next_index_slot(self, mut slot: UInt64, mut perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
         slot = ((5 * slot) + int(perturb + 1)) & (self._reserved() - 1)
 
-    fn _find_empty_index(self, hash: Int) -> Int:
+    fn _find_empty_index(self, hash: UInt64) -> UInt64:
         var slot = hash & (self._reserved() - 1)
-        var perturb = bitcast[DType.uint64](Int64(hash))
+        var perturb = hash
         while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
 
-    fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
+    fn _find_index(self, hash: UInt64, key: K) -> (Bool, UInt64, Int):
         # Return (found, slot, index)
         var slot = hash & (self._reserved() - 1)
-        var perturb = bitcast[DType.uint64](Int64(hash))
+        var perturb = hash
         while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:

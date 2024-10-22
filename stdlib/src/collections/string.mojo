@@ -17,7 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
-from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char
 from sys.intrinsics import _type_is_eq
@@ -754,7 +753,6 @@ struct String(
     Writer,
     CollectionElementNew,
     FloatableRaising,
-    _HashableWithHasher,
 ):
     """Represents a mutable string."""
 
@@ -2020,17 +2018,7 @@ struct String(
         """
         return self.as_string_slice().lstrip()
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.as_string_slice())
-
-    fn __hash__[H: _Hasher](self, mut hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
