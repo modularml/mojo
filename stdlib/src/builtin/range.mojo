@@ -700,7 +700,7 @@ trait _Iterator:
 #         ...
 
 
-# fn iter[T: _Iterable](ref [_]value: T) -> _Iterator[T]:
+# fn iter[T: AnyType, I: _Iterable[T]](ref [_]value: I) -> _Iterator[T]:
 #     return value.__iter__()
 
 
