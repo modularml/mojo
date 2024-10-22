@@ -90,6 +90,10 @@ struct _SpanIter[
         else:
             return self.index
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 @value
 struct Span[

@@ -52,6 +52,10 @@ struct _VecIter[
     fn __len__(self) -> Int:
         return self.size - self.i
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 # ===----------------------------------------------------------------------===#
 # InlinedFixedVector

@@ -74,6 +74,10 @@ struct _InlineListIter[
         else:
             return self.index
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 # TODO: Provide a smarter default for the capacity.
 struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):

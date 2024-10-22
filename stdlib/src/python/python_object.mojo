@@ -120,6 +120,10 @@ struct _PyIter(Sized):
         else:
             return 1
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__has_more__()
+
 
 @register_passable
 struct TypedPythonObject[type_hint: StringLiteral](
