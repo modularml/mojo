@@ -739,9 +739,7 @@ fn iter[
 @always_inline
 fn iter[
     T: CollectionElement
-](
-    ref [_]value: List[T, *_],
-) -> _ListIter[
+](ref [_]value: List[T, *_]) -> _ListIter[
     T, __type_of(value).hint_trivial_type, __origin_of(value)
 ]:
     """Return an iterator.
@@ -759,9 +757,8 @@ fn iter[
 
 
 fn iter[
-    K: KeyElement,
-    V: CollectionElement,
-](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
+    K: KeyElement, V: CollectionElement
+](ref [_]value: Dict[K, V]) -> _DictKeyIter[K, V, __origin_of(value)]:
     """Get an iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
@@ -776,26 +773,19 @@ fn iter[
     Returns:
         The iterator of the dict keys.
     """
-    return value.__reversed__()
+    return value.__iter__()
 
 
 fn iter[
-    K: KeyElement,
-    V: CollectionElement,
-    dict_mutability: Bool,
-    dict_origin: Origin[dict_mutability].type,
-](ref [_]value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
-    K, V, dict_origin
-]:
+    K: KeyElement, V: CollectionElement
+](ref [_]value: _DictValueIter[K, V, *_]) -> _DictValueIter[
+    K, V, __type_of(value).dict_origin
+] as output:
     """Get an iterator of the input dict values.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
-        dict_mutability: Whether the reference to the dict values is mutable.
-        dict_origin: The origin of the dict values.
 
     Args:
         value: The dict values to get the iterator of.
@@ -803,26 +793,20 @@ fn iter[
     Returns:
         The iterator of the dict values.
     """
-    return value.__iter__()
+    output = rebind[__type_of(output)](value.__iter__())
 
 
 fn iter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: Bool,
-    dict_origin: Origin[dict_mutability].type,
-](ref [_]value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
-    K, V, dict_origin
-]:
+](ref [_]value: _DictEntryIter[K, V, *_]) -> _DictEntryIter[
+    K, V, __type_of(value).dict_origin
+] as output:
     """Get an iterator of the input dict items.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
-        dict_mutability: Whether the reference to the dict items is mutable.
-        dict_origin: The origin of the dict items.
 
     Args:
         value: The dict items to get the iterator of.
@@ -831,7 +815,7 @@ fn iter[
         The iterator of the dict items.
     """
     var src = value.src
-    return _DictEntryIter[K, V, dict_origin](src[]._reserved() - 1, 0, src)
+    output = __type_of(output)(src[]._reserved() - 1, 0, src)
 
 
 @always_inline
