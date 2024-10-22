@@ -128,15 +128,11 @@ struct InlineArray[
             unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
         """
 
-        self._array = __mlir_op.`kgen.param.constant`[
-            _type = Self.type,
-            value = __mlir_attr[`#kgen.unknown : `, Self.type],
-        ]()
-
-        for i in range(Self.size):
-            unsafe_assume_initialized[i].unsafe_ptr().move_pointee_into(
-                self.unsafe_ptr() + i
-            )
+        self = (
+            UnsafePointer.address_of(unsafe_assume_initialized)
+            .bitcast[Self]()
+            .take_pointee()
+        )
 
     @always_inline
     fn __init__(inout self, fill: Self.ElementType):
