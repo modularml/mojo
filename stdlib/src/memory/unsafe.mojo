@@ -61,7 +61,7 @@ fn bitcast[
         _type = __mlir_type[
             `!pop.simd<`, new_width.value, `, `, new_type.value, `>`
         ]
-    ](val.value)
+    ](val._value)
 
 
 @always_inline("nodebug")
@@ -118,4 +118,4 @@ fn bitcast[
 
     return __mlir_op.`pop.bitcast`[
         _type = __mlir_type[`!pop.scalar<`, new_type.value, `>`]
-    ](val.value)
+    ](val._value)

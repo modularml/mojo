@@ -192,7 +192,7 @@ fn max(x: SIMD, y: __type_of(x), /) -> __type_of(x):
         A SIMD vector containing the elementwise maximum of x and y.
     """
     constrained[x.type.is_numeric(), "the SIMD type must be numeric"]()
-    return __mlir_op.`pop.max`(x.value, y.value)
+    return __mlir_op.`pop.max`(x._value, y._value)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -246,7 +246,7 @@ fn min(x: SIMD, y: __type_of(x), /) -> __type_of(x):
         A SIMD vector containing the elementwise minimum of x and y.
     """
     constrained[x.type.is_numeric(), "the SIMD type must be numeric"]()
-    return __mlir_op.`pop.min`(x.value, y.value)
+    return __mlir_op.`pop.min`(x._value, y._value)
 
 
 # ===----------------------------------------------------------------------=== #
