@@ -200,7 +200,7 @@ struct Deque[ElementType: CollectionElement](
     fn __del__(owned self):
         """Destroys all elements in the deque and free its memory."""
         for i in range(len(self)):
-            offset = (self._head + i) & (self._capacity - 1)
+            offset = self._physical_index(self._head + i)
             (self._data + offset).destroy_pointee()
         self._data.free()
 
@@ -248,7 +248,7 @@ struct Deque[ElementType: CollectionElement](
         if normalized_idx < 0:
             normalized_idx += len(self)
 
-        offset = (self._head + normalized_idx) & (self._capacity - 1)
+        offset = self._physical_index(self._head + normalized_idx)
         return (self._data + offset)[]
 
     # ===-------------------------------------------------------------------===#
@@ -263,10 +263,10 @@ struct Deque[ElementType: CollectionElement](
         """
         if len(self) == self._maxlen:
             (self._data + self._head).destroy_pointee()
-            self._head = (self._head + 1) & (self._capacity - 1)
+            self._head = self._physical_index(self._head + 1)
 
         (self._data + self._tail).init_pointee_move(value^)
-        self._tail = (self._tail + 1) & (self._capacity - 1)
+        self._tail = self._physical_index(self._tail + 1)
 
         if self._head == self._tail:
             self._realloc(self._capacity << 1)
@@ -279,6 +279,20 @@ struct Deque[ElementType: CollectionElement](
         """
         for value in values:
             self.append(value[])
+
+    @doc_private
+    @always_inline
+    fn _physical_index(self, logical_index: Int) -> Int:
+        """Calculates the physical index in the circular buffer.
+
+        Args:
+            logical_index: The logical index, which may fall outside the physical bounds
+                of the buffer and needs to be wrapped around.
+
+        The size of the underlying buffer is always a power of two, allowing the use of
+        the more efficient bitwise `&` operation instead of the modulo `%` operator.
+        """
+        return logical_index & (self._capacity - 1)
 
     @doc_private
     fn _realloc(inout self, new_capacity: Int):
