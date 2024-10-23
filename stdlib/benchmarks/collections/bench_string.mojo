@@ -16,8 +16,9 @@ from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from random import random_si64, seed
 from pathlib import _dir_of_current_file
 from collections import Optional
-from utils._utf8_validation import _is_valid_utf8
 from os import abort
+from stdlib.collections.string import String
+from stdlib.utils._utf8_validation import _is_valid_utf8
 
 
 # ===----------------------------------------------------------------------===#
@@ -26,8 +27,7 @@ from os import abort
 fn make_string[
     length: UInt = 0
 ](filename: StringLiteral = "UN_charter_EN.txt") -> String:
-    """Make a `String` made of items in the `./data` directory or random bytes
-    (ASCII value range) in case opening the file fails.
+    """Make a `String` made of items in the `./data` directory.
 
     Parameters:
         length: The length in bytes of the resulting `String`. If == 0 -> the
@@ -53,7 +53,7 @@ fn make_string[
         else:
             return String(f.read_bytes())
     except e:
-        print(e)
+        print(e, file=2)
     return abort[String]()
 
 
@@ -245,30 +245,29 @@ def main():
             alias fname = filenames.get[j, StringLiteral]()
             alias old = old_chars.get[j, StringLiteral]()
             alias new = new_chars.get[j, StringLiteral]()
+            suffix = "[" + str(length) + "](" + fname + ")"
             m.bench_function[bench_string_count[length, fname, old]](
-                BenchId("bench_string_count[" + str(length) + "]")
+                BenchId("bench_string_count" + suffix)
             )
             m.bench_function[bench_string_split[length, fname, old]](
-                BenchId("bench_string_split[" + str(length) + "]")
+                BenchId("bench_string_split" + suffix)
             )
             m.bench_function[bench_string_split[length, fname]](
-                BenchId(
-                    "bench_string_split[" + str(length) + ", sequence=None]"
-                )
+                BenchId("bench_string_split_none" + suffix)
             )
             m.bench_function[bench_string_splitlines[length, fname]](
-                BenchId("bench_string_splitlines[" + str(length) + "]")
+                BenchId("bench_string_splitlines" + suffix)
             )
             m.bench_function[bench_string_lower[length, fname]](
-                BenchId("bench_string_lower[" + str(length) + "]")
+                BenchId("bench_string_lower" + suffix)
             )
             m.bench_function[bench_string_upper[length, fname]](
-                BenchId("bench_string_upper[" + str(length) + "]")
+                BenchId("bench_string_upper" + suffix)
             )
             m.bench_function[bench_string_replace[length, fname, old, new]](
-                BenchId("bench_string_replace[" + str(length) + "]")
+                BenchId("bench_string_replace" + suffix)
             )
             m.bench_function[bench_string_is_valid_utf8[length, fname]](
-                BenchId("bench_string_is_valid_utf8[" + str(length) + "]")
+                BenchId("bench_string_is_valid_utf8" + suffix)
             )
     m.dump_report()
