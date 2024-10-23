@@ -1501,23 +1501,6 @@ struct String(
         buf.append(0)
         return String(buf^)
 
-    fn _strref_dangerous(self) -> StringRef:
-        """
-        Returns an inner pointer to the string as a StringRef.
-        This functionality is extremely dangerous because Mojo eagerly releases
-        strings.  Using this requires the use of the _strref_keepalive() method
-        to keep the underlying string alive long enough.
-        """
-        return StringRef(self.unsafe_ptr(), self.byte_length())
-
-    fn _strref_keepalive(self):
-        """
-        A noop that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
-        """
-        pass
-
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
