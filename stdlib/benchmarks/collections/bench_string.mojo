@@ -272,11 +272,12 @@ def main():
                 BenchId("bench_string_is_valid_utf8" + suffix)
             )
 
-    results = Dict[String, Float64]()
+    results = Dict[String, (Float64, Int)]()
     for info in m.info_vec:
         n = info[].name
         time = info[].result.mean("ms")
-        results[n] = (results.get(n).or_else(time) + time) / 2
+        avg, amnt = results.get(n).or_else((Float64(0), 0))
+        results[n] = ((avg * amnt + time) / (amnt + 1), amnt + 1)
     print("")
     for k_v in results.items():
-        print(k_v[].key, k_v[].value, sep=",")
+        print(k_v[].key, k_v[].value[0], sep=",")
