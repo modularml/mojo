@@ -846,7 +846,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
-        [universal separators](
+        [universal separators:](
         https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
@@ -1042,10 +1042,10 @@ fn _to_string_list[
 
 
 @always_inline
-fn to_string_list[
+fn _to_string_list[
     O: ImmutableOrigin, //
 ](items: List[StringSlice[O]]) -> List[String]:
-    """Create a list of Strings copying the existing data.
+    """Create a list of Strings **copying** the existing data.
 
     Parameters:
         O: The origin of the data.
@@ -1067,10 +1067,10 @@ fn to_string_list[
 
 
 @always_inline
-fn to_string_list[
+fn _to_string_list[
     O: ImmutableOrigin, //
 ](items: List[Span[Byte, O]]) -> List[String]:
-    """Create a list of Strings copying the existing data.
+    """Create a list of Strings **copying** the existing data.
 
     Parameters:
         O: The origin of the data.

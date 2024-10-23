@@ -28,7 +28,7 @@ from utils.string_slice import (
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
-    to_string_list,
+    _to_string_list,
 )
 
 # ===----------------------------------------------------------------------===#
@@ -573,7 +573,7 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return to_string_list(self.as_string_slice().splitlines(keepends))
+        return _to_string_list(self.as_string_slice().splitlines(keepends))
 
     fn count(self, substr: String) -> Int:
         """Return the number of non-overlapping occurrences of substring
