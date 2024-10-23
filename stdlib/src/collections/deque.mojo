@@ -56,26 +56,30 @@ struct Deque[ElementType: CollectionElement](
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    var data: UnsafePointer[ElementType]
+    var _data: UnsafePointer[ElementType]
     """The underlying storage for the deque."""
 
-    var head: Int
+    var _head: Int
     """The index of the head: points the first element of the deque."""
 
-    var tail: Int
+    var _tail: Int
     """The index of the tail: points behind the last element of the deque."""
 
-    var capacity: Int
+    var _capacity: Int
     """The amount of elements that can fit in the deque without resizing it."""
 
-    var minlen: Int
+    var _min_capacity: Int
     """The minimum required capacity in the number of elements of the deque."""
 
-    var maxlen: Int
-    """The maximum allowed capacity in the number of elements of the deque."""
+    var _maxlen: Int
+    """The maximum number of elements allowed in the deque.
 
-    var shrink: Bool
-    """The flag defining if the deque storage is re-allocated to make it smaller when possible."""
+    If more elements are pushed, causing the total to exceed this limit,
+    items will be popped from the opposite end to maintain the maximum length.
+    """
+
+    var _shrink: Bool
+    """ Indicates whether the deque's storage is re-allocated to a smaller size when possible."""
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -86,7 +90,7 @@ struct Deque[ElementType: CollectionElement](
         *,
         owned elements: Optional[List[ElementType]] = None,
         capacity: Int = self.default_capacity,
-        minlen: Int = self.default_capacity,
+        min_capacity: Int = self.default_capacity,
         maxlen: Int = -1,
         shrink: Bool = True,
     ):
@@ -95,7 +99,7 @@ struct Deque[ElementType: CollectionElement](
         Args:
             elements: The optional list of initial deque elements.
             capacity: The initial capacity of the deque.
-            minlen: The minimum allowed capacity of the deque when shrinking.
+            min_capacity: The minimum allowed capacity of the deque when shrinking.
             maxlen: The maximum allowed capacity of the deque when growing.
             shrink: Should storage be de-allocated when not needed.
         """
@@ -104,24 +108,24 @@ struct Deque[ElementType: CollectionElement](
         else:
             deque_capacity = bit_ceil(capacity)
 
-        if minlen <= 0:
-            min_capacity = self.default_capacity
+        if min_capacity <= 0:
+            min_deque_capacity = self.default_capacity
         else:
-            min_capacity = bit_ceil(minlen)
+            min_deque_capacity = bit_ceil(min_capacity)
 
         if maxlen <= 0:
-            max_capacity = -1
+            max_deque_capacity = -1
         else:
-            max_capacity = maxlen
+            max_deque_capacity = maxlen
             deque_capacity = min(deque_capacity, bit_ceil(maxlen))
 
-        self.capacity = deque_capacity
-        self.data = UnsafePointer[ElementType].alloc(deque_capacity)
-        self.head = 0
-        self.tail = 0
-        self.minlen = min_capacity
-        self.maxlen = max_capacity
-        self.shrink = shrink
+        self._capacity = deque_capacity
+        self._data = UnsafePointer[ElementType].alloc(deque_capacity)
+        self._head = 0
+        self._tail = 0
+        self._min_capacity = min_deque_capacity
+        self._maxlen = max_deque_capacity
+        self._shrink = shrink
 
         if elements is not None:
             self.extend(elements.value())
@@ -153,13 +157,13 @@ struct Deque[ElementType: CollectionElement](
 
         for i in range(args_length):
             src = UnsafePointer.address_of(variadic_list[i])
-            dst = self.data + i
+            dst = self._data + i
             src.move_pointee_into(dst)
 
         # Mark the elements as unowned to avoid del'ing uninitialized objects.
         variadic_list._is_owned = False
 
-        self.tail = args_length
+        self._tail = args_length
 
     fn __init__(inout self, other: Self):
         """Creates a deepcopy of the given deque.
@@ -168,16 +172,16 @@ struct Deque[ElementType: CollectionElement](
             other: The deque to copy.
         """
         self = Self(
-            capacity=other.capacity,
-            minlen=other.minlen,
-            maxlen=other.maxlen,
-            shrink=other.shrink,
+            capacity=other._capacity,
+            min_capacity=other._min_capacity,
+            maxlen=other._maxlen,
+            shrink=other._shrink,
         )
         for i in range(len(other)):
-            offset = (other.head + i) & (other.capacity - 1)
-            (self.data + i).init_pointee_copy((other.data + offset)[])
+            offset = (other._head + i) & (other._capacity - 1)
+            (self._data + i).init_pointee_copy((other._data + offset)[])
 
-        self.tail = len(other)
+        self._tail = len(other)
 
     fn __moveinit__(inout self, owned existing: Self):
         """Moves data of an existing deque into a new one.
@@ -185,20 +189,20 @@ struct Deque[ElementType: CollectionElement](
         Args:
             existing: The existing deque.
         """
-        self.data = existing.data
-        self.capacity = existing.capacity
-        self.head = existing.head
-        self.tail = existing.tail
-        self.minlen = existing.minlen
-        self.maxlen = existing.maxlen
-        self.shrink = existing.shrink
+        self._data = existing._data
+        self._capacity = existing._capacity
+        self._head = existing._head
+        self._tail = existing._tail
+        self._min_capacity = existing._min_capacity
+        self._maxlen = existing._maxlen
+        self._shrink = existing._shrink
 
     fn __del__(owned self):
         """Destroys all elements in the deque and free its memory."""
         for i in range(len(self)):
-            offset = (self.head + i) & (self.capacity - 1)
-            (self.data + offset).destroy_pointee()
-        self.data.free()
+            offset = (self._head + i) & (self._capacity - 1)
+            (self._data + offset).destroy_pointee()
+        self._data.free()
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -211,7 +215,7 @@ struct Deque[ElementType: CollectionElement](
         Returns:
             `False` if the deque is empty, `True` if there is at least one element.
         """
-        return self.head != self.tail
+        return self._head != self._tail
 
     @always_inline
     fn __len__(self) -> Int:
@@ -220,7 +224,7 @@ struct Deque[ElementType: CollectionElement](
         Returns:
             The number of elements in the deque.
         """
-        return (self.tail - self.head) & (self.capacity - 1)
+        return (self._tail - self._head) & (self._capacity - 1)
 
     fn __getitem__(ref [_]self, idx: Int) -> ref [self] ElementType:
         """Gets the deque element at the given index.
@@ -244,8 +248,8 @@ struct Deque[ElementType: CollectionElement](
         if normalized_idx < 0:
             normalized_idx += len(self)
 
-        offset = (self.head + normalized_idx) & (self.capacity - 1)
-        return (self.data + offset)[]
+        offset = (self._head + normalized_idx) & (self._capacity - 1)
+        return (self._data + offset)[]
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -257,15 +261,15 @@ struct Deque[ElementType: CollectionElement](
         Args:
             value: The value to append.
         """
-        if len(self) == self.maxlen:
-            (self.data + self.head).destroy_pointee()
-            self.head = (self.head + 1) & (self.capacity - 1)
+        if len(self) == self._maxlen:
+            (self._data + self._head).destroy_pointee()
+            self._head = (self._head + 1) & (self._capacity - 1)
 
-        (self.data + self.tail).init_pointee_move(value^)
-        self.tail = (self.tail + 1) & (self.capacity - 1)
+        (self._data + self._tail).init_pointee_move(value^)
+        self._tail = (self._tail + 1) & (self._capacity - 1)
 
-        if self.head == self.tail:
-            self._realloc(self.capacity << 1)
+        if self._head == self._tail:
+            self._realloc(self._capacity << 1)
 
     fn extend(inout self, owned values: List[ElementType]):
         """Extends the right side of the deque by consuming elements of the list argument.
@@ -283,10 +287,10 @@ struct Deque[ElementType: CollectionElement](
         Args:
             new_capacity: The new capacity of the buffer.
         """
-        deque_len = len(self) if self else self.capacity
+        deque_len = len(self) if self else self._capacity
 
-        tail_len = self.tail
-        head_len = self.capacity - self.head
+        tail_len = self._tail
+        head_len = self._capacity - self._head
 
         if head_len > deque_len:
             head_len = deque_len
@@ -294,20 +298,20 @@ struct Deque[ElementType: CollectionElement](
 
         new_data = UnsafePointer[ElementType].alloc(new_capacity)
 
-        src = self.data + self.head
+        src = self._data + self._head
         dsc = new_data
         for i in range(head_len):
             (src + i).move_pointee_into(dsc + i)
 
-        src = self.data
+        src = self._data
         dsc = new_data + head_len
         for i in range(tail_len):
             (src + i).move_pointee_into(dsc + i)
 
-        self.head = 0
-        self.tail = deque_len
+        self._head = 0
+        self._tail = deque_len
 
-        if self.data:
-            self.data.free()
-        self.data = new_data
-        self.capacity = new_capacity
+        if self._data:
+            self._data.free()
+        self._data = new_data
+        self._capacity = new_capacity
