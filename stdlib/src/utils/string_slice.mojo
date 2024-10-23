@@ -69,6 +69,22 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     return int((sizes < c).cast[DType.uint8]().reduce_add())
 
 
+@always_inline
+fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
+    """Get the length of the sequence starting with given byte. Do note that
+    this does not work correctly if given a continuation byte."""
+
+    debug_assert(
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
+    )
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
+
+
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
     """Shift unicode to utf8 representation.
 
@@ -965,23 +981,19 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         while offset < length:
             eol_start = offset
             eol_length = 0
-            iterator = Self(
-                unsafe_from_utf8_ptr=ptr + offset, len=length - offset
-            ).__iter__()
 
             while eol_start < length:
-                char = iterator.__next__()
-                c_len = char.byte_length()
+                b0 = ptr[eol_start]
+                char_len = _utf8_first_byte_sequence_length(b0)
+                char = Self(unsafe_from_utf8_ptr=ptr + eol_start, len=char_len)
                 if char.isnewline[single_character=True]():
-                    if c_len == 1 and char.unsafe_ptr()[0] == `\r`:
-                        next_char = iterator.__next__()
-                        if next_char.byte_length() == 1:
-                            isnewline = next_char.unsafe_ptr()[0] == `\n`
-                            eol_length = 1 + int(isnewline)
-                            break
-                    eol_length = c_len
+                    char_end = eol_start + char_len
+                    if b0 == `\r` and char_end < length:
+                        debug_assert(char_len == 1, "corrupted byte sequence")
+                        char_len += int(ptr[char_end] == `\n`)
+                    eol_length = char_len
                     break
-                eol_start += c_len
+                eol_start += char_len
 
             str_len = eol_start - offset + int(keepends) * eol_length
             s = StringSlice[O](unsafe_from_utf8_ptr=ptr + offset, len=str_len)

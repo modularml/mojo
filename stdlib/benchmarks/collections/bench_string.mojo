@@ -15,10 +15,10 @@
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from random import random_si64, seed
 from pathlib import _dir_of_current_file
-from collections import Optional
+from collections import Optional, Dict
 from os import abort
-from stdlib.collections.string import String
-from stdlib.utils._utf8_validation import _is_valid_utf8
+from collections.string import String
+from utils._utf8_validation import _is_valid_utf8
 
 
 # ===----------------------------------------------------------------------===#
@@ -224,16 +224,6 @@ fn bench_string_is_valid_utf8[
 def main():
     seed()
     var m = Bench(BenchConfig(num_repetitions=5))
-    # NOTE: A proper way to run a benchmark like this is:
-    # 1. Run the benchmark on nightly branch with num_repetitions=5 and take the
-    #    **median** value for each function, length, and language that is to be
-    #    measured.
-    # 2. Then run the benchmark on num_repetitions=1 if you want faster results
-    #    during development of your branch.
-    # 3. When ready to make statements about speed improvements, first run the
-    #    benchmark again with num_repetitions=5 and take the **median** of that.
-    # 4. Make a table and report the new **median** numbers and the markdown
-    #    percentage improvement over nightly version (new - nightly)/nightly.
     alias filenames = (
         "UN_charter_EN",
         "UN_charter_ES",
@@ -281,4 +271,12 @@ def main():
             m.bench_function[bench_string_is_valid_utf8[length, fname]](
                 BenchId("bench_string_is_valid_utf8" + suffix)
             )
-    m.dump_report()
+
+    results = Dict[String, Float64]()
+    for info in m.info_vec:
+        n = info[].name
+        time = info[].result.mean("ms")
+        results[n] = (results.get(n).or_else(time) + time) / 2
+    print("")
+    for k_v in results.items():
+        print(k_v[].key, k_v[].value, sep=",")
