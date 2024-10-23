@@ -1037,7 +1037,17 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        return not (self != other)
+        if not self and not other:
+            return True
+        if len(self) != len(other):
+            return False
+        # same pointer and length, so equal
+        if self.unsafe_ptr() == other.unsafe_ptr():
+            return True
+        for i in range(len(self)):
+            if self.unsafe_ptr()[i] != other.unsafe_ptr()[i]:
+                return False
+        return True
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -1049,7 +1059,7 @@ struct String(
         Returns:
             True if the Strings are not equal and False otherwise.
         """
-        return self._strref_dangerous() != other._strref_dangerous()
+        return not (self == other)
 
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
