@@ -246,7 +246,7 @@ def main():
             alias fname = filenames.get[j, StringLiteral]()
             alias old = old_chars.get[j, StringLiteral]()
             alias new = new_chars.get[j, StringLiteral]()
-            suffix = "[" + str(length) + "](" + fname + ")"
+            suffix = "[" + str(length) + "]"  # "(" + fname + ")"
             m.bench_function[bench_string_count[length, fname, old]](
                 BenchId("bench_string_count" + suffix)
             )
