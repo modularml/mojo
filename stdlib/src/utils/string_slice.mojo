@@ -973,10 +973,31 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         alias `\r` = UInt8(ord("\r"))
         alias `\n` = UInt8(ord("\n"))
+        alias `\t` = UInt8(ord("\t"))
+        alias `\x1c` = UInt8(ord("\x1c"))
+        alias `\x1e` = UInt8(ord("\x1e"))
         output = List[StringSlice[O]](capacity=128)  # guessing
         ptr = self.unsafe_ptr()
         length = self.byte_length()
         offset = 0
+
+        @always_inline
+        @parameter
+        fn _is_newline_char(
+            ptr: UnsafePointer[Byte], length: Int, b0: Byte
+        ) -> Bool:
+            # sorry for readability, but this has less overhead than memcmp
+            # highly performance sensitive code, benchmark before touching
+            if length == 1:
+                return `\t` <= b0 <= `\x1e` and not (`\r` < b0 < `\x1c`)
+            elif length == 2:
+                return ptr[0] == 0xC2 and ptr[1] == 0x85  # next line: \x85
+            elif length == 3:
+                # unicode line sep or paragraph sep: \u2028 , \u2029
+                v2 = ptr[2]
+                lastbyte = v2 == 0xA8 or v2 == 0xA9
+                return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
+            return False
 
         while offset < length:
             eol_start = offset
@@ -985,13 +1006,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             while eol_start < length:
                 b0 = ptr[eol_start]
                 char_len = _utf8_first_byte_sequence_length(b0)
-                char = Self(unsafe_from_utf8_ptr=ptr + eol_start, len=char_len)
-                if char.isnewline[single_character=True]():
-                    char_end = eol_start + char_len
-                    if b0 == `\r` and char_end < length:
-                        debug_assert(char_len == 1, "corrupted byte sequence")
-                        char_len += int(ptr[char_end] == `\n`)
-                    eol_length = char_len
+                isnewline = int(_is_newline_char(ptr + eol_start, char_len, b0))
+                char_end = isnewline * (eol_start + char_len)
+                next_idx = char_end * int(char_end < length)
+                is_n = next_idx != 0 and ptr[next_idx] == `\n`
+                eol_length = isnewline * (char_len + int(b0 == `\r` and is_n))
+                if isnewline == 1:
                     break
                 eol_start += char_len
 
