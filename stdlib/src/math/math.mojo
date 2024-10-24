@@ -19,6 +19,7 @@ from math import floor
 ```
 """
 
+from builtin._documentation import doc_private
 from collections import List
 from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const
@@ -34,7 +35,6 @@ from sys import (
 from memory import UnsafePointer
 
 from bit import count_trailing_zeros
-from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
@@ -2470,3 +2470,204 @@ fn _call_ptx_intrinsic[
         )
 
     return res
+
+
+# ===----------------------------------------------------------------------=== #
+# Ceilable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Ceilable:
+    """
+    The `Ceilable` trait describes a type that defines a ceiling operation.
+
+    Types that conform to `Ceilable` will work with the builtin `ceil`
+    function. The ceiling operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Ceilable, ceil
+
+    @value
+    struct Complex(Ceilable):
+        var re: Float64
+        var im: Float64
+
+        fn __ceil__(self) -> Self:
+            return Self(ceil(self.re), ceil(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Floorable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Floorable:
+    """
+    The `Floorable` trait describes a type that defines a floor operation.
+
+    Types that conform to `Floorable` will work with the builtin `floor`
+    function. The floor operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Floorable, floor
+
+    @value
+    struct Complex(Floorable):
+        var re: Float64
+        var im: Float64
+
+        fn __floor__(self) -> Self:
+            return Self(floor(self.re), floor(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# CeilDivable
+# ===----------------------------------------------------------------------=== #
+
+
+trait CeilDivable:
+    """
+    The `CeilDivable` trait describes a type that defines a ceil division
+    operation.
+
+    Types that conform to `CeilDivable` will work with the `math.ceildiv`
+    function.
+
+    For example:
+    ```mojo
+    from math import CeilDivable
+
+    @value
+    struct Foo(CeilDivable):
+        var x: Float64
+
+        fn __floordiv__(self, other: Self) -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) -> Self:
+            return other // self
+
+        fn __neg__(self) -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    @doc_private
+    fn __floordiv__(self, other: Self) -> Self:
+        ...
+
+    @doc_private
+    fn __rfloordiv__(self, other: Self) -> Self:
+        ...
+
+    @doc_private
+    fn __neg__(self) -> Self:
+        ...
+
+
+trait CeilDivableRaising:
+    """
+    The `CeilDivable` trait describes a type that define a floor division and
+    negation operation that can raise.
+
+    Types that conform to `CeilDivableRaising` will work with the `//` operator
+    as well as the `math.ceildiv` function.
+
+    For example:
+    ```mojo
+    from math import CeilDivableRaising
+
+    @value
+    struct Foo(CeilDivableRaising):
+        var x: object
+
+        fn __floordiv__(self, other: Self) raises -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) raises -> Self:
+            return other // self
+
+        fn __neg__(self) raises -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    @doc_private
+    fn __floordiv__(self, other: Self) raises -> Self:
+        ...
+
+    @doc_private
+    fn __rfloordiv__(self, other: Self) raises -> Self:
+        ...
+
+    @doc_private
+    fn __neg__(self) raises -> Self:
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Truncable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Truncable:
+    """
+    The `Truncable` trait describes a type that defines a truncation operation.
+
+    Types that conform to `Truncable` will work with the builtin `trunc`
+    function. The truncation operation always returns the same type as the
+    input.
+
+    For example:
+    ```mojo
+    from math import Truncable, trunc
+
+    @value
+    struct Complex(Truncable):
+        var re: Float64
+        var im: Float64
+
+        fn __trunc__(self) -> Self:
+            return Self(trunc(re), trunc(im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
