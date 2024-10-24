@@ -966,20 +966,18 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         @always_inline
         @parameter
-        fn _is_newline_char(
-            ptr: UnsafePointer[Byte], length: Int, b0: Byte
-        ) -> Bool:
+        fn _is_newline_char(p: UnsafePointer[Byte], l: Int, b0: Byte) -> Bool:
             # sorry for readability, but this has less overhead than memcmp
             # highly performance sensitive code, benchmark before touching
-            if length == 1:
+            if l == 1:
                 return `\t` <= b0 <= `\x1e` and not (`\r` < b0 < `\x1c`)
-            elif length == 2:
-                return b0 == 0xC2 and ptr[1] == 0x85  # next line: \x85
-            elif length == 3:
+            elif l == 2:
+                return b0 == 0xC2 and p[1] == 0x85  # next line: \x85
+            elif l == 3:
                 # unicode line sep or paragraph sep: \u2028 , \u2029
-                v2 = ptr[2]
+                v2 = p[2]
                 lastbyte = v2 == 0xA8 or v2 == 0xA9
-                return b0 == 0xE2 and ptr[1] == 0x80 and lastbyte
+                return b0 == 0xE2 and p[1] == 0x80 and lastbyte
             return False
 
         while offset < length:
@@ -989,6 +987,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             while eol_start < length:
                 b0 = ptr[eol_start]
                 char_len = _utf8_first_byte_sequence_length(b0)
+                debug_assert(
+                    eol_start + char_len < length,
+                    "corrupted sequence causing unsafe memory access",
+                )
                 isnewline = int(_is_newline_char(ptr + eol_start, char_len, b0))
                 char_end = isnewline * (eol_start + char_len)
                 next_idx = char_end * int(char_end < length)
