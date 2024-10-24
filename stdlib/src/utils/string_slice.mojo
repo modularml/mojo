@@ -28,6 +28,7 @@ from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
+from sys.intrinsics import unlikely
 from memory.memory import _memcmp_impl_unconstrained
 from ._utf8_validation import _is_valid_utf8
 
@@ -993,7 +994,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 next_idx = char_end * int(char_end < length)
                 is_r_n = b0 == `\r` and next_idx != 0 and ptr[next_idx] == `\n`
                 eol_length = isnewline * char_len + int(is_r_n)
-                if isnewline == 1:
+                if unlikely(isnewline == 1):
                     break
                 eol_start += char_len
 
