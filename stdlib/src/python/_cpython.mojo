@@ -60,8 +60,7 @@ alias Py_tp_repr = 66
 
 alias Py_TPFLAGS_DEFAULT = 0
 
-# TODO(MSTDL-892): Change this to alias ffi.C_ssize_t
-alias Py_ssize_t = Int
+alias Py_ssize_t = c_ssize_t
 
 # TODO(MOCO-1138):
 #   This should be a C ABI function pointer, not a Mojo ABI function.
@@ -460,9 +459,7 @@ struct PyObject(Stringable, Representable, Writable):
     """
 
     var object_ref_count: Int
-    # FIXME: should we use `PyObjectPtr`?  I don't think so!
     var object_type: UnsafePointer[PyTypeObject]
-    # var object_type: PyObjectPtr
 
     fn __init__(inout self):
         self.object_ref_count = 0
@@ -712,6 +709,7 @@ struct PyModuleDef(Stringable, Representable, Writable):
         writer.write(")")
 
 
+@value
 struct CPython:
     """
     Handle to the CPython interpreter present in the current process.
@@ -781,21 +779,11 @@ struct CPython:
                 self.init_error = "compatible Python library not found"
             self.lib.get_function[fn () -> None]("Py_Initialize")()
             self.version = PythonVersion(_py_get_version(self.lib))
-            _ = self.Py_None()
-            _ = self.PyDict_Type()
         else:
             self.version = PythonVersion(0, 0, 0)
 
     fn __del__(owned self):
         pass
-
-    fn __copyinit__(inout self, existing: Self):
-        self.lib = existing.lib
-        self.dict_type = existing.dict_type
-        self.logging_enabled = existing.logging_enabled
-        self.version = existing.version
-        self.total_ref_count = existing.total_ref_count
-        self.init_error = existing.init_error
 
     @staticmethod
     fn destroy(inout existing: CPython):
