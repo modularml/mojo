@@ -794,27 +794,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return 0
-
-        if self.byte_length() < substr.byte_length() + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = stringref._memmem(
-            haystack_str.unsafe_ptr(),
-            haystack_str.byte_length(),
-            substr.unsafe_ptr(),
-            substr.byte_length(),
-        )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
+        # FIXME(#3526): this should return unicode codepoint offsets
+        return self.as_bytes().find(substr.as_bytes(), start)
 
     fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -827,27 +808,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return len(self)
-
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = _memrmem(
-            haystack_str.unsafe_ptr(),
-            len(haystack_str),
-            substr.unsafe_ptr(),
-            len(substr),
-        )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
+        # FIXME(#3526): this should return unicode codepoint offsets
+        return self.as_bytes().rfind(substr.as_bytes(), start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
