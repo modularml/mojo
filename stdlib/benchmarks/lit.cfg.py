@@ -48,7 +48,10 @@ else:
     # still right now and is always used by the benchmarks.
     pre_built_packages_path = os.environ.get(
         "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
-        repo_root / ".magic" / "envs" / "default" / "lib" / "mojo",
+        os.environ.get(
+            "MODULAR_MOJO_IMPORT_PATH",
+            repo_root / ".magic" / "envs" / "default" / "lib" / "mojo",
+        ),
     )
 
     # The `run-tests.sh` script creates the build directory for you.
@@ -56,19 +59,18 @@ else:
 
     # The tests are executed inside this build directory to avoid
     # polluting the source tree.
-    config.test_exec_root = build_root / "stdlib" / "benchmarks"
+    config.test_exec_root = (build_root / "stdlib" / "benchmarks").resolve()
 
     # Add both the open source, locally built `stdlib.mojopkg`
     # along with the closed source, pre-built packages shipped
     # with the Mojo SDK to the appropriate environment variables.
     # These environment variables are interpreted by the mojo parser
     # when resolving imports.
-    os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = (
-        f"{build_root},{pre_built_packages_path}"
-    )
-    os.environ["MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"] = (
-        f"{build_root},{pre_built_packages_path}"
-    )
+    joint_path = f"{build_root.resolve()},{pre_built_packages_path.resolve()}"
+    os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = joint_path
+    os.environ["MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"] = joint_path
+    os.environ["MODULAR_MOJO_IMPORT_PATH"] = joint_path
+    os.environ["MODULAR_MOJO_MAX_IMPORT_PATH"] = joint_path
 
     # Pass through several environment variables
     # to the underlying subprocesses that run the tests.
