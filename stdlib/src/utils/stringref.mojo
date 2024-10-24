@@ -587,7 +587,7 @@ struct StringRef(
 
     fn strip(self) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
+        This only takes C spaces into account: " \\t\\n\\v\\f\\r".
 
         For example, `"  mojo  "` returns `"mojo"`.
 

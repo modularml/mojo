@@ -20,16 +20,16 @@ internally.
 If you want to just compile and run all of the benchmarks as-is,
 there is a script provided [here](../../stdlib/scripts/run-benchmarks.sh).
 This script builds the open source `stdlib.mojopkg` and then executes
-all of the benchmarks.  Note that, by default, the executor (`llvm-lit`)
-will run all of these benchmarks in parallel.  That is not terribly useful
-in practice for doing performance comparisons.  When doing A-B comparisons,
-I recommend just rebuilding the `stdlib.mojopkg` if needed using
-the [build-stdlib script](../../stdlib/scripts/build-stdlib.sh) and then
-just running `mojo` directly for the individual benchmark file.  For example,
-`mojo stdlib/benchmarks/collections/bench_dict.mojo` as run from the root
-of the repo.  As part of the benchmark configs, there is a mechanism
-for specifying the number of repetitions to run the benchmark, warmup iterations,
-and other things.
+all of the benchmarks sequentially. The script also allows specifying a
+subdirectory or a file to run.
+
+Running e.g. `magic run mojo run stdlib/benchmarks/collections/bench_dict.mojo`
+makes the linker use the existing branch that the compiler is on. If you wish to
+test changes you are making on the current branch, remove the `-t` flag on top
+of the benchmark file (`# RUN: %mojo-no-debug %s -t`) then run:
+`magic run stdlib/scripts/run-benchmarks.sh
+stdlib/benchmarks/collections/bench_dict.mojo`.
+Remember to replace the `-t` flag again before pushing any code.
 
 ## How to write effective benchmarks
 
