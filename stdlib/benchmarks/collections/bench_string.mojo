@@ -228,10 +228,10 @@ def main():
     var m = Bench(BenchConfig(num_repetitions=5))
     alias filenames = (
         "UN_charter_EN",
-        # "UN_charter_ES",
-        # "UN_charter_AR",
-        # "UN_charter_RU",
-        # "UN_charter_zh-CN",
+        "UN_charter_ES",
+        "UN_charter_AR",
+        "UN_charter_RU",
+        "UN_charter_zh-CN",
     )
     alias old_chars = ("a", "ó", "ل", "и", "一")
     alias new_chars = ("A", "Ó", "ل", "И", "一")
