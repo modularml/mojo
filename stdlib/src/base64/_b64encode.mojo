@@ -27,6 +27,7 @@ from collections import InlineArray
 from memory import memcpy, bitcast, UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from builtin.simd import _sub_with_saturation
+from math.math import _compile_time_iota
 
 
 """
@@ -53,17 +54,10 @@ alias END_FIRST_RANGE = 25
 alias END_SECOND_RANGE = 51
 
 
-fn _get_simd_range_values[simd_width: Int]() -> SIMD[DType.uint8, simd_width]:
-    var a = SIMD[DType.uint8, simd_width](0)
-    for i in range(simd_width):
-        a[i] = i
-    return a
-
-
 fn _base64_simd_mask[
     simd_width: Int
 ](nb_value_to_load: Int) -> SIMD[DType.bool, simd_width]:
-    alias mask = _get_simd_range_values[simd_width]()
+    alias mask = _compile_time_iota[DType.uint8, simd_width]()
     return mask < UInt8(nb_value_to_load)
 
 
