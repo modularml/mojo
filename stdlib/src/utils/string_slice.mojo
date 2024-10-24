@@ -988,7 +988,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 b0 = ptr[eol_start]
                 char_len = _utf8_first_byte_sequence_length(b0)
                 debug_assert(
-                    eol_start + char_len < length,
+                    eol_start + char_len <= length,
                     "corrupted sequence causing unsafe memory access",
                 )
                 isnewline = int(_is_newline_char(ptr + eol_start, char_len, b0))
