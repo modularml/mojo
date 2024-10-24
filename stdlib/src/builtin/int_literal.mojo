@@ -13,7 +13,7 @@
 """Implements the IntLiteral class."""
 
 from builtin._documentation import doc_private
-from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from math import Ceilable, CeilDivable, Floorable, Truncable
 
 
 @value

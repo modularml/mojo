@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin._documentation import doc_private
-from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from math import Ceilable, CeilDivable, Floorable, Truncable
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.io import _snprintf
