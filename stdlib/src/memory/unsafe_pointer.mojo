@@ -408,7 +408,7 @@ struct UnsafePointer[
         Returns:
             The string representation of the pointer.
         """
-        return hex(int(self))
+        return String.write(self)
 
     @no_inline
     fn write_to[W: Writer](self, inout writer: W):
@@ -421,9 +421,7 @@ struct UnsafePointer[
         Args:
             writer: The object to write to.
         """
-
-        # TODO: Avoid intermediate String allocation.
-        writer.write(str(self))
+        hex(int(self), writer=writer)
 
     # ===-------------------------------------------------------------------===#
     # Methods
