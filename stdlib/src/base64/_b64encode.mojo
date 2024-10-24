@@ -26,16 +26,7 @@ https://arxiv.org/abs/1704.00605
 from collections import InlineArray
 from memory import memcpy, bitcast, UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
-
-
-fn _subtract_with_saturation[
-    simd_size: Int, //, b: Int
-](a: SIMD[DType.uint8, simd_size]) -> SIMD[DType.uint8, simd_size]:
-    """The equivalent of https://doc.rust-lang.org/core/arch/x86_64/fn._mm_subs_epu8.html .
-    This can be a single instruction on some architectures.
-    """
-    alias b_as_vector = SIMD[DType.uint8, simd_size](b)
-    return max(a, b_as_vector) - b_as_vector
+from builtin.simd import _sub_with_saturation
 
 
 """
@@ -233,8 +224,9 @@ fn _to_b64_ascii[
 
     # See the table above for the offsets, we try to go from 6-bits values to target indexes.
     # The two first ranges go to 0, the other ranges are just 1...12.
-    var saturated = _subtract_with_saturation[END_SECOND_RANGE](
-        ready_to_encode_per_byte
+    var saturated = _sub_with_saturation(
+        ready_to_encode_per_byte,
+        SIMD[DType.uint8, simd_width](END_SECOND_RANGE),
     )
 
     var mask_in_first_range = ready_to_encode_per_byte <= END_FIRST_RANGE
