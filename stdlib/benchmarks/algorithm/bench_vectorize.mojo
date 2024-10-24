@@ -15,9 +15,10 @@
 # Benchmarking performance of vectorize over basic operations
 #
 # ===----------------------------------------------------------------------=== #
-
 # RUN: %mojo-no-debug %s -t | FileCheck %s
 # CHECK: Benchmark results
+# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
+# the -t flag. Remember to replace it again before pushing any code.
 
 from random import rand
 from sys import simdwidthof

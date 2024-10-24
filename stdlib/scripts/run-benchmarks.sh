@@ -32,4 +32,4 @@ if [[ $# -gt 0 ]]; then
 fi
 
 # Run the benchmarks sequentially
-lit -sv --workers 1 "${BENCHMARK_PATH}"
+lit --succinct --show-all --workers 1 ${BENCHMARK_PATH}

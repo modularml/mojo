@@ -42,7 +42,7 @@ else:
     # test_source_root: The root path where tests are located.
     config.test_source_root = Path(__file__).parent.resolve()
 
-    repo_root = Path(__file__).parent.parent.parent.resolve()
+    repo_root = Path(__file__).parent.parent.parent
 
     # This is important since `benchmark` is closed source
     # still right now and is always used by the benchmarks.

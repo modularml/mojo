@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo-no-debug %s -t
+# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
+# the -t flag. Remember to replace it again before pushing any code.
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from random import random_si64, seed
@@ -226,15 +228,16 @@ def main():
     var m = Bench(BenchConfig(num_repetitions=5))
     alias filenames = (
         "UN_charter_EN",
-        "UN_charter_ES",
-        "UN_charter_AR",
-        "UN_charter_RU",
-        "UN_charter_zh-CN",
+        # "UN_charter_ES",
+        # "UN_charter_AR",
+        # "UN_charter_RU",
+        # "UN_charter_zh-CN",
     )
     alias old_chars = ("a", "ó", "ل", "и", "一")
     alias new_chars = ("A", "Ó", "ل", "И", "一")
     alias lengths = (10, 30, 50, 100, 1000, 10_000, 100_000, 1_000_000)
-    """At an average 5 letters per word and 300 words per page:
+    """At an average 5 letters per word and 300 words per page
+    (in the English language):
 
     - 10: 2 words
     - 30: 6 words
