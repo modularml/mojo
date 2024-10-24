@@ -17,8 +17,8 @@ from random import random_si64, seed
 from pathlib import _dir_of_current_file
 from collections import Optional, Dict
 from os import abort
-from stdlib.collections.string import String
-from stdlib.utils._utf8_validation import _is_valid_utf8
+from collections.string import String
+from utils._utf8_validation import _is_valid_utf8
 
 
 # ===----------------------------------------------------------------------===#

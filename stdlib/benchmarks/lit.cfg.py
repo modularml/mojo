@@ -39,22 +39,18 @@ if "_START_MODULAR_INCLUDED" in os.environ:
         config.modular_obj_root, "open-source", "mojo", "stdlib", "benchmarks"
     )
 else:
-    # This is important since `benchmark` is closed source
-    # still right now and is always used by the benchmarks.
-    pre_built_packages_path = os.environ.get(
-        "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
-        Path(os.environ["MODULAR_HOME"])
-        / "pkg"
-        / "packages.modular.com_nightly_mojo"
-        / "lib"
-        / "mojo",
-    )
-
     # test_source_root: The root path where tests are located.
     config.test_source_root = Path(__file__).parent.resolve()
 
+    repo_root = Path(__file__).parent.parent.parent
+    # This is important since `benchmark` is closed source
+    # still right now and is always used by the benchmarks.
+    pre_built_packages_path = (
+        repo_root / ".magic" / "envs" / "default" / "lib" / "mojo",
+    )
+
     # The `run-tests.sh` script creates the build directory for you.
-    build_root = Path(__file__).parent.parent.parent / "build"
+    build_root = repo_root / "build"
 
     # The tests are executed inside this build directory to avoid
     # polluting the source tree.
@@ -65,12 +61,12 @@ else:
     # with the Mojo SDK to the appropriate environment variables.
     # These environment variables are interpreted by the mojo parser
     # when resolving imports.
-    os.environ[
-        "MODULAR_MOJO_NIGHTLY_IMPORT_PATH"
-    ] = f"{build_root},{pre_built_packages_path}"
-    os.environ[
-        "MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"
-    ] = f"{build_root},{pre_built_packages_path}"
+    os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = (
+        f"{build_root},{pre_built_packages_path}"
+    )
+    os.environ["MODULAR_MOJO_MAX_NIGHTLY_IMPORT_PATH"] = (
+        f"{build_root},{pre_built_packages_path}"
+    )
 
     # Pass through several environment variables
     # to the underlying subprocesses that run the tests.
