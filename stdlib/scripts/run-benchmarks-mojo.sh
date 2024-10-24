@@ -31,9 +31,9 @@ if [[ $# -gt 0 ]]; then
   BENCHMARK_PATH=$1
 fi
 
-# Run the benchmarks
+# Run the benchmarks sequentially
 for f in $(find $BENCHMARK_PATH | grep -E ".mojo|.🔥"); do 
   echo "-------------------- BENCHMARK START ${f} --------------------"
-  mojo run -I build/ $f
+  mojo run -I ${BUILD_DIR} ${f} 
   echo "-------------------- BENCHMARK END ${f} --------------------"
 done

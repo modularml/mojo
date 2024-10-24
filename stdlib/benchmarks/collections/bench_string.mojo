@@ -17,8 +17,8 @@ from random import random_si64, seed
 from pathlib import _dir_of_current_file
 from collections import Optional, Dict
 from os import abort
-from collections.string import String
-from utils._utf8_validation import _is_valid_utf8
+from stdlib.collections.string import String
+from stdlib.utils._utf8_validation import _is_valid_utf8
 
 
 # ===----------------------------------------------------------------------===#
@@ -287,7 +287,7 @@ def main():
     for info in m.info_vec:
         n = info[].name
         time = info[].result.mean("ms")
-        avg, amnt = results.get(n).or_else((Float64(0), 0))
+        avg, amnt = results.get(n, (Float64(0), 0))
         results[n] = ((avg * amnt + time) / (amnt + 1), amnt + 1)
     print("")
     for k_v in results.items():
