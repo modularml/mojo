@@ -20,6 +20,7 @@ from sys.ffi import c_char
 
 from memory import UnsafePointer, memcpy
 from memory.memory import _free
+from builtin._documentation import doc_private
 
 from utils import StringRef
 
@@ -211,6 +212,7 @@ struct Error(
         return String(StringRef(self.data, length))
 
 
+@doc_private
 fn __mojo_debugger_raise_hook():
     """This function is used internally by the Mojo Debugger."""
     pass
