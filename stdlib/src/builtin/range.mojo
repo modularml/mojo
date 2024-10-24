@@ -23,6 +23,15 @@ from python import (
 )  # TODO: remove this and fixup downstream imports
 from math import ceildiv
 from utils._select import _select_register_value as select
+from utils.string_slice import StringSlice, _StringSliceIter, Stringlike
+from collections.list import _ListIter
+from collections.dict import (
+    Dict,
+    _DictKeyIter,
+    _DictValueIter,
+    _DictEntryIter,
+    DictEntry,
+)
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -79,6 +88,10 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, -1, -1)
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
+
 
 @value
 @register_passable("trivial")
@@ -113,6 +126,10 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
+
 
 @value
 @register_passable("trivial")
@@ -139,6 +156,10 @@ struct _StridedRangeIterator(Sized):
     @always_inline
     fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
 
 
 @value
@@ -197,6 +218,10 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         var end = self.start - self.step
         var step = -self.step
         return range(start, end, step)
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
 
 
 @always_inline
@@ -351,6 +376,10 @@ struct _UIntZeroStartingRange(UIntSized):
         debug_assert(idx < self.__len__(), "index out of range")
         return idx
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
+
 
 @value
 @register_passable("trivial")
@@ -372,6 +401,10 @@ struct _UIntStridedRangeIterator(UIntSized):
     @always_inline
     fn __hasmore__(self) -> Bool:
         return self.__len__() > 0
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
 
 
 @value
@@ -423,6 +456,10 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     fn __getitem__(self, idx: UInt) -> UInt:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + idx * self.step
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
 
 
 @always_inline
@@ -498,6 +535,10 @@ struct _ZeroStartingScalarRange[type: DType]:
         ]()
         return range(self.end - 1, Scalar[type](-1), Scalar[type](-1))
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
+
 
 @value
 @register_passable("trivial")
@@ -532,6 +573,10 @@ struct _SequentialScalarRange[type: DType]:
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
+
 
 @value
 @register_passable("trivial")
@@ -556,6 +601,10 @@ struct _StridedScalarRangeIterator[type: DType]:
         var result = self.start
         self.start += self.step
         return result
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        return self.__hasmore__()
 
 
 @value
@@ -625,3 +674,318 @@ fn range[
         The constructed range.
     """
     return _StridedScalarRange(start, end, step)
+
+
+# ===----------------------------------------------------------------------=== #
+# Utils
+# ===----------------------------------------------------------------------=== #
+
+
+trait _Iterator:
+    fn __iter__(self) -> Self:
+        ...
+
+
+# TODO: this is the goal
+# trait _Iterator[T: AnyType]:
+#     fn __iter__(self) -> Self:
+#         ...
+
+#     fn __next__(inout self) -> T:
+#         ...
+
+#     fn __hasmore__(self) -> Bool:
+#         ...
+
+#     fn __bool__(self) -> Bool:
+#         return self.__hasmore__()
+
+
+# trait _Iterable[T: AnyType]:
+#     fn __iter__(ref [_]self) -> _Iterator[T]:
+#         ...
+
+
+# fn iter[T: AnyType, I: _Iterable[T]](ref [_]value: I) -> _Iterator[T]:
+#     return value.__iter__()
+
+# fn next[T: AnyType, I: _Iterable[T]](value: I) -> T:
+#     debug_assert(bool(value), "iterator has no next value to yield")
+#     return value.__next__()
+
+
+fn iter[T: _Iterator](value: T) -> T:
+    """Get an iterator from the iterator.
+
+    Parameters:
+        T: The type conforming to _Iterator.
+
+    Args:
+        value: The value to get the iterator of.
+
+    Returns:
+        The iterator of the value.
+    """
+    return value.__iter__()
+
+
+fn iter[
+    T: DType
+](value: _StridedScalarRange[T]) -> _StridedScalarRangeIterator[T]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()
+
+
+@always_inline
+fn iter[
+    T: CollectionElement
+](ref [_]value: List[T, *_]) -> _ListIter[
+    T, __type_of(value).hint_trivial_type, __origin_of(value)
+]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()
+
+
+fn iter[
+    K: KeyElement, V: CollectionElement
+](ref [_]value: Dict[K, V]) -> _DictKeyIter[K, V, __origin_of(value)]:
+    """Get an iterator of the input dict.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+
+    Args:
+        value: The dict to get the iterator of.
+
+    Returns:
+        The iterator of the dict keys.
+    """
+    return value.__iter__()
+
+
+fn iter[
+    K: KeyElement, V: CollectionElement
+](ref [_]value: _DictValueIter[K, V, *_]) -> _DictValueIter[
+    K, V, __type_of(value).dict_origin
+] as output:
+    """Get an iterator of the input dict values.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+
+    Args:
+        value: The dict values to get the iterator of.
+
+    Returns:
+        The iterator of the dict values.
+    """
+    output = rebind[__type_of(output)](value.__iter__())
+
+
+fn iter[
+    K: KeyElement,
+    V: CollectionElement,
+](ref [_]value: _DictEntryIter[K, V, *_]) -> _DictEntryIter[
+    K, V, __type_of(value).dict_origin
+] as output:
+    """Get an iterator of the input dict items.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+
+    Args:
+        value: The dict items to get the iterator of.
+
+    Returns:
+        The iterator of the dict items.
+    """
+    var src = value.src
+    output = __type_of(output)(src[]._reserved() - 1, 0, src)
+
+
+@always_inline
+fn iter[T: Stringlike](ref [_]value: T) -> _StringSliceIter[__origin_of(value)]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()
+
+
+fn next[T: DType](inout value: _ZeroStartingScalarRange[T]) -> Scalar[T]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+fn next[T: DType](inout value: _SequentialScalarRange[T]) -> Scalar[T]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+fn next[T: DType](inout value: _StridedScalarRangeIterator[T]) -> Scalar[T]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+fn next(inout value: _UIntZeroStartingRange) -> UInt:
+    """Return an iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+fn next(inout value: _UIntStridedRangeIterator) -> UInt:
+    """Return an iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+@always_inline
+fn next[
+    T: CollectionElement
+](inout value: _ListIter[T, *_]) -> Pointer[T, __type_of(value).list_origin]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+fn next[
+    K: KeyElement, V: CollectionElement
+](inout value: _DictValueIter[K, V, *_]) -> Pointer[
+    V, __type_of(value).dict_origin
+]:
+    """Get an iterator of the input dict values.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+
+    Args:
+        value: The dict values to get the iterator of.
+
+    Returns:
+        The iterator of the dict values.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
+
+
+fn next[
+    K: KeyElement, V: CollectionElement
+](inout value: _DictEntryIter[K, V, *_]) -> Pointer[
+    DictEntry[K, V], __type_of(value).dict_origin
+] as output:
+    """Get an iterator of the input dict items.
+
+    Parameters:
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+
+    Args:
+        value: The dict items to get the iterator of.
+
+    Returns:
+        The iterator of the dict items.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    output = rebind[__type_of(output)](value.__next__())
+
+
+@always_inline
+fn next(inout value: _StringSliceIter) -> StringSlice[__type_of(value).origin]:
+    """Return an iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    debug_assert(bool(value), "iterator has no next value to yield")
+    return value.__next__()
