@@ -112,7 +112,7 @@ struct StringRef(
         self.length = len
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8]):
+    fn __init__(inout self, *, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
