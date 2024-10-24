@@ -211,7 +211,7 @@ fn bench_string_is_valid_utf8[
     @always_inline
     @parameter
     fn call_fn() raises:
-        var res = _is_valid_utf8(items.unsafe_ptr(), length)
+        var res = _is_valid_utf8(items.as_bytes())
         keep(res)
 
     b.iter[call_fn]()
@@ -234,6 +234,17 @@ def main():
     alias old_chars = ("a", "ó", "ل", "и", "一")
     alias new_chars = ("A", "Ó", "ل", "И", "一")
     alias lengths = (10, 30, 50, 100, 1000, 10_000, 100_000, 1_000_000)
+    """At an average 5 letters per word and 300 words per page:
+
+    - 10: 2 words
+    - 30: 6 words
+    - 50: 10 words
+    - 100: 20 words
+    - 1000: ~ 1/2 page (200 words)
+    - 10_000: ~ 7 pages (2k words)
+    - 100_000: ~ 67 pages (20k words)
+    - 1_000_000: ~ 667 pages (200k words)
+    """
 
     m.bench_function[bench_string_init](BenchId("bench_string_init"))
 
