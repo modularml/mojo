@@ -131,6 +131,7 @@ from collections.string import (
     islower,
     isprintable,
 )
-from hashlib.hash import hash, Hashable
+from hashlib.hash import hash
+from hashlib.hasher import Hashable, Hasher
 from memory import Pointer, AddressSpace
 from utils import AsBytes, Writable, Writer

@@ -427,16 +427,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return len(self._slice) > 0
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self._slice._data, self._slice._len)
-
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
     # TODO: replace with a safe model that checks the body of the method for
@@ -613,6 +603,17 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             A float value that represents the string, or otherwise raises.
         """
         return _atof(self)
+
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
 
     # ===------------------------------------------------------------------===#
     # Methods
