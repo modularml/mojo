@@ -178,7 +178,7 @@ struct Deque[ElementType: CollectionElement](
             shrink=other._shrink,
         )
         for i in range(len(other)):
-            offset = (other._head + i) & (other._capacity - 1)
+            offset = other._physical_index(other._head + i)
             (self._data + i).init_pointee_copy((other._data + offset)[])
 
         self._tail = len(other)
