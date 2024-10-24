@@ -973,12 +973,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             if length == 1:
                 return `\t` <= b0 <= `\x1e` and not (`\r` < b0 < `\x1c`)
             elif length == 2:
-                return ptr[0] == 0xC2 and ptr[1] == 0x85  # next line: \x85
+                return b0 == 0xC2 and ptr[1] == 0x85  # next line: \x85
             elif length == 3:
                 # unicode line sep or paragraph sep: \u2028 , \u2029
                 v2 = ptr[2]
                 lastbyte = v2 == 0xA8 or v2 == 0xA9
-                return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
+                return b0 == 0xE2 and ptr[1] == 0x80 and lastbyte
             return False
 
         while offset < length:
@@ -991,8 +991,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 isnewline = int(_is_newline_char(ptr + eol_start, char_len, b0))
                 char_end = isnewline * (eol_start + char_len)
                 next_idx = char_end * int(char_end < length)
-                is_n = next_idx != 0 and ptr[next_idx] == `\n`
-                eol_length = isnewline * (char_len + int(b0 == `\r` and is_n))
+                is_r_n = b0 == `\r` and next_idx != 0 and ptr[next_idx] == `\n`
+                eol_length = isnewline * char_len + int(is_r_n)
                 if isnewline == 1:
                     break
                 eol_start += char_len
