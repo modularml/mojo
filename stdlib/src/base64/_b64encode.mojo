@@ -192,7 +192,6 @@ fn _shuffle_input_vector[
             54, 55, 55, 56, 
             57, 58, 58, 59, 
             60, 61, 61, 62, 
-            63,
         ]()
         # fmt: on
     else:
