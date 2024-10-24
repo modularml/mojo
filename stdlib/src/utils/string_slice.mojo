@@ -667,24 +667,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         return len(self.as_bytes())
 
-    fn _strref_dangerous(self) -> StringRef:
-        """Returns an inner pointer to the string as a StringRef.
-
-        Safety:
-            This functionality is extremely dangerous because Mojo eagerly
-            releases strings.  Using this requires the use of the
-            _strref_keepalive() method to keep the underlying string alive long
-            enough.
-        """
-        return StringRef(self.unsafe_ptr(), self.byte_length())
-
-    fn _strref_keepalive(self):
-        """A no-op that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
-        """
-        pass
-
     fn startswith(
         self, prefix: StringSlice[_], start: Int = 0, end: Int = -1
     ) -> Bool:
