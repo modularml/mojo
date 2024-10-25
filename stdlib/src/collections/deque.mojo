@@ -23,9 +23,9 @@ from collections import Deque
 
 from bit import bit_ceil
 from bit import bit_ceil, is_power_of_two
+from documentation import doc_private
 from memory import UnsafePointer
 
-from builtin._documentation import doc_private
 
 # ===----------------------------------------------------------------------===#
 # Deque
