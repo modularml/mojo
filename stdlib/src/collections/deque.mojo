@@ -22,7 +22,7 @@ from collections import Deque
 """
 
 from bit import bit_ceil
-from collections import Optional
+from bit import bit_ceil, is_power_of_two
 from memory import UnsafePointer
 
 from builtin._documentation import doc_private
@@ -114,17 +114,20 @@ struct Deque[ElementType: CollectionElement](
             min_deque_capacity = bit_ceil(min_capacity)
 
         if maxlen <= 0:
-            max_deque_capacity = -1
+            max_deque_len = -1
         else:
-            max_deque_capacity = maxlen
-            deque_capacity = min(deque_capacity, bit_ceil(maxlen))
+            max_deque_len = maxlen
+            max_deque_capacity = bit_ceil(maxlen)
+            if is_power_of_two(maxlen):
+                max_deque_capacity <<= 1
+            deque_capacity = min(deque_capacity, max_deque_capacity)
 
         self._capacity = deque_capacity
         self._data = UnsafePointer[ElementType].alloc(deque_capacity)
         self._head = 0
         self._tail = 0
         self._min_capacity = min_deque_capacity
-        self._maxlen = max_deque_capacity
+        self._maxlen = max_deque_len
         self._shrink = shrink
 
         if elements is not None:
@@ -277,8 +280,70 @@ struct Deque[ElementType: CollectionElement](
         Args:
             values: List whose elements will be added at the right side of the deque.
         """
-        for value in values:
-            self.append(value[])
+        len_self = len(self)
+        len_values = len(values)
+        len_total = len_self + len_values
+
+        new_capacity = self._capacity
+        if self._capacity <= len_total:
+            new_capacity = bit_ceil(len_total)
+            if is_power_of_two(len_total):
+                new_capacity <<= 1
+
+        max_capacity = new_capacity
+        if self._maxlen > 0:
+            max_capacity = bit_ceil(self._maxlen)
+            if is_power_of_two(self._maxlen):
+                max_capacity <<= 1
+
+        new_capacity = min(new_capacity, max_capacity)
+
+        # number of elements to move into the final deque
+        # first from `values` and then from `self`
+        n_move_total = len_total
+        if self._maxlen > 0:
+            n_move_total = min(len_total, self._maxlen)
+        n_move_values = min(len_values, n_move_total)
+        n_move_self = n_move_total - n_move_values
+
+        # number of elements that do not fit into `maxlen`
+        # and therefore have to be popped and destroyed
+        n_pop_self = len_self - n_move_self
+        n_pop_values = len_values - n_move_values
+
+        # pop excess `self` elements
+        for _ in range(n_pop_self):
+            (self._data + self._head).destroy_pointee()
+            self._head = self._physical_index(self._head + 1)
+
+        # move from `self` to new location if we have to re-allocate
+        if new_capacity > self._capacity:
+            new_data = UnsafePointer[ElementType].alloc(new_capacity)
+            for i in range(n_move_self):
+                offset = self._physical_index(self._head + i)
+                (self._data + offset).move_pointee_into(new_data + i)
+            if self._data:
+                self._data.free()
+            self._data = new_data
+            self._capacity = new_capacity
+            self._head = 0
+            self._tail = n_move_self
+
+        # we will consume all elements of `values`
+        values.size = 0
+        # pop excess elements from `values`
+        for i in range(n_pop_values):
+            (values.data + i).destroy_pointee()
+
+        # move remaining elements from `values`
+        src = values.data + n_pop_values
+        for i in range(n_move_values):
+            (src + i).move_pointee_into(self._data + self._tail)
+            self._tail = self._physical_index(self._tail + 1)
+
+        # mojo is too eager to destroy `values`
+        # TODO: remove this when mojo is fixed
+        _ = values.size
 
     @doc_private
     @always_inline

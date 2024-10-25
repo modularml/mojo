@@ -81,6 +81,13 @@ fn test_impl_init_maxlen() raises:
     assert_equal(q._maxlen, 10)
     assert_equal(q._capacity, 16)
 
+    # has to allocate two times more capacity
+    # when `maxlen` in a power of 2 because
+    # tail should always point into a free space
+    q = Deque[Int](maxlen=16)
+    assert_equal(q._maxlen, 16)
+    assert_equal(q._capacity, 32)
+
     q = Deque[Int](maxlen=100)
     assert_equal(q._maxlen, 100)
     assert_equal(q._capacity, q.default_capacity)
@@ -104,11 +111,11 @@ fn test_impl_init_list() raises:
 
 fn test_impl_init_list_args() raises:
     q = Deque(elements=List(0, 1, 2), maxlen=2, capacity=10)
-    assert_equal(q._head, 1)
-    assert_equal(q._tail, 3)
+    assert_equal(q._head, 0)
+    assert_equal(q._tail, 2)
     assert_equal(q._capacity, 4)
-    assert_equal((q._data + 1)[], 1)
-    assert_equal((q._data + 2)[], 2)
+    assert_equal((q._data + 0)[], 1)
+    assert_equal((q._data + 1)[], 2)
 
 
 fn test_impl_init_variadic() raises:
@@ -218,14 +225,13 @@ fn test_impl_extend() raises:
     q.extend(lst)
     assert_equal(q._head, 0)
     assert_equal(q._tail, 3)
-    assert_equal(q._capacity, 4)
+    assert_equal(q._capacity, 8)
     assert_equal((q._data + 0)[], 0)
     assert_equal((q._data + 1)[], 1)
     assert_equal((q._data + 2)[], 2)
 
     q.extend(lst)
-    # re-allocated buffer after the first append
-    # then poppedleft the first 2 elements
+    # has to popleft the first 2 elements
     assert_equal(q._capacity, 8)
     assert_equal(q._head, 2)
     assert_equal(q._tail, 6)
@@ -233,6 +239,45 @@ fn test_impl_extend() raises:
     assert_equal((q._data + 3)[], 0)
     assert_equal((q._data + 4)[], 1)
     assert_equal((q._data + 5)[], 2)
+
+    # turn off `maxlen` restriction
+    q._maxlen = -1
+    q.extend(lst)
+    assert_equal(q._capacity, 8)
+    assert_equal(q._head, 2)
+    assert_equal(q._tail, 1)
+    assert_equal((q._data + 2)[], 2)
+    assert_equal((q._data + 3)[], 0)
+    assert_equal((q._data + 4)[], 1)
+    assert_equal((q._data + 5)[], 2)
+    assert_equal((q._data + 6)[], 0)
+    assert_equal((q._data + 7)[], 1)
+    assert_equal((q._data + 0)[], 2)
+
+    # turn on `maxlen` and force to re-allocate
+    q._maxlen = 8
+    q.extend(lst)
+    assert_equal(q._capacity, 16)
+    assert_equal(q._head, 0)
+    assert_equal(q._tail, 8)
+    # has to popleft the first 2 elements
+    assert_equal((q._data + 0)[], 1)
+    assert_equal((q._data + 1)[], 2)
+    assert_equal((q._data + 6)[], 1)
+    assert_equal((q._data + 7)[], 2)
+
+    # extend with the list that is longer than `maxlen`
+    # has to pop all deque elements and some initial
+    # elements from the list as well
+    lst = List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    q.extend(lst)
+    assert_equal(q._capacity, 16)
+    assert_equal(q._head, 8)
+    assert_equal(q._tail, 0)
+    assert_equal((q._data + 8)[], 2)
+    assert_equal((q._data + 9)[], 3)
+    assert_equal((q._data + 14)[], 8)
+    assert_equal((q._data + 15)[], 9)
 
 
 # ===----------------------------------------------------------------------===#
