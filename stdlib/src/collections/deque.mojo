@@ -336,14 +336,10 @@ struct Deque[ElementType: CollectionElement](
             (values.data + i).destroy_pointee()
 
         # move remaining elements from `values`
-        src = values.data + n_pop_values
+        src = values.data.bitcast[origin=__origin_of(values)]() + n_pop_values
         for i in range(n_move_values):
             (src + i).move_pointee_into(self._data + self._tail)
             self._tail = self._physical_index(self._tail + 1)
-
-        # mojo is too eager to destroy `values`
-        # TODO: remove this when mojo is fixed
-        _ = values.size
 
     @doc_private
     @always_inline
