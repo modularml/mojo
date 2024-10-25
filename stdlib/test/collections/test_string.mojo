@@ -63,7 +63,7 @@ def test_repr():
     assert_equal(repr("\x0e"), r"'\x0e'")
     assert_equal(repr("\x1f"), r"'\x1f'")
     assert_equal(repr("'"), '"\'"')
-    assert_equal(repr("\\"), r"'\'")
+    assert_equal(repr("\\"), r"'\\'")
     assert_equal(repr("\x7f"), r"'\x7f'")
 
     # Multi-byte characters

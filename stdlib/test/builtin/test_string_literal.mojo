@@ -246,23 +246,38 @@ def test_lower_upper():
 
 
 def test_repr():
-    # Usual cases
-    assert_equal(StringLiteral.__repr__("hello"), "'hello'")
+    # Standard single-byte characters
+    assert_equal(repr("hello"), "'hello'")
+    assert_equal(repr(str(0)), "'0'")
+    assert_equal(repr("A"), "'A'")
+    assert_equal(repr(" "), "' '")
+    assert_equal(repr("~"), "'~'")
 
-    # Escape cases
-    assert_equal(StringLiteral.__repr__("\0"), r"'\x00'")
-    assert_equal(StringLiteral.__repr__("\x06"), r"'\x06'")
-    assert_equal(StringLiteral.__repr__("\x09"), r"'\t'")
-    assert_equal(StringLiteral.__repr__("\n"), r"'\n'")
-    assert_equal(StringLiteral.__repr__("\x0d"), r"'\r'")
-    assert_equal(StringLiteral.__repr__("\x0e"), r"'\x0e'")
-    assert_equal(StringLiteral.__repr__("\x1f"), r"'\x1f'")
-    assert_equal(StringLiteral.__repr__(" "), "' '")
-    assert_equal(StringLiteral.__repr__("'"), '"\'"')
-    assert_equal(StringLiteral.__repr__("A"), "'A'")
-    assert_equal(StringLiteral.__repr__("\\"), r"'\\'")
-    assert_equal(StringLiteral.__repr__("~"), "'~'")
-    assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
+    # Special single-byte characters
+    assert_equal(repr("\0"), r"'\x00'")
+    assert_equal(repr("\x06"), r"'\x06'")
+    assert_equal(repr("\t"), "'\\t'")
+    assert_equal(repr("\t"), r"'\t'")
+    assert_equal(repr("\n"), "'\\n'")
+    assert_equal(repr("\n"), r"'\n'")
+    assert_equal(repr("\r"), "'\\r'")
+    assert_equal(repr("\r"), r"'\r'")
+    assert_equal(repr("\x0e"), r"'\x0e'")
+    assert_equal(repr("\x1f"), r"'\x1f'")
+    assert_equal(repr("'"), '"\'"')
+    assert_equal(repr("\\"), r"'\\'")
+    assert_equal(repr("\x7f"), r"'\x7f'")
+
+    # Multi-byte characters
+    # 2-byte
+    assert_equal(ascii("Örnsköldsvik"), r"'\xd6rnsk\xf6ldsvik'")
+    assert_equal(repr("Örnsköldsvik"), r"'Örnsköldsvik'")
+    # 3-byte
+    assert_equal(ascii("你好!"), r"'\u4f60\u597d!'")
+    assert_equal(repr("你好!"), r"'你好!'")
+    # 4-byte
+    assert_equal(ascii("hello 🔥!"), r"'hello \U0001f525!'")
+    assert_equal(repr("hello 🔥!"), r"'hello 🔥!'")
 
 
 def test_strip():

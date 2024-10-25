@@ -192,6 +192,7 @@ fn chr(c: Int) -> String:
     # TODO: decide whether to use replacement char (�) or raise ValueError
     # if not _is_valid_utf8(p, num_bytes):
     #     debug_assert(False, "Invalid Unicode code point")
+    #     p.free()
     #     return chr(0xFFFD)
     p[num_bytes] = 0
     return String(ptr=p, len=num_bytes + 1)
@@ -216,7 +217,7 @@ fn _repr[T: Stringlike, //](value: T) -> String:
     span = value.as_bytes_read()
     span_len = len(span)
     debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
-    non_printable_ascii = span.count[func=_nonprintable_ascii]()
+    non_printable_ascii = span.count[func=_nonprintable_python]()
     hex_prefix = 3 * non_printable_ascii  # \xHH
     b_len = value.byte_length()
     length = b_len + hex_prefix + 2  # for the quotes
@@ -230,7 +231,13 @@ fn _repr[T: Stringlike, //](value: T) -> String:
         b0 = v_ptr[v_idx]
         seq_len = _utf8_first_byte_sequence_length(b0)
         use_dquote = use_dquote or (b0 == `'`)
-        if isprintable(b0):
+        if (
+            b0 == `\\`
+        ):  # Python escapes backslashes but they are ASCII printable
+            b_ptr[b_idx] = `\\`
+            b_ptr[b_idx + 1] = `\\`
+            b_idx += 2
+        elif isprintable(b0):
             b_ptr[b_idx] = b0
             b_idx += 1
         elif b0 == `\t`:
@@ -304,7 +311,9 @@ fn isdigit(c: Byte) -> Bool:
 
 
 @always_inline
-fn _isprintable_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+fn _is_ascii_printable_vec[
+    w: Int
+](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias ` ` = SIMD[DType.uint8, w](Byte(ord(" ")))
     alias `~` = SIMD[DType.uint8, w](Byte(ord("~")))
     return (` ` <= v) & (v <= `~`)
@@ -320,7 +329,7 @@ fn isprintable(v: SIMD[DType.uint8]) -> Bool:
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return _isprintable_vec(v).reduce_and()
+    return _is_ascii_printable_vec(v).reduce_and()
 
 
 @always_inline
@@ -333,7 +342,7 @@ fn isprintable(c: Byte) -> Bool:
     Returns:
         True if the character is printable, otherwise False.
     """
-    return _isprintable_vec(c)
+    return _is_ascii_printable_vec(c)
 
 
 @always_inline
@@ -346,13 +355,33 @@ fn isprintable(span: Span[Byte]) -> Bool:
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return span.count[func=_isprintable_vec]() == len(span)
+    return span.count[func=_is_ascii_printable_vec]() == len(span)
 
 
+@always_inline
 fn _nonprintable_ascii[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    return (~_isprintable_vec(v)) & (v < 0b1000_0000)
+    return (~_is_ascii_printable_vec(v)) & (v < 0b1000_0000)
 
 
+@always_inline
+fn _is_python_printable_vec[
+    w: Int
+](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    alias `\\` = SIMD[DType.uint8, w](Byte(ord(" ")))
+    return (v != `\\`) & _is_ascii_printable_vec(v)
+
+
+@always_inline
+fn _is_python_printable(b: Byte) -> Bool:
+    return _is_python_printable_vec(b)
+
+
+@always_inline
+fn _nonprintable_python[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    return (~_is_python_printable_vec(v)) & (v < 0b1000_0000)
+
+
+@always_inline
 fn _byte_to_hex_string(b: Byte) -> Byte:
     alias `0` = Byte(ord("0"))
     alias `9` = Byte(ord("9"))
@@ -360,6 +389,7 @@ fn _byte_to_hex_string(b: Byte) -> Byte:
     return `0` + int(b > 9) * (`a` - `9` - 1) + b
 
 
+@always_inline
 fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], codepoint: Int):
     alias `\\` = Byte(ord("\\"))
     alias `x` = Byte(ord("x"))
