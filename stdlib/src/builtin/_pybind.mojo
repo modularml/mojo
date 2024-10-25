@@ -29,7 +29,7 @@ from python._cpython import (
 from python._bindings import (
     Pythonable,
     PyMojoObject,
-    create_wrapper_function,
+    py_c_function_wrapper,
     check_argument_type,
     # Imported for use by the compiler
     check_arguments_arity,
@@ -107,7 +107,7 @@ fn add_wrapper_to_module[
         module,
         List[PyMethodDef](
             PyMethodDef.function[
-                create_wrapper_function[wrapper_func](), func_name
+                py_c_function_wrapper[wrapper_func], func_name
             ]()
         ),
     )
