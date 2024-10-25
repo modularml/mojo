@@ -80,8 +80,8 @@ features. We also benefit from tremendous lessons learned from other languages
 migrating developers to new compilers and languages, and we leverage the
 existing MLIR compiler ecosystem.
 
-Further, we decided that the right _long-term goal_ for Mojo is to provide a
-**superset of Python** (that is, to make Mojo compatible with existing Python
+Further, we decided that the right _long-term goal_ for Mojo is to adopt the
+**syntax of Python** (that is, to make Mojo compatible with existing Python
 programs) and to embrace the CPython implementation for long-tail ecosystem
 support. If you're a Python programmer, we hope that Mojo is immediately
 familiar, while also providing new tools to develop safe and performant
@@ -197,8 +197,8 @@ interpreter in Mojo instead of C? 🔥
 
 ## Python's problems
 
-By aiming to make Mojo a superset of Python, we believe we can solve many of
-Python's existing problems.
+By aiming to make Mojo the best way to extend Python, we believe we can solve
+many of Python's existing problems.
 
 Python has some well-known problems—most obviously, poor low-level performance
 and CPython implementation details like the global interpreter lock (GIL),
@@ -327,17 +327,17 @@ use-cases of Python, they cannot solve the "two world problem." This approach
 drives fragmentation, and incompatibility makes _migration_ difficult to
 impossible—recall how challenging it was to migrate from Python 2 to Python 3.
 
-### Python supersets with C compatibility
+### Python family languages with C compatibility
 
-Because Mojo is designed to be a superset of Python with improved systems
-programming capabilities, it shares some high-level ideas with other Python
-supersets like [Pyrex](https://wiki.python.org/moin/Pyrex) and
-[Cython](https://cython.org/). Like Mojo, these projects define their own
-language that also support the Python language. They allow you to write more
+Because Mojo is designed to adopt the syntax of Python with improved systems
+programming capabilities, it shares some high-level ideas with other members of
+the Python family of languages like [Pyrex](https://wiki.python.org/moin/Pyrex)
+and [Cython](https://cython.org/). Like Mojo, these projects define their own
+language while also supporting the Python language. They allow you to write more
 performant extensions for Python that interoperate with both Python and C
 libraries.
 
-These Python supersets are great for some kinds of applications, and they've
+These Python family languages are great for some kinds of applications, and they've
 been applied to great effect by some popular Python libraries. However, they
 don't solve [Python's two-world problem](#the-two-world-problem) and because
 they rely on CPython for their core semantics, they can't work without it,
