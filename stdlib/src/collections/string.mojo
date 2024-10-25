@@ -271,15 +271,7 @@ fn _repr[T: Stringlike, //](value: T) -> String:
 
 
 @always_inline
-fn isdigit_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    """Determines whether the given characters are a digit: [0, 9].
-
-    Args:
-        v: The characters to check.
-
-    Returns:
-        True if the characters are a digit.
-    """
+fn _isdigit_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias `0` = SIMD[DType.uint8, w](Byte(ord("0")))
     alias `9` = SIMD[DType.uint8, w](Byte(ord("9")))
     return `0` <= v <= `9`
@@ -295,7 +287,7 @@ fn isdigit(v: SIMD[DType.uint8]) -> Bool:
     Returns:
         True if the characters are a digit.
     """
-    return isdigit_vec(v).reduce_and()
+    return _isdigit_vec(v).reduce_and()
 
 
 @always_inline
@@ -308,19 +300,11 @@ fn isdigit(c: Byte) -> Bool:
     Returns:
         True if the character is a digit.
     """
-    return isdigit_vec(c)
+    return _isdigit_vec(c)
 
 
 @always_inline
-fn isprintable_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    """Determines whether the given characters are ASCII printable.
-
-    Args:
-        v: The characters to check.
-
-    Returns:
-        True if the characters are printable, otherwise False.
-    """
+fn _isprintable_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias ` ` = SIMD[DType.uint8, w](Byte(ord(" ")))
     alias `~` = SIMD[DType.uint8, w](Byte(ord("~")))
     return (` ` <= v) & (v <= `~`)
@@ -336,7 +320,7 @@ fn isprintable(v: SIMD[DType.uint8]) -> Bool:
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return isprintable_vec(v).reduce_and()
+    return _isprintable_vec(v).reduce_and()
 
 
 @always_inline
@@ -349,7 +333,7 @@ fn isprintable(c: Byte) -> Bool:
     Returns:
         True if the character is printable, otherwise False.
     """
-    return isprintable_vec(c)
+    return _isprintable_vec(c)
 
 
 @always_inline
@@ -362,11 +346,11 @@ fn isprintable(span: Span[Byte]) -> Bool:
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return span.count[func=isprintable_vec]() == len(span)
+    return span.count[func=_isprintable_vec]() == len(span)
 
 
 fn _nonprintable_ascii[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    return (~isprintable_vec(v)) & (v < 0b1000_0000)
+    return (~_isprintable_vec(v)) & (v < 0b1000_0000)
 
 
 fn _byte_to_hex_string(b: Byte) -> Byte:
