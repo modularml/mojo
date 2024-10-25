@@ -24,7 +24,7 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils.span import Span, AsBytesRead
-from collections.string import _is_ascii_space, _atol, _atof, _repr
+from collections.string import _is_ascii_space, _atol, _atof, _repr, _ascii
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
@@ -419,7 +419,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Returns:
             A new string containing the ASCII representation of the object.
         """
-        return ascii(self)
+        return _ascii(self)
 
     fn __len__(self) -> Int:
         """Nominally returns the _length in Unicode codepoints_ (not bytes!).

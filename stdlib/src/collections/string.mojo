@@ -217,8 +217,8 @@ fn _repr[T: Stringlike, //](value: T) -> String:
     span = value.as_bytes_read()
     span_len = len(span)
     debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
-    non_printable_ascii = span.count[func=_nonprintable_python]()
-    hex_prefix = 3 * non_printable_ascii  # \xHH
+    nonprintable_python = span.count[func=_nonprintable_python]()
+    hex_prefix = 3 * nonprintable_python  # \xHH
     b_len = value.byte_length()
     length = b_len + hex_prefix + 2  # for the quotes
     buf = String._buffer_type(capacity=length + 1)  # null terminator
@@ -231,9 +231,8 @@ fn _repr[T: Stringlike, //](value: T) -> String:
         b0 = v_ptr[v_idx]
         seq_len = _utf8_first_byte_sequence_length(b0)
         use_dquote = use_dquote or (b0 == `'`)
-        if (
-            b0 == `\\`
-        ):  # Python escapes backslashes but they are ASCII printable
+        # Python escapes backslashes but they are ASCII printable
+        if b0 == `\\`:
             b_ptr[b_idx] = `\\`
             b_ptr[b_idx + 1] = `\\`
             b_idx += 2
@@ -414,11 +413,16 @@ fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], codepoint: Int):
         idx += 1
 
 
-fn ascii[T: Stringlike, //](value: T) -> String:
+trait _HasAscii:
+    fn __ascii__(self) -> String:
+        ...
+
+
+fn ascii[T: _HasAscii](value: T) -> String:
     """Get the ASCII representation of the object.
 
     Parameters:
-        T: The Stringlike type.
+        T: The type.
 
     Args:
         value: The object to get the ASCII representation of.
@@ -426,7 +430,10 @@ fn ascii[T: Stringlike, //](value: T) -> String:
     Returns:
         A string containing the ASCII representation of the object.
     """
+    return value.__ascii__()
 
+
+fn _ascii[T: Stringlike, //](value: T) -> String:
     alias `'` = Byte(ord("'"))
     alias `"` = Byte(ord('"'))
 
@@ -1570,7 +1577,7 @@ struct String(
         Returns:
             A string containing the ASCII representation of the object.
         """
-        return ascii(self)
+        return _ascii(self)
 
     fn __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).

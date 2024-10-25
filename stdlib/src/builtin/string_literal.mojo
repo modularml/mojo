@@ -19,7 +19,7 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
-from collections.string import _repr
+from collections.string import _repr, _ascii
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -275,7 +275,7 @@ struct StringLiteral(
         Returns:
             A string containing the ASCII representation of the object.
         """
-        return ascii(self)
+        return _ascii(self)
 
     fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
