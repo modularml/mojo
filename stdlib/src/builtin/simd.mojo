@@ -34,7 +34,7 @@ from sys._assembly import inlined_assembly
 from os import abort
 
 from bit import pop_count
-from builtin._documentation import doc_private
+from documentation import doc_private
 from math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from hashlib.hash import _hash_simd

@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin._documentation import doc_private
+from documentation import doc_private
 from memory import Pointer, UnsafePointer
 
 

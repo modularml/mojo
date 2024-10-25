@@ -19,7 +19,7 @@ from math import floor
 ```
 """
 
-from builtin._documentation import doc_private
+from documentation import doc_private
 from collections import List
 from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const

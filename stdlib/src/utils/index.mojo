@@ -22,7 +22,7 @@ from utils import IndexList
 
 from sys import bitwidthof
 from builtin.dtype import _int_type_of_width, _uint_type_of_width
-from builtin._documentation import doc_private
+from documentation import doc_private
 from builtin.io import _get_dtype_printf_format, _snprintf
 from collections.string import _calc_initial_buffer_size
 

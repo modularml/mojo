@@ -19,7 +19,7 @@ from memory import Pointer
 ```
 """
 
-from builtin._documentation import doc_private
+from documentation import doc_private
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace
