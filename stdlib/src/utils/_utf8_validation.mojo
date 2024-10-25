@@ -132,12 +132,11 @@ fn validate_chunk[
     return must23_as_80 ^ sc
 
 
-fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
+fn _is_valid_utf8(span: Span[Byte]) -> Bool:
     """Verify that the bytes are valid UTF-8.
 
     Args:
-        ptr: The pointer to the data.
-        length: The length of the items pointed to.
+        span: The data.
 
     Returns:
         Whether the data is valid UTF-8.
@@ -158,6 +157,9 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     U+40000..U+FFFFF   | F1..F3     | 80..BF      | 80..BF     | 80..BF      |
     U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
     """
+
+    ptr = span.unsafe_ptr()
+    length = len(span)
     alias simd_size = sys.simdbytewidth()
     var i: Int = 0
     var previous = SIMD[DType.uint8, simd_size]()

@@ -21,8 +21,8 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char, OpaquePointer
 from utils import StaticString, write_args
 
-from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy, stack_allocation
+from bit import count_leading_zeros, bit_ceil
+from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
@@ -45,6 +45,9 @@ from utils.string_slice import (
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
     Stringlike,
+    _utf8_first_byte_sequence_length,
+    _is_continuation_byte,
+    _is_valid_utf8,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -53,33 +56,37 @@ from utils.string_slice import (
 
 
 fn ord(s: String) -> Int:
-    """Returns an integer that represents the given one-character string.
-
-    Given a string representing one character, return an integer
-    representing the code point of that character. For example, `ord("a")`
-    returns the integer `97`. This is the inverse of the `chr()` function.
+    """Returns the unicode codepoint for the character.
 
     Args:
         s: The input string slice, which must contain only a single character.
 
     Returns:
         An integer representing the code point of the given character.
+
+    Examples:
+    ```mojo
+    print(ord("a")) # 97
+    ```
+    .
     """
     return ord(s.as_string_slice())
 
 
 fn ord(s: StringSlice) -> Int:
-    """Returns an integer that represents the given one-character string.
-
-    Given a string representing one character, return an integer
-    representing the code point of that character. For example, `ord("a")`
-    returns the integer `97`. This is the inverse of the `chr()` function.
+    """Returns the unicode codepoint for the character.
 
     Args:
         s: The input string, which must contain only a single character.
 
     Returns:
-        An integer representing the code point of the given character.
+        An integer representing the unicode codepoint of the given character.
+
+    Examples:
+    ```mojo
+    print(ord("a")) # 97
+    ```
+    .
     """
     # UTF-8 to Unicode conversion:              (represented as UInt32 BE)
     # 1: 0aaaaaaa                            -> 00000000 00000000 00000000 0aaaaaaa     a
@@ -111,6 +118,48 @@ fn ord(s: StringSlice) -> Int:
     return result
 
 
+fn ord[num_bytes: Int](*args: Byte) -> Int:
+    """Returns the unicode codepoint for the given one-character byte sequence.
+
+    Parameters:
+        num_bytes: The amount of bytes of the utf8 sequence.
+
+    Args:
+        args: The input bytes, which must be only a single character.
+
+    Returns:
+        An integer representing the code point of the given character.
+
+    Examples:
+    ```mojo
+    print(ord[2](0xC3, 0xBD)) # 0xFD
+    ```
+    .
+    """
+    debug_assert(
+        num_bytes == _utf8_first_byte_sequence_length(args[0]),
+        "invalid first byte",
+    )
+
+    @parameter
+    if num_bytes == 1:
+        return int(args[0])
+    alias b1_mask = 0b11111111 >> (num_bytes + 1)
+    shift = int((6 * (num_bytes - 1)))
+    result = int(args[0] & b1_mask) << shift
+
+    @parameter
+    for i in range(1, num_bytes):
+        b = args[i]
+        debug_assert(
+            b >> 6 == 0b00000010, "invalid UTF-8 byte ", b, " at index ", i
+        )
+
+        shift -= 6
+        result |= int(b & 0b00111111) << shift
+    return result
+
+
 # ===----------------------------------------------------------------------=== #
 # chr
 # ===----------------------------------------------------------------------=== #
@@ -138,13 +187,7 @@ fn chr(c: Int) -> String:
         return String(String._buffer_type(c, 0))
 
     var num_bytes = _unicode_codepoint_utf8_byte_length(c)
-    var p: UnsafePointer[UInt8]
-    if num_bytes == 2:
-        p = stack_allocation[3, UInt8]()
-    elif num_bytes == 3:
-        p = stack_allocation[4, UInt8]()
-    else:
-        p = stack_allocation[5, UInt8]()
+    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
     _shift_unicode_to_utf8(p, c, num_bytes)
     # TODO: decide whether to use replacement char (�) or raise ValueError
     # if not _is_valid_utf8(p, num_bytes):
@@ -155,8 +198,104 @@ fn chr(c: Int) -> String:
 
 
 # ===----------------------------------------------------------------------=== #
+# repr
+# ===----------------------------------------------------------------------=== #
+
+
+fn _repr[T: Stringlike, //](value: T) -> String:
+    alias `'` = Byte(ord("'"))
+    alias `"` = Byte(ord('"'))
+    alias `\\` = Byte(ord("\\"))
+    alias `\t` = Byte(ord("\t"))
+    alias `t` = Byte(ord("t"))
+    alias `\n` = Byte(ord("\n"))
+    alias `n` = Byte(ord("n"))
+    alias `\r` = Byte(ord("\r"))
+    alias `r` = Byte(ord("r"))
+
+    span = value.as_bytes_read()
+    span_len = len(span)
+    debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
+    non_printable_ascii = span.count[func=_nonprintable_ascii]()
+    hex_prefix = 3 * non_printable_ascii  # \xHH
+    b_len = value.byte_length()
+    length = b_len + hex_prefix + 2  # for the quotes
+    buf = String._buffer_type(capacity=length + 1)  # null terminator
+
+    use_dquote = False
+    v_ptr, b_ptr = value.unsafe_ptr(), buf.unsafe_ptr()
+    v_idx, b_idx = 0, 1
+
+    while v_idx < span_len:
+        b0 = v_ptr[v_idx]
+        seq_len = _utf8_first_byte_sequence_length(b0)
+        use_dquote = use_dquote or (b0 == `'`)
+        if isprintable(b0):
+            b_ptr[b_idx] = b0
+            b_idx += 1
+        elif b0 == `\t`:
+            b_ptr[b_idx] = `\\`
+            b_ptr[b_idx + 1] = `t`
+            b_idx += 2
+        elif b0 == `\n`:
+            b_ptr[b_idx] = `\\`
+            b_ptr[b_idx + 1] = `n`
+            b_idx += 2
+        elif b0 == `\r`:
+            b_ptr[b_idx] = `\\`
+            b_ptr[b_idx + 1] = `r`
+            b_idx += 2
+        elif seq_len == 1:
+            _write_hex[2](b_ptr + b_idx, int(b0))
+            b_idx += 4
+        else:
+            for i in range(seq_len):
+                b_ptr[b_idx + i] = v_ptr[v_idx + i]
+            b_idx += seq_len
+        v_idx += seq_len
+
+    if use_dquote:
+        b_ptr[0] = `"`
+        b_ptr[b_idx] = `"`
+    else:
+        b_ptr[0] = `'`
+        b_ptr[b_idx] = `'`
+    b_ptr[b_idx + 1] = 0  # null terminator
+    buf.size = b_idx + 2
+    return String(buf^)
+
+
+# ===----------------------------------------------------------------------=== #
 # ascii
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn isdigit_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    """Determines whether the given characters are a digit: [0, 9].
+
+    Args:
+        v: The characters to check.
+
+    Returns:
+        True if the characters are a digit.
+    """
+    alias `0` = SIMD[DType.uint8, w](Byte(ord("0")))
+    alias `9` = SIMD[DType.uint8, w](Byte(ord("9")))
+    return `0` <= v <= `9`
+
+
+@always_inline
+fn isdigit(v: SIMD[DType.uint8]) -> Bool:
+    """Determines whether the given characters are a digit: [0, 9].
+
+    Args:
+        v: The characters to check.
+
+    Returns:
+        True if the characters are a digit.
+    """
+    return isdigit_vec(v).reduce_and()
 
 
 @always_inline
@@ -169,18 +308,22 @@ fn isdigit(c: Byte) -> Bool:
     Returns:
         True if the character is a digit.
     """
-    alias `0` = Byte(ord("0"))
-    alias `9` = Byte(ord("9"))
-    return `0` <= c <= `9`
+    return isdigit_vec(c)
 
 
 @always_inline
-fn _is_ascii_printable_vec[
-    w: Int, //
-](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    alias ` ` = Byte(ord(" "))
-    alias `~` = Byte(ord("~"))
-    return v >= ` ` and v <= `~`
+fn isprintable_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    """Determines whether the given characters are ASCII printable.
+
+    Args:
+        v: The characters to check.
+
+    Returns:
+        True if the characters are printable, otherwise False.
+    """
+    alias ` ` = SIMD[DType.uint8, w](Byte(ord(" ")))
+    alias `~` = SIMD[DType.uint8, w](Byte(ord("~")))
+    return (` ` <= v) & (v <= `~`)
 
 
 @always_inline
@@ -193,7 +336,20 @@ fn isprintable(v: SIMD[DType.uint8]) -> Bool:
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return _is_ascii_printable_vec(v).reduce_and()
+    return isprintable_vec(v).reduce_and()
+
+
+@always_inline
+fn isprintable(c: Byte) -> Bool:
+    """Determines whether the given character is ASCII printable.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is printable, otherwise False.
+    """
+    return isprintable_vec(c)
 
 
 @always_inline
@@ -206,7 +362,42 @@ fn isprintable(span: Span[Byte]) -> Bool:
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return span.count[func=_is_ascii_printable_vec]() == len(span)
+    return span.count[func=isprintable_vec]() == len(span)
+
+
+fn _nonprintable_ascii[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
+    return (~isprintable_vec(v)) & (v < 0b1000_0000)
+
+
+fn _byte_to_hex_string(b: Byte) -> Byte:
+    alias `0` = Byte(ord("0"))
+    alias `9` = Byte(ord("9"))
+    alias `a` = Byte(ord("a"))
+    return `0` + int(b > 9) * (`a` - `9` - 1) + b
+
+
+fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], codepoint: Int):
+    alias `\\` = Byte(ord("\\"))
+    alias `x` = Byte(ord("x"))
+    alias `u` = Byte(ord("u"))
+    alias `U` = Byte(ord("U"))
+
+    alias amnt = min(bit_ceil(amnt_hex_bytes), 8)
+    p[0] = `\\`
+
+    @parameter
+    if amnt == 2:
+        p[1] = `x`
+    elif amnt == 4:
+        p[1] = `u`
+    else:
+        p[1] = `U`
+    idx = 2
+
+    @parameter
+    for i in reversed(range(amnt)):
+        p[idx] = _byte_to_hex_string((codepoint // (16**i)) % 16)
+        idx += 1
 
 
 fn ascii[T: Stringlike, //](value: T) -> String:
@@ -222,53 +413,79 @@ fn ascii[T: Stringlike, //](value: T) -> String:
         A string containing the ASCII representation of the object.
     """
 
-    alias `'` = UInt8(ord("'"))
-    alias `\\` = UInt8(ord("\\"))
-    alias `x` = UInt8(ord("x"))
+    alias `'` = Byte(ord("'"))
+    alias `"` = Byte(ord('"'))
 
     span = value.as_bytes_read()
     span_len = len(span)
-    non_printable_chars = span_len - span.count[func=_is_ascii_printable_vec]()
-    hex_prefix = non_printable_chars * 3
+    debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
+    non_printable_ascii = span.count[func=_nonprintable_ascii]()
+    continuation_bytes = span.count[func=_is_continuation_byte]()
+    hex_prefix = 3 * (non_printable_ascii + continuation_bytes)
     b_len = value.byte_length()
-    result = String(String._buffer_type(capacity=b_len + hex_prefix + 3))
+    length = b_len + hex_prefix + 2  # for the quotes
+    buf = String._buffer_type(capacity=length + 1)  # null terminator
 
     use_dquote = False
-    v_ptr, r_ptr = value.unsafe_ptr(), result.unsafe_ptr()
-    v_idx, r_idx = 0, 0
+    v_ptr, b_ptr = value.unsafe_ptr(), buf.unsafe_ptr()
+    v_idx, b_idx = 0, 1
 
-    for _ in range(span_len):
-        char = v_ptr[v_idx]
-        use_dquote = use_dquote or (char == `'`)
-        if isprintable(char):
-            r_ptr[r_idx] = char
+    while v_idx < span_len:
+        b0 = v_ptr[v_idx]
+        use_dquote = use_dquote or (b0 == `'`)
+        seq_len = _utf8_first_byte_sequence_length(b0)
+        b1 = v_ptr[v_idx + int(seq_len > 1)]
+        is_2byte_short = seq_len == 2 and b0 <= 0xC3
+        if isprintable(b0):
+            b_ptr[b_idx] = b0
+            b_idx += 1
+        elif seq_len == 1 or is_2byte_short:
+            codepoint = int(b0)
+            if is_2byte_short:
+                codepoint = ord[2](b0, b1)
+            _write_hex[2](b_ptr + b_idx, codepoint)
+            b_idx += 4
+        elif seq_len < 4:
+            var codepoint: Int
+            if seq_len == 2:
+                codepoint = ord[2](b0, b1)
+            else:
+                codepoint = ord[3](b0, b1, v_ptr[v_idx + 2])
+            _write_hex[4](b_ptr + b_idx, codepoint)
+            b_idx += 6
         else:
-            r_ptr[r_idx] = `\\`
-            r_ptr[r_idx + 1] = `x`
-            r_ptr[r_idx + 2] = char // 16
-            r_ptr[r_idx + 3] = char % 16
-            r_idx += 3
-        v_idx += 1
-        r_idx += 1
+            codepoint = ord[4](b0, b1, v_ptr[v_idx + 2], v_ptr[v_idx + 3])
+            _write_hex[8](b_ptr + b_idx, codepoint)
+            b_idx += 10
+        v_idx += seq_len
 
-    return '"' + result + '"' if use_dquote else "'" + result + "'"
+    if use_dquote:
+        b_ptr[0] = `"`
+        b_ptr[b_idx] = `"`
+    else:
+        b_ptr[0] = `'`
+        b_ptr[b_idx] = `'`
+    b_ptr[b_idx + 1] = 0  # null terminator
+    buf.size = b_idx + 2
+    return String(buf^)
 
 
 @always_inline
 fn _is_ascii_uppercase_vec[
-    w: Int, //
+    w: Int
 ](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    alias `A` = Byte(ord("A"))
-    alias `Z` = Byte(ord("Z"))
-    return v >= `A` and v <= `Z`
+    alias `A` = SIMD[DType.uint8, w](Byte(ord("A")))
+    alias `Z` = SIMD[DType.uint8, w](Byte(ord("Z")))
+    return (`A` <= v) & (v <= `Z`)
+
+
+@always_inline
+fn _is_ascii_uppercase(c: Byte) -> Bool:
+    return _is_ascii_uppercase_vec(c)
 
 
 @always_inline
 fn _is_ascii_uppercase(v: SIMD[DType.uint8]) -> Bool:
-    return _is_ascii_uppercase_vec(v).reduce_and()
-
-@always_inline
-fn _is_ascii_uppercase(v: Byte) -> Bool:
     return _is_ascii_uppercase_vec(v).reduce_and()
 
 
@@ -279,20 +496,22 @@ fn _is_ascii_uppercase(span: Span[Byte]) -> Bool:
 
 @always_inline
 fn _is_ascii_lowercase_vec[
-    w: Int, //
+    w: Int
 ](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    alias `a` = Byte(ord("a"))
-    alias `z` = Byte(ord("z"))
-    return v >= `a` and v <= `z`
+    alias `a` = SIMD[DType.uint8, w](Byte(ord("a")))
+    alias `z` = SIMD[DType.uint8, w](Byte(ord("z")))
+    return (`a` <= v) & (v <= `z`)
+
+
+@always_inline
+fn _is_ascii_lowercase(c: Byte) -> Bool:
+    return _is_ascii_lowercase_vec(c)
 
 
 @always_inline
 fn _is_ascii_lowercase(v: SIMD[DType.uint8]) -> Bool:
     return _is_ascii_lowercase_vec(v).reduce_and()
 
-@always_inline
-fn _is_ascii_lowercase(v: Byte) -> Bool:
-    return _is_ascii_lowercase_vec(v).reduce_and()
 
 @always_inline
 fn _is_ascii_lowercase(span: Span[Byte]) -> Bool:
@@ -1326,7 +1545,7 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        return ascii(self)
+        return _repr(self)
 
     fn __ascii__(self) -> String:
         """Get the ASCII representation of the object. You don't need to call

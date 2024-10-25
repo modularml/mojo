@@ -25,6 +25,7 @@ from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
 from sys import simdwidthof
 
+
 trait AsBytes:
     """
     The `AsBytes` trait denotes a type that can be returned as a immutable byte
@@ -61,6 +62,7 @@ trait AsBytesRead:
             This does not include the trailing null terminator.
         """
         ...
+
 
 @value
 struct _SpanIter[
@@ -372,7 +374,7 @@ struct Span[
         )
 
     fn count[
-        D: DType, //, func: fn[w: Int, //] (SIMD[D, w]) -> SIMD[DType.bool, w]
+        D: DType, //, func: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w]
     ](self: Span[Scalar[D]]) -> Int:
         """Count the amount of times the function returns True.
 
@@ -384,23 +386,23 @@ struct Span[
             The amount of times the function returns True.
         """
 
-        alias sizes = (256, 128, 64, 32, 16, 8)
+        alias widths = (256, 128, 64, 32, 16, 8)
         ptr = self.unsafe_ptr()
         num_bytes = len(self)
         amnt = 0
         processed = 0
 
         @parameter
-        for i in range(len(sizes)):
-            alias s = sizes.get[i, Int]()
+        for i in range(len(widths)):
+            alias w = widths.get[i, Int]()
 
             @parameter
-            if simdwidthof[D]() >= s:
+            if simdwidthof[D]() >= w:
                 rest = num_bytes - processed
-                for _ in range(rest // s):
-                    var vec = (ptr + processed).load[width=s]()
-                    amnt += int(func(vec).cast[D]().reduce_add())
-                    processed += s
+                for _ in range(rest // w):
+                    var vec = (ptr + processed).load[width=w]()
+                    amnt += int(func[w](vec).cast[D]().reduce_add())
+                    processed += w
 
         for i in range(num_bytes - processed):
             amnt += int(func(ptr[processed + i]))

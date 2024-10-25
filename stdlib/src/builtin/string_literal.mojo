@@ -19,6 +19,7 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
+from collections.string import _repr
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -51,7 +52,7 @@ struct StringLiteral(
     FloatableRaising,
     BytesCollectionElement,
     _HashableWithHasher,
-    AsBytesRead
+    AsBytesRead,
 ):
     """This type represents a string literal.
 
@@ -263,7 +264,7 @@ struct StringLiteral(
         Returns:
             A new representation of the string.
         """
-        return ascii(self)
+        return _repr(self)
 
     fn __ascii__(self) -> String:
         """Get the ASCII representation of the object.

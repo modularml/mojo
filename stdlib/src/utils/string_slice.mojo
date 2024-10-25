@@ -24,11 +24,12 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils.span import Span, AsBytesRead
-from collections.string import _is_ascii_space, _atol, _atof
+from collections.string import _is_ascii_space, _atol, _atof, _repr
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 from memory.memory import _memcmp_impl_unconstrained
+from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -36,7 +37,7 @@ alias StaticString = StringSlice[StaticConstantOrigin]
 
 @always_inline
 fn _is_continuation_byte[
-    w: Int, //
+    w: Int
 ](vec: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     return (vec & 0b1100_0000) == 0b1000_0000
 
@@ -52,6 +53,22 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     )
     alias sizes = SIMD[DType.int32, 4](0, 0b0111_1111, 0b0111_1111_1111, 0xFFFF)
     return int((sizes < c).cast[DType.uint8]().reduce_add())
+
+
+@always_inline
+fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
+    """Get the length of the sequence starting with given byte. Do note that
+    this does not work correctly if given a continuation byte."""
+
+    debug_assert(
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
+    )
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
@@ -391,7 +408,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Returns:
             A new representation of the string.
         """
-        return ascii(self)
+        return _repr(self)
 
     fn __ascii__(self) -> String:
         """Get the ASCII representation of the object. You don't need to call
@@ -1000,6 +1017,7 @@ trait Stringlike(AsBytesRead):
             A string containing the ASCII representation of the object.
         """
         ...
+
 
 # ===----------------------------------------------------------------------===#
 # Format method structures
