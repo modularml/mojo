@@ -401,6 +401,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return String(str_slice=self)
 
+    @always_inline
     fn __repr__(self) -> String:
         """Return a representation of the string instance. You don't need to
         call this method directly, use `repr("...")` instead.
@@ -410,6 +411,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return _repr(self)
 
+    @always_inline
     fn __ascii__(self) -> String:
         """Get the ASCII representation of the object. You don't need to call
         this method directly, use `ascii("...")` instead.

@@ -257,6 +257,7 @@ struct StringLiteral(
         string._buffer = buffer^
         return string
 
+    @always_inline
     fn __repr__(self) -> String:
         """Return a representation of the string instance. You don't need to
         call this method directly, use `repr("...")` instead.
@@ -266,11 +267,13 @@ struct StringLiteral(
         """
         return _repr(self)
 
+    @always_inline
     fn __ascii__(self) -> String:
-        """Get the ASCII representation of the object.
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
 
         Returns:
-            A new string containing the ASCII representation of the object.
+            A string containing the ASCII representation of the object.
         """
         return ascii(self)
 
