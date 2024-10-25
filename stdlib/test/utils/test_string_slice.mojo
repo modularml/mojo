@@ -226,8 +226,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0xF4, 0x8F, 0x88, 0xAA),
     )
     for item in positive:
-        assert_true(_is_valid_utf8(item[].as_bytes()))
-        assert_true(_is_valid_utf8(item[].as_bytes()))
+        assert_true(_is_valid_utf8(Span(item[])))
+        assert_true(_is_valid_utf8(Span(item[])))
     var negative = List[List[UInt8]](
         List[UInt8](0x80),
         List[UInt8](0xBF),
@@ -256,8 +256,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
     )
     for item in negative:
-        assert_false(_is_valid_utf8(item[].as_bytes()))
-        assert_false(_is_valid_utf8(item[].as_bytes()))
+        assert_false(_is_valid_utf8(Span(item[])))
+        assert_false(_is_valid_utf8(Span(item[])))
 
 
 def test_find():
