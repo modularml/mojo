@@ -29,7 +29,6 @@ from sys.intrinsics import _type_is_eq
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
 from utils import (
-    Span,
     IndexList,
     StringRef,
     StringSlice,
@@ -37,6 +36,7 @@ from utils import (
     Writable,
     Writer,
 )
+from utils.span import Span, AsBytesRead
 from utils.string_slice import (
     _utf8_byte_type,
     _StringSliceIter,
@@ -44,6 +44,7 @@ from utils.string_slice import (
     _shift_unicode_to_utf8,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
+    Stringlike,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -179,7 +180,7 @@ fn _is_ascii_printable_vec[
 ](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias ` ` = Byte(ord(" "))
     alias `~` = Byte(ord("~"))
-    return ` ` <= v <= `~`
+    return v >= ` ` and v <= `~`
 
 
 @always_inline
@@ -200,30 +201,12 @@ fn isprintable(span: Span[Byte]) -> Bool:
     """Determines whether the given characters are ASCII printable.
 
     Args:
-        v: The characters to check.
+        span: The characters to check.
 
     Returns:
         True if the characters are printable, otherwise False.
     """
-    return span.count[_is_ascii_printable_vec]() == len(span)
-
-
-trait _HasAscii:
-    fn __ascii__(self) -> String:
-        ...
-
-
-@always_inline
-fn ascii[T: _HasAscii](value: T) -> String:
-    """Get the ASCII representation of the object.
-
-    Args:
-        value: The object to get the ASCII representation of.
-
-    Returns:
-        A string containing the ASCII representation of the object.
-    """
-    return value.__ascii__()
+    return span.count[func=_is_ascii_printable_vec]() == len(span)
 
 
 fn ascii[T: Stringlike, //](value: T) -> String:
@@ -245,7 +228,7 @@ fn ascii[T: Stringlike, //](value: T) -> String:
 
     span = value.as_bytes_read()
     span_len = len(span)
-    non_printable_chars = span_len - span.count[_is_ascii_printable_vec]()
+    non_printable_chars = span_len - span.count[func=_is_ascii_printable_vec]()
     hex_prefix = non_printable_chars * 3
     b_len = value.byte_length()
     result = String(String._buffer_type(capacity=b_len + hex_prefix + 3))
@@ -254,7 +237,7 @@ fn ascii[T: Stringlike, //](value: T) -> String:
     v_ptr, r_ptr = value.unsafe_ptr(), result.unsafe_ptr()
     v_idx, r_idx = 0, 0
 
-    for i in range(span_len):
+    for _ in range(span_len):
         char = v_ptr[v_idx]
         use_dquote = use_dquote or (char == `'`)
         if isprintable(char):
@@ -277,17 +260,21 @@ fn _is_ascii_uppercase_vec[
 ](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias `A` = Byte(ord("A"))
     alias `Z` = Byte(ord("Z"))
-    return `A` <= c <= `Z`
+    return v >= `A` and v <= `Z`
 
 
 @always_inline
 fn _is_ascii_uppercase(v: SIMD[DType.uint8]) -> Bool:
     return _is_ascii_uppercase_vec(v).reduce_and()
 
+@always_inline
+fn _is_ascii_uppercase(v: Byte) -> Bool:
+    return _is_ascii_uppercase_vec(v).reduce_and()
+
 
 @always_inline
 fn _is_ascii_uppercase(span: Span[Byte]) -> Bool:
-    return span.count[_is_ascii_uppercase_vec]() == len(span)
+    return span.count[func=_is_ascii_uppercase_vec]() == len(span)
 
 
 @always_inline
@@ -296,17 +283,20 @@ fn _is_ascii_lowercase_vec[
 ](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias `a` = Byte(ord("a"))
     alias `z` = Byte(ord("z"))
-    return `a` <= v <= `z`
+    return v >= `a` and v <= `z`
 
 
 @always_inline
 fn _is_ascii_lowercase(v: SIMD[DType.uint8]) -> Bool:
     return _is_ascii_lowercase_vec(v).reduce_and()
 
+@always_inline
+fn _is_ascii_lowercase(v: Byte) -> Bool:
+    return _is_ascii_lowercase_vec(v).reduce_and()
 
 @always_inline
 fn _is_ascii_lowercase(span: Span[Byte]) -> Bool:
-    return span.count[_is_ascii_lowercase_vec]() == len(span)
+    return span.count[func=_is_ascii_lowercase_vec]() == len(span)
 
 
 fn _is_ascii_space(c: Byte) -> Bool:
@@ -719,6 +709,7 @@ struct String(
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
+    AsBytesRead,
 ):
     """Represents a mutable string."""
 
@@ -1539,6 +1530,20 @@ struct String(
         return Span[Byte, __origin_of(self)](
             unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )
+
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return self.as_bytes()
 
     @always_inline
     fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:

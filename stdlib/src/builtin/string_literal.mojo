@@ -20,11 +20,12 @@ from sys.ffi import c_char
 from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from utils import StringRef, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.span import Span, AsBytesRead
 from utils.string_slice import (
+    StringSlice,
+    StaticString,
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
@@ -50,6 +51,7 @@ struct StringLiteral(
     FloatableRaising,
     BytesCollectionElement,
     _HashableWithHasher,
+    AsBytesRead
 ):
     """This type represents a string literal.
 
@@ -421,6 +423,20 @@ struct StringLiteral(
             unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
+
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return rebind[Span[Byte, O]](self.as_bytes())
 
     @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:

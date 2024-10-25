@@ -21,7 +21,7 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils import Span
+from utils.span import Span, AsBytesRead
 from collections.string import _is_ascii_space, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
@@ -41,7 +41,7 @@ fn _is_continuation_byte[
 
 @always_inline
 fn _count_utf8_continuation_bytes(span: Span[Byte]) -> Int:
-    return span.count[_is_continuation_byte]()
+    return span.count[func=_is_continuation_byte]()
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
@@ -253,6 +253,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     CollectionElement,
     CollectionElementNew,
     Hashable,
+    AsBytesRead,
 ):
     """
     A non-owning view to encoded string data.
@@ -635,9 +636,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
+        while start < end and _is_ascii_space(ptr[start]):
             start += 1
-        while end > start and _isspace(ptr[end - 1]):
+        while end > start and _is_ascii_space(ptr[end - 1]):
             end -= 1
         return StringSlice[origin](
             unsafe_from_utf8_ptr=ptr + start, len=end - start
@@ -651,6 +652,20 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             A slice containing the underlying sequence of encoded bytes.
         """
         return self._slice
+
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return rebind[Span[Byte, O]](self._slice)
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -967,7 +982,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike:
+trait Stringlike(AsBytesRead):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -990,6 +1005,14 @@ trait Stringlike:
         """
         ...
 
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
+
+        Returns:
+            A string containing the ASCII representation of the object.
+        """
+        ...
 
 # ===----------------------------------------------------------------------===#
 # Format method structures

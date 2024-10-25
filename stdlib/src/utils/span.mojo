@@ -23,7 +23,7 @@ from utils import Span
 from collections import InlineArray
 from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
-
+from sys import simdwidthof
 
 trait AsBytes:
     """
@@ -42,6 +42,25 @@ trait AsBytes:
         """
         ...
 
+
+trait AsBytesRead:
+    """The `AsBytesRead` trait denotes a type that can be returned as an
+    immutable byte span.
+    """
+
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
 
 @value
 struct _SpanIter[
@@ -353,18 +372,18 @@ struct Span[
         )
 
     fn count[
-        D: DType, w: Int, //, func: fn (SIMD[D, w]) -> SIMD[DType.bool, w]
+        D: DType, //, func: fn[w: Int, //] (SIMD[D, w]) -> SIMD[DType.bool, w]
     ](self: Span[Scalar[D]]) -> Int:
         """Count the amount of times the function returns True.
 
         Parameters:
             D: The DType.
-            w: The width.
             func: The function to evaluate.
 
         Returns:
             The amount of times the function returns True.
         """
+
         alias sizes = (256, 128, 64, 32, 16, 8)
         ptr = self.unsafe_ptr()
         num_bytes = len(self)
