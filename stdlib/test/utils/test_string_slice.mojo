@@ -205,8 +205,8 @@ fn test_utf8_validation() raises:
      ظهرت نسخ جديدة ومختلفة من نص لوريم إيبسوم، أحياناً عن طريق
      الصدفة، وأحياناً عن عمد كإدخال بعض العبارات الفكاهية إليها.
     """
-    assert_true(_is_valid_utf8(text.unsafe_ptr(), text.byte_length()))
-    assert_true(_is_valid_utf8(text.unsafe_ptr(), text.byte_length()))
+    assert_true(_is_valid_utf8(text.as_bytes()))
+    assert_true(_is_valid_utf8(text.as_bytes()))
 
     var positive = List[List[UInt8]](
         List[UInt8](0x0),
@@ -226,8 +226,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0xF4, 0x8F, 0x88, 0xAA),
     )
     for item in positive:
-        assert_true(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
-        assert_true(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_true(_is_valid_utf8(item[].as_bytes()))
+        assert_true(_is_valid_utf8(item[].as_bytes()))
     var negative = List[List[UInt8]](
         List[UInt8](0x80),
         List[UInt8](0xBF),
@@ -256,8 +256,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
     )
     for item in negative:
-        assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
-        assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_false(_is_valid_utf8(item[].as_bytes()))
+        assert_false(_is_valid_utf8(item[].as_bytes()))
 
 
 def test_find():
@@ -335,7 +335,7 @@ alias BAD_SEQUENCES = List[String](
 
 
 fn validate_utf8(slice: String) -> Bool:
-    return _is_valid_utf8(slice.unsafe_ptr(), slice.byte_length())
+    return _is_valid_utf8(slice.as_bytes())
 
 
 def test_good_utf8_sequences():

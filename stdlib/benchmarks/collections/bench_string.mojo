@@ -211,7 +211,7 @@ fn bench_string_is_valid_utf8[
     @always_inline
     @parameter
     fn call_fn() raises:
-        var res = _is_valid_utf8(items.unsafe_ptr(), length)
+        var res = _is_valid_utf8(items.as_bytes())
         keep(res)
 
     b.iter[call_fn]()
