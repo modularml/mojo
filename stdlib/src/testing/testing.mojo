@@ -487,7 +487,7 @@ fn _assert_cmp_error[
     cmp: String
 ](lhs: String, rhs: String, *, msg: String, loc: _SourceLocation) -> String:
     var err = (
-        cmp + " failed:\n   left: " + ascii(lhs) + "\n  right: " + ascii(rhs)
+        cmp + " failed:\n   left: " + repr(lhs) + "\n  right: " + repr(rhs)
     )
     if msg:
         err += "\n  reason: " + msg
