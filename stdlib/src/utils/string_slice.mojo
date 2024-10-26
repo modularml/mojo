@@ -975,98 +975,45 @@ trait Stringlike(CollectionElement):
         ...
 
 
+# TODO: make this public? it's pretty useful
 struct _ConcatStr:
-    """An internal tool to concatenate stringlike items in an efficient manner.
-    """
+    """A tool to concatenate Writable items lazily."""
 
     alias _S = String
+    alias _W = VariadicPack[element_trait=Writable, *_, **_]
     var _buffer: List[Self._S]
 
-    fn __init__(
-        inout self,
-        owned values: VariadicPack[element_trait=Stringlike, *_, **_],
-    ):
-        alias amnt = __type_of(values).__len__()
-        self._buffer = List[Self._S](capacity=amnt)
-        b_ptr = self._buffer.unsafe_ptr()
+    fn __init__(inout self, owned values: Self._W):
+        self._buffer = List[Self._S](capacity=8)
+        self._buffer.unsafe_ptr().init_pointee_move(Self.concat(values^))
+        self._buffer.size = 1
 
-        @parameter
-        for i in range(amnt):
-            var v = values[i]
-            p, l = v.unsafe_ptr(), v.byte_length()
-
-            @parameter
-            if _type_is_eq[__type_of(values[i]), String]():
-                (b_ptr + i).init_pointee_move(rebind[String](v^))
-            else:
-                (b_ptr + i).init_pointee_move(Self._build(p, l))
-        self._buffer.size = amnt
-
-    fn __init__[*T: Stringlike](inout self, owned *values: *T):
+    fn __init__[*T: Writable](inout self, owned *values: *T):
         self = Self(values=values^)
 
-    fn __init__(inout self, capacity: Int):
+    fn __init__(inout self, *, capacity: Int):
         self._buffer = List[Self._S](capacity=capacity)
 
     fn __moveinit__(inout self, owned existing: Self):
         self._buffer = existing._buffer^
 
-    fn append(
-        inout self,
-        owned values: VariadicPack[element_trait=Stringlike, *_, **_],
-    ):
-        alias amnt = __type_of(values).__len__()
-        s_len = len(self._buffer)
-        if s_len + amnt > self._buffer.capacity:
-            self._buffer.reserve(s_len + amnt)
-        b_ptr = self._buffer.unsafe_ptr()
+    fn append(inout self, owned values: Self._W):
+        self._buffer.append(Self.concat(values^))
 
-        @parameter
-        for i in range(amnt):
-            var v = values[i]
-            p, l = v.unsafe_ptr(), v.byte_length()
-
-            @parameter
-            if _type_is_eq[__type_of(values[i]), String]():
-                (b_ptr + i).init_pointee_move(rebind[String](v^))
-            else:
-                (b_ptr + i).init_pointee_move(Self._build(p, l))
-
-    fn append[*T: Stringlike](inout self, owned *values: *T):
+    fn append[*T: Writable](inout self, owned *values: *T):
         self.append(values^)
 
-    fn insert[T: Stringlike, //](inout self, idx: Int, owned value: T):
-        p, l = value.unsafe_ptr(), value.byte_length()
-        self._buffer.insert(idx, Self._build(p, l))
+    fn insert[T: Writable, //](inout self, idx: Int, owned value: T):
+        self._buffer.insert(idx, Self.concat(value^))
 
-    fn prepend[*T: Stringlike](inout self, owned *values: *T):
-        alias amnt = __type_of(values).__len__()
-        s_len = len(self._buffer)
-        buf = List[Self._S](capacity=s_len + amnt)
-        b_ptr = buf.unsafe_ptr()
+    fn prepend[*T: Writable](inout self, owned *values: *T):
+        self._buffer.insert(0, Self.concat(values^))
 
-        @parameter
-        for i in range(amnt):
-            var v = values[i]
-            p, l = v.unsafe_ptr(), v.byte_length()
+    fn __iadd__[T: Writable, //](inout self, owned value: T):
+        self.append(value^)
 
-            @parameter
-            if _type_is_eq[__type_of(values[i]), String]():
-                (b_ptr + i).init_pointee_move(rebind[String](v^))
-            else:
-                (b_ptr + i).init_pointee_move(Self._build(p, l))
-
-        s_ptr = self._buffer.unsafe_ptr()
-
-        for i in range(s_len):
-            (s_ptr + i).move_pointee_into(b_ptr + amnt + i)
-        self._buffer = buf^
-
-    fn __iadd__[T: Stringlike, //](inout self, owned value: T):
-        self.append(value)
-
-    fn __radd__[T: Stringlike, //](inout self, owned value: T):
-        self.insert(0, value)
+    fn __radd__[T: Writable, //](inout self, owned value: T):
+        self.insert(0, value^)
 
     fn pop(inout self):
         _ = self._buffer.pop()
@@ -1089,6 +1036,14 @@ struct _ConcatStr:
             i += 1
         b_ptr[total_len - 1] = 0
         return String(buf^)
+
+    @staticmethod
+    fn concat[*T: Writable](*values: *T) -> String:
+        return String.write(values)
+
+    @staticmethod
+    fn concat(values: Self._W) -> String:
+        return String.write(values)
 
     @staticmethod
     fn _build(p: UnsafePointer[Byte], l: Int) -> Self._S:

@@ -410,11 +410,11 @@ fn assert_almost_equal[
     )
 
     if not all(almost_equal):
-        var err = _ConcatStr(str(lhs), " is not close to ", str(rhs))
+        err = _ConcatStr(str(lhs), " is not close to ", str(rhs))
 
         @parameter
         if type.is_integral() or type.is_floating_point():
-            err.append(" with a diff of ", str(abs(lhs - rhs)))
+            err.append(" with a diff of ", abs(lhs - rhs))
 
         if msg:
             err.append(" (", msg, ")")
@@ -487,7 +487,7 @@ fn assert_is_not[
 fn _assert_cmp_error[
     cmp: String
 ](lhs: String, rhs: String, *, msg: String, loc: _SourceLocation) -> String:
-    var err = _ConcatStr(cmp, " failed:\n   left: ", lhs, "\n  right: ", rhs)
+    err = _ConcatStr(cmp, " failed:\n   left: ", lhs, "\n  right: ", rhs)
     if msg:
         err.append("\n  reason: ", msg)
     return _assert_error(err^, loc)

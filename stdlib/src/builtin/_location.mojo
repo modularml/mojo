@@ -39,17 +39,7 @@ struct _SourceLocation(Writable, Stringable):
         Args:
             msg: The message to attach the prefix to.
         """
-        msg.prepend(
-            "At ",
-            str(self.file_name),
-            ":",
-            str(self.line),
-            ":",
-            str(self.col),
-            ": ",
-        )
-        print("msg: ", msg)
-        print("msg string: ", str(msg))
+        msg.prepend("At ", self, ": ")
         return msg^
 
     fn write_to[W: Writer](self, inout writer: W):
