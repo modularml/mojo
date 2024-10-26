@@ -994,7 +994,9 @@ struct _ConcatStr:
         for i in range(amnt):
             var v = values[i]
             p, l = v.unsafe_ptr(), v.byte_length()
-            if _type_is_eq[__type_of(v), String]():
+
+            @parameter
+            if _type_is_eq[__type_of(values[i]), String]():
                 (b_ptr + i).init_pointee_move(rebind[String](v^))
             else:
                 (b_ptr + i).init_pointee_move(Self._build(p, l))
@@ -1005,6 +1007,9 @@ struct _ConcatStr:
 
     fn __init__(inout self, capacity: Int):
         self._buffer = List[Self._S](capacity=capacity)
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self._buffer = existing._buffer^
 
     fn append(
         inout self,
@@ -1020,7 +1025,9 @@ struct _ConcatStr:
         for i in range(amnt):
             var v = values[i]
             p, l = v.unsafe_ptr(), v.byte_length()
-            if _type_is_eq[__type_of(v), String]():
+
+            @parameter
+            if _type_is_eq[__type_of(values[i]), String]():
                 (b_ptr + i).init_pointee_move(rebind[String](v^))
             else:
                 (b_ptr + i).init_pointee_move(Self._build(p, l))
@@ -1042,12 +1049,17 @@ struct _ConcatStr:
         for i in range(amnt):
             var v = values[i]
             p, l = v.unsafe_ptr(), v.byte_length()
-            if _type_is_eq[__type_of(v), String]():
+
+            @parameter
+            if _type_is_eq[__type_of(values[i]), String]():
                 (b_ptr + i).init_pointee_move(rebind[String](v^))
             else:
                 (b_ptr + i).init_pointee_move(Self._build(p, l))
 
-        memcpy(b_ptr + amnt, self._buffer.unsafe_ptr(), s_len)
+        s_ptr = self._buffer.unsafe_ptr()
+
+        for i in range(s_len):
+            (s_ptr + i).move_pointee_into(b_ptr + amnt + i)
         self._buffer = buf^
 
     fn __iadd__[T: Stringlike, //](inout self, owned value: T):

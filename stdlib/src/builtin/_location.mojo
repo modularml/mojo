@@ -33,14 +33,22 @@ struct _SourceLocation(Writable, Stringable):
         return String.write(self)
 
     @no_inline
-    fn prefix(self, owned msg: _ConcatStr) -> String:
+    fn prefix(self, owned msg: _ConcatStr) -> _ConcatStr:
         """Return the given message prefixed with the pretty-printer location.
 
         Args:
             msg: The message to attach the prefix to.
         """
-        msg.prepend("At ", str(self), ": ")
-        return str(msg)
+        msg.prepend(
+            "At ",
+            str(self.file_name),
+            ":",
+            str(self.line),
+            ":",
+            str(self.col),
+            ": ",
+        )
+        return msg^
 
     fn write_to[W: Writer](self, inout writer: W):
         """
