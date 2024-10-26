@@ -335,6 +335,36 @@ def test_object_dict():
     #asap __del__ of b
     assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
 
+def test_object_dict_contains():
+    a = object.dict()
+    a["one"] = 1
+    a["twothree"] = [2,3]
+    a[4] = "four"
+    a[5.5] = 6
+    assert_equal("twothree" in a, True)
+    assert_equal("one" in a, True)
+    assert_equal("two" in a, False)
+    assert_equal(4 in a, True)
+    assert_equal(5 in a, False)
+    assert_equal(5.5 in a, True)
+    assert_equal(6.5 in a, False)
+
+def test_object_dict_pop():
+    a = object.dict()
+    a["one"] = 1
+    a["twothree"] = [2,3]
+    a[4] = "four"
+    a[5.5] = 6
+    assert_equal(len(a),4)
+    tmp_element = a.pop(4)
+    assert_equal(len(a),3)
+    assert_equal(tmp_element, "four")
+    tmp_element = a.pop("twothree")
+    assert_equal(len(a),2)
+    assert_equal(tmp_element, [2,3])
+    assert_equal(tmp_element._value.get_as_list().impl.count(), 1)
+
+
 def test_object_cast():
     a = object()
     a = "1"
@@ -348,6 +378,28 @@ def test_object_init_list_attr():
     assert_equal(y.val, [1,2])
     assert_equal(y.add(10,20), 30)
 
+def test_object_list_contains():
+    a = object([1, "two", True, 1.5])
+    assert_equal(1 in a, True)
+    assert_equal(2 in a, False)
+    assert_equal("two" in a, True)
+    assert_equal("three" in a, False)
+    assert_equal(1.5 in a, True)
+    assert_equal(2.0 in a, False)
+    assert_equal(True in a, True)
+    assert_equal(False in a, False)
+
+def test_object_list_pop():
+    a = object([1, "two", 3.0])
+    assert_equal(len(a),3)
+    tmp_element = a.pop(2)
+    assert_equal(len(a),2)
+    assert_equal(tmp_element, 3.0)
+    tmp_element = a.pop(0)
+    assert_equal(len(a),1)
+    assert_equal(tmp_element, 1)
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -359,5 +411,9 @@ def main():
     test_matrix()
     test_convert_to_string()
     test_object_dict()
+    test_object_dict_contains()
+    test_object_dict_pop()
     test_object_cast()
     test_object_init_list_attr()
+    test_object_list_contains()
+    test_object_list_pop()

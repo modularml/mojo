@@ -1740,7 +1740,9 @@ struct object(
             return self._value.get_as_string().__len__()
         if self._value.is_list():
             return self._value.get_list_length()
-        raise Error("TypeError: only strings and lists have length")
+        if self._value.is_dict():
+            return len(self._value.get_as_dict().impl[])
+        raise Error("TypeError: only strings, lists and dict have length")
 
     @staticmethod
     @always_inline
@@ -1927,6 +1929,36 @@ struct object(
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)
 
+    fn __contains__(self, value: Self) raises ->Bool:
+        if self._value.is_list():
+            for v in self._value.get_as_list().impl[]:
+                if object(v[]).__eq__(value): return True
+            return False
+        if self._value.is_dict():
+            return self._value.get_as_dict().impl[].__contains__(value)
+        raise "only lists and dict implements the __contains__ dunder"
+    
+    fn pop(self, value: Self) raises -> object:
+        #TODO: argument with None as default for pop()
+        if self._value.is_list():
+            if value._value.is_int():
+                tmp_i = value._value.get_as_int().__int__()
+                self_len = self._value.get_list_length()
+                if tmp_i < self_len and tmp_i >= 0:
+                    ret_val = self._value.get_as_list().impl[].pop(tmp_i)
+                    return ret_val
+                else:
+                    raise "Index should be < len and >= 0"
+            else:
+                raise "List uses non float numbers as indexes"
+        if self._value.is_dict():
+            try:
+                tmp_ret =  self._value.get_as_dict().impl[].pop(value)
+                return tmp_ret
+            except e:
+                raise e
+        raise "self is not a list or a dict"
+    
     # ===------------------------------------------------------------------=== #
     # Factory methods
     # ===------------------------------------------------------------------=== #
