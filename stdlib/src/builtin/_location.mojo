@@ -48,6 +48,8 @@ struct _SourceLocation(Writable, Stringable):
             str(self.col),
             ": ",
         )
+        print("msg: ", msg)
+        print("msg string: ", str(msg))
         return msg^
 
     fn write_to[W: Writer](self, inout writer: W):
