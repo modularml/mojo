@@ -67,7 +67,7 @@ struct _ImmutableString(CollectionElement, CollectionElementNew):
             return 0
         return -1 if self.length < rhs.length else 1
 
-
+@value
 struct _RefCountedList:
     """Python objects have the behavior that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
@@ -81,32 +81,7 @@ struct _RefCountedList:
     fn __init__(inout self):
         self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
 
-
-@register_passable("trivial")
-struct _RefCountedListRef(CollectionElement, CollectionElementNew):
-    # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    var lst: OpaquePointer
-    """The reference to the list."""
-
-    @always_inline
-    fn __init__(inout self):
-        var ptr = UnsafePointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
-        self.lst = ptr.bitcast[NoneType]()
-
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        self.lst = other.lst
-
-    @always_inline
-    fn copy(self) -> Self:
-        _ = self.lst.bitcast[_RefCountedList]()[].impl
-        return Self {lst: self.lst}
-
-    fn release(self):
-        var ptr = self.lst.bitcast[_RefCountedList]()[].impl
-
-
+@value
 struct _RefCountedAttrsDict:
     """This type contains the attribute dictionary for a dynamic object. The
     attribute dictionary is constructed once with a fixed number of elements.
@@ -122,6 +97,13 @@ struct _RefCountedAttrsDict:
         self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
             Dict[StringLiteral, _ObjectImpl]()
         )
+
+    @always_inline
+    fn __init__(inout self, values: VariadicListMem[Attr, _]):
+        self = Self()
+        # Elements can only be added on construction.
+        for i in range(len(values)):
+            self.impl[]._insert(values[i].key, values[i].value._value.copy())
 
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
@@ -168,36 +150,6 @@ struct Attr:
         """
         self.key = key
         self.value = value^
-
-
-@register_passable("trivial")
-struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
-    # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    # FIXME(#12604): Distinguish this type from _RefCountedListRef.
-    var attrs: UnsafePointer[Int8]
-    """The reference to the dictionary."""
-
-    @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _]):
-        var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
-        # Elements can only be added on construction.
-        for i in range(len(values)):
-            ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
-
-        self.attrs = ptr.bitcast[Int8]()
-
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        self = other
-
-    @always_inline
-    fn copy(self) -> Self:
-        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
-        return Self {attrs: self.attrs}
-
-    fn release(self):
-        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
 
 
 @register_passable("trivial")
@@ -272,9 +224,9 @@ struct _ObjectImpl(
         Int64,
         Float64,
         _ImmutableString,
-        _RefCountedListRef,
+        _RefCountedList,
         _Function,
-        _RefCountedAttrsDictRef,
+        _RefCountedAttrsDict,
     ]
     """The variant value type."""
     var value: Self.type
@@ -329,7 +281,7 @@ struct _ObjectImpl(
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _RefCountedListRef):
+    fn __init__(inout self, value: _RefCountedList):
         self.value = Self.type(value)
 
     @always_inline
@@ -337,7 +289,7 @@ struct _ObjectImpl(
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _RefCountedAttrsDictRef):
+    fn __init__(inout self, value: _RefCountedAttrsDict):
         self.value = Self.type(value)
 
     @always_inline
@@ -371,19 +323,15 @@ struct _ObjectImpl(
             )
             return impl
         if self.is_list():
-            return self.get_as_list().copy()
+            return self.get_as_list()
         if self.is_obj():
-            return self.get_obj_attrs().copy()
+            return self.get_obj_attrs()
         return self
 
     @always_inline
     fn destroy(self):
         if self.is_str():
             self.get_as_string().data.free()
-        elif self.is_list():
-            self.get_as_list().release()
-        elif self.is_obj():
-            self.get_obj_attrs().release()
 
     # ===------------------------------------------------------------------=== #
     # Value Query
@@ -411,7 +359,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_list(self) -> Bool:
-        return self.value.isa[_RefCountedListRef]()
+        return self.value.isa[_RefCountedList]()
 
     @always_inline
     fn is_dict(self) -> Bool:
@@ -423,7 +371,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_obj(self) -> Bool:
-        return self.value.isa[_RefCountedAttrsDictRef]()
+        return self.value.isa[_RefCountedAttrsDict]()
 
     # get a copy
     @always_inline
@@ -443,16 +391,16 @@ struct _ObjectImpl(
         return self.value[_ImmutableString]
 
     @always_inline
-    fn get_as_list(self) -> _RefCountedListRef:
-        return self.value[_RefCountedListRef]
+    fn get_as_list(self) -> _RefCountedList:
+        return self.value[_RefCountedList]
 
     @always_inline
     fn get_as_func(self) -> _Function:
         return self.value[_Function]
 
     @always_inline
-    fn get_obj_attrs(self) -> _RefCountedAttrsDictRef:
-        return self.value[_RefCountedAttrsDictRef]
+    fn get_obj_attrs(self) -> _RefCountedAttrsDict:
+        return self.value[_RefCountedAttrsDict]
 
     @always_inline
     fn get_type_id(self) -> Int:
@@ -608,7 +556,7 @@ struct _ObjectImpl(
         var ptr = self.get_obj_attrs_ptr()
         writer.write(String("{"))
         var print_sep = False
-        for entry in ptr[].impl[].items():
+        for entry in ptr[].items():
             if print_sep:
                 writer.write(", ")
             writer.write(
@@ -647,7 +595,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
-        return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
+        return self.get_as_list().impl
 
     @always_inline
     fn list_append(self, value: Self):
@@ -675,16 +623,16 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_obj_attrs_ptr(self) -> UnsafePointer[_RefCountedAttrsDict]:
-        return self.get_obj_attrs().attrs.bitcast[_RefCountedAttrsDict]()
+    fn get_obj_attrs_ptr(self) -> Arc[Dict[StringLiteral, _ObjectImpl]]:
+        return self.get_obj_attrs().impl
 
     @always_inline
     fn set_obj_attr(self, key: StringLiteral, value: _ObjectImpl) raises:
-        self.get_obj_attrs_ptr()[].set(key, value)
+        self.get_obj_attrs_ptr()[][key]= value
 
     @always_inline
     fn get_obj_attr(self, key: StringLiteral) raises -> _ObjectImpl:
-        return self.get_obj_attrs_ptr()[].get(key).copy()
+        return self.get_obj_attrs_ptr()[][key]
 
 
 # ===----------------------------------------------------------------------=== #
@@ -825,7 +773,7 @@ struct object(
         Args:
             value: The list value.
         """
-        self._value = _RefCountedListRef()
+        self._value = _RefCountedList()
 
         @parameter
         for i in range(len(VariadicList(Ts))):
@@ -892,7 +840,7 @@ struct object(
         Args:
             attrs: Zero or more attributes.
         """
-        self._value = _RefCountedAttrsDictRef(attrs)
+        self._value = _RefCountedAttrsDict(attrs)
 
     @always_inline
     fn __moveinit__(inout self, owned existing: object):
