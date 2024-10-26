@@ -409,15 +409,17 @@ fn assert_almost_equal[
     )
 
     if not all(almost_equal):
-        err = _ConcatStr(str(lhs), " is not close to ", str(rhs))
-
-        @parameter
-        if type.is_integral() or type.is_floating_point():
-            err.append(" with a diff of ", abs(lhs - rhs))
-
-        if msg:
-            err.append(" (", msg, ")")
-
+        alias is_numeric = type.is_integral() or type.is_floating_point()
+        err = _ConcatStr(
+            str(lhs),
+            " is not close to ",
+            str(rhs),
+            " with a diff of " if is_numeric else "",
+            str(abs(lhs - rhs)) if is_numeric else "",
+            " (" if msg else "",
+            msg,
+            ")" if msg else "",
+        )
         raise _assert_error(err^, location.or_else(__call_location()))
 
 

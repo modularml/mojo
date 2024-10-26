@@ -308,13 +308,13 @@ fn _debug_assert_msg(
         )
 
     else:
-        message = _ConcatStr.concat(messages)
+        message = _ConcatStr(messages)
 
         @parameter
         if defined_mode == "warn":
-            print(loc.prefix(message, "Assert Warning: "))
+            print(loc.prefix(message^, "Assert Warning: "))
         else:
-            abort(loc.prefix(message, "Assert Error: "))
+            abort(loc.prefix(message^, "Assert Error: "))
 
 
 @no_inline
@@ -342,6 +342,6 @@ fn _debug_assert_msg_literal(message: StringLiteral, loc: _SourceLocation):
 
         @parameter
         if defined_mode == "warn":
-            print(loc.prefix(message, "Assert Warning: "))
+            print(loc.prefix(_ConcatStr("Assert Warning: ", message)))
         else:
-            abort(loc.prefix(message, "Assert Error: "))
+            abort(loc.prefix(_ConcatStr("Assert Error: ", message)))

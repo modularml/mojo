@@ -951,7 +951,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(CollectionElement):
+trait Stringlike:
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -983,9 +983,9 @@ struct _ConcatStr:
     alias _W = VariadicPack[element_trait=Writable, *_, **_]
     var _buffer: List[Self._S]
 
-    fn __init__(inout self, owned values: Self._W):
+    fn __init__(inout self, values: Self._W):
         self._buffer = List[Self._S](capacity=8)
-        self._buffer.unsafe_ptr().init_pointee_move(Self.concat(values^))
+        self._buffer.unsafe_ptr().init_pointee_move(Self.concat(values))
         self._buffer.size = 1
 
     fn __init__[*T: Writable](inout self, owned *values: *T):
