@@ -1040,9 +1040,6 @@ struct _ConcatStr:
     fn __iadd__(inout self, owned other: Self):
         self._buffer.extend(other._buffer)
 
-    fn __len__(self) -> Int:
-        return len(self._buffer)
-
     fn pop(inout self):
         _ = self._buffer.pop()
 
