@@ -308,14 +308,14 @@ fn _debug_assert_msg(
         )
 
     else:
-        message = _ConcatStr(String.write(messages))
+        message = _ConcatStr(capacity=5)
 
         @parameter
         if defined_mode == "warn":
-            message.prepend("Assert Warning: ")
+            message.append("Assert Warning: ", String.write(messages))
             print(loc.prefix(message^))
         else:
-            message.prepend("Assert Error: ")
+            message.append("Assert Error: ", String.write(messages))
             abort(loc.prefix(message^))
 
 
