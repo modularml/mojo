@@ -28,6 +28,7 @@ from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
+from sys.intrinsics import _type_is_eq
 from memory.memory import _memcmp_impl_unconstrained
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -993,7 +994,10 @@ struct _ConcatStr:
         for i in range(amnt):
             var v = values[i]
             p, l = v.unsafe_ptr(), v.byte_length()
-            (b_ptr + i).init_pointee_move(Self._build(p, l))
+            if _type_is_eq[__type_of(v), String]():
+                (b_ptr + i).init_pointee_move(rebind[String](v^))
+            else:
+                (b_ptr + i).init_pointee_move(Self._build(p, l))
         self._buffer.size = amnt
 
     fn __init__[*T: Stringlike](inout self, owned *values: *T):
@@ -1016,7 +1020,10 @@ struct _ConcatStr:
         for i in range(amnt):
             var v = values[i]
             p, l = v.unsafe_ptr(), v.byte_length()
-            (b_ptr + i).init_pointee_move(Self._build(p, l))
+            if _type_is_eq[__type_of(v), String]():
+                (b_ptr + i).init_pointee_move(rebind[String](v^))
+            else:
+                (b_ptr + i).init_pointee_move(Self._build(p, l))
 
     fn append[*T: Stringlike](inout self, owned *values: *T):
         self.append(values^)
@@ -1035,7 +1042,10 @@ struct _ConcatStr:
         for i in range(amnt):
             var v = values[i]
             p, l = v.unsafe_ptr(), v.byte_length()
-            (b_ptr + i).init_pointee_move(Self._build(p, l))
+            if _type_is_eq[__type_of(v), String]():
+                (b_ptr + i).init_pointee_move(rebind[String](v^))
+            else:
+                (b_ptr + i).init_pointee_move(Self._build(p, l))
 
         memcpy(b_ptr + amnt, self._buffer.unsafe_ptr(), s_len)
         self._buffer = buf^
@@ -1051,8 +1061,6 @@ struct _ConcatStr:
 
     fn __str__(self) -> String:
         n_elems = len(self._buffer)
-        if n_elems == 0:
-            return String("")
         total_len = 1
         for e in self._buffer:
             total_len += e[].byte_length()
