@@ -980,7 +980,8 @@ struct _ConcatStr[origin: Origin[False].type = StaticConstantOrigin]:
     Safety:
         This is meant to only be used with function arguments or string
         literals. This rebinds everything to a `StringSlice[origin]` which by
-        default is a `StaticString`.
+        default is a `StaticString`. When used with multiple current scope
+        variables, it should be stringified (`str(...)`) ASAP.
     """
 
     alias _S = StringSlice[origin]
