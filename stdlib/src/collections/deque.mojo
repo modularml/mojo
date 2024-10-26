@@ -22,7 +22,7 @@ from collections import Deque
 """
 
 from bit import bit_ceil
-from bit import bit_ceil
+from collections import Optional
 from documentation import doc_private
 from memory import UnsafePointer
 
