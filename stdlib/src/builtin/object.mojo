@@ -1930,6 +1930,9 @@ struct object(
     fn __contains__(self, value: Self) raises -> Bool:
         """Returns `True` if value is in `self` (`dict` key or `list` element).
 
+        Args:
+            value: The value that is compared.
+
         Example:
         ```mojo
         a = object([1, "two"])
@@ -1951,6 +1954,9 @@ struct object(
 
     fn pop(self, value: Self) raises -> object:
         """Removes an element and returns it.
+
+        Args:
+            value: The index for lists, the key for dicts.
 
         Returns:
             The element.
