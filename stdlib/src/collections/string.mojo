@@ -55,7 +55,7 @@ from utils.string_slice import (
 # ===----------------------------------------------------------------------=== #
 
 
-fn ord[T: Stringlike, //](s: T) -> Int:
+fn ord[T: Stringlike, //](ref [_]s: T) -> Int:
     """Returns the unicode codepoint for the character.
 
     Parameters:
@@ -74,10 +74,10 @@ fn ord[T: Stringlike, //](s: T) -> Int:
     .
     """
 
+    # FIXME(#933): llvm intrinsic can't recognize pop value when trying to
+    # fold ctlz at comp time
     @parameter
     if _type_is_eq[T, StringLiteral]():
-        # FIXME(#933): llvm intrinsic can't recognize pop value when trying to
-        # fold ctlz at comp time
         v = rebind[StringLiteral](s)
         p = v.unsafe_ptr()
         b0 = p[0] if v.byte_length() > 0 else 0
@@ -114,10 +114,10 @@ fn ord[T: Stringlike, //](s: T) -> Int:
                 | int(p[3] & c_byte_mask)
             )
     else:
-        return ord(s.as_bytes_read())
+        return ord(StringSlice(unsafe_from_utf8=s.as_bytes_read()))
 
 
-fn ord[O: ImmutableOrigin, //](s: Span[Byte, O]) -> Int:
+fn ord[O: ImmutableOrigin, //](s: StringSlice[O]) -> Int:
     """Returns the unicode codepoint for the character.
 
     Parameters:
@@ -143,7 +143,9 @@ fn ord[O: ImmutableOrigin, //](s: Span[Byte, O]) -> Int:
     p = s.unsafe_ptr()
     b0 = p[0]
     num_bytes = _utf8_first_byte_sequence_length(b0)
-    debug_assert(len(s) == num_bytes, "input string must be one character")
+    debug_assert(
+        s.byte_length() == num_bytes, "input string must be one character"
+    )
     debug_assert(1 <= num_bytes <= 4, "invalid UTF-8 byte ", b0, " at index 0")
     alias c_byte_mask = 0b0011_1111
     b0_mask = 0b1111_1111 >> (num_bytes + int(num_bytes > 1))
