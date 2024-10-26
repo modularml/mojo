@@ -409,13 +409,20 @@ fn assert_almost_equal[
     )
 
     if not all(almost_equal):
-        alias is_numeric = type.is_integral() or type.is_floating_point()
+        diff = ""
+        num = String("")
+
+        @parameter
+        if type.is_integral() or type.is_floating_point():
+            diff = " with a diff of "
+            num = str(abs(lhs - rhs))
+
         err = _ConcatStr(
             str(lhs),
             " is not close to ",
             str(rhs),
-            " with a diff of " if is_numeric else "",
-            str(abs(lhs - rhs)) if is_numeric else "",
+            diff,
+            num,
             " (" if msg else "",
             msg,
             ")" if msg else "",
