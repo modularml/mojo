@@ -16,7 +16,7 @@ from testing import assert_equal, assert_true, assert_false
 
 from utils import Span, StringSlice
 from utils._utf8_validation import _is_valid_utf8
-from utils.string_slice import _count_utf8_continuation_bytes
+from utils.string_slice import _count_utf8_continuation_bytes, _ConcatStr
 
 
 fn test_string_literal_byte_span() raises:
@@ -415,7 +415,23 @@ def test_count_utf8_continuation_bytes():
     _test(3, List[UInt8](b2, c, b3, c, c))
 
 
-fn main() raises:
+def test_concatstr():
+    msg = _ConcatStr("2")
+    assert_equal(str(msg), "2")
+    msg.prepend("hello", " ", "1")
+    assert_equal(str(msg), "hello 12")
+    msg.append("3", str("4"), "5".as_string_slice())
+    assert_equal(str(msg), "hello 12345")
+    assert_equal(str(msg), "hello 12345")
+    assert_equal(str(msg), String.write(msg))
+    msg += 6
+    assert_equal(str(msg), "hello 123456")
+    msg2 = _ConcatStr("hello 123456")
+    msg += msg2^
+    assert_equal(str(msg), "hello 123456" * 2)
+
+
+def main():
     test_string_literal_byte_span()
     test_string_byte_span()
     test_heap_string_from_string_slice()
@@ -432,3 +448,4 @@ fn main() raises:
     test_combination_10_good_utf8_sequences()
     test_combination_10_good_10_bad_utf8_sequences()
     test_count_utf8_continuation_bytes()
+    test_concatstr()

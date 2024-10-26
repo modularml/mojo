@@ -615,6 +615,26 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return _atof(self)
 
+    fn __mul__(self, n: Int) -> String:
+        """Concatenates the string `n` times.
+
+        Args:
+            n : The number of times to concatenate the string.
+
+        Returns:
+            The string concatenated `n` times.
+        """
+
+        len_self = self.byte_length()
+        count = len_self * n + 1
+        buf = String._buffer_type(capacity=count)
+        buf.size = count
+        b_ptr = buf.unsafe_ptr()
+        for i in range(n):
+            memcpy(b_ptr + len_self * i, self.unsafe_ptr(), len_self)
+        b_ptr[count - 1] = 0
+        return String(buf^)
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
@@ -994,26 +1014,34 @@ struct _ConcatStr:
     fn __init__(inout self, *, capacity: Int = 8):
         self._buffer = List[Self._S](capacity=capacity)
 
+    fn __init__(inout self, owned existing: List[Self._S]):
+        self._buffer = existing^
+
     fn __moveinit__(inout self, owned existing: Self):
         self._buffer = existing._buffer^
 
     fn append(inout self, owned values: Self._W):
         self._buffer.append(Self._concat(values^))
 
+    @always_inline
     fn append[*T: Writable](inout self, owned *values: *T):
         self.append(values^)
 
-    fn insert[T: Writable, //](inout self, idx: Int, owned value: T):
-        self._buffer.insert(idx, Self._concat(value^))
-
-    fn prepend[*T: Writable](inout self, owned *values: *T):
+    fn prepend(inout self, owned values: Self._W):
         self._buffer.insert(0, Self._concat(values^))
+
+    @always_inline
+    fn prepend[*T: Writable](inout self, owned *values: *T):
+        self.prepend(values^)
 
     fn __iadd__[T: Writable, //](inout self, owned value: T):
         self.append(value^)
 
-    fn __radd__[T: Writable, //](inout self, owned value: T):
-        self.insert(0, value^)
+    fn __iadd__(inout self, owned other: Self):
+        self._buffer.extend(other._buffer)
+
+    fn __len__(self) -> Int:
+        return len(self._buffer)
 
     fn pop(inout self):
         _ = self._buffer.pop()
@@ -1037,6 +1065,7 @@ struct _ConcatStr:
         b_ptr[total_len - 1] = 0
         return String(buf^)
 
+    @always_inline
     @staticmethod
     fn _concat[*T: Writable](*values: *T) -> String:
         return Self._concat(values=values)

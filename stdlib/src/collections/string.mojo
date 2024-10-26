@@ -2135,19 +2135,7 @@ struct String(
         Returns:
             The string concatenated `n` times.
         """
-        if n <= 0:
-            return ""
-        var len_self = self.byte_length()
-        var count = len_self * n + 1
-        var buf = Self._buffer_type(capacity=count)
-        buf.resize(count, 0)
-        for i in range(n):
-            memcpy(
-                dest=buf.data + len_self * i,
-                src=self.unsafe_ptr(),
-                count=len_self,
-            )
-        return String(buf^)
+        return self.as_string_slice() * n
 
     @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
