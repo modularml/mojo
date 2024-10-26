@@ -40,7 +40,7 @@ def test_object_ctors():
     assert_true(a)
     b = object([2, 4])
     assert_true(a < b)
-    
+
     a = String("hello world")
     assert_true(a == object("hello world"))
     a += "!"
@@ -314,6 +314,7 @@ def test_convert_to_string():
     assert_equal(str(a["one"]), "1")
     assert_equal(str(a[2]), "two")
 
+
 def test_object_dict():
     a = object.dict()
     a["one"] = 1
@@ -325,20 +326,21 @@ def test_object_dict():
     assert_equal(a._value.get_as_dict().impl.count(), 2)
     # asap __del__ of a
     assert_equal(b._value.get_as_dict().impl.count(), 1)
-    
-    ref_counted_list = object([1,2,3])
+
+    ref_counted_list = object([1, 2, 3])
     assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
     b["ref_counted_list"] = ref_counted_list
     assert_equal(ref_counted_list._value.get_as_list().impl.count(), 2)
     ref_counted_list.append(4)
-    assert_equal(b["ref_counted_list"], [1,2,3,4])
-    #asap __del__ of b
+    assert_equal(b["ref_counted_list"], [1, 2, 3, 4])
+    # asap __del__ of b
     assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
+
 
 def test_object_dict_contains():
     a = object.dict()
     a["one"] = 1
-    a["twothree"] = [2,3]
+    a["twothree"] = [2, 3]
     a[4] = "four"
     a[5.5] = 6
     assert_equal("twothree" in a, True)
@@ -349,34 +351,37 @@ def test_object_dict_contains():
     assert_equal(5.5 in a, True)
     assert_equal(6.5 in a, False)
 
+
 def test_object_dict_pop():
     a = object.dict()
     a["one"] = 1
-    a["twothree"] = [2,3]
+    a["twothree"] = [2, 3]
     a[4] = "four"
     a[5.5] = 6
-    assert_equal(len(a),4)
+    assert_equal(len(a), 4)
     tmp_element = a.pop(4)
-    assert_equal(len(a),3)
+    assert_equal(len(a), 3)
     assert_equal(tmp_element, "four")
     tmp_element = a.pop("twothree")
-    assert_equal(len(a),2)
-    assert_equal(tmp_element, [2,3])
+    assert_equal(len(a), 2)
+    assert_equal(tmp_element, [2, 3])
     assert_equal(tmp_element._value.get_as_list().impl.count(), 1)
 
 
 def test_object_cast():
     a = object()
     a = "1"
-    assert_equal(int(a)+1, 2)
+    assert_equal(int(a) + 1, 2)
+
 
 def test_object_init_list_attr():
     attrs = List[Attr]()
-    attrs.append(Attr("val", [1,2]))
+    attrs.append(Attr("val", [1, 2]))
     attrs.append(Attr("add", test_function))
     y = object(attrs)
-    assert_equal(y.val, [1,2])
-    assert_equal(y.add(10,20), 30)
+    assert_equal(y.val, [1, 2])
+    assert_equal(y.add(10, 20), 30)
+
 
 def test_object_list_contains():
     a = object([1, "two", True, 1.5])
@@ -389,14 +394,15 @@ def test_object_list_contains():
     assert_equal(True in a, True)
     assert_equal(False in a, False)
 
+
 def test_object_list_pop():
     a = object([1, "two", 3.0])
-    assert_equal(len(a),3)
+    assert_equal(len(a), 3)
     tmp_element = a.pop(2)
-    assert_equal(len(a),2)
+    assert_equal(len(a), 2)
     assert_equal(tmp_element, 3.0)
     tmp_element = a.pop(0)
-    assert_equal(len(a),1)
+    assert_equal(len(a), 1)
     assert_equal(tmp_element, 1)
 
 

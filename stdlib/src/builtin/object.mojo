@@ -35,6 +35,7 @@ struct _NoneMarker(CollectionElementNew):
     fn __init__(inout self, *, other: Self):
         pass
 
+
 @value
 struct _RefCountedList:
     """Python objects have the behavior that bool, int, float, and str are
@@ -48,6 +49,7 @@ struct _RefCountedList:
 
     fn __init__(inout self):
         self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
+
 
 @value
 struct _RefCountedAttrsDict:
@@ -79,7 +81,7 @@ struct _RefCountedAttrsDict:
         # Elements can only be added on construction.
         for i in range(len(values)):
             self.impl[]._insert(values[i].key, values[i].value._value.copy())
-    
+
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
         if key in self.impl[]:
@@ -101,6 +103,7 @@ struct _RefCountedAttrsDict:
             + key
             + "'"
         )
+
 
 @value
 struct Attr:
@@ -125,25 +128,23 @@ struct Attr:
         self.key = key
         self.value = value^
 
+
 @value
 struct _RefCountedDict:
-    """This type contains the dictionary implementation for a dynamic object.
-    """
+    """This type contains the dictionary implementation for a dynamic object."""
 
     var impl: Arc[Dict[object, object]]
     """The implementation of the map."""
 
     fn __init__(inout self):
-        self.impl = Arc[Dict[object, object]](
-            Dict[object, object]()
-        )
+        self.impl = Arc[Dict[object, object]](Dict[object, object]())
 
     @always_inline
     fn set(self, key: object, value: object) raises:
         self.impl[][key] = value
 
     @always_inline
-    fn get(self, key: object) raises -> ref[self]object:
+    fn get(self, key: object) raises -> ref [self] object:
         return UnsafePointer.address_of(self.impl[].__getitem__(key))[]
 
 
@@ -375,7 +376,7 @@ struct _ObjectImpl(
         return self.value[String]
 
     @always_inline
-    fn get_as_list(ref[_]self) -> ref[self.value] _RefCountedList:
+    fn get_as_list(ref [_]self) -> ref [self.value] _RefCountedList:
         return self.value[_RefCountedList]
 
     @always_inline
@@ -383,13 +384,13 @@ struct _ObjectImpl(
         return self.value[_Function]
 
     @always_inline
-    fn get_obj_attrs(ref[_]self) -> ref[self.value] _RefCountedAttrsDict:
+    fn get_obj_attrs(ref [_]self) -> ref [self.value] _RefCountedAttrsDict:
         return self.value[_RefCountedAttrsDict]
 
     @always_inline
-    fn get_as_dict(ref[_]self) ->ref[self.value] _RefCountedDict:
+    fn get_as_dict(ref [_]self) -> ref [self.value] _RefCountedDict:
         return self.value[_RefCountedDict]
-    
+
     @always_inline
     fn get_type_id(self) -> Int:
         if self.is_none():
@@ -521,9 +522,7 @@ struct _ObjectImpl(
             writer.write(str(self.get_as_float()))
             return
         if self.is_str():
-            writer.write(
-                "'" + self.get_as_string() + "'"
-            )
+            writer.write("'" + self.get_as_string() + "'")
             return
         if self.is_func():
             writer.write(
@@ -540,7 +539,7 @@ struct _ObjectImpl(
             return
 
         if self.is_dict():
-            #TODO: dict repr
+            # TODO: dict repr
             writer.write("todo")
             return
 
@@ -618,7 +617,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn set_obj_attr(self, key: StringLiteral, value: _ObjectImpl) raises:
-        self.get_obj_attrs_ptr()[][key]= value
+        self.get_obj_attrs_ptr()[][key] = value
 
     @always_inline
     fn get_obj_attr(self, key: StringLiteral) raises -> _ObjectImpl:
@@ -842,7 +841,7 @@ struct object(
             attrs: Zero or more attributes.
         """
         self._value = _RefCountedAttrsDict(attrs)
-    
+
     @always_inline
     fn __moveinit__(inout self, owned existing: object):
         """Move the value of an object.
@@ -908,7 +907,7 @@ struct object(
 
         if self._value.is_float():
             return int(self._value.get_as_float())
-        
+
         if self._value.is_str():
             return int(self._value.get_as_string())
 
@@ -1119,7 +1118,6 @@ struct object(
             print(e)
             print("objects are not comparable")
         return True
-
 
     fn __gt__(self, rhs: object) raises -> object:
         """Greater-than comparator. This lexicographically compares the
@@ -1769,7 +1767,7 @@ struct object(
 
         if self._value.is_dict():
             return self._value.get_as_dict().get(i)
-        
+
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
 
@@ -1807,7 +1805,7 @@ struct object(
             _ = object(self._value.get_obj_attr("__setitem__"))(self, i, value)
             return
         if self._value.is_dict():
-            self._value.get_as_dict().set(i,value)
+            self._value.get_as_dict().set(i, value)
             return
         if self._value.is_str():
             raise Error(
@@ -1929,9 +1927,9 @@ struct object(
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)
 
-    fn __contains__(self, value: Self) raises ->Bool:
+    fn __contains__(self, value: Self) raises -> Bool:
         """Returns `True` if value is in `self` (`dict` key or `list` element).
-        
+
         Example:
         ```mojo
         a = object([1, "two"])
@@ -1944,15 +1942,16 @@ struct object(
         """
         if self._value.is_list():
             for v in self._value.get_as_list().impl[]:
-                if object(v[]).__eq__(value): return True
+                if object(v[]).__eq__(value):
+                    return True
             return False
         if self._value.is_dict():
             return self._value.get_as_dict().impl[].__contains__(value)
         raise "only lists and dict implements the __contains__ dunder"
-    
+
     fn pop(self, value: Self) raises -> object:
         """Removes an element and returns it.
-        
+
         Returns:
             The element.
 
@@ -1966,7 +1965,7 @@ struct object(
         ```
         Note: implemented for list and dictionary.
         """
-        #TODO: argument with None as default for pop()
+        # TODO: argument with None as default for pop()
         if self._value.is_list():
             if value._value.is_int():
                 tmp_i = value._value.get_as_int().__int__()
@@ -1980,17 +1979,17 @@ struct object(
                 raise "List uses non float numbers as indexes"
         if self._value.is_dict():
             try:
-                tmp_ret =  self._value.get_as_dict().impl[].pop(value)
+                tmp_ret = self._value.get_as_dict().impl[].pop(value)
                 return tmp_ret
             except e:
                 raise e
         raise "self is not a list or a dict"
-    
+
     # ===------------------------------------------------------------------=== #
     # Factory methods
     # ===------------------------------------------------------------------=== #
     @staticmethod
-    fn dict()->Self:
+    fn dict() -> Self:
         """Construct an empty dictionary.
 
         Returns:
@@ -2013,14 +2012,14 @@ struct object(
     # ===------------------------------------------------------------------=== #
     # Trait implementations
     # ===------------------------------------------------------------------=== #
-    fn __hash__(self)->UInt:
+    fn __hash__(self) -> UInt:
         """Compute the hash of `self`.
 
         Returns:
             An `UInt`.
-        
+
         Note: `hash(repr(self))` is returned if `self` type is not hashable.
-        
+
         The hashables types are `String`, `Int64` and `Float64`.
         """
         if self._value.is_str():
@@ -2029,5 +2028,5 @@ struct object(
             return hash(self._value.get_as_int())
         if self._value.is_float():
             return hash(self._value.get_as_float())
-        #FIXME: hash(repr(self)) as fallback 
+        # FIXME: hash(repr(self)) as fallback
         return hash(repr(self))
