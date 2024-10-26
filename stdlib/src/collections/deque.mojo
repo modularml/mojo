@@ -22,7 +22,7 @@ from collections import Deque
 """
 
 from bit import bit_ceil
-from bit import bit_ceil, is_power_of_two
+from bit import bit_ceil
 from documentation import doc_private
 from memory import UnsafePointer
 
@@ -118,7 +118,7 @@ struct Deque[ElementType: CollectionElement](
         else:
             max_deque_len = maxlen
             max_deque_capacity = bit_ceil(maxlen)
-            if is_power_of_two(maxlen):
+            if max_deque_capacity == maxlen:
                 max_deque_capacity <<= 1
             deque_capacity = min(deque_capacity, max_deque_capacity)
 
@@ -284,20 +284,6 @@ struct Deque[ElementType: CollectionElement](
         len_values = len(values)
         len_total = len_self + len_values
 
-        new_capacity = self._capacity
-        if self._capacity <= len_total:
-            new_capacity = bit_ceil(len_total)
-            if is_power_of_two(len_total):
-                new_capacity <<= 1
-
-        max_capacity = new_capacity
-        if self._maxlen > 0:
-            max_capacity = bit_ceil(self._maxlen)
-            if is_power_of_two(self._maxlen):
-                max_capacity <<= 1
-
-        new_capacity = min(new_capacity, max_capacity)
-
         # number of elements to move into the final deque
         # first from `values` and then from `self`
         n_move_total = len_total
@@ -317,7 +303,10 @@ struct Deque[ElementType: CollectionElement](
             self._head = self._physical_index(self._head + 1)
 
         # move from `self` to new location if we have to re-allocate
-        if new_capacity > self._capacity:
+        if n_move_total >= self._capacity:
+            new_capacity = bit_ceil(n_move_total)
+            if new_capacity == n_move_total:
+                new_capacity <<= 1
             new_data = UnsafePointer[ElementType].alloc(new_capacity)
             for i in range(n_move_self):
                 offset = self._physical_index(self._head + i)
