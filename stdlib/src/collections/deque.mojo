@@ -319,13 +319,14 @@ struct Deque[ElementType: CollectionElement](
             self._tail = n_move_self
 
         # we will consume all elements of `values`
-        values.size = 0
+        values_data = values.steal_data()
+
         # pop excess elements from `values`
         for i in range(n_pop_values):
-            (values.data + i).destroy_pointee()
+            (values_data + i).destroy_pointee()
 
         # move remaining elements from `values`
-        src = values.data.bitcast[origin = __origin_of(values)]() + n_pop_values
+        src = values_data + n_pop_values
         for i in range(n_move_values):
             (src + i).move_pointee_into(self._data + self._tail)
             self._tail = self._physical_index(self._tail + 1)
