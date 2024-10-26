@@ -419,7 +419,7 @@ fn assert_almost_equal[
         if msg:
             err.append(" (", msg, ")")
 
-        raise _assert_error(str(err), location.or_else(__call_location()))
+        raise _assert_error(err^, location.or_else(__call_location()))
 
 
 @always_inline

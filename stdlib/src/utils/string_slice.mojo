@@ -974,22 +974,16 @@ trait Stringlike(CollectionElement):
         ...
 
 
-struct _ConcatStr[origin: Origin[False].type = StaticConstantOrigin]:
-    """An internal tool to concatenate stringslike items in an efficient manner.
-
-    Safety:
-        This is meant to only be used with function arguments or string
-        literals. This rebinds everything to a `StringSlice[origin]` which by
-        default is a `StaticString`. When used with multiple current scope
-        variables, it should be stringified (`str(...)`) ASAP.
+struct _ConcatStr:
+    """An internal tool to concatenate stringlike items in an efficient manner.
     """
 
-    alias _S = StringSlice[origin]
+    alias _S = String
     var _buffer: List[Self._S]
 
     fn __init__(
         inout self,
-        values: VariadicPack[element_trait=Stringlike, *_, **_],
+        owned values: VariadicPack[element_trait=Stringlike, *_, **_],
     ):
         alias amnt = __type_of(values).__len__()
         self._buffer = List[Self._S](capacity=amnt)
@@ -1002,14 +996,15 @@ struct _ConcatStr[origin: Origin[False].type = StaticConstantOrigin]:
             (b_ptr + i).init_pointee_move(Self._build(p, l))
         self._buffer.size = amnt
 
-    fn __init__[*T: Stringlike](inout self, *values: *T):
-        self = Self(values=values)
+    fn __init__[*T: Stringlike](inout self, owned *values: *T):
+        self = Self(values=values^)
 
     fn __init__(inout self, capacity: Int):
         self._buffer = List[Self._S](capacity=capacity)
 
     fn append(
-        inout self, values: VariadicPack[element_trait=Stringlike, *_, **_]
+        inout self,
+        owned values: VariadicPack[element_trait=Stringlike, *_, **_],
     ):
         alias amnt = __type_of(values).__len__()
         s_len = len(self._buffer)
@@ -1023,10 +1018,10 @@ struct _ConcatStr[origin: Origin[False].type = StaticConstantOrigin]:
             p, l = v.unsafe_ptr(), v.byte_length()
             (b_ptr + i).init_pointee_move(Self._build(p, l))
 
-    fn append[*T: Stringlike](inout self, *values: *T):
-        self.append(values)
+    fn append[*T: Stringlike](inout self, owned *values: *T):
+        self.append(values^)
 
-    fn insert[T: Stringlike, //](inout self, idx: Int, value: T):
+    fn insert[T: Stringlike, //](inout self, idx: Int, owned value: T):
         p, l = value.unsafe_ptr(), value.byte_length()
         self._buffer.insert(idx, Self._build(p, l))
 
@@ -1045,10 +1040,10 @@ struct _ConcatStr[origin: Origin[False].type = StaticConstantOrigin]:
         memcpy(b_ptr + amnt, self._buffer.unsafe_ptr(), s_len)
         self._buffer = buf^
 
-    fn __iadd__[T: Stringlike, //](inout self, value: T):
+    fn __iadd__[T: Stringlike, //](inout self, owned value: T):
         self.append(value)
 
-    fn __radd__[T: Stringlike, //](inout self, value: T):
+    fn __radd__[T: Stringlike, //](inout self, owned value: T):
         self.insert(0, value)
 
     fn pop(inout self):
@@ -1077,7 +1072,7 @@ struct _ConcatStr[origin: Origin[False].type = StaticConstantOrigin]:
 
     @staticmethod
     fn _build(p: UnsafePointer[Byte], l: Int) -> Self._S:
-        return Self._S(unsafe_from_utf8_ptr=p, len=l)
+        return Self._S(StaticString(unsafe_from_utf8_ptr=p, len=l))
 
     fn write_to[W: Writer](self, inout writer: W):
         for e in self._buffer:
