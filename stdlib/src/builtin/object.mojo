@@ -118,6 +118,27 @@ struct Attr:
         self.key = key
         self.value = value^
 
+@value
+struct _RefCountedDict:
+    """This type contains the dictionary implementation for a dynamic object.
+    """
+
+    var impl: Arc[Dict[object, object]]
+    """The implementation of the map."""
+
+    fn __init__(inout self):
+        self.impl = Arc[Dict[object, object]](
+            Dict[object, object]()
+        )
+
+    @always_inline
+    fn set(self, key: object, value: object) raises:
+        self.impl[][key] = value
+
+    @always_inline
+    fn get(self, key: object) raises -> ref[self]object:
+        return UnsafePointer.address_of(self.impl[].__getitem__(key))[]
+
 
 @register_passable("trivial")
 struct _Function(CollectionElement, CollectionElementNew):
@@ -194,6 +215,7 @@ struct _ObjectImpl(
         _RefCountedList,
         _Function,
         _RefCountedAttrsDict,
+        _RefCountedDict,
     ]
     """The variant value type."""
     var value: Self.type
@@ -212,7 +234,7 @@ struct _ObjectImpl(
     """Type discriminator indicating a string."""
     alias list: Int = 5
     """Type discriminator indicating a list."""
-    alias dict: Int = 8  # TODO
+    alias dict: Int = 8
     """Type discriminator indicating a dictionary."""
     alias function: Int = 6
     """Type discriminator indicating a function."""
@@ -284,6 +306,8 @@ struct _ObjectImpl(
             return self.get_as_list()
         if self.is_obj():
             return self.get_obj_attrs()
+        if self.is_dict():
+            return self.get_as_dict()
         return self
 
     # ===------------------------------------------------------------------=== #
@@ -316,7 +340,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_dict(self) -> Bool:
-        return False
+        return self.value.isa[_RefCountedDict]()
 
     @always_inline
     fn is_func(self) -> Bool:
@@ -344,7 +368,7 @@ struct _ObjectImpl(
         return self.value[String]
 
     @always_inline
-    fn get_as_list(self) -> _RefCountedList:
+    fn get_as_list(ref[_]self) -> ref[self.value] _RefCountedList:
         return self.value[_RefCountedList]
 
     @always_inline
@@ -352,9 +376,13 @@ struct _ObjectImpl(
         return self.value[_Function]
 
     @always_inline
-    fn get_obj_attrs(self) -> _RefCountedAttrsDict:
+    fn get_obj_attrs(ref[_]self) -> ref[self.value] _RefCountedAttrsDict:
         return self.value[_RefCountedAttrsDict]
 
+    @always_inline
+    fn get_as_dict(ref[_]self) ->ref[self.value] _RefCountedDict:
+        return self.value[_RefCountedDict]
+    
     @always_inline
     fn get_type_id(self) -> Int:
         if self.is_none():
@@ -371,6 +399,8 @@ struct _ObjectImpl(
             return Self.list
         if self.is_func():
             return Self.function
+        if self.is_dict():
+            return Self.dict
         debug_assert(self.is_obj(), "expected a generic object")
         return Self.obj
 
@@ -391,6 +421,8 @@ struct _ObjectImpl(
             return "list"
         if self.is_func():
             return "function"
+        if self.is_dict():
+            return "dict"
         debug_assert(self.is_obj(), "expected a generic object")
         return "obj"
 
@@ -483,9 +515,7 @@ struct _ObjectImpl(
             return
         if self.is_str():
             writer.write(
-                "'"
-                + self.get_as_string()
-                + "'"
+                "'" + self.get_as_string() + "'"
             )
             return
         if self.is_func():
@@ -498,8 +528,13 @@ struct _ObjectImpl(
             for j in range(self.get_list_length()):
                 if j != 0:
                     writer.write(", ")
-                writer.write(str(object(self.get_list_element(j))))
+                writer.write(repr(object(self.get_list_element(j))))
             writer.write("]")
+            return
+
+        if self.is_dict():
+            #TODO: dict repr
+            writer.write("todo")
             return
 
         var ptr = self.get_obj_attrs_ptr()
@@ -737,6 +772,8 @@ struct object(
                 self._append(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
                 self._append(value.get[i, Bool]())
+            elif _type_is_eq[T, String]():
+                self._append(value.get[i, String]())
             elif _type_is_eq[T, StringRef]():
                 self._append(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
@@ -856,6 +893,9 @@ struct object(
 
         if self._value.is_float():
             return int(self._value.get_as_float())
+        
+        if self._value.is_str():
+            return int(self._value.get_as_string())
 
         raise "object type cannot be converted to an integer"
 
@@ -889,6 +929,8 @@ struct object(
         Returns:
             The String representation of the object.
         """
+        if self._value.is_str():
+            return self._value.get_as_string()
         return String.write(self._value)
 
     @no_inline
@@ -1018,7 +1060,7 @@ struct object(
             self, rhs
         )
 
-    fn __eq__(self, rhs: object) raises -> object:
+    fn __eq__(self, rhs: object) -> Bool:
         """Equality comparator. This compares the elements of strings
         and lists.
 
@@ -1028,20 +1070,25 @@ struct object(
         Returns:
             True if the objects are equal.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string() == rhs._value.get_as_string()
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) == 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() == rhs._value.get_as_string()
+            if self._value.is_list() and rhs._value.is_list():
+                return self._list_compare(rhs) == 0
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs == rhs
+            @always_inline
+            fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
+                return lhs == rhs
 
-        return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
-            self, rhs
-        )
+            return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
+                self, rhs
+            )
+        except e:
+            print(e)
+            print("objects are not comparable")
+        return False
 
-    fn __ne__(self, rhs: object) raises -> object:
+    fn __ne__(self, rhs: object) -> Bool:
         """Inequality comparator. This compares the elements of strings
         and lists.
 
@@ -1051,18 +1098,13 @@ struct object(
         Returns:
             True if the objects are not equal.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string() != rhs._value.get_as_string()
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) != 0
+        try:
+            return bool(not self.__eq__(rhs))
+        except e:
+            print(e)
+            print("objects are not comparable")
+        return True
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs != rhs
-
-        return Self._comparison_op[Float64.__ne__, Int64.__ne__, bool_fn](
-            self, rhs
-        )
 
     fn __gt__(self, rhs: object) raises -> object:
         """Greater-than comparator. This lexicographically compares the
@@ -1708,6 +1750,9 @@ struct object(
         if self._value.is_obj():
             return object(self._value.get_obj_attr("__getitem__"))(self, i)
 
+        if self._value.is_dict():
+            return self._value.get_as_dict().get(i)
+        
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
 
@@ -1743,6 +1788,9 @@ struct object(
         """
         if self._value.is_obj():
             _ = object(self._value.get_obj_attr("__setitem__"))(self, i, value)
+            return
+        if self._value.is_dict():
+            self._value.get_as_dict().set(i,value)
             return
         if self._value.is_str():
             raise Error(
@@ -1863,3 +1911,23 @@ struct object(
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)
+
+    # ===------------------------------------------------------------------=== #
+    # Factory methods
+    # ===------------------------------------------------------------------=== #
+    @staticmethod
+    fn dict()->Self:
+        return Self(_ObjectImpl(_RefCountedDict()))
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+    fn __hash__(self)->UInt:
+        if self._value.is_str():
+            return hash(self._value.get_as_string())
+        if self._value.is_int():
+            return hash(self._value.get_as_int())
+        if self._value.is_float():
+            return hash(self._value.get_as_float())
+        #FIXME: hash(__repr__(self)) as fallback 
+        return hash(str(self))

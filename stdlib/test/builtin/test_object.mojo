@@ -272,7 +272,7 @@ def test_convert_to_string():
     a = 2.5
     assert_equal(str(a), "2.5")
     a = "hello"
-    assert_equal(str(a), "'hello'")
+    assert_equal(str(a), "hello")
     a = []
     assert_equal(str(a), "[]")
     a.append(3)
@@ -283,9 +283,9 @@ def test_convert_to_string():
     b.append("baz")
     a.append(b)
     assert_equal(str(a), "[3, False, 5.5, ['foo', 'baz']]")
-    assert_equal(str(a[3, 1]), "'baz'")
+    assert_equal(str(a[3, 1]), "baz")
     a[3, 1] = "bar"
-    assert_equal(str(a[3, 1]), "'bar'")
+    assert_equal(str(a[3, 1]), "bar")
     var c = a + b
     assert_equal(str(c), "[3, False, 5.5, ['foo', 'bar'], 'foo', 'bar']")
     b.append(False)
@@ -296,18 +296,49 @@ def test_convert_to_string():
     assert_equal(str(a), "[3, False, 5.5, ['foo', None, False]]")
     a = "abc"
     b = a[True]
-    assert_equal(str(b), "'b'")
+    assert_equal(str(b), "b")
     b = a[2]
-    assert_equal(str(b), "'c'")
+    assert_equal(str(b), "c")
     a = [1, 1.2, False, "true"]
     assert_equal(str(a), "[1, 1.2, False, 'true']")
 
     a = object(Attr("foo", 5), Attr("bar", "hello"), Attr("baz", False))
-    assert_equal(str(a.bar), "'hello'")
+    assert_equal(str(a.bar), "hello")
     a.bar = [1, 2]
     assert_equal(str(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
     assert_equal(repr(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
 
+    a = object.dict()
+    a["one"] = 1
+    a[2] = "two"
+    assert_equal(str(a["one"]), "1")
+    assert_equal(str(a[2]), "two")
+
+def test_object_dict():
+    a = object.dict()
+    a["one"] = 1
+    a[2] = "two"
+    assert_equal(a["one"], 1)
+    assert_equal(a[2], "two")
+    assert_equal(str(a[2]), "two")
+    b = a
+    assert_equal(a._value.get_as_dict().impl.count(), 2)
+    # asap __del__ of a
+    assert_equal(b._value.get_as_dict().impl.count(), 1)
+    
+    ref_counted_list = object([1,2,3])
+    assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
+    b["ref_counted_list"] = ref_counted_list
+    assert_equal(ref_counted_list._value.get_as_list().impl.count(), 2)
+    ref_counted_list.append(4)
+    assert_equal(b["ref_counted_list"], [1,2,3,4])
+    #asap __del__ of b
+    assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
+
+def test_object_cast():
+    a = object()
+    a = "1"
+    assert_equal(int(a)+1, 2)
 
 def main():
     test_object_ctors()
@@ -319,3 +350,5 @@ def main():
     test_non_object_getattr()
     test_matrix()
     test_convert_to_string()
+    test_object_dict()
+    test_object_cast()
