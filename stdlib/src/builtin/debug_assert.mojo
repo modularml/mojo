@@ -23,6 +23,7 @@ from sys.param_env import env_get_string
 from sys.ffi import external_call, c_uint, c_size_t, c_char
 from sys.info import sizeof
 from memory import UnsafePointer
+from utils.string_slice import _ConcatStr
 
 
 from builtin._location import __call_location, _SourceLocation
@@ -307,13 +308,15 @@ fn _debug_assert_msg(
         )
 
     else:
-        message = String.write(messages)
+        message = _ConcatStr(String.write(messages))
 
         @parameter
         if defined_mode == "warn":
-            print(loc.prefix("Assert Warning: " + message))
+            message.prepend("Assert Warning: ")
+            print(loc.prefix(message^))
         else:
-            abort(loc.prefix("Assert Error: " + message))
+            message.prepend("Assert Error: ")
+            abort(loc.prefix(message^))
 
 
 @no_inline

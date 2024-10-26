@@ -34,7 +34,7 @@ from collections import Optional
 from math import isclose
 
 from builtin._location import __call_location, _SourceLocation
-
+from utils.string_slice import _ConcatStr, Stringlike
 
 # ===----------------------------------------------------------------------=== #
 # Assertions
@@ -42,8 +42,9 @@ from builtin._location import __call_location, _SourceLocation
 
 
 @always_inline
-fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
-    return loc.prefix("AssertionError: " + str(msg))
+fn _assert_error(owned msg: _ConcatStr, loc: _SourceLocation) -> String:
+    msg.prepend("AssertionError: ")
+    return loc.prefix(msg^)
 
 
 @always_inline
@@ -409,16 +410,16 @@ fn assert_almost_equal[
     )
 
     if not all(almost_equal):
-        var err = str(lhs) + " is not close to " + str(rhs)
+        var err = _ConcatStr(str(lhs), " is not close to ", str(rhs))
 
         @parameter
         if type.is_integral() or type.is_floating_point():
-            err += " with a diff of " + str(abs(lhs - rhs))
+            err.append(" with a diff of ", str(abs(lhs - rhs)))
 
         if msg:
-            err += " (" + msg + ")"
+            err.append(" (", msg, ")")
 
-        raise _assert_error(err, location.or_else(__call_location()))
+        raise _assert_error(err^, location.or_else(__call_location()))
 
 
 @always_inline
@@ -486,10 +487,10 @@ fn assert_is_not[
 fn _assert_cmp_error[
     cmp: String
 ](lhs: String, rhs: String, *, msg: String, loc: _SourceLocation) -> String:
-    var err = (cmp + " failed:\n   left: " + lhs + "\n  right: " + rhs)
+    var err = _ConcatStr(cmp, " failed:\n   left: ", lhs, "\n  right: ", rhs)
     if msg:
-        err += "\n  reason: " + msg
-    return _assert_error(err, loc)
+        err.append("\n  reason: ", msg)
+    return _assert_error(err^, loc)
 
 
 struct assert_raises:

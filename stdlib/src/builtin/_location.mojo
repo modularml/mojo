@@ -13,6 +13,8 @@
 """Implements utilities to capture and represent source code location.
 """
 
+from utils.string_slice import _ConcatStr
+
 
 @value
 @register_passable("trivial")
@@ -31,16 +33,14 @@ struct _SourceLocation(Writable, Stringable):
         return String.write(self)
 
     @no_inline
-    fn prefix[T: Stringable](self, msg: T) -> String:
+    fn prefix(self, owned msg: _ConcatStr) -> String:
         """Return the given message prefixed with the pretty-printer location.
-
-        Parameters:
-            T: The type of the message.
 
         Args:
             msg: The message to attach the prefix to.
         """
-        return "At " + str(self) + ": " + str(msg)
+        msg.prepend("At ", str(self), ": ")
+        return str(msg)
 
     fn write_to[W: Writer](self, inout writer: W):
         """
