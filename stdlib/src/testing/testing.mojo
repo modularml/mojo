@@ -44,7 +44,7 @@ from utils.string_slice import _ConcatStr, Stringlike
 @always_inline
 fn _assert_error(owned msg: _ConcatStr, loc: _SourceLocation) -> String:
     msg.prepend("AssertionError: ")
-    return loc.prefix(msg^)
+    return str(loc.prefix(msg^))
 
 
 @always_inline

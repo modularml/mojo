@@ -24,7 +24,7 @@ from utils import IndexList, StringRef
 
 @always_inline
 fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
-    return loc.prefix("AssertionError: " + str(msg))
+    return str(loc.prefix("AssertionError: " + str(msg)))
 
 
 fn _assert_equal_error(
