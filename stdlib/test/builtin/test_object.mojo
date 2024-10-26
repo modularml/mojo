@@ -340,6 +340,14 @@ def test_object_cast():
     a = "1"
     assert_equal(int(a)+1, 2)
 
+def test_object_init_list_attr():
+    attrs = List[Attr]()
+    attrs.append(Attr("val", [1,2]))
+    attrs.append(Attr("add", test_function))
+    y = object(attrs)
+    assert_equal(y.val, [1,2])
+    assert_equal(y.add(10,20), 30)
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -352,3 +360,4 @@ def main():
     test_convert_to_string()
     test_object_dict()
     test_object_cast()
+    test_object_init_list_attr()

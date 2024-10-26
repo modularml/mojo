@@ -74,6 +74,13 @@ struct _RefCountedAttrsDict:
             self.impl[]._insert(values[i].key, values[i].value._value.copy())
 
     @always_inline
+    fn __init__(inout self, values: List[Attr]):
+        self = Self()
+        # Elements can only be added on construction.
+        for i in range(len(values)):
+            self.impl[]._insert(values[i].key, values[i].value._value.copy())
+    
+    @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
         if key in self.impl[]:
             self.impl[][key] = value
@@ -95,7 +102,7 @@ struct _RefCountedAttrsDict:
             + "'"
         )
 
-
+@value
 struct Attr:
     """A generic object's attributes are set on construction, after which the
     attributes can be read and modified, but no attributes may be removed or
@@ -828,6 +835,14 @@ struct object(
         """
         self._value = _RefCountedAttrsDict(attrs)
 
+    fn __init__(inout self, attrs: List[Attr]):
+        """Initializes the object with a list of zero or more attributes.
+
+        Args:
+            attrs: Zero or more attributes.
+        """
+        self._value = _RefCountedAttrsDict(attrs)
+    
     @always_inline
     fn __moveinit__(inout self, owned existing: object):
         """Move the value of an object.
