@@ -21,7 +21,7 @@ from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char, OpaquePointer
 from utils import StaticString, write_args
 
-from bit import count_leading_zeros, bit_ceil
+from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
@@ -31,13 +31,13 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import (
     IndexList,
     StringRef,
-    StringSlice,
     Variant,
     Writable,
     Writer,
 )
 from utils.span import Span, AsBytesRead
 from utils.string_slice import (
+    StringSlice,
     _utf8_byte_type,
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
