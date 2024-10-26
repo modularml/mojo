@@ -351,44 +351,6 @@ struct Span[
         """
         return not self == rhs
 
-    fn __str__[U: RepresentableCollectionElement](self: Span[U]) -> String:
-        """Returns a string representation of a `Span`.
-
-        Parameters:
-            U: The type of the elements in the `Span`. Must implement the
-              traits `Representable` and `CollectionElement`.
-
-        Returns:
-            A string representation of the `Span`.
-        """
-        var output = String()
-        self._write_to(output)
-        return output^
-
-    @no_inline
-    fn __repr__[U: RepresentableCollectionElement, //](self: Span[U]) -> String:
-        """Returns a string representation of a `Span`.
-
-        Parameters:
-            U: The type of the elements in the `Span`. Must implement the
-              traits `Representable` and `CollectionElement`.
-
-        Returns:
-            A string representation of the `Span`.
-        """
-        return self.__str__()
-
-    @no_inline
-    fn _write_to[
-        W: Writer, U: RepresentableCollectionElement, //
-    ](self: Span[U], inout writer: W):
-        writer.write("[")
-        for i in range(len(self)):
-            writer.write(repr(self[i]))
-            if i < len(self) - 1:
-                writer.write(", ")
-        writer.write("]")
-
     fn fill[origin: MutableOrigin, //](self: Span[T, origin], value: T):
         """Fill the memory that a span references with a given value.
 

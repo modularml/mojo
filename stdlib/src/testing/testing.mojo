@@ -486,11 +486,10 @@ fn assert_is_not[
 fn _assert_cmp_error[
     cmp: String
 ](lhs: String, rhs: String, *, msg: String, loc: _SourceLocation) -> String:
-    err = List(cmp, " failed:\n   left: ", repr(lhs), "\n  right: ", repr(rhs))
+    var err = (cmp + " failed:\n   left: " + lhs + "\n  right: " + rhs)
     if msg:
-        err.append("\n  reason: ")
-        err.append(msg)
-    return _assert_error("".join(err), loc)
+        err += "\n  reason: " + msg
+    return _assert_error(err, loc)
 
 
 struct assert_raises:

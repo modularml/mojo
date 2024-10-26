@@ -267,9 +267,7 @@ fn _repr[T: Stringlike, //](value: T) -> String:
 
     span = value.as_bytes_read()
     span_len = len(span)
-    debug_assert(
-        _is_valid_utf8(span), "invalid utf8 sequence: " + span.__str__()
-    )
+    debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
     nonprintable_python = span.count[func=_nonprintable_python]()
     hex_prefix = 3 * nonprintable_python  # \xHH
     b_len = value.byte_length()
@@ -483,9 +481,7 @@ fn _ascii[T: Stringlike, //](value: T) -> String:
 
     span = value.as_bytes_read()
     span_len = len(span)
-    debug_assert(
-        _is_valid_utf8(span), "invalid utf8 sequence: " + span.__str__()
-    )
+    debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
     non_printable_ascii = span.count[func=_nonprintable_ascii]()
     continuation_bytes = span.count[func=_is_continuation_byte]()
     hex_prefix = 3 * (non_printable_ascii + continuation_bytes)
