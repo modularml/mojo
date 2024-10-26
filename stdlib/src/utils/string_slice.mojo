@@ -56,19 +56,15 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
 
 
 @always_inline
-fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
+fn _utf8_first_byte_sequence_length(b: SIMD[DType.uint8, 1]) -> Int:
     """Get the length of the sequence starting with given byte. Do note that
     this does not work correctly if given a continuation byte."""
 
     debug_assert(
-        (b & 0b1100_0000) != 0b1000_0000,
-        (
-            "Function `_utf8_first_byte_sequence_length()` does not work"
-            " correctly if given a continuation byte."
-        ),
+        not _is_continuation_byte(b),
+        "Function does not work correctly if given a continuation byte.",
     )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
+    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
@@ -86,14 +82,11 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         - (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000,
         d | 0b10000000
     """
-    if num_bytes == 1:
-        ptr[0] = UInt8(c)
-        return
 
     var shift = 6 * (num_bytes - 1)
-    var mask = UInt8(0xFF) >> (num_bytes + 1)
+    var mask = UInt8(0xFF) >> (num_bytes + int(num_bytes > 1))
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    ptr[0] = ((c >> shift) & mask) | num_bytes_marker
+    ptr[0] = ((c >> shift) & mask) | num_bytes_marker * int(num_bytes > 1)
     for i in range(1, num_bytes):
         shift -= 6
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000

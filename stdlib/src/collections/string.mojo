@@ -55,8 +55,11 @@ from utils.string_slice import (
 # ===----------------------------------------------------------------------=== #
 
 
-fn ord(s: String) -> Int:
+fn ord[T: Stringlike, //](s: T) -> Int:
     """Returns the unicode codepoint for the character.
+
+    Parameters:
+        T: The Stringlike type.
 
     Args:
         s: The input string slice, which must contain only a single character.
@@ -66,15 +69,59 @@ fn ord(s: String) -> Int:
 
     Examples:
     ```mojo
-    print(ord("a")) # 97
+    print(ord("a"), ord("€")) # 97 8364
     ```
     .
     """
-    return ord(s.as_string_slice())
+
+    @parameter
+    if _type_is_eq[T, StringLiteral]():
+        # FIXME(#933): llvm intrinsic can't recognize pop value when trying to
+        # fold ctlz at comp time
+        v = rebind[StringLiteral](s)
+        p = v.unsafe_ptr()
+        b0 = p[0] if v.byte_length() > 0 else 0
+        debug_assert(not _is_continuation_byte(b0), "invalid byte at index 0")
+        alias c_byte_mask = 0b0011_1111
+
+        if b0 < 0b1000_0000:
+            return int(b0)
+        elif b0 < 0b1110_0000:
+            debug_assert(v.byte_length() == 2, "wrong sized string")
+            b0_mask = 0b1111_1111 >> 3
+            debug_assert(_is_continuation_byte(p[1]), "invalid byte at index 1")
+            return (int(b0 & b0_mask) << 6) | int(p[1] & c_byte_mask)
+        elif b0 < 0b1111_0000:
+            debug_assert(v.byte_length() == 3, "wrong sized string")
+            b0_mask = 0b1111_1111 >> 4
+            debug_assert(_is_continuation_byte(p[1]), "invalid byte at index 1")
+            debug_assert(_is_continuation_byte(p[2]), "invalid byte at index 2")
+            return (
+                (int(b0 & b0_mask) << 12)
+                | (int(p[1] & c_byte_mask) << 6)
+                | int(p[2] & c_byte_mask)
+            )
+        else:
+            debug_assert(v.byte_length() == 4, "wrong sized string")
+            b0_mask = 0b1111_1111 >> 5
+            debug_assert(_is_continuation_byte(p[1]), "invalid byte at index 1")
+            debug_assert(_is_continuation_byte(p[2]), "invalid byte at index 2")
+            debug_assert(_is_continuation_byte(p[3]), "invalid byte at index 3")
+            return (
+                (int(b0 & b0_mask) << 18)
+                | (int(p[1] & c_byte_mask) << 12)
+                | (int(p[2] & c_byte_mask) << 6)
+                | int(p[3] & c_byte_mask)
+            )
+    else:
+        return ord(s.as_bytes_read())
 
 
-fn ord(s: StringSlice) -> Int:
+fn ord[O: ImmutableOrigin, //](s: Span[Byte, O]) -> Int:
     """Returns the unicode codepoint for the character.
+
+    Parameters:
+        O: The immutable origin.
 
     Args:
         s: The input string, which must contain only a single character.
@@ -84,7 +131,7 @@ fn ord(s: StringSlice) -> Int:
 
     Examples:
     ```mojo
-    print(ord("a")) # 97
+    print(ord("a"), ord("€")) # 97 8364
     ```
     .
     """
@@ -93,36 +140,29 @@ fn ord(s: StringSlice) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s.unsafe_ptr().bitcast[UInt8]()
-    var b1 = p[]
-    if (b1 >> 7) == 0:  # This is 1 byte ASCII char
-        debug_assert(s.byte_length() == 1, "input string length must be 1")
-        return int(b1)
-    var num_bytes = count_leading_zeros(~b1)
-    debug_assert(
-        s.byte_length() == int(num_bytes), "input string must be one character"
-    )
-    debug_assert(
-        1 < int(num_bytes) < 5, "invalid UTF-8 byte ", b1, " at index 0"
-    )
-    var shift = int((6 * (num_bytes - 1)))
-    var b1_mask = 0b11111111 >> (num_bytes + 1)
-    var result = int(b1 & b1_mask) << shift
+    p = s.unsafe_ptr()
+    b0 = p[0]
+    num_bytes = _utf8_first_byte_sequence_length(b0)
+    debug_assert(len(s) == num_bytes, "input string must be one character")
+    debug_assert(1 <= num_bytes <= 4, "invalid UTF-8 byte ", b0, " at index 0")
+    alias c_byte_mask = 0b0011_1111
+    b0_mask = 0b1111_1111 >> (num_bytes + int(num_bytes > 1))
+    shift = int((6 * (num_bytes - 1)))
+    result = int(b0 & b0_mask) << shift
     for i in range(1, num_bytes):
-        p += 1
+        b = p[i]
         debug_assert(
-            p[] >> 6 == 0b00000010, "invalid UTF-8 byte ", b1, " at index ", i
+            _is_continuation_byte(b), "invalid UTF-8 byte ", b, " at index ", i
         )
         shift -= 6
-        result |= int(p[] & 0b00111111) << shift
+        result |= int(b & c_byte_mask) << shift
     return result
 
 
-fn ord[num_bytes: Int](*args: Byte) -> Int:
-    """Returns the unicode codepoint for the given one-character byte sequence.
-
-    Parameters:
-        num_bytes: The amount of bytes of the utf8 sequence.
+# FIXME: remove num_bytes once variadic list length can be used at comp time
+# and maybe make this public
+fn _ord[num_bytes: Int](*args: Byte) -> Int:
+    """Returns the unicode codepoint for the given utf8 byte sequence.
 
     Args:
         args: The input bytes, which must be only a single character.
@@ -132,32 +172,45 @@ fn ord[num_bytes: Int](*args: Byte) -> Int:
 
     Examples:
     ```mojo
-    print(ord[2](0xC3, 0xBD)) # 0xFD
+    %# from collections.string import _ord
+    print(_ord[2](0xC3, 0xBD)) # 0xFD
     ```
     .
     """
+
+    debug_assert(num_bytes == len(args), "invalid num_bytes")
     debug_assert(
         num_bytes == _utf8_first_byte_sequence_length(args[0]),
         "invalid first byte",
     )
 
-    @parameter
-    if num_bytes == 1:
-        return int(args[0])
-    alias b1_mask = 0b11111111 >> (num_bytes + 1)
-    shift = int((6 * (num_bytes - 1)))
-    result = int(args[0] & b1_mask) << shift
-
-    @parameter
     for i in range(1, num_bytes):
         b = args[i]
         debug_assert(
-            b >> 6 == 0b00000010, "invalid UTF-8 byte ", b, " at index ", i
+            _is_continuation_byte(b), "invalid UTF-8 byte ", b, " at index ", i
         )
 
-        shift -= 6
-        result |= int(b & 0b00111111) << shift
-    return result
+    alias b0_mask = 0b1111_1111 >> (num_bytes + 1)
+    alias c_byte_mask = 0b0011_1111
+
+    @parameter
+    if num_bytes == 1:
+        return int(args[0])
+    elif num_bytes == 2:
+        return (int(args[0] & b0_mask) << 6) | int(args[1]) & c_byte_mask
+    elif num_bytes == 3:
+        return (
+            (int(args[0] & b0_mask) << 12)
+            | (int(args[1] & c_byte_mask) << 6)
+            | (int(args[2] & c_byte_mask))
+        )
+    else:
+        return (
+            (int(args[0] & b0_mask) << 18)
+            | (int(args[1] & c_byte_mask) << 12)
+            | (int(args[2] & c_byte_mask) << 6)
+            | int(args[3] & c_byte_mask)
+        )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -177,17 +230,13 @@ fn chr(c: Int) -> String:
 
     Examples:
     ```mojo
-    print(chr(97)) # "a"
-    print(chr(8364)) # "€"
+    print(chr(97), chr(8364)) # a €
     ```
     .
     """
 
-    if c < 0b1000_0000:  # 1 byte ASCII char
-        return String(String._buffer_type(c, 0))
-
-    var num_bytes = _unicode_codepoint_utf8_byte_length(c)
-    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
+    num_bytes = _unicode_codepoint_utf8_byte_length(c)
+    p = UnsafePointer[UInt8].alloc(num_bytes + 1)
     _shift_unicode_to_utf8(p, c, num_bytes)
     # TODO: decide whether to use replacement char (�) or raise ValueError
     # if not _is_valid_utf8(p, num_bytes):
@@ -216,7 +265,9 @@ fn _repr[T: Stringlike, //](value: T) -> String:
 
     span = value.as_bytes_read()
     span_len = len(span)
-    debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
+    debug_assert(
+        _is_valid_utf8(span), "invalid utf8 sequence: " + span.__str__()
+    )
     nonprintable_python = span.count[func=_nonprintable_python]()
     hex_prefix = 3 * nonprintable_python  # \xHH
     b_len = value.byte_length()
@@ -233,23 +284,19 @@ fn _repr[T: Stringlike, //](value: T) -> String:
         use_dquote = use_dquote or (b0 == `'`)
         # Python escapes backslashes but they are ASCII printable
         if b0 == `\\`:
-            b_ptr[b_idx] = `\\`
-            b_ptr[b_idx + 1] = `\\`
+            b_ptr[b_idx], b_ptr[b_idx + 1] = `\\`, `\\`
             b_idx += 2
         elif isprintable(b0):
             b_ptr[b_idx] = b0
             b_idx += 1
         elif b0 == `\t`:
-            b_ptr[b_idx] = `\\`
-            b_ptr[b_idx + 1] = `t`
+            b_ptr[b_idx], b_ptr[b_idx + 1] = `\\`, `t`
             b_idx += 2
         elif b0 == `\n`:
-            b_ptr[b_idx] = `\\`
-            b_ptr[b_idx + 1] = `n`
+            b_ptr[b_idx], b_ptr[b_idx + 1] = `\\`, `n`
             b_idx += 2
         elif b0 == `\r`:
-            b_ptr[b_idx] = `\\`
-            b_ptr[b_idx + 1] = `r`
+            b_ptr[b_idx], b_ptr[b_idx + 1] = `\\`, `r`
             b_idx += 2
         elif seq_len == 1:
             _write_hex[2](b_ptr + b_idx, int(b0))
@@ -260,12 +307,7 @@ fn _repr[T: Stringlike, //](value: T) -> String:
             b_idx += seq_len
         v_idx += seq_len
 
-    if use_dquote:
-        b_ptr[0] = `"`
-        b_ptr[b_idx] = `"`
-    else:
-        b_ptr[0] = `'`
-        b_ptr[b_idx] = `'`
+    b_ptr[0], b_ptr[b_idx] = (`"`, `"`) if use_dquote else (`'`, `'`)
     b_ptr[b_idx + 1] = 0  # null terminator
     buf.size = b_idx + 2
     return String(buf^)
@@ -280,7 +322,7 @@ fn _repr[T: Stringlike, //](value: T) -> String:
 fn _isdigit_vec[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     alias `0` = SIMD[DType.uint8, w](Byte(ord("0")))
     alias `9` = SIMD[DType.uint8, w](Byte(ord("9")))
-    return `0` <= v <= `9`
+    return (`0` <= v) & (v <= `9`)
 
 
 @always_inline
@@ -395,20 +437,20 @@ fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], codepoint: Int):
     alias `u` = Byte(ord("u"))
     alias `U` = Byte(ord("U"))
 
-    alias amnt = min(bit_ceil(amnt_hex_bytes), 8)
+    constrained[amnt_hex_bytes in (2, 4, 8), "only 2 or 4 or 8 sequences"]()
     p[0] = `\\`
 
     @parameter
-    if amnt == 2:
+    if amnt_hex_bytes == 2:
         p[1] = `x`
-    elif amnt == 4:
+    elif amnt_hex_bytes == 4:
         p[1] = `u`
     else:
         p[1] = `U`
     idx = 2
 
     @parameter
-    for i in reversed(range(amnt)):
+    for i in reversed(range(amnt_hex_bytes)):
         p[idx] = _byte_to_hex_string((codepoint // (16**i)) % 16)
         idx += 1
 
@@ -439,7 +481,9 @@ fn _ascii[T: Stringlike, //](value: T) -> String:
 
     span = value.as_bytes_read()
     span_len = len(span)
-    debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
+    debug_assert(
+        _is_valid_utf8(span), "invalid utf8 sequence: " + span.__str__()
+    )
     non_printable_ascii = span.count[func=_nonprintable_ascii]()
     continuation_bytes = span.count[func=_is_continuation_byte]()
     hex_prefix = 3 * (non_printable_ascii + continuation_bytes)
@@ -463,29 +507,24 @@ fn _ascii[T: Stringlike, //](value: T) -> String:
         elif seq_len == 1 or is_2byte_short:
             codepoint = int(b0)
             if is_2byte_short:
-                codepoint = ord[2](b0, b1)
+                codepoint = _ord[2](b0, b1)
             _write_hex[2](b_ptr + b_idx, codepoint)
             b_idx += 4
         elif seq_len < 4:
             var codepoint: Int
             if seq_len == 2:
-                codepoint = ord[2](b0, b1)
+                codepoint = _ord[2](b0, b1)
             else:
-                codepoint = ord[3](b0, b1, v_ptr[v_idx + 2])
+                codepoint = _ord[3](b0, b1, v_ptr[v_idx + 2])
             _write_hex[4](b_ptr + b_idx, codepoint)
             b_idx += 6
         else:
-            codepoint = ord[4](b0, b1, v_ptr[v_idx + 2], v_ptr[v_idx + 3])
+            codepoint = _ord[4](b0, b1, v_ptr[v_idx + 2], v_ptr[v_idx + 3])
             _write_hex[8](b_ptr + b_idx, codepoint)
             b_idx += 10
         v_idx += seq_len
 
-    if use_dquote:
-        b_ptr[0] = `"`
-        b_ptr[b_idx] = `"`
-    else:
-        b_ptr[0] = `'`
-        b_ptr[b_idx] = `'`
+    b_ptr[0], b_ptr[b_idx] = (`"`, `"`) if use_dquote else (`'`, `'`)
     b_ptr[b_idx + 1] = 0  # null terminator
     buf.size = b_idx + 2
     return String(buf^)

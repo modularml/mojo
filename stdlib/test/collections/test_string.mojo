@@ -1010,7 +1010,7 @@ def test_upper():
     assert_equal(String("É").upper(), "É")
 
 
-def test_is_ascii_space():
+def test_isspace():
     # checking true cases
     for item in List(" ", "\n", "\t", "\r", "\v", "\f", "\x1c", "\x1d", "\x1e"):
         assert_true(_is_ascii_space(ord(item[])))
@@ -1653,7 +1653,7 @@ def main():
     test_islower()
     test_lower()
     test_upper()
-    test_is_ascii_space()
+    test_isspace()
     test_ascii_aliases()
     test_rstrip()
     test_lstrip()
