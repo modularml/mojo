@@ -985,11 +985,11 @@ struct _ConcatStr:
 
     fn __init__(inout self, values: Self._W):
         self._buffer = List[Self._S](capacity=8)
-        self._buffer.unsafe_ptr().init_pointee_move(Self.concat(values))
+        self._buffer.unsafe_ptr().init_pointee_move(Self._concat(values))
         self._buffer.size = 1
 
-    fn __init__[*T: Writable](inout self, owned *values: *T):
-        self = Self(values=values^)
+    fn __init__[*T: Writable](inout self, *values: *T):
+        self = Self(values=values)
 
     fn __init__(inout self, *, capacity: Int = 8):
         self._buffer = List[Self._S](capacity=capacity)
@@ -998,16 +998,16 @@ struct _ConcatStr:
         self._buffer = existing._buffer^
 
     fn append(inout self, owned values: Self._W):
-        self._buffer.append(Self.concat(values^))
+        self._buffer.append(Self._concat(values^))
 
     fn append[*T: Writable](inout self, owned *values: *T):
         self.append(values^)
 
     fn insert[T: Writable, //](inout self, idx: Int, owned value: T):
-        self._buffer.insert(idx, Self.concat(value^))
+        self._buffer.insert(idx, Self._concat(value^))
 
     fn prepend[*T: Writable](inout self, owned *values: *T):
-        self._buffer.insert(0, Self.concat(values^))
+        self._buffer.insert(0, Self._concat(values^))
 
     fn __iadd__[T: Writable, //](inout self, owned value: T):
         self.append(value^)
@@ -1038,11 +1038,11 @@ struct _ConcatStr:
         return String(buf^)
 
     @staticmethod
-    fn concat[*T: Writable](*values: *T) -> String:
-        return Self.concat(values=values)
+    fn _concat[*T: Writable](*values: *T) -> String:
+        return Self._concat(values=values)
 
     @staticmethod
-    fn concat(values: Self._W) -> String:
+    fn _concat(values: Self._W) -> String:
         @parameter
         if (
             __type_of(values).__len__() == 1
@@ -1051,10 +1051,6 @@ struct _ConcatStr:
             return rebind[String](values[0])
         else:
             return String.write(values)
-
-    @staticmethod
-    fn _build(p: UnsafePointer[Byte], l: Int) -> Self._S:
-        return Self._S(StaticString(unsafe_from_utf8_ptr=p, len=l))
 
     fn write_to[W: Writer](self, inout writer: W):
         for e in self._buffer:
