@@ -34,7 +34,7 @@ from collections import Optional
 from math import isclose
 
 from builtin._location import __call_location, _SourceLocation
-from utils.string_slice import _ConcatStr, Stringlike
+from utils.string_slice import _ConcatStr
 
 # ===----------------------------------------------------------------------=== #
 # Assertions
@@ -43,8 +43,7 @@ from utils.string_slice import _ConcatStr, Stringlike
 
 @always_inline
 fn _assert_error(owned msg: _ConcatStr, loc: _SourceLocation) -> String:
-    msg.prepend("AssertionError: ")
-    return str(loc.prefix(msg^))
+    return str(loc.prefix(msg^, "AssertionError: "))
 
 
 @always_inline
@@ -487,9 +486,15 @@ fn assert_is_not[
 fn _assert_cmp_error[
     cmp: String
 ](lhs: String, rhs: String, *, msg: String, loc: _SourceLocation) -> String:
-    err = _ConcatStr(cmp, " failed:\n   left: ", lhs, "\n  right: ", rhs)
-    if msg:
-        err.append("\n  reason: ", msg)
+    err = _ConcatStr(
+        cmp,
+        " failed:\n   left: ",
+        repr(lhs),
+        "\n  right: ",
+        repr(rhs),
+        "\n  reason: " if msg else "",
+        msg,
+    )
     return _assert_error(err^, loc)
 
 

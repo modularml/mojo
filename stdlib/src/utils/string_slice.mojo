@@ -991,7 +991,7 @@ struct _ConcatStr:
     fn __init__[*T: Writable](inout self, owned *values: *T):
         self = Self(values=values^)
 
-    fn __init__(inout self, *, capacity: Int):
+    fn __init__(inout self, *, capacity: Int = 8):
         self._buffer = List[Self._S](capacity=capacity)
 
     fn __moveinit__(inout self, owned existing: Self):
@@ -1039,11 +1039,18 @@ struct _ConcatStr:
 
     @staticmethod
     fn concat[*T: Writable](*values: *T) -> String:
-        return String.write(values)
+        return Self.concat(values=values)
 
     @staticmethod
     fn concat(values: Self._W) -> String:
-        return String.write(values)
+        @parameter
+        if (
+            __type_of(values).__len__() == 1
+            and _type_is_eq[__type_of(values[0]), String]()
+        ):
+            return rebind[String](values[0])
+        else:
+            return String.write(values)
 
     @staticmethod
     fn _build(p: UnsafePointer[Byte], l: Int) -> Self._S:
