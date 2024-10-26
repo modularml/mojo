@@ -264,7 +264,8 @@ struct Deque[ElementType: CollectionElement](
         Args:
             value: The value to append.
         """
-        if len(self) == self._maxlen:
+        # checking for positive _maxlen first is important for speed
+        if self._maxlen > 0 and len(self) == self._maxlen:
             (self._data + self._head).destroy_pointee()
             self._head = self._physical_index(self._head + 1)
 
