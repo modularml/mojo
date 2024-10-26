@@ -1097,7 +1097,7 @@ struct object(
 
             return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
                 self, rhs
-            )
+            ).__bool__()
         except e:
             print(e)
             print("objects are not comparable")
@@ -1930,6 +1930,18 @@ struct object(
         return self._value.get_as_func().invoke(arg0, arg1, arg2)
 
     fn __contains__(self, value: Self) raises ->Bool:
+        """Returns `True` if value is in `self` (`dict` key or `list` element).
+        
+        Example:
+        ```mojo
+        a = object([1, "two"])
+        if "two" in a:
+            print("two is in a")
+        ```
+
+        Returns:
+            A `Bool` (`True` or `False`).
+        """
         if self._value.is_list():
             for v in self._value.get_as_list().impl[]:
                 if object(v[]).__eq__(value): return True
@@ -1939,6 +1951,21 @@ struct object(
         raise "only lists and dict implements the __contains__ dunder"
     
     fn pop(self, value: Self) raises -> object:
+        """Removes an element and returns it.
+        
+        Returns:
+            The element.
+
+        Example
+        ```mojo
+        x = object.dict()
+        x["one"] = 1
+        x["two"] = 2
+        y = x.pop("two")
+        print(y == 2)
+        ```
+        Note: implemented for list and dictionary.
+        """
         #TODO: argument with None as default for pop()
         if self._value.is_list():
             if value._value.is_int():
@@ -1964,17 +1991,43 @@ struct object(
     # ===------------------------------------------------------------------=== #
     @staticmethod
     fn dict()->Self:
+        """Construct an empty dictionary.
+
+        Returns:
+            The constructed empty dictionary.
+
+        Example:
+        ```mojo
+        x = object.dict()
+        x["one"] = 1
+        x[2] = "two"
+        x[3.0] = [3.0]
+        ```
+
+        Note: supported key types are `Float64`, `Int64` and `String`.
+
+        Values can be object of any types.
+        """
         return Self(_ObjectImpl(_RefCountedDict()))
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
     # ===------------------------------------------------------------------=== #
     fn __hash__(self)->UInt:
+        """Compute the hash of `self`.
+
+        Returns:
+            An `UInt`.
+        
+        Note: `hash(repr(self))` is returned if `self` type is not hashable.
+        
+        The hashables types are `String`, `Int64` and `Float64`.
+        """
         if self._value.is_str():
             return hash(self._value.get_as_string())
         if self._value.is_int():
             return hash(self._value.get_as_int())
         if self._value.is_float():
             return hash(self._value.get_as_float())
-        #FIXME: hash(__repr__(self)) as fallback 
-        return hash(str(self))
+        #FIXME: hash(repr(self)) as fallback 
+        return hash(repr(self))
