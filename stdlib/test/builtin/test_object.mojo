@@ -40,6 +40,11 @@ def test_object_ctors():
     assert_true(a)
     b = object([2, 4])
     assert_true(a < b)
+    
+    a = String("hello world")
+    assert_true(a == object("hello world"))
+    a += "!"
+    assert_true(a == "hello world!")
 
 
 def test_comparison_ops():

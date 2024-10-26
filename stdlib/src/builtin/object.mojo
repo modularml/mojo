@@ -35,38 +35,6 @@ struct _NoneMarker(CollectionElementNew):
     fn __init__(inout self, *, other: Self):
         pass
 
-
-@register_passable("trivial")
-struct _ImmutableString(CollectionElement, CollectionElementNew):
-    """Python strings are immutable. This class is marked as trivially register
-    passable because its memory will be managed by `_ObjectImpl`. It is a
-    pointer and integer pair. Memory will be dynamically allocated.
-    """
-
-    var data: UnsafePointer[UInt8]
-    """The pointer to the beginning of the string contents. It is not
-    null-terminated."""
-    var length: Int
-    """The length of the string."""
-
-    @always_inline
-    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
-        self.data = data
-        self.length = length
-
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        self = other
-
-    @always_inline
-    fn string_compare(self, rhs: _ImmutableString) -> Int:
-        var res = memcmp(self.data, rhs.data, min(self.length, rhs.length))
-        if res != 0:
-            return -1 if res < 0 else 1
-        if self.length == rhs.length:
-            return 0
-        return -1 if self.length < rhs.length else 1
-
 @value
 struct _RefCountedList:
     """Python objects have the behavior that bool, int, float, and str are
@@ -108,7 +76,6 @@ struct _RefCountedAttrsDict:
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
         if key in self.impl[]:
-            self.impl[][key].destroy()
             self.impl[][key] = value
             return
         raise Error(
@@ -223,7 +190,7 @@ struct _ObjectImpl(
         Bool,
         Int64,
         Float64,
-        _ImmutableString,
+        String,
         _RefCountedList,
         _Function,
         _RefCountedAttrsDict,
@@ -277,7 +244,7 @@ struct _ObjectImpl(
             self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _ImmutableString):
+    fn __init__(inout self, value: String):
         self.value = Self.type(value)
 
     @always_inline
@@ -312,26 +279,12 @@ struct _ObjectImpl(
     @always_inline
     fn copy(self) -> Self:
         if self.is_str():
-            var str = self.get_as_string()
-            var impl = _ImmutableString(
-                UnsafePointer[UInt8].alloc(str.length), str.length
-            )
-            memcpy(
-                dest=impl.data,
-                src=str.data,
-                count=str.length,
-            )
-            return impl
+            return self.get_as_string()
         if self.is_list():
             return self.get_as_list()
         if self.is_obj():
             return self.get_obj_attrs()
         return self
-
-    @always_inline
-    fn destroy(self):
-        if self.is_str():
-            self.get_as_string().data.free()
 
     # ===------------------------------------------------------------------=== #
     # Value Query
@@ -355,7 +308,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_str(self) -> Bool:
-        return self.value.isa[_ImmutableString]()
+        return self.value.isa[String]()
 
     @always_inline
     fn is_list(self) -> Bool:
@@ -387,8 +340,8 @@ struct _ObjectImpl(
         return self.value[Float64]
 
     @always_inline
-    fn get_as_string(self) -> _ImmutableString:
-        return self.value[_ImmutableString]
+    fn get_as_string(self) -> String:
+        return self.value[String]
 
     @always_inline
     fn get_as_list(self) -> _RefCountedList:
@@ -531,11 +484,7 @@ struct _ObjectImpl(
         if self.is_str():
             writer.write(
                 "'"
-                + str(
-                    StringRef(
-                        self.get_as_string().data, self.get_as_string().length
-                    )
-                )
+                + self.get_as_string()
                 + "'"
             )
             return
@@ -615,7 +564,6 @@ struct _ObjectImpl(
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
         var ptr = self.get_list_ptr()
-        ptr[][i].destroy()
         ptr[][i] = value
 
     # ===------------------------------------------------------------------=== #
@@ -738,6 +686,15 @@ struct object(
         self._value = value
 
     @always_inline
+    fn __init__(inout self, value: String):
+        """Initializes the object from a string.
+
+        Args:
+            value: The string value.
+        """
+        self._value = value
+
+    @always_inline
     fn __init__(inout self, value: StringLiteral):
         """Initializes the object from a string literal.
 
@@ -753,15 +710,7 @@ struct object(
         Args:
             value: The string value.
         """
-        var impl = _ImmutableString(
-            UnsafePointer[UInt8].alloc(value.length), value.length
-        )
-        memcpy(
-            dest=impl.data,
-            src=value.unsafe_ptr(),
-            count=value.length,
-        )
-        self._value = impl
+        self._value = String(value)
 
     @always_inline
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
@@ -865,7 +814,7 @@ struct object(
     @always_inline
     fn __del__(owned self):
         """Delete the object and release any owned memory."""
-        self._value.destroy()
+        ...
 
     # ===------------------------------------------------------------------=== #
     # Conversion
@@ -888,7 +837,7 @@ struct object(
             return (self._value.get_as_float() != 0.0).__bool__()
         if self._value.is_str():
             # Strings are true if they are non-empty.
-            return self._value.get_as_string().length != 0
+            return self._value.get_as_string().__bool__()
         debug_assert(self._value.is_list(), "expected a list")
         return self._value.get_list_length() != 0
 
@@ -1000,12 +949,6 @@ struct object(
         return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
 
     @always_inline
-    fn _string_compare(self, rhs: object) -> Int:
-        return self._value.get_as_string().string_compare(
-            rhs._value.get_as_string()
-        )
-
-    @always_inline
     fn _list_compare(self, rhs: object) raises -> Int:
         var llen = self._value.get_list_length()
         var rlen = self._value.get_list_length()
@@ -1034,7 +977,10 @@ struct object(
             True if the object is less than the right hard argument.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) < 0
+            return self._value.get_as_string().__lt__(
+                rhs._value.get_as_string()
+            )
+
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) < 0
 
@@ -1057,7 +1003,10 @@ struct object(
             True if the object is less than or equal to the right hard argument.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) <= 0
+            return self._value.get_as_string().__le__(
+                rhs._value.get_as_string()
+            )
+
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) <= 0
 
@@ -1080,7 +1029,7 @@ struct object(
             True if the objects are equal.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) == 0
+            return self._value.get_as_string() == rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) == 0
 
@@ -1103,7 +1052,7 @@ struct object(
             True if the objects are not equal.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) != 0
+            return self._value.get_as_string() != rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) != 0
 
@@ -1126,7 +1075,7 @@ struct object(
             True if the left hand value is greater.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) > 0
+            return self._value.get_as_string() > rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) > 0
 
@@ -1150,7 +1099,7 @@ struct object(
             hand value.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) >= 0
+            return self._value.get_as_string() >= rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) >= 0
 
@@ -1274,17 +1223,7 @@ struct object(
             The sum or concatenated values.
         """
         if self._value.is_str() and rhs._value.is_str():
-            var lhsStr = self._value.get_as_string()
-            var rhsStr = rhs._value.get_as_string()
-            var length = lhsStr.length + rhsStr.length
-            var impl = _ImmutableString(
-                UnsafePointer[UInt8].alloc(length), length
-            )
-            memcpy(impl.data, lhsStr.data, lhsStr.length)
-            memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
-            var result = object()
-            result._value = impl
-            return result
+            return self._value.get_as_string() + rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
             var result2 = object([])
             for i in range(self.__len__()):
@@ -1741,7 +1680,7 @@ struct object(
             or dictionary value.
         """
         if self._value.is_str():
-            return self._value.get_as_string().length
+            return self._value.get_as_string().__len__()
         if self._value.is_list():
             return self._value.get_list_length()
         raise Error("TypeError: only strings and lists have length")
@@ -1775,10 +1714,7 @@ struct object(
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             # Construct a new single-character string.
-            var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
-            var char = self._value.get_as_string().data[index]
-            impl.data.init_pointee_move(char)
-            return _ObjectImpl(impl)
+            return self._value.get_as_string()[index]
         return self._value.get_list_element(i._value.get_as_int().value)
 
     @always_inline
