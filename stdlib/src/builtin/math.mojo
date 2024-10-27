@@ -171,7 +171,7 @@ fn max(x: UInt, y: UInt, /) -> UInt:
     Returns:
         Maximum of x and y.
     """
-    return __mlir_op.`index.maxu`(x.value, y.value)
+    return __mlir_op.`index.maxu`(x._value, y._value)
 
 
 @always_inline("nodebug")
@@ -225,7 +225,7 @@ fn min(x: UInt, y: UInt, /) -> UInt:
     Returns:
         Minimum of x and y.
     """
-    return __mlir_op.`index.minu`(x.value, y.value)
+    return __mlir_op.`index.minu`(x._value, y._value)
 
 
 @always_inline("nodebug")

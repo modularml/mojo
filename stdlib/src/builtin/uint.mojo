@@ -42,7 +42,7 @@ struct UInt(IntLike, _HashableWithHasher):
     alias MIN: UInt = 0
     """Returns the minimum value of type."""
 
-    var value: __mlir_type.index
+    var _value: __mlir_type.index
     """The underlying storage for the integer value.
 
 
@@ -56,7 +56,9 @@ struct UInt(IntLike, _HashableWithHasher):
     @always_inline("nodebug")
     fn __init__(inout self):
         """Default constructor that produces zero."""
-        self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
+        self._value = __mlir_op.`index.constant`[
+            value = __mlir_attr.`0:index`
+        ]()
 
     @doc_private
     @always_inline("nodebug")
@@ -66,7 +68,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Args:
             value: The init value.
         """
-        self.value = value
+        self._value = value
 
     @doc_private
     @always_inline("nodebug")
@@ -76,9 +78,9 @@ struct UInt(IntLike, _HashableWithHasher):
         Args:
             value: The init value.
         """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
-            value
-        )
+        self._value = __mlir_op.`pop.cast_to_builtin`[
+            _type = __mlir_type.index
+        ](value)
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
@@ -87,7 +89,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Args:
             value: The init value.
         """
-        self.value = value.value
+        self._value = value.value
 
     @always_inline("nodebug")
     fn __init__(inout self, value: IntLiteral):
@@ -105,7 +107,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             The corresponding __mlir_type.index value.
         """
-        return self.value
+        return self._value
 
     @no_inline
     fn __str__(self) -> String:
@@ -186,7 +188,7 @@ struct UInt(IntLike, _HashableWithHasher):
         return Bool(
             __mlir_op.`index.cmp`[
                 pred = __mlir_attr.`#index<cmp_predicate eq>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -202,7 +204,7 @@ struct UInt(IntLike, _HashableWithHasher):
         return Bool(
             __mlir_op.`index.cmp`[
                 pred = __mlir_attr.`#index<cmp_predicate ne>`
-            ](self.value, rhs.value)
+            ](self._value, rhs._value)
         )
 
     @always_inline("nodebug")
@@ -215,7 +217,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self + rhs` value.
         """
-        return __mlir_op.`index.add`(self.value, rhs.value)
+        return __mlir_op.`index.add`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __sub__(self, rhs: UInt) -> UInt:
@@ -227,7 +229,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self - rhs` value.
         """
-        return __mlir_op.`index.sub`(self.value, rhs.value)
+        return __mlir_op.`index.sub`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __mul__(self, rhs: UInt) -> UInt:
@@ -239,7 +241,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self * rhs` value.
         """
-        return __mlir_op.`index.mul`(self.value, rhs.value)
+        return __mlir_op.`index.mul`(self._value, rhs._value)
 
     fn __truediv__(self, rhs: UInt) -> Float64:
         """Return the floating point division of `self` and `rhs`.
@@ -266,7 +268,7 @@ struct UInt(IntLike, _HashableWithHasher):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        return __mlir_op.`index.divu`(self.value, rhs.value)
+        return __mlir_op.`index.divu`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: UInt) -> UInt:
@@ -281,7 +283,7 @@ struct UInt(IntLike, _HashableWithHasher):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        return __mlir_op.`index.remu`(self.value, rhs.value)
+        return __mlir_op.`index.remu`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __divmod__(self, rhs: UInt) -> Tuple[UInt, UInt]:
@@ -329,7 +331,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self << rhs`.
         """
-        return __mlir_op.`index.shl`(self.value, rhs.value)
+        return __mlir_op.`index.shl`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __rshift__(self, rhs: UInt) -> UInt:
@@ -341,7 +343,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self >> rhs`.
         """
-        return __mlir_op.`index.shru`(self.value, rhs.value)
+        return __mlir_op.`index.shru`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __and__(self, rhs: UInt) -> UInt:
@@ -353,7 +355,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self & rhs`.
         """
-        return __mlir_op.`index.and`(self.value, rhs.value)
+        return __mlir_op.`index.and`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __xor__(self, rhs: UInt) -> UInt:
@@ -365,7 +367,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self ^ rhs`.
         """
-        return __mlir_op.`index.xor`(self.value, rhs.value)
+        return __mlir_op.`index.xor`(self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __or__(self, rhs: UInt) -> UInt:
@@ -377,7 +379,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             `self | rhs`.
         """
-        return __mlir_op.`index.or`(self.value, rhs.value)
+        return __mlir_op.`index.or`(self._value, rhs._value)
 
     # ===----------------------------------------------------------------------===#
     # In place operations.
@@ -641,7 +643,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ugt>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: UInt) -> Bool:
@@ -655,7 +657,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ult>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: Int) -> Bool:
@@ -669,7 +671,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ult>`
-        ](self.value, rhs.value)
+        ](self._value, rhs.value)
 
     @always_inline("nodebug")
     fn __le__(self, rhs: UInt) -> Bool:
@@ -683,7 +685,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ule>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __ge__(self, rhs: UInt) -> Bool:
@@ -698,7 +700,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate uge>`
-        ](self.value, rhs.value)
+        ](self._value, rhs._value)
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:

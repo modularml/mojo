@@ -268,7 +268,7 @@ fn int(value: UInt) -> Int:
     Returns:
         The integral representation of the value.
     """
-    return value.value
+    return value._value
 
 
 # ===----------------------------------------------------------------------=== #
@@ -410,7 +410,7 @@ struct Int(
         Args:
             value: The init value.
         """
-        self = Self(value.value)
+        self = Self(value._value)
 
     # ===------------------------------------------------------------------=== #
     # Operator dunders

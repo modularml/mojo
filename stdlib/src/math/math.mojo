@@ -154,7 +154,7 @@ fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
     Returns:
         The ceiling of dividing x by y.
     """
-    return __mlir_op.`index.ceildivu`(numerator.value, denominator.value)
+    return __mlir_op.`index.ceildivu`(numerator._value, denominator._value)
 
 
 # ===----------------------------------------------------------------------=== #
