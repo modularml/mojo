@@ -73,14 +73,14 @@ struct _RefCountedAttrsDict:
         self = Self()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            self.impl[]._insert(values[i].key, values[i].value._value.copy())
+            self.impl[]._insert(values[i].key, values[i].value._value)
 
     @always_inline
     fn __init__(inout self, values: List[Attr]):
         self = Self()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            self.impl[]._insert(values[i].key, values[i].value._value.copy())
+            self.impl[]._insert(values[i].key, values[i].value._value)
 
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
@@ -305,18 +305,6 @@ struct _ObjectImpl(
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
         self = other.value^
-
-    @always_inline
-    fn copy(self) -> Self:
-        if self.is_str():
-            return self.get_as_string()
-        if self.is_list():
-            return self.get_as_list()
-        if self.is_obj():
-            return self.get_obj_attrs()
-        if self.is_dict():
-            return self.get_as_dict()
-        return self
 
     # ===------------------------------------------------------------------=== #
     # Value Query
@@ -553,7 +541,7 @@ struct _ObjectImpl(
                 "'"
                 + str(entry[].key)
                 + "' = "
-                + str(object(entry[].value.copy()))
+                + str(object(entry[].value))
             )
             print_sep = True
         writer.write("}")
@@ -600,7 +588,7 @@ struct _ObjectImpl(
     @always_inline
     fn get_list_element(self, i: Int) -> _ObjectImpl:
         var ptr = self.get_list_ptr()
-        return ptr[][i].copy()
+        return ptr[][i]
 
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
@@ -860,7 +848,7 @@ struct object(
         Args:
             existing: The object to copy.
         """
-        self._value = existing._value.copy()
+        self._value = existing._value
 
     @always_inline
     fn __del__(owned self):
@@ -1718,7 +1706,7 @@ struct object(
 
     @always_inline
     fn _append(self, value: object):
-        self._value.list_append(value._value.copy())
+        self._value.list_append(value._value)
 
     @always_inline
     fn __len__(self) raises -> Int:
@@ -1809,7 +1797,7 @@ struct object(
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
         var index = Self._convert_index_to_int(i)
-        self._value.set_list_element(index.value, value._value.copy())
+        self._value.set_list_element(index.value, value._value)
 
     @always_inline
     fn __setitem__(self, i: object, j: object, value: object) raises:
@@ -1862,7 +1850,7 @@ struct object(
                 + key
                 + "'"
             )
-        self._value.set_obj_attr(key, value._value.copy())
+        self._value.set_obj_attr(key, value._value)
 
     @always_inline
     fn __call__(self) raises -> object:
