@@ -678,15 +678,6 @@ struct object(
         self._value = Int64(value)
 
     @always_inline
-    fn __init__(inout self, value: Float64):
-        """Initializes the object with an floating-point value.
-
-        Args:
-            value: The float value.
-        """
-        self._value = value
-
-    @always_inline
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         """Initializes the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
