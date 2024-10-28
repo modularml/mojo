@@ -77,8 +77,8 @@ For all these reasons, "nice to have" syntactic sugar is not a priority, and we
 will quickly close such proposals to avoid cluttering the issue tracker. If
 you'd like to propose a "general goodness" syntactic feature, please do so with
 the existing [Python PEP process](https://peps.python.org/pep-0000/). If/when
-Python adopts a feature, Mojo will also add it, because Mojo's goal is to be a
-superset. We are happy with this approach because the Python community is
+Python adopts a feature, Mojo may also add it, because Mojo's goal is to adopt
+Python's syntax. We are happy with this approach because the Python community is
 better equipped to evaluate these features, they have mature code bases to
 evaluate them with, and they have processes and infrastructure for making
 structured language evolution features.

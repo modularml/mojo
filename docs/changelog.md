@@ -214,6 +214,19 @@ what we publish.
 - The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
   `b my_module::main`.
 
+- The VS Code extension now allows cancelling the installation of its private
+  MAX SDK.
+
+- The VS Code extension now opens the Run and Debug tab automatically whenever
+  a debug session starts.
+
+- The `mojo debug --vscode` command now support the `--init-command` and
+  `--stop-on-entry` flags. Execute `mojo debug --help` for more information.
+
+- The Mojo LLDB debugger on VS Code now supports inspecting the raw attributes
+  of variables that are handled as synthetic types, e.g. `List` from Mojo or
+  `std::vector` from C++.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -373,3 +386,6 @@ what we publish.
 
 - The VS Code extension now downloads its private copy of the MAX SDK in a way
   that prevents ETXTBSY errors on Linux.
+
+- The VS Code extension now allows invoking a mojo formatter from SDK
+  installations that contain white spaces in their path.
