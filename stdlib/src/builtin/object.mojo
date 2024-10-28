@@ -1940,7 +1940,7 @@ struct object(
         """
         if self._value.is_list():
             for v in self._value.get_as_list().impl[]:
-                if object(v[]).__eq__(value):
+                if object(v[]) == value:
                     return True
             return False
         if self._value.is_dict():
