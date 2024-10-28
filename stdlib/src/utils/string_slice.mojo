@@ -75,13 +75,9 @@ fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
 
     debug_assert(
         (b & 0b1100_0000) != 0b1000_0000,
-        (
-            "Function `_utf8_first_byte_sequence_length()` does not work"
-            " correctly if given a continuation byte."
-        ),
+        "Function does not work correctly if given a continuation byte.",
     )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
+    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
@@ -218,13 +214,13 @@ struct _StringSliceIter[
         forward: The iteration direction. `False` is backwards.
     """
 
+    alias _S = StringSlice[origin]
+    alias _U = UnsafePointer[Byte]
     var index: Int
-    var ptr: UnsafePointer[Byte]
+    var ptr: Self._U
     var length: Int
 
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[Byte], length: Int
-    ):
+    fn __init__(inout self, *, unsafe_pointer: Self._U, length: Int):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
@@ -232,23 +228,20 @@ struct _StringSliceIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringSlice[origin]:
+    fn __next__(inout self) -> Self._S:
         @parameter
         if forward:
             byte_len = _utf8_first_byte_sequence_length(self.ptr[self.index])
+            i = self.index
             self.index += byte_len
-            return StringSlice[origin](
-                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
-                len=byte_len,
-            )
+            return Self._S(unsafe_from_utf8_ptr=self.ptr + i, len=byte_len)
         else:
             byte_len = 1
             while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
                 byte_len += 1
             self.index -= byte_len
-            return StringSlice[origin](
-                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
-            )
+            p = self.ptr + self.index
+            return Self._S(unsafe_from_utf8_ptr=p, len=byte_len)
 
     @always_inline
     fn __hasmore__(self) -> Bool:
@@ -259,7 +252,7 @@ struct _StringSliceIter[
             return self.index > 0
 
     fn __len__(self) -> Int:
-        alias S = Span[UInt8, ImmutableAnyOrigin]
+        alias S = Span[Byte, ImmutableAnyOrigin]
         alias _count = _count_utf8_continuation_bytes
 
         @parameter
