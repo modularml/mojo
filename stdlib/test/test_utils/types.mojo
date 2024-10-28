@@ -154,7 +154,7 @@ struct MoveCounter[T: CollectionElementNew](
 @value
 struct ValueDestructorRecorder(ExplicitlyCopyable):
     var value: Int
-    var destructor_counter: UnsafePointer[List[Int]]
+    var destructor_counter: UnsafePointer[List[Int], stack=True]
 
     fn __init__(inout self, *, other: Self):
         self.value = other.value
@@ -171,7 +171,7 @@ struct ValueDestructorRecorder(ExplicitlyCopyable):
 
 @value
 struct ObservableDel(CollectionElement):
-    var target: UnsafePointer[Bool]
+    var target: UnsafePointer[Bool, stack=True]
 
     fn __init__(inout self, *, other: Self):
         self = other

@@ -345,6 +345,7 @@ fn memset_zero[
 # ===----------------------------------------------------------------------===#
 
 
+@deprecated("Use UnsafePointer[type].alloc[count]() instead.")
 @always_inline
 fn stack_allocation[
     count: Int,
@@ -352,7 +353,7 @@ fn stack_allocation[
     /,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[Scalar[type], address_space]:
+]() -> UnsafePointer[Scalar[type], address_space, stack=True]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -366,11 +367,12 @@ fn stack_allocation[
         A data pointer of the given type pointing to the allocated space.
     """
 
-    return stack_allocation[
+    return _stack_allocation[
         count, Scalar[type], alignment=alignment, address_space=address_space
     ]()
 
 
+@deprecated("Use UnsafePointer[type].alloc[count]() instead.")
 @always_inline
 fn stack_allocation[
     count: Int,
@@ -379,7 +381,34 @@ fn stack_allocation[
     name: Optional[StringLiteral] = None,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[type, address_space]:
+]() -> UnsafePointer[type, address_space, stack=True]:
+    """Allocates data buffer space on the stack given a data type and number of
+    elements.
+
+    Parameters:
+        count: Number of elements to allocate memory for.
+        type: The data type of each element.
+        name: The name of the global variable (only honored in certain cases).
+        alignment: Address alignment of the allocated data.
+        address_space: The address space of the pointer.
+
+    Returns:
+        A data pointer of the given type pointing to the allocated space.
+    """
+    return _stack_allocation[
+        count, type, alignment=alignment, address_space=address_space
+    ]()
+
+
+@always_inline
+fn _stack_allocation[
+    count: Int,
+    type: AnyType,
+    /,
+    name: Optional[StringLiteral] = None,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+]() -> UnsafePointer[type, address_space, stack=True]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -425,42 +454,3 @@ fn stack_allocation[
         _type = UnsafePointer[type, address_space]._mlir_type,
         alignment = alignment.value,
     ]()
-
-
-# ===----------------------------------------------------------------------===#
-# malloc
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _malloc[
-    type: AnyType,
-    /,
-    *,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
-](size: Int, /) -> UnsafePointer[
-    type, AddressSpace.GENERIC, alignment=alignment
-]:
-    @parameter
-    if triple_is_nvidia_cuda():
-        return external_call[
-            "malloc", UnsafePointer[NoneType, AddressSpace.GENERIC]
-        ](size).bitcast[type]()
-    else:
-        return __mlir_op.`pop.aligned_alloc`[
-            _type = UnsafePointer[type, AddressSpace.GENERIC]._mlir_type
-        ](alignment.value, size.value)
-
-
-# ===----------------------------------------------------------------------===#
-# aligned_free
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
-    @parameter
-    if triple_is_nvidia_cuda():
-        libc.free(ptr.bitcast[NoneType]())
-    else:
-        __mlir_op.`pop.aligned_free`(ptr.address)

@@ -19,7 +19,6 @@ from sys import alignof, sizeof
 from sys.ffi import c_char
 
 from memory import UnsafePointer, memcpy
-from memory.memory import _free
 from documentation import doc_private
 
 from utils import StringRef

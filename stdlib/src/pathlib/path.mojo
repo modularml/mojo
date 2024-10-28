@@ -36,7 +36,7 @@ fn cwd() raises -> Path:
       The current directory.
     """
     alias MAX_CWD_BUFFER_SIZE = 1024
-    var buf = stack_allocation[MAX_CWD_BUFFER_SIZE, c_char]()
+    var buf = UnsafePointer[c_char].alloc[MAX_CWD_BUFFER_SIZE]()
 
     var res = external_call["getcwd", UnsafePointer[c_char]](
         buf, Int(MAX_CWD_BUFFER_SIZE)
