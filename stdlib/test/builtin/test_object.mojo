@@ -406,6 +406,19 @@ def test_object_list_pop():
     assert_equal(tmp_element, 1)
 
 
+def test_object_hash():
+    a = Int(1)
+    b = Float64(2.5)
+    c = String("hello world")
+    assert_equal(hash(a), hash(object(a)))
+    assert_equal(hash(b), hash(object(b)))
+    assert_equal(hash(c), hash(object(c)))
+
+    abc = object([a, b, c])
+    abc_repr = repr(abc)
+    assert_equal(hash(abc), hash("[1, 2.5, 'hello world']"))
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -416,6 +429,7 @@ def main():
     test_non_object_getattr()
     test_matrix()
     test_convert_to_string()
+    test_object_hash()
     test_object_dict()
     test_object_dict_contains()
     test_object_dict_pop()
