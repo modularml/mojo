@@ -522,7 +522,7 @@ struct _ObjectImpl(
             writer.write(str(self.get_as_float()))
             return
         if self.is_str():
-            writer.write("'" + self.get_as_string() + "'")
+            writer.write("'", self.get_as_string(), "'")
             return
         if self.is_func():
             writer.write(
