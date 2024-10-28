@@ -418,6 +418,24 @@ struct StringLiteral(
         )
 
     @always_inline
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
         """Format a template with `*args`.
 
@@ -509,7 +527,7 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        return self.as_string_slice.join(elems)
+        return self.as_string_slice().join(elems)
 
     fn join_bytes[
         T: BytesReadCollectionElement, //,

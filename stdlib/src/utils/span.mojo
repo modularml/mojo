@@ -43,6 +43,26 @@ trait AsBytes:
         ...
 
 
+trait AsBytesRead:
+    """The `AsBytesRead` trait denotes a type that can be returned as an
+    immutable byte span.
+    """
+
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+
 @value
 struct _SpanIter[
     is_mutable: Bool, //,

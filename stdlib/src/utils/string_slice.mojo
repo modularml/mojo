@@ -26,8 +26,9 @@ from bit import count_leading_zeros
 from utils import Span
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer
+from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
+from sys.intrinsics import _type_is_eq
 from memory.memory import _memcmp_impl_unconstrained
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -656,6 +657,24 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return self._slice
 
     @always_inline
+    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
+        """Returns an immutable contiguous slice of the bytes.
+
+        Parameters:
+            O: The Origin of the bytes.
+
+        Returns:
+            An immutable contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+
+        return Span[UInt8, O](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
+
+    @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Gets a pointer to the first element of this string slice.
 
@@ -948,34 +967,34 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             The joined string.
         """
 
-        var n_elems = len(elems)
+        n_elems = len(elems)
         if n_elems == 0:
             return String("")
-        var s_len = self.byte_length()
-        var len_elems = 0
+        s_len = self.byte_length()
+        len_elems = 0
         # Calculate the total size of the elements to join beforehand
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
         for e_ref in elems:
             len_elems += len(e_ref[].as_bytes_read())
-        var capacity = s_len * (n_elems - 1) + len_elems
-        var buf = Self._buffer_type(capacity=capacity)
-        var s_ptr = self.unsafe_ptr()
-        var b_ptr = buf.unsafe_ptr()
-        var offset = 0
-        var i = 0
-        var not_first = False
+        capacity = s_len * (n_elems - 1) + len_elems + 1
+        buf = String._buffer_type(capacity=capacity)
+        buf.size = capacity
+        s_ptr = self.unsafe_ptr()
+        b_ptr = buf.unsafe_ptr()
+        offset = 0
+        i = 0
+        not_first = False
         while i < n_elems:
             memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
             offset += s_len * int(not_first)
             not_first = True
-            var e = elems[i].as_bytes_read()
-            var e_len = len(e)
+            e = elems[i].as_bytes_read()
+            e_len = len(e)
             memcpy(dest=b_ptr + offset, src=e.unsafe_ptr(), count=e_len)
             offset += e_len
             i += 1
-        buf.size = capacity
-        b_ptr[capacity] = 0
+        b_ptr[capacity - 1] = 0
         return String(buf^)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
@@ -1036,7 +1055,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike:
+trait Stringlike(AsBytesRead):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
