@@ -1069,8 +1069,14 @@ struct object(
             if self._value.is_str() and rhs._value.is_str():
                 return self._value.get_as_string() == rhs._value.get_as_string()
             if self._value.is_list() and rhs._value.is_list():
-                return self._list_compare(rhs) == 0
-
+                return self._value.get_as_list().impl[].__eq__(
+                    rhs._value.get_as_list().impl[]
+                )
+            if self._value.is_dict() and rhs._value.is_dict():
+                return (repr(self) == repr(rhs))
+            if self._value.is_obj() and rhs._value.is_obj():
+                return (repr(self) == repr(rhs))
+            
             @always_inline
             fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
                 return lhs == rhs
