@@ -533,9 +533,7 @@ struct _ObjectImpl(
             for entry in ptr[].items():
                 if print_sep:
                     writer.write(", ")
-                writer.write(
-                    repr(entry[].key), " = ", repr(entry[].value)
-                )
+                writer.write(repr(entry[].key), " = ", repr(entry[].value))
                 print_sep = True
             writer.write("}")
             return
@@ -546,9 +544,7 @@ struct _ObjectImpl(
         for entry in ptr[].items():
             if print_sep:
                 writer.write(", ")
-            writer.write(
-                "'" + str(entry[].key) + "' = " + repr(entry[].value)
-            )
+            writer.write("'" + str(entry[].key) + "' = " + repr(entry[].value))
             print_sep = True
         writer.write("}")
         return
@@ -1069,14 +1065,16 @@ struct object(
             if self._value.is_str() and rhs._value.is_str():
                 return self._value.get_as_string() == rhs._value.get_as_string()
             if self._value.is_list() and rhs._value.is_list():
-                return self._value.get_as_list().impl[].__eq__(
-                    rhs._value.get_as_list().impl[]
+                return (
+                    self._value.get_as_list()
+                    .impl[]
+                    .__eq__(rhs._value.get_as_list().impl[])
                 )
             if self._value.is_dict() and rhs._value.is_dict():
-                return (repr(self) == repr(rhs))
+                return repr(self) == repr(rhs)
             if self._value.is_obj() and rhs._value.is_obj():
-                return (repr(self) == repr(rhs))
-            
+                return repr(self) == repr(rhs)
+
             @always_inline
             fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
                 return lhs == rhs

@@ -79,14 +79,13 @@ def test_comparison_ops():
     rhs["one"].append(4)
     assert_false(lhs == rhs)
     assert_true(lhs != rhs)
-    
+
     lhs = object(Attr("value", [1, 2.0]))
     rhs = object(Attr("value", [1, 2.0]))
     assert_true(lhs == rhs)
     rhs.value = 1
     assert_false(lhs == rhs)
     assert_true(lhs != rhs)
-
 
 
 def test_arithmetic_ops():
@@ -349,6 +348,7 @@ def test_convert_to_string():
     a.value["function"] = matrix_append
     b.value["function"] = matrix_append
     assert_equal(repr(a), repr(b))
+
 
 def test_object_dict():
     a = object.dict()
