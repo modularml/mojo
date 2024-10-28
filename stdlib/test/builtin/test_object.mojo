@@ -313,7 +313,19 @@ def test_convert_to_string():
     a[2] = "two"
     assert_equal(str(a["one"]), "1")
     assert_equal(str(a[2]), "two")
+    assert_equal(str(a), "{'one' = 1, 2 = 'two'}")
+    b = object.dict()
+    b["three"] = 1
+    a["nested"] = b
+    assert_equal(str(a), "{'one' = 1, 2 = 'two', 'nested' = {'three' = 1}}")
+    b["three"] = True
+    assert_equal(str(a), "{'one' = 1, 2 = 'two', 'nested' = {'three' = True}}")
 
+    a = object(Attr("value", object.dict()))
+    b = object(Attr("value", object.dict()))
+    a.value["function"] = matrix_append
+    b.value["function"] = matrix_append
+    assert_equal(repr(a), repr(b))
 
 def test_object_dict():
     a = object.dict()

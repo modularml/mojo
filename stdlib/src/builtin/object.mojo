@@ -527,8 +527,17 @@ struct _ObjectImpl(
             return
 
         if self.is_dict():
-            # TODO: dict repr
-            writer.write("todo")
+            var ptr = self.get_as_dict().impl
+            writer.write(String("{"))
+            var print_sep = False
+            for entry in ptr[].items():
+                if print_sep:
+                    writer.write(", ")
+                writer.write(
+                    repr(entry[].key), " = ", repr(entry[].value)
+                )
+                print_sep = True
+            writer.write("}")
             return
 
         var ptr = self.get_obj_attrs_ptr()
@@ -538,7 +547,7 @@ struct _ObjectImpl(
             if print_sep:
                 writer.write(", ")
             writer.write(
-                "'" + str(entry[].key) + "' = " + str(entry[].value)
+                "'" + str(entry[].key) + "' = " + repr(entry[].value)
             )
             print_sep = True
         writer.write("}")
