@@ -1108,7 +1108,7 @@ struct object(
             True if the objects are not equal.
         """
         try:
-            return bool(not self.__eq__(rhs))
+            return not (self == rhs)
         except e:
             print(e)
             print("objects are not comparable")
