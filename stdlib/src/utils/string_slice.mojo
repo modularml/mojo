@@ -940,17 +940,15 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 rebind[List[StringSlice[__origin_of(elems)]]](elems)
             )
         else:
-            var result: String = ""
-            var is_first = True
+            e_len = len(elems)
+            buf = List[String](capacity=e_len)
+            buf.size = e_len
+            b_ptr = buf.unsafe_ptr()
 
-            for e in elems:
-                if is_first:
-                    is_first = False
-                else:
-                    result += self
-                result += str(e[])
+            for i in range(e_len):
+                (b_ptr + i).init_pointee_move(str(elems.unsafe_get(i)))
 
-            return result
+            return self.join_bytes(buf^)
 
     fn join_bytes[
         T: BytesReadCollectionElement, //,
