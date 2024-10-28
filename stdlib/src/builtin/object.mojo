@@ -1090,9 +1090,8 @@ struct object(
             fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
                 return lhs == rhs
 
-            return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
-                self, rhs
-            ).__bool__()
+            c = Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](self, rhs)
+            return bool(c)
         except e:
             print(e)
             print("objects are not comparable")
