@@ -133,4 +133,5 @@ from collections.string import (
 )
 from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
-from utils import AsBytes, AsBytesRead, Formattable, Formatter
+from utils import AsBytes, AsBytesRead, Writable, Writer
+from documentation import doc_private

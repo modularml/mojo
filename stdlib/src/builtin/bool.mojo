@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin._documentation import doc_private
+from documentation import doc_private
 from collections import Set, List
 
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -108,7 +108,7 @@ struct Bool(
     Intable,
     Representable,
     Stringable,
-    Formattable,
+    Writable,
     Floatable,
 ):
     """The primitive Bool scalar value used in Mojo."""
@@ -220,15 +220,18 @@ struct Bool(
         Returns:
             A string representation.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this boolean to the provided formatter.
+        Formats this boolean to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write("True" if self else "False")

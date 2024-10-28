@@ -27,12 +27,11 @@ fn doc_private():
 
     This decorator allows for hiding the documentation for a declaration during
     generation. This is often used to hide `__init__`, and other special
-    methods, that are intended for internal consumption.
+    methods, that are not intended to be part of a library's documentation.
 
     For example:
 
     ```mojo
-    %# from builtin._documentation import doc_private
     struct Foo:
         @doc_private
         fn __init__(inout self):

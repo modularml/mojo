@@ -21,7 +21,7 @@ These are Mojo built-ins, so you don't need to import them.
 struct NoneType(
     CollectionElement,
     CollectionElementNew,
-    Formattable,
+    Writable,
     Representable,
     Stringable,
 ):
@@ -65,10 +65,13 @@ struct NoneType(
         return "None"
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Write `None` to a formatter stream.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Write `None` to a writer stream.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("None")

@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
-from builtin._documentation import doc_private
+from documentation import doc_private
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
@@ -121,14 +121,17 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             The string representation of this UInt.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Formats this integer to the provided formatter.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Formats this integer to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(UInt64(self))

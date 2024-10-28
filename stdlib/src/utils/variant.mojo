@@ -20,9 +20,9 @@ from utils import Variant
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
   if x.isa[String]():
-    return x[String][]
+    return x[String]
   # x.isa[Int]()
-  return str(x[Int])[]
+  return str(x[Int])
 
 # They have to be mutable for now, and implement CollectionElement
 var an_int = IntOrString(4)
@@ -83,9 +83,9 @@ struct Variant[*Ts: CollectionElement](
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
-            return x[String][]
+            return x[String]
         # x.isa[Int]()
-        return str(x[Int][])
+        return str(x[Int])
 
     # They have to be mutable for now, and implement CollectionElement
     var an_int = IntOrString(4)

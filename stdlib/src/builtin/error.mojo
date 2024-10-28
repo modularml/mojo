@@ -20,6 +20,7 @@ from sys.ffi import c_char
 
 from memory import UnsafePointer, memcpy
 from memory.memory import _free
+from documentation import doc_private
 
 from utils import StringRef
 
@@ -33,7 +34,7 @@ struct Error(
     Stringable,
     Boolable,
     Representable,
-    Formattable,
+    Writable,
     CollectionElement,
     CollectionElementNew,
 ):
@@ -156,15 +157,18 @@ struct Error(
         Returns:
             A String of the error message.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this error to the provided formatter.
+        Formats this error to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Avoid this unnecessary intermediate String allocation.
@@ -208,7 +212,7 @@ struct Error(
         return String(StringRef(self.data, length))
 
 
-@export("__mojo_debugger_raise_hook")
+@doc_private
 fn __mojo_debugger_raise_hook():
     """This function is used internally by the Mojo Debugger."""
     pass

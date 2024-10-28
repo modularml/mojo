@@ -77,8 +77,8 @@ For all these reasons, "nice to have" syntactic sugar is not a priority, and we
 will quickly close such proposals to avoid cluttering the issue tracker. If
 you'd like to propose a "general goodness" syntactic feature, please do so with
 the existing [Python PEP process](https://peps.python.org/pep-0000/). If/when
-Python adopts a feature, Mojo will also add it, because Mojo's goal is to be a
-superset. We are happy with this approach because the Python community is
+Python adopts a feature, Mojo may also add it, because Mojo's goal is to adopt
+Python's syntax. We are happy with this approach because the Python community is
 better equipped to evaluate these features, they have mature code bases to
 evaluate them with, and they have processes and infrastructure for making
 structured language evolution features.
@@ -373,8 +373,8 @@ print(One()) # prints '1'
 ```
 
 Mojo currently supports similar functionality through the
-[`Formattable`](/mojo/stdlib/utils/format/Formattable) trait, so that
-`print()` works on all `Formattable` types. Similar support exists for the
+[`Writable`](/mojo/stdlib/utils/write/Writable) trait, so that
+`print()` works on all `Writable` types. Similar support exists for the
 [`int()`](/mojo/stdlib/builtin/int/int-function) and
 [`len()`](/mojo/stdlib/builtin/len/len) functions. We'll continue to
 add traits support to the standard library to enable common use cases like this.

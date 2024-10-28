@@ -19,10 +19,7 @@ from memory import Pointer
 ```
 """
 
-from builtin._documentation import doc_private
-
-# TODO: This is kept for compatibility, remove this in the future.
-alias Reference = Pointer[*_]
+from documentation import doc_private
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace

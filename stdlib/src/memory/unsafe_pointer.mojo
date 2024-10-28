@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from builtin._documentation import doc_private
+from documentation import doc_private
 from sys import alignof, sizeof, triple_is_nvidia_cuda
 from sys.intrinsics import (
     _mlirtype_is_eq,
@@ -60,7 +60,7 @@ struct UnsafePointer[
     CollectionElement,
     CollectionElementNew,
     Stringable,
-    Formattable,
+    Writable,
     Intable,
     Comparable,
 ):
@@ -411,12 +411,15 @@ struct UnsafePointer[
         return hex(int(self))
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this pointer address to the provided formatter.
+        Formats this pointer address to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Avoid intermediate String allocation.
