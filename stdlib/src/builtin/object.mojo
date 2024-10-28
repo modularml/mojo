@@ -1969,7 +1969,7 @@ struct object(
         # TODO: argument with None as default for pop()
         if self._value.is_list():
             if value._value.is_int():
-                tmp_i = value._value.get_as_int().__int__()
+                tmp_i = int(value._value.get_as_int())
                 self_len = self._value.get_list_length()
                 if tmp_i < self_len and tmp_i >= 0:
                     ret_val = self._value.get_as_list().impl[].pop(tmp_i)
