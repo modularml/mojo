@@ -44,11 +44,11 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    var impl: Arc[List[_ObjectImpl]]
+    var impl: Arc[List[object]]
     """The list value."""
 
     fn __init__(inout self):
-        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
+        self.impl = Arc[List[object]](List[object]())
 
 
 @value
@@ -60,12 +60,12 @@ struct _RefCountedAttrsDict:
     directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
-    var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
+    var impl: Arc[Dict[StringLiteral, object]]
     """The implementation of the map."""
 
     fn __init__(inout self):
-        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
-            Dict[StringLiteral, _ObjectImpl]()
+        self.impl = Arc[Dict[StringLiteral, object]](
+            Dict[StringLiteral, object]()
         )
 
     @always_inline
@@ -73,17 +73,17 @@ struct _RefCountedAttrsDict:
         self = Self()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            self.impl[]._insert(values[i].key, values[i].value._value)
+            self.impl[]._insert(values[i].key, values[i].value)
 
     @always_inline
     fn __init__(inout self, values: List[Attr]):
         self = Self()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            self.impl[]._insert(values[i].key, values[i].value._value)
+            self.impl[]._insert(values[i].key, values[i].value)
 
     @always_inline
-    fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
+    fn set(inout self, key: StringLiteral, value: object) raises:
         if key in self.impl[]:
             self.impl[][key] = value
             return
@@ -94,7 +94,7 @@ struct _RefCountedAttrsDict:
         )
 
     @always_inline
-    fn get(self, key: StringLiteral) raises -> _ObjectImpl:
+    fn get(self, key: StringLiteral) raises -> object:
         var iter = self.impl[].find(key)
         if iter:
             return iter.value()
@@ -522,7 +522,7 @@ struct _ObjectImpl(
             for j in range(self.get_list_length()):
                 if j != 0:
                     writer.write(", ")
-                writer.write(repr(object(self.get_list_element(j))))
+                writer.write(repr(self.get_list_element(j)))
             writer.write("]")
             return
 
@@ -538,7 +538,7 @@ struct _ObjectImpl(
             if print_sep:
                 writer.write(", ")
             writer.write(
-                "'" + str(entry[].key) + "' = " + str(object(entry[].value))
+                "'" + str(entry[].key) + "' = " + str(entry[].value)
             )
             print_sep = True
         writer.write("}")
@@ -569,13 +569,13 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
+    fn get_list_ptr(self) -> Arc[List[object]]:
         return self.get_as_list().impl
 
     @always_inline
-    fn list_append(self, value: Self):
+    fn list_append(self, value: object):
         var ptr = self.get_list_ptr()
-        ptr[].append(value.value)
+        ptr[].append(value)
 
     @always_inline
     fn get_list_length(self) -> Int:
@@ -583,12 +583,12 @@ struct _ObjectImpl(
         return len(ptr[])
 
     @always_inline
-    fn get_list_element(self, i: Int) -> _ObjectImpl:
+    fn get_list_element(self, i: Int) -> object:
         var ptr = self.get_list_ptr()
         return ptr[][i]
 
     @always_inline
-    fn set_list_element(self, i: Int, value: _ObjectImpl):
+    fn set_list_element(self, i: Int, value: object):
         var ptr = self.get_list_ptr()
         ptr[][i] = value
 
@@ -597,15 +597,15 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_obj_attrs_ptr(self) -> Arc[Dict[StringLiteral, _ObjectImpl]]:
+    fn get_obj_attrs_ptr(self) -> Arc[Dict[StringLiteral, object]]:
         return self.get_obj_attrs().impl
 
     @always_inline
-    fn set_obj_attr(self, key: StringLiteral, value: _ObjectImpl) raises:
+    fn set_obj_attr(self, key: StringLiteral, value: object) raises:
         self.get_obj_attrs_ptr()[][key] = value
 
     @always_inline
-    fn get_obj_attr(self, key: StringLiteral) raises -> _ObjectImpl:
+    fn get_obj_attr(self, key: StringLiteral) raises -> object:
         return self.get_obj_attrs_ptr()[][key]
 
 
@@ -1688,7 +1688,7 @@ struct object(
             value: The value to append.
         """
         if self._value.is_obj():
-            _ = object(self._value.get_obj_attr("append"))(self, value)
+            _ = self._value.get_obj_attr("append")(self, value)
             return
         if not self._value.is_list():
             raise Error("TypeError: can only append to lists")
@@ -1696,7 +1696,7 @@ struct object(
 
     @always_inline
     fn _append(self, value: object):
-        self._value.list_append(value._value)
+        self._value.list_append(value)
 
     @always_inline
     fn __len__(self) raises -> Int:
@@ -1736,7 +1736,7 @@ struct object(
             The value at the index or key.
         """
         if self._value.is_obj():
-            return object(self._value.get_obj_attr("__getitem__"))(self, i)
+            return self._value.get_obj_attr("__getitem__")(self, i)
 
         if self._value.is_dict():
             return self._value.get_as_dict().get(i)
@@ -1775,7 +1775,7 @@ struct object(
             value: The value to set.
         """
         if self._value.is_obj():
-            _ = object(self._value.get_obj_attr("__setitem__"))(self, i, value)
+            _ = self._value.get_obj_attr("__setitem__")(self, i, value)
             return
         if self._value.is_dict():
             self._value.get_as_dict().set(i, value)
@@ -1787,7 +1787,7 @@ struct object(
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
         var index = Self._convert_index_to_int(i)
-        self._value.set_list_element(index.value, value._value)
+        self._value.set_list_element(index.value, value)
 
     @always_inline
     fn __setitem__(self, i: object, j: object, value: object) raises:
@@ -1840,7 +1840,7 @@ struct object(
                 + key
                 + "'"
             )
-        self._value.set_obj_attr(key, value._value)
+        self._value.set_obj_attr(key, value)
 
     @always_inline
     fn __call__(self) raises -> object:
@@ -1917,10 +1917,7 @@ struct object(
             A `Bool` (`True` or `False`).
         """
         if self._value.is_list():
-            for v in self._value.get_as_list().impl[]:
-                if object(v[]) == value:
-                    return True
-            return False
+            return value in self._value.get_as_list().impl[]
         if self._value.is_dict():
             return value in self._value.get_as_dict().impl[]
         raise "only lists and dict implements the __contains__ dunder"
