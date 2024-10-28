@@ -1057,9 +1057,7 @@ struct object(
             True if the object is less than or equal to the right hard argument.
         """
         if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string().__le__(
-                rhs._value.get_as_string()
-            )
+            return self._value.get_as_string() <= rhs._value.get_as_string()
 
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) <= 0
