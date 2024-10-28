@@ -983,7 +983,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
             offset += s_len * int(not_first)
             not_first = True
-            e = elems[i].as_bytes_read()
+            e = elems.unsafe_get(i).as_bytes_read()
             e_len = len(e)
             memcpy(dest=b_ptr + offset, src=e.unsafe_ptr(), count=e_len)
             offset += e_len
