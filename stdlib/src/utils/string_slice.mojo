@@ -966,22 +966,18 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
 
         n_elems = len(elems)
-        if n_elems == 0:
-            return String("")
         s_len = self.byte_length()
         len_elems = 0
         # Calculate the total size of the elements to join beforehand
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
-        for e_ref in elems:
-            len_elems += len(e_ref[].as_bytes_read())
-        capacity = s_len * (n_elems - 1) + len_elems + 1
+        for e in elems:
+            len_elems += len(e[].as_bytes_read())
+        capacity = s_len * (n_elems - int(n_elems > 0)) + len_elems + 1
         buf = String._buffer_type(capacity=capacity)
         buf.size = capacity
-        s_ptr = self.unsafe_ptr()
-        b_ptr = buf.unsafe_ptr()
-        offset = 0
-        i = 0
+        s_ptr, b_ptr = self.unsafe_ptr(), buf.unsafe_ptr()
+        offset, i = 0, 0
         not_first = False
         while i < n_elems:
             memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
