@@ -1944,7 +1944,7 @@ struct object(
                     return True
             return False
         if self._value.is_dict():
-            return self._value.get_as_dict().impl[].__contains__(value)
+            return value in self._value.get_as_dict().impl[]
         raise "only lists and dict implements the __contains__ dunder"
 
     fn pop(self, value: Self) raises -> object:
