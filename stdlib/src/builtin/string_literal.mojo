@@ -103,6 +103,68 @@ struct StringLiteral(
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
 
     @always_inline("nodebug")
+    fn __iadd__(inout self, rhs: StringLiteral):
+        """Concatenate a string literal to an existing one. Can only be
+        evaluated at compile time using the `alias` keyword, which will write
+        the result into the binary.
+
+        Args:
+            rhs: The string to concat.
+
+        Example:
+
+        ```mojo
+        fn add_literal(
+            owned original: StringLiteral, add: StringLiteral, n: Int
+        ) -> StringLiteral:
+            for _ in range(n):
+                original += add
+            return original
+
+
+        fn main():
+            alias original = "mojo"
+            alias concat = add_literal(original, "!", 4)
+            print(concat)
+        ```
+
+        Result:
+
+        ```
+        mojo!!!!
+        ```
+        """
+        self = self + rhs
+
+    @always_inline("nodebug")
+    fn __mul__(self, n: Int) -> StringLiteral:
+        """Concatenates the string literal `n` times. Can only be evaluated at
+        compile time using the `alias` keyword, which will write the result into
+        The binary.
+
+        Args:
+            n : The number of times to concatenate the string literal.
+
+        Returns:
+            The string concatenated `n` times.
+
+        Example:
+
+        ```mojo
+        alias original = "mojo"
+        alias concat = original * 3
+        print(concat)
+        ```
+
+        `concat` now points to the StringLiteral "mojomojomojo", which is
+        written into the binary.
+        """
+        var concat = ""
+        for _ in range(n):
+            concat += self
+        return concat
+
+    @always_inline("nodebug")
     fn __eq__(self, rhs: StringLiteral) -> Bool:
         """Compare two string literals for equality.
 

@@ -361,6 +361,35 @@ what we publish.
   for more information and rationale.  As a consequence `__lifetime_of` is now
   named `__origin_of`.
 
+- You can now use the `+=` and `*` operators on a `StringLiteral` at compile
+  time using the `alias` keyword:
+
+  ```mojo
+  alias original = "mojo"
+  alias concat = original * 3
+  assert_equal("mojomojomojo", concat)
+  ```
+
+  Or inside a `fn` that is being evaluated at compile time:
+
+  ```mojo
+  fn add_literal(
+      owned original: StringLiteral, add: StringLiteral, n: Int
+  ) -> StringLiteral:
+      for _ in range(n):
+          original += add
+      return original
+
+
+  fn main():
+      alias original = "mojo"
+      alias concat = add_literal(original, "!", 4)
+      assert_equal("mojo!!!!", concat)
+  ```
+
+  These operators can't be evaluated at runtime, as a `StringLiteral` must be
+  written into the binary during compilation.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed

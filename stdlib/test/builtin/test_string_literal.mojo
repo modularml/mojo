@@ -30,6 +30,26 @@ def test_add():
     assert_equal("fivesix", StringLiteral.__add__("five", "six"))
 
 
+fn add_literal(
+    owned original: StringLiteral, add: StringLiteral, n: Int
+) -> StringLiteral:
+    for _ in range(n):
+        original += add
+    return original
+
+
+def test_iadd():
+    alias original = "mojo"
+    alias concat = add_literal(original, "!", 4)
+    assert_equal("mojo!!!!", concat)
+
+
+def test_mul():
+    alias original = "mojo"
+    alias concat = original * 3
+    assert_equal("mojomojomojo", concat)
+
+
 def test_equality():
     assert_false(StringLiteral.__eq__("five", "six"))
     assert_true(StringLiteral.__eq__("six", "six"))
@@ -446,6 +466,8 @@ def test_float_conversion():
 
 def main():
     test_add()
+    test_iadd()
+    test_mul()
     test_equality()
     test_len()
     test_bool()
