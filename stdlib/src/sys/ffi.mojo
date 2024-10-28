@@ -317,6 +317,225 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         return res
 
+    # FIXME
+    # fn call[
+    #     name: StringLiteral,
+    #     return_type: AnyTrivialRegType,
+    #     *T: AnyType,
+    # ](self, *args: *T) -> return_type:
+    #     """Call a function with any amount of arguments.
+
+    #     Parameters:
+    #         name: The name of the function.
+    #         return_type: The return type of the function.
+    #         T: The types of `args`.
+
+    #     Args:
+    #         args: The arguments.
+
+    #     Returns:
+    #         The result.
+    #     """
+    #     debug_assert(self.check_symbol(name), "symbol not found: " + name)
+    #     values = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    #     return self.get_function[fn (*T) -> return_type](name)(values)
+
+    fn call[
+        name: StringLiteral, return_type: AnyTrivialRegType = NoneType
+    ](self) -> return_type:
+        """Call a function with 0 arguments.
+
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn () -> return_type](name)()
+
+    fn call[
+        T0: AnyType, //,
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+    ](self, arg0: T0) -> return_type:
+        """Call a function with 1 argument.
+
+        Parameters:
+            T0: The type of `arg0`.
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            arg0: The argument.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn (T0) -> return_type](name)(arg0)
+
+    fn call[
+        T0: AnyType,
+        T1: AnyType, //,
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+    ](self, arg0: T0, arg1: T1) -> return_type:
+        """Call a function with 2 arguments.
+
+        Parameters:
+            T0: The type of `arg0`.
+            T1: The type of `arg1`.
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            arg0: The argument.
+            arg1: The argument.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn (T0, T1) -> return_type](name)(arg0, arg1)
+
+    fn call[
+        T0: AnyType,
+        T1: AnyType,
+        T2: AnyType, //,
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+    ](self, arg0: T0, arg1: T1, arg2: T2) -> return_type:
+        """Call a function with 3 arguments.
+
+        Parameters:
+            T0: The type of `arg0`.
+            T1: The type of `arg1`.
+            T2: The type of `arg2`.
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            arg0: The argument.
+            arg1: The argument.
+            arg2: The argument.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn (T0, T1, T2) -> return_type](name)(
+            arg0, arg1, arg2
+        )
+
+    fn call[
+        T0: AnyType,
+        T1: AnyType,
+        T2: AnyType,
+        T3: AnyType, //,
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+    ](self, arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> return_type:
+        """Call a function with 4 arguments.
+
+        Parameters:
+            T0: The type of `arg0`.
+            T1: The type of `arg1`.
+            T2: The type of `arg2`.
+            T3: The type of `arg3`.
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            arg0: The argument.
+            arg1: The argument.
+            arg2: The argument.
+            arg3: The argument.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn (T0, T1, T2, T3) -> return_type](name)(
+            arg0, arg1, arg2, arg3
+        )
+
+    fn call[
+        T0: AnyType,
+        T1: AnyType,
+        T2: AnyType,
+        T3: AnyType,
+        T4: AnyType, //,
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+    ](self, arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> return_type:
+        """Call a function with 5 arguments.
+
+        Parameters:
+            T0: The type of `arg0`.
+            T1: The type of `arg1`.
+            T2: The type of `arg2`.
+            T3: The type of `arg3`.
+            T4: The type of `arg4`.
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            arg0: The argument.
+            arg1: The argument.
+            arg2: The argument.
+            arg3: The argument.
+            arg4: The argument.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn (T0, T1, T2, T3, T4) -> return_type](name)(
+            arg0, arg1, arg2, arg3, arg4
+        )
+
+    fn call[
+        T0: AnyType,
+        T1: AnyType,
+        T2: AnyType,
+        T3: AnyType,
+        T4: AnyType,
+        T5: AnyType, //,
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+    ](
+        self, arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5
+    ) -> return_type:
+        """Call a function with 6 arguments.
+
+        Parameters:
+            T0: The type of `arg0`.
+            T1: The type of `arg1`.
+            T2: The type of `arg2`.
+            T3: The type of `arg3`.
+            T4: The type of `arg4`.
+            T5: The type of `arg4`.
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            arg0: The argument.
+            arg1: The argument.
+            arg2: The argument.
+            arg3: The argument.
+            arg4: The argument.
+            arg5: The argument.
+
+        Returns:
+            The result.
+        """
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        return self.get_function[fn (T0, T1, T2, T3, T4, T5) -> return_type](
+            name
+        )(arg0, arg1, arg2, arg3, arg4, arg5)
+
 
 # ===----------------------------------------------------------------------===#
 # Library Load
@@ -385,8 +604,8 @@ fn _get_dylib_function[
 
 @always_inline("nodebug")
 fn external_call[
-    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
-](*arguments: *types) -> type:
+    callee: StringLiteral, return_type: AnyTrivialRegType, *types: AnyType
+](*arguments: *types) -> return_type:
     """Calls an external function.
 
     Args:
@@ -394,7 +613,7 @@ fn external_call[
 
     Parameters:
       callee: The name of the external function.
-      type: The return type.
+      return_type: The return type.
       types: The argument types.
 
     Returns:
@@ -407,15 +626,15 @@ fn external_call[
     var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
+    if _mlirtype_is_eq[return_type, NoneType]():
         __mlir_op.`pop.external_call`[func = callee.value, _type=None](
             loaded_pack
         )
-        return rebind[type](None)
+        return rebind[return_type](None)
     else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            loaded_pack
-        )
+        return __mlir_op.`pop.external_call`[
+            func = callee.value, _type=return_type
+        ](loaded_pack)
 
 
 # ===----------------------------------------------------------------------===#
@@ -425,8 +644,8 @@ fn external_call[
 
 @always_inline("nodebug")
 fn _external_call_const[
-    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
-](*arguments: *types) -> type:
+    callee: StringLiteral, return_type: AnyTrivialRegType, *types: AnyType
+](*arguments: *types) -> return_type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
     to the same function.
@@ -436,7 +655,7 @@ fn _external_call_const[
 
     Parameters:
       callee: The name of the external function.
-      type: The return type.
+      return_type: The return type.
       types: The argument types.
 
     Returns:
@@ -457,5 +676,5 @@ fn _external_call_const[
             `argMem = none, `,
             `inaccessibleMem = none>`,
         ],
-        _type=type,
+        _type=return_type,
     ](loaded_pack)
