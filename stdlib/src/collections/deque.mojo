@@ -281,22 +281,9 @@ struct Deque[ElementType: CollectionElement](
         Args:
             values: List whose elements will be added at the right side of the deque.
         """
-        len_self = len(self)
-        len_values = len(values)
-        len_total = len_self + len_values
-
-        # number of elements to move into the final deque
-        # first from `values` and then from `self`
-        n_move_total = len_total
-        if self._maxlen > 0:
-            n_move_total = min(len_total, self._maxlen)
-        n_move_values = min(len_values, n_move_total)
-        n_move_self = n_move_total - n_move_values
-
-        # number of elements that do not fit into `maxlen`
-        # and therefore have to be popped and destroyed
-        n_pop_self = len_self - n_move_self
-        n_pop_values = len_values - n_move_values
+        n_move_total, n_move_self, n_move_values, n_pop_self, n_pop_values = (
+            self._compute_pop_and_move_counts(len(self), len(values))
+        )
 
         # pop excess `self` elements
         for _ in range(n_pop_self):
@@ -305,19 +292,7 @@ struct Deque[ElementType: CollectionElement](
 
         # move from `self` to new location if we have to re-allocate
         if n_move_total >= self._capacity:
-            new_capacity = bit_ceil(n_move_total)
-            if new_capacity == n_move_total:
-                new_capacity <<= 1
-            new_data = UnsafePointer[ElementType].alloc(new_capacity)
-            for i in range(n_move_self):
-                offset = self._physical_index(self._head + i)
-                (self._data + offset).move_pointee_into(new_data + i)
-            if self._data:
-                self._data.free()
-            self._data = new_data
-            self._capacity = new_capacity
-            self._head = 0
-            self._tail = n_move_self
+            self._prepare_for_new_elements(n_move_total, n_move_self)
 
         # we will consume all elements of `values`
         values_data = values.steal_data()
@@ -333,6 +308,46 @@ struct Deque[ElementType: CollectionElement](
             self._tail = self._physical_index(self._tail + 1)
 
     @doc_private
+    fn _compute_pop_and_move_counts(
+        self, len_self: Int, len_values: Int
+    ) -> (Int, Int, Int, Int, Int):
+        """
+        Calculates the number of elements to retain, move or discard in the deque and
+        in the list of the new values based on the current length of the deque,
+        the length of new values to add, and the maximum length constraint `_maxlen`.
+
+        Args:
+            len_self: The current number of elements in the deque.
+            len_values: The number of new elements to add to the deque.
+
+        Returns:
+            A tuple: (n_move_total, n_move_self, n_move_values, n_pop_self, n_pop_values)
+                n_move_total: Total final number of elements in the deque.
+                n_move_self: Number of existing elements to retain in the deque.
+                n_move_values: Number of new elements to add from `values`.
+                n_pop_self: Number of existing elements to remove from the deque.
+                n_pop_values: Number of new elements that don't fit and will be discarded.
+        """
+        len_total = len_self + len_values
+
+        n_move_total = (
+            min(len_total, self._maxlen) if self._maxlen > 0 else len_total
+        )
+        n_move_values = min(len_values, n_move_total)
+        n_move_self = n_move_total - n_move_values
+
+        n_pop_self = len_self - n_move_self
+        n_pop_values = len_values - n_move_values
+
+        return (
+            n_move_total,
+            n_move_self,
+            n_move_values,
+            n_pop_self,
+            n_pop_values,
+        )
+
+    @doc_private
     @always_inline
     fn _physical_index(self, logical_index: Int) -> Int:
         """Calculates the physical index in the circular buffer.
@@ -345,6 +360,33 @@ struct Deque[ElementType: CollectionElement](
         the more efficient bitwise `&` operation instead of the modulo `%` operator.
         """
         return logical_index & (self._capacity - 1)
+
+    @doc_private
+    fn _prepare_for_new_elements(inout self, n_total: Int, n_retain: Int):
+        """Prepares the deque’s internal buffer for adding new elements by
+        reallocating memory and retaining the specified number of existing elements.
+
+        Args:
+            n_total: The total number of elements the new buffer should support.
+            n_retain: The number of existing elements to keep in the deque.
+        """
+        new_capacity = bit_ceil(n_total)
+        if new_capacity == n_total:
+            new_capacity <<= 1
+
+        new_data = UnsafePointer[ElementType].alloc(new_capacity)
+
+        for i in range(n_retain):
+            offset = self._physical_index(self._head + i)
+            (self._data + offset).move_pointee_into(new_data + i)
+
+        if self._data:
+            self._data.free()
+
+        self._data = new_data
+        self._capacity = new_capacity
+        self._head = 0
+        self._tail = n_retain
 
     @doc_private
     fn _realloc(inout self, new_capacity: Int):
