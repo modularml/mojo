@@ -888,7 +888,7 @@ struct object(
             return (self._value.get_as_float() != 0.0).__bool__()
         if self._value.is_str():
             # Strings are true if they are non-empty.
-            return self._value.get_as_string().__bool__()
+            return bool(self._value.get_as_string())
         debug_assert(self._value.is_list(), "expected a list")
         return self._value.get_list_length() != 0
 
