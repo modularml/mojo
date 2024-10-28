@@ -538,10 +538,7 @@ struct _ObjectImpl(
             if print_sep:
                 writer.write(", ")
             writer.write(
-                "'"
-                + str(entry[].key)
-                + "' = "
-                + str(object(entry[].value))
+                "'" + str(entry[].key) + "' = " + str(object(entry[].value))
             )
             print_sep = True
         writer.write("}")
@@ -1069,7 +1066,9 @@ struct object(
             fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
                 return lhs == rhs
 
-            c = Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](self, rhs)
+            c = Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
+                self, rhs
+            )
             return bool(c)
         except e:
             print(e)
