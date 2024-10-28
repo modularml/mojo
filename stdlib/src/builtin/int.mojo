@@ -85,7 +85,7 @@ fn index[T: Indexer](idx: T, /) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-trait Intable:
+trait Intable(CollectionElement):
     """The `Intable` trait describes a type that can be converted to an Int.
 
     Any type that conforms to `Intable` or
@@ -178,7 +178,6 @@ trait IntableRaising:
 trait IntLike(
     Absable,
     Ceilable,
-    Comparable,
     Floorable,
     Writable,
     Powable,
