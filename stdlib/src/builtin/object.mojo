@@ -1730,7 +1730,7 @@ struct object(
             or dictionary value.
         """
         if self._value.is_str():
-            return self._value.get_as_string().__len__()
+            return len(self._value.get_as_string())
         if self._value.is_list():
             return self._value.get_list_length()
         if self._value.is_dict():
