@@ -143,8 +143,8 @@ struct UnsafePointer[
     @staticmethod
     @always_inline("nodebug")
     fn address_of(
-        ref [origin, address_space._value.value]arg: type
-    ) -> UnsafePointer[type, address_space, alignment, origin, False] as result:
+        ref [_, address_space._value.value]arg: type
+    ) -> UnsafePointer[type, address_space, alignment, _, False] as result:
         """Gets the address of the argument.
 
         Args:
