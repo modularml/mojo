@@ -10,18 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: echo "Hello, World" | %mojo %s
+"""Implements the documentation package."""
 
-from builtin.io import _fdopen
-from testing import testing
-
-
-fn test_stdin() raises:
-    # "Hello, World" piped from RUN command above
-    var stdin = _fdopen["r"](0)
-    testing.assert_equal(stdin.read_until_delimiter(","), "Hello")
-    testing.assert_equal(stdin.readline(), " World")
-
-
-fn main() raises:
-    test_stdin()
+from .documentation import doc_private

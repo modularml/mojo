@@ -13,7 +13,9 @@
 
 """Implements the StringSlice type.
 
-You can import these APIs from the `utils.string_slice` module. For example:
+You can import these APIs from the `utils.string_slice` module.
+
+Examples:
 
 ```mojo
 from utils import StringSlice
@@ -192,7 +194,7 @@ struct _StringSliceIter[
     origin: Origin[is_mutable].type,
     forward: Bool = True,
 ]:
-    """Iterator for StringSlice
+    """Iterator for `StringSlice` over unicode characters.
 
     Parameters:
         is_mutable: Whether the slice is mutable.
@@ -268,15 +270,15 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     CollectionElementNew,
     Hashable,
 ):
-    """
-    A non-owning view to encoded string data.
-
-    TODO:
-    The underlying string data is guaranteed to be encoded using UTF-8.
+    """A non-owning view to encoded string data.
 
     Parameters:
         is_mutable: Whether the slice is mutable.
         origin: The origin of the underlying string data.
+
+    Notes:
+        TODO: The underlying string data is guaranteed to be encoded using
+        UTF-8.
     """
 
     var _slice: Span[Byte, origin]
@@ -289,10 +291,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     fn __init__(
         inout self: StringSlice[StaticConstantOrigin], lit: StringLiteral
     ):
-        """Construct a new string slice from a string literal.
+        """Construct a new `StringSlice` from a `StringLiteral`.
 
         Args:
-            lit: The literal to construct this string slice from.
+            lit: The literal to construct this `StringSlice` from.
         """
         # Since a StringLiteral has static origin, it will outlive
         # whatever arbitrary `origin` the user has specified they need this
@@ -312,29 +314,30 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
     @always_inline
     fn __init__(inout self, *, owned unsafe_from_utf8: Span[Byte, origin]):
-        """Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
+        """Construct a new `StringSlice` from a sequence of UTF-8 encoded bytes.
+
+        Args:
+            unsafe_from_utf8: A `Span[Byte]` encoded in UTF-8.
 
         Safety:
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
-
-        Args:
-            unsafe_from_utf8: A slice of bytes encoded in UTF-8.
         """
 
         self._slice = unsafe_from_utf8^
 
     fn __init__(inout self, *, unsafe_from_utf8_strref: StringRef):
-        """Construct a new StringSlice from a StringRef pointing to UTF-8
+        """Construct a new StringSlice from a `StringRef` pointing to UTF-8
         encoded bytes.
+
+        Args:
+            unsafe_from_utf8_strref: A `StringRef` of bytes encoded in UTF-8.
 
         Safety:
             - `unsafe_from_utf8_strref` MUST point to data that is valid for
               `origin`.
             - `unsafe_from_utf8_strref` MUST be valid UTF-8 encoded data.
-
-        Args:
-            unsafe_from_utf8_strref: A StringRef of bytes encoded in UTF-8.
         """
+
         var strref = unsafe_from_utf8_strref
 
         var byte_slice = Span[Byte, origin](
@@ -351,19 +354,19 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         unsafe_from_utf8_ptr: UnsafePointer[UInt8],
         len: Int,
     ):
-        """Construct a StringSlice from a pointer to a sequence of UTF-8 encoded
-        bytes and a length.
+        """Construct a `StringSlice` from a pointer to a sequence of UTF-8
+        encoded bytes and a length.
+
+        Args:
+            unsafe_from_utf8_ptr: A pointer to a sequence of bytes encoded in
+              UTF-8.
+            len: The number of bytes of encoded data.
 
         Safety:
             - `unsafe_from_utf8_ptr` MUST point to at least `len` bytes of valid
               UTF-8 encoded data.
             - `unsafe_from_utf8_ptr` must point to data that is live for the
               duration of `origin`.
-
-        Args:
-            unsafe_from_utf8_ptr: A pointer to a sequence of bytes encoded in
-              UTF-8.
-            len: The number of bytes of encoded data.
         """
         var byte_slice = Span[Byte, origin](
             unsafe_ptr=unsafe_from_utf8_ptr,
@@ -406,11 +409,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return b_len - _count_utf8_continuation_bytes(s)
 
     fn write_to[W: Writer](self, inout writer: W):
-        """
-        Formats this string slice to the provided Writer.
+        """Formats this string slice to the provided `Writer`.
 
         Parameters:
-            W: A type conforming to the Writable trait.
+            W: A type conforming to the `Writable` trait.
 
         Args:
             writer: The object to write to.
@@ -441,14 +443,13 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     # accesses to the origin.
     @__unsafe_disable_nested_origin_exclusivity
     fn __eq__(self, rhs: StringSlice) -> Bool:
-        """Verify if a string slice is equal to another string slice.
+        """Verify if a `StringSlice` is equal to another `StringSlice`.
 
         Args:
-            rhs: The string slice to compare against.
+            rhs: The `StringSlice` to compare against.
 
         Returns:
-            True if the string slices are equal in length and contain the same
-                elements, False otherwise.
+            If the `StringSlice` is equal to the input in length and contents.
         """
         if not self and not rhs:
             return True
@@ -464,80 +465,79 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
     @always_inline
     fn __eq__(self, rhs: String) -> Bool:
-        """Verify if a string slice is equal to a string.
+        """Verify if a `StringSlice` is equal to a string.
 
         Args:
-            rhs: The string to compare against.
+            rhs: The `String` to compare against.
 
         Returns:
-            True if the string slice is equal to the input string in length and
-                contain the same bytes, False otherwise.
+            If the `StringSlice` is equal to the input in length and contents.
         """
         return self == rhs.as_string_slice()
 
     @always_inline
     fn __eq__(self, rhs: StringLiteral) -> Bool:
-        """Verify if a string slice is equal to a literal.
+        """Verify if a `StringSlice` is equal to a literal.
 
         Args:
-            rhs: The literal to compare against.
+            rhs: The `StringLiteral` to compare against.
 
         Returns:
-            True if the string slice is equal to the input literal in length and
-                contain the same bytes, False otherwise.
+            If the `StringSlice` is equal to the input in length and contents.
         """
         return self == rhs.as_string_slice()
 
     @__unsafe_disable_nested_origin_exclusivity
     @always_inline
     fn __ne__(self, rhs: StringSlice) -> Bool:
-        """Verify if span is not equal to another string slice.
+        """Verify if span is not equal to another `StringSlice`.
 
         Args:
-            rhs: The string slice to compare against.
+            rhs: The `StringSlice` to compare against.
 
         Returns:
-            True if the string slices are not equal in length or contents, False
-                otherwise.
+            If the `StringSlice` is not equal to the input in length and
+            contents.
         """
         return not self == rhs
 
     @always_inline
     fn __ne__(self, rhs: String) -> Bool:
-        """Verify if span is not equal to another string slice.
+        """Verify if span is not equal to another `StringSlice`.
 
         Args:
-            rhs: The string slice to compare against.
+            rhs: The `StringSlice` to compare against.
 
         Returns:
-            True if the string and slice are not equal in length or contents,
-                False otherwise.
+            If the `StringSlice` is not equal to the input in length and
+            contents.
         """
         return not self == rhs
 
     @always_inline
     fn __ne__(self, rhs: StringLiteral) -> Bool:
-        """Verify if span is not equal to a literal.
+        """Verify if span is not equal to a `StringLiteral`.
 
         Args:
-            rhs: The string literal to compare against.
+            rhs: The `StringLiteral` to compare against.
 
         Returns:
-            True if the slice is not equal to the literal in length or contents,
-                False otherwise.
+            If the `StringSlice` is not equal to the input in length and
+            contents.
         """
         return not self == rhs
 
     @always_inline
     fn __lt__(self, rhs: StringSlice) -> Bool:
-        """Compare this StringSlice to the RHS using LT comparison.
+        """Verify if the `StringSlice` bytes are strictly less than the input in
+        overlapping content.
 
         Args:
-            rhs: The other StringSlice to compare against.
+            rhs: The other `StringSlice` to compare against.
 
         Returns:
-            True if this string is strictly less than the RHS string and False
-            otherwise.
+            If the `StringSlice` bytes are strictly less than the input in
+            overlapping content.
         """
         var len1 = len(self)
         var len2 = len(rhs)
@@ -621,13 +621,20 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     @always_inline
     fn strip(self) -> StringSlice[origin]:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
-
-        For example, `"  mojo  "` returns `"mojo"`.
+        This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A StringRef with leading and trailing whitespaces removed.
+
+        Examples:
+
+        ```mojo
+        print("  mojo  ".strip()) # "mojo"
+        ```
+        .
         """
+        # FIXME: this can already do full isspace support with iterator
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
@@ -668,37 +675,19 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         return len(self.as_bytes())
 
-    fn _strref_dangerous(self) -> StringRef:
-        """Returns an inner pointer to the string as a StringRef.
-
-        Safety:
-            This functionality is extremely dangerous because Mojo eagerly
-            releases strings.  Using this requires the use of the
-            _strref_keepalive() method to keep the underlying string alive long
-            enough.
-        """
-        return StringRef(self.unsafe_ptr(), self.byte_length())
-
-    fn _strref_keepalive(self):
-        """A no-op that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
-        """
-        pass
-
     fn startswith(
         self, prefix: StringSlice[_], start: Int = 0, end: Int = -1
     ) -> Bool:
-        """Checks if the StringRef starts with the specified prefix between start
-        and end positions. Returns True if found and False otherwise.
+        """Verify if the `StringSlice` starts with the specified prefix between
+        start and end positions.
 
         Args:
-          prefix: The prefix to check.
-          start: The start offset from which to check.
-          end: The end offset from which to check.
+            prefix: The prefix to check.
+            start: The start offset from which to check.
+            end: The end offset from which to check.
 
         Returns:
-          True if the self[start:end] is prefixed by the input prefix.
+            True if the `self[start:end]` is prefixed by the input prefix.
         """
         if end == -1:
             return self.find(prefix, start) == start
@@ -709,16 +698,16 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     fn endswith(
         self, suffix: StringSlice[_], start: Int = 0, end: Int = -1
     ) -> Bool:
-        """Checks if the StringRef end with the specified suffix between start
-        and end positions. Returns True if found and False otherwise.
+        """Verify if the `StringSlice` end with the specified suffix between
+        start and end positions.
 
         Args:
-          suffix: The suffix to check.
-          start: The start offset from which to check.
-          end: The end offset from which to check.
+            suffix: The suffix to check.
+            start: The start offset from which to check.
+            end: The end offset from which to check.
 
         Returns:
-          True if the self[start:end] is suffixed by the input suffix.
+            True if the `self[start:end]` is suffixed by the input suffix.
         """
         if len(suffix) > len(self):
             return False
@@ -730,10 +719,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
     fn _from_start(self, start: Int) -> Self:
         """Gets the `StringSlice` pointing to the substring after the specified
-        slice start position.
-
-        If start is negative, it is interpreted as the number of characters
-        from the end of the string to start at.
+        slice start position. If start is negative, it is interpreted as the
+        number of characters from the end of the string to start at.
 
         Args:
             start: Starting index of the slice.
@@ -798,28 +785,28 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
     fn find(ref [_]self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
-        `start`. If not found, returns -1.
+        `start`. If not found, returns `-1`.
 
         Args:
-          substr: The substring to find.
-          start: The offset from which to find.
+            substr: The substring to find.
+            start: The offset from which to find.
 
         Returns:
-          The offset of `substr` relative to the beginning of the string.
+            The offset of `substr` relative to the beginning of the string.
         """
         # FIXME(#3526): this should return unicode codepoint offsets
         return self.as_bytes().find(substr.as_bytes(), start)
 
     fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
-        `start`. If not found, returns -1.
+        `start`. If not found, returns `-1`.
 
         Args:
-          substr: The substring to find.
-          start: The offset from which to find.
+            substr: The substring to find.
+            start: The offset from which to find.
 
         Returns:
-          The offset of `substr` relative to the beginning of the string.
+            The offset of `substr` relative to the beginning of the string.
         """
         # FIXME(#3526): this should return unicode codepoint offsets
         return self.as_bytes().rfind(substr.as_bytes(), start)
@@ -828,12 +815,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
         [universal separators](
-            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
             True if the whole StringSlice is made up of whitespace characters
-                listed above, otherwise False.
+            listed above, otherwise False.
         """
 
         if self.byte_length() == 0:
@@ -870,7 +857,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines](
-            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
@@ -961,12 +948,12 @@ trait _CurlyEntryFormattable(Stringable, Representable):
     will be less constrained.
     """
 
-    pass
+    ...
 
 
 @value
 struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
-    """The struct that handles string-like formatting by curly braces entries.
+    """The struct that handles `Stringlike` formatting by curly braces entries.
     This is internal for the types: `String`, `StringLiteral` and `StringSlice`.
     """
 
@@ -1300,7 +1287,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 @register_passable("trivial")
 struct _FormatSpec:
     """Store every field of the format specifier in a byte (e.g., ord("+") for
-    sign). It is stored in a byte because every [format specifier](\
+    sign). It is stored in a byte because every [format specifier](
     https://docs.python.org/3/library/string.html#formatspec) is an ASCII
     character.
     """
@@ -1313,15 +1300,15 @@ struct _FormatSpec:
     """The meaning of the various alignment options is as follows:
 
     | Option | Meaning|
-    |:-------|:-------|
-    |'<' | Forces the field to be left-aligned within the available space
+    |:------:|:-------|
+    |'<' | Forces the field to be left-aligned within the available space \
     (this is the default for most objects).|
-    |'>' | Forces the field to be right-aligned within the available space
+    |'>' | Forces the field to be right-aligned within the available space \
     (this is the default for numbers).|
-    |'=' | Forces the padding to be placed after the sign (if any) but before
-    the digits. This is used for printing fields in the form `+000000120`. This
-    alignment option is only valid for numeric types. It becomes the default for
-    numbers when `0` immediately precedes the field width.|
+    |'=' | Forces the padding to be placed after the sign (if any) but before \
+    the digits. This is used for printing fields in the form `+000000120`. This\
+    alignment option is only valid for numeric types. It becomes the default\
+    for numbers when `0` immediately precedes the field width.|
     |'^' | Forces the field to be centered within the available space.|
     """
     var sign: UInt8
@@ -1329,12 +1316,12 @@ struct _FormatSpec:
     following:
 
     | Option | Meaning|
-    |:-------|:-------|
-    |'+' | indicates that a sign should be used for both positive as well as
+    |:------:|:-------|
+    |'+' | indicates that a sign should be used for both positive as well as\
     negative numbers.|
-    |'-' | indicates that a sign should be used only for negative numbers (this
+    |'-' | indicates that a sign should be used only for negative numbers (this\
     is the default behavior).|
-    |space | indicates that a leading space should be used on positive numbers,
+    |space | indicates that a leading space should be used on positive numbers,\
     and a minus sign on negative numbers.|
     """
     var coerce_z: Bool
@@ -1382,18 +1369,18 @@ struct _FormatSpec:
     The available integer presentation types are:
 
     | Option | Meaning|
-    |:-------|:-------|
+    |:------:|:-------|
     |'b' |Binary format. Outputs the number in base 2.|
-    |'c' |Character. Converts the integer to the corresponding unicode character
-    before printing.|
+    |'c' |Character. Converts the integer to the corresponding unicode\
+    character before printing.|
     |'d' |Decimal Integer. Outputs the number in base 10.|
     |'o' |Octal format. Outputs the number in base 8.|
-    |'x' |Hex format. Outputs the number in base 16, using lower-case letters
+    |'x' |Hex format. Outputs the number in base 16, using lower-case letters\
     for the digits above 9.|
-    |'X' |Hex format. Outputs the number in base 16, using upper-case letters
-    for the digits above 9. In case '#' is specified, the prefix '0x' will be
+    |'X' |Hex format. Outputs the number in base 16, using upper-case letters\
+    for the digits above 9. In case '#' is specified, the prefix '0x' will be\
     upper-cased to '0X' as well.|
-    |'n' |Number. This is the same as 'd', except that it uses the current
+    |'n' |Number. This is the same as 'd', except that it uses the current\
     locale setting to insert the appropriate number separator characters.|
     |None | The same as 'd'.|
 
@@ -1405,59 +1392,59 @@ struct _FormatSpec:
     The available presentation types for float and Decimal values are:
 
     | Option | Meaning|
-    |:-------|:-------|
-    |'e' |Scientific notation. For a given precision p, formats the number in
-    scientific notation with the letter `e` separating the coefficient from the
-    exponent. The coefficient has one digit before and p digits after the
-    decimal point, for a total of p + 1 significant digits. With no precision
-    given, uses a precision of 6 digits after the decimal point for float, and
-    shows all coefficient digits for Decimal. If no digits follow the decimal
+    |:------:|:-------|
+    |'e' |Scientific notation. For a given precision p, formats the number in\
+    scientific notation with the letter `e` separating the coefficient from the\
+    exponent. The coefficient has one digit before and p digits after the\
+    decimal point, for a total of p + 1 significant digits. With no precision\
+    given, uses a precision of 6 digits after the decimal point for float, and\
+    shows all coefficient digits for Decimal. If no digits follow the decimal\
     point, the decimal point is also removed unless the # option is used.|
-    |'E' |Scientific notation. Same as 'e' except it uses an upper case `E` as
+    |'E' |Scientific notation. Same as 'e' except it uses an upper case `E` as\
     the separator character.|
-    |'f' |Fixed-point notation. For a given precision p, formats the number as a
-    decimal number with exactly p digits following the decimal point. With no
-    precision given, uses a precision of 6 digits after the decimal point for
-    float, and uses a precision large enough to show all coefficient digits for
-    Decimal. If no digits follow the decimal point, the decimal point is also
-    removed unless the # option is used.|
-    |'F' |Fixed-point notation. Same as 'f', but converts nan to NAN and inf to
+    |'f' |Fixed-point notation. For a given precision p, formats the number as\
+    a decimal number with exactly p digits following the decimal point. With no\
+    precision given, uses a precision of 6 digits after the decimal point for\
+    float, and uses a precision large enough to show all coefficient digits for\
+    Decimal. If no digits follow the decimal point, the decimal point is also\
+    removed unless the '#' option is used.|
+    |'F' |Fixed-point notation. Same as 'f', but converts nan to NAN and inf to\
     INF.|
-    |'g' |General format. For a given precision p >= 1, this rounds the number
-    to p significant digits and then formats the result in either fixed-point
-    format or in scientific notation, depending on its magnitude. A precision of
-    0 is treated as equivalent to a precision of 1.
-    The precise rules are as follows: suppose that the result formatted with
-    presentation type 'e' and precision p-1 would have exponent exp. Then, if
-    m <= exp < p, where m is -4 for floats and -6 for Decimals, the number is
-    formatted with presentation type 'f' and precision p-1-exp. Otherwise, the
-    number is formatted with presentation type 'e' and precision p-1. In both
-    cases insignificant trailing zeros are removed from the significand, and the
-    decimal point is also removed if there are no remaining digits following it,
-    unless the '#' option is used.
-    With no precision given, uses a precision of 6 significant digits for float.
-    For Decimal, the coefficient of the result is formed from the coefficient
-    digits of the value; scientific notation is used for values smaller than
-    1e-6 in absolute value and values where the place value of the least
-    significant digit is larger than 1, and fixed-point notation is used
-    otherwise.
-    Positive and negative infinity, positive and negative zero, and nans, are
-    formatted as inf, -inf, 0, -0 and nan respectively, regardless of the
+    |'g' |General format. For a given precision p >= 1, this rounds the number\
+    to p significant digits and then formats the result in either fixed-point\
+    format or in scientific notation, depending on its magnitude. A precision\
+    of 0 is treated as equivalent to a precision of 1.\
+    The precise rules are as follows: suppose that the result formatted with\
+    presentation type 'e' and precision p-1 would have exponent exp. Then, if\
+    m <= exp < p, where m is -4 for floats and -6 for Decimals, the number is\
+    formatted with presentation type 'f' and precision p-1-exp. Otherwise, the\
+    number is formatted with presentation type 'e' and precision p-1. In both\
+    cases insignificant trailing zeros are removed from the significand, and\
+    the decimal point is also removed if there are no remaining digits\
+    following it, unless the '#' option is used.\
+    With no precision given, uses a precision of 6 significant digits for\
+    float. For Decimal, the coefficient of the result is formed from the\
+    coefficient digits of the value; scientific notation is used for values\
+    smaller than 1e-6 in absolute value and values where the place value of the\
+    least significant digit is larger than 1, and fixed-point notation is used\
+    otherwise.\
+    Positive and negative infinity, positive and negative zero, and nans, are\
+    formatted as inf, -inf, 0, -0 and nan respectively, regardless of the\
     precision.|
-    |'G' |General format. Same as 'g' except switches to 'E' if the number gets
+    |'G' |General format. Same as 'g' except switches to 'E' if the number gets\
     too large. The representations of infinity and NaN are uppercased, too.|
-    |'n' |Number. This is the same as 'g', except that it uses the current
+    |'n' |Number. This is the same as 'g', except that it uses the current\
     locale setting to insert the appropriate number separator characters.|
-    |'%' |Percentage. Multiplies the number by 100 and displays in fixed ('f')
+    |'%' |Percentage. Multiplies the number by 100 and displays in fixed ('f')\
     format, followed by a percent sign.|
-    |None |For float this is like the 'g' type, except that when fixed-point
-    notation is used to format the result, it always includes at least one digit
-    past the decimal point, and switches to the scientific notation when
-    exp >= p - 1. When the precision is not specified, the latter will be as
-    large as needed to represent the given value faithfully.
-    For Decimal, this is the same as either 'g' or 'G' depending on the value of
-    context.capitals for the current decimal context.
-    The overall effect is to match the output of str() as altered by the other
+    |None |For float this is like the 'g' type, except that when fixed-point\
+    notation is used to format the result, it always includes at least one\
+    digit past the decimal point, and switches to the scientific notation when\
+    exp >= p - 1. When the precision is not specified, the latter will be as\
+    large as needed to represent the given value faithfully.\
+    For Decimal, this is the same as either 'g' or 'G' depending on the value\
+    of context.capitals for the current decimal context.\
+    The overall effect is to match the output of str() as altered by the other\
     format modifiers.|
     """
 
@@ -1477,18 +1464,18 @@ struct _FormatSpec:
 
         Args:
             fill: Defaults to space.
-            align: Defaults to 0 which is adjusted to the default for the arg
+            align: Defaults to `0` which is adjusted to the default for the arg
                 type.
             sign: Defaults to `-`.
             coerce_z: Defaults to False.
             alternate_form: Defaults to False.
-            width: Defaults to 0 which is adjusted to the default for the arg
+            width: Defaults to `0` which is adjusted to the default for the arg
                 type.
-            grouping_option: Defaults to 0 which is adjusted to the default for
+            grouping_option: Defaults to `0` which is adjusted to the default for
                 the arg type.
-            precision: Defaults to 0 which is adjusted to the default for the
+            precision: Defaults to `0` which is adjusted to the default for the
                 arg type.
-            type: Defaults to 0 which is adjusted to the default for the arg
+            type: Defaults to `0` which is adjusted to the default for the arg
                 type.
         """
         self.fill = fill
@@ -1511,12 +1498,14 @@ struct _FormatSpec:
         Returns:
             An instance of FormatSpec.
         """
+
+        alias `:` = UInt8(ord(":"))
         var f_len = fmt_str.byte_length()
         var f_ptr = fmt_str.unsafe_ptr()
         var colon_idx = -1
         var idx = 0
         while idx < f_len:
-            if f_ptr[idx] == ord(":"):
+            if f_ptr[idx] == `:`:
                 exclamation_index = idx
                 break
             idx += 1

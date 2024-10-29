@@ -1036,7 +1036,17 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        return not (self != other)
+        if not self and not other:
+            return True
+        if len(self) != len(other):
+            return False
+        # same pointer and length, so equal
+        if self.unsafe_ptr() == other.unsafe_ptr():
+            return True
+        for i in range(len(self)):
+            if self.unsafe_ptr()[i] != other.unsafe_ptr()[i]:
+                return False
+        return True
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -1048,7 +1058,7 @@ struct String(
         Returns:
             True if the Strings are not equal and False otherwise.
         """
-        return self._strref_dangerous() != other._strref_dangerous()
+        return not (self == other)
 
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
@@ -1490,23 +1500,6 @@ struct String(
         buf.size = capacity
         buf.append(0)
         return String(buf^)
-
-    fn _strref_dangerous(self) -> StringRef:
-        """
-        Returns an inner pointer to the string as a StringRef.
-        This functionality is extremely dangerous because Mojo eagerly releases
-        strings.  Using this requires the use of the _strref_keepalive() method
-        to keep the underlying string alive long enough.
-        """
-        return StringRef(self.unsafe_ptr(), self.byte_length())
-
-    fn _strref_keepalive(self):
-        """
-        A noop that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
-        """
-        pass
 
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.

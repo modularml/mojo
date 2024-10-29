@@ -22,7 +22,7 @@ from utils import IndexList
 
 from sys import bitwidthof
 from builtin.dtype import _int_type_of_width, _uint_type_of_width
-from builtin._documentation import doc_private
+from documentation import doc_private
 from builtin.io import _get_dtype_printf_format, _snprintf
 from collections.string import _calc_initial_buffer_size
 
@@ -80,7 +80,7 @@ fn _int_tuple_binary_apply[
     for i in range(a.size):
         var a_elem = a.__getitem__[i]()
         var b_elem = b.__getitem__[i]()
-        c.__setitem__[i](binary_fn[a._int_dtype](a_elem, b_elem))
+        c.__setitem__[i](binary_fn[a.element_type](a_elem, b_elem))
 
     return c
 
@@ -111,7 +111,7 @@ fn _int_tuple_compare[
     for i in range(a.size):
         var a_elem = a.__getitem__[i]()
         var b_elem = b.__getitem__[i]()
-        c.__setitem__[i](comp_fn[a._int_dtype](a_elem, b_elem))
+        c.__setitem__[i](comp_fn[a.element_type](a_elem, b_elem))
 
     return c
 
@@ -185,10 +185,10 @@ struct IndexList[
         unsigned: Whether the integer is signed or unsigned.
     """
 
-    alias _int_dtype = _type_of_width[element_bitwidth, unsigned]()
+    alias element_type = _type_of_width[element_bitwidth, unsigned]()
     """The underlying dtype of the integer element value."""
 
-    alias _int_type = Scalar[Self._int_dtype]
+    alias _int_type = Scalar[Self.element_type]
     """The underlying storage of the integer element value."""
 
     var data: StaticTuple[Self._int_type, size]
@@ -775,9 +775,9 @@ struct IndexList[
         @parameter
         for i in range(size):
             res.data[i] = rebind[__type_of(result.data).element_type](
-                rebind[Scalar[Self._int_dtype]](
+                rebind[Scalar[Self.element_type]](
                     self.data.__getitem__[i]()
-                ).cast[result._int_dtype]()
+                ).cast[result.element_type]()
             )
         return res
 

@@ -17,8 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from builtin._documentation import doc_private
-from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from documentation import doc_private
+from math import Ceilable, CeilDivable, Floorable, Truncable
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.io import _snprintf
@@ -85,7 +85,7 @@ fn index[T: Indexer](idx: T, /) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-trait Intable:
+trait Intable(CollectionElement):
     """The `Intable` trait describes a type that can be converted to an Int.
 
     Any type that conforms to `Intable` or
@@ -178,7 +178,6 @@ trait IntableRaising:
 trait IntLike(
     Absable,
     Ceilable,
-    Comparable,
     Floorable,
     Writable,
     Powable,
