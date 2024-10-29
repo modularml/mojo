@@ -353,7 +353,7 @@ fn stack_allocation[
     /,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[Scalar[type], address_space, stack=True]:
+]() -> UnsafePointer[Scalar[type], address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -381,7 +381,7 @@ fn stack_allocation[
     name: Optional[StringLiteral] = None,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[type, address_space, stack=True]:
+]() -> UnsafePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -408,7 +408,7 @@ fn _stack_allocation[
     name: Optional[StringLiteral] = None,
     alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[type, address_space, stack=True]:
+]() -> UnsafePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 

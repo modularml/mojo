@@ -20,6 +20,8 @@ from memory import Pointer
 """
 
 from documentation import doc_private
+from collections import Optional
+from .unsafe_pointer import _default_alignment
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace
@@ -173,7 +175,7 @@ struct AddressSpace(EqualityComparable):
         """Initializes the address space from the underlying integral value.
 
         Args:
-          value: The address space value.
+            value: The address space value.
         """
         self._value = value
 
@@ -294,8 +296,22 @@ struct Pointer[
         `>`,
     ]
 
-    var _value: Self._mlir_type
+    var _mlir_value: Self._mlir_type
     """The underlying MLIR representation."""
+    var _flags: UInt8
+    """Bitwise flags for the pointer.
+    
+    #### Bits:
+
+    - 0: is_register_passable.
+    - 1: is_allocated.
+    - 2: unset.
+    - 3: unset.
+    - 4: unset.
+    - 5: unset.
+    - 6: unset.
+    - 7: unset.
+    """
 
     # ===------------------------------------------------------------------===#
     # Initializers
@@ -303,13 +319,24 @@ struct Pointer[
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, *, _mlir_value: Self._mlir_type):
+    fn __init__(
+        inout self,
+        *,
+        _mlir_value: Self._mlir_type,
+        is_allocated: Bool,
+        register_passable: Bool = False,
+    ):
         """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
-             _mlir_value: The MLIR representation of the pointer.
+            _mlir_value: The MLIR representation of the pointer.
+            is_allocated: Whether the pointer's memory is allocated.
+            register_passable: Whether the pointer is allocated on registers.
         """
-        self._value = _mlir_value
+        self._mlir_value = _mlir_value
+        self._flags = (UInt8(register_passable) << 7) | (
+            UInt8(is_allocated) << 6
+        )
 
     @staticmethod
     @always_inline("nodebug")
@@ -322,17 +349,45 @@ struct Pointer[
         Returns:
             The result Pointer.
         """
-        return Pointer(_mlir_value=__get_mvalue_as_litref(value))
+        # TODO(#3581): this should make register_passable = is_trivial(type)
+        return Pointer(
+            _mlir_value=__get_mvalue_as_litref(value), is_allocated=True
+        )
 
     fn __init__(inout self, *, other: Self):
-        """Constructs a copy from another Pointer.
-
-        Note that this does **not** copy the underlying data.
+        """Constructs a copy from another Pointer **(not the data)**.
 
         Args:
             other: The `Pointer` to copy.
         """
-        self._value = other._value
+        self._mlir_value = other._mlir_value
+        self._flags = other._flags
+
+    @doc_private
+    @always_inline("nodebug")
+    fn __init__[
+        O: MutableOrigin
+    ](
+        inout self: Pointer[type, O, address_space],
+        *,
+        unsafe_ptr: UnsafePointer[type, address_space, _, O],
+        is_allocated: Bool = True,
+        register_passable: Bool = False,
+    ):
+        """Constructs a Pointer from its MLIR prepresentation.
+
+        Args:
+            unsafe_ptr: The UnsafePointer.
+            is_allocated: Whether the pointer's memory is allocated.
+            register_passable: Whether the pointer is allocated on registers.
+        """
+        self = __type_of(self)(
+            _mlir_value=__mlir_op.`lit.ref.from_pointer`[
+                _type = __type_of(self)._mlir_type
+            ](unsafe_ptr.address),
+            is_allocated=is_allocated,
+            register_passable=register_passable,
+        )
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
@@ -345,7 +400,7 @@ struct Pointer[
         Returns:
             A reference to the underlying value in memory.
         """
-        return __get_litref_as_mvalue(self._value)
+        return __get_litref_as_mvalue(self._mlir_value)
 
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
@@ -387,3 +442,72 @@ struct Pointer[
             The string representation of the Pointer.
         """
         return str(UnsafePointer.address_of(self[]))
+
+    @staticmethod
+    @always_inline
+    fn alloc[O: MutableOrigin](count: Int) -> Pointer[type, O, address_space]:
+        """Allocate an array with specified or default alignment.
+
+        Parameters:
+            O: The origin of the Pointer.
+
+        Args:
+            count: The number of elements in the array.
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        return Pointer[type, O, address_space](
+            unsafe_ptr=UnsafePointer[type, address_space].alloc(count),
+            is_allocated=True,
+        )
+
+    @staticmethod
+    @always_inline
+    fn alloc[
+        count: Int,
+        /,
+        O: MutableOrigin,
+        *,
+        stack_alloc_limit: Int = 1 * 2**20,
+        name: Optional[StringLiteral] = None,
+    ]() -> Pointer[type, O, address_space]:
+        """Allocate an array on the stack with specified or default alignment.
+
+        Parameters:
+            count: The number of elements in the array.
+            O: The origin of the Pointer.
+            stack_alloc_limit: The limit of bytes to allocate on the stack
+                (default 1 MiB).
+            name: The name of the global variable (only honored in certain
+                cases).
+
+        Returns:
+            The pointer to the newly allocated array.
+        """
+        return Pointer[type, O, address_space](
+            unsafe_ptr=UnsafePointer[type, address_space].alloc[count](),
+            is_allocated=True,
+            register_passable=True,
+        )
+
+    fn unsafe_free[
+        O: MutableOrigin
+    ](inout self: Pointer[type, O, address_space]):
+        """Free the memory referenced by the pointer.
+
+        Safety:
+            Pointer is not reference counted, so any dereferencing of another
+            pointer to this same address that was copied before the free is
+            **not safe**.
+        """
+
+        @parameter
+        if address_space is AddressSpace.GENERIC:
+            if self._flags & 0b1100_0000 == 0b0100_0000:
+                p = __mlir_op.`lit.ref.to_pointer`(self._mlir_value)
+                alias UP = UnsafePointer[
+                    type, AddressSpace.GENERIC, _default_alignment[type](), O
+                ]
+                UP(rebind[UP._mlir_type](p)).free()
+                self._flags &= 0b0011_1111

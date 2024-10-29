@@ -33,7 +33,7 @@ fn cwd() raises -> Path:
     """Gets the current directory.
 
     Returns:
-      The current directory.
+        The current directory.
     """
     alias MAX_CWD_BUFFER_SIZE = 1024
     var buf = UnsafePointer[c_char].alloc[MAX_CWD_BUFFER_SIZE]()

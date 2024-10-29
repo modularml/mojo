@@ -55,7 +55,6 @@ struct UnsafePointer[
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
     origin: Origin[True].type = MutableAnyOrigin,
-    stack: Bool = False,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -72,7 +71,6 @@ struct UnsafePointer[
         address_space: The address space associated with the UnsafePointer allocated memory.
         alignment: The minimum alignment of this pointer known statically.
         origin: The origin of the memory being addressed.
-        stack: Whether the pointer is on the stack.
     """
 
     # ===-------------------------------------------------------------------===#
@@ -142,9 +140,7 @@ struct UnsafePointer[
     # TODO: propagate the origin
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(
-        ref [_, address_space._value.value]arg: type
-    ) -> UnsafePointer[type, address_space, alignment, _, False] as result:
+    fn address_of(ref [_, address_space._value.value]arg: type) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -153,15 +149,11 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        result = __type_of(result)(
-            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg))
-        )
+        return __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg))
 
     @staticmethod
     @always_inline
-    fn alloc(
-        count: Int,
-    ) -> UnsafePointer[type, alignment=alignment]:
+    fn alloc(count: Int) -> Self:
         """Allocate an array with specified or default alignment.
 
         Args:
@@ -176,12 +168,12 @@ struct UnsafePointer[
 
         @parameter
         if triple_is_nvidia_cuda():
-            return external_call["malloc", UnsafePointer[NoneType]](
-                size
-            ).bitcast[type]()
+            return external_call[
+                "malloc", UnsafePointer[NoneType, address_space]
+            ](size).bitcast[type]()
         else:
             return __mlir_op.`pop.aligned_alloc`[
-                _type = UnsafePointer[type]._mlir_type
+                _type = UnsafePointer[type, address_space]._mlir_type
             ](alignment.value, size.value)
 
     @staticmethod
@@ -192,7 +184,7 @@ struct UnsafePointer[
         *,
         stack_alloc_limit: Int = 1 * 2**20,
         name: Optional[StringLiteral] = None,
-    ]() -> UnsafePointer[type, alignment=alignment, stack=True] as output:
+    ]() -> Self:
         """Allocate an array on the stack with specified or default alignment.
 
         Parameters:
@@ -211,9 +203,7 @@ struct UnsafePointer[
         constrained[
             size <= stack_alloc_limit, "size must be `<=` stack_alloc_limit"
         ]()
-        output = rebind[__type_of(output)](
-            _stack_allocation[count, type, name, alignment, address_space]()
-        )
+        return _stack_allocation[count, type, name, alignment, address_space]()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -960,14 +950,13 @@ struct UnsafePointer[
         scatter(val, base, mask, alignment)
 
     @always_inline
-    fn free(self: UnsafePointer[address_space = AddressSpace.GENERIC]):
+    fn free(self: UnsafePointer[type, AddressSpace.GENERIC, *_, **_]):
         """Free the memory referenced by the pointer."""
 
         @parameter
-        if stack:
-            pass
-        elif triple_is_nvidia_cuda():
-            libc.free(self.bitcast[NoneType]())
+        if triple_is_nvidia_cuda():
+            p = rebind[UnsafePointer[type, address_space.GENERIC]](self)
+            libc.free(p.bitcast[NoneType]())
         else:
             __mlir_op.`pop.aligned_free`(self.address)
 

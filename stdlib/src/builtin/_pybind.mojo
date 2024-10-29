@@ -68,7 +68,7 @@ fn pointer_bitcast[
         _mlir_value=__mlir_op.`lit.ref.from_pointer`[
             _type = __type_of(out)._mlir_type
         ](
-            UnsafePointer(__mlir_op.`lit.ref.to_pointer`(ptr._value))
+            UnsafePointer(__mlir_op.`lit.ref.to_pointer`(ptr._mlir_value))
             .bitcast[To]()
             .address
         )
