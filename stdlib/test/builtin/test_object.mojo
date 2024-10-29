@@ -494,6 +494,35 @@ def test_object_hash():
     assert_equal(hash(abc), hash("[1, 2.5, 'hello world']"))
 
 
+def test_object_RefCountedCowString():
+    a = object(String("Hello world"))
+    b = a
+    assert_equal(a._value.ref_count(), 2)
+    assert_equal(b._value.ref_count(), 2)
+    #asap del of b
+    assert_equal(a._value.ref_count(), 1)
+    c = a
+    assert_equal(a._value.ref_count(), 2)
+    assert_equal(c._value.ref_count(), 2)
+    c += "!"
+    assert_equal(a._value.ref_count(), 1)
+    assert_equal(c._value.ref_count(), 1)
+    assert_equal(str(a), "Hello world")
+    assert_equal(str(c), "Hello world!")
+
+    a = object.dict()
+    c = object("hello world")
+    a[1] = c
+    assert_equal(c._value.ref_count(), 2)
+    a[1] += "!"
+    assert_equal(c, "hello world")
+    assert_equal(c._value.ref_count(), 1)
+    assert_equal(a[1], "hello world!")
+    a = a.pop(1)
+    assert_equal(a._value.ref_count(), 1)
+
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -512,3 +541,4 @@ def main():
     test_object_init_list_attr()
     test_object_list_contains()
     test_object_list_pop()
+    test_object_RefCountedCowString()

@@ -52,6 +52,11 @@ struct _RefCountedList:
 
 
 @value
+struct _RefCountedString(CollectionElement):
+    var impl: Arc[String]
+
+
+@value
 struct _RefCountedAttrsDict:
     """This type contains the attribute dictionary for a dynamic object. The
     attribute dictionary is constructed once with a fixed number of elements.
@@ -219,7 +224,7 @@ struct _ObjectImpl(
         Bool,
         Int64,
         Float64,
-        String,
+        _RefCountedString,
         _RefCountedList,
         _Function,
         _RefCountedAttrsDict,
@@ -275,7 +280,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn __init__(inout self, value: String):
-        self.value = Self.type(value)
+        self.value = Self.type(_RefCountedString(value))
 
     @always_inline
     fn __init__(inout self, value: _RefCountedList):
@@ -328,7 +333,7 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_str(self) -> Bool:
-        return self.value.isa[String]()
+        return self.value.isa[_RefCountedString]()
 
     @always_inline
     fn is_list(self) -> Bool:
@@ -360,8 +365,8 @@ struct _ObjectImpl(
         return self.value[Float64]
 
     @always_inline
-    fn get_as_string(self) -> String:
-        return self.value[String]
+    fn get_as_string(ref [_]self) -> ref [self.value] String:
+        return UnsafePointer.address_of(self.value[_RefCountedString].impl[])[]
 
     @always_inline
     fn get_as_list(ref [_]self) -> ref [self.value] _RefCountedList:
@@ -421,6 +426,17 @@ struct _ObjectImpl(
             return "dict"
         debug_assert(self.is_obj(), "expected a generic object")
         return "obj"
+
+    def ref_count(ref [_]self) -> Int:
+        if self.is_dict():
+            return self.get_as_dict().impl.count().__int__()
+        if self.is_obj():
+            return self.get_obj_attrs().impl.count().__int__()
+        if self.is_str():
+            return self.value[_RefCountedString].impl.count().__int__()
+        if self.is_list():
+            return self.value[_RefCountedList].impl.count().__int__()
+        raise self._get_type_name() + " is not ref counted"
 
     # ===------------------------------------------------------------------=== #
     # Type Conversion
