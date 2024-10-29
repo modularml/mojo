@@ -515,14 +515,14 @@ struct Pointer[
     fn bitcast[
         T: AnyType = Self.type
     ](self) -> Pointer[T, origin, address_space] as output:
-        """Bitcasts a UnsafePointer to a different type.
+        """Bitcasts a `Pointer` to a different type.
 
         Parameters:
             T: The target type.
 
         Returns:
-            A new UnsafePointer object with the specified type and the same address,
-            as the original UnsafePointer.
+            A new `Pointer` object with the specified type and the same address,
+            as the original `Pointer`.
         """
         output = rebind[__type_of(output)](
             __mlir_op.`pop.pointer.bitcast`[
