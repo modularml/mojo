@@ -496,6 +496,9 @@ struct Pointer[
     ](inout self: Pointer[type, O, address_space]):
         """Free the memory referenced by the pointer.
 
+        Parameters:
+            O: The mutable origin.
+
         Safety:
             Pointer is not reference counted, so any dereferencing of another
             pointer to this same address that was copied before the free is
@@ -524,24 +527,21 @@ struct Pointer[
             A new `Pointer` object with the specified type and the same address,
             as the original `Pointer`.
         """
+        alias P = Pointer[T, MutableAnyOrigin, address_space]
+        s = rebind[Pointer[T, MutableAnyOrigin, address_space]](self)
         output = rebind[__type_of(output)](
-            __mlir_op.`pop.pointer.bitcast`[
-                _type = UnsafePointer[
-                    T, address_space, _default_alignment[type]()
-                ]._mlir_type,
-            ](
-                rebind[Pointer[type, MutableAnyOrigin]](self)
-                .unsafe_ptr()
-                .address
-            )
+            P(unsafe_ptr=s.unsafe_ptr().bitcast[T]())
         )
 
     fn unsafe_ptr[
         O: MutableOrigin, //
-    ](self: Pointer[type, O]) -> UnsafePointer[
+    ](self: Pointer[type, O, address_space]) -> UnsafePointer[
         type, address_space, _default_alignment[type](), O
     ] as output:
         """Get a raw pointer to the underlying data.
+
+        Parameters:
+            O: The mutable origin.
 
         Returns:
             The raw pointer to the data.
