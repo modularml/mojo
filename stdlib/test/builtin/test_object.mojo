@@ -379,18 +379,18 @@ def test_object_dict():
     assert_equal(a[2], "two")
     assert_equal(str(a[2]), "two")
     b = a
-    assert_equal(a._value.get_as_dict().impl.count(), 2)
+    assert_equal(a._value.ref_count(), 2)
     # asap __del__ of a
-    assert_equal(b._value.get_as_dict().impl.count(), 1)
+    assert_equal(b._value.ref_count(), 1)
 
     ref_counted_list = object([1, 2, 3])
-    assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
+    assert_equal(ref_counted_list._value.ref_count(), 1)
     b["ref_counted_list"] = ref_counted_list
-    assert_equal(ref_counted_list._value.get_as_list().impl.count(), 2)
+    assert_equal(ref_counted_list._value.ref_count(), 2)
     ref_counted_list.append(4)
     assert_equal(b["ref_counted_list"], [1, 2, 3, 4])
     # asap __del__ of b
-    assert_equal(ref_counted_list._value.get_as_list().impl.count(), 1)
+    assert_equal(ref_counted_list._value.ref_count(), 1)
 
 
 def test_object_dict_contains():
@@ -421,7 +421,7 @@ def test_object_dict_pop():
     tmp_element = a.pop("twothree")
     assert_equal(tmp_element, [2, 3])
     assert_equal(len(a), 2)
-    assert_equal(tmp_element._value.get_as_list().impl.count(), 1)
+    assert_equal(tmp_element._value.ref_count(), 1)
 
     with assert_raises(contains="usage: .pop(key) for dictionaries"):
         a.pop()
@@ -499,7 +499,7 @@ def test_object_RefCountedCowString():
     b = a
     assert_equal(a._value.ref_count(), 2)
     assert_equal(b._value.ref_count(), 2)
-    #asap del of b
+    # asap del of b
     assert_equal(a._value.ref_count(), 1)
     c = a
     assert_equal(a._value.ref_count(), 2)
@@ -520,7 +520,6 @@ def test_object_RefCountedCowString():
     assert_equal(a[1], "hello world!")
     a = a.pop(1)
     assert_equal(a._value.ref_count(), 1)
-
 
 
 def main():
