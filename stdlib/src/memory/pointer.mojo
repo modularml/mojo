@@ -511,3 +511,40 @@ struct Pointer[
                 ]
                 UP(rebind[UP._mlir_type](p)).free()
                 self._flags &= 0b0011_1111
+
+    fn bitcast[
+        T: AnyType = Self.type
+    ](self) -> Pointer[T, origin, address_space] as output:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            T: The target type.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+        output = rebind[__type_of(output)](
+            __mlir_op.`pop.pointer.bitcast`[
+                _type = UnsafePointer[
+                    T, address_space, _default_alignment[type]()
+                ]._mlir_type,
+            ](
+                rebind[Pointer[type, MutableAnyOrigin]](self)
+                .unsafe_ptr()
+                .address
+            )
+        )
+
+    fn unsafe_ptr[
+        O: MutableOrigin, //
+    ](self: Pointer[type, O]) -> UnsafePointer[
+        type, address_space, _default_alignment[type](), O
+    ] as output:
+        """Get a raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        p = __mlir_op.`lit.ref.to_pointer`(self._mlir_value)
+        output = __type_of(output)(rebind[__type_of(output)._mlir_type](p))
