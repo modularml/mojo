@@ -358,6 +358,7 @@ struct Pointer[
             _mlir_value=__get_mvalue_as_litref(value),
             is_allocated=True,
             in_registers=True,
+            is_initialized=True,
         )
 
     fn __init__(inout self, *, other: Self):
@@ -471,6 +472,8 @@ struct Pointer[
         return Pointer[type, O, address_space](
             unsafe_ptr=UnsafePointer[type, address_space].alloc(count),
             is_allocated=True,
+            in_registers=False,
+            is_initialized=False,
         )
 
     @staticmethod
@@ -500,6 +503,7 @@ struct Pointer[
             unsafe_ptr=UnsafePointer[type, address_space].alloc[count](),
             is_allocated=True,
             in_registers=True,
+            is_initialized=True,
         )
 
     fn unsafe_free[
@@ -559,3 +563,46 @@ struct Pointer[
         """
         p = __mlir_op.`lit.ref.to_pointer`(self._mlir_value)
         output = __type_of(output)(rebind[__type_of(output)._mlir_type](p))
+
+    @always_inline
+    fn __getattr__[name: StringLiteral](self) -> Bool:
+        """Get the attribute.
+
+        Parameters:
+            name: The name of the attribute.
+
+        Returns:
+            The attribute value.
+        """
+
+        @parameter
+        if name == "is_initialized":
+            return bool((self._flags >> 5) & 0b1)
+        elif name == "is_allocated":
+            return bool((self._flags >> 6) & 0b1)
+        elif name == "in_registers":
+            return bool((self._flags >> 7) & 0b1)
+        else:
+            constrained[False, "unknown attribute"]()
+            return abort[Bool]()
+
+    @always_inline
+    fn __setattr__[name: StringLiteral](inout self, value: Bool):
+        """Set the attribute.
+
+        Parameters:
+            name: The name of the attribute.
+
+        Args:
+            value: The value to set the attribute to.
+        """
+
+        @parameter
+        if name == "is_initialized":
+            self._flags &= UInt8(value) << 5
+        elif name == "is_allocated":
+            self._flags &= UInt8(value) << 6
+        elif name == "in_registers":
+            self._flags &= UInt8(value) << 7
+        else:
+            constrained[False, "unknown attribute"]()
