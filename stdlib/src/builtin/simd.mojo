@@ -3197,6 +3197,16 @@ fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
     return (result_int, result_frac)
 
 
+@always_inline("nodebug")
+fn _sub_with_saturation[
+    width: Int, //
+](a: SIMD[DType.uint8, width], b: SIMD[DType.uint8, width]) -> SIMD[
+    DType.uint8, width
+]:
+    # generates a single `vpsubusb` on x86 with AVX
+    return llvm_intrinsic["llvm.usub.sat", __type_of(a)](a, b)
+
+
 # ===----------------------------------------------------------------------=== #
 # floor
 # ===----------------------------------------------------------------------=== #
