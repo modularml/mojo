@@ -1935,7 +1935,7 @@ struct object(
             return value in self._value.get_as_dict().impl[]
         raise "only lists and dict implements the __contains__ dunder"
 
-    fn pop(self, value: Self) raises -> object:
+    fn pop(self, value: Self = None) raises -> object:
         """Removes an element and returns it.
 
         Args:
@@ -1954,22 +1954,23 @@ struct object(
         ```
         Note: implemented for list and dictionary.
         """
-        # TODO: argument with None as default for pop()
         if self._value.is_list():
+            self_len = self._value.get_list_length()
             if value._value.is_int():
                 tmp_i = int(value._value.get_as_int())
-                self_len = self._value.get_list_length()
-                if tmp_i < self_len and tmp_i >= 0:
-                    ret_val = self._value.get_as_list().impl[].pop(tmp_i)
-                    return ret_val
-                else:
-                    raise "Index should be < len and >= 0"
-            else:
-                raise "List uses non float numbers as indexes"
+                if not (-self_len <= tmp_i < self_len):
+                    raise "pop index out of range"
+                return self._value.get_as_list().impl[].pop(tmp_i)
+            if value._value.is_none():
+                if self_len == 0:
+                    raise "List is empty"
+                return self._value.get_as_list().impl[].pop()
+            raise "List uses non float numbers as indexes"
         if self._value.is_dict():
             try:
-                tmp_ret = self._value.get_as_dict().impl[].pop(value)
-                return tmp_ret
+                if value._value.is_none():
+                    raise "usage: .pop(key) for dictionaries"
+                return self._value.get_as_dict().impl[].pop(value)
             except e:
                 raise e
         raise "self is not a list or a dict"

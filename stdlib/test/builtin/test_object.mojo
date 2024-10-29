@@ -395,12 +395,18 @@ def test_object_dict_pop():
     a[5.5] = 6
     assert_equal(len(a), 4)
     tmp_element = a.pop(4)
-    assert_equal(len(a), 3)
     assert_equal(tmp_element, "four")
+    assert_equal(len(a), 3)
     tmp_element = a.pop("twothree")
-    assert_equal(len(a), 2)
     assert_equal(tmp_element, [2, 3])
+    assert_equal(len(a), 2)
     assert_equal(tmp_element._value.get_as_list().impl.count(), 1)
+
+    with assert_raises(contains="usage: .pop(key) for dictionaries"):
+        a.pop()
+
+    with assert_raises(contains="KeyError"):
+        a.pop("key")
 
 
 def test_object_cast():
@@ -439,6 +445,19 @@ def test_object_list_pop():
     tmp_element = a.pop(0)
     assert_equal(len(a), 1)
     assert_equal(tmp_element, 1)
+    res = a.pop()
+    assert_equal(res, "two")
+    with assert_raises(contains="List is empty"):
+        a.pop()
+
+    a = object([1, "two", 3.0])
+    with assert_raises(contains="pop index out of range"):
+        a.pop(3)
+    assert_equal(len(a), 3)
+    b = a.pop(-1)
+    assert_equal(b, 3.0)
+    with assert_raises(contains="List uses non float numbers as indexes"):
+        a.pop(3.5)
 
 
 def test_object_hash():
