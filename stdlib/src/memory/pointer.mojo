@@ -599,10 +599,10 @@ struct Pointer[
 
         @parameter
         if name == "is_initialized":
-            self._flags &= UInt8(value) << 5
+            self._flags &= (UInt8(value) << 5) | 0b1101_1111
         elif name == "is_allocated":
-            self._flags &= UInt8(value) << 6
+            self._flags &= (UInt8(value) << 6) | 0b1011_1111
         elif name == "in_registers":
-            self._flags &= UInt8(value) << 7
+            self._flags &= (UInt8(value) << 7) | 0b0111_1111
         else:
             constrained[False, "unknown attribute"]()
