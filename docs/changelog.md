@@ -390,6 +390,15 @@ what we publish.
   These operators can't be evaluated at runtime, as a `StringLiteral` must be
   written into the binary during compilation.
 
+  - You can now index into `UnsafePointer` using SIMD scalar integral types:
+
+  ```mojo
+  p = UnsafePointer[Int].alloc(1)
+  i = UInt8(1)
+  p[i] = 42
+  print(p[i])
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
