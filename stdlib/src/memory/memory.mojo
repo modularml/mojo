@@ -33,6 +33,7 @@ from sys import (
 from collections import Optional
 from builtin.dtype import _integral_type_of
 from memory.pointer import AddressSpace, _GPUAddressSpace
+from .unsafe_pointer import _default_alignment
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -286,6 +287,65 @@ fn memset[
         count: Number of elements to fill (in elements, not bytes).
     """
     _memset_impl(ptr.bitcast[Byte](), value, count * sizeof[type]())
+
+
+@always_inline
+fn memset[
+    type: Movable, address_space: AddressSpace
+](ptr: UnsafePointer[type, address_space], owned value: type):
+    """Stores a single element value at the given offset by moving it.
+
+    Parameters:
+        type: The data type of the elements.
+        address_space: The address space of the pointer.
+
+    Args:
+        ptr: UnsafePointer to the memory address to store.
+        value: The value to move into the memory address.
+    """
+
+    alias dt = DType.get_dtype[T]()
+
+    @parameter
+    if dt is not DType.invalid:
+        memset(ptr.bitcast[SIMD[dt, 1]]().offset(offset), value^)
+    else:
+        (ptr + offset).init_pointee_move(value^)
+
+@always_inline("nodebug")
+fn memset[
+    type: DType,
+    address_space: AddressSpace,
+    alignment: Int,
+    width: Int, //,
+    *,
+    volatile: Bool = False,
+](
+    ptr: UnsafePointer[Scalar[type], address_space, alignment],
+    owned value: SIMD[type, width],
+):
+    """Stores a single element value at the given offset by moving it.
+
+    Parameters:
+        type: The data type of SIMD vector elements.
+        address_space: The address space of the pointer.
+        alignment: The minimal alignment of the address.
+        width: The size of the SIMD vector.
+        volatile: Whether the operation is volatile or not.
+
+    Args:
+        ptr: UnsafePointer to the memory address to store.
+        value: The value to store.
+    """
+        @parameter
+        if volatile:
+            __mlir_op.`pop.store`[
+                alignment = alignment.value, isVolatile = __mlir_attr.unit
+            ](value, ptr.bitcast[SIMD[type, width]]().address)
+        else:
+            __mlir_op.`pop.store`[alignment = alignment.value](
+                value, ptr.bitcast[SIMD[type, width]]().address
+            )
 
 
 # ===----------------------------------------------------------------------===#

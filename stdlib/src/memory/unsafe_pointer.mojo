@@ -572,12 +572,13 @@ struct UnsafePointer[
             width=width, alignment=alignment, volatile=volatile
         ]()
 
+    @always_inline
     fn store[
         I: IntLike, T: Movable, //
     ](
         inout self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_],
         offset: I,
-        owned val: T,
+        owned value: T,
     ):
         """Stores a single element value at the given offset by moving it.
 
@@ -587,23 +588,17 @@ struct UnsafePointer[
 
         Args:
             offset: The offset to store to.
-            val: The value to store.
+            value: The value to store.
         """
+        memset(self.offset(offset), value^)
 
-        alias dt = DType.get_dtype[T]()
-
-        @parameter
-        if dt is not DType.invalid:
-            self.bitcast[Scalar[dt]]().store[alignment=alignment](offset, val^)
-        else:
-            (self + offset).init_pointee_move(val^)
-
+    @always_inline
     fn store[
         I: IntLike, T: Copyable, //
     ](
         inout self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_],
         offset: I,
-        val: T,
+        value: T,
         count: Int,
     ):
         """Stores values at the given offset count times by copying it.
@@ -614,22 +609,18 @@ struct UnsafePointer[
 
         Args:
             offset: The offset to store to.
-            val: The value to store.
+            value: The value to store.
             count: The amount of times to copy the value.
         """
-        memset(self, val, count)
+        memset(self.offset(offset), value, count)
 
     @always_inline
     fn store[
-        T: IntLike,
-        type: DType, //,
-        *,
-        alignment: Int,
-        volatile: Bool = False,
+        T: IntLike, type: DType, //, *, volatile: Bool
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: T,
-        val: Scalar[type],
+        value: Scalar[type],
     ):
         """Stores a single element value at the given offset.
 
@@ -640,27 +631,21 @@ struct UnsafePointer[
         Parameters:
             T: The type of offset, either `Int` or `UInt`.
             type: The data type of SIMD vector elements.
-            alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
 
         Args:
             offset: The offset to store to.
-            val: The value to store.
+            value: The value to store.
         """
-        self.offset(offset)._store[alignment=alignment, volatile=volatile](val)
+        memset[volatile=volatile](self.offset(offset), value)
 
     @always_inline
     fn store[
-        T: IntLike,
-        type: DType,
-        width: Int, //,
-        *,
-        alignment: Int = _default_alignment[type, width](),
-        volatile: Bool = False,
+        T: IntLike, type: DType, width: Int, //, *, volatile: Bool = False
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: T,
-        val: SIMD[type, width],
+        value: SIMD[type, width],
     ):
         """Stores a single element value at the given offset.
 
@@ -672,26 +657,21 @@ struct UnsafePointer[
             T: The type of offset, either `Int` or `UInt`.
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
-            alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
 
         Args:
             offset: The offset to store to.
-            val: The value to store.
+            value: The value to store.
         """
-        self.offset(offset).store[alignment=alignment, volatile=volatile](val)
+        memset[volatile=volatile](self.offset(offset), value)
 
     @always_inline
     fn store[
-        type: DType,
-        offset_type: DType, //,
-        *,
-        alignment: Int = _default_alignment[type](),
-        volatile: Bool = False,
+        type: DType, offset_type: DType, //, *, volatile: Bool
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: Scalar[offset_type],
-        val: Scalar[type],
+        value: Scalar[type],
     ):
         """Stores a single element value at the given offset.
 
@@ -701,17 +681,14 @@ struct UnsafePointer[
         Parameters:
             type: The data type of SIMD vector elements.
             offset_type: The data type of the offset value.
-            alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
 
         Args:
             offset: The offset to store to.
-            val: The value to store.
+            value: The value to store.
         """
         constrained[offset_type.is_integral(), "offset must be integer"]()
-        self.offset(int(offset))._store[alignment=alignment, volatile=volatile](
-            val
-        )
+        memset[volatile=volatile](self.offset(offset), value)
 
     @always_inline
     fn store[
@@ -719,12 +696,11 @@ struct UnsafePointer[
         width: Int,
         offset_type: DType, //,
         *,
-        alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: Scalar[offset_type],
-        val: SIMD[type, width],
+        value: SIMD[type, width],
     ):
         """Stores a single element value at the given offset.
 
@@ -735,25 +711,19 @@ struct UnsafePointer[
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
             offset_type: The data type of the offset value.
-            alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
 
         Args:
             offset: The offset to store to.
-            val: The value to store.
+            value: The value to store.
         """
         constrained[offset_type.is_integral(), "offset must be integer"]()
-        self.offset(int(offset))._store[alignment=alignment, volatile=volatile](
-            val
-        )
+        memset[volatile=volatile](self.offset(offset), value)
 
     @always_inline("nodebug")
     fn store[
-        type: DType, //,
-        *,
-        alignment: Int = _default_alignment[type](),
-        volatile: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], val: Scalar[type]):
+        type: DType, //, *, volatile: Bool
+    ](self: UnsafePointer[Scalar[type], *_, **_], value: Scalar[type]):
         """Stores a single element value.
 
         Constraints:
@@ -761,22 +731,17 @@ struct UnsafePointer[
 
         Parameters:
             type: The data type of SIMD vector elements.
-            alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
 
         Args:
-            val: The value to store.
+            value: The value to store.
         """
-        self._store[alignment=alignment, volatile=volatile](val)
+        memset[volatile=volatile](self, value)
 
     @always_inline("nodebug")
     fn store[
-        type: DType,
-        width: Int, //,
-        *,
-        alignment: Int = _default_alignment[type, width](),
-        volatile: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], val: SIMD[type, width]):
+        type: DType, width: Int, //, *, volatile: Bool = False
+    ](self: UnsafePointer[Scalar[type], *_, **_], value: SIMD[type, width]):
         """Stores a single element value.
 
         Constraints:
@@ -785,36 +750,12 @@ struct UnsafePointer[
         Parameters:
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
-            alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
 
         Args:
-            val: The value to store.
+            value: The value to store.
         """
-        self._store[alignment=alignment, volatile=volatile](val)
-
-    @always_inline("nodebug")
-    fn _store[
-        type: DType,
-        width: Int,
-        *,
-        alignment: Int = _default_alignment[type, width](),
-        volatile: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], val: SIMD[type, width]):
-        constrained[width > 0, "width must be a positive integer value"]()
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-
-        @parameter
-        if volatile:
-            __mlir_op.`pop.store`[
-                alignment = alignment.value, isVolatile = __mlir_attr.unit
-            ](val, self.bitcast[SIMD[type, width]]().address)
-        else:
-            __mlir_op.`pop.store`[alignment = alignment.value](
-                val, self.bitcast[SIMD[type, width]]().address
-            )
+        memset[volatile=volatile](self, value)
 
     @always_inline("nodebug")
     fn strided_load[
@@ -839,9 +780,7 @@ struct UnsafePointer[
 
     @always_inline("nodebug")
     fn strided_store[
-        type: DType,
-        T: Intable, //,
-        width: Int,
+        type: DType, T: Intable, //, width: Int
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         val: SIMD[type, width],
@@ -865,9 +804,7 @@ struct UnsafePointer[
         type: DType, //,
         *,
         width: Int = 1,
-        alignment: Int = alignof[
-            SIMD[type, width]
-        ]() if triple_is_nvidia_cuda() else 1,
+        alignment: Int = _default_alignment[type, width](),
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: SIMD[_, width],
