@@ -179,28 +179,28 @@ fn _memcpy_impl(
     if n <= 16:
         if n >= 8:
             var ui64_size = sizeof[UInt64]()
-            dest_data.bitcast[UInt64]().store[alignment=1](
-                0, src_data.bitcast[UInt64]().load[alignment=1](0)
+            dest_data.bitcast[UInt64, alignment=1]().store(
+                0, src_data.bitcast[UInt64, alignment=1]().load(0)
             )
-            dest_data.offset(n - ui64_size).bitcast[UInt64]().store[
-                alignment=1
-            ](
+            dest_data.offset(n - ui64_size).bitcast[
+                UInt64, alignment=1
+            ]().store(
                 0,
                 src_data.offset(n - ui64_size)
-                .bitcast[UInt64]()
-                .load[alignment=1](0),
+                .bitcast[UInt64, alignment=1]()
+                .load(0),
             )
             return
 
         var ui32_size = sizeof[UInt32]()
-        dest_data.bitcast[UInt32]().store[alignment=1](
-            0, src_data.bitcast[UInt32]().load[alignment=1](0)
+        dest_data.bitcast[UInt32, alignment=1]().store(
+            0, src_data.bitcast[UInt32, alignment=1]().load(0)
         )
-        dest_data.offset(n - ui32_size).bitcast[UInt32]().store[alignment=1](
+        dest_data.offset(n - ui32_size).bitcast[UInt32, alignment=1]().store(
             0,
             src_data.offset(n - ui32_size)
-            .bitcast[UInt32]()
-            .load[alignment=1](0),
+            .bitcast[UInt32, alignment=1]()
+            .load(0),
         )
         return
 

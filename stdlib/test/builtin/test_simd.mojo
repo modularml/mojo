@@ -160,8 +160,8 @@ def test_issue_20421():
     var a = UnsafePointer[UInt8, alignment=64].alloc(count=16 * 64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = a.offset(128 + 64 + 4).bitcast[Int32]().load[
-        width=4, alignment=1
+    var av16 = a.offset(128 + 64 + 4).bitcast[Int32, alignment=1]().load[
+        width=4
     ]()
     assert_equal(
         av16,
