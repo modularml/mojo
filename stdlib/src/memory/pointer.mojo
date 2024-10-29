@@ -22,6 +22,7 @@ from memory import Pointer
 from documentation import doc_private
 from collections import Optional
 from .unsafe_pointer import _default_alignment
+from os import abort
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace
@@ -303,9 +304,9 @@ struct Pointer[
     
     #### Bits:
 
-    - 0: is_register_passable.
-    - 1: is_allocated.
-    - 2: unset.
+    - 0: in_registers: Whether the pointer is allocated on registers.
+    - 1: is_allocated: Whether the pointer's memory is allocated.
+    - 2: is_initialized: Whether the memory is initialized.
     - 3: unset.
     - 4: unset.
     - 5: unset.
@@ -324,18 +325,22 @@ struct Pointer[
         *,
         _mlir_value: Self._mlir_type,
         is_allocated: Bool,
-        register_passable: Bool = False,
+        in_registers: Bool = False,
+        is_initialized: Bool = True,
     ):
         """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
             _mlir_value: The MLIR representation of the pointer.
             is_allocated: Whether the pointer's memory is allocated.
-            register_passable: Whether the pointer is allocated on registers.
+            in_registers: Whether the pointer is allocated on registers.
+            is_initialized: Whether the memory is initialized.
         """
         self._mlir_value = _mlir_value
-        self._flags = (UInt8(register_passable) << 7) | (
-            UInt8(is_allocated) << 6
+        self._flags = (
+            (UInt8(in_registers) << 7)
+            | (UInt8(is_allocated) << 6)
+            | (UInt8(is_initialized) << 5)
         )
 
     @staticmethod
@@ -349,9 +354,10 @@ struct Pointer[
         Returns:
             The result Pointer.
         """
-        # TODO(#3581): this should make register_passable = is_trivial(type)
         return Pointer(
-            _mlir_value=__get_mvalue_as_litref(value), is_allocated=True
+            _mlir_value=__get_mvalue_as_litref(value),
+            is_allocated=True,
+            in_registers=True,
         )
 
     fn __init__(inout self, *, other: Self):
@@ -372,21 +378,24 @@ struct Pointer[
         *,
         unsafe_ptr: UnsafePointer[type, address_space, _, O],
         is_allocated: Bool = True,
-        register_passable: Bool = False,
+        in_registers: Bool = False,
+        is_initialized: Bool = True,
     ):
         """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
             unsafe_ptr: The UnsafePointer.
             is_allocated: Whether the pointer's memory is allocated.
-            register_passable: Whether the pointer is allocated on registers.
+            in_registers: Whether the pointer is allocated in registers.
+            is_initialized: Whether the memory is initialized.
         """
         self = __type_of(self)(
             _mlir_value=__mlir_op.`lit.ref.from_pointer`[
                 _type = __type_of(self)._mlir_type
             ](unsafe_ptr.address),
             is_allocated=is_allocated,
-            register_passable=register_passable,
+            in_registers=in_registers,
+            is_initialized=is_initialized,
         )
 
     # ===------------------------------------------------------------------===#
@@ -400,6 +409,8 @@ struct Pointer[
         Returns:
             A reference to the underlying value in memory.
         """
+        if self._flags & 0b0110_0000 != 0b0110_0000:
+            abort("dereferencing of an uninitialized memory address")
         return __get_litref_as_mvalue(self._mlir_value)
 
     # This decorator informs the compiler that indirect address spaces are not
@@ -488,7 +499,7 @@ struct Pointer[
         return Pointer[type, O, address_space](
             unsafe_ptr=UnsafePointer[type, address_space].alloc[count](),
             is_allocated=True,
-            register_passable=True,
+            in_registers=True,
         )
 
     fn unsafe_free[

@@ -61,12 +61,6 @@ fn fail_initialization(owned err: Error) -> PythonObject:
     return PythonObject(PyObjectPtr())
 
 
-fn pointer_bitcast[
-    To: AnyType
-](ptr: Pointer) -> Pointer[To, ptr.origin, ptr.address_space, *_, **_] as out:
-    return ptr.bitcast[To]()
-
-
 fn gen_pytype_wrapper[
     T: Pythonable,
     name: StringLiteral,
@@ -84,7 +78,7 @@ fn gen_pytype_wrapper[
     # each time.
     # FIXME(MSTDL-969): Bitcast to `TypedPythonObject["Module"]`.
     Python.add_object(
-        pointer_bitcast[PyModule](Pointer.address_of(module))[], name, type_obj
+        Pointer.address_of(module).bitcast[PyModule]()[], name, type_obj
     )
 
 
