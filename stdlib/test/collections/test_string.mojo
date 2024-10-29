@@ -844,71 +844,41 @@ def test_split():
 
 
 def test_splitlines():
+    alias L = List[String]
     # Test with no line breaks
-    var in1 = String("hello world")
-    var res1 = in1.splitlines()
-    assert_equal(len(res1), 1)
-    assert_equal(res1[0], "hello world")
+    assert_equal(String("hello world").splitlines(), L("hello world"))
 
-    # Test with \n line break
-    var in2 = String("hello\nworld")
-    var res2 = in2.splitlines()
-    assert_equal(len(res2), 2)
-    assert_equal(res2[0], "hello")
-    assert_equal(res2[1], "world")
-
-    # Test with \r\n line break
-    var in3 = String("hello\r\nworld")
-    var res3 = in3.splitlines()
-    assert_equal(len(res3), 2)
-    assert_equal(res3[0], "hello")
-    assert_equal(res3[1], "world")
-
-    # Test with \r line break
-    var in4 = String("hello\rworld")
-    var res4 = in4.splitlines()
-    assert_equal(len(res4), 2)
-    assert_equal(res4[0], "hello")
-    assert_equal(res4[1], "world")
+    # Test with line breaks
+    assert_equal(String("hello\nworld").splitlines(), L("hello", "world"))
+    assert_equal(String("hello\rworld").splitlines(), L("hello", "world"))
+    assert_equal(String("hello\r\nworld").splitlines(), L("hello", "world"))
 
     # Test with multiple different line breaks
-    var in5 = String("hello\nworld\r\nmojo\rlanguage")
-    var res5 = in5.splitlines()
-    assert_equal(len(res5), 4)
-    assert_equal(res5[0], "hello")
-    assert_equal(res5[1], "world")
-    assert_equal(res5[2], "mojo")
-    assert_equal(res5[3], "language")
-
-    # Test with keepends=True
-    var res6 = in5.splitlines(keepends=True)
-    assert_equal(len(res6), 4)
-    assert_equal(res6[0], "hello\n")
-    assert_equal(res6[1], "world\r\n")
-    assert_equal(res6[2], "mojo\r")
-    assert_equal(res6[3], "language")
+    s1 = String("hello\nworld\r\nmojo\rlanguage\r\n")
+    hello_mojo = L("hello", "world", "mojo", "language")
+    assert_equal(s1.splitlines(), hello_mojo)
+    assert_equal(
+        s1.splitlines(keepends=True),
+        L("hello\n", "world\r\n", "mojo\r", "language\r\n"),
+    )
 
     # Test with an empty string
-    var in7 = String("")
-    var res7 = in7.splitlines()
-    assert_equal(len(res7), 0)
-
+    assert_equal(String("").splitlines(), L())
     # test \v \f \x1c \x1d
-    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
-    var res8 = in8.splitlines()
-    assert_equal(len(res8), 4)
-    assert_equal(res8[0], "hello")
-    assert_equal(res8[1], "world")
-    assert_equal(res8[2], "mojo")
-    assert_equal(res8[3], "language")
+    s2 = String("hello\vworld\fmojo\x1clanguage\x1d")
+    assert_equal(s2.splitlines(), hello_mojo)
+    assert_equal(
+        s2.splitlines(keepends=True),
+        L("hello\v", "world\f", "mojo\x1c", "language\x1d"),
+    )
 
-    # test \x1e \x1d
-    var in9 = String("hello\x1eworld\x1dmojo")
-    var res9 = in9.splitlines()
-    assert_equal(len(res9), 3)
-    assert_equal(res9[0], "hello")
-    assert_equal(res9[1], "world")
-    assert_equal(res9[2], "mojo")
+    # test \x1c \x1d \x1e
+    s3 = String("hello\x1cworld\x1dmojo\x1elanguage\x1e")
+    assert_equal(s3.splitlines(), hello_mojo)
+    assert_equal(
+        s3.splitlines(keepends=True),
+        L("hello\x1c", "world\x1d", "mojo\x1e", "language\x1e"),
+    )
 
     # test \x85 \u2028 \u2029
     var next_line = List[UInt8](0xC2, 0x85, 0)
@@ -919,28 +889,13 @@ def test_splitlines():
     """TODO: \\u2029"""
 
     for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
-        var in9 = "hello\x1eworld" + String(i[]) + "mojo"
-        var res9 = in9.splitlines()
-        assert_equal(len(res9), 3)
-        assert_equal(res9[0], "hello")
-        assert_equal(res9[1], "world")
-        assert_equal(res9[2], "mojo")
-
-    # test with keepends=True
-    var res10 = in8.splitlines(keepends=True)
-    assert_equal(len(res10), 4)
-    assert_equal(res10[0], "hello\v")
-    assert_equal(res10[1], "world\f")
-    assert_equal(res10[2], "mojo\x1c")
-    assert_equal(res10[3], "language\x1d")
-
-    var res11 = ("hello\x1eworld" + String(next_line) + "mojo").splitlines(
-        keepends=True
-    )
-    assert_equal(len(res11), 3)
-    assert_equal(res11[0], "hello\x1e")
-    assert_equal(res11[1], "world" + String(next_line))
-    assert_equal(res11[2], "mojo")
+        u = String(i[])
+        item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
+        assert_equal(item.splitlines(), hello_mojo)
+        assert_equal(
+            item.splitlines(keepends=True),
+            L("hello" + u, "world" + u, "mojo" + u, "language" + u),
+        )
 
 
 def test_isupper():
