@@ -87,6 +87,27 @@ def test_comparison_ops():
     assert_false(lhs == rhs)
     assert_true(lhs != rhs)
 
+    lhs = object.dict()
+    rhs = object([1, 2])
+    assert_false(lhs == rhs)
+    lhs = 1
+    assert_false(lhs == rhs)
+    lhs = object(Attr("value", 1))
+    assert_false(lhs == rhs)
+    rhs = object.dict()
+    assert_false(lhs == rhs)
+
+    lhs = []
+    lhs.append(object.dict())
+    lhs[0]["one"] = 1
+    assert_equal(lhs[0]["one"], 1)
+    rhs = []
+    assert_false(lhs == rhs)
+    rhs.append(object.dict())
+    assert_false(lhs == rhs)
+    rhs[0]["one"] = 1
+    assert_true(lhs == rhs)
+
 
 def test_arithmetic_ops():
     a = object(False)
