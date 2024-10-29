@@ -17,6 +17,7 @@ ENV/
 env.bak/
 venv.bak/
 .magic/
+magic.lock # adding this just to avoid CI failure
 
 # MacOS
 .DS_Store

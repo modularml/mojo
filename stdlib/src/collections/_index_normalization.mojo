@@ -42,8 +42,8 @@ fn normalize_index[
     Notes:
         Setting cap_to_container_length to True does not deactivate the
         debug_assert that verifies that the index does not exceed the limit.
-        Only when setting ignore_zero_length to True as well. Then if the
-        container length is zero, the function allways returns 0.
+        Only when setting ignore_zero_length to True. Then if the container
+        length is zero, the function always returns 0.
     """
     container_length = len(container)
 
