@@ -16,7 +16,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.magic/
+.magic
 magic.lock
 
 # MacOS
