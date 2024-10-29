@@ -21,6 +21,7 @@ from utils import Span
 """
 
 from collections import InlineArray
+from collections import normalize_index
 from memory import Pointer, UnsafePointer, bitcast, memcmp
 from builtin.builtin_list import _lit_mut_cast
 from sys import simdwidthof
@@ -363,6 +364,7 @@ struct Span[
         D: DType, //,
         from_left: Bool = True,
         single_value: Bool = False,
+        unsafe_dont_normalize: Bool = False,
     ](
         self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2], start: Int = 0
     ) -> Int:
@@ -375,6 +377,8 @@ struct Span[
             D: The `DType` of the Scalar.
             from_left: Whether to search the first occurrence from the left.
             single_value: Whether to search with the `subseq`s first value.
+            unsafe_dont_normalize: Whether to not normalize the index (no
+                negative indexing, no bounds checks).
 
         Args:
             subseq: The sub sequence to find.
@@ -393,10 +397,16 @@ struct Span[
             else:
                 return _len
 
-        start_norm = max(_len + start, 0) if start < 0 else min(_len, start)
-        haystack = __type_of(self)(
-            unsafe_ptr=self.unsafe_ptr() + start_norm, len=_len - start_norm
-        )
+        var n_s: Int
+
+        @parameter
+        if unsafe_dont_normalize:
+            debug_assert(0 <= start < _len, "unsafe index access")
+            n_s = start
+        else:
+            n_s = normalize_index["Span", ignore_zero_length=True](start, self)
+        s_ptr = self.unsafe_ptr()
+        haystack = __type_of(self)(unsafe_ptr=s_ptr + n_s, len=_len - n_s)
         var loc: UnsafePointer[Scalar[D]]
 
         @parameter
@@ -409,7 +419,7 @@ struct Span[
         else:
             loc = _memrchr(haystack, subseq.unsafe_ptr()[0])
 
-        return int(loc) - int(self.unsafe_ptr()) if loc else -1
+        return int(loc) - int(s_ptr) if loc else -1
 
     @always_inline
     fn rfind[

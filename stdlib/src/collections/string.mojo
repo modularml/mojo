@@ -1586,13 +1586,15 @@ struct String(
         Returns:
           The number of occurrences of `substr`.
         """
+
+        s_len = len(self)
         if not substr:
-            return len(self) + 1
+            return s_len + 1
 
         var res = 0
         var offset = 0
 
-        while True:
+        while offset < s_len:
             var pos = self.find(substr, offset)
             if pos == -1:
                 break
@@ -1808,7 +1810,7 @@ struct String(
             return self._interleave(new)
 
         var occurrences = self.count(old)
-        if occurrences == -1:
+        if occurrences == len(self) + 1:
             return self
 
         var self_start = self.unsafe_ptr()
@@ -1825,6 +1827,8 @@ struct String(
         for _ in range(occurrences):
             var curr_offset = int(self_ptr) - int(self_start)
 
+            if curr_offset > self_len:
+                break
             var idx = self.find(old, curr_offset)
 
             debug_assert(idx >= 0, "expected to find occurrence during find")
