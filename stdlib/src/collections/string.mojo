@@ -1827,8 +1827,6 @@ struct String(
         for _ in range(occurrences):
             var curr_offset = int(self_ptr) - int(self_start)
 
-            if curr_offset > self_len:
-                break
             var idx = self.find(old, curr_offset)
 
             debug_assert(idx >= 0, "expected to find occurrence during find")
