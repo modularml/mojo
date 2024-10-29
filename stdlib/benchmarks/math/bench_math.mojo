@@ -39,7 +39,20 @@ fn make_inputs(
     return result
 
 
+fn make_int_inputs(begin: Int, end: Int, num: Int) -> List[Int]:
+    if num == 1:
+        return List[Int](begin)
+
+    var step = (end - begin) // (num - 1)
+
+    var result: List[Int] = List[Int]()
+    for i in range(num):
+        result.append(begin + step * i)
+    return result
+
+
 var inputs = make_inputs(0, 10_000, 1_000_000)
+var int_inputs = make_int_inputs(0, 10_000_000, 1_000_000)
 
 # ===----------------------------------------------------------------------===#
 # Benchmark math_func
@@ -80,6 +93,21 @@ fn bench_math3[
 
 
 # ===----------------------------------------------------------------------===#
+# Benchmark lcm/gcd
+# ===----------------------------------------------------------------------===#
+@parameter
+fn bench_math2[math_f2p: fn (Int, Int, /) -> Int](inout b: Bencher) raises:
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        for i in range(len(int_inputs) // 2):
+            var result = keep(math_f2p(int_inputs[i], int_inputs[-(i + 1)]))
+            keep(result)
+
+    b.iter[call_fn]()
+
+
+# ===----------------------------------------------------------------------===#
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
@@ -98,4 +126,6 @@ def main():
     m.bench_function[bench_math[exp]](BenchId("bench_math_exp"))
     m.bench_function[bench_math[erf]](BenchId("bench_math_erf"))
     m.bench_function[bench_math3[fma]](BenchId("bench_math_fma"))
+    m.bench_function[bench_math2[lcm]](BenchId("bench_math_lcm"))
+    m.bench_function[bench_math2[gcd]](BenchId("bench_math_gcd"))
     m.dump_report()
