@@ -957,7 +957,7 @@ struct String(
             buff: The buffer. This should have an existing terminator.
         """
 
-        return String(buff, len(StringRef(buff)) + 1)
+        return String(buff, len(StringRef(ptr=buff)) + 1)
 
     @staticmethod
     fn _from_bytes(owned buff: Self._buffer_type) -> String:
