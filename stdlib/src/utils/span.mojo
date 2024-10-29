@@ -405,9 +405,7 @@ struct Span[
             n_s = start
         else:
             # _memXXX implementations already handle all edge cases
-            n_s = normalize_index[
-                "Span", ignore_zero_length=True, cap_to_container_length=False
-            ](start, self)
+            n_s = normalize_index["Span", ignore_zero_length=True](start, self)
         s_ptr = self.unsafe_ptr()
         haystack = __type_of(self)(unsafe_ptr=s_ptr + n_s, len=_len - n_s)
         var loc: UnsafePointer[Scalar[D]]
