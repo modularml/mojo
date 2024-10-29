@@ -378,7 +378,8 @@ struct Span[
             from_left: Whether to search the first occurrence from the left.
             single_value: Whether to search with the `subseq`s first value.
             unsafe_dont_normalize: Whether to not normalize the index (no
-                negative indexing, no bounds checks).
+                negative indexing, no bounds checks at runtime. There is still
+                a debug_assert `0 <= start < len(self)`).
 
         Args:
             subseq: The sub sequence to find.
