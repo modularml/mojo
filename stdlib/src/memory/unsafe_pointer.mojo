@@ -572,12 +572,59 @@ struct UnsafePointer[
             width=width, alignment=alignment, volatile=volatile
         ]()
 
+    fn store[
+        I: IntLike, T: Movable, //
+    ](
+        inout self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_],
+        offset: I,
+        owned val: T,
+    ):
+        """Stores a single element value at the given offset by moving it.
+
+        Parameters:
+            I: The type of offset, either `Int` or `UInt`.
+            T: The data type of the elements.
+
+        Args:
+            offset: The offset to store to.
+            val: The value to store.
+        """
+
+        alias dt = DType.get_dtype[T]()
+
+        @parameter
+        if dt is not DType.invalid:
+            self.bitcast[Scalar[dt]]().store[alignment=alignment](offset, val^)
+        else:
+            (self + offset).init_pointee_move(val^)
+
+    fn store[
+        I: IntLike, T: Copyable, //
+    ](
+        inout self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_],
+        offset: I,
+        val: T,
+        count: Int,
+    ):
+        """Stores values at the given offset count times by copying it.
+
+        Parameters:
+            I: The type of offset, either `Int` or `UInt`.
+            T: The data type of the elements.
+
+        Args:
+            offset: The offset to store to.
+            val: The value to store.
+            count: The amount of times to copy the value.
+        """
+        memset(self, val, count)
+
     @always_inline
     fn store[
         T: IntLike,
         type: DType, //,
         *,
-        alignment: Int = _default_alignment[type](),
+        alignment: Int,
         volatile: Bool = False,
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
