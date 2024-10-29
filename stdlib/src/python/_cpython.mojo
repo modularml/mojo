@@ -296,7 +296,7 @@ fn _py_get_version(lib: DLHandle) -> StringRef:
     var version_string = lib.get_function[fn () -> UnsafePointer[c_char]](
         "Py_GetVersion"
     )()
-    return StringRef(version_string)
+    return StringRef(ptr=version_string)
 
 
 fn _py_finalize(lib: DLHandle):

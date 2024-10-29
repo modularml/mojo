@@ -267,7 +267,7 @@ def test_stringref():
 
 def test_stringref_from_dtypepointer():
     var a = StringRef("AAA")
-    var b = StringRef(a.data)
+    var b = StringRef(ptr=a.data)
     assert_equal(3, len(a))
     assert_equal(3, len(b))
     assert_equal(a, b)
