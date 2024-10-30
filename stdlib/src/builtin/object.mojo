@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Dict, List
 from sys.intrinsics import _type_is_eq
 from sys.ffi import OpaquePointer
-
+from builtin.builtin_list import _lit_mut_cast
 from memory import Arc, memcmp, memcpy, UnsafePointer
 
 from utils import StringRef, Variant
@@ -68,46 +68,9 @@ struct _RefCountedAttrsDict:
     var impl: Arc[Dict[StringLiteral, object]]
     """The implementation of the map."""
 
-    fn __init__(inout self):
-        self.impl = Arc[Dict[StringLiteral, object]](
-            Dict[StringLiteral, object]()
-        )
-
-    @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _]):
-        self = Self()
-        # Elements can only be added on construction.
-        for i in range(len(values)):
-            self.impl[]._insert(values[i].key, values[i].value)
-
-    @always_inline
-    fn __init__(inout self, values: List[Attr]):
-        self = Self()
-        # Elements can only be added on construction.
-        for i in range(len(values)):
-            self.impl[]._insert(values[i].key, values[i].value)
-
-    @always_inline
-    fn set(inout self, key: StringLiteral, value: object) raises:
-        if key in self.impl[]:
-            self.impl[][key] = value
-            return
-        raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
-        )
-
-    @always_inline
-    fn get(self, key: StringLiteral) raises -> object:
-        var iter = self.impl[].find(key)
-        if iter:
-            return iter.value()
-        raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
-        )
+    @staticmethod
+    fn initialized_dict() -> Self:
+        return Arc[Dict[StringLiteral, object]](Dict[StringLiteral, object]())
 
 
 @value
@@ -143,14 +106,6 @@ struct _RefCountedDict:
 
     fn __init__(inout self):
         self.impl = Arc[Dict[object, object]](Dict[object, object]())
-
-    @always_inline
-    fn set(self, key: object, value: object) raises:
-        self.impl[][key] = value
-
-    @always_inline
-    fn get(self, key: object) raises -> ref [self] object:
-        return UnsafePointer.address_of(self.impl[].__getitem__(key))[]
 
 
 @register_passable("trivial")
@@ -206,7 +161,6 @@ struct _Function(CollectionElement, CollectionElementNew):
 
 struct _ObjectImpl(
     CollectionElement,
-    CollectionElementNew,
     Stringable,
     Representable,
     Writable,
@@ -226,9 +180,9 @@ struct _ObjectImpl(
         Float64,
         _RefCountedString,
         _RefCountedList,
+        _RefCountedDict,
         _Function,
         _RefCountedAttrsDict,
-        _RefCountedDict,
     ]
     """The variant value type."""
     var value: Self.type
@@ -259,40 +213,8 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, value: Self.type):
-        self.value = value
-
-    @always_inline
-    fn __init__(inout self):
-        self.value = Self.type(_NoneMarker {})
-
-    @always_inline
-    fn __init__(inout self, value: Bool):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
-        @parameter
-        if dt.is_integral():
-            self.value = Self.type(value)
-        else:
-            self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: String):
-        self.value = Self.type(_RefCountedString(value))
-
-    @always_inline
-    fn __init__(inout self, value: _RefCountedList):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: _Function):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: _RefCountedAttrsDict):
-        self.value = Self.type(value)
+    fn __init__(inout self, owned arg: Self.type):
+        self.value = arg^
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -301,15 +223,15 @@ struct _ObjectImpl(
         Args:
             other: The value to copy.
         """
-        self = other.value
+        self = other
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
-        self = existing.value
+        self.value = existing.value
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
-        self = other.value^
+        self.value = other.value^
 
     # ===------------------------------------------------------------------=== #
     # Value Query
@@ -369,20 +291,32 @@ struct _ObjectImpl(
         return UnsafePointer.address_of(self.value[_RefCountedString].impl[])[]
 
     @always_inline
-    fn get_as_list(ref [_]self) -> ref [self.value] _RefCountedList:
-        return self.value[_RefCountedList]
+    fn get_as_list(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] List[object]:
+        return UnsafePointer.address_of(self.value[_RefCountedList].impl[])[]
 
     @always_inline
     fn get_as_func(self) -> _Function:
         return self.value[_Function]
 
     @always_inline
-    fn get_obj_attrs(ref [_]self) -> ref [self.value] _RefCountedAttrsDict:
-        return self.value[_RefCountedAttrsDict]
+    fn get_as_obj(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] Dict[
+        StringLiteral, object
+    ]:
+        return UnsafePointer.address_of(
+            self.value[_RefCountedAttrsDict].impl[]
+        )[]
 
     @always_inline
-    fn get_as_dict(ref [_]self) -> ref [self.value] _RefCountedDict:
-        return self.value[_RefCountedDict]
+    fn get_as_dict(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] Dict[
+        object, object
+    ]:
+        return UnsafePointer.address_of(self.value[_RefCountedDict].impl[])[]
 
     @always_inline
     fn get_type_id(self) -> Int:
@@ -429,9 +363,9 @@ struct _ObjectImpl(
 
     def ref_count(ref [_]self) -> Int:
         if self.is_dict():
-            return self.get_as_dict().impl.count().__int__()
+            return self.value[_RefCountedDict].impl.count().__int__()
         if self.is_obj():
-            return self.get_obj_attrs().impl.count().__int__()
+            return self.value[_RefCountedAttrsDict].impl.count().__int__()
         if self.is_str():
             return self.value[_RefCountedString].impl.count().__int__()
         if self.is_list():
@@ -535,18 +469,17 @@ struct _ObjectImpl(
             return
         if self.is_list():
             writer.write(String("["))
-            for j in range(self.get_list_length()):
+            for j in range(len(self.get_as_list())):
                 if j != 0:
                     writer.write(", ")
-                writer.write(repr(self.get_list_element(j)))
+                writer.write(repr(self.get_as_list()[j]))
             writer.write("]")
             return
 
         if self.is_dict():
-            var ptr = self.get_as_dict().impl
             writer.write(String("{"))
             var print_sep = False
-            for entry in ptr[].items():
+            for entry in self.get_as_dict().items():
                 if print_sep:
                     writer.write(", ")
                 writer.write(repr(entry[].key), " = ", repr(entry[].value))
@@ -554,10 +487,9 @@ struct _ObjectImpl(
             writer.write("}")
             return
 
-        var ptr = self.get_obj_attrs_ptr()
         writer.write(String("{"))
         var print_sep = False
-        for entry in ptr[].items():
+        for entry in self.get_as_obj().items():
             if print_sep:
                 writer.write(", ")
             writer.write("'" + str(entry[].key) + "' = " + repr(entry[].value))
@@ -585,50 +517,6 @@ struct _ObjectImpl(
         """
         return String.write(self)
 
-    # ===------------------------------------------------------------------=== #
-    # List Functions
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn get_list_ptr(self) -> Arc[List[object]]:
-        return self.get_as_list().impl
-
-    @always_inline
-    fn list_append(self, value: object):
-        var ptr = self.get_list_ptr()
-        ptr[].append(value)
-
-    @always_inline
-    fn get_list_length(self) -> Int:
-        var ptr = self.get_list_ptr()
-        return len(ptr[])
-
-    @always_inline
-    fn get_list_element(self, i: Int) -> object:
-        var ptr = self.get_list_ptr()
-        return ptr[][i]
-
-    @always_inline
-    fn set_list_element(self, i: Int, value: object):
-        var ptr = self.get_list_ptr()
-        ptr[][i] = value
-
-    # ===------------------------------------------------------------------=== #
-    # Object Attribute Functions
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn get_obj_attrs_ptr(self) -> Arc[Dict[StringLiteral, object]]:
-        return self.get_obj_attrs().impl
-
-    @always_inline
-    fn set_obj_attr(self, key: StringLiteral, value: object) raises:
-        self.get_obj_attrs_ptr()[][key] = value
-
-    @always_inline
-    fn get_obj_attr(self, key: StringLiteral) raises -> object:
-        return self.get_obj_attrs_ptr()[][key]
-
 
 # ===----------------------------------------------------------------------=== #
 # object
@@ -649,15 +537,6 @@ struct object(
     var _value: _ObjectImpl
     """The underlying value of the object."""
 
-    alias nullary_function = _Function.fn0
-    """Nullary function type."""
-    alias unary_function = _Function.fn1
-    """Unary function type."""
-    alias binary_function = _Function.fn2
-    """Binary function type."""
-    alias ternary_function = _Function.fn3
-    """Ternary function type."""
-
     # ===------------------------------------------------------------------=== #
     # Constructors
     # ===------------------------------------------------------------------=== #
@@ -665,17 +544,7 @@ struct object(
     @always_inline
     fn __init__(inout self):
         """Initializes the object with a `None` value."""
-        self._value = _ObjectImpl()
-
-    @always_inline
-    fn __init__(inout self, impl: _ObjectImpl):
-        """Initializes the object with an implementation value. This is meant for
-        internal use only.
-
-        Args:
-            impl: The object implementation.
-        """
-        self._value = impl
+        self._value = _ObjectImpl(_NoneMarker {})
 
     @always_inline
     fn __init__(inout self, none: NoneType):
@@ -684,7 +553,7 @@ struct object(
         Args:
             none: None.
         """
-        self._value = _ObjectImpl()
+        self._value = _ObjectImpl(_NoneMarker {})
 
     @always_inline
     fn __init__(inout self, value: Int):
@@ -696,7 +565,7 @@ struct object(
         self._value = Int64(value)
 
     @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    fn __init__[dt: DType](inout self, value: Scalar[dt]):
         """Initializes the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
         converted to the appropriate integer or floating point type.
@@ -712,7 +581,12 @@ struct object(
         if dt == DType.bool:
             self._value = value.__bool__()
         else:
-            self._value = value
+
+            @parameter
+            if dt.is_integral():
+                self._value = value.cast[DType.int64]()
+            else:
+                self._value = value.cast[DType.float64]()
 
     @always_inline
     fn __init__(inout self, value: Bool):
@@ -730,7 +604,7 @@ struct object(
         Args:
             value: The string value.
         """
-        self._value = value
+        self._value = _RefCountedString(value)
 
     @always_inline
     fn __init__(inout self, value: StringLiteral):
@@ -739,7 +613,7 @@ struct object(
         Args:
             value: The string value.
         """
-        self = object(StringRef(value))
+        self = Self(StringRef(value))
 
     @always_inline
     fn __init__(inout self, value: StringRef):
@@ -748,7 +622,7 @@ struct object(
         Args:
             value: The string value.
         """
-        self._value = String(value)
+        self = String(value)
 
     @always_inline
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
@@ -770,24 +644,28 @@ struct object(
 
             @parameter
             if _type_is_eq[T, Int]():
-                self._append(value.get[i, Int]())
+                self._value.get_as_list().append(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
-                self._append(value.get[i, Float64]())
+                self._value.get_as_list().append(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
-                self._append(value.get[i, Bool]())
+                self._value.get_as_list().append(value.get[i, Bool]())
             elif _type_is_eq[T, String]():
-                self._append(value.get[i, String]())
+                self._value.get_as_list().append(value.get[i, String]())
             elif _type_is_eq[T, StringRef]():
-                self._append(value.get[i, StringRef]())
+                self._value.get_as_list().append(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
-                self._append(value.get[i, StringLiteral]())
+                self._value.get_as_list().append(value.get[i, StringLiteral]())
+            elif _type_is_eq[T, _ObjectImpl]():
+                constrained[
+                    False, "implicit conversion from _ObjectImpl to object"
+                ]()
             else:
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
 
     @always_inline
-    fn __init__(inout self, func: Self.nullary_function):
+    fn __init__(inout self, func: _Function.fn0):
         """Initializes an object from a function that takes no arguments.
 
         Args:
@@ -796,7 +674,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.unary_function):
+    fn __init__(inout self, func: _Function.fn1):
         """Initializes an object from a function that takes one argument.
 
         Args:
@@ -805,7 +683,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.binary_function):
+    fn __init__(inout self, func: _Function.fn2):
         """Initializes an object from a function that takes two arguments.
 
         Args:
@@ -814,7 +692,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.ternary_function):
+    fn __init__(inout self, func: _Function.fn3):
         """Initializes an object from a function that takes three arguments.
 
         Args:
@@ -823,13 +701,25 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
+    fn __init__(inout self, owned arg: _RefCountedDict):
+        """Initializes the object with a _RefCountedDict.
+
+        Args:
+            arg: The ref counted dictionary.
+        """
+        self._value = arg^
+
+    @always_inline
     fn __init__(inout self, *attrs: Attr):
         """Initializes the object with a sequence of zero or more attributes.
 
         Args:
             attrs: Zero or more attributes.
         """
-        self._value = _RefCountedAttrsDict(attrs)
+        self._value = _RefCountedAttrsDict.initialized_dict()
+        # Elements can only be added on construction.
+        for a in attrs:
+            self._value.get_as_obj()._insert(a[].key, a[].value)
 
     fn __init__(inout self, attrs: List[Attr]):
         """Initializes the object with a list of zero or more attributes.
@@ -837,7 +727,10 @@ struct object(
         Args:
             attrs: Zero or more attributes.
         """
-        self._value = _RefCountedAttrsDict(attrs)
+        self._value = _RefCountedAttrsDict.initialized_dict()
+        # Elements can only be added on construction.
+        for i in range(len(attrs)):
+            self._value.get_as_obj()._insert(attrs[i].key, attrs[i].value)
 
     @always_inline
     fn __moveinit__(inout self, owned existing: object):
@@ -847,7 +740,16 @@ struct object(
             existing: The object to move.
         """
         self._value = existing._value
-        existing._value = _ObjectImpl()
+        existing._value = _ObjectImpl(_NoneMarker {})
+
+    @always_inline
+    fn __init__(inout self, existing: object):
+        """Copies the object. Used to remove implicit conversions.
+
+        Args:
+            existing: The object to copy.
+        """
+        self._value = existing._value
 
     @always_inline
     fn __copyinit__(inout self, existing: object):
@@ -886,8 +788,13 @@ struct object(
         if self._value.is_str():
             # Strings are true if they are non-empty.
             return bool(self._value.get_as_string())
-        debug_assert(self._value.is_list(), "expected a list")
-        return self._value.get_list_length() != 0
+        if self._value.is_list():
+            return len(self._value.get_as_list()) != 0
+        if self._value.is_dict():
+            return len(self._value.get_as_dict()) != 0
+        # TODO: __bool__ in RefCountedAttrsDict
+        debug_assert(self._value.is_obj(), "expected an RefCountedAttrsDict")
+        return False
 
     fn __int__(self) raises -> Int:
         """Performs conversion to integer according to Python
@@ -1003,12 +910,12 @@ struct object(
 
     @always_inline
     fn _list_compare(self, rhs: object) raises -> Int:
-        var llen = self._value.get_list_length()
-        var rlen = self._value.get_list_length()
+        var llen = len(self._value.get_as_list())
+        var rlen = len(rhs._value.get_as_list())
         var cmp_len = min(llen, rlen)
         for i in range(cmp_len):
-            var lelt: object = self._value.get_list_element(i)
-            var relt: object = rhs._value.get_list_element(i)
+            var lelt: object = self._value.get_as_list()[i]
+            var relt: object = rhs._value.get_as_list()[i]
             if lelt < relt:
                 return -1
             if lelt > relt:
@@ -1081,11 +988,7 @@ struct object(
             if self._value.is_str() and rhs._value.is_str():
                 return self._value.get_as_string() == rhs._value.get_as_string()
             if self._value.is_list() and rhs._value.is_list():
-                return (
-                    self._value.get_as_list()
-                    .impl[]
-                    .__eq__(rhs._value.get_as_list().impl[])
-                )
+                return self._value.get_as_list() == rhs._value.get_as_list()
             if self._value.is_dict() and rhs._value.is_dict():
                 return repr(self) == repr(rhs)
             if self._value.is_obj() and rhs._value.is_obj():
@@ -1717,15 +1620,11 @@ struct object(
             value: The value to append.
         """
         if self._value.is_obj():
-            _ = self._value.get_obj_attr("append")(self, value)
+            _ = self._value.get_as_obj()["append"](self, value)
             return
         if not self._value.is_list():
             raise Error("TypeError: can only append to lists")
-        self._append(value)
-
-    @always_inline
-    fn _append(self, value: object):
-        self._value.list_append(value)
+        self._value.get_as_list().append(value)
 
     @always_inline
     fn __len__(self) raises -> Int:
@@ -1739,9 +1638,9 @@ struct object(
         if self._value.is_str():
             return len(self._value.get_as_string())
         if self._value.is_list():
-            return self._value.get_list_length()
+            return len(self._value.get_as_list())
         if self._value.is_dict():
-            return len(self._value.get_as_dict().impl[])
+            return len(self._value.get_as_dict())
         raise Error("TypeError: only strings, lists and dict have length")
 
     @staticmethod
@@ -1765,10 +1664,10 @@ struct object(
             The value at the index or key.
         """
         if self._value.is_obj():
-            return self._value.get_obj_attr("__getitem__")(self, i)
+            return self._value.get_as_obj()["__getitem__"](self, i)
 
         if self._value.is_dict():
-            return self._value.get_as_dict().get(i)
+            return self._value.get_as_dict()[i]
 
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
@@ -1777,7 +1676,7 @@ struct object(
         if self._value.is_str():
             # Construct a new single-character string.
             return self._value.get_as_string()[index]
-        return self._value.get_list_element(i._value.get_as_int().value)
+        return self._value.get_as_list()[i._value.get_as_int().value]
 
     @always_inline
     fn __getitem__(self, *index: object) raises -> object:
@@ -1804,10 +1703,10 @@ struct object(
             value: The value to set.
         """
         if self._value.is_obj():
-            _ = self._value.get_obj_attr("__setitem__")(self, i, value)
+            _ = self._value.get_as_obj()["__setitem__"](self, i, value)
             return
         if self._value.is_dict():
-            self._value.get_as_dict().set(i, value)
+            self._value.get_as_dict()[i] = value
             return
         if self._value.is_str():
             raise Error(
@@ -1816,7 +1715,7 @@ struct object(
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
         var index = Self._convert_index_to_int(i)
-        self._value.set_list_element(index.value, value)
+        self._value.get_as_list()[index.value] = value
 
     @always_inline
     fn __setitem__(self, i: object, j: object, value: object) raises:
@@ -1851,7 +1750,14 @@ struct object(
                 + key
                 + "'"
             )
-        return self._value.get_obj_attr(key)
+        var iter = self._value.get_as_obj().find(key)
+        if iter:
+            return iter.value()
+        raise Error(
+            "AttributeError: Object does not have an attribute of name '"
+            + key
+            + "'"
+        )
 
     @always_inline
     fn __setattr__(inout self, key: StringLiteral, value: object) raises:
@@ -1869,7 +1775,14 @@ struct object(
                 + key
                 + "'"
             )
-        self._value.set_obj_attr(key, value)
+        if key in self._value.get_as_obj():
+            self._value.get_as_obj()[key] = value
+            return
+        raise Error(
+            "AttributeError: Object does not have an attribute of name '"
+            + key
+            + "'"
+        )
 
     @always_inline
     fn __call__(self) raises -> object:
@@ -1946,9 +1859,9 @@ struct object(
             A `Bool` (`True` or `False`).
         """
         if self._value.is_list():
-            return value in self._value.get_as_list().impl[]
+            return value in self._value.get_as_list()
         if self._value.is_dict():
-            return value in self._value.get_as_dict().impl[]
+            return value in self._value.get_as_dict()
         raise "only lists and dict implements the __contains__ dunder"
 
     fn pop(self, value: Self = None) raises -> object:
@@ -1971,22 +1884,22 @@ struct object(
         Note: implemented for list and dictionary.
         """
         if self._value.is_list():
-            self_len = self._value.get_list_length()
+            self_len = len(self._value.get_as_list())
             if value._value.is_int():
                 tmp_i = int(value._value.get_as_int())
                 if not (-self_len <= tmp_i < self_len):
                     raise "pop index out of range"
-                return self._value.get_as_list().impl[].pop(tmp_i)
+                return self._value.get_as_list().pop(tmp_i)
             if value._value.is_none():
                 if self_len == 0:
                     raise "List is empty"
-                return self._value.get_as_list().impl[].pop()
+                return self._value.get_as_list().pop()
             raise "List uses non float numbers as indexes"
         if self._value.is_dict():
             try:
                 if value._value.is_none():
                     raise "usage: .pop(key) for dictionaries"
-                return self._value.get_as_dict().impl[].pop(value)
+                return self._value.get_as_dict().pop(value)
             except e:
                 raise e
         raise "self is not a list or a dict"
@@ -2013,7 +1926,7 @@ struct object(
 
         Values can be object of any types.
         """
-        return Self(_ObjectImpl(_RefCountedDict()))
+        return Self(_RefCountedDict())
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
