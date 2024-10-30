@@ -116,21 +116,6 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
-@always_inline
-fn _utf8_first_byte_sequence_length(b: UInt8) -> Int:
-    """Get the length of the sequence starting with given byte. Do note that
-    this does not work correctly if given a continuation byte."""
-    debug_assert(
-        (b & 0b1100_0000) != 0b1000_0000,
-        (
-            "Function `_utf8_first_byte_sequence_length()` does not work"
-            " correctly if given a continuation byte."
-        ),
-    )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
-
-
 @always_inline("nodebug")
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
@@ -1210,10 +1195,10 @@ fn _to_string_list[
 
 
 @always_inline
-fn to_string_list[
+fn _to_string_list[
     O: ImmutableOrigin, //
 ](items: List[StringSlice[O]]) -> List[String]:
-    """Create a list of Strings copying the existing data.
+    """Create a list of Strings **copying** the existing data.
 
     Parameters:
         O: The origin of the data.
@@ -1235,10 +1220,10 @@ fn to_string_list[
 
 
 @always_inline
-fn to_string_list[
+fn _to_string_list[
     O: ImmutableOrigin, //
 ](items: List[Span[Byte, O]]) -> List[String]:
-    """Create a list of Strings copying the existing data.
+    """Create a list of Strings **copying** the existing data.
 
     Parameters:
         O: The origin of the data.
@@ -1268,11 +1253,11 @@ fn _split[
 ](src_str: T0, sep: Optional[T1], maxsplit: Int) -> List[String]:
     @parameter
     if has_sep:
-        return to_string_list(
+        return _to_string_list(
             _split_impl[has_maxsplit](src_str, sep.value(), maxsplit)
         )
     else:
-        return to_string_list(_split_impl[has_maxsplit](src_str, maxsplit))
+        return _to_string_list(_split_impl[has_maxsplit](src_str, maxsplit))
 
 
 fn _split_sl[
@@ -1401,77 +1386,6 @@ fn _split_impl[
 
         output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
         lhs = rhs
-
-
-fn _to_string_list[
-    T: CollectionElement, //,
-    len_fn: fn (T) -> Int,
-    unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
-](items: List[T]) -> List[String]:
-    i_len = len(items)
-    i_ptr = items.unsafe_ptr()
-    out_ptr = UnsafePointer[String].alloc(i_len)
-
-    for i in range(i_len):
-        og_len = len_fn(i_ptr[i])
-        f_len = og_len + 1  # null terminator
-        p = UnsafePointer[Byte].alloc(f_len)
-        og_ptr = unsafe_ptr_fn(i_ptr[i])
-        memcpy(p, og_ptr, og_len)
-        p[og_len] = 0  # null terminator
-        buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=f_len)
-        (out_ptr + i).init_pointee_move(String(buf^))
-    return List[String](unsafe_pointer=out_ptr, size=i_len, capacity=i_len)
-
-
-@always_inline
-fn _to_string_list[
-    O: ImmutableOrigin, //
-](items: List[StringSlice[O]]) -> List[String]:
-    """Create a list of Strings **copying** the existing data.
-
-    Parameters:
-        O: The origin of the data.
-
-    Args:
-        items: The List of string slices.
-
-    Returns:
-        The list of created strings.
-    """
-
-    fn unsafe_ptr_fn(v: StringSlice[O]) -> UnsafePointer[Byte]:
-        return v.unsafe_ptr()
-
-    fn len_fn(v: StringSlice[O]) -> Int:
-        return v.byte_length()
-
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
-
-
-@always_inline
-fn _to_string_list[
-    O: ImmutableOrigin, //
-](items: List[Span[Byte, O]]) -> List[String]:
-    """Create a list of Strings **copying** the existing data.
-
-    Parameters:
-        O: The origin of the data.
-
-    Args:
-        items: The List of Bytes.
-
-    Returns:
-        The list of created strings.
-    """
-
-    fn unsafe_ptr_fn(v: Span[Byte, O]) -> UnsafePointer[Byte]:
-        return v.unsafe_ptr()
-
-    fn len_fn(v: Span[Byte, O]) -> Int:
-        return len(v)
-
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
 
 
 # ===----------------------------------------------------------------------===#
