@@ -29,6 +29,7 @@ from utils.string_slice import (
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
+    _to_string_list,
     _split,
 )
 from collections.string import _atol
@@ -105,6 +106,68 @@ struct StringLiteral(
             The concatenated string.
         """
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __iadd__(inout self, rhs: StringLiteral):
+        """Concatenate a string literal to an existing one. Can only be
+        evaluated at compile time using the `alias` keyword, which will write
+        the result into the binary.
+
+        Args:
+            rhs: The string to concat.
+
+        Example:
+
+        ```mojo
+        fn add_literal(
+            owned original: StringLiteral, add: StringLiteral, n: Int
+        ) -> StringLiteral:
+            for _ in range(n):
+                original += add
+            return original
+
+
+        fn main():
+            alias original = "mojo"
+            alias concat = add_literal(original, "!", 4)
+            print(concat)
+        ```
+
+        Result:
+
+        ```
+        mojo!!!!
+        ```
+        """
+        self = self + rhs
+
+    @always_inline("nodebug")
+    fn __mul__(self, n: Int) -> StringLiteral:
+        """Concatenates the string literal `n` times. Can only be evaluated at
+        compile time using the `alias` keyword, which will write the result into
+        The binary.
+
+        Args:
+            n : The number of times to concatenate the string literal.
+
+        Returns:
+            The string concatenated `n` times.
+
+        Example:
+
+        ```mojo
+        alias original = "mojo"
+        alias concat = original * 3
+        print(concat)
+        ```
+
+        `concat` now points to the StringLiteral "mojomojomojo", which is
+        written into the binary.
+        """
+        var concat = ""
+        for _ in range(n):
+            concat += self
+        return concat
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: StringLiteral) -> Bool:
@@ -624,7 +687,7 @@ struct StringLiteral(
         _ = "      hello    world     ".split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
         _ = (
-            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+            "hello \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
         ).split()  # ["hello", "world"]
         ```
         .
@@ -633,9 +696,9 @@ struct StringLiteral(
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string literal at line boundaries. This corresponds to Python's
-        [universal newlines](
+        [universal newlines:](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -643,7 +706,7 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return self.as_string_slice().splitlines(keepends)
+        return _to_string_list(self.as_string_slice().splitlines(keepends))
 
     fn count(self, substr: String) -> Int:
         """Return the number of non-overlapping occurrences of substring

@@ -214,6 +214,19 @@ what we publish.
 - The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
   `b my_module::main`.
 
+- The VS Code extension now allows cancelling the installation of its private
+  MAX SDK.
+
+- The VS Code extension now opens the Run and Debug tab automatically whenever
+  a debug session starts.
+
+- The `mojo debug --vscode` command now support the `--init-command` and
+  `--stop-on-entry` flags. Execute `mojo debug --help` for more information.
+
+- The Mojo LLDB debugger on VS Code now supports inspecting the raw attributes
+  of variables that are handled as synthetic types, e.g. `List` from Mojo or
+  `std::vector` from C++.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -348,6 +361,44 @@ what we publish.
   for more information and rationale.  As a consequence `__lifetime_of` is now
   named `__origin_of`.
 
+- You can now use the `+=` and `*` operators on a `StringLiteral` at compile
+  time using the `alias` keyword:
+
+  ```mojo
+  alias original = "mojo"
+  alias concat = original * 3
+  assert_equal("mojomojomojo", concat)
+  ```
+
+  Or inside a `fn` that is being evaluated at compile time:
+
+  ```mojo
+  fn add_literal(
+      owned original: StringLiteral, add: StringLiteral, n: Int
+  ) -> StringLiteral:
+      for _ in range(n):
+          original += add
+      return original
+
+
+  fn main():
+      alias original = "mojo"
+      alias concat = add_literal(original, "!", 4)
+      assert_equal("mojo!!!!", concat)
+  ```
+
+  These operators can't be evaluated at runtime, as a `StringLiteral` must be
+  written into the binary during compilation.
+
+  - You can now index into `UnsafePointer` using SIMD scalar integral types:
+
+  ```mojo
+  p = UnsafePointer[Int].alloc(1)
+  i = UInt8(1)
+  p[i] = 42
+  print(p[i])
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -373,3 +424,6 @@ what we publish.
 
 - The VS Code extension now downloads its private copy of the MAX SDK in a way
   that prevents ETXTBSY errors on Linux.
+
+- The VS Code extension now allows invoking a mojo formatter from SDK
+  installations that contain white spaces in their path.
