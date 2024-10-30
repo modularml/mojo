@@ -225,7 +225,7 @@ fn bench_string_is_valid_utf8[
 # ===----------------------------------------------------------------------===#
 def main():
     seed()
-    var m = Bench(BenchConfig(num_repetitions=5))
+    var m = Bench(BenchConfig(num_repetitions=1))
     alias filenames = (
         "UN_charter_EN",
         "UN_charter_ES",
@@ -249,7 +249,7 @@ def main():
     - 1_000_000: ~ 667 pages (200k words)
     """
 
-    m.bench_function[bench_string_init](BenchId("bench_string_init"))
+    # m.bench_function[bench_string_init](BenchId("bench_string_init"))
 
     @parameter
     for i in range(len(lengths)):
@@ -261,30 +261,30 @@ def main():
             alias old = old_chars.get[j, StringLiteral]()
             alias new = new_chars.get[j, StringLiteral]()
             suffix = "[" + str(length) + "]"  # "(" + fname + ")"
-            m.bench_function[bench_string_count[length, fname, old]](
-                BenchId("bench_string_count" + suffix)
-            )
+            # m.bench_function[bench_string_count[length, fname, old]](
+            #     BenchId("bench_string_count" + suffix)
+            # )
             m.bench_function[bench_string_split[length, fname, old]](
                 BenchId("bench_string_split" + suffix)
             )
             m.bench_function[bench_string_split[length, fname]](
                 BenchId("bench_string_split_none" + suffix)
             )
-            m.bench_function[bench_string_splitlines[length, fname]](
-                BenchId("bench_string_splitlines" + suffix)
-            )
-            m.bench_function[bench_string_lower[length, fname]](
-                BenchId("bench_string_lower" + suffix)
-            )
-            m.bench_function[bench_string_upper[length, fname]](
-                BenchId("bench_string_upper" + suffix)
-            )
-            m.bench_function[bench_string_replace[length, fname, old, new]](
-                BenchId("bench_string_replace" + suffix)
-            )
-            m.bench_function[bench_string_is_valid_utf8[length, fname]](
-                BenchId("bench_string_is_valid_utf8" + suffix)
-            )
+            # m.bench_function[bench_string_splitlines[length, fname]](
+            #     BenchId("bench_string_splitlines" + suffix)
+            # )
+            # m.bench_function[bench_string_lower[length, fname]](
+            #     BenchId("bench_string_lower" + suffix)
+            # )
+            # m.bench_function[bench_string_upper[length, fname]](
+            #     BenchId("bench_string_upper" + suffix)
+            # )
+            # m.bench_function[bench_string_replace[length, fname, old, new]](
+            #     BenchId("bench_string_replace" + suffix)
+            # )
+            # m.bench_function[bench_string_is_valid_utf8[length, fname]](
+            #     BenchId("bench_string_is_valid_utf8" + suffix)
+            # )
 
     results = Dict[String, (Float64, Int)]()
     for info in m.info_vec:
