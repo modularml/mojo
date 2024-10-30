@@ -46,6 +46,30 @@ def test_object_ctors():
     a += "!"
     assert_true(a == "hello world!")
 
+    b = object.dict()
+    b["one"] = 1
+    b[2] = 2
+    b[3.0] = "three"
+    assert_equal(len(b), 3)
+    assert_equal(b["one"], 1)
+    assert_equal(b[2], 2)
+    assert_equal(b[3.0], "three")
+
+    a = (0, True, 2.0, "three")
+    assert_true(bool(a))
+    assert_equal(len(a), 4)
+    assert_equal(a[0], 0)
+    assert_equal(a[1], True)
+    assert_equal(a[2], 2.0)
+    assert_equal(a[3], "three")
+
+    b["tuple"] = a
+    assert_equal(b["tuple"], a)
+    assert_equal(b._value.ref_count(), 1)
+    assert_equal(a._value.ref_count(), 2)
+    _ = b^
+    assert_equal(a._value.ref_count(), 1)
+
 
 def test_comparison_ops():
     assert_true(object(False) < True)
@@ -107,6 +131,14 @@ def test_comparison_ops():
     assert_false(lhs == rhs)
     rhs[0]["one"] = 1
     assert_true(lhs == rhs)
+
+    lhs = (0, True, 2.0, "three")
+    rhs = (0, True, 2.0, "three")
+    assert_true(lhs == rhs)
+    assert_equal(lhs[2], rhs[2])
+    assert_equal(lhs[2], 2.0)
+    rhs = (0, 1, 2)
+    assert_false(lhs == rhs)
 
 
 def test_arithmetic_ops():
@@ -370,6 +402,13 @@ def test_convert_to_string():
     b.value["function"] = matrix_append
     assert_equal(repr(a), repr(b))
 
+    a = (0, True, 1.0, "Three")
+    assert_equal(str(a), "(0, True, 1.0, 'Three')")
+    b = []
+    b.append(a)
+    b.append(4)
+    assert_equal(str(b), "[(0, True, 1.0, 'Three'), 4]")
+
 
 def test_object_dict():
     a = object.dict()
@@ -522,6 +561,28 @@ def test_object_RefCountedCowString():
     assert_equal(a._value.ref_count(), 1)
 
 
+def test_object_tuple_contains():
+    a = object((1, "two", True, 1.5))
+    assert_equal(1 in a, True)
+    assert_equal(2 in a, False)
+    assert_equal("two" in a, True)
+    assert_equal("three" in a, False)
+    assert_equal(1.5 in a, True)
+    assert_equal(2.0 in a, False)
+    assert_equal(True in a, True)
+    assert_equal(False in a, False)
+
+
+def test_object_tuple_add():
+    a = object((0, 1))
+    b = object(("two", "three"))
+    c = a + b
+    assert_equal(len(c), 4)
+    assert_equal(len(a), 2)
+    assert_equal(len(b), 2)
+    assert_equal(c[2], "two")
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -541,3 +602,5 @@ def main():
     test_object_list_contains()
     test_object_list_pop()
     test_object_RefCountedCowString()
+    test_object_tuple_contains()
+    test_object_tuple_add()

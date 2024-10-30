@@ -52,6 +52,17 @@ struct _RefCountedList:
 
 
 @value
+struct _RefCountedTuple:
+    """Tuple implementation is similar to List."""
+
+    var impl: Arc[List[object]]
+    """The list value."""
+
+    fn __init__(inout self):
+        self.impl = Arc[List[object]](List[object]())
+
+
+@value
 struct _RefCountedString(CollectionElement):
     var impl: Arc[String]
 
@@ -183,6 +194,7 @@ struct _ObjectImpl(
         _RefCountedDict,
         _Function,
         _RefCountedAttrsDict,
+        _RefCountedTuple,
     ]
     """The variant value type."""
     var value: Self.type
@@ -207,6 +219,8 @@ struct _ObjectImpl(
     """Type discriminator indicating a function."""
     alias obj: Int = 7
     """Type discriminator indicating an object."""
+    alias tuple: Int = 8
+    """Type discriminator indicating a tuple."""
 
     # ===------------------------------------------------------------------=== #
     # Constructors
@@ -273,6 +287,10 @@ struct _ObjectImpl(
     fn is_obj(self) -> Bool:
         return self.value.isa[_RefCountedAttrsDict]()
 
+    @always_inline
+    fn is_tuple(self) -> Bool:
+        return self.value.isa[_RefCountedTuple]()
+
     # get a copy
     @always_inline
     fn get_as_bool(self) -> Bool:
@@ -319,6 +337,12 @@ struct _ObjectImpl(
         return UnsafePointer.address_of(self.value[_RefCountedDict].impl[])[]
 
     @always_inline
+    fn get_as_tuple(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] List[object]:
+        return UnsafePointer.address_of(self.value[_RefCountedTuple].impl[])[]
+
+    @always_inline
     fn get_type_id(self) -> Int:
         if self.is_none():
             return Self.none
@@ -336,6 +360,8 @@ struct _ObjectImpl(
             return Self.function
         if self.is_dict():
             return Self.dict
+        if self.is_tuple():
+            return Self.tuple
         debug_assert(self.is_obj(), "expected a generic object")
         return Self.obj
 
@@ -358,6 +384,8 @@ struct _ObjectImpl(
             return "function"
         if self.is_dict():
             return "dict"
+        if self.is_tuple():
+            return "tuple"
         debug_assert(self.is_obj(), "expected a generic object")
         return "obj"
 
@@ -370,6 +398,8 @@ struct _ObjectImpl(
             return self.value[_RefCountedString].impl.count().__int__()
         if self.is_list():
             return self.value[_RefCountedList].impl.count().__int__()
+        if self.is_tuple():
+            return self.value[_RefCountedTuple].impl.count().__int__()
         raise self._get_type_name() + " is not ref counted"
 
     # ===------------------------------------------------------------------=== #
@@ -474,6 +504,15 @@ struct _ObjectImpl(
                     writer.write(", ")
                 writer.write(repr(self.get_as_list()[j]))
             writer.write("]")
+            return
+
+        if self.is_tuple():
+            writer.write(String("("))
+            for j in range(len(self.get_as_tuple())):
+                if j != 0:
+                    writer.write(", ")
+                writer.write(repr(self.get_as_tuple()[j]))
+            writer.write(")")
             return
 
         if self.is_dict():
@@ -665,6 +704,46 @@ struct object(
                 ]()
 
     @always_inline
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
+        """Initializes the object from a tuple literal.
+
+        Parameters:
+            Ts: The tuple element types.
+
+        Args:
+            value: The tuple value.
+        """
+        self._value = _ObjectImpl(_RefCountedTuple())
+
+        @parameter
+        for i in range(len(VariadicList(Ts))):
+            # We need to rebind the element to one we know how to convert from.
+            # FIXME: This doesn't handle implicit conversions or nested lists.
+            alias T = Ts[i]
+
+            @parameter
+            if _type_is_eq[T, Int]():
+                self._value.get_as_tuple().append(value.get[i, Int]())
+            elif _type_is_eq[T, Float64]():
+                self._value.get_as_tuple().append(value.get[i, Float64]())
+            elif _type_is_eq[T, Bool]():
+                self._value.get_as_tuple().append(value.get[i, Bool]())
+            elif _type_is_eq[T, String]():
+                self._value.get_as_tuple().append(value.get[i, String]())
+            elif _type_is_eq[T, StringRef]():
+                self._value.get_as_tuple().append(value.get[i, StringRef]())
+            elif _type_is_eq[T, StringLiteral]():
+                self._value.get_as_tuple().append(value.get[i, StringLiteral]())
+            elif _type_is_eq[T, _ObjectImpl]():
+                constrained[
+                    False, "implicit conversion from _ObjectImpl to object"
+                ]()
+            else:
+                constrained[
+                    False, "cannot convert nested list element to object"
+                ]()
+
+    @always_inline
     fn __init__(inout self, func: _Function.fn0):
         """Initializes an object from a function that takes no arguments.
 
@@ -792,6 +871,8 @@ struct object(
             return len(self._value.get_as_list()) != 0
         if self._value.is_dict():
             return len(self._value.get_as_dict()) != 0
+        if self._value.is_tuple():
+            return len(self._value.get_as_tuple()) != 0
         # TODO: __bool__ in RefCountedAttrsDict
         debug_assert(self._value.is_obj(), "expected an RefCountedAttrsDict")
         return False
@@ -993,6 +1074,8 @@ struct object(
                 return repr(self) == repr(rhs)
             if self._value.is_obj() and rhs._value.is_obj():
                 return repr(self) == repr(rhs)
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._value.get_as_tuple() == rhs._value.get_as_tuple()
 
             @always_inline
             fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
@@ -1190,6 +1273,17 @@ struct object(
                 result2.append(self[i])
             for j in range(rhs.__len__()):
                 result2.append(rhs[j])
+            return result2
+        if self._value.is_tuple() and rhs._value.is_tuple():
+            var result2 = object(())
+            for i in range(self.__len__()):
+                result2._value.get_as_tuple().append(
+                    self._value.get_as_tuple()[i]
+                )
+            for j in range(rhs.__len__()):
+                result2._value.get_as_tuple().append(
+                    rhs._value.get_as_tuple()[j]
+                )
             return result2
 
         return Self._arithmetic_binary_op[Float64.__add__, Int64.__add__](
@@ -1633,7 +1727,7 @@ struct object(
 
         Returns:
             The length of the string value or the number of elements in the list
-            or dictionary value.
+            ,dictionary or tuple value.
         """
         if self._value.is_str():
             return len(self._value.get_as_string())
@@ -1641,7 +1735,11 @@ struct object(
             return len(self._value.get_as_list())
         if self._value.is_dict():
             return len(self._value.get_as_dict())
-        raise Error("TypeError: only strings, lists and dict have length")
+        if self._value.is_tuple():
+            return len(self._value.get_as_tuple())
+        raise Error(
+            "TypeError: only strings, lists, dicts and tuples have length"
+        )
 
     @staticmethod
     @always_inline
@@ -1669,13 +1767,21 @@ struct object(
         if self._value.is_dict():
             return self._value.get_as_dict()[i]
 
-        if not self._value.is_str() and not self._value.is_list():
-            raise Error("TypeError: can only index into lists and strings")
+        if (
+            not self._value.is_str()
+            and not self._value.is_list()
+            and not self._value.is_tuple()
+        ):
+            raise Error(
+                "TypeError: can only index into lists, strings and tuples"
+            )
 
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             # Construct a new single-character string.
             return self._value.get_as_string()[index]
+        if self._value.is_tuple():
+            return self._value.get_as_tuple()[i._value.get_as_int().value]
         return self._value.get_as_list()[i._value.get_as_int().value]
 
     @always_inline
@@ -1862,7 +1968,9 @@ struct object(
             return value in self._value.get_as_list()
         if self._value.is_dict():
             return value in self._value.get_as_dict()
-        raise "only lists and dict implements the __contains__ dunder"
+        if self._value.is_tuple():
+            return value in self._value.get_as_tuple()
+        raise "only lists, dicts and tuples implements the __contains__ dunder"
 
     fn pop(self, value: Self = None) raises -> object:
         """Removes an element and returns it.
