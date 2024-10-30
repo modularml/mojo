@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import abort
-from builtin._documentation import doc_private
+from documentation import doc_private
 
 
 struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
@@ -37,7 +37,10 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     @always_inline
     fn __init__(inout self):
         """The memory is now considered uninitialized."""
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     @doc_private
     @always_inline
@@ -212,7 +215,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     @always_inline
     fn assume_initialized(
         ref [_]self: Self,
-    ) -> ref [__lifetime_of(self)] Self.ElementType:
+    ) -> ref [self] Self.ElementType:
         """Returns a reference to the internal value.
 
         Calling this method assumes that the memory is initialized.

@@ -48,10 +48,11 @@ def test_unsafepointer_of_move_only_type():
     assert_equal(actions_ptr[0][1], "__moveinit__", msg="emplace_value")
     assert_equal(ptr[0].value, 42)
 
-    var value = ptr.take_pointee()
-    assert_equal(len(actions_ptr[0]), 3)
-    assert_equal(actions_ptr[0][2], "__moveinit__")
-    assert_equal(value.value, 42)
+    if True:  # scope value
+        var value = ptr.take_pointee()
+        assert_equal(len(actions_ptr[0]), 3)
+        assert_equal(actions_ptr[0][2], "__moveinit__")
+        assert_equal(value.value, 42)
 
     ptr.free()
     assert_equal(len(actions_ptr[0]), 4)
@@ -131,6 +132,9 @@ def test_bitcast():
     assert_equal(int(ptr), int(ptr.bitcast[Int]()))
 
     assert_equal(int(ptr), int(aliased_ptr))
+
+    assert_equal(ptr.bitcast[ptr.type, alignment=33]().alignment, 33)
+
     _ = local
 
 
@@ -223,6 +227,29 @@ def test_indexing():
     assert_equal(ptr[3], 3)
 
 
+def test_indexing_simd():
+    var ptr = UnsafePointer[Int].alloc(4)
+    for i in range(4):
+        ptr[UInt8(i)] = i
+
+    assert_equal(ptr[UInt8(1)], 1)
+    assert_equal(ptr[UInt8(3)], 3)
+    assert_equal(ptr[UInt16(1)], 1)
+    assert_equal(ptr[UInt16(3)], 3)
+    assert_equal(ptr[UInt32(1)], 1)
+    assert_equal(ptr[UInt32(3)], 3)
+    assert_equal(ptr[UInt64(1)], 1)
+    assert_equal(ptr[UInt64(3)], 3)
+    assert_equal(ptr[Int8(1)], 1)
+    assert_equal(ptr[Int8(3)], 3)
+    assert_equal(ptr[Int16(1)], 1)
+    assert_equal(ptr[Int16(3)], 3)
+    assert_equal(ptr[Int32(1)], 1)
+    assert_equal(ptr[Int32(3)], 3)
+    assert_equal(ptr[Int64(1)], 1)
+    assert_equal(ptr[Int64(3)], 3)
+
+
 def test_bool():
     var nullptr = UnsafePointer[Int]()
     var ptr = UnsafePointer[Int].alloc(1)
@@ -277,7 +304,22 @@ def test_load_and_store_simd():
 
     var ptr2 = UnsafePointer[Int8].alloc(16)
     for i in range(0, 16, 4):
-        ptr2.store[width=4](i, i)
+        ptr2.store(i, SIMD[DType.int8, 4](i))
+    for i in range(16):
+        assert_equal(ptr2[i], i // 4 * 4)
+
+
+def test_volatile_load_and_store_simd():
+    var ptr = UnsafePointer[Int8].alloc(16)
+    for i in range(16):
+        ptr[i] = i
+    for i in range(0, 16, 4):
+        var vec = ptr.load[width=4, volatile=True](i)
+        assert_equal(vec, SIMD[DType.int8, 4](i, i + 1, i + 2, i + 3))
+
+    var ptr2 = UnsafePointer[Int8].alloc(16)
+    for i in range(0, 16, 4):
+        ptr2.store[volatile=True](i, SIMD[DType.int8, 4](i))
     for i in range(16):
         assert_equal(ptr2[i], i // 4 * 4)
 
@@ -300,7 +342,9 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
+    test_indexing_simd()
     test_bool()
     test_alignment()
     test_offset()
     test_load_and_store_simd()
+    test_volatile_load_and_store_simd()

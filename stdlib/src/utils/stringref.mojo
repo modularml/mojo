@@ -16,6 +16,7 @@
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, bitcast
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
@@ -45,10 +46,12 @@ struct StringRef(
     CollectionElement,
     CollectionElementNew,
     Stringable,
-    Formattable,
+    Writable,
     Hashable,
+    _HashableWithHasher,
     Boolable,
     Comparable,
+    AsBytes,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -209,6 +212,16 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous Span of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+        return Span[Byte, __origin_of(self)](
+            unsafe_ptr=self.data, len=self.length
+        )
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
@@ -341,6 +354,17 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.data, self.length)
+
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
@@ -351,7 +375,10 @@ struct StringRef(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        var str_slice = StringSlice[ImmutableAnyOrigin](
+            unsafe_from_utf8_strref=self
+        )
+        return _atol(str_slice)
 
     @always_inline
     fn __len__(self) -> Int:
@@ -369,24 +396,26 @@ struct StringRef(
         Returns:
             A new string.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this StringRef to the provided formatter.
+        Formats this StringRef to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
-
         # SAFETY:
-        #   Safe because our use of this StringSlice does not outlive `self`.
-        var str_slice = StringSlice[ImmutableAnyLifetime](
-            unsafe_from_utf8_strref=self
+        #   Safe because our use of this Span does not outlive `self`.
+        writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](
+                unsafe_ptr=self.unsafe_ptr(), len=len(self)
+            )
         )
-
-        writer.write_str(str_slice)
 
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.
@@ -573,6 +602,41 @@ struct StringRef(
         while end > start and _isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
+
+    fn split(self, delimiter: StringRef) raises -> List[StringRef]:
+        """Split the StringRef by a delimiter.
+
+        Args:
+            delimiter: The StringRef to split on.
+
+        Returns:
+            A List of StringRefs containing the input split by the delimiter.
+
+        Raises:
+            Error if an empty delimiter is specified.
+        """
+        if not delimiter:
+            raise Error("empty delimiter not allowed to be passed to split.")
+
+        var output = List[StringRef]()
+        var ptr = self.unsafe_ptr()
+
+        var current_offset = 0
+        while True:
+            var loc = self.find(delimiter, current_offset)
+            # delimiter not found, so add the search slice from where we're currently at
+            if loc == -1:
+                output.append(
+                    StringRef(ptr + current_offset, len(self) - current_offset)
+                )
+                break
+
+            # We found a delimiter, so add the preceding string slice
+            output.append(StringRef(ptr + current_offset, loc - current_offset))
+
+            # Advance our search offset past the delimiter
+            current_offset = loc + len(delimiter)
+        return output
 
     fn startswith(
         self, prefix: StringRef, start: Int = 0, end: Int = -1

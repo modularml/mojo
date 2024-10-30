@@ -27,20 +27,20 @@ fn doc_private():
 
     This decorator allows for hiding the documentation for a declaration during
     generation. This is often used to hide `__init__`, and other special
-    methods, that are intended for internal consumption.
+    methods, that are not intended to be part of a library's documentation.
 
     For example:
 
     ```mojo
     struct Foo:
-      @doc_private
-      fn __init__(inout self):
-        "This should not be called directly, prefer Foo.create instead."
-        return
+        @doc_private
+        fn __init__(inout self):
+            "This should not be called directly, use `Foo.create` instead."
+            return
 
-      @staticmethod
-      fn create() -> Self:
-        return Self()
+        @staticmethod
+        fn create() -> Self:
+            return Self()
     ```
     """
     return

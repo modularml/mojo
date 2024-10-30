@@ -16,6 +16,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.magic/
 
 # MacOS
 .DS_Store

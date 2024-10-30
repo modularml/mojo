@@ -23,11 +23,9 @@ fn standardize_string_slice(
     """
     var standardized_x = InlineArray[UInt8, size=std_size](ord("0"))
     memcpy(
-        dest_data=(standardized_x.unsafe_ptr() + std_size - len(x)).bitcast[
-            Int8
-        ](),
-        src_data=x.unsafe_ptr().bitcast[Int8](),
-        n=len(x),
+        dest=(standardized_x.unsafe_ptr() + std_size - len(x)).bitcast[Int8](),
+        src=x.unsafe_ptr().bitcast[Int8](),
+        count=len(x),
     )
     return standardized_x
 

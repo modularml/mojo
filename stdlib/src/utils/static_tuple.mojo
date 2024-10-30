@@ -77,8 +77,13 @@ fn _create_array[
         ](lst[0])
 
     debug_assert(size == len(lst), "mismatch in the number of elements")
-    var array = __mlir_op.`kgen.undef`[
-        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+
+    var array = __mlir_op.`kgen.param.constant`[
+        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        value = __mlir_attr[
+            `#kgen.unknown : `,
+            __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        ],
     ]()
 
     @parameter
@@ -101,7 +106,7 @@ fn _static_tuple_construction_checks[size: Int]():
     Parameters:
       size: The number of elements.
     """
-    constrained[size > 0, "number of elements in `StaticTuple` must be > 0"]()
+    constrained[size >= 0, "number of elements in `StaticTuple` must be >= 0"]()
 
 
 @value
@@ -124,7 +129,10 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     fn __init__(inout self):
         """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[size]()
-        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self.array = __mlir_op.`kgen.param.constant`[
+            _type = Self.type,
+            value = __mlir_attr[`#kgen.unknown : `, Self.type],
+        ]()
 
     @always_inline
     fn __init__(inout self, *elems: Self.element_type):
@@ -181,6 +189,57 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         return val
 
     @always_inline("nodebug")
+    fn __getitem__[
+        IntLike: IntLike, //
+    ](self, idx: IntLike) -> Self.element_type:
+        """Returns the value of the tuple at the given dynamic index.
+
+        Parameters:
+            IntLike: The type of idx; either `Int` or `UInt`.
+
+        Args:
+            idx: The index into the tuple.
+
+        Returns:
+            The value at the specified position.
+        """
+        debug_assert(
+            int(idx.__mlir_index__()) < size, "index must be within bounds"
+        )
+        # Copy the array so we can get its address, because we can't take the
+        # address of 'self' in a non-mutating method.
+        var arrayCopy = self.array
+        var ptr = __mlir_op.`pop.array.gep`(
+            UnsafePointer.address_of(arrayCopy).address, idx.__mlir_index__()
+        )
+        var result = UnsafePointer(ptr)[]
+        _ = arrayCopy
+        return result
+
+    @always_inline("nodebug")
+    fn __setitem__[
+        IntLike: IntLike, //
+    ](inout self, idx: IntLike, val: Self.element_type):
+        """Stores a single value into the tuple at the specified dynamic index.
+
+        Parameters:
+            IntLike: The type of idx; either `Int` or `UInt`.
+
+        Args:
+            idx: The index into the tuple.
+            val: The value to store.
+        """
+        debug_assert(
+            int(idx.__mlir_index__()) < size, "index must be within bounds"
+        )
+        var tmp = self
+        var ptr = __mlir_op.`pop.array.gep`(
+            UnsafePointer.address_of(tmp.array).address, idx.__mlir_index__()
+        )
+        UnsafePointer(ptr)[] = val
+        self = tmp
+
+    @always_inline("nodebug")
     fn __setitem__[index: Int](inout self, val: Self.element_type):
         """Stores a single value into the tuple at the specified index.
 
@@ -193,41 +252,4 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         constrained[index < size]()
         var tmp = self
         _set_array_elem[index, size, Self.element_type](val, tmp.array)
-        self = tmp
-
-    @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Self.element_type:
-        """Returns the value of the tuple at the given dynamic index.
-
-        Args:
-            idx: The index into the tuple.
-
-        Returns:
-            The value at the specified position.
-        """
-        debug_assert(idx < size, "index must be within bounds")
-        # Copy the array so we can get its address, because we can't take the
-        # address of 'self' in a non-mutating method.
-        var arrayCopy = self.array
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(arrayCopy).address, idx.value
-        )
-        var result = UnsafePointer(ptr)[]
-        _ = arrayCopy
-        return result
-
-    @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: Self.element_type):
-        """Stores a single value into the tuple at the specified dynamic index.
-
-        Args:
-            idx: The index into the tuple.
-            val: The value to store.
-        """
-        debug_assert(idx < size, "index must be within bounds")
-        var tmp = self
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(tmp.array).address, idx.value
-        )
-        UnsafePointer(ptr)[] = val
         self = tmp

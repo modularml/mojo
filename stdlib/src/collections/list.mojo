@@ -23,7 +23,7 @@ from collections import List
 from sys.intrinsics import _type_is_eq
 from sys import sizeof
 from os import abort
-from memory import Reference, UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy
 from utils import Span
 
 from .optional import Optional
@@ -38,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_lifetime: AnyLifetime[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -48,28 +48,32 @@ struct _ListIter[
         T: The type of the elements in the list.
         hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
             but it helps performance. Will go away in the future.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T, hint_trivial_type]
 
     var index: Int
-    var src: Reference[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_lifetime]:
+    ) -> Pointer[T, list_origin]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[][self.index - 1]
+            return Pointer.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return self.src[][self.index]
+            return Pointer.address_of(self.src[][self.index])
+
+    @always_inline
+    fn __hasmore__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         @parameter
@@ -347,23 +351,23 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self)]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _ListIter(0, self)
+        return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __lifetime_of(self), False]:
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self), self)
+        return _ListIter[forward=False](len(self), Pointer.address_of(self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -412,21 +416,21 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             A string representation of the list.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output^
 
     @no_inline
-    fn format_to[
-        U: RepresentableCollectionElement, //
-    ](self: List[U, *_], inout writer: Formatter):
-        """Write `my_list.__str__()` to a `Formatter`.
+    fn write_to[
+        W: Writer, U: RepresentableCollectionElement, //
+    ](self: List[U, *_], inout writer: W):
+        """Write `my_list.__str__()` to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("[")
         for i in range(len(self)):
@@ -785,7 +789,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+    fn __getitem__(ref [_]self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -794,10 +798,15 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A reference to the element at the given index.
         """
+
         var normalized_idx = idx
+
         debug_assert(
             -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
+            "index: ",
+            normalized_idx,
+            " is out of bounds for `List` of size: ",
+            self.size,
         )
         if normalized_idx < 0:
             normalized_idx += len(self)
@@ -805,9 +814,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.T:
+    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it

@@ -19,6 +19,7 @@ from math import floor
 ```
 """
 
+from documentation import doc_private
 from collections import List
 from sys._assembly import inlined_assembly
 from sys.ffi import _external_call_const
@@ -34,13 +35,12 @@ from sys import (
 from memory import UnsafePointer
 
 from bit import count_trailing_zeros
-from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
 
 from utils import Span
-from utils.index import StaticIntTuple
+from utils.index import IndexList
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
 
@@ -2217,7 +2217,7 @@ fn factorial(n: Int) -> Int:
     Returns:
         The factorial of the input. Results are undefined for negative inputs.
     """
-    alias table = StaticIntTuple[21](
+    alias table = StaticTuple[Int, 21](
         1,
         1,
         2,
@@ -2368,7 +2368,21 @@ fn _call_ptx_intrinsic_scalar[
         Scalar[type],
         constraints=constraints,
         has_side_effect=False,
-    ](arg).cast[type]()
+    ](arg)
+
+
+fn _call_ptx_intrinsic_scalar[
+    type: DType, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg0: Scalar[type], arg1: Scalar[type]) -> Scalar[type]:
+    return inlined_assembly[
+        instruction + " $0, $1, $2;",
+        Scalar[type],
+        constraints=constraints,
+        has_side_effect=False,
+    ](arg0, arg1)
 
 
 fn _call_ptx_intrinsic[
@@ -2419,7 +2433,241 @@ fn _call_ptx_intrinsic[
                 SIMD[type, 2],
                 constraints=vector_constraints,
                 has_side_effect=False,
-            ](arg).cast[type]()
+            ](arg.slice[2, offset=i]())
         )
 
     return res
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    scalar_instruction: StringLiteral,
+    vector2_instruction: StringLiteral,
+    scalar_constraints: StringLiteral,
+    vector_constraints: StringLiteral,
+](arg0: SIMD[type, simd_width], arg1: SIMD[type, simd_width]) -> SIMD[
+    type, simd_width
+]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=scalar_instruction, constraints=scalar_constraints
+        ](arg0[0], arg1[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(0, simd_width, 2):
+        res = res.insert[offset=i](
+            inlined_assembly[
+                vector2_instruction + " $0, $1; $2;",
+                SIMD[type, 2],
+                constraints=vector_constraints,
+                has_side_effect=False,
+            ](arg0.slice[2, offset=i](), arg1.slice[2, offset=i]())
+        )
+
+    return res
+
+
+# ===----------------------------------------------------------------------=== #
+# Ceilable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Ceilable:
+    """
+    The `Ceilable` trait describes a type that defines a ceiling operation.
+
+    Types that conform to `Ceilable` will work with the builtin `ceil`
+    function. The ceiling operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Ceilable, ceil
+
+    @value
+    struct Complex(Ceilable):
+        var re: Float64
+        var im: Float64
+
+        fn __ceil__(self) -> Self:
+            return Self(ceil(self.re), ceil(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Floorable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Floorable:
+    """
+    The `Floorable` trait describes a type that defines a floor operation.
+
+    Types that conform to `Floorable` will work with the builtin `floor`
+    function. The floor operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Floorable, floor
+
+    @value
+    struct Complex(Floorable):
+        var re: Float64
+        var im: Float64
+
+        fn __floor__(self) -> Self:
+            return Self(floor(self.re), floor(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# CeilDivable
+# ===----------------------------------------------------------------------=== #
+
+
+trait CeilDivable:
+    """
+    The `CeilDivable` trait describes a type that defines a ceil division
+    operation.
+
+    Types that conform to `CeilDivable` will work with the `math.ceildiv`
+    function.
+
+    For example:
+    ```mojo
+    from math import CeilDivable
+
+    @value
+    struct Foo(CeilDivable):
+        var x: Float64
+
+        fn __floordiv__(self, other: Self) -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) -> Self:
+            return other // self
+
+        fn __neg__(self) -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    @doc_private
+    fn __floordiv__(self, other: Self) -> Self:
+        ...
+
+    @doc_private
+    fn __rfloordiv__(self, other: Self) -> Self:
+        ...
+
+    @doc_private
+    fn __neg__(self) -> Self:
+        ...
+
+
+trait CeilDivableRaising:
+    """
+    The `CeilDivable` trait describes a type that define a floor division and
+    negation operation that can raise.
+
+    Types that conform to `CeilDivableRaising` will work with the `//` operator
+    as well as the `math.ceildiv` function.
+
+    For example:
+    ```mojo
+    from math import CeilDivableRaising
+
+    @value
+    struct Foo(CeilDivableRaising):
+        var x: object
+
+        fn __floordiv__(self, other: Self) raises -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) raises -> Self:
+            return other // self
+
+        fn __neg__(self) raises -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    @doc_private
+    fn __floordiv__(self, other: Self) raises -> Self:
+        ...
+
+    @doc_private
+    fn __rfloordiv__(self, other: Self) raises -> Self:
+        ...
+
+    @doc_private
+    fn __neg__(self) raises -> Self:
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Truncable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Truncable:
+    """
+    The `Truncable` trait describes a type that defines a truncation operation.
+
+    Types that conform to `Truncable` will work with the builtin `trunc`
+    function. The truncation operation always returns the same type as the
+    input.
+
+    For example:
+    ```mojo
+    from math import Truncable, trunc
+
+    @value
+    struct Complex(Truncable):
+        var re: Float64
+        var im: Float64
+
+        fn __trunc__(self) -> Self:
+            return Self(trunc(re), trunc(im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...

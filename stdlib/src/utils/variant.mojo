@@ -20,9 +20,9 @@ from utils import Variant
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
   if x.isa[String]():
-    return x[String][]
+    return x[String]
   # x.isa[Int]()
-  return str(x[Int])[]
+  return str(x[Int])
 
 # They have to be mutable for now, and implement CollectionElement
 var an_int = IntOrString(4)
@@ -73,7 +73,7 @@ struct Variant[*Ts: CollectionElement](
         - use `isa[T]()` to check what type a variant is
         - use `unsafe_take[T]()` to take a value from the variant
         - use `[T]` to get a value out of a variant
-            - This currently does an extra copy/move until we have lifetimes
+            - This currently does an extra copy/move until we have origins
             - It also temporarily requires the value to be mutable
         - use `set[T](owned new_value: T)` to reset the variant to a new value
 
@@ -83,9 +83,9 @@ struct Variant[*Ts: CollectionElement](
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
-            return x[String][]
+            return x[String]
         # x.isa[Int]()
-        return str(x[Int][])
+        return str(x[Int])
 
     # They have to be mutable for now, and implement CollectionElement
     var an_int = IntOrString(4)
@@ -194,9 +194,7 @@ struct Variant[*Ts: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __getitem__[
-        T: CollectionElement
-    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
+    fn __getitem__[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -210,12 +208,12 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            A reference to the internal data.
         """
         if not self.isa[T]():
             abort("get: wrong variant type")
 
-        return self.unsafe_get[T]()[]
+        return self.unsafe_get[T]()
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -232,7 +230,7 @@ struct Variant[*Ts: CollectionElement](
         return discr_ptr
 
     @always_inline("nodebug")
-    fn _get_discr(ref [_]self: Self) -> ref [__lifetime_of(self)] UInt8:
+    fn _get_discr(ref [_]self: Self) -> ref [self] UInt8:
         var ptr = UnsafePointer.address_of(self._impl).address
         var discr_ptr = __mlir_op.`pop.variant.discr_gep`[
             _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
@@ -364,9 +362,7 @@ struct Variant[*Ts: CollectionElement](
         alias idx = Self._check[T]()
         return self._get_discr() == idx
 
-    fn unsafe_get[
-        T: CollectionElement
-    ](ref [_]self: Self) -> Reference[T, __lifetime_of(self)]:
+    fn unsafe_get[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
@@ -381,7 +377,7 @@ struct Variant[*Ts: CollectionElement](
             T: The type of the value to get out.
 
         Returns:
-            The internal data represented as a `Reference[T]`.
+            The internal data represented as a `Pointer[T]`.
         """
         debug_assert(self.isa[T](), "get: wrong variant type")
         return self._get_ptr[T]()[]

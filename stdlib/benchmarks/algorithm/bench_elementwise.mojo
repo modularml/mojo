@@ -17,7 +17,7 @@ from algorithm import elementwise
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from buffer import Buffer
 
-from utils.index import Index, StaticIntTuple
+from utils.index import Index, IndexList
 
 
 # ===----------------------------------------------------------------------===#
@@ -35,11 +35,11 @@ fn bench_elementwise[n: Int](inout b: Bencher) raises:
     fn call_fn() raises:
         @always_inline
         @parameter
-        fn func[simd_width: Int, rank: Int](idx: StaticIntTuple[rank]):
+        fn func[simd_width: Int, rank: Int](idx: IndexList[rank]):
             vector[idx[0]] = 42
 
         elementwise[func, 1](Index(n))
-        elementwise[func=func, simd_width = simdwidthof[DType.index](), rank=1](
+        elementwise[func=func, simd_width = simdwidthof[DType.index]()](
             Index(n)
         )
 

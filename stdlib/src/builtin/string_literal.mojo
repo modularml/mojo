@@ -19,11 +19,16 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
-from utils import StringRef, Span, StringSlice
-from utils import Formattable, Formatter
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from utils import StringRef, Span, StringSlice, StaticString
+from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from collections.string import _atol, _StringSliceIter
+from utils.string_slice import (
+    _StringSliceIter,
+    _FormatCurlyEntry,
+    _CurlyEntryFormattable,
+)
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -36,13 +41,15 @@ struct StringLiteral(
     Boolable,
     Comparable,
     CollectionElementNew,
-    Formattable,
+    Writable,
     IntableRaising,
     KeyElement,
     Representable,
     Sized,
     Stringable,
     FloatableRaising,
+    BytesCollectionElement,
+    _HashableWithHasher,
 ):
     """This type represents a string literal.
 
@@ -94,6 +101,68 @@ struct StringLiteral(
             The concatenated string.
         """
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __iadd__(inout self, rhs: StringLiteral):
+        """Concatenate a string literal to an existing one. Can only be
+        evaluated at compile time using the `alias` keyword, which will write
+        the result into the binary.
+
+        Args:
+            rhs: The string to concat.
+
+        Example:
+
+        ```mojo
+        fn add_literal(
+            owned original: StringLiteral, add: StringLiteral, n: Int
+        ) -> StringLiteral:
+            for _ in range(n):
+                original += add
+            return original
+
+
+        fn main():
+            alias original = "mojo"
+            alias concat = add_literal(original, "!", 4)
+            print(concat)
+        ```
+
+        Result:
+
+        ```
+        mojo!!!!
+        ```
+        """
+        self = self + rhs
+
+    @always_inline("nodebug")
+    fn __mul__(self, n: Int) -> StringLiteral:
+        """Concatenates the string literal `n` times. Can only be evaluated at
+        compile time using the `alias` keyword, which will write the result into
+        The binary.
+
+        Args:
+            n : The number of times to concatenate the string literal.
+
+        Returns:
+            The string concatenated `n` times.
+
+        Example:
+
+        ```mojo
+        alias original = "mojo"
+        alias concat = original * 3
+        print(concat)
+        ```
+
+        `concat` now points to the StringLiteral "mojomojomojo", which is
+        written into the binary.
+        """
+        var concat = ""
+        for _ in range(n):
+            concat += self
+        return concat
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: StringLiteral) -> Bool:
@@ -203,27 +272,25 @@ struct StringLiteral(
         """
         return len(self) != 0
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
-
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        If the string cannot be parsed as an int, an error is raised.
 
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return int(self.as_string_slice())
 
+    @always_inline
     fn __float__(self) raises -> Float64:
-        """Parses the string as a float point number and returns that value.
-
-        If the string cannot be parsed as a float, an error is raised.
+        """Parses the string as a float point number and returns that value. If
+        the string cannot be parsed as a float, an error is raised.
 
         Returns:
             A float value that represents the string, or otherwise raises.
         """
-        return atof(self)
+        return float(self.as_string_slice())
 
     @no_inline
     fn __str__(self) -> String:
@@ -232,6 +299,10 @@ struct StringLiteral(
         Returns:
             A new string.
         """
+        # TODO(MOCO-1224): We should be able to reuse this, but we have to
+        # inline the string slice constructor to work around an elaborator
+        # memory leak.
+        # return self.as_string_slice()
         var string = String()
         var length = self.byte_length()
         var buffer = String._buffer_type()
@@ -265,6 +336,17 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
+
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.
 
@@ -273,13 +355,23 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantOrigin]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[__lifetime_of(self)](
+        return _StringSliceIter[StaticConstantOrigin](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantOrigin, False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator over the string.
+        """
+        return _StringSliceIter[StaticConstantOrigin, False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -314,6 +406,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
 
@@ -327,6 +420,8 @@ struct StringLiteral(
         #   return type.
         return ptr.bitcast[UInt8]()
 
+    @always_inline
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
@@ -338,45 +433,88 @@ struct StringLiteral(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[ImmutableAnyLifetime]:
+    fn as_string_slice(self) -> StaticString:
         """Returns a string slice of this static string literal.
 
         Returns:
             A string slice pointing to this static string literal.
         """
 
-        var bytes = self.as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[ImmutableAnyLifetime](unsafe_from_utf8=bytes)
+        return StaticString(
+            unsafe_from_utf8_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, ImmutableAnyLifetime]:
+    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
         """
-        Returns a contiguous slice of the bytes owned by this string.
+        Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        var ptr = self.unsafe_ptr()
-
-        return Span[UInt8, ImmutableAnyLifetime](
-            unsafe_ptr=ptr,
+        return Span[Byte, StaticConstantOrigin](
+            unsafe_ptr=self.unsafe_ptr(),
             len=self.byte_length(),
         )
 
-    fn format_to(self, inout writer: Formatter):
+    @always_inline
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
-        Formats this string literal to the provided formatter.
+        # Does NOT include the NUL terminator.
+        return Span[Byte, __origin_of(self)](
+            unsafe_ptr=self.unsafe_ptr(),
+            len=self.byte_length(),
+        )
+
+    @always_inline
+    fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
+        """Format a template with `*args`.
 
         Args:
-            writer: The formatter to write to.
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of substitution values that implement `Representable`
+                and `Stringable` (to be changed and made more flexible).
+
+        Returns:
+            The template with the given values substituted.
+
+        Examples:
+
+        ```mojo
+        # Manual indexing:
+        print("{0} {1} {0}".format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print("{} {}".format(True, "hello world")) # True hello world
+        ```
+        .
+        """
+        return _FormatCurlyEntry.format(self, args)
+
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Formats this string literal to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
         """
 
-        writer.write_str(self.as_string_slice())
+        writer.write(self.as_string_slice())
 
     fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
@@ -429,17 +567,7 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        var result: String = ""
-        var is_first = True
-
-        for e in elems:
-            if is_first:
-                is_first = False
-            else:
-                result += self
-            result += str(e[])
-
-        return result
+        return str(self).join(elems)
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.

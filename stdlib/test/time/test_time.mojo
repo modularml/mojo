@@ -13,7 +13,14 @@
 # RUN: %mojo %s
 
 from sys import os_is_windows
-from time import now, perf_counter, perf_counter_ns, sleep, time_function
+from time import (
+    now,
+    perf_counter,
+    perf_counter_ns,
+    sleep,
+    time_function,
+    monotonic,
+)
 
 from testing import assert_true
 
@@ -54,6 +61,7 @@ fn test_time() raises:
     assert_true(perf_counter() > 0)
     assert_true(perf_counter_ns() > 0)
     assert_true(now() > 0)
+    assert_true(monotonic() > 0)
 
     var t1 = time_function[time_me]()
     assert_true(t1 > 1 * ns_per_sec)
