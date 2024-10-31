@@ -20,7 +20,7 @@ impressive improvements.
 
 #### Zig
 Zig has taken custom allocators to the next level and has proven that its model
-gives some amazing and safe control over memory reminicent of C. Arena
+gives some amazing and safe control over memory reminiscent of C. Arena
 allocators seem to be a favorite.
 
 
@@ -36,7 +36,6 @@ trait SafePointer:
     # TODO: this needs parametrized __getitem__, unsafe_ptr() etc.
 
     @staticmethod
-    @always_inline
     fn alloc(count: Int) -> Self:
         """Allocate memory according to the pointer's logic.
 
