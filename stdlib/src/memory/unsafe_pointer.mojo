@@ -19,7 +19,6 @@ from memory import UnsafePointer
 ```
 """
 
-from documentation import doc_private
 from sys import alignof, sizeof, triple_is_nvidia_cuda
 from sys.intrinsics import (
     _mlirtype_is_eq,

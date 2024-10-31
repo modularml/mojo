@@ -12,7 +12,6 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
-from documentation import doc_private
 from math import Ceilable, CeilDivable, Floorable, Truncable
 
 

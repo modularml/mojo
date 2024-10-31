@@ -19,7 +19,6 @@ from python import PythonObject
 ```
 """
 
-from documentation import doc_private
 from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
