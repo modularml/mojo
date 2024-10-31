@@ -291,7 +291,7 @@ struct PythonVersion:
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:
-    return StringRef(lib.call["Py_GetVersion", UnsafePointer[c_char]]())
+    return StringRef(ptr=lib.call["Py_GetVersion", UnsafePointer[c_char]]())
 
 
 fn _py_finalize(lib: DLHandle):

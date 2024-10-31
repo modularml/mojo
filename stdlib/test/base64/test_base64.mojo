@@ -32,6 +32,14 @@ def test_b64encode():
     )
 
     assert_equal(b64encode("ABCDEFabcdef"), "QUJDREVGYWJjZGVm")
+    assert_equal(b64encode("\x00\n\x14\x1e(2<FPZdn"), "AAoUHigyPEZQWmRu")
+    # 43 random bytes
+    assert_equal(
+        b64encode(
+            "\xc5f\xff}\xc3\x1a\xc7\xfe]+M\x02O\xe9\xd645\xb8}\xbcN\xcc\x13:W\x0f?\n}\n\xcc\xe1\xd91\x97\x8bB\xd1\x8ej\xff\x08:"
+        ),
+        "xWb/fcMax/5dK00CT+nWNDW4fbxOzBM6Vw8/Cn0KzOHZMZeLQtGOav8IOg==",
+    )
 
 
 def test_b64decode():
