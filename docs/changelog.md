@@ -180,9 +180,25 @@ what we publish.
   ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
    [@bgreni](https://github.com/bgreni))
 
-- `StringRef` now implements `split()` which can be used to split a
-  `StringRef` into a `List[StringRef]` by a delimiter.
-  ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
+- `String.split()` and `String.splitlines()` now work for `StringLiteral` and
+  `StringSlice`. In the case of `StringSlice` they return a `List[StringSlice]`
+  of immutable origin (from the splitted Stringlike item). Some heavy
+  optimizations were added that improved both functions by several orders of
+  magnitude. PRs [#3528](https://github.com/modularml/mojo/pull/3528), [#3697](
+    https://github.com/modularml/mojo/pull/3697
+  ) by [@martinvuyk](https://github.com/martinvuyk).
+
+- `String` concatenation with `StringLiteral` and `StringSlice` is now more
+  efficient. PR [#3591](https://github.com/modularml/mojo/pull/3591) by
+  [@martinvuyk](https://github.com/martinvuyk).
+
+- `String.format()` now works with `StringLiteral` and `StringSlice` and is
+  more efficient. PR [#3539](https://github.com/modularml/mojo/pull/3539) by
+  [@martinvuyk](https://github.com/martinvuyk).
+
+- We now have solid string benchmarking infrastructure based on many of the most
+  spoken languages. PR [#3523](https://github.com/modularml/mojo/pull/3523) by
+  [@martinvuyk](https://github.com/martinvuyk).
 
 - Support for multi-dimensional indexing for `PythonObject`
   ([PR #3583](https://github.com/modularml/mojo/pull/3583) by [@jjvraw](https://github.com/jjvraw)).
@@ -206,7 +222,7 @@ what we publish.
 
 - There is now a [`Byte`](/mojo/stdlib/builtin/simd/Byte) alias to better
   express intent when working with a pack of bits.
-  ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraos](https://github.com/soraros)).
+  ([PR #3670](https://github.com/modularml/mojo/pull/3670) by [@soraros](https://github.com/soraros)).
 
 - The VS Code extension now supports setting [data breakpoints](https://code.visualstudio.com/docs/editor/debugging#_data-breakpoints)
   as well as [function breakpoints](https://code.visualstudio.com/docs/editor/debugging#_function-breakpoints).
