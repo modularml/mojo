@@ -297,5 +297,4 @@ fn main():
     # ASAP freed since they own their data
 ```
 I would not try to sell this as "fearless pointers" since there are many ways
-one can make mistakes here. But it is a lot safer than the current ubiquitous
-use of `UnsafePointer` in the stdlib.
+one can make mistakes here. But it is a lot safer than `UnsafePointer`.
