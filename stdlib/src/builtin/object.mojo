@@ -1074,11 +1074,11 @@ struct object(
             )
             return bool(c)
         except e:
-            #TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise error from _comparison_type_check
             # _comparison_op -> _comparison_type_check()
             debug_assert(
                 str(e) == "TypeError: not a valid comparison type",
-                "expecting error: TypeError: not a valid comparison type"
+                "expecting error: TypeError: not a valid comparison type",
             )
             return False
 
