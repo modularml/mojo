@@ -1377,7 +1377,7 @@ struct String(
             writer: The object to write to.
         """
 
-        writer.write_bytes(self.as_bytes[False, __origin_of(self)]())
+        writer.write_bytes(self.as_bytes())
 
     fn join(self, *elems: Int) -> String:
         """Joins the elements from the tuple using the current string as a
@@ -1507,7 +1507,7 @@ struct String(
         buf.append(0)
         return String(buf^)
 
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Byte]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:

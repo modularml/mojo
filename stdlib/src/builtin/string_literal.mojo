@@ -433,7 +433,7 @@ struct StringLiteral(
 
     @always_inline("nodebug")
     # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Byte]:
         """Get raw pointer to the underlying data.
 
         Returns:
