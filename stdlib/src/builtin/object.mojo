@@ -1104,12 +1104,7 @@ struct object(
         Returns:
             True if the objects are not equal.
         """
-        try:
-            return not (self == rhs)
-        except e:
-            print(e)
-            print("objects are not comparable")
-        return True
+        return not (self == rhs)
 
     fn __gt__(self, rhs: object) raises -> object:
         """Greater-than comparator. This lexicographically compares the
