@@ -411,7 +411,7 @@ fn _is_sm_8x() -> Bool:
 
 @always_inline("nodebug")
 fn _is_sm_9x() -> Bool:
-    return triple_is_nvidia_cuda["sm_90"]() or triple_is_nvidia_cuda["sm_9a"]()
+    return triple_is_nvidia_cuda["sm_90"]() or triple_is_nvidia_cuda["sm_90a"]()
 
 
 @always_inline("nodebug")
