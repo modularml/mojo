@@ -415,6 +415,78 @@ def test_count_utf8_continuation_bytes():
     _test(3, List[UInt8](b2, c, b3, c, c))
 
 
+def test_splitlines():
+    alias S = StringSlice[StaticConstantOrigin]
+    alias L = List[StringSlice[StaticConstantOrigin]]
+
+    # FIXME: remove once StringSlice conforms to TestableCollectionElement
+    fn _assert_equal[
+        O1: ImmutableOrigin, O2: ImmutableOrigin
+    ](l1: List[StringSlice[O1]], l2: List[StringSlice[O2]]) raises:
+        assert_equal(len(l1), len(l2))
+        for i in range(len(l1)):
+            assert_equal(str(l1[i]), str(l2[i]))
+
+    # FIXME: remove once StringSlice conforms to TestableCollectionElement
+    fn _assert_equal[
+        O1: ImmutableOrigin
+    ](l1: List[StringSlice[O1]], l2: List[String]) raises:
+        assert_equal(len(l1), len(l2))
+        for i in range(len(l1)):
+            assert_equal(str(l1[i]), l2[i])
+
+    # Test with no line breaks
+    _assert_equal(S("hello world").splitlines(), L("hello world"))
+
+    # Test with line breaks
+    _assert_equal(S("hello\nworld").splitlines(), L("hello", "world"))
+    _assert_equal(S("hello\rworld").splitlines(), L("hello", "world"))
+    _assert_equal(S("hello\r\nworld").splitlines(), L("hello", "world"))
+
+    # Test with multiple different line breaks
+    s1 = S("hello\nworld\r\nmojo\rlanguage\r\n")
+    hello_mojo = L("hello", "world", "mojo", "language")
+    _assert_equal(s1.splitlines(), hello_mojo)
+    _assert_equal(
+        s1.splitlines(keepends=True),
+        L("hello\n", "world\r\n", "mojo\r", "language\r\n"),
+    )
+
+    # Test with an empty string
+    _assert_equal(S("").splitlines(), L())
+    # test \v \f \x1c \x1d
+    s2 = S("hello\vworld\fmojo\x1clanguage\x1d")
+    _assert_equal(s2.splitlines(), hello_mojo)
+    _assert_equal(
+        s2.splitlines(keepends=True),
+        L("hello\v", "world\f", "mojo\x1c", "language\x1d"),
+    )
+
+    # test \x1c \x1d \x1e
+    s3 = S("hello\x1cworld\x1dmojo\x1elanguage\x1e")
+    _assert_equal(s3.splitlines(), hello_mojo)
+    _assert_equal(
+        s3.splitlines(keepends=True),
+        L("hello\x1c", "world\x1d", "mojo\x1e", "language\x1e"),
+    )
+
+    # test \x85 \u2028 \u2029
+    var next_line = String(List[UInt8](0xC2, 0x85, 0))
+    """TODO: \\x85"""
+    var unicode_line_sep = String(List[UInt8](0xE2, 0x80, 0xA8, 0))
+    """TODO: \\u2028"""
+    var unicode_paragraph_sep = String(List[UInt8](0xE2, 0x80, 0xA9, 0))
+    """TODO: \\u2029"""
+
+    for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
+        u = i[]
+        item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
+        s = StringSlice(item)
+        _assert_equal(s.splitlines(), hello_mojo)
+        items = List("hello" + u, "world" + u, "mojo" + u, "language" + u)
+        _assert_equal(s.splitlines(keepends=True), items)
+
+
 fn main() raises:
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -432,3 +504,4 @@ fn main() raises:
     test_combination_10_good_utf8_sequences()
     test_combination_10_good_10_bad_utf8_sequences()
     test_count_utf8_continuation_bytes()
+    test_splitlines()

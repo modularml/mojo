@@ -27,6 +27,7 @@ https://github.com/simdutf/SimdUnicode/blob/main/src/UTF8.cs
 
 from memory import UnsafePointer
 from sys.intrinsics import llvm_intrinsic
+from builtin.simd import _sub_with_saturation
 
 alias TOO_SHORT: UInt8 = 1 << 0
 alias TOO_LONG: UInt8 = 1 << 1
@@ -91,16 +92,6 @@ fn _extract_vector[
     return a.join(b).slice[width, offset=offset]()
 
 
-@always_inline("nodebug")
-fn _sub_with_saturation[
-    width: Int, //
-](a: SIMD[DType.uint8, width], b: SIMD[DType.uint8, width]) -> SIMD[
-    DType.uint8, width
-]:
-    # generates a single `vpsubusb` on x86 with AVX
-    return llvm_intrinsic["llvm.usub.sat", __type_of(a)](a, b)
-
-
 fn validate_chunk[
     simd_size: Int
 ](
@@ -136,7 +127,7 @@ fn _is_valid_utf8(span: Span[Byte]) -> Bool:
     """Verify that the bytes are valid UTF-8.
 
     Args:
-        span: The data.
+        span: The Span of bytes.
 
     Returns:
         Whether the data is valid UTF-8.

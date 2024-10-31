@@ -113,7 +113,7 @@ struct StringRef(
         self.length = len
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8]):
+    fn __init__(inout self, *, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
@@ -596,7 +596,7 @@ struct StringRef(
 
     fn strip(self) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
+        This only takes C spaces into account: " \\t\\n\\v\\f\\r".
 
         For example, `"  mojo  "` returns `"mojo"`.
 

@@ -179,12 +179,10 @@ struct SIMD[type: DType, size: Int](
     Hashable,
     _HashableWithHasher,
     Intable,
-    Powable,
+    IntLike,
     Representable,
     Roundable,
     Sized,
-    Stringable,
-    Truncable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -1399,6 +1397,18 @@ struct SIMD[type: DType, size: Int](
             return __mlir_op.`pop.cast`[
                 _type = __mlir_type.`!pop.scalar<index>`
             ](rebind[Scalar[type]](self).value)
+
+    @always_inline("nodebug")
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        constrained[
+            type.is_integral(), "cannot index using a floating point type"
+        ]()
+        return int(self).value
 
     @always_inline("nodebug")
     fn __float__(self) -> Float64:
@@ -3185,6 +3195,16 @@ fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
         result_frac[i] = tup[1]
 
     return (result_int, result_frac)
+
+
+@always_inline("nodebug")
+fn _sub_with_saturation[
+    width: Int, //
+](a: SIMD[DType.uint8, width], b: SIMD[DType.uint8, width]) -> SIMD[
+    DType.uint8, width
+]:
+    # generates a single `vpsubusb` on x86 with AVX
+    return llvm_intrinsic["llvm.usub.sat", __type_of(a)](a, b)
 
 
 # ===----------------------------------------------------------------------=== #
