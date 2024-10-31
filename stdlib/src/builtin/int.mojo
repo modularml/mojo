@@ -17,7 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from documentation import doc_private
 from math import Ceilable, CeilDivable, Floorable, Truncable
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
