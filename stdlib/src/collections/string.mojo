@@ -1239,13 +1239,39 @@ struct String(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
+    fn __reversed__(
+        ref [_]self,
+    ) -> _StringSliceIter[__origin_of(self), forward=False]:
         """Iterate backwards over the string unicode characters.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
         return _StringSliceIter[__origin_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    fn __iter__[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> _StringSliceIter[origin]:
+        """Iterate over the string unicode characters.
+
+        Returns:
+            An iterator of references to the string unicode characters.
+        """
+        return _StringSliceIter[origin](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    fn __reversed__[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> _StringSliceIter[origin, forward=False]:
+        """Iterate backwards over the string unicode characters.
+
+        Returns:
+            A reversed iterator of references to the string unicode characters.
+        """
+        return _StringSliceIter[origin, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 

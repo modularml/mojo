@@ -361,23 +361,35 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+    fn __iter__[
+        is_mutable: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](self) -> _StringSliceIter[origin]:
         """Iterate over the string unicode characters.
 
         Returns:
             An iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[__origin_of(self)](
+        constrained[not is_mutable, "StringLiteral can't be mutated"]()
+        return _StringSliceIter[origin](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
+    fn __reversed__[
+        is_mutable: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](self) -> _StringSliceIter[origin, forward=False]:
         """Iterate backwards over the string unicode characters.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[__origin_of(self), False](
+        constrained[not is_mutable, "StringLiteral can't be mutated"]()
+        return _StringSliceIter[origin, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -446,19 +458,6 @@ struct StringLiteral(
             A string slice pointing to this static string literal.
         """
         return StaticString(self)
-
-    @always_inline
-    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
-        """
-        Returns a contiguous Span of the bytes owned by this string.
-
-        Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-        """
-
-        return Span[Byte, StaticConstantOrigin](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
 
     @always_inline
     fn as_bytes[

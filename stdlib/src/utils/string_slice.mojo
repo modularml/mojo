@@ -538,23 +538,33 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             self.unsafe_ptr(), rhs.unsafe_ptr(), min(len1, len2)
         )
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+    fn __iter__[
+        is_mutable: Bool = is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[origin, is_mutable]
+        .result,
+    ](self) -> _StringSliceIter[origin]:
         """Iterate over the string unicode characters.
 
         Returns:
             An iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[__origin_of(self)](
+        return _StringSliceIter[origin](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
+    fn __reversed__[
+        is_mutable: Bool = is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[origin, is_mutable]
+        .result,
+    ](self) -> _StringSliceIter[origin, False]:
         """Iterate backwards over the string unicode characters.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[__origin_of(self), forward=False](
+        return _StringSliceIter[origin, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -1130,7 +1140,9 @@ trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
         """
         ...
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+    fn __iter__[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> _StringSliceIter[origin]:
         """Iterate over the string unicode characters.
 
         Returns:
@@ -1265,7 +1277,7 @@ fn _split_impl[
 ](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
     sep_len = len(sep.as_bytes[False, O]())
     if sep_len == 0:
-        iterator = src_str.__iter__()
+        iterator = src_str.__iter__[False, __origin_of(src_str)]()
         i_len = len(iterator) + 2
         out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
         out_ptr[0] = src_str.as_bytes[False, O]()[0:0]
