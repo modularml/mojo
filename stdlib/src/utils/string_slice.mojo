@@ -350,10 +350,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Args:
             value: The string value.
         """
-
-        debug_assert(
-            _is_valid_utf8(value.as_bytes()), "value is not valid utf8"
-        )
+        # FIXME: problems at comp time
+        # debug_assert(
+        #     _is_valid_utf8(value.as_bytes()), "value is not valid utf8"
+        # )
         self = StringSlice[O](unsafe_from_utf8=value.as_bytes())
 
     # ===------------------------------------------------------------------===#
