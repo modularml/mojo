@@ -621,6 +621,10 @@ def test_find():
     assert_equal(6, str.find("world"))
     assert_equal(-1, str.find("universe"))
 
+    # Empty string and substring.
+    assert_equal(String("").find("ab"), -1)
+    assert_equal(String("foo").find(""), 0)
+
     # Test find() offset is absolute, not relative (issue mojo/#1355)
     var str2 = String("...a")
     assert_equal(3, str2.find("a", 0))

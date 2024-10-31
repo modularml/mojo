@@ -379,7 +379,7 @@ struct Span[
             single_value: Whether to search with the `subseq`s first value.
             unsafe_dont_normalize: Whether to not normalize the index (no
                 negative indexing, no bounds checks at runtime. There is still
-                a debug_assert `0 <= start < len(self)`).
+                a `debug_assert(0 <= start < len(self))`).
 
         Args:
             subseq: The sub sequence to find.
@@ -387,6 +387,9 @@ struct Span[
 
         Returns:
             The offset of `subseq` relative to the beginning of the `Span`.
+
+        Notes:
+            The function works on an empty span, always returning `-1`.
         """
         _len = len(self)
 
@@ -400,12 +403,12 @@ struct Span[
 
         var n_s: Int
 
+        # _memXXX implementations already handle when haystack_len == 0
         @parameter
         if unsafe_dont_normalize:
-            debug_assert(0 <= start < _len, "unsafe index access")
+            debug_assert(0 <= start < _len + int(_len == 0), "out of bounds")
             n_s = start
         else:
-            # _memXXX implementations already handle all edge cases
             n_s = normalize_index["Span", ignore_zero_length=True](start, self)
         s_ptr = self.unsafe_ptr()
         haystack = __type_of(self)(unsafe_ptr=s_ptr + n_s, len=_len - n_s)
@@ -422,11 +425,6 @@ struct Span[
             loc = _memrchr(haystack, subseq.unsafe_ptr()[0])
 
         return (int(loc) - int(s_ptr) + 1) * int(bool(loc)) - 1
-        # @parameter
-        # if from_left:
-        #    return (int(loc) - int(s_ptr) + 1) * int(bool(loc)) - 1
-        # else:
-        #     return (int(loc) - int(s_ptr)) * int(bool(loc)) - 1
 
     @always_inline
     fn rfind[
@@ -533,7 +531,6 @@ fn _memmem[
                 return
             mask = mask & (mask - 1)
 
-    # remaining partial block compare using byte-by-byte
     for i in range(vectorized_end, haystack_len - needle_len + 1):
         if haystack[i] != needle[0]:
             continue
