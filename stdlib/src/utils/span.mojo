@@ -34,6 +34,10 @@ trait AsBytes:
     ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
 
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
+
         Returns:
             A contiguous slice pointing to bytes.
 

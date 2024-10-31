@@ -546,6 +546,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     ](self) -> _StringSliceIter[origin]:
         """Iterate over the string unicode characters.
 
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
+
         Returns:
             An iterator of references to the string unicode characters.
         """
@@ -560,6 +564,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         .result,
     ](self) -> _StringSliceIter[origin, False]:
         """Iterate backwards over the string unicode characters.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
@@ -657,6 +665,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         .result,
     ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
             A contiguous slice pointing to bytes.
@@ -1197,6 +1209,10 @@ trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
         is_mutable: Bool, origin: Origin[is_mutable].type
     ](self) -> _StringSliceIter[origin]:
         """Iterate over the string unicode characters.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
             An iterator of references to the string unicode characters.

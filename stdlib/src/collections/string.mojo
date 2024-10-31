@@ -1256,6 +1256,10 @@ struct String(
     ](self) -> _StringSliceIter[origin]:
         """Iterate over the string unicode characters.
 
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
+
         Returns:
             An iterator of references to the string unicode characters.
         """
@@ -1267,6 +1271,10 @@ struct String(
         is_mutable: Bool, origin: Origin[is_mutable].type
     ](self) -> _StringSliceIter[origin, forward=False]:
         """Iterate backwards over the string unicode characters.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
@@ -1525,9 +1533,32 @@ struct String(
 
     @always_inline
     fn as_bytes[
+        is_mutable: Bool = False
+    ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+
+        Returns:
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return self.as_bytes[
+            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
+        ]()
+
+    @always_inline
+    fn as_bytes[
         is_mutable: Bool, origin: Origin[is_mutable].type
     ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
             A contiguous slice pointing to bytes.
