@@ -199,9 +199,9 @@ struct PyObjectPtr:
         # TODO: Make this part of the trait bound
         expected_type_name: StringLiteral,
     ) -> Optional[UnsafePointer[T]]:
-        cpython = _get_global_python_itf().cpython()
-        type = cpython.Py_TYPE(self)
-        type_name = PythonObject(cpython.PyType_GetName(type))
+        var cpython = _get_global_python_itf().cpython()
+        var type = cpython.Py_TYPE(self)
+        var type_name = PythonObject(cpython.PyType_GetName(type))
 
         # FIXME(MSTDL-978):
         #   Improve this check. We should do something conceptually equivalent
@@ -270,16 +270,16 @@ struct PythonVersion:
         The version string is parsed to extract major, minor, and patch numbers.
         If parsing fails for any component, it defaults to -1.
         """
-        version_string = String(version)
-        components = InlineArray[Int, 3](-1)
-        start = 0
-        next_idx = 0
-        i = 0
+        var version_string = String(version)
+        var components = InlineArray[Int, 3](-1)
+        var start = 0
+        var next_idx = 0
+        var i = 0
         while next_idx < len(version_string) and i < 3:
             if version_string[next_idx] == "." or (
                 version_string[next_idx] == " " and i == 2
             ):
-                c = version_string[start:next_idx]
+                var c = version_string[start:next_idx]
                 try:
                     components[i] = atol(c)
                 except:
@@ -734,16 +734,16 @@ struct CPython:
     # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
-        logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
+        var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
             print("MOJO_PYTHON:", getenv("MOJO_PYTHON"))
             print("MOJO_PYTHON_LIBRARY:", getenv("MOJO_PYTHON_LIBRARY"))
 
         # Add directory of target file to top of sys.path to find python modules
-        file_dir = dirname(argv()[0])
+        var file_dir = dirname(argv()[0])
         if Path(file_dir).is_dir() or file_dir == "":
-            python_path = getenv("PYTHONPATH")
+            var python_path = getenv("PYTHONPATH")
             # A leading `:` will put the current dir at the top of sys.path.
             # If we're doing `mojo run main.mojo` or `./main`, the returned
             # `dirname` will be an empty string.
@@ -761,7 +761,7 @@ struct CPython:
             UnsafePointer[c_char],
         ]()
 
-        python_lib = getenv("MOJO_PYTHON_LIBRARY")
+        var python_lib = getenv("MOJO_PYTHON_LIBRARY")
 
         if logging_enabled:
             print("PYTHONEXECUTABLE:", getenv("PYTHONEXECUTABLE"))
@@ -801,10 +801,10 @@ struct CPython:
         raise an error if one occurred when initializing the global CPython.
         """
         if self.init_error:
-            error = String(self.init_error)
-            mojo_python = getenv("MOJO_PYTHON")
-            python_lib = getenv("MOJO_PYTHON_LIBRARY")
-            python_exe = getenv("PYTHONEXECUTABLE")
+            var error = String(self.init_error)
+            var mojo_python = getenv("MOJO_PYTHON")
+            var python_lib = getenv("MOJO_PYTHON_LIBRARY")
+            var python_exe = getenv("PYTHONEXECUTABLE")
             if mojo_python:
                 error += "\nMOJO_PYTHON: " + mojo_python
             if python_lib:
@@ -848,11 +848,11 @@ struct CPython:
     # ===-------------------------------------------------------------------===#
 
     fn _inc_total_rc(inout self):
-        v = self.total_ref_count.take_pointee()
+        var v = self.total_ref_count.take_pointee()
         self.total_ref_count.init_pointee_move(v + 1)
 
     fn _dec_total_rc(inout self):
-        v = self.total_ref_count.take_pointee()
+        var v = self.total_ref_count.take_pointee()
         self.total_ref_count.init_pointee_move(v - 1)
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
@@ -871,7 +871,6 @@ struct CPython:
         """
 
         self.log(ptr._get_ptr_as_int(), " DECREF refcnt:", self._Py_REFCNT(ptr))
-
         self.lib.call["Py_DecRef"](ptr)
         self._dec_total_rc()
 
@@ -938,7 +937,7 @@ struct CPython:
         https://docs.python.org/3/c-api/dict.html#c.PyDict_New).
         """
 
-        r = self.lib.call["PyDict_New", PyObjectPtr]()
+        var r = self.lib.call["PyDict_New", PyObjectPtr]()
 
         self.log(
             r._get_ptr_as_int(),
@@ -957,7 +956,7 @@ struct CPython:
         https://docs.python.org/3/c-api/dict.html#c.PyDict_SetItem).
         """
 
-        r = self.lib.call["PyDict_SetItem", c_int](dict_obj, key, value)
+        var r = self.lib.call["PyDict_SetItem", c_int](dict_obj, key, value)
 
         self.log(
             "PyDict_SetItem, key: ",
@@ -975,7 +974,9 @@ struct CPython:
         https://docs.python.org/3/c-api/dict.html#c.PyDict_GetItemWithError).
         """
 
-        r = self.lib.call["PyDict_GetItemWithError", PyObjectPtr](dict_obj, key)
+        var r = self.lib.call["PyDict_GetItemWithError", PyObjectPtr](
+            dict_obj, key
+        )
         self.log("PyDict_GetItemWithError, key: ", key._get_ptr_as_int())
         return r
 
@@ -984,10 +985,10 @@ struct CPython:
         https://docs.python.org/3/c-api/dict.html#c.PyDict_Check).
         """
 
-        my_type = self.PyObject_Type(maybe_dict)
-        my_type_as_int = my_type._get_ptr_as_int()
-        dict_type = self.PyDict_Type()
-        result = my_type_as_int == dict_type._get_ptr_as_int()
+        var my_type = self.PyObject_Type(maybe_dict)
+        var my_type_as_int = my_type._get_ptr_as_int()
+        var dict_type = self.PyDict_Type()
+        var result = my_type_as_int == dict_type._get_ptr_as_int()
         self.Py_DecRef(my_type)
         return result
 
@@ -1006,11 +1007,11 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/dict.html#c.PyDict_Next).
         """
-        key = PyObjectPtr()
-        value = PyObjectPtr()
-        v = p
-        position = UnsafePointer[Int].address_of(v)
-        result = self.lib.call["PyDict_Next", c_int](
+        var key = PyObjectPtr()
+        var value = PyObjectPtr()
+        var v = p
+        var position = UnsafePointer[Int].address_of(v)
+        var result = self.lib.call["PyDict_Next", c_int](
             dictionary,
             position,
             UnsafePointer.address_of(key),
@@ -1053,7 +1054,7 @@ struct CPython:
         https://docs.python.org/3/c-api/import.html#c.PyImport_ImportModule).
         """
 
-        r = self.lib.call["PyImport_ImportModule", PyObjectPtr](name.data)
+        var r = self.lib.call["PyImport_ImportModule", PyObjectPtr](name.data)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1085,8 +1086,8 @@ struct CPython:
         # TODO: See https://docs.python.org/3/c-api/module.html#c.PyModule_Create
         # and https://github.com/pybind/pybind11/blob/a1d00916b26b187e583f3bce39cd59c3b0652c32/include/pybind11/pybind11.h#L1326
         # for what we want to do essentially here.
-        module_def_ptr = UnsafePointer[PyModuleDef].alloc(1)
-        module_def = PyModuleDef(name)
+        var module_def_ptr = UnsafePointer[PyModuleDef].alloc(1)
+        var module_def = PyModuleDef(name)
         module_def_ptr.init_pointee_move(module_def^)
 
         # TODO: set gil stuff
@@ -1194,7 +1195,7 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_String).
         """
-        result = self.lib.call["PyRun_String", PyObjectPtr](
+        var result = self.lib.call["PyRun_String", PyObjectPtr](
             strref.unsafe_ptr(), Int32(run_mode), globals, locals
         )
 
@@ -1220,7 +1221,7 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/veryhigh.html#c.PyEval_EvalCode).
         """
-        result = self.lib.call["PyEval_EvalCode", PyObjectPtr](
+        var result = self.lib.call["PyEval_EvalCode", PyObjectPtr](
             co, globals, locals
         )
         self._inc_total_rc()
@@ -1242,7 +1243,7 @@ struct CPython:
         https://docs.python.org/3/c-api/veryhigh.html#c.Py_CompileString).
         """
 
-        r = self.lib.call["Py_CompileString", PyObjectPtr](
+        var r = self.lib.call["Py_CompileString", PyObjectPtr](
             strref.unsafe_ptr(), filename.unsafe_ptr(), Int32(compile_mode)
         )
         self._inc_total_rc()
@@ -1272,7 +1273,7 @@ struct CPython:
         https://docs.python.org/3/c-api/object.html#c.PyObject_Type).
         """
 
-        p = self.lib.call["PyObject_Type", PyObjectPtr](obj)
+        var p = self.lib.call["PyObject_Type", PyObjectPtr](obj)
         self._inc_total_rc()
         return p
 
@@ -1281,7 +1282,7 @@ struct CPython:
         https://docs.python.org/3/c-api/object.html#c.PyObject_Str).
         """
 
-        p = self.lib.call["PyObject_Str", PyObjectPtr](obj)
+        var p = self.lib.call["PyObject_Str", PyObjectPtr](obj)
         self._inc_total_rc()
         return p
 
@@ -1292,7 +1293,7 @@ struct CPython:
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetItem).
         """
 
-        r = self.lib.call["PyObject_GetItem", PyObjectPtr](obj, key)
+        var r = self.lib.call["PyObject_GetItem", PyObjectPtr](obj, key)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1314,7 +1315,7 @@ struct CPython:
         https://docs.python.org/3/c-api/object.html#c.PyObject_SetItem).
         """
 
-        r = self.lib.call["PyObject_SetItem", c_int](obj, key, value)
+        var r = self.lib.call["PyObject_SetItem", c_int](obj, key, value)
 
         self.log(
             "PyObject_SetItem result:",
@@ -1338,7 +1339,9 @@ struct CPython:
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetAttrString).
         """
 
-        r = self.lib.call["PyObject_GetAttrString", PyObjectPtr](obj, name.data)
+        var r = self.lib.call["PyObject_GetAttrString", PyObjectPtr](
+            obj, name.data
+        )
 
         self.log(
             r._get_ptr_as_int(),
@@ -1361,7 +1364,7 @@ struct CPython:
         """
 
         # int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
-        r = self.lib.call["PyObject_SetAttrString", c_int](
+        var r = self.lib.call["PyObject_SetAttrString", c_int](
             obj, name.data, new_value
         )
 
@@ -1387,7 +1390,7 @@ struct CPython:
         https://docs.python.org/3/c-api/call.html#c.PyObject_CallObject).
         """
 
-        r = self.lib.call["PyObject_CallObject", PyObjectPtr](
+        var r = self.lib.call["PyObject_CallObject", PyObjectPtr](
             callable_obj, args
         )
 
@@ -1412,7 +1415,7 @@ struct CPython:
         https://docs.python.org/3/c-api/call.html#c.PyObject_Call).
         """
 
-        r = self.lib.call["PyObject_Call", PyObjectPtr](
+        var r = self.lib.call["PyObject_Call", PyObjectPtr](
             callable_obj, args, kwargs
         )
 
@@ -1431,8 +1434,6 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/object.html#c.PyObject_IsTrue).
         """
-
-        # int PyObject_IsTrue(PyObject *o)
         return self.lib.call["PyObject_IsTrue", c_int](obj)
 
     fn PyObject_Length(inout self, obj: PyObjectPtr) -> Int:
@@ -1454,7 +1455,7 @@ struct CPython:
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetIter).
         """
 
-        iterator = self.lib.call["PyObject_GetIter", PyObjectPtr](
+        var iterator = self.lib.call["PyObject_GetIter", PyObjectPtr](
             traversablePyObject
         )
 
@@ -1480,7 +1481,7 @@ struct CPython:
         https://docs.python.org/3/c-api/tuple.html#c.PyTuple_New).
         """
 
-        r = self.lib.call["PyTuple_New", PyObjectPtr](count)
+        var r = self.lib.call["PyTuple_New", PyObjectPtr](count)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1511,7 +1512,6 @@ struct CPython:
         # PyTuple_SetItem steals the reference - the element object will be
         # destroyed along with the tuple
         self._dec_total_rc()
-        # int PyTuple_SetItem(PyObject *p, Py_ssize_t pos, PyObject *o)
         return self.lib.call["PyTuple_SetItem", c_int](
             tuple_obj, index, element
         )
@@ -1525,7 +1525,7 @@ struct CPython:
         https://docs.python.org/3/c-api/list.html#c.PyList_New).
         """
 
-        r = self.lib.call["PyList_New", PyObjectPtr](length)
+        var r = self.lib.call["PyList_New", PyObjectPtr](length)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1558,7 +1558,6 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/list.html#c.PyList_GetItem).
         """
-
         return self.lib.call["PyList_GetItem", PyObjectPtr](list_obj, index)
 
     # ===-------------------------------------------------------------------===#
@@ -1578,7 +1577,7 @@ struct CPython:
         #   macros.
         # TODO(MSTDL-977):
         #   Investigate doing this without hard-coding private API details.
-        ptr = self.lib.get_symbol[PyObject]("_Py_NoneStruct")
+        var ptr = self.lib.get_symbol[PyObject]("_Py_NoneStruct")
 
         if not ptr:
             abort("error: unable to get pointer to CPython `None` struct")
@@ -1594,7 +1593,7 @@ struct CPython:
         https://docs.python.org/3/c-api/bool.html#c.PyBool_FromLong).
         """
 
-        r = self.lib.call["PyBool_FromLong", PyObjectPtr](value)
+        var r = self.lib.call["PyBool_FromLong", PyObjectPtr](value)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1616,7 +1615,7 @@ struct CPython:
         https://docs.python.org/3/c-api/long.html#c.PyLong_FromSsize_t).
         """
 
-        r = self.lib.call["PyLong_FromSsize_t", PyObjectPtr](value)
+        var r = self.lib.call["PyLong_FromSsize_t", PyObjectPtr](value)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1635,7 +1634,7 @@ struct CPython:
         https://docs.python.org/3/c-api/long.html#c.PyLong_FromSize_t).
         """
 
-        r = self.lib.call["PyLong_FromSize_t", PyObjectPtr](value)
+        var r = self.lib.call["PyLong_FromSize_t", PyObjectPtr](value)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1664,7 +1663,7 @@ struct CPython:
         https://docs.python.org/3/c-api/float.html#c.PyFloat_FromDouble).
         """
 
-        r = self.lib.call["PyFloat_FromDouble", PyObjectPtr](value)
+        var r = self.lib.call["PyFloat_FromDouble", PyObjectPtr](value)
 
         self.log(
             r._get_ptr_as_int(),
@@ -1693,7 +1692,7 @@ struct CPython:
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).
         """
 
-        r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
+        var r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
             strref.unsafe_ptr().bitcast[Int8](),
             strref.length,
             "strict".unsafe_cstr_ptr(),
@@ -1715,7 +1714,7 @@ struct CPython:
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).
         """
         # return self.PyUnicode_DecodeUTF8(StringRef(strslice.unsafe_ptr(), strslice.byte_length()))
-        r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
+        var r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
             strslice.unsafe_ptr().bitcast[Int8](),
             strslice.byte_length(),
             "strict".unsafe_cstr_ptr(),
@@ -1738,9 +1737,9 @@ struct CPython:
         # the Slice parameters directly to Python. Python's C implementation
         # already handles such conditions, allowing Python to apply its own slice
         # handling.
-        py_start = self.Py_None()
-        py_stop = self.Py_None()
-        py_step = self.Py_None()
+        var py_start = self.Py_None()
+        var py_stop = self.Py_None()
+        var py_step = self.Py_None()
 
         if slice.start:
             py_start = self.PyLong_FromSsize_t(c_ssize_t(slice.start.value()))
@@ -1749,7 +1748,7 @@ struct CPython:
         if slice.end:
             py_step = self.PyLong_FromSsize_t(c_ssize_t(slice.step.value()))
 
-        py_slice = self.PySlice_New(py_start, py_stop, py_step)
+        var py_slice = self.PySlice_New(py_start, py_stop, py_step)
 
         if py_start != self.Py_None():
             self.Py_DecRef(py_start)
@@ -1765,7 +1764,7 @@ struct CPython:
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize).
         """
 
-        s = StringRef()
+        var s = StringRef()
         s.data = self.lib.call[
             "PyUnicode_AsUTF8AndSize", UnsafePointer[c_char]
         ](py_object, UnsafePointer.address_of(s.length)).bitcast[UInt8]()
@@ -1791,16 +1790,16 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Fetch).
         """
-        type = PyObjectPtr()
-        value = PyObjectPtr()
-        traceback = PyObjectPtr()
+        var type = PyObjectPtr()
+        var value = PyObjectPtr()
+        var traceback = PyObjectPtr()
 
         self.lib.call["PyErr_Fetch"](
             UnsafePointer.address_of(type),
             UnsafePointer.address_of(value),
             UnsafePointer.address_of(traceback),
         )
-        r = value
+        var r = value
 
         self.log(
             r._get_ptr_as_int(),
@@ -1844,7 +1843,7 @@ struct CPython:
 
         # Get pointer to the immortal `global_name` PyObject struct
         # instance.
-        ptr = self.lib.get_symbol[PyObjectPtr](global_name)
+        var ptr = self.lib.get_symbol[PyObjectPtr](global_name)
 
         if not ptr:
             abort(
@@ -1864,7 +1863,7 @@ struct CPython:
         https://docs.python.org/3/c-api/iter.html#c.PyIter_Next).
         """
 
-        next_obj = self.lib.call["PyIter_Next", PyObjectPtr](iterator)
+        var next_obj = self.lib.call["PyIter_Next", PyObjectPtr](iterator)
 
         self.log(
             next_obj._get_ptr_as_int(),
@@ -1902,7 +1901,7 @@ struct CPython:
         """[Reference](
         https://docs.python.org/3/c-api/slice.html#c.PySlice_New).
         """
-        r = self.lib.call["PySlice_New", PyObjectPtr](start, stop, step)
+        var r = self.lib.call["PySlice_New", PyObjectPtr](start, stop, step)
 
         self.log(
             r._get_ptr_as_int(),
