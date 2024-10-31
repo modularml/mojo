@@ -381,7 +381,12 @@ struct Span[
                 rest = num_bytes - processed
                 for _ in range(rest // w):
                     var vec = (ptr + processed).load[width=w]()
-                    amnt += int(func[w](vec).cast[D]().reduce_add())
+
+                    @parameter
+                    if w >= 256:
+                        amnt += int(func(vec).cast[DType.uint16]().reduce_add())
+                    else:
+                        amnt += int(func(vec).cast[DType.uint8]().reduce_add())
                     processed += w
 
         for i in range(num_bytes - processed):

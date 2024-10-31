@@ -45,7 +45,6 @@ from builtin.builtin_list import _lit_mut_cast
 struct StringLiteral(
     Boolable,
     Comparable,
-    CollectionElementNew,
     Writable,
     IntableRaising,
     KeyElement,
