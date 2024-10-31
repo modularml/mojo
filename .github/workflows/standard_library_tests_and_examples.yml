@@ -63,5 +63,5 @@ jobs:
         env:
           MOJO_ENABLE_ASSERTIONS_IN_TESTS: ${{ matrix.mojo-enable-assertions }}
         run: |
-          magic run tests
-          magic run examples
+          magic run --frozen tests
+          magic run --frozen examples
