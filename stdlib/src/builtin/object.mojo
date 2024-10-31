@@ -1023,11 +1023,7 @@ struct object(
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) < 0
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return not lhs and rhs
-
-        return Self._comparison_op[Float64.__lt__, Int64.__lt__, bool_fn](
+        return Self._comparison_op[Float64.__lt__, Int64.__lt__, Bool.__lt__](
             self, rhs
         )
 
@@ -1047,11 +1043,7 @@ struct object(
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) <= 0
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs == rhs or not lhs
-
-        return Self._comparison_op[Float64.__le__, Int64.__le__, bool_fn](
+        return Self._comparison_op[Float64.__le__, Int64.__le__, Bool.__le__](
             self, rhs
         )
 
@@ -1077,11 +1069,7 @@ struct object(
             if self._value.is_tuple() and rhs._value.is_tuple():
                 return self._value.get_as_tuple() == rhs._value.get_as_tuple()
 
-            @always_inline
-            fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-                return lhs == rhs
-
-            c = Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
+            c = Self._comparison_op[Float64.__eq__, Int64.__eq__, Bool.__eq__](
                 self, rhs
             )
             return bool(c)
@@ -1121,11 +1109,7 @@ struct object(
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) > 0
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs and not rhs
-
-        return Self._comparison_op[Float64.__gt__, Int64.__gt__, bool_fn](
+        return Self._comparison_op[Float64.__gt__, Int64.__gt__, Bool.__gt__](
             self, rhs
         )
 
@@ -1145,11 +1129,7 @@ struct object(
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) >= 0
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs == rhs or lhs
-
-        return Self._comparison_op[Float64.__ge__, Int64.__ge__, bool_fn](
+        return Self._comparison_op[Float64.__ge__, Int64.__ge__, Bool.__ge__](
             self, rhs
         )
 
