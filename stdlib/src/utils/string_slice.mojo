@@ -23,13 +23,14 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils.span import Span, AsBytesRead
+from utils.span import Span, AsBytes
 from collections.string import _is_ascii_space, _atol, _atof, _repr, _ascii
 from collections import List, Optional
 from memory import memcmp, UnsafePointer
 from sys import simdwidthof, bitwidthof
 from memory.memory import _memcmp_impl_unconstrained
 from ._utf8_validation import _is_valid_utf8
+from builtin.builtin_list import _lit_mut_cast
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -265,7 +266,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     CollectionElement,
     CollectionElementNew,
     Hashable,
-    AsBytesRead,
+    AsBytes,
 ):
     """A non-owning view to encoded string data.
 
@@ -664,27 +665,25 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         )
 
     @always_inline
-    fn as_bytes(self) -> Span[Byte, origin]:
-        """Get the sequence of encoded bytes of the underlying string.
-
-        Returns:
-            A slice containing the underlying sequence of encoded bytes.
-        """
-        return self._slice
-
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
-        """Returns an immutable contiguous slice of the bytes.
+    fn as_bytes[
+        is_mutable: Bool = is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[origin, is_mutable]
+        .result,
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
 
         Parameters:
-            O: The Origin of the bytes.
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
-            An immutable contiguous slice pointing to the bytes.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-        return rebind[Span[Byte, O]](self._slice)
+        return rebind[Span[Byte, origin]](self._slice)
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -981,7 +980,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytesRead):
+trait Stringlike(AsBytes):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 

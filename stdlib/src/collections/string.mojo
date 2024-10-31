@@ -35,7 +35,7 @@ from utils import (
     Writable,
     Writer,
 )
-from utils.span import Span, AsBytesRead
+from utils.span import Span, AsBytes
 from utils.string_slice import (
     StringSlice,
     _utf8_byte_type,
@@ -49,6 +49,7 @@ from utils.string_slice import (
     _is_continuation_byte,
     _is_valid_utf8,
 )
+from builtin.builtin_list import _lit_mut_cast
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -986,7 +987,6 @@ struct String(
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
-    AsBytesRead,
 ):
     """Represents a mutable string."""
 
@@ -1788,34 +1788,36 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
-
-        Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-
-        # Does NOT include the NUL terminator.
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
-        )
-
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
-        """Returns an immutable contiguous slice of the bytes.
-
+    fn as_bytes[
+        is_mutable: Bool = False
+    ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
+        """Returns a contiguous slice of bytes.
         Parameters:
-            O: The Origin of the bytes.
-
+            is_mutable: Whether the result will be mutable.
         Returns:
-            An immutable contiguous slice pointing to the bytes.
-
+            A contiguous slice pointing to bytes.
         Notes:
             This does not include the trailing null terminator.
         """
-        return self.as_bytes()
+        return self.as_bytes[
+            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
+        ]()
+
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
+
+        Returns:
+            A contiguous slice pointing to bytes.
+        """
+        return Span[Byte, origin](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
 
     @always_inline
     fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:

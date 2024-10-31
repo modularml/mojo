@@ -22,6 +22,7 @@ from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import c_char
 from sys import simdwidthof
+from builtin.builtin_list import _lit_mut_cast
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -212,15 +213,23 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous Span of the bytes owned by this string.
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.data, len=self.length
-        )
+        return Span[Byte, origin](unsafe_ptr=self.data, len=self.length)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders

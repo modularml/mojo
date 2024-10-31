@@ -23,7 +23,7 @@ from collections.string import _repr, _ascii
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.span import Span, AsBytesRead
+from utils.span import Span, AsBytes
 from utils.string_slice import (
     StringSlice,
     StaticString,
@@ -31,6 +31,7 @@ from utils.string_slice import (
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
 )
+from builtin.builtin_list import _lit_mut_cast
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -52,7 +53,7 @@ struct StringLiteral(
     FloatableRaising,
     BytesCollectionElement,
     _HashableWithHasher,
-    AsBytesRead,
+    AsBytes,
 ):
     """This type represents a string literal.
 
@@ -390,57 +391,31 @@ struct StringLiteral(
         Returns:
             A string slice pointing to this static string literal.
         """
-
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in StringLiteral so this is actually
-        #   guaranteed to be valid.
-        return StaticString(
-            unsafe_from_utf8_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return StaticString(self)
 
     @always_inline
-    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
-        """
-        Returns a contiguous Span of the bytes owned by this string.
-
-        Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-        """
-
-        return Span[Byte, StaticConstantOrigin](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
-        )
-
-    @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
-
-        Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-        # Does NOT include the NUL terminator.
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
-        )
-
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[Byte, O]:
-        """Returns an immutable contiguous slice of the bytes.
+    fn as_bytes[
+        is_mutable: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
 
         Parameters:
-            O: The Origin of the bytes.
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
-            An immutable contiguous slice pointing to the bytes.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-        return rebind[Span[Byte, O]](self.as_bytes())
+        constrained[not is_mutable, "StringLiteral can't be mutated"]()
+        return Span[Byte, origin](
+            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
+        )
 
     @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
