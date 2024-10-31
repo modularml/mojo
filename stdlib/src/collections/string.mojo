@@ -1148,7 +1148,7 @@ struct String(
             T: The string like type.
 
         Args:
-            other: The string literal to append.
+            other: The string to append.
 
         Returns:
             The new constructed string.

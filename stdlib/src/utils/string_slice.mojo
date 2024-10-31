@@ -1024,6 +1024,59 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return _split_sl[has_maxsplit=False, has_sep=False](self, sep, -1)
 
+    fn isnewline[single_character: Bool = False](self) -> Bool:
+        """Determines whether every character in the given StringSlice is a
+        python newline character. This corresponds to Python's
+        [universal newlines:](
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+
+        Parameters:
+            single_character: Whether to evaluate the stringslice as a single
+                unicode character (avoids overhead when already iterating).
+
+        Returns:
+            True if the whole StringSlice is made up of whitespace characters
+            listed above, otherwise False.
+        """
+
+        @always_inline
+        fn _is_newline_char(s: StringSlice) -> Bool:
+            # sorry for readability, but this has less overhead than memcmp
+            # highly performance sensitive code, benchmark before touching
+            alias `\t` = UInt8(ord("\t"))
+            alias `\r` = UInt8(ord("\r"))
+            alias `\n` = UInt8(ord("\n"))
+            alias `\x1c` = UInt8(ord("\x1c"))
+            alias `\x1e` = UInt8(ord("\x1e"))
+            no_null_len = s.byte_length()
+            ptr = s.unsafe_ptr()
+
+            if no_null_len == 1:
+                v = ptr[0]
+                return `\t` <= v <= `\x1e` and not (`\r` < v < `\x1c`)
+            elif no_null_len == 2:
+                v0 = ptr[0]
+                v1 = ptr[1]
+                next_line = v0 == 0xC2 and v1 == 0x85  # next line: \x85
+                r_n = v0 == `\r` and v1 == `\n`
+                return next_line or r_n
+            elif no_null_len == 3:
+                # unicode line sep or paragraph sep: \u2028 , \u2029
+                v2 = ptr[2]
+                lastbyte = v2 == 0xA8 or v2 == 0xA9
+                return ptr[0] == 0xE2 and ptr[1] == 0x80 and lastbyte
+            return False
+
+        @parameter
+        if single_character:
+            return _is_newline_char(self)
+        else:
+            for s in self:
+                if not _is_newline_char(s):
+                    return False
+            return self.byte_length() != 0
+
     fn splitlines[
         O: ImmutableOrigin, //
     ](self: StringSlice[O], keepends: Bool = False) -> List[StringSlice[O]]:
