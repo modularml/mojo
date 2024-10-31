@@ -993,13 +993,13 @@ struct object(
     fn _list_compare(self, rhs: object) raises -> Int:
         var llen = len(self._value.get_as_list())
         var rlen = len(rhs._value.get_as_list())
+        var lptr = Pointer.address_of(self._value.get_as_list())
+        var rptr = Pointer.address_of(rhs._value.get_as_list())
         var cmp_len = min(llen, rlen)
         for i in range(cmp_len):
-            var lelt: object = self._value.get_as_list()[i]
-            var relt: object = rhs._value.get_as_list()[i]
-            if lelt < relt:
+            if lptr[][i] < rptr[][i]:
                 return -1
-            if lelt > relt:
+            if lptr[][i] > rptr[][i]:
                 return 1
         if llen < rlen:
             return -1

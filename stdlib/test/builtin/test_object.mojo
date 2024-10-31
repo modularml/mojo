@@ -161,6 +161,27 @@ def test_comparison_ops():
     rhs = (0, 1, 2)
     assert_false(lhs == rhs)
 
+    lhs = [1.0, 0.0, -1.0]
+    rhs = [1.0, 0.0, -2.0]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+    lhs = [1, 0, -1]
+    rhs = [1, 0, -2]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+    lhs = [1.0, 0.0, -1.0]
+    rhs = [1, 0, -2]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+    lhs = [True, True]
+    rhs = [True, False]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+
 
 def test_arithmetic_ops():
     a = object(False)
