@@ -633,6 +633,24 @@ def test_find():
     assert_equal(7, str.find("o", -5))
 
     assert_equal(-1, String("abc").find("abcd"))
+    assert_equal(0, (String("0") * 100).find("0"))
+    assert_equal(0, (String("0") * 100).find("00"))
+    assert_equal(9, String.DIGITS.find("9"))
+    assert_equal(25, String.ASCII_LETTERS.find("z"))
+    assert_equal(25, String.ASCII_LETTERS.find("zA"))
+    assert_equal(25, String.ASCII_LETTERS.find("zABCD"))
+    for i in range(2, 50):
+        assert_equal(51, (String.ASCII_LETTERS * i).find("Za"))
+
+    # Special characters.
+    # FIXME: once find works by unicode codepoints
+    # assert_equal(String("こんにちは").find("にち"), 2)
+    # assert_equal(String("🔥🔥").find("🔥"), 0)
+
+    # pathlike operations
+    p = "/subdir/subdir/subdir/subdir/mojo/stdlib/test/os/path/test_split.mojo"
+    file_name = "test_split.mojo"
+    assert_equal(len(p) - len(file_name), p.find("test_split.mojo"))
 
 
 def test_count():
@@ -689,11 +707,24 @@ def test_rfind():
     assert_equal(String("hello world").rfind("w", -5), 6)
 
     assert_equal(-1, String("abc").rfind("abcd"))
+    assert_equal(99, (String("0") * 100).rfind("0"))
+    assert_equal(98, (String("0") * 100).rfind("00"))
+    assert_equal(9, String.DIGITS.rfind("9"))
+    assert_equal(25, String.ASCII_LETTERS.rfind("z"))
+    assert_equal(25, String.ASCII_LETTERS.rfind("zA"))
+    assert_equal(25, String.ASCII_LETTERS.rfind("zABCD"))
+    for i in range(2, 50):
+        assert_equal(0, ("123" + String.ASCII_LETTERS * i).rfind("123"))
 
     # Special characters.
-    # TODO(#26444): Support unicode strings.
+    # FIXME: once find works by unicode codepoints
     # assert_equal(String("こんにちは").rfind("にち"), 2)
     # assert_equal(String("🔥🔥").rfind("🔥"), 1)
+
+    # pathlike operations
+    p = "/subdir/subdir/subdir/subdir/mojo/stdlib/test/os/path/test_split.mojo"
+    file_name = "test_split.mojo"
+    assert_equal(len(p) - len(file_name) - 1, p.rfind("/"))
 
 
 def test_split():
@@ -1073,6 +1104,7 @@ def test_rstrip():
 
     var str1 = String("string")
     assert_true(str1.rstrip() == "string")
+    assert_equal(str1.rstrip("g"), "strin")
 
     var str2 = String("something \t\n\t\v\f")
     assert_true(str2.rstrip() == "something")
@@ -1099,6 +1131,7 @@ def test_lstrip():
 
     var str1 = String("string")
     assert_true(str1.lstrip() == "string")
+    assert_equal(str1.lstrip("s"), "tring")
 
     var str2 = String(" \t\n\t\v\fsomething")
     assert_true(str2.lstrip() == "something")

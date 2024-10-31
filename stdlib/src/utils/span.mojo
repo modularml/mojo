@@ -25,7 +25,7 @@ from collections import normalize_index
 from memory import Pointer, UnsafePointer, bitcast, memcmp
 from builtin.builtin_list import _lit_mut_cast
 from sys import simdwidthof
-from bit import count_trailing_zeros
+from bit import count_trailing_zeros, count_leading_zeros
 from builtin.dtype import _uint_type_of_width
 
 
@@ -421,7 +421,12 @@ struct Span[
         else:
             loc = _memrchr(haystack, subseq.unsafe_ptr()[0])
 
-        return int(loc) - int(s_ptr) if loc else -1
+        return (int(loc) - int(s_ptr) + 1) * int(bool(loc)) - 1
+        # @parameter
+        # if from_left:
+        #    return (int(loc) - int(s_ptr) + 1) * int(bool(loc)) - 1
+        # else:
+        #     return (int(loc) - int(s_ptr)) * int(bool(loc)) - 1
 
     @always_inline
     fn rfind[
@@ -557,12 +562,11 @@ fn _memrchr[
             return
 
     for i in reversed(range(0, vectorized_end, bool_mask_width)):
-        bool_mask = (
-            haystack.load[width=bool_mask_width](i).reversed() == first_needle
-        )
+        bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
         mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
-            output = haystack + int(i + count_trailing_zeros(mask))
+            zeros = int(count_leading_zeros(mask)) + 1
+            output = haystack + (i + bool_mask_width - zeros)
             return
 
     output = UnsafePointer[Scalar[type]]()
@@ -602,18 +606,16 @@ fn _memrmem[
     last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
 
     for i in reversed(range(0, vectorized_end, bool_mask_width)):
-        first_block = haystack.load[width=bool_mask_width](i).reversed()
-        last_block = haystack.load[width=bool_mask_width](
-            i + needle_len - 1
-        ).reversed()
+        first_block = haystack.load[width=bool_mask_width](i)
+        last_block = haystack.load[width=bool_mask_width](i + needle_len - 1)
 
         bool_mask = (first_needle == first_block) & (last_needle == last_block)
         mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
 
         while mask:
-            offset = int(i + count_trailing_zeros(mask))
-            if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
-                output = haystack + offset
+            offset = i + bool_mask_width - int(count_leading_zeros(mask))
+            if memcmp(haystack + offset, needle + 1, needle_len - 1) == 0:
+                output = haystack + offset - 1
                 return
             mask = mask & (mask - 1)
 
