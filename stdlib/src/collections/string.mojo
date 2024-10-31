@@ -1135,10 +1135,7 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add(
-            self.as_bytes[False, __origin_of(self)](),
-            other.as_bytes[False, __origin_of(other)](),
-        )
+        return Self._add(self.as_bytes(), other.as_bytes())
 
     @always_inline
     fn __add__[T: Stringlike, //](self, other: T) -> String:
@@ -1154,8 +1151,7 @@ struct String(
             The new constructed string.
         """
         return Self._add(
-            self.as_bytes[False, __origin_of(self)](),
-            other.as_bytes[False, __origin_of(other)](),
+            self.as_bytes(), other.as_bytes[False, __origin_of(other)]()
         )
 
     @always_inline
@@ -1169,8 +1165,7 @@ struct String(
             The new constructed string.
         """
         return Self._add(
-            other.as_bytes[False, __origin_of(other)](),
-            self.as_bytes[False, __origin_of(self)](),
+            other.as_bytes[False, __origin_of(other)](), self.as_bytes()
         )
 
     @always_inline
@@ -1187,8 +1182,7 @@ struct String(
             The new constructed string.
         """
         return Self._add(
-            other.as_bytes[False, __origin_of(other)](),
-            self.as_bytes[False, __origin_of(self)](),
+            other.as_bytes[False, __origin_of(other)](), self.as_bytes()
         )
 
     fn _iadd(inout self, other: Span[Byte]):
@@ -1215,7 +1209,7 @@ struct String(
         Args:
             other: The string to append.
         """
-        self._iadd(other.as_bytes[False, __origin_of(other)]())
+        self._iadd(other.as_bytes())
 
     @always_inline
     fn __iadd__[T: Stringlike, //](inout self, other: T):

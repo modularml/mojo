@@ -33,7 +33,7 @@ fn test_string_literal_byte_span() raises:
 
 fn test_string_byte_span() raises:
     var string = String("Hello")
-    var str_slice = string.as_bytes[True, __origin_of(string)]()
+    var str_slice = string.as_bytes[True]()
 
     assert_equal(len(str_slice), 5)
     assert_equal(str_slice[0], ord("H"))
@@ -335,7 +335,7 @@ alias BAD_SEQUENCES = List[String](
 
 
 fn validate_utf8(slice: String) -> Bool:
-    return _is_valid_utf8(slice.as_bytes[False, __origin_of(slice)]())
+    return _is_valid_utf8(slice.as_bytes())
 
 
 def test_good_utf8_sequences():

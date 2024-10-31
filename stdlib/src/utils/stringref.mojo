@@ -217,6 +217,10 @@ struct StringRef(
     ](self) -> Span[Byte, origin]:
         """Returns a contiguous Span of the bytes owned by this string.
 
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
+
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
