@@ -23,14 +23,15 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils.span import Span, AsBytesRead, AsBytesWrite
+from utils.span import Span, AsBytes
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer, memcpy, memcpy
+from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
 from sys.intrinsics import unlikely
 from memory.memory import _memcmp_impl_unconstrained
 from ._utf8_validation import _is_valid_utf8
+from builtin.builtin_list import _lit_mut_cast
 
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -79,13 +80,9 @@ fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
 
     debug_assert(
         (b & 0b1100_0000) != 0b1000_0000,
-        (
-            "Function `_utf8_first_byte_sequence_length()` does not work"
-            " correctly if given a continuation byte."
-        ),
+        "Function does not work correctly if given a continuation byte.",
     )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
+    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
@@ -253,7 +250,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     CollectionElementNew,
     Hashable,
     Stringlike,
-    AsBytesWrite,
 ):
     """A non-owning view to encoded string data.
 
@@ -303,7 +299,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Safety:
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
         """
-
+        # FIXME: this is giving a lot of problems at comp time
+        # debug_assert(
+        #     _is_valid_utf8(unsafe_from_utf8), "value is not valid utf8"
+        # )
         self._slice = unsafe_from_utf8^
 
     fn __init__(inout self, *, unsafe_from_utf8_strref: StringRef):
@@ -376,11 +375,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Args:
             value: The string value.
         """
-
-        debug_assert(
-            _is_valid_utf8(value.as_bytes()), "value is not valid utf8"
-        )
-        self = StringSlice[O](unsafe_from_utf8=value.as_bytes())
+        self = StringSlice[O](unsafe_from_utf8=value.as_bytes[False, O]())
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -645,7 +640,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, origin]:
+    fn as_bytes[
+        is_mutable: Bool = is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[origin, is_mutable]
+        .result,
+    ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
 
         Returns:
@@ -654,46 +654,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Notes:
             This does not include the trailing null terminator.
         """
-        return self._slice
+        return rebind[Span[Byte, origin]](self._slice)
 
     @always_inline
-    fn as_bytes_write[O: MutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns a mutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            A mutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-
-        return Span[UInt8, O](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
-
-    @always_inline
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns an immutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            An immutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-
-        return Span[UInt8, O](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
-
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Byte]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:
@@ -835,18 +799,20 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             The offset of `substr` relative to the beginning of the string.
         """
 
-        var sub = substr.as_bytes_read()
+        var sub = substr.as_bytes[False, __origin_of(substr)]()
         var sub_len = len(sub)
         if sub_len == 0:
             return 0
 
-        var s_span = self.as_bytes_read()
+        var s_span = self.as_bytes[False, __origin_of(substr)]()
         if len(s_span) < sub_len + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        var haystack = self._from_start(start).as_bytes_read()
+        var haystack = self._from_start(start).as_bytes[
+            False, __origin_of(substr)
+        ]()
 
         var loc = stringref._memmem(
             haystack.unsafe_ptr(), len(haystack), sub.unsafe_ptr(), sub_len
@@ -1125,7 +1091,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytesRead, CollectionElement, CollectionElementNew):
+trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -1297,17 +1263,17 @@ fn _split_impl[
     O: ImmutableOrigin, //,
     has_maxsplit: Bool,
 ](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
-    sep_len = len(sep.as_bytes_read())
+    sep_len = len(sep.as_bytes[False, O]())
     if sep_len == 0:
         iterator = src_str.__iter__()
         i_len = len(iterator) + 2
         out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
-        out_ptr[0] = src_str.as_bytes_read()[0:0]
+        out_ptr[0] = src_str.as_bytes[False, O]()[0:0]
         i = 1
         for s in iterator:
-            out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes_read())
+            out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes[False, O]())
             i += 1
-        out_ptr[i] = src_str.as_bytes_read()[-1:-1]
+        out_ptr[i] = src_str.as_bytes[False, O]()[-1:-1]
         output = __type_of(output)(
             unsafe_pointer=out_ptr, size=i_len, capacity=i_len
         )
@@ -1320,13 +1286,13 @@ fn _split_impl[
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    str_byte_len = len(src_str.as_bytes_read())
+    str_byte_len = len(src_str.as_bytes[False, O]())
     lhs = 0
     rhs = 0
     items = 0
-    ptr = src_str.as_bytes_read().unsafe_ptr()
-    # str_span = src_str.as_bytes_read() # FIXME(#3295)
-    # sep_span = sep.as_bytes_read() # FIXME(#3295)
+    ptr = src_str.as_bytes[False, O]().unsafe_ptr()
+    # str_span = src_str.as_bytes[False, O]() # FIXME(#3295)
+    # sep_span = sep.as_bytes[False, O]() # FIXME(#3295)
 
     while lhs <= str_byte_len:
         rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span and sep_span
@@ -1351,11 +1317,11 @@ fn _split_impl[
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    str_byte_len = len(src_str.as_bytes_read())
+    str_byte_len = len(src_str.as_bytes[False, O]())
     lhs = 0
     rhs = 0
     items = 0
-    ptr = src_str.as_bytes_read().unsafe_ptr()
+    ptr = src_str.as_bytes[False, O]().unsafe_ptr()
     alias S = StringSlice[StaticConstantOrigin]
 
     @always_inline("nodebug")

@@ -20,6 +20,7 @@ from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char, OpaquePointer
 from utils import StaticString, write_args
+from builtin.builtin_list import _lit_mut_cast
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
@@ -29,7 +30,7 @@ from sys.intrinsics import _type_is_eq
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
 from utils import IndexList, StringRef, Variant
-from utils.span import Span, AsBytesWrite
+from utils.span import Span
 from utils.write import Writer, Writable
 from utils.string_slice import (
     StringSlice,
@@ -705,7 +706,6 @@ struct String(
     FloatableRaising,
     _HashableWithHasher,
     Stringlike,
-    AsBytesWrite,
 ):
     """Represents a mutable string."""
 
@@ -838,14 +838,13 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     fn write_bytes(inout self, bytes: Span[Byte, _]):
-        """
-        Write a byte span to this String.
+        """Write a byte span to this String.
 
         Args:
             bytes: The byte span to write to this String. Must NOT be
-              null terminated.
+                null terminated.
         """
-        self._iadd[True](bytes)
+        self._iadd(bytes)
 
     fn write[*Ts: Writable](inout self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
@@ -1107,7 +1106,7 @@ struct String(
         return not (self < rhs)
 
     @staticmethod
-    fn _add[rhs_has_null: Bool](lhs: Span[Byte], rhs: Span[Byte]) -> String:
+    fn _add(lhs: Span[Byte], rhs: Span[Byte]) -> String:
         var lhs_len = len(lhs)
         var rhs_len = len(rhs)
         var lhs_ptr = lhs.unsafe_ptr()
@@ -1121,12 +1120,9 @@ struct String(
         var buffer = Self._buffer_type(capacity=sum_len + 1)
         var ptr = buffer.unsafe_ptr()
         memcpy(ptr, lhs_ptr, lhs_len)
-        memcpy(ptr + lhs_len, rhs_ptr, rhs_len + int(rhs_has_null))
+        memcpy(ptr + lhs_len, rhs_ptr, rhs_len)
         buffer.size = sum_len + 1
-
-        @parameter
-        if not rhs_has_null:
-            ptr[sum_len] = 0
+        ptr[sum_len] = 0
         return Self(buffer^)
 
     @always_inline
@@ -1139,11 +1135,17 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](self.as_bytes(), other.as_bytes())
+        return Self._add(
+            self.as_bytes[False, __origin_of(self)](),
+            other.as_bytes[False, __origin_of(other)](),
+        )
 
     @always_inline
-    fn __add__(self, other: StringLiteral) -> String:
+    fn __add__[T: Stringlike, //](self, other: T) -> String:
         """Creates a string by appending a string literal at the end.
+
+        Parameters:
+            T: The string like type.
 
         Args:
             other: The string literal to append.
@@ -1151,19 +1153,10 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[False](self.as_bytes(), other.as_bytes())
-
-    @always_inline
-    fn __add__(self, other: StringSlice) -> String:
-        """Creates a string by appending a string slice at the end.
-
-        Args:
-            other: The string slice to append.
-
-        Returns:
-            The new constructed string.
-        """
-        return Self._add[False](self.as_bytes(), other.as_bytes())
+        return Self._add(
+            self.as_bytes[False, __origin_of(self)](),
+            other.as_bytes[False, __origin_of(other)](),
+        )
 
     @always_inline
     fn __radd__(self, other: String) -> String:
@@ -1175,23 +1168,17 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](other.as_bytes(), self.as_bytes())
+        return Self._add(
+            other.as_bytes[False, __origin_of(other)](),
+            self.as_bytes[False, __origin_of(self)](),
+        )
 
     @always_inline
-    fn __radd__(self, other: StringLiteral) -> String:
+    fn __radd__[T: Stringlike, //](self, other: T) -> String:
         """Creates a string by prepending another string literal to the start.
 
-        Args:
-            other: The string to prepend.
-
-        Returns:
-            The new constructed string.
-        """
-        return Self._add[True](other.as_bytes(), self.as_bytes())
-
-    @always_inline
-    fn __radd__(self, other: StringSlice) -> String:
-        """Creates a string by prepending another string slice to the start.
+        Parameters:
+            T: The string like type.
 
         Args:
             other: The string to prepend.
@@ -1199,9 +1186,12 @@ struct String(
         Returns:
             The new constructed string.
         """
-        return Self._add[True](other.as_bytes(), self.as_bytes())
+        return Self._add(
+            other.as_bytes[False, __origin_of(other)](),
+            self.as_bytes[False, __origin_of(self)](),
+        )
 
-    fn _iadd[has_null: Bool](inout self, other: Span[Byte]):
+    fn _iadd(inout self, other: Span[Byte]):
         var s_len = self.byte_length()
         var o_len = len(other)
         var o_ptr = other.unsafe_ptr()
@@ -1214,12 +1204,9 @@ struct String(
         var sum_len = s_len + o_len
         self._buffer.reserve(sum_len + 1)
         var s_ptr = self.unsafe_ptr()
-        memcpy(s_ptr + s_len, o_ptr, o_len + int(has_null))
+        memcpy(s_ptr + s_len, o_ptr, o_len)
         self._buffer.size = sum_len + 1
-
-        @parameter
-        if not has_null:
-            s_ptr[sum_len] = 0
+        s_ptr[sum_len] = 0
 
     @always_inline
     fn __iadd__(inout self, other: String):
@@ -1228,25 +1215,19 @@ struct String(
         Args:
             other: The string to append.
         """
-        self._iadd[True](other.as_bytes())
+        self._iadd(other.as_bytes[False, __origin_of(other)]())
 
     @always_inline
-    fn __iadd__(inout self, other: StringLiteral):
+    fn __iadd__[T: Stringlike, //](inout self, other: T):
         """Appends another string literal to this string.
 
-        Args:
-            other: The string to append.
-        """
-        self._iadd[False](other.as_bytes())
-
-    @always_inline
-    fn __iadd__(inout self, other: StringSlice):
-        """Appends another string slice to this string.
+        Parameters:
+            T: The string like type.
 
         Args:
             other: The string to append.
         """
-        self._iadd[False](other.as_bytes())
+        self._iadd(other.as_bytes[False, __origin_of(other)]())
 
     fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over the string unicode characters.
@@ -1368,7 +1349,7 @@ struct String(
             writer: The object to write to.
         """
 
-        writer.write_bytes(self.as_bytes())
+        writer.write_bytes(self.as_bytes[False, __origin_of(self)]())
 
     fn join(self, *elems: Int) -> String:
         """Joins the elements from the tuple using the current string as a
@@ -1475,7 +1456,7 @@ struct String(
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
         for e_ref in elems:
-            len_elems += len(e_ref[].as_bytes())
+            len_elems += len(e_ref[].as_bytes[False, __origin_of(e_ref)]())
         var capacity = len_self * (n_elems - 1) + len_elems
         var buf = Self._buffer_type(capacity=capacity)
         var self_ptr = self.unsafe_ptr()
@@ -1489,7 +1470,7 @@ struct String(
             else:
                 memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
                 offset += len_self
-            var e = elems[i].as_bytes()
+            var e = elems[i].as_bytes[False, __origin_of(elems[i])]()
             var e_len = len(e)
             memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
             offset += e_len
@@ -1517,7 +1498,9 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
 
         Returns:
@@ -1527,51 +1510,20 @@ struct String(
             This does not include the trailing null terminator.
         """
 
-        return Span[Byte, __origin_of(self)](
+        return Span[Byte, origin](
             unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
         )
 
     @always_inline
-    fn as_bytes_write[O: MutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns a mutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            A mutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-        return self.as_bytes()
-
-    @always_inline
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns an immutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            An immutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-        return self.as_bytes()
-
-    @always_inline
-    fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(
+        ref [_]self,
+    ) -> StringSlice[_lit_mut_cast[__origin_of(self), False].result]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in String so this is actually
-        #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes())
+        return StringSlice(self)
 
     @always_inline
     fn byte_length(self) -> Int:

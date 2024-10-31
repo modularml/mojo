@@ -33,6 +33,7 @@ from utils.string_slice import (
     _split,
 )
 from collections.string import _atol
+from builtin.builtin_list import _lit_mut_cast
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -444,13 +445,7 @@ struct StringLiteral(
         Returns:
             A string slice pointing to this static string literal.
         """
-
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in StringLiteral so this is actually
-        #   guaranteed to be valid.
-        return StaticString(
-            unsafe_from_utf8_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return StaticString(self)
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
@@ -466,7 +461,12 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes[
+        is_mutable: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
 
         Returns:
@@ -475,25 +475,8 @@ struct StringLiteral(
         Notes:
             This does not include the trailing null terminator.
         """
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
-
-    @always_inline
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns an immutable contiguous slice of the bytes.
-
-        Parameters:
-            O: The Origin of the bytes.
-
-        Returns:
-            An immutable contiguous slice pointing to the bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-
-        return Span[UInt8, O](
+        constrained[not is_mutable, "StringLiteral can't be mutated"]()
+        return Span[Byte, origin](
             unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
         )
 

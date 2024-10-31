@@ -212,15 +212,15 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> Span[Byte, origin]:
         """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.data, len=self.length
-        )
+        return Span[Byte, origin](unsafe_ptr=self.data, len=self.length)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
