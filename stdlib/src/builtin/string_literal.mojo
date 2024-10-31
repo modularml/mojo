@@ -23,10 +23,11 @@ from collections.string import _repr, _ascii
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.span import Span, AsBytes
+from utils.span import Span
 from utils.string_slice import (
     StringSlice,
     StaticString,
+    Stringlike,
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
@@ -52,9 +53,8 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
-    BytesCollectionElement,
     _HashableWithHasher,
-    AsBytes,
+    Stringlike,
 ):
     """This type represents a string literal.
 

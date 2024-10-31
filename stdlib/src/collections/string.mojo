@@ -116,7 +116,9 @@ fn ord[T: Stringlike, //](ref [_]s: T) -> Int:
                 | int(p[3] & c_byte_mask)
             )
     else:
-        return ord(StringSlice(unsafe_from_utf8=s.as_bytes_read()))
+        return ord(
+            StringSlice(unsafe_from_utf8=s.as_bytes[False, __origin_of(s)]())
+        )
 
 
 fn ord[O: ImmutableOrigin, //](s: StringSlice[O]) -> Int:
@@ -267,7 +269,7 @@ fn _repr[T: Stringlike, //](value: T) -> String:
     alias `\r` = Byte(ord("\r"))
     alias `r` = Byte(ord("r"))
 
-    span = value.as_bytes_read()
+    span = value.as_bytes[False, __origin_of(value)]()
     span_len = len(span)
     debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
     nonprintable_python = span.count[func=_nonprintable_python]()
@@ -481,7 +483,7 @@ fn _ascii[T: Stringlike, //](value: T) -> String:
     alias `'` = Byte(ord("'"))
     alias `"` = Byte(ord('"'))
 
-    span = value.as_bytes_read()
+    span = value.as_bytes[False, __origin_of(value)]()
     span_len = len(span)
     debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
     non_printable_ascii = span.count[func=_nonprintable_ascii]()
@@ -977,7 +979,6 @@ fn islower(c: UInt8) -> Bool:
 struct String(
     Sized,
     Stringable,
-    AsBytes,
     Representable,
     IntableRaising,
     KeyElement,
@@ -985,9 +986,9 @@ struct String(
     Boolable,
     Writable,
     Writer,
-    CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
+    Stringlike,
 ):
     """Represents a mutable string."""
 
@@ -1747,7 +1748,7 @@ struct String(
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
         for e_ref in elems:
-            len_elems += len(e_ref[].as_bytes())
+            len_elems += len(e_ref[].as_bytes[False, __origin_of(e_ref)]())
         var capacity = len_self * (n_elems - 1) + len_elems
         var buf = Self._buffer_type(capacity=capacity)
         var self_ptr = self.unsafe_ptr()
@@ -1761,7 +1762,7 @@ struct String(
             else:
                 memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
                 offset += len_self
-            var e = elems[i].as_bytes()
+            var e = elems[i].as_bytes[False, __origin_of(elems[i])]()
             var e_len = len(e)
             memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
             offset += e_len
@@ -1793,10 +1794,13 @@ struct String(
         is_mutable: Bool = False
     ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
         """Returns a contiguous slice of bytes.
+
         Parameters:
             is_mutable: Whether the result will be mutable.
+
         Returns:
             A contiguous slice pointing to bytes.
+
         Notes:
             This does not include the trailing null terminator.
         """
@@ -1809,6 +1813,7 @@ struct String(
         is_mutable: Bool, origin: Origin[is_mutable].type
     ](self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
+
         Parameters:
             is_mutable: Whether the result will be mutable.
             origin: The origin of the data.
@@ -1821,16 +1826,15 @@ struct String(
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(
+        ref [_]self,
+    ) -> StringSlice[_lit_mut_cast[__origin_of(self), False].result]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in String so this is actually
-        #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self.as_bytes())
+        return StringSlice(self)
 
     @always_inline
     fn byte_length(self) -> Int:

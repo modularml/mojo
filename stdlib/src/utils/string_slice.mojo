@@ -226,10 +226,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     Stringable,
     Sized,
     Writable,
-    CollectionElement,
-    CollectionElementNew,
     Hashable,
-    AsBytes,
+    Stringlike,
 ):
     """A non-owning view to encoded string data.
 
@@ -1026,7 +1024,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytes):
+trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
