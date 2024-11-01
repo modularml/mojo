@@ -154,9 +154,9 @@ def test_array_unsafe_assume_initialized_constructor_string():
     var maybe_uninitialized_arr = InlineArray[
         UnsafeMaybeUninitialized[String], 3
     ](unsafe_uninitialized=True)
-    maybe_uninitialized_arr[0].write("hello")
-    maybe_uninitialized_arr[1].write("mojo")
-    maybe_uninitialized_arr[2].write("world")
+    maybe_uninitialized_arr[0] = "hello"
+    maybe_uninitialized_arr[1] = "mojo"
+    maybe_uninitialized_arr[2] = "world"
 
     var initialized_arr = InlineArray[String, 3](
         unsafe_assume_initialized=maybe_uninitialized_arr^
