@@ -1706,7 +1706,7 @@ struct object(
 
         Returns:
             The length of the string value or the number of elements in the list
-            ,dictionary or tuple value.
+            , dictionary or tuple value.
         """
         if self._value.is_str():
             return len(self._value.get_as_string())
