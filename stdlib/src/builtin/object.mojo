@@ -219,7 +219,7 @@ struct _ObjectImpl(
     """Type discriminator indicating a function."""
     alias obj: Int = 7
     """Type discriminator indicating an object."""
-    alias tuple: Int = 8
+    alias tuple: Int = 9
     """Type discriminator indicating a tuple."""
 
     # ===------------------------------------------------------------------=== #
@@ -391,15 +391,15 @@ struct _ObjectImpl(
 
     def ref_count(ref [_]self) -> Int:
         if self.is_dict():
-            return self.value[_RefCountedDict].impl.count().__int__()
+            return int(self.value[_RefCountedDict].impl.count())
         if self.is_obj():
-            return self.value[_RefCountedAttrsDict].impl.count().__int__()
+            return int(self.value[_RefCountedAttrsDict].impl.count())
         if self.is_str():
-            return self.value[_RefCountedString].impl.count().__int__()
+            return int(self.value[_RefCountedString].impl.count())
         if self.is_list():
-            return self.value[_RefCountedList].impl.count().__int__()
+            return int(self.value[_RefCountedList].impl.count())
         if self.is_tuple():
-            return self.value[_RefCountedTuple].impl.count().__int__()
+            return int(self.value[_RefCountedTuple].impl.count())
         raise self._get_type_name() + " is not ref counted"
 
     # ===------------------------------------------------------------------=== #
