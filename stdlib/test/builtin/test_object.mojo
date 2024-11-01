@@ -625,6 +625,26 @@ def test_object_tuple_add():
     assert_equal(c[2], "two")
 
 
+def test_object_get_type_id():
+    var x = object()
+    assert_equal(x._value.get_type_id(), x._value.none)
+    x = 1
+    assert_equal(x._value.get_type_id(), x._value.int)
+    x = 1.0
+    assert_equal(x._value.get_type_id(), x._value.float)
+    x = "hello world"
+    assert_equal(x._value.get_type_id(), x._value.str)
+    x = object(Attr("value", 1))
+    assert_equal(x._value.get_type_id(), x._value.obj)
+    x = [1, 2.0, "three"]
+    assert_equal(x._value.get_type_id(), x._value.list)
+    x = (1, 2.0, "three")
+    assert_equal(x._value.get_type_id(), x._value.tuple)
+    x = object.dict()
+    x["one"] = 1
+    assert_equal(x._value.get_type_id(), x._value.dict)
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -646,3 +666,4 @@ def main():
     test_object_RefCountedCowString()
     test_object_tuple_contains()
     test_object_tuple_add()
+    test_object_get_type_id()
