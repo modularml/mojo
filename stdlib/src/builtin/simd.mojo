@@ -57,6 +57,7 @@ from sys import sizeof, alignof
 from .dtype import (
     _get_dtype_printf_format,
     _integral_type_of,
+    _unsigned_integral_type_of,
     _scientific_notation_digits,
 )
 from .io import _printf, _snprintf_scalar
@@ -492,6 +493,20 @@ struct SIMD[type: DType, size: Int](
                 )
             )
 
+    fn __init__[
+        int_type: DType, //
+    ](inout self, *, from_bits: SIMD[int_type, size]):
+        """Initializes the SIMD vector from the bits of an integral SIMD vector.
+
+        Parameters:
+            int_type: The integral type of the input SIMD vector.
+
+        Args:
+            from_bits: The SIMD vector to copy the bits from.
+        """
+        constrained[int_type.is_integral(), "the SIMD type must be integral"]()
+        self = bitcast[type, size](from_bits)
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
@@ -776,9 +791,7 @@ struct SIMD[type: DType, size: Int](
         # As a workaround, we roll our own implementation
         @parameter
         if has_neon() and type is DType.bfloat16:
-            var int_self = bitcast[_integral_type_of[type](), size](self)
-            var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
-            return int_self == int_rhs
+            return self.to_bits() == rhs.to_bits()
         else:
             return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
                 self.value, rhs.value
@@ -801,9 +814,7 @@ struct SIMD[type: DType, size: Int](
         # As a workaround, we roll our own implementation.
         @parameter
         if has_neon() and type is DType.bfloat16:
-            var int_self = bitcast[_integral_type_of[type](), size](self)
-            var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
-            return int_self != int_rhs
+            return self.to_bits() != rhs.to_bits()
         else:
             return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
                 self.value, rhs.value
@@ -1514,9 +1525,9 @@ struct SIMD[type: DType, size: Int](
                     self
                 )
 
-            alias integral_type = FPUtils[type].integral_type
-            var m = self._float_to_bits[integral_type]()
-            return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
+            # FIXME: This should be an alias
+            var mask = FPUtils[type].exponent_mantissa_mask()
+            return Self(from_bits=self.to_bits() & mask)
         else:
             return (self < 0).select(-self, self)
 
@@ -1726,32 +1737,31 @@ struct SIMD[type: DType, size: Int](
         if size > 1:
             writer.write("]")
 
+    # FIXME: `_integral_type_of` doesn't work with `DType.bool`.
     @always_inline
-    fn _bits_to_float[dest_type: DType](self) -> SIMD[dest_type, size]:
-        """Bitcasts the integer value to a floating-point value.
+    fn to_bits[
+        int_dtype: DType = _integral_type_of[type]()
+    ](self) -> SIMD[int_dtype, size]:
+        """Bitcasts the SIMD vector to an integer SIMD vector.
 
         Parameters:
-            dest_type: DType to bitcast the input SIMD vector to.
-
-        Returns:
-            A floating-point representation of the integer value.
-        """
-        alias integral_type = FPUtils[type].integral_type
-        return bitcast[dest_type, size](self.cast[integral_type]())
-
-    @always_inline
-    fn _float_to_bits[dest_type: DType](self) -> SIMD[dest_type, size]:
-        """Bitcasts the floating-point value to an integer value.
-
-        Parameters:
-            dest_type: DType to bitcast the input SIMD vector to.
+            int_dtype: The integer type to cast to.
 
         Returns:
             An integer representation of the floating-point value.
         """
-        alias integral_type = FPUtils[type].integral_type
-        var v = bitcast[integral_type, size](self)
-        return v.cast[dest_type]()
+        constrained[
+            int_dtype.is_integral(), "the target type must be integral"
+        ]()
+        constrained[
+            bitwidthof[int_dtype]() >= bitwidthof[type](),
+            (
+                "the target integer type must be at least as wide as the source"
+                " type"
+            ),
+        ]()
+
+        return bitcast[_integral_type_of[type](), size](self).cast[int_dtype]()
 
     fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[
@@ -3221,14 +3231,16 @@ fn _floor(x: SIMD) -> __type_of(x):
     alias bitwidth = bitwidthof[x.type]()
     alias exponent_width = FPUtils[x.type].exponent_width()
     alias mantissa_width = FPUtils[x.type].mantissa_width()
+    # FIXME: GH issue #3613
+    # alias mask = FPUtils[x.type].exponent_mask()
     alias mask = (1 << exponent_width) - 1
     alias bias = FPUtils[x.type].exponent_bias()
     alias shift_factor = bitwidth - exponent_width - 1
 
-    var bits = bitcast[integral_type, x.size](x)
+    bits = x.to_bits()
     var e = ((bits >> mantissa_width) & mask) - bias
     bits = (e < shift_factor).select(
         bits & ~((1 << (shift_factor - e)) - 1),
         bits,
     )
-    return bitcast[x.type, x.size](bits)
+    return __type_of(x)(from_bits=bits)
