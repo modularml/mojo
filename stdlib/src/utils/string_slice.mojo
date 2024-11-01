@@ -282,7 +282,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         #   StringLiteral is guaranteed to use UTF-8 encoding.
         # FIXME(MSTDL-160):
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
-        # FIXME: this gets practically stuck at compile time
+        # FIXME(#3706): this gets practically stuck at compile time
         # debug_assert(
         #     _is_valid_utf8(lit.as_bytes()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
@@ -299,7 +299,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Safety:
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
         """
-        # FIXME: this is giving a lot of problems at comp time
+        # FIXME(#3706): this is giving a lot of problems at comp time
         # debug_assert(
         #     _is_valid_utf8(unsafe_from_utf8), "value is not valid utf8"
         # )
@@ -946,7 +946,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        return _split_sl[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
+        return _split_slice[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
 
     @always_inline
     fn split[
@@ -977,7 +977,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        return _split_sl[has_maxsplit=False, has_sep=True](self, sep, -1)
+        return _split_slice[has_maxsplit=False, has_sep=True](self, sep, -1)
 
     @always_inline
     fn split[
@@ -1002,7 +1002,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        return _split_sl[has_maxsplit=True, has_sep=False](self, None, maxsplit)
+        return _split_slice[has_maxsplit=True, has_sep=False](self, None, maxsplit)
 
     @always_inline
     fn split[
@@ -1034,7 +1034,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        return _split_sl[has_maxsplit=False, has_sep=False](self, sep, -1)
+        return _split_slice[has_maxsplit=False, has_sep=False](self, sep, -1)
 
     fn isnewline[single_character: Bool = False](self) -> Bool:
         """Determines whether every character in the given StringSlice is a
@@ -1307,7 +1307,7 @@ fn _split[
         return _to_string_list(_split_impl[has_maxsplit](src_str, maxsplit))
 
 
-fn _split_sl[
+fn _split_slice[
     O: ImmutableOrigin, //,
     has_maxsplit: Bool,
     has_sep: Bool,
@@ -1372,11 +1372,11 @@ fn _split_impl[
     rhs = 0
     items = 0
     ptr = src_str.as_bytes[False, O]().unsafe_ptr()
-    # str_span = src_str.as_bytes[False, O]() # FIXME(#3295)
-    # sep_span = sep.as_bytes[False, O]() # FIXME(#3295)
+    # str_span = src_str.as_bytes[False, O]() # FIXME: solve #3526 with #3548
+    # sep_span = sep.as_bytes[False, O]() # FIXME: solve #3526 with #3548
 
     while lhs <= str_byte_len:
-        rhs = src_str.find(sep, lhs)  # FIXME(#3295): use str_span and sep_span
+        rhs = src_str.find(sep, lhs)  # FIXME(#3526): use str_span and sep_span
         rhs += int(rhs == -1) * (str_byte_len + 1)  # if not found go to end
 
         @parameter
