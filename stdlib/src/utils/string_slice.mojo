@@ -946,7 +946,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        return _split_slice[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
+        return _split_slice[has_maxsplit=True, has_sep=True](
+            self, sep, maxsplit
+        )
 
     @always_inline
     fn split[
@@ -1002,7 +1004,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        return _split_slice[has_maxsplit=True, has_sep=False](self, None, maxsplit)
+        return _split_slice[has_maxsplit=True, has_sep=False](
+            self, None, maxsplit
+        )
 
     @always_inline
     fn split[
@@ -1225,15 +1229,15 @@ fn _to_string_list[
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
-    i_len = len(items)
-    i_ptr = items.unsafe_ptr()
-    out_ptr = UnsafePointer[String].alloc(i_len)
+    var i_len = len(items)
+    var i_ptr = items.unsafe_ptr()
+    var out_ptr = UnsafePointer[String].alloc(i_len)
 
     for i in range(i_len):
-        og_len = len_fn(i_ptr[i])
-        f_len = og_len + 1  # null terminator
-        p = UnsafePointer[Byte].alloc(f_len)
-        og_ptr = unsafe_ptr_fn(i_ptr[i])
+        var og_len = len_fn(i_ptr[i])
+        var f_len = og_len + 1  # null terminator
+        var p = UnsafePointer[Byte].alloc(f_len)
+        var og_ptr = unsafe_ptr_fn(i_ptr[i])
         memcpy(p, og_ptr, og_len)
         p[og_len] = 0  # null terminator
         buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=f_len)
@@ -1327,9 +1331,9 @@ fn _split_slice[
             _split_impl[has_maxsplit](src_str, maxsplit)
         )
 
-    i_len = len(items)
+    var i_len = len(items)
     out_ptr = UnsafePointer[StringSlice[O]].alloc(i_len)
-    i = 0
+    var i = 0
     for item in items:
         (out_ptr + i).init_pointee_move(StringSlice[O](unsafe_from_utf8=item[]))
         i += 1
@@ -1344,11 +1348,11 @@ fn _split_impl[
     O: ImmutableOrigin, //,
     has_maxsplit: Bool,
 ](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
-    sep_len = len(sep.as_bytes[False, O]())
+    var sep_len = len(sep.as_bytes[False, O]())
     if sep_len == 0:
-        iterator = src_str.__iter__[False, __origin_of(src_str)]()
-        i_len = len(iterator) + 2
-        out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
+        var iterator = src_str.__iter__[False, __origin_of(src_str)]()
+        var i_len = len(iterator) + 2
+        var out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
         out_ptr[0] = src_str.as_bytes[False, O]()[0:0]
         i = 1
         for s in iterator:
@@ -1361,22 +1365,24 @@ fn _split_impl[
         return
 
     alias prealloc = 32  # guessing, Python's implementation uses 12
-    amnt = prealloc
+    var amnt = prealloc
 
     @parameter
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    str_byte_len = len(src_str.as_bytes[False, O]())
-    lhs = 0
-    rhs = 0
-    items = 0
-    ptr = src_str.as_bytes[False, O]().unsafe_ptr()
-    # str_span = src_str.as_bytes[False, O]() # FIXME: solve #3526 with #3548
-    # sep_span = sep.as_bytes[False, O]() # FIXME: solve #3526 with #3548
+    var str_byte_len = len(src_str.as_bytes[False, O]())
+    var lhs = 0
+    var rhs = 0
+    var items = 0
+    var ptr = src_str.as_bytes[False, O]().unsafe_ptr()
+    # var str_span = src_str.as_bytes[False, O]() # FIXME: solve #3526 with #3548
+    # var sep_span = sep.as_bytes[False, O]() # FIXME: solve #3526 with #3548
 
     while lhs <= str_byte_len:
-        rhs = src_str.find(sep, lhs)  # FIXME(#3526): use str_span and sep_span
+        var rhs = src_str.find(
+            sep, lhs
+        )  # FIXME(#3526): use str_span and sep_span
         rhs += int(rhs == -1) * (str_byte_len + 1)  # if not found go to end
 
         @parameter
@@ -1392,17 +1398,17 @@ fn _split_impl[
     T: Stringlike, O: ImmutableOrigin, //, has_maxsplit: Bool
 ](ref [O]src_str: T, maxsplit: Int) -> List[Span[Byte, O]] as output:
     alias prealloc = 32  # guessing, Python's implementation uses 12
-    amnt = prealloc
+    var amnt = prealloc
 
     @parameter
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    str_byte_len = len(src_str.as_bytes[False, O]())
-    lhs = 0
-    rhs = 0
-    items = 0
-    ptr = src_str.as_bytes[False, O]().unsafe_ptr()
+    var str_byte_len = len(src_str.as_bytes[False, O]())
+    var lhs = 0
+    var rhs = 0
+    var items = 0
+    var ptr = src_str.as_bytes[False, O]().unsafe_ptr()
     alias S = StringSlice[StaticConstantOrigin]
 
     @always_inline("nodebug")
