@@ -645,6 +645,31 @@ def test_object_get_type_id():
     assert_equal(x._value.get_type_id(), x._value.dict)
 
 
+def test_object_getattr():
+    # test cow 1:
+    x = object(Attr("value", "hello world"))
+    y = x.value
+    assert_equal(x.value, y)
+    x.value = "hello world!"
+    assert_equal(x.value, "hello world!")
+    assert_equal(y, "hello world")
+
+    # test cow 2:
+    x = object(Attr("value", "hello world"))
+    y = object(Attr("value", x.value))
+    assert_equal(y.value, "hello world")
+    x.value = "hello world!"
+    assert_equal(x.value, "hello world!")
+    assert_equal(y.value, "hello world")
+
+    with assert_raises(contains="does not have an attribute of name 'value2'"):
+        _ = x.value2
+    with assert_raises(
+        contains="does not have an attribute of name 'new_attr'"
+    ):
+        x.new_attr = 1
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -667,3 +692,4 @@ def main():
     test_object_tuple_contains()
     test_object_tuple_add()
     test_object_get_type_id()
+    test_object_getattr()

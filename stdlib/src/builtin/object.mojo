@@ -1818,7 +1818,9 @@ struct object(
         self[i][j] = value
 
     @always_inline
-    fn __getattr__(self, key: StringLiteral) raises -> object:
+    fn __getattr__(
+        self, key: StringLiteral
+    ) raises -> ref [self._value.value] object:
         """Gets the named attribute.
 
         Args:
@@ -1835,14 +1837,17 @@ struct object(
                 + key
                 + "'"
             )
-        var iter = self._value.get_as_obj().find(key)
-        if iter:
-            return iter.value()
-        raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
-        )
+        try:
+            return UnsafePointer.address_of(
+                self._value.get_as_obj()._find_ref(key)
+            )[]
+        except e:
+            debug_assert(str(e) == "KeyError")
+            raise Error(
+                "AttributeError: Object does not have an attribute of name '"
+                + key
+                + "'"
+            )
 
     @always_inline
     fn __setattr__(inout self, key: StringLiteral, value: object) raises:
@@ -1860,14 +1865,16 @@ struct object(
                 + key
                 + "'"
             )
-        if key in self._value.get_as_obj():
-            self._value.get_as_obj()[key] = value
+        try:
+            self._value.get_as_obj()._find_ref(key) = value
             return
-        raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
-        )
+        except e:
+            debug_assert(str(e) == "KeyError")
+            raise Error(
+                "AttributeError: Object does not have an attribute of name '"
+                + key
+                + "'"
+            )
 
     @always_inline
     fn __call__(self) raises -> object:
