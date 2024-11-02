@@ -327,11 +327,11 @@ def test_non_object_getattr():
 
 
 def matrix_getitem(self, i) -> object:
-    return self.value[i]
+    return self.value[i[0]][i[1]]
 
 
 def matrix_setitem(self, i, value) -> object:
-    self.value[i] = value
+    self.value[i[0]][i[1]] = value
     return None
 
 
@@ -376,9 +376,9 @@ def test_matrix():
         C.append(row_zero)
 
     matmul_untyped(C, A, B)
-    assert_equal(str(C[0]), "[5, 8, 11]")
-    assert_equal(str(C[1]), "[8, 14, 20]")
-    assert_equal(str(C[2]), "[11, 20, 29]")
+    assert_equal(str(C.value[0]), "[5, 8, 11]")
+    assert_equal(str(C.value[1]), "[8, 14, 20]")
+    assert_equal(str(C.value[2]), "[11, 20, 29]")
 
 
 def test_convert_to_string():
@@ -400,9 +400,9 @@ def test_convert_to_string():
     b.append("baz")
     a.append(b)
     assert_equal(str(a), "[3, False, 5.5, ['foo', 'baz']]")
-    assert_equal(str(a[3, 1]), "baz")
-    a[3, 1] = "bar"
-    assert_equal(str(a[3, 1]), "bar")
+    assert_equal(str(a[3][1]), "baz")
+    a[3][1] = "bar"
+    assert_equal(str(a[3][1]), "bar")
     var c = a + b
     assert_equal(str(c), "[3, False, 5.5, ['foo', 'bar'], 'foo', 'bar']")
     b.append(False)

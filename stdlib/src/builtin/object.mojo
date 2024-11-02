@@ -1755,10 +1755,18 @@ struct object(
                 "TypeError: can only index into lists, strings and tuples"
             )
 
+        if i._value.is_tuple():
+            raise Error(
+                "'" + self._value._get_type_name() + "'"
+                + " object does not support " + i._value._get_type_name()
+                + " as an index"
+            )
+        
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             # Construct a new single-character string.
             return self._value.get_as_string()[index]
+        
         if self._value.is_tuple():
             return self._value.get_as_tuple()[i._value.get_as_int().value]
         return self._value.get_as_list()[i._value.get_as_int().value]
@@ -1773,10 +1781,10 @@ struct object(
         Returns:
             The value at the index.
         """
-        var value = self
+        var tmp_tuple = object(())
         for i in index:
-            value = value[i[]]
-        return value
+            tmp_tuple._value.get_as_tuple().append(i[])
+        return self[tmp_tuple]
 
     @always_inline
     fn __setitem__(self, i: object, value: object) raises -> None:
@@ -1799,6 +1807,11 @@ struct object(
             )
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
+        if not i._value.is_int():
+            raise Error(
+                "'list' object does not support " + self._value._get_type_name()
+                + " as an index"
+            )
         var index = Self._convert_index_to_int(i)
         self._value.get_as_list()[index.value] = value
 
@@ -1815,7 +1828,10 @@ struct object(
             j: The second index.
             value: The value to set.
         """
-        self[i][j] = value
+        var tmp_tuple = object(())
+        tmp_tuple._value.get_as_tuple().append(i)
+        tmp_tuple._value.get_as_tuple().append(j)
+        self[tmp_tuple] = value
 
     @always_inline
     fn __getattr__(
