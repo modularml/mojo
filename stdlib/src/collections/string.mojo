@@ -27,6 +27,7 @@ from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from builtin.builtin_list import _lit_mut_cast
 
 from utils import (
     Span,
@@ -1502,13 +1503,31 @@ struct String(
         buf.append(0)
         return String(buf^)
 
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr[
+        is_mutable: Bool = True
+    ](self) -> UnsafePointer[
+        UInt8,
+        is_mutable=is_mutable,
+        origin = _lit_mut_cast[__origin_of(self), is_mutable].result,
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data
+        return self.unsafe_ptr[
+            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
+        ]()
+
+    fn unsafe_ptr[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self._buffer.unsafe_ptr[is_mutable, origin]()
 
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.

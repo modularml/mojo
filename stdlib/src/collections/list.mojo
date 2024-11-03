@@ -25,6 +25,7 @@ from sys import sizeof
 from os import abort
 from memory import Pointer, UnsafePointer, memcpy
 from utils import Span
+from builtin.builtin_list import _lit_mut_cast
 
 from .optional import Optional
 
@@ -925,14 +926,31 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if elt_idx_1 != elt_idx_2:
             swap((self.data + elt_idx_1)[], (self.data + elt_idx_2)[])
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr[
+        is_mutable: Bool = True
+    ](self) -> UnsafePointer[
+        T,
+        is_mutable=is_mutable,
+        origin = _lit_mut_cast[__origin_of(self), is_mutable].result,
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The UnsafePointer to the underlying memory.
+            The pointer to the underlying memory.
         """
-        return self.data
+        return self.unsafe_ptr[
+            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
+        ]()
+
+    fn unsafe_ptr[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> UnsafePointer[T, is_mutable=is_mutable, origin=origin]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.data.bitcast[is_mutable=is_mutable, origin=origin]()
 
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:

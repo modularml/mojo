@@ -23,6 +23,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
+from builtin.builtin_list import _lit_mut_cast
 
 from utils.string_slice import (
     _StringSliceIter,
@@ -407,23 +408,29 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr[
+        is_mutable: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Get raw pointer to the underlying data.
 
         Returns:
             The raw pointer to the data.
         """
+        constrained[not is_mutable, "StringLiteral can't be mutated"]()
         var ptr = UnsafePointer(__mlir_op.`pop.string.address`(self.value))
 
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return ptr.bitcast[UInt8]()
+        return ptr.bitcast[Byte, is_mutable=is_mutable, origin=origin]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
+    fn unsafe_cstr_ptr(
+        self,
+    ) -> UnsafePointer[c_char, is_mutable=False, origin=StaticConstantOrigin]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.

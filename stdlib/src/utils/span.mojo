@@ -106,7 +106,7 @@ struct Span[
     """
 
     # Field
-    var _data: UnsafePointer[T]
+    var _data: UnsafePointer[T, is_mutable=is_mutable, origin=origin]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
@@ -234,15 +234,18 @@ struct Span[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
-        """
-        Gets a pointer to the first element of this slice.
+    fn unsafe_ptr[
+        is_mutable: Bool = Self.is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[Self.origin, is_mutable]
+        .result,
+    ](self) -> UnsafePointer[T, is_mutable=is_mutable, origin=origin]:
+        """Retrieves a pointer to the underlying memory.
 
         Returns:
-            A pointer pointing at the first element of this slice.
+            The pointer to the underlying memory.
         """
-
-        return self._data
+        return self._data.bitcast[is_mutable=is_mutable, origin=origin]()
 
     fn as_ref(self) -> Pointer[T, origin]:
         """

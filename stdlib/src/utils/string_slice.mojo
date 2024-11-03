@@ -23,6 +23,7 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
+from builtin.builtin_list import _lit_mut_cast
 from utils import Span
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
@@ -649,14 +650,18 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return self._slice
 
     @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr[
+        is_mutable: Bool = Self.is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[Self.origin, is_mutable]
+        .result,
+    ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:
             A pointer pointing at the first element of this string slice.
         """
-
-        return self._slice.unsafe_ptr()
+        return self._slice.unsafe_ptr[is_mutable, origin]()
 
     @always_inline
     fn byte_length(self) -> Int:
@@ -1028,7 +1033,9 @@ trait Stringlike:
         """
         ...
 
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -1203,7 +1210,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         buf.unsafe_set(0, 0)
         var res = String(buf^)
         var offset = 0
-        var ptr = fmt_src.unsafe_ptr()
+        var ptr = fmt_src.unsafe_ptr[False, __origin_of(fmt_src)]()
         alias S = StringSlice[StaticConstantOrigin]
 
         @always_inline("nodebug")
@@ -1239,7 +1246,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var entries = List[Self]()
         var start = Optional[Int](None)
         var skip_next = False
-        var fmt_ptr = fmt_src.unsafe_ptr()
+        var fmt_ptr = fmt_src.unsafe_ptr[False, __origin_of(fmt_src)]()
         var fmt_len = fmt_src.byte_length()
         var total_estimated_entry_byte_width = 0
 
@@ -1329,7 +1336,11 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
             return S(unsafe_from_utf8_ptr=p + start, len=end - start)
 
-        var field = _build_slice(fmt_src.unsafe_ptr(), start_value + 1, i)
+        var field = _build_slice(
+            fmt_src.unsafe_ptr[False, __origin_of(fmt_src)](),
+            start_value + 1,
+            i,
+        )
         var field_ptr = field.unsafe_ptr()
         var field_len = i - (start_value + 1)
         var exclamation_index = -1
