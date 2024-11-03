@@ -15,6 +15,7 @@ from .path import (
     dirname,
     exists,
     expanduser,
+    expandvars,
     getsize,
     isdir,
     isfile,
