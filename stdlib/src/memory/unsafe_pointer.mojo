@@ -289,12 +289,7 @@ struct UnsafePointer[
         """
         self = self - offset
 
-    # This decorator informs the compiler that indirect address spaces are not
-    # dereferenced by the method.
-    # TODO: replace with a safe model that checks the body of the method for
-    # accesses to the origin.
-    @__unsafe_disable_nested_origin_exclusivity
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are equal.
 
@@ -306,8 +301,7 @@ struct UnsafePointer[
         """
         return int(self) == int(rhs)
 
-    @__unsafe_disable_nested_origin_exclusivity
-    @always_inline("nodebug")
+    @always_inline
     fn __ne__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are not equal.
 
@@ -319,8 +313,7 @@ struct UnsafePointer[
         """
         return not (self == rhs)
 
-    @__unsafe_disable_nested_origin_exclusivity
-    @always_inline("nodebug")
+    @always_inline
     fn __lt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower address than rhs.
 
@@ -332,8 +325,7 @@ struct UnsafePointer[
         """
         return int(self) < int(rhs)
 
-    @__unsafe_disable_nested_origin_exclusivity
-    @always_inline("nodebug")
+    @always_inline
     fn __le__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower than or equal
            address than rhs.
@@ -346,8 +338,7 @@ struct UnsafePointer[
         """
         return int(self) <= int(rhs)
 
-    @__unsafe_disable_nested_origin_exclusivity
-    @always_inline("nodebug")
+    @always_inline
     fn __gt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher address than rhs.
 
@@ -355,12 +346,12 @@ struct UnsafePointer[
             rhs: The value of the other pointer.
 
         Returns:
-            True if this pointer represents a higher than or equal address and False otherwise.
+            True if this pointer represents a higher than or equal address and
+            False otherwise.
         """
         return int(self) > int(rhs)
 
-    @__unsafe_disable_nested_origin_exclusivity
-    @always_inline("nodebug")
+    @always_inline
     fn __ge__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher than or equal
            address than rhs.
@@ -369,7 +360,8 @@ struct UnsafePointer[
             rhs: The value of the other pointer.
 
         Returns:
-            True if this pointer represents a higher than or equal address and False otherwise.
+            True if this pointer represents a higher than or equal address and
+            False otherwise.
         """
         return int(self) >= int(rhs)
 
@@ -395,8 +387,12 @@ struct UnsafePointer[
         """
         return self.__bool__()
 
+    # This decorator informs the compiler that indirect address spaces are not
+    # dereferenced by the method.
+    # TODO: replace with a safe model that checks the body of the method for
+    # accesses to the origin.
     @__unsafe_disable_nested_origin_exclusivity
-    @always_inline
+    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
