@@ -687,6 +687,63 @@ fn isprintable(c: UInt8) -> Bool:
 
 
 # ===----------------------------------------------------------------------=== #
+# String Representation
+# ===----------------------------------------------------------------------=== #
+
+
+struct StringRepr(Writable):
+    """Represents a string representation of an String."""
+
+    var _value: StringSlice[ImmutableAnyOrigin]
+    """The string representation of the String."""
+
+    fn __init__(inout self, value: String):
+        """Constructs a string representation of the string.
+
+        Args:
+            value: The string to represent.
+        """
+        self._value = StringSlice[ImmutableAnyOrigin](
+            unsafe_from_utf8_ptr=value.unsafe_ptr(),
+            len=len(value),
+        )
+
+    fn write_to[W: Writer](self, inout writer: W):
+        """Writes the string representation to the provided writer.
+
+        Parameters:
+            W: The type of the writer.
+
+        Args:
+            writer: The writer to write the string representation to.
+        """
+        var quote = "'"
+        if len(self._value) > 0 and self._value[0] == "'":
+            quote = '"'
+        writer.write(quote)
+        for s in self._value:
+            if s == "\\":
+                writer.write(r"\\")
+            elif s == "\t":
+                writer.write(r"\t")
+            elif s == "\n":
+                writer.write(r"\n")
+            elif s == "\r":
+                writer.write(r"\r")
+            else:
+                var codepoint = ord(s)
+                if isprintable(codepoint):
+                    writer.write(s)
+                elif codepoint < 0x10:
+                    writer.write(hex(codepoint, prefix=r"\x0"))
+                elif codepoint < 0x20 or codepoint == 0x7F:
+                    writer.write(hex(codepoint, prefix=r"\x"))
+                else:  # multi-byte character
+                    writer.write(s)
+        writer.write(quote)
+
+
+# ===----------------------------------------------------------------------=== #
 # String
 # ===----------------------------------------------------------------------=== #
 
@@ -1320,34 +1377,9 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        var result = String()
-        var use_dquote = False
-        for s in self:
-            use_dquote = use_dquote or (s == "'")
-
-            if s == "\\":
-                result += r"\\"
-            elif s == "\t":
-                result += r"\t"
-            elif s == "\n":
-                result += r"\n"
-            elif s == "\r":
-                result += r"\r"
-            else:
-                var codepoint = ord(s)
-                if isprintable(codepoint):
-                    result += s
-                elif codepoint < 0x10:
-                    result += hex(codepoint, prefix=r"\x0")
-                elif codepoint < 0x20 or codepoint == 0x7F:
-                    result += hex(codepoint, prefix=r"\x")
-                else:  # multi-byte character
-                    result += s
-
-        if use_dquote:
-            return '"' + result + '"'
-        else:
-            return "'" + result + "'"
+        var output = String()
+        StringRepr(self).write_to(output)
+        return output
 
     fn __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).
