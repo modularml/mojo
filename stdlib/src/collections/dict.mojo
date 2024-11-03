@@ -191,7 +191,9 @@ struct _DictValueIter[
         # Cast through a pointer to grant additional mutability because
         # _DictEntryIter.next erases it.
         return Self.ref_type.address_of(
-            UnsafePointer.address_of(entry_ref[].value)[]
+            UnsafePointer[is_mutable=dict_mutability].address_of(
+                entry_ref[].value
+            )[]
         )
 
     @always_inline

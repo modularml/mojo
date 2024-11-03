@@ -935,6 +935,9 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     ]:
         """Retrieves a pointer to the underlying memory.
 
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+
         Returns:
             The pointer to the underlying memory.
         """
@@ -946,6 +949,10 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         is_mutable: Bool, origin: Origin[is_mutable].type
     ](self) -> UnsafePointer[T, is_mutable=is_mutable, origin=origin]:
         """Retrieves a pointer to the underlying memory.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            origin: The origin of the data.
 
         Returns:
             The pointer to the underlying memory.

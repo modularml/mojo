@@ -242,6 +242,10 @@ struct Span[
     ](self) -> UnsafePointer[T, is_mutable=is_mutable, origin=origin]:
         """Retrieves a pointer to the underlying memory.
 
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            origin: The origin of the data.
+
         Returns:
             The pointer to the underlying memory.
         """

@@ -1512,6 +1512,9 @@ struct String(
     ]:
         """Retrieves a pointer to the underlying memory.
 
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+
         Returns:
             The pointer to the underlying memory.
         """
@@ -1523,6 +1526,10 @@ struct String(
         is_mutable: Bool, origin: Origin[is_mutable].type
     ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Retrieves a pointer to the underlying memory.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            origin: The origin of the data.
 
         Returns:
             The pointer to the underlying memory.

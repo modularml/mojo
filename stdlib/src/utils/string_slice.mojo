@@ -658,6 +658,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            origin: The origin of the data.
+
         Returns:
             A pointer pointing at the first element of this string slice.
         """

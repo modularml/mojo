@@ -144,15 +144,13 @@ struct UnsafePointer[
     # Factory methods
     # ===-------------------------------------------------------------------===#
 
+    # TODO: need a method to extract mutability from origin
     @staticmethod
     @always_inline("nodebug")
     fn address_of(
-        ref [_, address_space._value.value]arg: type
+        ref [origin, address_space._value.value]arg: type
     ) -> UnsafePointer[
-        type,
-        address_space,
-        is_mutable = Self.is_mutable,
-        origin = Self.origin,
+        type, address_space, is_mutable = Self.is_mutable, origin=origin
     ] as result:
         """Gets the address of the argument.
 
@@ -199,7 +197,7 @@ struct UnsafePointer[
         alias _ref_type = Pointer[type, origin, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[type, address_space, alignment](self).address
+                self.address
             )
         )
 
