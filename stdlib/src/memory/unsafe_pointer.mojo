@@ -395,6 +395,7 @@ struct UnsafePointer[
         """
         return self.__bool__()
 
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
