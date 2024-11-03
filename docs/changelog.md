@@ -16,6 +16,9 @@ what we publish.
 
 ### ⭐️ New
 
+- `StringRef` is now representable so `repr(StringRef("hello"))` will return
+  `StringRef('hello')`.
+
 - Mojo can now interpret simple LLVM intrinsics in parameter expressions,
   enabling things like `count_leading_zeros` to work at compile time:
   [Issue #933](https://github.com/modularml/mojo/issues/933).
