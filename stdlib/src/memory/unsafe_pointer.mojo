@@ -28,7 +28,7 @@ from sys.intrinsics import (
     strided_load,
     strided_store,
 )
-from builtin.builtin_list import _lit_mut_cast
+from builtin.builtin_list import _lit_mut_cast, _is_mutable_origin
 from bit import is_power_of_two
 from memory.memory import _free, _malloc
 
@@ -144,13 +144,15 @@ struct UnsafePointer[
     # Factory methods
     # ===-------------------------------------------------------------------===#
 
-    # TODO: need a method to extract mutability from origin
     @staticmethod
     @always_inline("nodebug")
     fn address_of(
-        ref [origin, address_space._value.value]arg: type
+        ref [_, address_space._value.value]arg: type
     ) -> UnsafePointer[
-        type, address_space, is_mutable = Self.is_mutable, origin=origin
+        type,
+        address_space,
+        is_mutable = _is_mutable_origin[__origin_of(arg)].result,
+        origin = __origin_of(arg),
     ] as result:
         """Gets the address of the argument.
 

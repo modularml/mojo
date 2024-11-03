@@ -1506,7 +1506,7 @@ struct String(
     fn unsafe_ptr[
         is_mutable: Bool = True
     ](self) -> UnsafePointer[
-        UInt8,
+        Byte,
         is_mutable=is_mutable,
         origin = _lit_mut_cast[__origin_of(self), is_mutable].result,
     ]:

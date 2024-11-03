@@ -1042,6 +1042,10 @@ trait Stringlike:
     ](self) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Get raw pointer to the underlying data.
 
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            origin: The origin of the data.
+
         Returns:
             The raw pointer to the data.
         """

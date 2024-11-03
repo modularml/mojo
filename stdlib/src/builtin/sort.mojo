@@ -45,7 +45,7 @@ fn _insertion_sort[
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin]):
     """Sort the array[start:end] slice"""
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
 
     for i in range(1, size):
@@ -69,7 +69,7 @@ fn _quicksort_partition_right[
     origin: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin]) -> Int:
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
 
     var left = 1
@@ -98,7 +98,7 @@ fn _quicksort_partition_left[
     origin: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin]) -> Int:
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
 
     var left = 1
@@ -124,7 +124,7 @@ fn _heap_sort_fix_down[
     origin: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin], idx: Int):
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
     var i = idx
     var j = i * 2 + 1
@@ -145,7 +145,7 @@ fn _heap_sort[
     origin: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin]):
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
     # heapify
     for i in range(size // 2 - 1, -1, -1):
@@ -174,7 +174,7 @@ fn _delegate_small_sort[
     origin: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin]):
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
     if size == 2:
         _small_sort[2, type, cmp_fn](array)
@@ -206,7 +206,7 @@ fn _quicksort[
     origin: MutableOrigin, //,
     cmp_fn: fn (_SortWrapper[type], _SortWrapper[type]) capturing [_] -> Bool,
 ](span: Span[type, origin]):
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var size = len(span)
     if size == 0:
         return
@@ -378,7 +378,7 @@ fn _partition[
     if size <= 1:
         return 0
 
-    var array = span.unsafe_ptr[is_mutable=True, origin=MutableAnyOrigin]()
+    var array = span.unsafe_ptr().bitcast[origin=MutableAnyOrigin]()
     var pivot = size // 2
 
     var pivot_value = array[pivot]

@@ -290,6 +290,12 @@ struct _lit_mut_cast[
     ]
 
 
+struct _is_mutable_origin[
+    is_mutable: Bool, //, origin: Origin[is_mutable].type
+]:
+    alias result = is_mutable
+
+
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
