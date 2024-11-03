@@ -41,17 +41,18 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @value
 @register_passable("trivial")
 struct StringRef(
-    Sized,
-    IntableRaising,
+    AsBytes,
+    Boolable,
     CollectionElement,
     CollectionElementNew,
+    Comparable,
+    Hashable,
+    IntableRaising,
+    Representable,
+    Sized,
     Stringable,
     Writable,
-    Hashable,
     _HashableWithHasher,
-    Boolable,
-    Comparable,
-    AsBytes,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -397,6 +398,19 @@ struct StringRef(
             A new string.
         """
         return String.write(self)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Convert the string reference to a string.
+
+        Returns:
+            The String representation of the StringRef.
+        """
+        var output = String()
+        output.write("StringRef('")
+        self.write_to(output)
+        output.write("')")
+        return output
 
     @no_inline
     fn write_to[W: Writer](self, inout writer: W):

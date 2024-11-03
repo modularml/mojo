@@ -169,6 +169,11 @@ fn test_stringref_split() raises:
     assert_equal(res4[1], "o")
 
 
+def test_str_and_ref():
+    assert_equal(str(StringRef("abc")), String("abc"))
+    assert_equal(repr(StringRef("abc")), String("StringRef('abc')"))
+
+
 def main():
     test_strref_from_start()
     test_stringref_split()
@@ -177,3 +182,4 @@ def main():
     test_indexing()
     test_find()
     test_endswith()
+    test_str_and_ref()
