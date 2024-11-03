@@ -152,14 +152,17 @@ def test_eq():
     var local = 1
     var p1 = UnsafePointer[Int].address_of(local)
     var p2 = p1
-    assert_equal(p1, p2)
+    assert_equal(int(p1), int(p2))
+    assert_equal(p1[], p2[])
 
     var other_local = 2
     var p3 = UnsafePointer[Int].address_of(other_local)
-    assert_not_equal(p1, p3)
+    assert_not_equal(int(p1), int(p3))
+    assert_not_equal(p1[], p3[])
 
     var p4 = UnsafePointer[Int].address_of(local)
-    assert_equal(p1, p4)
+    assert_equal(int(p1), int(p4))
+    assert_equal(p1[], p4[])
     _ = local
     _ = other_local
 

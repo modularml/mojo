@@ -152,17 +152,13 @@ struct MoveCounter[T: CollectionElementNew](
 
 
 @value
-# FIXME
-# struct ValueDestructorRecorder[
-#     is_mutable: Bool, //, origin: Origin[is_mutable].type
-# ](ExplicitlyCopyable):
-#     var value: Int
-#     var destructor_counter: UnsafePointer[
-#         List[Int], is_mutable=is_mutable, origin=origin
-#     ]
-struct ValueDestructorRecorder(ExplicitlyCopyable):
+struct ValueDestructorRecorder[
+    is_mutable: Bool, //, origin: Origin[is_mutable].type
+](ExplicitlyCopyable):
     var value: Int
-    var destructor_counter: UnsafePointer[List[Int]]
+    var destructor_counter: UnsafePointer[
+        List[Int], is_mutable=is_mutable, origin=origin
+    ]
 
     fn __init__(inout self, *, other: Self):
         self.value = other.value
@@ -178,13 +174,10 @@ struct ValueDestructorRecorder(ExplicitlyCopyable):
 
 
 @value
-# FIXME
-# struct ObservableDel[is_mutable: Bool, //, origin: Origin[is_mutable].type](
-#     CollectionElement
-# ):
-#     var target: UnsafePointer[Bool, is_mutable=is_mutable, origin=origin]
-struct ObservableDel(CollectionElement):
-    var target: UnsafePointer[Bool]
+struct ObservableDel[is_mutable: Bool, //, origin: Origin[is_mutable].type](
+    CollectionElement
+):
+    var target: UnsafePointer[Bool, is_mutable=is_mutable, origin=origin]
 
     fn __init__(inout self, *, other: Self):
         self = other
