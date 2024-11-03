@@ -426,9 +426,7 @@ fn _is_shell_special_variable(byte: Byte) -> Bool:
         ord("8"),
         ord("9"),
     )
-    if int(byte) in shell_variables:
-        return True
-    return False
+    return int(byte) in shell_variables
 
 
 fn _is_alphanumeric(byte: Byte) -> Bool:
@@ -452,7 +450,9 @@ fn _is_alphanumeric(byte: Byte) -> Bool:
     )
 
 
-fn _parse_variable_name(bytes: Span[Byte]) -> Tuple[String, Int]:
+fn _parse_variable_name[
+    immutable: ImmutableOrigin
+](bytes: Span[Byte, immutable]) -> Tuple[StringSlice[immutable], Int]:
     """Returns the environment variable name and the byte count required to extract it.
     For `${}` expansions, two additional bytes are added to the byte count to account for the braces.
 
@@ -468,43 +468,41 @@ fn _parse_variable_name(bytes: Span[Byte]) -> Tuple[String, Int]:
             and _is_shell_special_variable(bytes[1])
             and bytes[2] == ord("}")
         ):
-            return String(StringSlice(unsafe_from_utf8=bytes[1:2])), 3
+            return StringSlice(unsafe_from_utf8=bytes[1:2]), 3
 
         # Scan until the closing brace or the end of the bytes.
         var i = 1
         while i < len(bytes):
             if bytes[i] == ord("}"):
-                if i == 1:
-                    return String("${}"), 2
-                return String(StringSlice(unsafe_from_utf8=bytes[1:i])), i + 1
+                return StringSlice(unsafe_from_utf8=bytes[1:i]), i + 1
             i += 1
-        return String("${"), 1
+        return StringSlice(unsafe_from_utf8=bytes[1:i]), i + 1
     elif _is_shell_special_variable(bytes[0]):
-        return String(StringSlice(unsafe_from_utf8=bytes[0:1])), 1
+        return StringSlice(unsafe_from_utf8=bytes[0:1]), 1
 
     # Scan until we hit an invalid character in environment variable names.
     var i = 0
     while i < len(bytes) and _is_alphanumeric(bytes[i]):
         i += 1
 
-    return String(StringSlice(unsafe_from_utf8=bytes[:i])), i
+    return StringSlice(unsafe_from_utf8=bytes[:i]), i
 
 
 fn expandvars[PathLike: os.PathLike, //](path: PathLike) -> String:
     """Replaces `${var}` or `$var` in the path with values from the current environment variables.
-    Undefined variables should be left alone.
+    Malformed variable names and references to non-existing variables are left unchanged.
 
     Parameters:
         PathLike: The type conforming to the os.PathLike trait.
 
     Args:
-        path: The path to expand.
+        path: The path that is being expanded.
 
     Returns:
-        The input path with environment variables expanded.
+        The expanded path.
     """
     var path_str = path.__fspath__()
-    var bytes = path_str.as_bytes()
+    var bytes = path_str.as_bytes().get_immutable()
     var buf = String()
 
     # Byte scanning should be fine, ${} is ASCII.
@@ -518,19 +516,16 @@ fn expandvars[PathLike: os.PathLike, //](path: PathLike) -> String:
 
             name, length = _parse_variable_name(bytes[j + 1 :])
 
-            # Invalid syntax (`${}` or `${`); write as is.
-            if name.startswith("$") and length > 0:
-                buf.write(name)
-            # $ was not followed by a name, write the $.
-            elif name == "":
-                buf.write_bytes(bytes[j : j + 1])
+            # Invalid syntax (`${}` or `${`) or $ was not followed by a name; write as is.
+            if name.startswith("{") or name == "":
+                buf.write_bytes(bytes[j : j + length + 1])
             # Shell variable (eg `$@` or `$*`); write as is.
             elif _is_shell_special_variable(name.as_bytes()[0]):
                 buf.write_bytes(bytes[j : j + 2])
             # Environment variable; expand it. If no value, write as is.
             else:
-                value = os.getenv(name)
-                if value:
+                value = os.getenv(String(name))
+                if value != "":
                     buf.write(value)
                 else:
                     buf.write_bytes(bytes[j : j + length + 1])
