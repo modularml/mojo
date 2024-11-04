@@ -17,7 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from documentation import doc_private
 from math import Ceilable, CeilDivable, Floorable, Truncable
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
@@ -26,11 +25,15 @@ from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
+from python import Python, PythonObject
+from python._cpython import Py_ssize_t
+from memory import UnsafePointer
 
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
 from sys import triple_is_nvidia_cuda, bitwidthof
+from sys.ffi import OpaquePointer
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -1123,6 +1126,17 @@ struct Int(
             hasher: The hasher instance.
         """
         hasher._update_with_simd(Int64(self))
+
+    @doc_private
+    @staticmethod
+    fn try_from_python(obj: PythonObject) raises -> Self as result:
+        """Construct an `Int` from a Python integer value.
+
+        Raises:
+            An error if conversion failed.
+        """
+
+        result = Python.py_long_as_ssize_t(obj)
 
     # ===-------------------------------------------------------------------===#
     # Methods
