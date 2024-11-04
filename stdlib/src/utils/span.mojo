@@ -22,7 +22,7 @@ from utils import Span
 
 from collections import InlineArray
 from collections import normalize_index
-from memory import Pointer, UnsafePointer, bitcast, memcmp
+from memory import Pointer, UnsafePointer, memcmp, pack_bits
 from builtin.builtin_list import _lit_mut_cast
 from sys import simdwidthof
 from bit import count_trailing_zeros, count_leading_zeros
@@ -480,7 +480,7 @@ fn _memchr[
 
     for i in range(0, vectorized_end, bool_mask_width):
         bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
-        mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        mask = pack_bits(bool_mask)
         if mask:
             output = haystack + int(i + count_trailing_zeros(mask))
             return
@@ -522,7 +522,7 @@ fn _memmem[
         last_block = haystack.load[width=bool_mask_width](i + needle_len - 1)
 
         bool_mask = (first_needle == first_block) & (last_needle == last_block)
-        mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        mask = pack_bits(bool_mask)
 
         while mask:
             offset = int(i + count_trailing_zeros(mask))
@@ -560,7 +560,7 @@ fn _memrchr[
 
     for i in reversed(range(0, vectorized_end, bool_mask_width)):
         bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
-        mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        mask = pack_bits(bool_mask)
         if mask:
             zeros = int(count_leading_zeros(mask)) + 1
             output = haystack + (i + bool_mask_width - zeros)
@@ -607,7 +607,7 @@ fn _memrmem[
         last_block = haystack.load[width=bool_mask_width](i + needle_len - 1)
 
         bool_mask = (first_needle == first_block) & (last_needle == last_block)
-        mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        mask = pack_bits(bool_mask)
 
         while mask:
             offset = i + bool_mask_width - int(count_leading_zeros(mask))
