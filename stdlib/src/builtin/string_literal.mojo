@@ -293,17 +293,6 @@ struct StringLiteral(
         """
         return float(self.as_string_slice())
 
-    fn __mul__(self, n: Int) -> String:
-        """Concatenates the string `n` times.
-
-        Args:
-            n : The number of times to concatenate the string.
-
-        Returns:
-            The string concatenated `n` times.
-        """
-        return self.as_string_slice() * n
-
     @no_inline
     fn __str__(self) -> String:
         """Convert the string literal to a string.
