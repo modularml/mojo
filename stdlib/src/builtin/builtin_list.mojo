@@ -546,8 +546,8 @@ struct _LITRefPackHelper[
 
 @register_passable
 struct VariadicPack[
-    elt_is_mutable: __mlir_type.i1, //,
-    origin: Origin[Bool {value: elt_is_mutable}].type,
+    elt_is_mutable: Bool, //,
+    origin: Origin[elt_is_mutable].type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
 ](Sized):
