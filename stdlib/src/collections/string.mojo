@@ -1588,7 +1588,7 @@ struct String(
           The number of occurrences of `substr`.
         """
 
-        s_len = len(self)
+        var s_len = len(self)
         if not substr:
             return s_len + 1
 

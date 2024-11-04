@@ -359,8 +359,8 @@ fn split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     Returns:
         A tuple containing two strings: (head, tail).
     """
-    fspath = path.__fspath__()
-    i = fspath.rfind(os.sep) + 1
+    var fspath = path.__fspath__()
+    var i = fspath.rfind(os.sep) + 1
     head, tail = fspath[:i], fspath[i:]
     if not (head.byte_length() == 1 and head == os.sep):
         head = head.rstrip(os.sep)

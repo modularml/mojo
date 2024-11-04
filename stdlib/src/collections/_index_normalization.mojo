@@ -45,34 +45,32 @@ fn normalize_index[
         Only when setting ignore_zero_length to True. Then if the container
         length is zero, the function always returns 0.
     """
-    container_length = len(container)
+    var c_len = len(container)
 
     @parameter
     if not ignore_zero_length:
         debug_assert[assert_mode="safe", cpu_only=True](
-            container_length > 0,
+            c_len > 0,
             "indexing into a ",
             container_name,
             " that has 0 elements",
         )
         debug_assert[assert_mode="safe", cpu_only=True](
-            -container_length <= idx < container_length,
+            -c_len <= idx < c_len,
             container_name,
             " has length: ",
-            container_length,
+            c_len,
             " index out of bounds: ",
             idx,
             " should be between ",
-            -container_length,
+            -c_len,
             " and ",
-            container_length - 1,
+            c_len - 1,
         )
 
     @parameter
-    if cap_to_container_length:
-        value = idx + container_length * int(idx < 0)
-        return value * int(
-            value < container_length and value > 0
-        ) + container_length * int(value >= container_length)
+    if cap_to_c_len:
+        var v = idx + c_len * int(idx < 0)
+        return v * int(v < c_len and v > 0) + c_len * int(v >= c_len)
     else:
-        return idx + container_length * int(idx < 0)
+        return idx + c_len * int(idx < 0)
