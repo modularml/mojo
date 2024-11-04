@@ -317,7 +317,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         return res
 
-    # FIXME
+    # FIXME: No support for unpacking `VariadicPack` into its types yet
     # fn call[
     #     name: StringLiteral,
     #     return_type: AnyTrivialRegType,
