@@ -28,7 +28,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 struct UInt(IntLike, _HashableWithHasher):
     """This type represents an unsigned integer.
 
-    An unsigned integer is represents a positive integral number.
+    An unsigned integer represents a positive integral number.
 
     The size of this unsigned integer is platform-dependent.
 

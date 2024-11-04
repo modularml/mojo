@@ -17,7 +17,7 @@ from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from memory import UnsafePointer, memcmp, bitcast
+from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import c_char
@@ -112,7 +112,7 @@ struct StringRef(
         self.length = len
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8]):
+    fn __init__(inout self, *, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
@@ -601,7 +601,7 @@ struct StringRef(
 
     fn strip(self) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
+        This only takes C spaces into account: " \\t\\n\\v\\f\\r".
 
         For example, `"  mojo  "` returns `"mojo"`.
 
@@ -712,7 +712,7 @@ fn _memchr[
 
     for i in range(0, vectorized_end, bool_mask_width):
         var bool_mask = source.load[width=bool_mask_width](i) == first_needle
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
         if mask:
             return source + int(i + count_trailing_zeros(mask))
 
@@ -756,7 +756,7 @@ fn _memmem[
         var eq_last = last_needle == last_block
 
         var bool_mask = eq_first & eq_last
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
 
         while mask:
             var offset = int(i + count_trailing_zeros(mask))

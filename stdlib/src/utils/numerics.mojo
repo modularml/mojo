@@ -152,6 +152,7 @@ struct FPUtils[
         Returns:
             The sign mask.
         """
+        # convert to `Int` first to bypass overflow check
         return 1 << int(Self.exponent_width() + Self.mantissa_width())
 
     @staticmethod
@@ -171,12 +172,12 @@ struct FPUtils[
     fn exponent_mantissa_mask() -> Int:
         """Returns the exponent and mantissa mask of a floating point type.
 
-        It is computed by `exponent_mask + mantissa_mask`.
+        It is computed by `exponent_mask | mantissa_mask`.
 
         Returns:
             The exponent and mantissa mask.
         """
-        return Self.exponent_mask() + Self.mantissa_mask()
+        return Self.exponent_mask() | Self.mantissa_mask()
 
     @staticmethod
     @always_inline
