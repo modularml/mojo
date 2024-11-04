@@ -557,9 +557,9 @@ fn _memchr[
 
 @always_inline
 fn _memmem[
-    O: ImmutableOrigin, D: DType, //
+    O1: ImmutableOrigin, O2: ImmutableOrigin, D: DType, //
 ](
-    haystack_span: Span[Scalar[D], O], needle_span: Span[Scalar[D]]
+    haystack_span: Span[Scalar[D], O1], needle_span: Span[Scalar[D], O2]
 ) -> UnsafePointer[Scalar[D]] as output:
     var haystack = haystack_span.unsafe_ptr()
     var haystack_len = len(haystack_span)
@@ -639,9 +639,9 @@ fn _memrchr[
 
 @always_inline
 fn _memrmem[
-    O: ImmutableOrigin, D: DType, //
+    O1: ImmutableOrigin, O2: ImmutableOrigin, D: DType, //
 ](
-    haystack_span: Span[Scalar[D], O], needle_span: Span[Scalar[D]]
+    haystack_span: Span[Scalar[D], O1], needle_span: Span[Scalar[D], O2]
 ) -> UnsafePointer[Scalar[D]] as output:
     var haystack = haystack_span.unsafe_ptr()
     var haystack_len = len(haystack_span)
