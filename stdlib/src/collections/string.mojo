@@ -19,7 +19,7 @@ from bit import count_leading_zeros
 from builtin.builtin_list import _lit_mut_cast
 from collections import KeyElement, List
 from collections._index_normalization import normalize_index
-from hashlib._hasher import _Hasher
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcpy
 from sys import bitwidthof
 from sys.ffi import c_char
@@ -689,7 +689,14 @@ fn isprintable(c: UInt8) -> Bool:
 
 
 @value
-struct String(Representable, KeyElement, Comparable, Writer, Stringlike):
+struct String(
+    Representable,
+    KeyElement,
+    Comparable,
+    Writer,
+    Stringlike,
+    _HashableWithHasher,
+):
     """Represents a mutable string."""
 
     # Fields

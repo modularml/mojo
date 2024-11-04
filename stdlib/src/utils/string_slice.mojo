@@ -427,17 +427,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         """
         return hash(self._slice._data, self._slice._len)
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
-        """Updates hasher with the underlying bytes.
-
-        Parameters:
-            H: The hasher type.
-
-        Args:
-            hasher: The hasher instance.
-        """
-        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
-
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
     # TODO: replace with a safe model that checks the body of the method for
@@ -1132,7 +1121,6 @@ trait Stringlike(
     IntableRaising,
     FloatableRaising,
     Hashable,
-    _HashableWithHasher,
 ):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""

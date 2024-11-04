@@ -19,7 +19,7 @@ from builtin.builtin_list import _lit_mut_cast
 from memory import memcpy, UnsafePointer
 from collections import List
 from collections.string import _atol
-from hashlib._hasher import _Hasher
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_char
 from utils import StringRef, Span, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -40,7 +40,9 @@ from utils.string_slice import (
 
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
-struct StringLiteral(Comparable, KeyElement, Representable, Stringlike):
+struct StringLiteral(
+    Comparable, KeyElement, Representable, Stringlike, _HashableWithHasher
+):
     """This type represents a string literal.
 
     String literals are all null-terminated for compatibility with C APIs, but
