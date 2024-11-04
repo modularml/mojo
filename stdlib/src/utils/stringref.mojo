@@ -15,6 +15,7 @@
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
+from builtin.builtin_list import _lit_mut_cast
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, pack_bits
@@ -212,13 +213,17 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(
+        ref [_]self,
+    ) -> Span[Byte, _lit_mut_cast[__origin_of(self), False].result]:
         """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
-        return self.as_bytes[False, __origin_of(self)]()
+        return self.as_bytes[
+            False, _lit_mut_cast[__origin_of(self), False].result
+        ]()
 
     @always_inline
     fn as_bytes[
@@ -229,6 +234,8 @@ struct StringRef(
         Parameters:
             is_mutable: Whether the result will be mutable.
             origin: The origin of the data.
+
+        Returns:
             A contiguous slice pointing to bytes.
 
         Notes:

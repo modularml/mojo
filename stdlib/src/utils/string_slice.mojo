@@ -23,14 +23,14 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils.span import Span, AsBytes
+from builtin.builtin_list import _lit_mut_cast
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
-from memory import memcmp, UnsafePointer, memcpy
+from memory.memory import _memcmp_impl_unconstrained
 from sys import simdwidthof, bitwidthof
 from sys.intrinsics import unlikely, _type_is_eq
-from memory.memory import _memcmp_impl_unconstrained
+from utils.span import Span, AsBytes
 from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -658,9 +658,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         Notes:
             This does not include the trailing null terminator.
         """
-        return Span[Byte, origin](
-            unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return rebind[Span[Byte, origin]](self._slice)
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -856,6 +854,88 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
 
         return int(loc) - int(self.unsafe_ptr())
 
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        # TODO(#3403): Simplify this when the linked conditional conformance
+        # feature is added.  Runs a faster algorithm if the concrete types are
+        # able to be converted to a span of bytes.
+
+        @parameter
+        if _type_is_eq[T, String]():
+            return self.join_bytes(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self.join_bytes(rebind[List[StringLiteral]](elems))
+        elif _type_is_eq[T, StringSlice[__origin_of(elems)]]():
+            return self.join_bytes(
+                rebind[List[StringSlice[__origin_of(elems)]]](elems)
+            )
+        else:
+            var e_len = len(elems)
+            var buf = List[String](capacity=e_len)
+            buf.size = e_len
+            var b_ptr = buf.unsafe_ptr()
+
+            for i in range(e_len):
+                (b_ptr + i).init_pointee_move(str(elems.unsafe_get(i)))
+
+            return self.join_bytes(buf^)
+
+    fn join_bytes[
+        T: AsBytesCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        var n_elems = len(elems)
+        var s_len = self.byte_length()
+        var len_elems = 0
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
+        for e in elems:
+            len_elems += len(e[].as_bytes[False, __origin_of(e)]())
+        var capacity = s_len * (n_elems - int(n_elems > 0)) + len_elems + 1
+        var buf = String._buffer_type(capacity=capacity)
+        buf.size = capacity
+        s_ptr, b_ptr = self.unsafe_ptr(), buf.unsafe_ptr()
+        offset, i = 0, 0
+        var not_first = False
+        while i < n_elems:
+            memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
+            offset += s_len * int(not_first)
+            not_first = True
+            var e_span = elems.unsafe_get(i).as_bytes[
+                False, __origin_of(elems[i])
+            ]()
+            e_len = len(e_span)
+            memcpy(dest=b_ptr + offset, src=e_span.unsafe_ptr(), count=e_len)
+            offset += e_len
+            i += 1
+        b_ptr[capacity - 1] = 0
+        return String(buf^)
+
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
@@ -898,86 +978,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
                 return False
         _ = next_line, unicode_line_sep, unicode_paragraph_sep
         return True
-
-    fn join[
-        T: StringableCollectionElement, //
-    ](self, elems: List[T, *_]) -> String:
-        """Joins string elements using the current string as a delimiter.
-
-        Parameters:
-            T: The types of the elements.
-
-        Args:
-            elems: The input values.
-
-        Returns:
-            The joined string.
-        """
-
-        # TODO(#3403): Simplify this when the linked conditional conformance
-        # feature is added.  Runs a faster algorithm if the concrete types are
-        # able to be converted to a span of bytes.
-
-        @parameter
-        if _type_is_eq[T, String]():
-            return self.join_bytes(rebind[List[String]](elems))
-        elif _type_is_eq[T, StringLiteral]():
-            return self.join_bytes(rebind[List[StringLiteral]](elems))
-        elif _type_is_eq[T, StringSlice[__origin_of(elems)]]():
-            return self.join_bytes(
-                rebind[List[StringSlice[__origin_of(elems)]]](elems)
-            )
-        else:
-            e_len = len(elems)
-            buf = List[String](capacity=e_len)
-            buf.size = e_len
-            b_ptr = buf.unsafe_ptr()
-
-            for i in range(e_len):
-                (b_ptr + i).init_pointee_move(str(elems.unsafe_get(i)))
-
-            return self.join_bytes(buf^)
-
-    fn join_bytes[
-        T: AsBytesCollectionElement, //,
-    ](self, elems: List[T, *_]) -> String:
-        """Joins string elements using the current string as a delimiter.
-
-        Parameters:
-            T: The types of the elements.
-
-        Args:
-            elems: The input values.
-
-        Returns:
-            The joined string.
-        """
-
-        n_elems = len(elems)
-        s_len = self.byte_length()
-        len_elems = 0
-        # Calculate the total size of the elements to join beforehand
-        # to prevent alloc syscalls as we know the buffer size.
-        # This can hugely improve the performance on large lists
-        for e in elems:
-            len_elems += len(e[].as_bytes_read())
-        capacity = s_len * (n_elems - int(n_elems > 0)) + len_elems + 1
-        buf = String._buffer_type(capacity=capacity)
-        buf.size = capacity
-        s_ptr, b_ptr = self.unsafe_ptr(), buf.unsafe_ptr()
-        offset, i = 0, 0
-        not_first = False
-        while i < n_elems:
-            memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
-            offset += s_len * int(not_first)
-            not_first = True
-            e = elems.unsafe_get(i).as_bytes_read()
-            e_len = len(e)
-            memcpy(dest=b_ptr + offset, src=e.unsafe_ptr(), count=e_len)
-            offset += e_len
-            i += 1
-        b_ptr[capacity - 1] = 0
-        return String(buf^)
 
     fn isnewline[single_character: Bool = False](self) -> Bool:
         """Determines whether every character in the given StringSlice is a

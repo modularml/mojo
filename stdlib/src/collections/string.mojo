@@ -15,19 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import KeyElement, List, Optional
-from collections._index_normalization import normalize_index
-from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char, OpaquePointer
-from utils import StaticString, write_args
-
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
-from python import PythonObject
-
-from sys.intrinsics import _type_is_eq
+from builtin.builtin_list import _lit_mut_cast
+from collections import KeyElement, List
+from collections._index_normalization import normalize_index
 from hashlib._hasher import _HashableWithHasher, _Hasher
-
+from memory import UnsafePointer, memcpy
+from sys import bitwidthof
+from sys.ffi import c_char
+from utils import StaticString, write_args
 from utils import (
     Span,
     IndexList,
@@ -1404,7 +1400,6 @@ struct String(
         Returns:
             The joined string.
         """
-
         var result = String()
         var is_first = True
 
@@ -1473,7 +1468,7 @@ struct String(
     @always_inline
     fn as_bytes[
         is_mutable: Bool = False
-    ](ref [_]self) -> Span[Byte, __origin_of(self)]:
+    ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1482,7 +1477,9 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-        return self.as_bytes[is_mutable, __origin_of(self)]()
+        return self.as_bytes[
+            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
+        ]()
 
     @always_inline
     fn as_bytes[
@@ -1505,15 +1502,14 @@ struct String(
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(
+        ref [_]self,
+    ) -> StringSlice[_lit_mut_cast[__origin_of(self), False].result]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in String so this is actually
-        #   guaranteed to be valid.
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline

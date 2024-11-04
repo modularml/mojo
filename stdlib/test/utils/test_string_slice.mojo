@@ -33,7 +33,7 @@ fn test_string_literal_byte_span() raises:
 
 fn test_string_byte_span() raises:
     var string = String("Hello")
-    var str_slice = string.as_bytes()
+    var str_slice = string.as_bytes[is_mutable=True]()
 
     assert_equal(len(str_slice), 5)
     assert_equal(str_slice[0], ord("H"))
