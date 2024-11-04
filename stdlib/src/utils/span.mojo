@@ -567,7 +567,7 @@ fn _memmem[
     var needle_len = len(needle_span)
     debug_assert(needle_len > 0, "needle_len must be > 0")
     if needle_len == 1:
-        output = _memchr[D](haystack_span, needle[0])
+        output = _memchr(haystack_span, needle[0])
         return
     elif needle_len > haystack_len:
         output = UnsafePointer[Scalar[D]]()
@@ -650,7 +650,7 @@ fn _memrmem[
     debug_assert(needle_len > 0, "needle_len must be > 0")
 
     if needle_len == 1:
-        output = _memrchr[D](haystack_span, needle[0])
+        output = _memrchr(haystack_span, needle[0])
         return
     elif needle_len > haystack_len:
         output = UnsafePointer[Scalar[D]]()
@@ -690,4 +690,4 @@ fn _memrmem[
                 return
             mask = mask & (mask - 1)
 
-    output = UnsafePointer[Scalar[type]]()
+    output = UnsafePointer[Scalar[D]]()
