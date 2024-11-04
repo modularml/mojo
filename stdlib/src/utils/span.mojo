@@ -366,7 +366,7 @@ struct Span[
         single_value: Bool = False,
         unsafe_dont_normalize: Bool = False,
     ](
-        self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2], start: Int = 0
+        self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2], start: Int
     ) -> Int:
         """Finds the offset of the first occurrence of `subseq` starting at
         `start`. If not found, returns `-1`.
@@ -426,6 +426,34 @@ struct Span[
 
         return (int(loc) - int(s_ptr) + 1) * int(bool(loc)) - 1
 
+    fn find[
+        O1: ImmutableOrigin,
+        O2: ImmutableOrigin,
+        D: DType, //,
+        single_value: Bool = False,
+    ](self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2]) -> Int:
+        """Finds the offset of the first occurrence of `subseq`. If not found,
+        returns `-1`.
+
+        Parameters:
+            O1: The immutable origin of `self`.
+            O2: The immutable origin of `subseq`.
+            D: The `DType` of the Scalar.
+            single_value: Whether to search with the `subseq`s first value.
+
+        Args:
+            subseq: The sub sequence to find.
+
+        Returns:
+            The offset of `subseq` relative to the beginning of the `Span`.
+
+        Notes:
+            The function works on an empty span, always returning `-1`.
+        """
+        return self.find[single_value=single_value, unsafe_dont_normalize=True](
+            subseq, 0
+        )
+
     @always_inline
     fn rfind[
         O1: ImmutableOrigin,
@@ -433,7 +461,7 @@ struct Span[
         D: DType, //,
         single_value: Bool = False,
     ](
-        self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2], start: Int = 0
+        self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2], start: Int
     ) -> Int:
         """Finds the offset of the last occurrence of `subseq` starting at
         `start`. If not found, returns `-1`.
@@ -450,10 +478,44 @@ struct Span[
 
         Returns:
             The offset of `subseq` relative to the beginning of the `Span`.
+
+        Notes:
+            The function works on an empty span, always returning `-1`.
         """
         return self.find[from_left=False, single_value=single_value](
             subseq, start
         )
+
+    @always_inline
+    fn rfind[
+        O1: ImmutableOrigin,
+        O2: ImmutableOrigin,
+        D: DType, //,
+        single_value: Bool = False,
+    ](self: Span[Scalar[D], O1], subseq: Span[Scalar[D], O2]) -> Int:
+        """Finds the offset of the last occurrence of `subseq`. If not found,
+        returns `-1`.
+
+        Parameters:
+            O1: The immutable origin of `self`.
+            O2: The immutable origin of `subseq`.
+            D: The `DType` of the Scalar.
+            single_value: Whether to search with the `subseq`s first value.
+
+        Args:
+            subseq: The sub sequence to find.
+
+        Returns:
+            The offset of `subseq` relative to the beginning of the `Span`.
+
+        Notes:
+            The function works on an empty span, always returning `-1`.
+        """
+        return self.find[
+            from_left=False,
+            single_value=single_value,
+            unsafe_dont_normalize=True,
+        ](subseq, 0)
 
 
 # ===----------------------------------------------------------------------===#
