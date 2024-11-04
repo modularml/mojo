@@ -60,6 +60,8 @@ struct _RefCountedTuple:
 
     fn __init__(inout self):
         self.impl = Arc[List[object]](List[object]())
+    fn __init__(inout self, capacity: Int):
+        self.impl = Arc[List[object]](List[object](capacity=capacity))
 
 
 @value
@@ -782,6 +784,15 @@ struct object(
     @always_inline
     fn __init__(inout self, owned arg: _RefCountedDict):
         """Initializes the object with a _RefCountedDict.
+
+        Args:
+            arg: The ref counted dictionary.
+        """
+        self._value = arg^
+    
+    @always_inline
+    fn __init__(inout self, owned arg: _RefCountedTuple):
+        """Initializes the object with a _RefCountedTuple.
 
         Args:
             arg: The ref counted dictionary.
@@ -1781,7 +1792,7 @@ struct object(
         Returns:
             The value at the index.
         """
-        var tmp_tuple = object(())
+        var tmp_tuple = object(_RefCountedTuple(capacity=len(index)))
         for i in index:
             tmp_tuple._value.get_as_tuple().append(i[])
         return self[tmp_tuple]
@@ -1828,7 +1839,7 @@ struct object(
             j: The second index.
             value: The value to set.
         """
-        var tmp_tuple = object(())
+        var tmp_tuple = object(_RefCountedTuple(capacity=2))
         tmp_tuple._value.get_as_tuple().append(i)
         tmp_tuple._value.get_as_tuple().append(j)
         self[tmp_tuple] = value
