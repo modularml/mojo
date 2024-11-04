@@ -17,7 +17,7 @@ from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _is_ascii_space
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from memory import UnsafePointer, memcmp, bitcast
+from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import c_char
@@ -707,7 +707,7 @@ fn _memchr[
 
     for i in range(0, vectorized_end, bool_mask_width):
         var bool_mask = source.load[width=bool_mask_width](i) == first_needle
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
         if mask:
             return source + int(i + count_trailing_zeros(mask))
 
@@ -751,7 +751,7 @@ fn _memmem[
         var eq_last = last_needle == last_block
 
         var bool_mask = eq_first & eq_last
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
 
         while mask:
             var offset = int(i + count_trailing_zeros(mask))
