@@ -918,7 +918,11 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
         for e in elems:
-            len_elems += len(e[].as_bytes[False, __origin_of(e)]())
+            len_elems += len(
+                e[].as_bytes[
+                    False, _lit_mut_cast[__origin_of(e), False].result
+                ]()
+            )
         var capacity = s_len * (n_elems - int(n_elems > 0)) + len_elems + 1
         var buf = String._buffer_type(capacity=capacity)
         buf.size = capacity
@@ -930,7 +934,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
             offset += s_len * int(not_first)
             not_first = True
             var e_span = elems.unsafe_get(i).as_bytes[
-                False, __origin_of(elems[i])
+                False, _lit_mut_cast[__origin_of(e), False].result
             ]()
             e_len = len(e_span)
             memcpy(dest=b_ptr + offset, src=e_span.unsafe_ptr(), count=e_len)
