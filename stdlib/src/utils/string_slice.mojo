@@ -875,11 +875,11 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
 
         @parameter
         if _type_is_eq[T, String]():
-            return self.join_bytes(rebind[List[String]](elems))
+            return self._join_bytes(rebind[List[String]](elems))
         elif _type_is_eq[T, StringLiteral]():
-            return self.join_bytes(rebind[List[StringLiteral]](elems))
+            return self._join_bytes(rebind[List[StringLiteral]](elems))
         elif _type_is_eq[T, StringSlice[__origin_of(elems)]]():
-            return self.join_bytes(
+            return self._join_bytes(
                 rebind[List[StringSlice[__origin_of(elems)]]](elems)
             )
         else:
@@ -891,9 +891,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
             for i in range(e_len):
                 (b_ptr + i).init_pointee_move(str(elems.unsafe_get(i)))
 
-            return self.join_bytes(buf^)
+            return self._join_bytes(buf^)
 
-    fn join_bytes[
+    fn _join_bytes[
         T: AsBytesCollectionElement, //,
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
@@ -906,6 +906,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
 
         Returns:
             The joined string.
+
+        Notes:
+            This is a temporary method until we can build a generic
+            `Span[Scalar[D]].join[T: AsSpan[D]](elems: Span[T])`. Where AsSpan
+            is a parametrized trait for types which have `.as_span(self) ->
+            Span[T]`.
         """
 
         var n_elems = len(elems)

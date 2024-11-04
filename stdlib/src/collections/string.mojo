@@ -1431,22 +1431,6 @@ struct String(
         """
         return self.as_string_slice().join(elems)
 
-    fn join_bytes[
-        T: AsBytesCollectionElement, //,
-    ](self, elems: List[T, *_]) -> String:
-        """Joins string elements using the current string as a delimiter.
-
-        Parameters:
-            T: The types of the elements.
-
-        Args:
-            elems: The input values.
-
-        Returns:
-            The joined string.
-        """
-        return self.as_string_slice().join_bytes(elems)
-
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 

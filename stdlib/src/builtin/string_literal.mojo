@@ -581,22 +581,6 @@ struct StringLiteral(
         """
         return self.as_string_slice().join(elems)
 
-    fn join_bytes[
-        T: AsBytesCollectionElement, //,
-    ](self, elems: List[T, *_]) -> String:
-        """Joins string elements using the current string as a delimiter.
-
-        Parameters:
-            T: The types of the elements.
-
-        Args:
-            elems: The input values.
-
-        Returns:
-            The joined string.
-        """
-        return self.as_string_slice().join_bytes(elems)
-
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.
 
