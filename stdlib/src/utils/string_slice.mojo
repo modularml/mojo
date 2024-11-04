@@ -1177,18 +1177,18 @@ struct _ConcatStr:
         _ = self._buffer.pop()
 
     fn __str__(self) -> String:
-        n_elems = len(self._buffer)
-        total_len = 1
+        var n_elems = len(self._buffer)
+        var total_len = 1
         for e in self._buffer:
             total_len += e[].byte_length()
-        buf = String._buffer_type(capacity=total_len)
+        var buf = String._buffer_type(capacity=total_len)
         buf.size = total_len
-        b_ptr = buf.unsafe_ptr()
-        offset = 0
-        i = 0
+        var b_ptr = buf.unsafe_ptr()
+        var offset = 0
+        var i = 0
         while i < n_elems:
-            e = self._buffer.unsafe_get(i).as_bytes()
-            e_len = len(e)
+            var e = self._buffer.unsafe_get(i).as_bytes()
+            var e_len = len(e)
             memcpy(dest=b_ptr + offset, src=e.unsafe_ptr(), count=e_len)
             offset += e_len
             i += 1
