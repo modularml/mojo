@@ -221,13 +221,13 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait BytesReadCollectionElement(CollectionElement, AsBytesRead):
-    """The BytesReadCollectionElement trait denotes a trait composition
-    of the `CollectionElement` and `AsBytesRead`.
+trait AsBytesCollectionElement(CollectionElement, AsBytes):
+    """The AsBytesCollectionElement trait denotes a trait composition
+    of the `CollectionElement` and `AsBytes`.
 
     This is useful to have as a named entity since Mojo does not
     currently support anonymous trait compositions to constrain
-    on `CollectionElement & AsBytesRead` in the parameter.
+    on `CollectionElement & AsBytes` in the parameter.
     """
 
     pass

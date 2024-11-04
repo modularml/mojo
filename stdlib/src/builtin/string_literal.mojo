@@ -20,11 +20,13 @@ from sys.ffi import c_char
 from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
+from utils import StringRef, Span
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.span import AsBytesRead
 from utils.string_slice import (
+    StringSlice,
+    StaticString,
+    Stringlike,
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
@@ -41,8 +43,6 @@ from collections.string import _atol
 struct StringLiteral(
     Boolable,
     Comparable,
-    CollectionElement,
-    CollectionElementNew,
     Writable,
     IntableRaising,
     KeyElement,
@@ -50,7 +50,7 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
-    AsBytesRead,
+    Stringlike,
     _HashableWithHasher,
 ):
     """This type represents a string literal.
@@ -402,36 +402,26 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
-
-        Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-        # Does NOT include the NUL terminator.
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
-        )
-
-    @always_inline
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns an immutable contiguous slice of the bytes.
+    fn as_bytes[
+        is_mutable: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
 
         Parameters:
-            O: The Origin of the bytes.
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
-            An immutable contiguous slice pointing to the bytes.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-
-        return Span[UInt8, O](
+        constrained[not is_mutable, "StringLiteral can't be mutated"]()
+        return Span[Byte, origin](
             unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
         )
 
@@ -530,7 +520,7 @@ struct StringLiteral(
         return self.as_string_slice().join(elems)
 
     fn join_bytes[
-        T: BytesReadCollectionElement, //,
+        T: AsBytesCollectionElement, //,
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 

@@ -218,9 +218,23 @@ struct StringRef(
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.data, len=self.length
-        )
+        return self.as_bytes[False, __origin_of(self)]()
+
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return Span[Byte, origin](unsafe_ptr=self.data, len=self.length)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders

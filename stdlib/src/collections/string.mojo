@@ -32,12 +32,13 @@ from utils import (
     Span,
     IndexList,
     StringRef,
-    StringSlice,
     Variant,
     Writable,
     Writer,
 )
 from utils.string_slice import (
+    StringSlice,
+    Stringlike,
     _utf8_byte_type,
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
@@ -694,7 +695,6 @@ fn isprintable(c: UInt8) -> Bool:
 struct String(
     Sized,
     Stringable,
-    AsBytes,
     Representable,
     IntableRaising,
     KeyElement,
@@ -705,6 +705,7 @@ struct String(
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
+    Stringlike,
 ):
     """Represents a mutable string."""
 
@@ -1435,7 +1436,7 @@ struct String(
         return self.as_string_slice().join(elems)
 
     fn join_bytes[
-        T: BytesReadCollectionElement, //,
+        T: AsBytesCollectionElement, //,
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1469,7 +1470,9 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes[
+        is_mutable: Bool = False
+    ](ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1478,27 +1481,25 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-
-        # Does NOT include the NUL terminator.
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
-        )
+        return self.as_bytes[is_mutable, __origin_of(self)]()
 
     @always_inline
-    fn as_bytes_read[O: ImmutableOrigin, //](ref [O]self) -> Span[UInt8, O]:
-        """Returns an immutable contiguous slice of the bytes.
+    fn as_bytes[
+        is_mutable: Bool, origin: Origin[is_mutable].type
+    ](self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of bytes.
 
         Parameters:
-            O: The Origin of the bytes.
+            is_mutable: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
-            An immutable contiguous slice pointing to the bytes.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-
-        return Span[UInt8, O](
+        return Span[Byte, origin](
             unsafe_ptr=self.unsafe_ptr(), len=self.byte_length()
         )
 

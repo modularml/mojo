@@ -91,7 +91,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
-    BytesReadCollectionElement,
+    AsBytesCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
@@ -133,5 +133,5 @@ from collections.string import (
 )
 from hashlib.hash import hash, Hashable
 from memory import Pointer, AddressSpace
-from utils import AsBytes, AsBytesRead, Writable, Writer
+from utils import AsBytes, Writable, Writer
 from documentation import doc_private
