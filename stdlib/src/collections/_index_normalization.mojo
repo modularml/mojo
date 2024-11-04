@@ -69,7 +69,7 @@ fn normalize_index[
         )
 
     @parameter
-    if cap_to_c_len:
+    if cap_to_container_length:
         var v = idx + c_len * int(idx < 0)
         return v * int(v < c_len and v > 0) + c_len * int(v >= c_len)
     else:
