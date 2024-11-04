@@ -530,14 +530,14 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 
 @always_inline
 fn _memchr[
-    O: ImmutableOrigin, //, type: DType
-](span: Span[Scalar[type], O], char: Scalar[type]) -> UnsafePointer[
-    Scalar[type]
+    O: ImmutableOrigin, D: DType, //
+](span: Span[Scalar[D], O], char: Scalar[D]) -> UnsafePointer[
+    Scalar[D]
 ] as output:
     var haystack = span.unsafe_ptr()
     var length = len(span)
     alias bool_mask_width = simdwidthof[DType.bool]()
-    var first_needle = SIMD[type, bool_mask_width](char)
+    var first_needle = SIMD[D, bool_mask_width](char)
     var vectorized_end = _align_down(length, bool_mask_width)
 
     for i in range(0, vectorized_end, bool_mask_width):
@@ -552,25 +552,25 @@ fn _memchr[
             output = haystack + i
             return
 
-    output = UnsafePointer[Scalar[type]]()
+    output = UnsafePointer[Scalar[D]]()
 
 
 @always_inline
 fn _memmem[
-    O: ImmutableOrigin, //, type: DType
+    O: ImmutableOrigin, D: DType, //
 ](
-    haystack_span: Span[Scalar[type], O], needle_span: Span[Scalar[type]]
-) -> UnsafePointer[Scalar[type]] as output:
+    haystack_span: Span[Scalar[D], O], needle_span: Span[Scalar[D]]
+) -> UnsafePointer[Scalar[D]] as output:
     var haystack = haystack_span.unsafe_ptr()
     var haystack_len = len(haystack_span)
     var needle = needle_span.unsafe_ptr()
     var needle_len = len(needle_span)
     debug_assert(needle_len > 0, "needle_len must be > 0")
     if needle_len == 1:
-        output = _memchr[type](haystack_span, needle[0])
+        output = _memchr[D](haystack_span, needle[0])
         return
     elif needle_len > haystack_len:
-        output = UnsafePointer[Scalar[type]]()
+        output = UnsafePointer[Scalar[D]]()
         return
 
     alias bool_mask_width = simdwidthof[DType.bool]()
@@ -578,8 +578,8 @@ fn _memmem[
         haystack_len - needle_len + 1, bool_mask_width
     )
 
-    var first_needle = SIMD[type, bool_mask_width](needle[0])
-    var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
+    var first_needle = SIMD[D, bool_mask_width](needle[0])
+    var last_needle = SIMD[D, bool_mask_width](needle[needle_len - 1])
 
     for i in range(0, vectorized_end, bool_mask_width):
         var first_block = haystack.load[width=bool_mask_width](i)
@@ -606,19 +606,19 @@ fn _memmem[
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             output = haystack + i
             return
-    output = UnsafePointer[Scalar[type]]()
+    output = UnsafePointer[Scalar[D]]()
 
 
 @always_inline
 fn _memrchr[
-    O: ImmutableOrigin, //, type: DType
-](span: Span[Scalar[type], O], char: Scalar[type]) -> UnsafePointer[
-    Scalar[type]
+    O: ImmutableOrigin, D: DType, //
+](span: Span[Scalar[D], O], char: Scalar[D]) -> UnsafePointer[
+    Scalar[D]
 ] as output:
     var haystack = span.unsafe_ptr()
     var length = len(span)
     alias bool_mask_width = simdwidthof[DType.bool]()
-    var first_needle = SIMD[type, bool_mask_width](char)
+    var first_needle = SIMD[D, bool_mask_width](char)
     var vectorized_end = _align_down(length, bool_mask_width)
 
     for i in reversed(range(vectorized_end, length)):
@@ -634,15 +634,15 @@ fn _memrchr[
             output = haystack + (i + bool_mask_width - zeros)
             return
 
-    output = UnsafePointer[Scalar[type]]()
+    output = UnsafePointer[Scalar[D]]()
 
 
 @always_inline
 fn _memrmem[
-    O: ImmutableOrigin, //, type: DType
+    O: ImmutableOrigin, D: DType, //
 ](
-    haystack_span: Span[Scalar[type], O], needle_span: Span[Scalar[type]]
-) -> UnsafePointer[Scalar[type]] as output:
+    haystack_span: Span[Scalar[D], O], needle_span: Span[Scalar[D]]
+) -> UnsafePointer[Scalar[D]] as output:
     var haystack = haystack_span.unsafe_ptr()
     var haystack_len = len(haystack_span)
     var needle = needle_span.unsafe_ptr()
@@ -650,10 +650,10 @@ fn _memrmem[
     debug_assert(needle_len > 0, "needle_len must be > 0")
 
     if needle_len == 1:
-        output = _memrchr[type](haystack_span, needle[0])
+        output = _memrchr[D](haystack_span, needle[0])
         return
     elif needle_len > haystack_len:
-        output = UnsafePointer[Scalar[type]]()
+        output = UnsafePointer[Scalar[D]]()
         return
 
     alias bool_mask_width = simdwidthof[DType.bool]()
@@ -669,8 +669,8 @@ fn _memrmem[
             output = haystack + i
             return
 
-    var first_needle = SIMD[type, bool_mask_width](needle[0])
-    var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
+    var first_needle = SIMD[D, bool_mask_width](needle[0])
+    var last_needle = SIMD[D, bool_mask_width](needle[needle_len - 1])
 
     for i in reversed(range(0, vectorized_end, bool_mask_width)):
         var first_block = haystack.load[width=bool_mask_width](i)
