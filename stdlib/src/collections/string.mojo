@@ -19,7 +19,7 @@ from bit import count_leading_zeros
 from builtin.builtin_list import _lit_mut_cast
 from collections import KeyElement, List
 from collections._index_normalization import normalize_index
-from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib._hasher import _Hasher
 from memory import UnsafePointer, memcpy
 from sys import bitwidthof
 from sys.ffi import c_char
@@ -689,21 +689,7 @@ fn isprintable(c: UInt8) -> Bool:
 
 
 @value
-struct String(
-    Sized,
-    Stringable,
-    Representable,
-    IntableRaising,
-    KeyElement,
-    Comparable,
-    Boolable,
-    Writable,
-    Writer,
-    CollectionElementNew,
-    FloatableRaising,
-    _HashableWithHasher,
-    Stringlike,
-):
+struct String(Representable, KeyElement, Comparable, Writer, Stringlike):
     """Represents a mutable string."""
 
     # Fields
@@ -1400,6 +1386,7 @@ struct String(
         Returns:
             The joined string.
         """
+
         var result = String()
         var is_first = True
 

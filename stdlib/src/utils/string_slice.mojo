@@ -26,6 +26,7 @@ from bit import count_leading_zeros
 from builtin.builtin_list import _lit_mut_cast
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import memcmp, UnsafePointer, memcpy
 from memory.memory import _memcmp_impl_unconstrained
 from sys import simdwidthof, bitwidthof
@@ -244,11 +245,7 @@ struct _StringSliceIter[
 
 @value
 struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
-    Stringable,
-    Sized,
-    Writable,
-    Hashable,
-    Stringlike,
+    Stringlike
 ):
     """A non-owning view to encoded string data.
 
@@ -429,6 +426,17 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
             builtin documentation for more details.
         """
         return hash(self._slice._data, self._slice._len)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
 
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
@@ -1113,7 +1121,19 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
+trait Stringlike(
+    Sized,
+    Boolable,
+    AsBytes,
+    CollectionElement,
+    CollectionElementNew,
+    Writable,
+    Stringable,
+    IntableRaising,
+    FloatableRaising,
+    Hashable,
+    _HashableWithHasher,
+):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
