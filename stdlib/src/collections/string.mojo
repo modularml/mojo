@@ -1471,6 +1471,9 @@ struct String(
     ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
         """Returns a contiguous slice of the bytes owned by this string.
 
+        Parameters:
+            is_mutable: Whether the result will be mutable.
+
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
 
