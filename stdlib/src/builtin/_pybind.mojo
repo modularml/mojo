@@ -28,8 +28,9 @@ from python._cpython import (
 )
 from python._bindings import (
     Pythonable,
+    ConvertibleFromPython,
     PyMojoObject,
-    create_wrapper_function,
+    py_c_function_wrapper,
     check_argument_type,
     # Imported for use by the compiler
     check_arguments_arity,
@@ -107,7 +108,7 @@ fn add_wrapper_to_module[
         module,
         List[PyMethodDef](
             PyMethodDef.function[
-                create_wrapper_function[wrapper_func](), func_name
+                py_c_function_wrapper[wrapper_func], func_name
             ]()
         ),
     )
@@ -122,3 +123,30 @@ fn check_and_get_arg[
     index: Int,
 ) raises -> UnsafePointer[T]:
     return check_argument_type[T](func_name, type_name_id, py_args[index])
+
+
+fn try_convert_arg[
+    T: ConvertibleFromPython
+](
+    func_name: StringLiteral,
+    type_name_id: StringLiteral,
+    py_args: TypedPythonObject["Tuple"],
+    argidx: Int,
+) raises -> T as result:
+    try:
+        result = T.try_from_python(py_args[argidx])
+    except convert_err:
+        raise Error(
+            String.format(
+                (
+                    "TypeError: {}() expected argument at position {} to be"
+                    " instance of (or convertible to) Mojo '{}'; got '{}'."
+                    " (Note: attempted conversion failed due to: {})"
+                ),
+                func_name,
+                argidx,
+                type_name_id,
+                py_args[argidx]._get_type_name(),
+                convert_err,
+            )
+        )

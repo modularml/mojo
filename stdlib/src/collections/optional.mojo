@@ -31,7 +31,6 @@ print(d)  # prints 2
 ```
 """
 
-from builtin._documentation import doc_private
 from os import abort
 from utils import Variant
 

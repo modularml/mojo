@@ -21,10 +21,11 @@ what we publish.
   [Issue #933](https://github.com/modularml/mojo/issues/933).
 
 - The destructor insertion logic in Mojo is now aware that types that take an
-  `AnyLifetime` as part of their signature could potentially access any live
-  value that destructor insertion is tracking, eliminating a significant
-  usability issue with unsafe APIs like `UnsafePointer`.  Consider a typical
-  example working with strings before this change:
+  `MutableAnyOrigin` or `ImmutableAnyOrigin` as part of their signature could
+  potentially access any live value that destructor insertion is tracking,
+  eliminating a significant usability issue with unsafe APIs like
+  `UnsafePointer`.  Consider a typical example working with strings before this
+   change:
 
   ```mojo
   var str = String(...)
@@ -35,20 +36,20 @@ what we publish.
 
   The `_ = str^` pattern was formerly required because the Mojo compiler has no
   idea what "ptr" might reference.  As a consequence, it had no idea that
-  `some_low_level_api` might access `str` and therefore thought it was ok to
+  `some_low_level_api()` might access `str` and therefore thought it was ok to
   destroy the `String` before the call - this is why the explicit lifetime
   extension was required.
 
-  Mojo now knows that `UnsafePointer` may access the `AnyLifetime` lifetime,
-  and now assumes that any API that uses that lifetime could use live values.
-  In this case, it assumes that `some_low_level_api` might access `str` and
+  Mojo now knows that `UnsafePointer` may access the `MutableAnyOrigin` origin,
+  and now assumes that any API that uses that origin could use live values.
+  In this case, it assumes that `some_low_level_api()` might access `str` and
   because it might be using it, it cannot destroy `str` until after the call.
   The consequence of this is that the old hack is no longer needed for these
   cases!
 
-- The `UnsafePointer` type now has a `lifetime` parameter that can be used when
-  the `UnsafePointer` is known to point into some lifetime.  This lifetime is
-  propagated through the `ptr[]` indirection operation.
+- The `UnsafePointer` type now has an `origin` parameter that can be used when
+  the `UnsafePointer` is known to point to a value with a known origin. This
+  origin is propagated through the `ptr[]` indirection operation.
 
 - The VS Code Mojo Debugger now has a `buildArgs` JSON debug configuration
   setting that can be used in conjunction with `mojoFile` to define the build
@@ -123,9 +124,9 @@ what we publish.
     pass
   ```
 
-- Function types now accept a lifetime set parameter. This parameter represents
-  the lifetimes of values captured by a parameter closure. The compiler
-  automatically tags parameter closures with the right set of lifetimes. This
+- Function types now accept an origin set parameter. This parameter represents
+  the origins of values captured by a parameter closure. The compiler
+  automatically tags parameter closures with the right set of origins. This
   enables lifetimes and parameter closures to correctly compose.
 
   ```mojo
@@ -144,8 +145,8 @@ what we publish.
   ```
 
   Note that this only works for higher-order functions which have explicitly
-  added `[_]` as the capture lifetimes. By default, the compiler still assumes
-  a `capturing` closure does not reference any lifetimes. This will soon change.
+  added `[_]` as the capture origins. By default, the compiler still assumes
+  a `capturing` closure does not reference any origins. This will soon change.
 
 - The VS Code extension now has the `mojo.run.focusOnTerminalAfterLaunch`
   setting, which controls whether to focus on the terminal used by the
@@ -165,10 +166,10 @@ what we publish.
   ([PR #3524](https://github.com/modularml/mojo/pull/3524) by [@szbergeron](https://github.com/szbergeron))
 
 - `ref` argument and result specifiers now allow providing a memory value
-  directly in the lifetime specifier, rather than requiring the use of
-  `__origin_of`.  It is still fine to use `__origin_of` explicitly though,
-  and this is required when specifying lifetimes for parameters (e.g. to the
-  `Reference` type). For example, this is now valid without `__origin_of`:
+  directly in the origin specifier, rather than requiring the use of
+  `__origin_of()`.  It is still fine to use `__origin_of()` explicitly though,
+  and this is required when specifying origins for parameters (e.g. to the
+  `Pointer` type). For example, this is now valid without `__origin_of()`:
 
   ```mojo
   fn return_ref(a: String) -> ref [a] String:
@@ -214,6 +215,19 @@ what we publish.
 - The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
   `b my_module::main`.
 
+- The VS Code extension now allows cancelling the installation of its private
+  MAX SDK.
+
+- The VS Code extension now opens the Run and Debug tab automatically whenever
+  a debug session starts.
+
+- The `mojo debug --vscode` command now support the `--init-command` and
+  `--stop-on-entry` flags. Execute `mojo debug --help` for more information.
+
+- The Mojo LLDB debugger on VS Code now supports inspecting the raw attributes
+  of variables that are handled as synthetic types, e.g. `List` from Mojo or
+  `std::vector` from C++.
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
@@ -234,8 +248,8 @@ what we publish.
   specifies to the compiler that the resultant pointer is a distinct
   identifiable object that does not alias any other memory in the local scope.
 
-- The `AnyLifetime` type (useful for declaring lifetime types as parameters) has
-  been renamed to `Lifetime`.
+- The `AnyLifetime` type (useful for declaring origin types as parameters) has
+  been renamed to `Origin`.
 
 - Restore implicit copyability of `Tuple` and `ListLiteral`.
 
@@ -341,12 +355,50 @@ what we publish.
   been consolidated under `s.as_bytes` to return a `Span[Byte]`, you can convert
   it to a `List` if you require a copy with `List(s.as_bytes())`.
 
-- `Lifetime` and related types has been renamed to `Origin` in the standard
+- `Lifetime` and related types have been renamed to `Origin` in the standard
   library to better clarify that parameters of this type indicate where a
   reference is derived from, not the more complicated notion of where a variable
   is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
-  for more information and rationale.  As a consequence `__lifetime_of` is now
-  named `__origin_of`.
+  for more information and rationale.  As a consequence the `__lifetime_of()`
+  operator is now named `__origin_of()`.
+
+- You can now use the `+=` and `*` operators on a `StringLiteral` at compile
+  time using the `alias` keyword:
+
+  ```mojo
+  alias original = "mojo"
+  alias concat = original * 3
+  assert_equal("mojomojomojo", concat)
+  ```
+
+  Or inside a `fn` that is being evaluated at compile time:
+
+  ```mojo
+  fn add_literal(
+      owned original: StringLiteral, add: StringLiteral, n: Int
+  ) -> StringLiteral:
+      for _ in range(n):
+          original += add
+      return original
+
+
+  fn main():
+      alias original = "mojo"
+      alias concat = add_literal(original, "!", 4)
+      assert_equal("mojo!!!!", concat)
+  ```
+
+  These operators can't be evaluated at runtime, as a `StringLiteral` must be
+  written into the binary during compilation.
+
+  - You can now index into `UnsafePointer` using SIMD scalar integral types:
+
+  ```mojo
+  p = UnsafePointer[Int].alloc(1)
+  i = UInt8(1)
+  p[i] = 42
+  print(p[i])
+  ```
 
 ### ❌ Removed
 
@@ -365,7 +417,7 @@ what we publish.
   doesn't extend the lifetimes of the values it references.
 
 - [Issue #3627](https://github.com/modularml/mojo/issues/3627) - Compiler
-  overlooked exclusivity violation caused by `ref [MutableAnyLifetime] T`
+  overlooked exclusivity violation caused by `ref [MutableAnyOrigin] T`
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
@@ -373,3 +425,6 @@ what we publish.
 
 - The VS Code extension now downloads its private copy of the MAX SDK in a way
   that prevents ETXTBSY errors on Linux.
+
+- The VS Code extension now allows invoking a mojo formatter from SDK
+  installations that contain white spaces in their path.

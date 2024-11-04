@@ -19,7 +19,6 @@ from python import PythonObject
 ```
 """
 
-from builtin._documentation import doc_private
 from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
@@ -414,10 +413,7 @@ struct PythonObject(
             string: The string value.
         """
         cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyUnicode_DecodeUTF8(
-            string._strref_dangerous()
-        )
-        string._strref_keepalive()
+        self.py_object = cpython.PyUnicode_DecodeUTF8(string.as_string_slice())
 
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
@@ -537,6 +533,20 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         cpython.Py_IncRef(self.py_object)
 
+    fn __del__(owned self):
+        """Destroy the object.
+
+        This decrements the underlying refcount of the pointed-to object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        # Acquire GIL such that __del__ can be called safely for cases where the
+        # PyObject is handled in non-python contexts.
+        var state = cpython.PyGILState_Ensure()
+        if not self.py_object.is_null():
+            cpython.Py_DecRef(self.py_object)
+        self.py_object = PyObjectPtr()
+        cpython.PyGILState_Release(state)
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
@@ -554,47 +564,6 @@ struct PythonObject(
         var iter = cpython.PyObject_GetIter(self.py_object)
         Python.throw_python_exception_if_error_state(cpython)
         return _PyIter(PythonObject(iter))
-
-    # ===-------------------------------------------------------------------===#
-    # Methods
-    # ===-------------------------------------------------------------------===#
-
-    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
-        """Get the underlying PyObject pointer.
-
-        Returns:
-            The underlying PyObject pointer.
-
-        Safety:
-            Use-after-free: The caller must take care that `self` outlives the
-            usage of the pointer returned by this function.
-        """
-        return self.py_object
-
-    fn steal_data(owned self) -> PyObjectPtr:
-        """Take ownership of the underlying pointer from the Python object.
-
-        Returns:
-            The underlying data.
-        """
-        var ptr = self.py_object
-        self.py_object = PyObjectPtr()
-
-        return ptr
-
-    fn __del__(owned self):
-        """Destroy the object.
-
-        This decrements the underlying refcount of the pointed-to object.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        # Acquire GIL such that __del__ can be called safely for cases where the
-        # PyObject is handled in non-python contexts.
-        var state = cpython.PyGILState_Ensure()
-        if not self.py_object.is_null():
-            cpython.Py_DecRef(self.py_object)
-        self.py_object = PyObjectPtr()
-        cpython.PyGILState_Release(state)
 
     fn __getattr__(self, name: StringLiteral) raises -> PythonObject:
         """Return the value of the object attribute with the given name.
@@ -672,47 +641,6 @@ struct PythonObject(
             True if they are not the same object and False otherwise.
         """
         return not (self is other)
-
-    fn __len__(self) raises -> Int:
-        """Returns the length of the object.
-
-        Returns:
-            The length of the object.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_Length(self.py_object)
-        if result == -1:
-            # TODO: Improve error message so we say
-            # "object of type 'int' has no len()" function to match Python
-            raise Error("object has no len()")
-        return result
-
-    fn __hash__(self) -> UInt:
-        """Returns the length of the object.
-
-        Returns:
-            The length of the object.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_Length(self.py_object)
-        # TODO: make this function raise when we can raise parametrically.
-        debug_assert(result != -1, "object is not hashable")
-        return result
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
-        """Updates hasher with this python object hash value.
-
-        Parameters:
-            H: The hasher type.
-
-        Args:
-            hasher: The hasher instance.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_Hash(self.py_object)
-        # TODO: make this function raise when we can raise parametrically.
-        debug_assert(result != -1, "object is not hashable")
-        hasher.update(result)
 
     fn __getitem__(self, *args: PythonObject) raises -> PythonObject:
         """Return the value for the given key or keys.
@@ -1382,9 +1310,6 @@ struct PythonObject(
         """
         return self._call_zero_arg_method("__invert__")
 
-    fn _get_ptr_as_int(self) -> Int:
-        return self.py_object._get_ptr_as_int()
-
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules
     fn __call__(
@@ -1416,7 +1341,7 @@ struct PythonObject(
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
             var key = cpython.PyUnicode_DecodeUTF8(
-                entry[].key._strref_dangerous()
+                entry[].key.as_string_slice()
             )
             var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object
@@ -1441,6 +1366,51 @@ struct PythonObject(
                 " return NoneType."
             )
         return PythonObject(result)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    fn __len__(self) raises -> Int:
+        """Returns the length of the object.
+
+        Returns:
+            The length of the object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var result = cpython.PyObject_Length(self.py_object)
+        if result == -1:
+            # TODO: Improve error message so we say
+            # "object of type 'int' has no len()" function to match Python
+            raise Error("object has no len()")
+        return result
+
+    fn __hash__(self) -> UInt:
+        """Returns the length of the object.
+
+        Returns:
+            The length of the object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var result = cpython.PyObject_Length(self.py_object)
+        # TODO: make this function raise when we can raise parametrically.
+        debug_assert(result != -1, "object is not hashable")
+        return result
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this python object hash value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var result = cpython.PyObject_Hash(self.py_object)
+        # TODO: make this function raise when we can raise parametrically.
+        debug_assert(result != -1, "object is not hashable")
+        hasher.update(result)
 
     fn __index__(self) -> Int:
         """Returns an index representation of the object.
@@ -1477,26 +1447,6 @@ struct PythonObject(
         """
         return self.__float__()
 
-    fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
-        """Convert a Python-owned and managed pointer into a Mojo pointer.
-
-        Warning: converting from an integer to a pointer is unsafe! The
-        compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
-        pointer. This is OK because the pointer originates from Python.
-
-        Parameters:
-            type: The desired DType of the pointer.
-
-        Returns:
-            An `UnsafePointer` for the underlying Python data.
-        """
-        var tmp = int(self)
-        var result = UnsafePointer.address_of(tmp).bitcast[
-            UnsafePointer[Scalar[type]]
-        ]()[]
-        _ = tmp
-        return result
-
     fn __str__(self) -> String:
         """Returns a string representation of the object.
 
@@ -1528,6 +1478,64 @@ struct PythonObject(
 
         # TODO: Avoid this intermediate String allocation, if possible.
         writer.write(str(self))
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn unsafe_as_py_object_ptr(self) -> PyObjectPtr:
+        """Get the underlying PyObject pointer.
+
+        Returns:
+            The underlying PyObject pointer.
+
+        Safety:
+            Use-after-free: The caller must take care that `self` outlives the
+            usage of the pointer returned by this function.
+        """
+        return self.py_object
+
+    fn steal_data(owned self) -> PyObjectPtr:
+        """Take ownership of the underlying pointer from the Python object.
+
+        Returns:
+            The underlying data.
+        """
+        var ptr = self.py_object
+        self.py_object = PyObjectPtr()
+
+        return ptr
+
+    fn unsafe_get_as_pointer[type: DType](self) -> UnsafePointer[Scalar[type]]:
+        """Convert a Python-owned and managed pointer into a Mojo pointer.
+
+        Warning: converting from an integer to a pointer is unsafe! The
+        compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
+        pointer. This is OK because the pointer originates from Python.
+
+        Parameters:
+            type: The desired DType of the pointer.
+
+        Returns:
+            An `UnsafePointer` for the underlying Python data.
+        """
+        var tmp = int(self)
+        var result = UnsafePointer.address_of(tmp).bitcast[
+            UnsafePointer[Scalar[type]]
+        ]()[]
+        _ = tmp
+        return result
+
+    fn _get_ptr_as_int(self) -> Int:
+        return self.py_object._get_ptr_as_int()
+
+    fn _get_type_name(self) -> String:
+        var cpython = Python().impl.cpython()
+
+        var actual_type = cpython.Py_TYPE(self.unsafe_as_py_object_ptr())
+        var actual_type_name = PythonObject(cpython.PyType_GetName(actual_type))
+
+        return str(actual_type_name)
 
 
 # ===-----------------------------------------------------------------------===#

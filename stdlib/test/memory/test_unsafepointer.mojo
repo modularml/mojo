@@ -227,6 +227,29 @@ def test_indexing():
     assert_equal(ptr[3], 3)
 
 
+def test_indexing_simd():
+    var ptr = UnsafePointer[Int].alloc(4)
+    for i in range(4):
+        ptr[UInt8(i)] = i
+
+    assert_equal(ptr[UInt8(1)], 1)
+    assert_equal(ptr[UInt8(3)], 3)
+    assert_equal(ptr[UInt16(1)], 1)
+    assert_equal(ptr[UInt16(3)], 3)
+    assert_equal(ptr[UInt32(1)], 1)
+    assert_equal(ptr[UInt32(3)], 3)
+    assert_equal(ptr[UInt64(1)], 1)
+    assert_equal(ptr[UInt64(3)], 3)
+    assert_equal(ptr[Int8(1)], 1)
+    assert_equal(ptr[Int8(3)], 3)
+    assert_equal(ptr[Int16(1)], 1)
+    assert_equal(ptr[Int16(3)], 3)
+    assert_equal(ptr[Int32(1)], 1)
+    assert_equal(ptr[Int32(3)], 3)
+    assert_equal(ptr[Int64(1)], 1)
+    assert_equal(ptr[Int64(3)], 3)
+
+
 def test_bool():
     var nullptr = UnsafePointer[Int]()
     var ptr = UnsafePointer[Int].alloc(1)
@@ -319,6 +342,7 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
+    test_indexing_simd()
     test_bool()
     test_alignment()
     test_offset()

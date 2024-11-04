@@ -34,7 +34,6 @@ from sys import (
 from memory import UnsafePointer
 
 from bit import count_trailing_zeros
-from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
@@ -419,11 +418,9 @@ fn exp2[
     if type not in (DType.float32, DType.float64):
         return exp2(x.cast[DType.float32]()).cast[type]()
 
-    alias integral_type = FPUtils[type].integral_type
-
     var xc = x.clamp(-126, 126)
 
-    var m = xc.cast[integral_type]()
+    var m = xc.cast[__type_of(x.to_bits()).type]()
 
     xc -= m.cast[type]()
 
@@ -437,11 +434,9 @@ fn exp2[
             1.33336498402e-3,
         ),
     ](xc)
-
-    return (
-        r._float_to_bits[integral_type]()
-        + (m << FPUtils[type].mantissa_width())
-    )._bits_to_float[type]()
+    return __type_of(r)(
+        from_bits=(r.to_bits() + (m << FPUtils[type].mantissa_width()))
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -505,11 +500,9 @@ fn _ldexp_impl[
         return res
 
     alias integral_type = FPUtils[type].integral_type
-    var m: SIMD[integral_type, simd_width] = (
-        exp.cast[integral_type]() + FPUtils[type].exponent_bias()
-    )
+    var m = exp.cast[integral_type]() + FPUtils[type].exponent_bias()
 
-    return x * (m << FPUtils[type].mantissa_width())._bits_to_float[type]()
+    return x * __type_of(x)(from_bits=m << FPUtils[type].mantissa_width())
 
 
 @always_inline
@@ -630,8 +623,8 @@ fn exp[
 
 @always_inline
 fn _frexp_mask1[
-    simd_width: Int, type: DType, integral_type: DType
-]() -> SIMD[integral_type, simd_width]:
+    simd_width: Int, type: DType
+]() -> SIMD[_integral_type_of[type](), simd_width]:
     @parameter
     if type is DType.float16:
         return 0x7C00
@@ -646,8 +639,8 @@ fn _frexp_mask1[
 
 @always_inline
 fn _frexp_mask2[
-    simd_width: Int, type: DType, integral_type: DType
-]() -> SIMD[integral_type, simd_width]:
+    simd_width: Int, type: DType
+]() -> SIMD[_integral_type_of[type](), simd_width]:
     @parameter
     if type is DType.float16:
         return 0x3800
@@ -682,22 +675,20 @@ fn frexp[
     """
     # Based on the implementation in boost/simd/arch/common/simd/function/ifrexp.hpp
     constrained[type.is_floating_point(), "must be a floating point value"]()
-    alias integral_type = _integral_type_of[type]()
-    alias zero = SIMD[type, simd_width](0)
+    alias T = SIMD[type, simd_width]
+    alias zero = T(0)
     alias max_exponent = FPUtils[type].max_exponent() - 2
     alias mantissa_width = FPUtils[type].mantissa_width()
-    var mask1 = _frexp_mask1[simd_width, type, integral_type]()
-    var mask2 = _frexp_mask2[simd_width, type, integral_type]()
-    var x_int = x._float_to_bits[integral_type]()
+    var mask1 = _frexp_mask1[simd_width, type]()
+    var mask2 = _frexp_mask2[simd_width, type]()
+    var x_int = x.to_bits()
     var selector = x != zero
     var exp = selector.select(
         (((mask1 & x_int) >> mantissa_width) - max_exponent).cast[type](),
         zero,
     )
-    var frac = selector.select(
-        ((x_int & ~mask1) | mask2)._bits_to_float[type](), zero
-    )
-    return StaticTuple[SIMD[type, simd_width], 2](frac, exp)
+    var frac = selector.select(T(from_bits=x_int & ~mask1 | mask2), zero)
+    return StaticTuple[size=2](frac, exp)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1055,6 +1046,18 @@ fn isclose[
 # ===----------------------------------------------------------------------=== #
 # iota
 # ===----------------------------------------------------------------------=== #
+
+
+# TODO: Remove this when `iota` works at compile-time
+fn _compile_time_iota[type: DType, simd_width: Int]() -> SIMD[type, simd_width]:
+    constrained[
+        type.is_integral(),
+        "_compile_time_iota can only be used with integer types.",
+    ]()
+    var a = SIMD[type, simd_width](0)
+    for i in range(simd_width):
+        a[i] = i
+    return a
 
 
 @always_inline
@@ -2470,3 +2473,204 @@ fn _call_ptx_intrinsic[
         )
 
     return res
+
+
+# ===----------------------------------------------------------------------=== #
+# Ceilable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Ceilable:
+    """
+    The `Ceilable` trait describes a type that defines a ceiling operation.
+
+    Types that conform to `Ceilable` will work with the builtin `ceil`
+    function. The ceiling operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Ceilable, ceil
+
+    @value
+    struct Complex(Ceilable):
+        var re: Float64
+        var im: Float64
+
+        fn __ceil__(self) -> Self:
+            return Self(ceil(self.re), ceil(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Floorable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Floorable:
+    """
+    The `Floorable` trait describes a type that defines a floor operation.
+
+    Types that conform to `Floorable` will work with the builtin `floor`
+    function. The floor operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Floorable, floor
+
+    @value
+    struct Complex(Floorable):
+        var re: Float64
+        var im: Float64
+
+        fn __floor__(self) -> Self:
+            return Self(floor(self.re), floor(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# CeilDivable
+# ===----------------------------------------------------------------------=== #
+
+
+trait CeilDivable:
+    """
+    The `CeilDivable` trait describes a type that defines a ceil division
+    operation.
+
+    Types that conform to `CeilDivable` will work with the `math.ceildiv`
+    function.
+
+    For example:
+    ```mojo
+    from math import CeilDivable
+
+    @value
+    struct Foo(CeilDivable):
+        var x: Float64
+
+        fn __floordiv__(self, other: Self) -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) -> Self:
+            return other // self
+
+        fn __neg__(self) -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    @doc_private
+    fn __floordiv__(self, other: Self) -> Self:
+        ...
+
+    @doc_private
+    fn __rfloordiv__(self, other: Self) -> Self:
+        ...
+
+    @doc_private
+    fn __neg__(self) -> Self:
+        ...
+
+
+trait CeilDivableRaising:
+    """
+    The `CeilDivable` trait describes a type that define a floor division and
+    negation operation that can raise.
+
+    Types that conform to `CeilDivableRaising` will work with the `//` operator
+    as well as the `math.ceildiv` function.
+
+    For example:
+    ```mojo
+    from math import CeilDivableRaising
+
+    @value
+    struct Foo(CeilDivableRaising):
+        var x: object
+
+        fn __floordiv__(self, other: Self) raises -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) raises -> Self:
+            return other // self
+
+        fn __neg__(self) raises -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    @doc_private
+    fn __floordiv__(self, other: Self) raises -> Self:
+        ...
+
+    @doc_private
+    fn __rfloordiv__(self, other: Self) raises -> Self:
+        ...
+
+    @doc_private
+    fn __neg__(self) raises -> Self:
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Truncable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Truncable:
+    """
+    The `Truncable` trait describes a type that defines a truncation operation.
+
+    Types that conform to `Truncable` will work with the builtin `trunc`
+    function. The truncation operation always returns the same type as the
+    input.
+
+    For example:
+    ```mojo
+    from math import Truncable, trunc
+
+    @value
+    struct Complex(Truncable):
+        var re: Float64
+        var im: Float64
+
+        fn __trunc__(self) -> Self:
+            return Self(trunc(re), trunc(im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
