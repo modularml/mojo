@@ -13,7 +13,7 @@
 
 from memory import UnsafePointer, Box
 
-from sys.ffi import c_int
+from sys.ffi import c_int, OpaquePointer
 from sys.info import sizeof
 
 from os import abort
@@ -33,6 +33,30 @@ from python._cpython import (
     newfunc,
     destructor,
 )
+
+
+trait ConvertibleFromPython(CollectionElement):
+    """Denotes a type that can attempt construction from a borrowed Python
+    object.
+    """
+
+    @staticmethod
+    fn try_from_python(obj: PythonObject) raises -> Self:
+        """Attempt to construct an instance of this object from a borrowed
+        Python value.
+
+        Args:
+            obj: The Python object to convert from.
+
+        Raises:
+            If conversion was not successful.
+        """
+        ...
+
+
+trait PythonableAndConvertibleFromPython(Pythonable, ConvertibleFromPython):
+    pass
+
 
 # ===-----------------------------------------------------------------------===#
 # Mojo Object
@@ -339,17 +363,12 @@ fn check_argument_type[
     ](type_name_id)
 
     if not opt:
-        var cpython = _get_global_python_itf().cpython()
-
-        var actual_type = cpython.Py_TYPE(obj.unsafe_as_py_object_ptr())
-        var actual_type_name = PythonObject(cpython.PyType_GetName(actual_type))
-
         raise Error(
             String.format(
                 "TypeError: {}() expected Mojo '{}' type argument, got '{}'",
                 func_name,
                 type_name_id,
-                str(actual_type_name),
+                obj._get_type_name(),
             )
         )
 

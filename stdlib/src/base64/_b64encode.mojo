@@ -14,6 +14,7 @@
 """
 We make use of the following papers for the implementation, note that there
 are some small differences.
+
 Wojciech Muła, Daniel Lemire, Base64 encoding and decoding at almost the
 speed of a memory copy, Software: Practice and Experience 50 (2), 2020.
 https://arxiv.org/abs/1910.05109
@@ -23,35 +24,13 @@ Instructions, ACM Transactions on the Web 12 (3), 2018.
 https://arxiv.org/abs/1704.00605
 """
 
-from collections import InlineArray
-from memory import memcpy, bitcast, UnsafePointer
-from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from builtin.simd import _sub_with_saturation
+from collections import InlineArray
 from math.math import _compile_time_iota
+from memory import memcpy, bitcast, UnsafePointer
+from utils import IndexList
 
-
-"""
-| 6-bit Value | ASCII Range | Target index | Offset (6-bit to ASCII) |
-|-------------|-------------|--------------|-------------------------|
-| 0 ... 25    | A ... Z     | 13           | 65                      |
-| 26 ... 51   | a ... z     | 0            | 71                      |
-| 52 ... 61   | 0 ... 9     | 1 ... 10     | -4                      |
-| 62          | +           | 11           | -19                     |
-| 63          | /           | 12           | -16                     |
-"""
-alias UNUSED = 0
-# fmt: off
-alias TABLE_BASE64_OFFSETS = SIMD[DType.uint8, 16](
-    71,                                     # a ... z
-    -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, # 0 ... 9 
-    -19,                                    # +
-    -16,                                    # /
-    65,                                     # A ... Z
-    UNUSED, UNUSED
-)
-# fmt: on
-alias END_FIRST_RANGE = 25
-alias END_SECOND_RANGE = 51
+alias Bytes = SIMD[DType.uint8, _]
 
 
 fn _base64_simd_mask[
@@ -61,171 +40,79 @@ fn _base64_simd_mask[
     return mask < UInt8(nb_value_to_load)
 
 
-fn _repeat_until[
-    dtype: DType, input_size: Int, //, target_size: Int
-](vector: SIMD[dtype, input_size]) -> SIMD[dtype, target_size]:
-    @parameter
-    if target_size == input_size:
-        var same_vector = rebind[SIMD[dtype, target_size]](vector)
-        return same_vector
-    else:
-        return _repeat_until[target_size](vector.join(vector))
+# |                |---- byte 2 ----|---- byte 1 ----|---- byte 0 ----|
+# |                |c₁c₀d₅d₄d₃d₂d₁d₀|b₃b₂b₁b₀c₅c₄c₃c₂|a₅a₄a₃a₂a₁a₀b₅b₄|
+# <----------------|----------------|----------------|----------------|
+# |31 . . . . . .24|23 . . . . . .16|15 . . . . . .08| 7 6 5 4 3 2 1 0|
+# |                                                                   |
+# |---- byte 1 ----|---- byte 2 ----|---- byte 0 ----|---- byte 1 ----|
+# |b₃b₂b₁b₀c₅c₄c₃c₂|c₁c₀d₅d₄d₃d₂d₁d₀|a₅a₄a₃a₂a₁a₀b₅b₄|b₃b₂b₁b₀c₅c₄c₃c₂|
+# |        -------------____________ ------------_____________        |
+# |        [     C     ][     D    ] [    A     ][     B     ]        |
+# |                                                                   |
+# |--- ascii(d) ---|--- ascii(c) ---|--- ascii(b) ---|--- ascii(a) ---|
+# |. . d₅d₄d₃d₂d₁d₀|. . c₅c₄c₃c₂c₁c₀|. . b₅b₄b₃b₂b₁b₀|. . a₅a₄a₃a₂a₁a₀|
+fn _6bit_to_byte[width: Int](input: Bytes[width]) -> Bytes[width]:
+    constrained[width in [4, 8, 16, 32, 64], "width must be between 4 and 64"]()
+
+    fn indices() -> IndexList[width]:
+        alias perm = List(1, 0, 2, 1)
+        var res = IndexList[width]()
+        for i in range(width // 4):
+            for j in range(4):
+                res[4 * i + j] = 3 * i + perm[j]
+        return res
+
+    @always_inline
+    fn combine[
+        mask: Bytes[4], shift: Int
+    ](shuffled: Bytes[width]) -> Bytes[width]:
+        var `6bit` = shuffled & _repeat_until[width](mask)
+        return _rshift_bits_in_u16[shift](`6bit`)
+
+    var shuffled = input.shuffle[mask = indices()]()
+    var a = combine[
+        Bytes[4](0b0000_0000, 0b1111_1100, 0b0000_0000, 0b0000_0000), 10
+    ](shuffled)
+    var b = combine[
+        Bytes[4](0b1111_0000, 0b0000_0011, 0b0000_0000, 0b0000_0000), -4
+    ](shuffled)
+    var c = combine[
+        Bytes[4](0b0000_0000, 0b0000_0000, 0b1100_0000, 0b0000_1111), 6
+    ](shuffled)
+    var d = combine[
+        Bytes[4](0b0000_0000, 0b0000_0000, 0b0011_1111, 0b0000_0000), 8
+    ](shuffled)
+    return a | b | c | d
 
 
-fn _move_first_group_of_6_bits[
-    simd_width: Int
-](shuffled_vector: SIMD[DType.uint8, simd_width]) -> SIMD[
-    DType.uint8, simd_width
-]:
-    alias mask_1 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](0b11111100, 0, 0, 0)
-    )
-    var masked_1 = shuffled_vector & mask_1
-    var result = masked_1 >> 2
-    return result
+# | 6-bit Value | ASCII Range | Target index | Offset (6-bit to ASCII) |
+# |-------------|-------------|--------------|-------------------------|
+# |  0 ... 25   | A ... Z     | 13           | 65                      |
+# | 26 ... 51   | a ... z     |  0           | 71                      |
+# | 52 ... 61   | 0 ... 9     |  1 ... 10    | -4                      |
+# | 62          | +           | 11           | -19                     |
+# | 63          | /           | 12           | -16                     |
+# fmt: off
+alias UNUSED = 0
+alias OFFSETS = Bytes[16](
+    71,                                     # a ... z
+    -4, -4, -4, -4, -4, -4, -4, -4, -4, -4, # 0 ... 9
+    -19,                                    # +
+    -16,                                    # /
+    65,                                     # A ... Z
+    UNUSED, UNUSED
+)
+alias END_FIRST_RANGE = 25
+alias END_SECOND_RANGE = 51
+# fmt: on
 
 
-fn _move_second_group_of_6_bits[
-    simd_width: Int
-](shuffled_vector: SIMD[DType.uint8, simd_width]) -> SIMD[
-    DType.uint8, simd_width
-]:
-    alias mask_2 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](0b00000011, 0b11110000, 0, 0)
-    )
-    var masked_2 = shuffled_vector & mask_2
-    var masked_2_as_uint16 = bitcast[DType.uint16, simd_width // 2](masked_2)
-    var rotated_2 = bit.rotate_bits_right[4](masked_2_as_uint16)
-    var result = bitcast[DType.uint8, simd_width](rotated_2)
-    return result
-
-
-fn _move_third_group_of_6_bits[
-    simd_width: Int
-](shuffled_vector: SIMD[DType.uint8, simd_width]) -> SIMD[
-    DType.uint8, simd_width
-]:
-    alias mask_3 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](
-            0,
-            0,
-            0b00001111,
-            0b11000000,
-        )
-    )
-    var masked_3 = shuffled_vector & mask_3
-    var masked_3_as_uint16 = bitcast[DType.uint16, simd_width // 2](masked_3)
-    var rotated_3 = bit.rotate_bits_left[2](masked_3_as_uint16)
-    var result = bitcast[DType.uint8, simd_width](rotated_3)
-    return result
-
-
-fn _move_fourth_group_of_6_bits[
-    simd_width: Int
-](shuffled_vector: SIMD[DType.uint8, simd_width]) -> SIMD[
-    DType.uint8, simd_width
-]:
-    alias mask_4 = _repeat_until[simd_width](
-        SIMD[DType.uint8, 4](
-            0,
-            0,
-            0,
-            0b00111111,
-        )
-    )
-    result = shuffled_vector & mask_4
-    return result
-
-
-fn _shuffle_input_vector[
-    simd_width: Int
-](input_vector: SIMD[DType.uint8, simd_width]) -> SIMD[DType.uint8, simd_width]:
-    # We reorder the bytes to fall in their correct 4 bytes chunks
-    # When Mojo is a bit more flexible with compile-time programming, we should be
-    # able to make this less verbose.
-    @parameter
-    if simd_width < 4:
-        constrained[False, msg="simd_width must be at least 4"]()
-        return SIMD[DType.uint8, simd_width]()  # dummy, unreachable
-    elif simd_width == 4:
-        return input_vector.shuffle[0, 1, 1, 2]()
-    elif simd_width == 8:
-        return input_vector.shuffle[0, 1, 1, 2, 3, 4, 4, 5]()
-    elif simd_width == 16:
-        return input_vector.shuffle[
-            0, 1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 10, 11
-        ]()
-    elif simd_width == 32:
-        # fmt: off
-        return input_vector.shuffle[
-            0, 1, 1, 2, 
-            3, 4, 4, 5,
-            6, 7, 7, 8, 
-            9, 10, 10, 11, 
-            12, 13, 13, 14, 
-            15, 16, 16, 17, 
-            18, 19, 19, 20, 
-            21, 22, 22, 23
-        ]()
-        # fmt: on
-    elif simd_width == 64:
-        # fmt: off
-        return input_vector.shuffle[
-            0, 1, 1, 2, 
-            3, 4, 4, 5, 
-            6, 7, 7, 8, 
-            9, 10, 10, 11, 
-            12, 13, 13, 14, 
-            15, 16, 16, 17, 
-            18, 19, 19, 20, 
-            21, 22, 22, 23, 
-            24, 25, 25, 26, 
-            27, 28, 28, 29, 
-            30, 31, 31, 32, 
-            33, 34, 34, 35, 
-            36, 37, 37, 38, 
-            39, 40, 40, 41, 
-            42, 43, 43, 44, 
-            45, 46, 46, 47, 
-        ]()
-        # fmt: on
-    else:
-        constrained[False, msg="simd_width must be at most 64"]()
-        return SIMD[DType.uint8, simd_width]()  # dummy, unreachable
-
-
-fn _to_b64_ascii[
-    simd_width: Int
-](input_vector: SIMD[DType.uint8, simd_width]) -> SIMD[DType.uint8, simd_width]:
-    alias constant_13 = SIMD[DType.uint8, simd_width](13)
-
-    # We reorder the bytes to fall in their correct 4 bytes chunks
-    var shuffled_vector = _shuffle_input_vector(input_vector)
-
-    # We have 4 different masks to extract each group of 6 bits from the 4 bytes
-    var ready_to_encode_per_byte = (
-        _move_first_group_of_6_bits(shuffled_vector)
-        | _move_second_group_of_6_bits(shuffled_vector)
-        | _move_third_group_of_6_bits(shuffled_vector)
-        | _move_fourth_group_of_6_bits(shuffled_vector)
-    )
-
-    # See the table above for the offsets, we try to go from 6-bits values to target indexes.
-    # The two first ranges go to 0, the other ranges are just 1...12.
-    var saturated = _sub_with_saturation(
-        ready_to_encode_per_byte,
-        SIMD[DType.uint8, simd_width](END_SECOND_RANGE),
-    )
-
-    var mask_in_first_range = ready_to_encode_per_byte <= END_FIRST_RANGE
-
-    # Now are have the target indexes
-    # The first range goes to 13
-    var indices = mask_in_first_range.select(constant_13, saturated)
-
-    var offsets = TABLE_BASE64_OFFSETS._dynamic_shuffle(indices)
-
-    return ready_to_encode_per_byte + offsets
+fn _to_b64_ascii[width: Int, //](input: Bytes[width]) -> Bytes[width]:
+    var abcd = _6bit_to_byte(input)
+    var target_indices = _sub_with_saturation(abcd, END_SECOND_RANGE)
+    var offset_indices = (abcd <= END_FIRST_RANGE).select(13, target_indices)
+    return abcd + OFFSETS._dynamic_shuffle(offset_indices)
 
 
 fn _get_table_number_of_bytes_to_store_from_number_of_bytes_to_load[
@@ -386,3 +273,21 @@ fn b64encode_with_buffers(
         )
         result.size += nb_of_elements_to_store
         input_index += input_simd_width
+
+
+# Utility functions
+
+
+fn _repeat_until[width: Int](v: SIMD) -> SIMD[v.type, width]:
+    constrained[width >= v.size, "width must be at least v.size"]()
+
+    @parameter
+    if width == v.size:
+        return rebind[SIMD[v.type, width]](v)
+    return _repeat_until[width](v.join(v))
+
+
+fn _rshift_bits_in_u16[shift: Int](input: Bytes) -> __type_of(input):
+    var u16 = bitcast[DType.uint16, input.size // 2](input)
+    var res = bit.rotate_bits_right[shift](u16)
+    return bitcast[DType.uint8, input.size](res)

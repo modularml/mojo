@@ -1529,6 +1529,14 @@ struct PythonObject(
     fn _get_ptr_as_int(self) -> Int:
         return self.py_object._get_ptr_as_int()
 
+    fn _get_type_name(self) -> String:
+        var cpython = Python().impl.cpython()
+
+        var actual_type = cpython.Py_TYPE(self.unsafe_as_py_object_ptr())
+        var actual_type_name = PythonObject(cpython.PyType_GetName(actual_type))
+
+        return str(actual_type_name)
+
 
 # ===-----------------------------------------------------------------------===#
 # Helper functions
