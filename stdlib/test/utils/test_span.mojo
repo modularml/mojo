@@ -194,6 +194,16 @@ def test_ref():
     assert_true(s.as_ref() == Pointer.address_of(l.unsafe_ptr()[]))
 
 
+def test_write():
+    a = List[Byte](0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    b = List[Byte](capacity=10)
+    b.size = 10
+    s1 = Span(a).for_read()
+    s2 = Span(b).for_write()
+    s2.write_bytes(s1)
+    assert_equal(a.__str__(), b.__str__())
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -205,3 +215,4 @@ def main():
     test_bool()
     test_fill()
     test_ref()
+    test_write()

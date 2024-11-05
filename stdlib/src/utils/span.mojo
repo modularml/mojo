@@ -21,8 +21,10 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Pointer, UnsafePointer
+from memory import Pointer, UnsafePointer, memcpy
 from builtin.builtin_list import _lit_mut_cast
+from sys.intrinsics import _type_is_eq
+from utils import Writer, Writable
 
 
 trait AsBytes:
@@ -96,7 +98,7 @@ struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
     origin: Origin[is_mutable].type,
-](CollectionElementNew):
+](CollectionElement, CollectionElementNew, Writer, Writable):
     """A non owning view of contiguous data.
 
     Parameters:
@@ -343,13 +345,72 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
-        """
-        Return an immutable version of this span.
+    fn for_read(self) -> Span[T, _lit_mut_cast[origin, False].result]:
+        """Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
         return Span[T, _lit_mut_cast[origin, False].result](
             unsafe_ptr=self._data, len=self._len
+        )
+
+    fn for_write(self) -> Span[T, _lit_mut_cast[origin, True].result]:
+        """Return a mutable version of this span.
+
+        Returns:
+            A span covering the same elements, but with mutability.
+        """
+        alias O = _lit_mut_cast[origin, True].result
+        return Span[T, _lit_mut_cast[origin, True].result](
+            unsafe_ptr=self.unsafe_ptr().bitcast[origin=O](), len=self._len
+        )
+
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
+        """Write a byte span overriding this Span on the overlapping section.
+
+        Args:
+            bytes: The byte span to write to this Span.
+        """
+
+        constrained[
+            _type_is_eq[__type_of(self).T, Byte](),
+            "The type of the Span must be Byte.",
+        ]()
+        constrained[Self.is_mutable, "Self must be mutable."]()
+        memcpy(
+            self.unsafe_ptr().bitcast[Byte](),
+            bytes.unsafe_ptr(),
+            min(len(bytes), len(self)),
+        )
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this Writer.
+        """
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+    fn write_to[W: Writer](self, inout writer: W):
+        """Formats this Span to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        writer.write_bytes(
+            Span[Byte, origin](
+                unsafe_ptr=self.unsafe_ptr().bitcast[Byte](), len=len(self)
+            )
         )
