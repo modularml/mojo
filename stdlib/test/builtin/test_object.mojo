@@ -729,6 +729,43 @@ def test_object_getattr():
         x.new_attr = 1
 
 
+def test_object_iter():
+    var value = [0, 1]
+    x = object([0, True, 2.0, "three"])
+    x.append(value)
+    # asap del of value
+    assert_equal(x._value.get_as_list()[4]._value.ref_count(), 1)
+    i = 0
+    y = object([])
+    for element in x:
+        assert_equal(element[], x[i])
+        y.append(element[])
+        if i == 0:
+            x[4].append(3)
+        i += 1
+    assert_equal(i, 5)
+    assert_equal(x, y)
+    assert_equal(repr(y), "[0, True, 2.0, 'three', [0, 1, 3]]")
+    assert_equal(x._value.get_as_list()[4]._value.ref_count(), 2)
+    _ = y
+
+    x = object.dict()
+    x["one"] = 1
+    x[2] = 2.0
+    i = 0
+    results = object([])
+    for element in x:
+        if i == 0:
+            assert_equal(x["one"], x[element[]])
+            assert_equal(element[], object("one"))
+        elif i == 1:
+            assert_equal(element[], object(2))
+        results.append(element[])
+        i += 1
+    assert_equal(i, 2)
+    assert_equal(repr(results), "['one', 2]")
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -752,3 +789,4 @@ def main():
     test_object_tuple_add()
     test_object_get_type_id()
     test_object_getattr()
+    test_object_iter()
