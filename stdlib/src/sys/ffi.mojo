@@ -384,8 +384,8 @@ fn _get_dylib_function[
 
 @always_inline
 fn external_call[
-    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
-](*args: *types) -> type:
+    callee: StringLiteral, return_type: AnyTrivialRegType, *T: AnyType
+](*args: *T) -> return_type:
     """Calls an external function.
 
     Args:
@@ -393,27 +393,27 @@ fn external_call[
 
     Parameters:
         callee: The name of the external function.
-        type: The return type.
-        types: The argument types.
+        return_type: The return type.
+        T: The argument types.
 
     Returns:
         The external call result.
     """
-    return external_call[callee, type](args)
+    return external_call[callee, return_type](args)
 
 
 @always_inline("nodebug")
 fn external_call[
-    callee: StringLiteral, type: AnyTrivialRegType
-](args: VariadicPack) -> type:
+    callee: StringLiteral, return_type: AnyTrivialRegType
+](args: VariadicPack[element_trait=AnyType]) -> return_type:
     """Calls an external function.
-
-    Args:
-        args: The arguments to pass to the external function.
 
     Parameters:
         callee: The name of the external function.
-        type: The return type.
+        return_type: The return type.
+
+    Args:
+        args: The arguments to pass to the external function.
 
     Returns:
         The external call result.
@@ -421,11 +421,13 @@ fn external_call[
     var p = args._get_loaded_kgen_pack()
 
     @parameter
-    if _mlirtype_is_eq[type, NoneType]():
+    if _mlirtype_is_eq[return_type, NoneType]():
         __mlir_op.`pop.external_call`[func = callee.value, _type=None](p)
-        return rebind[type](None)
+        return rebind[return_type](None)
     else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](p)
+        return __mlir_op.`pop.external_call`[
+            func = callee.value, _type=return_type
+        ](p)
 
 
 # ===----------------------------------------------------------------------===#
@@ -435,8 +437,8 @@ fn external_call[
 
 @always_inline("nodebug")
 fn _external_call_const[
-    callee: StringLiteral, type: AnyTrivialRegType, *types: AnyType
-](*args: *types) -> type:
+    callee: StringLiteral, return_type: AnyTrivialRegType, *types: AnyType
+](*args: *types) -> return_type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
     to the same function.
@@ -446,7 +448,7 @@ fn _external_call_const[
 
     Parameters:
       callee: The name of the external function.
-      type: The return type.
+      return_type: The return type.
       types: The argument types.
 
     Returns:
@@ -462,5 +464,5 @@ fn _external_call_const[
             `argMem = none, `,
             `inaccessibleMem = none>`,
         ],
-        _type=type,
+        _type=return_type,
     ](args._get_loaded_kgen_pack())

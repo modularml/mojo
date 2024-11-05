@@ -203,8 +203,9 @@ fn _snprintf[
     Returns:
         The number of bytes written into the output string.
     """
+
+    # FIXME: external_call should handle this
     var f = fmt.unsafe_ptr().bitcast[c_char]()
-    # FIXME: externall_call should handle this
     var num = __mlir_op.`pop.external_call`[
         func = "snprintf".value,
         variadicType = __mlir_attr[
