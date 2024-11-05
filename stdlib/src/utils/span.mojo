@@ -347,7 +347,7 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn read(self) -> Span[T, _lit_mut_cast[origin, False].result]:
+    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
         """
         Return an immutable version of this span.
 
