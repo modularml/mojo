@@ -1533,7 +1533,7 @@ struct String(
 
         # Does NOT include the NUL terminator.
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
+            ptr=self._buffer.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline

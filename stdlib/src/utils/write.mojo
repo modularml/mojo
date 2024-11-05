@@ -233,7 +233,7 @@ struct _WriteBuffer[W: MovableWriter, //, capacity: Int](Writer):
     fn flush(inout self):
         self.writer.write_bytes(
             Span[Byte, ImmutableAnyOrigin](
-                unsafe_ptr=self.data.unsafe_ptr(), len=self.pos
+                ptr=self.data.unsafe_ptr(), length=self.pos
             )
         )
         self.pos = 0

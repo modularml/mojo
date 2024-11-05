@@ -218,9 +218,7 @@ struct StringRef(
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.data, len=self.length
-        )
+        return Span[Byte, __origin_of(self)](ptr=self.data, length=self.length)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -413,7 +411,7 @@ struct StringRef(
         #   Safe because our use of this Span does not outlive `self`.
         writer.write_bytes(
             Span[Byte, ImmutableAnyOrigin](
-                unsafe_ptr=self.unsafe_ptr(), len=len(self)
+                ptr=self.unsafe_ptr(), length=len(self)
             )
         )
 

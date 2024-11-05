@@ -194,7 +194,7 @@ struct _StringSliceIter[
         self.ptr = unsafe_pointer
         self.length = length
         alias S = Span[Byte, StaticConstantOrigin]
-        var s = S(unsafe_ptr=self.ptr, len=self.length)
+        var s = S(ptr=self.ptr, length=self.length)
         self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
     fn __iter__(self) -> Self:
@@ -317,8 +317,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var strref = unsafe_from_utf8_strref
 
         var byte_slice = Span[Byte, origin](
-            unsafe_ptr=strref.unsafe_ptr(),
-            len=len(strref),
+            ptr=strref.unsafe_ptr(),
+            length=len(strref),
         )
 
         self = Self(unsafe_from_utf8=byte_slice)
@@ -345,8 +345,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
               duration of `origin`.
         """
         var byte_slice = Span[Byte, origin](
-            unsafe_ptr=unsafe_from_utf8_ptr,
-            len=len,
+            ptr=unsafe_from_utf8_ptr, length=len
         )
 
         self._slice = byte_slice
@@ -398,7 +397,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         var b_len = self.byte_length()
         alias S = Span[Byte, StaticConstantOrigin]
-        var s = S(unsafe_ptr=self.unsafe_ptr(), len=b_len)
+        var s = S(ptr=self.unsafe_ptr(), length=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
     fn write_to[W: Writer](self, inout writer: W):
