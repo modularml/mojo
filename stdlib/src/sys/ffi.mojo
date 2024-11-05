@@ -19,7 +19,6 @@ from utils import StringRef
 
 from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
 from .intrinsics import _mlirtype_is_eq
-from builtin.builtin_list import _LITRefPackHelper
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
 
@@ -445,7 +444,7 @@ fn external_call[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
@@ -487,7 +486,7 @@ fn _external_call_const[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     return __mlir_op.`pop.external_call`[
         func = callee.value,
