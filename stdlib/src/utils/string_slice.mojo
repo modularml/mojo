@@ -211,8 +211,7 @@ struct _StringSliceIter[
                     self.continuation_bytes -= byte_len - 1
             self.index += byte_len
             return StringSlice[origin](
-                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
-                len=byte_len,
+                ptr=self.ptr + (self.index - byte_len), length=byte_len
             )
         else:
             var byte_len = 1
@@ -226,7 +225,7 @@ struct _StringSliceIter[
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
             return StringSlice[origin](
-                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
+                ptr=self.ptr + self.index, length=byte_len
             )
 
     @always_inline
@@ -324,32 +323,21 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         self = Self(unsafe_from_utf8=byte_slice)
 
     @always_inline
-    fn __init__(
-        inout self,
-        *,
-        unsafe_from_utf8_ptr: UnsafePointer[UInt8],
-        len: Int,
-    ):
+    fn __init__(inout self, *, ptr: UnsafePointer[UInt8], length: Int):
         """Construct a `StringSlice` from a pointer to a sequence of UTF-8
         encoded bytes and a length.
 
         Args:
-            unsafe_from_utf8_ptr: A pointer to a sequence of bytes encoded in
-              UTF-8.
-            len: The number of bytes of encoded data.
+            ptr: A pointer to a sequence of bytes encoded in UTF-8.
+            length: The number of bytes of encoded data.
 
         Safety:
-            - `unsafe_from_utf8_ptr` MUST point to at least `len` bytes of valid
-              UTF-8 encoded data.
-            - `unsafe_from_utf8_ptr` must point to data that is live for the
-              duration of `origin`.
+            - `ptr` MUST point to at least `length` bytes of valid UTF-8 encoded
+                data.
+            - `ptr` must point to data that is live for the duration of
+                `origin`.
         """
-        var byte_slice = Span[Byte, origin](
-            unsafe_ptr=unsafe_from_utf8_ptr,
-            len=len,
-        )
-
-        self._slice = byte_slice
+        self._slice = Span[Byte, origin](unsafe_ptr=ptr, length=length)
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -635,9 +623,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             start += 1
         while end > start and _isspace(ptr[end - 1]):
             end -= 1
-        return StringSlice[origin](
-            unsafe_from_utf8_ptr=ptr + start, len=end - start
-        )
+        return StringSlice[origin](ptr=ptr + start, length=end - start)
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, origin]:
@@ -685,7 +671,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         if end == -1:
             return self.find(prefix, start) == start
         return StringSlice[__origin_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+            ptr=self.unsafe_ptr() + start, length=end - start
         ).startswith(prefix)
 
     fn endswith(
@@ -707,7 +693,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
         return StringSlice[__origin_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+            ptr=self.unsafe_ptr() + start, length=end - start
         ).endswith(suffix)
 
     fn _from_start(self, start: Int) -> Self:
@@ -1001,7 +987,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 eol_start += char_len
 
             str_len = eol_start - offset + int(keepends) * eol_length
-            s = StringSlice[O](unsafe_from_utf8_ptr=ptr + offset, len=str_len)
+            s = StringSlice[O](ptr=ptr + offset, length=str_len)
             output.append(s^)
             offset = eol_start + eol_length
 
@@ -1208,7 +1194,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         @always_inline("nodebug")
         fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
-            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+            return S(ptr=p + start, length=end - start)
 
         var auto_arg_index = 0
         for e in entries:
@@ -1327,7 +1313,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
         @always_inline("nodebug")
         fn _build_slice(p: UnsafePointer[UInt8], start: Int, end: Int) -> S:
-            return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+            return S(ptr=p + start, length=end - start)
 
         var field = _build_slice(fmt_src.unsafe_ptr(), start_value + 1, i)
         var field_ptr = field.unsafe_ptr()
