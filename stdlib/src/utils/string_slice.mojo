@@ -1053,9 +1053,9 @@ fn _to_string_list[
         og_ptr = unsafe_ptr_fn(i_ptr[i])
         memcpy(p, og_ptr, og_len)
         p[og_len] = 0  # null terminator
-        buf = String._buffer_type(unsafe_pointer=p, size=f_len, capacity=f_len)
+        buf = String._buffer_type(ptr=p, length=f_len, capacity=f_len)
         (out_ptr + i).init_pointee_move(String(buf^))
-    return List[String](unsafe_pointer=out_ptr, size=i_len, capacity=i_len)
+    return List[String](ptr=out_ptr, length=i_len, capacity=i_len)
 
 
 @always_inline
