@@ -170,9 +170,10 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             span: The span of values to populate the list with.
         """
-        self = Self(capacity=len(span))
-        for value in span:
-            self.append(value[])
+        var span_len = len(span)
+        self = Self(capacity=span_len)
+        self.size = span_len
+        memcpy(self.unsafe_ptr(), span.unsafe_ptr(), span_len)
 
     fn __init__(
         inout self,
@@ -471,11 +472,52 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn bytecount(self) -> Int:
-        """Gets the bytecount of the List.
+    fn _iadd(inout self, other: Span[T]):
+        var s_len = self.byte_length()
+        var o_len = len(other)
+        var o_ptr = other.unsafe_ptr()
+        if o_len == 0:
+            return
+        var sum_len = s_len + o_len
+        self.reserve(sum_len)
+        var s_ptr = self.unsafe_ptr()
+        memcpy(s_ptr + s_len, o_ptr, o_len)
+        self.size = sum_len
+
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
+        """Write a byte span overriding this Span on the overlapping section.
+
+        Args:
+            bytes: The byte span to write to this Span.
+        """
+
+        constrained[
+            _type_is_eq[__type_of(self).T, Byte](),
+            "The type of the List must be Byte.",
+        ]()
+        self._iadd(rebind[Span[T, bytes.origin]](bytes))
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this Writer.
+        """
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+    fn byte_length(self) -> Int:
+        """Gets the of the List in bytes.
 
         Returns:
-            The bytecount of the List.
+            The byte length of the List.
         """
         return len(self) * sizeof[T]()
 
