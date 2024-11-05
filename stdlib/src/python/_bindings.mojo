@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer, Box
+from memory import UnsafePointer
 
 from sys.ffi import c_int, OpaquePointer
 from sys.info import sizeof
