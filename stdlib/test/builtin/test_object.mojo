@@ -116,6 +116,11 @@ def test_comparison_ops():
     lhs.append(4)
     assert_false(lhs == rhs)
 
+    lhs = (False, 1, "two", 3.0)
+    rhs = (False, 1, "two", 3.0)
+    assert_true(lhs == rhs)
+    assert_false(lhs != rhs)
+
     lhs = object.dict()
     rhs = object.dict()
     lhs["one"] = [2, 3.0]
@@ -181,6 +186,21 @@ def test_comparison_ops():
     assert_true(rhs < lhs)
     assert_false(rhs > lhs)
     assert_false(rhs == lhs)
+
+    lhs = (1.0, 0.0, -1.0)
+    rhs = (1.0, 0.0, -2.0)
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+
+    lhs = (1.0, 0.0, -1.0)
+    rhs = (1.0, 0.0, -2.0)
+    assert_true(rhs <= lhs)
+    assert_false(rhs >= lhs)
+
+    lhs = (1.0, 0.0, -1.0)
+    rhs = (1.0, 0.0, -1.0)
+    assert_true(rhs <= lhs)
+    assert_true(rhs >= lhs)
 
 
 def test_arithmetic_ops():

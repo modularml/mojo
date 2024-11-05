@@ -60,6 +60,7 @@ struct _RefCountedTuple:
 
     fn __init__(inout self):
         self.impl = Arc[List[object]](List[object]())
+
     fn __init__(inout self, capacity: Int):
         self.impl = Arc[List[object]](List[object](capacity=capacity))
 
@@ -789,7 +790,7 @@ struct object(
             arg: The ref counted dictionary.
         """
         self._value = arg^
-    
+
     @always_inline
     fn __init__(inout self, owned arg: _RefCountedTuple):
         """Initializes the object with a _RefCountedTuple.
@@ -1001,11 +1002,31 @@ struct object(
         return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
 
     @always_inline
-    fn _list_compare(self, rhs: object) raises -> Int:
-        var llen = len(self._value.get_as_list())
-        var rlen = len(rhs._value.get_as_list())
-        var lptr = Pointer.address_of(self._value.get_as_list())
-        var rptr = Pointer.address_of(rhs._value.get_as_list())
+    fn _compare[
+        list_or_tuple: StringLiteral = "list"
+    ](self, rhs: object) raises -> Int:
+        var llen: Int
+        var rlen: Int
+        var lptr: Pointer[
+            List[object],
+            _lit_mut_cast[__origin_of(self._value.value), True].result,
+        ]
+        var rptr: Pointer[
+            List[object],
+            _lit_mut_cast[__origin_of(rhs._value.value), True].result,
+        ]
+
+        @parameter
+        if list_or_tuple == "list":
+            llen = len(self._value.get_as_list())
+            rlen = len(rhs._value.get_as_list())
+            lptr = Pointer.address_of(self._value.get_as_list())
+            rptr = Pointer.address_of(rhs._value.get_as_list())
+        else:
+            llen = len(self._value.get_as_tuple())
+            rlen = len(rhs._value.get_as_tuple())
+            lptr = Pointer.address_of(self._value.get_as_tuple())
+            rptr = Pointer.address_of(rhs._value.get_as_tuple())
         var cmp_len = min(llen, rlen)
         for i in range(cmp_len):
             if lptr[][i] < rptr[][i]:
@@ -1032,7 +1053,10 @@ struct object(
             return self._value.get_as_string() < rhs._value.get_as_string()
 
         if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) < 0
+            return self._compare(rhs) < 0
+
+        if self._value.is_tuple() and rhs._value.is_tuple():
+            return self._compare[list_or_tuple="tuple"](rhs) < 0
 
         return Self._comparison_op[Float64.__lt__, Int64.__lt__, Bool.__lt__](
             self, rhs
@@ -1052,7 +1076,10 @@ struct object(
             return self._value.get_as_string() <= rhs._value.get_as_string()
 
         if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) <= 0
+            return self._compare(rhs) <= 0
+
+        if self._value.is_tuple() and rhs._value.is_tuple():
+            return self._compare[list_or_tuple="tuple"](rhs) <= 0
 
         return Self._comparison_op[Float64.__le__, Int64.__le__, Bool.__le__](
             self, rhs
@@ -1118,7 +1145,9 @@ struct object(
         if self._value.is_str() and rhs._value.is_str():
             return self._value.get_as_string() > rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) > 0
+            return self._compare(rhs) > 0
+        if self._value.is_tuple() and rhs._value.is_tuple():
+            return self._compare[list_or_tuple="tuple"](rhs) > 0
 
         return Self._comparison_op[Float64.__gt__, Int64.__gt__, Bool.__gt__](
             self, rhs
@@ -1138,7 +1167,9 @@ struct object(
         if self._value.is_str() and rhs._value.is_str():
             return self._value.get_as_string() >= rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) >= 0
+            return self._compare(rhs) >= 0
+        if self._value.is_tuple() and rhs._value.is_tuple():
+            return self._compare[list_or_tuple="tuple"](rhs) >= 0
 
         return Self._comparison_op[Float64.__ge__, Int64.__ge__, Bool.__ge__](
             self, rhs
@@ -1768,16 +1799,19 @@ struct object(
 
         if i._value.is_tuple():
             raise Error(
-                "'" + self._value._get_type_name() + "'"
-                + " object does not support " + i._value._get_type_name()
+                "'"
+                + self._value._get_type_name()
+                + "'"
+                + " object does not support "
+                + i._value._get_type_name()
                 + " as an index"
             )
-        
+
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             # Construct a new single-character string.
             return self._value.get_as_string()[index]
-        
+
         if self._value.is_tuple():
             return self._value.get_as_tuple()[i._value.get_as_int().value]
         return self._value.get_as_list()[i._value.get_as_int().value]
@@ -1820,7 +1854,8 @@ struct object(
             raise Error("TypeError: can only assign items in lists")
         if not i._value.is_int():
             raise Error(
-                "'list' object does not support " + self._value._get_type_name()
+                "'list' object does not support "
+                + self._value._get_type_name()
                 + " as an index"
             )
         var index = Self._convert_index_to_int(i)
