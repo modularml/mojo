@@ -323,7 +323,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         self = Self(unsafe_from_utf8=byte_slice)
 
     @always_inline
-    fn __init__(inout self, *, ptr: UnsafePointer[UInt8], length: Int):
+    fn __init__(inout self, *, ptr: UnsafePointer[Byte], length: Int):
         """Construct a `StringSlice` from a pointer to a sequence of UTF-8
         encoded bytes and a length.
 
@@ -337,7 +337,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             - `ptr` must point to data that is live for the duration of
                 `origin`.
         """
-        self._slice = Span[Byte, origin](unsafe_ptr=ptr, length=length)
+        self._slice = Span[Byte, origin](unsafe_ptr=ptr, len=length)
 
     @always_inline
     fn __init__(inout self, *, other: Self):
