@@ -1049,7 +1049,7 @@ fn isclose[
 
 
 # TODO: Remove this when `iota` works at compile-time
-fn _compile_time_iota[type: DType, simd_width: Int]() -> SIMD[type, simd_width]:
+fn _iota[type: DType, simd_width: Int]() -> SIMD[type, simd_width]:
     constrained[
         type.is_integral(),
         "_compile_time_iota can only be used with integer types.",
