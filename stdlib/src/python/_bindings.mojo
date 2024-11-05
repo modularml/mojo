@@ -54,6 +54,10 @@ trait ConvertibleFromPython(CollectionElement):
         ...
 
 
+trait PythonableAndConvertibleFromPython(Pythonable, ConvertibleFromPython):
+    pass
+
+
 # ===-----------------------------------------------------------------------===#
 # Mojo Object
 # ===-----------------------------------------------------------------------===#

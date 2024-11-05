@@ -15,6 +15,7 @@
 from sys import sizeof, simdwidthof
 
 from memory import (
+    AddressSpace,
     UnsafePointer,
     memcmp,
     memcpy,
@@ -365,6 +366,11 @@ def test_pointer_refitem_pair():
     ptr.free()
 
 
+def test_address_space_str():
+    assert_equal(str(AddressSpace.GENERIC), "AddressSpace.GENERIC")
+    assert_equal(str(AddressSpace(17)), "AddressSpace(17)")
+
+
 def test_dtypepointer_gather():
     var ptr = UnsafePointer[Float32].alloc(4)
     ptr.store(0, SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0))
@@ -503,6 +509,8 @@ def main():
     test_pointer_refitem_string()
     test_pointer_refitem_pair()
     test_pointer_string()
+
+    test_address_space_str()
 
     test_dtypepointer_gather()
     test_dtypepointer_scatter()
