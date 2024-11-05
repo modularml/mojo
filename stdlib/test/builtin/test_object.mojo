@@ -71,6 +71,22 @@ def test_object_ctors():
     assert_equal(a._value.ref_count(), 1)
 
 
+def method_obj_gt(self, rhs):
+    return self.value > rhs.value
+
+
+def method_obj_lt(self, rhs):
+    return self.value < rhs.value
+
+
+def method_obj_ge(self, rhs):
+    return self.value >= rhs.value
+
+
+def method_obj_le(self, rhs):
+    return self.value <= rhs.value
+
+
 def test_comparison_ops():
     assert_true(object(False) < True)
     assert_false(object(True) < True)
@@ -201,6 +217,29 @@ def test_comparison_ops():
     rhs = (1.0, 0.0, -1.0)
     assert_true(rhs <= lhs)
     assert_true(rhs >= lhs)
+
+    lhs = object(
+        Attr("value", 0),
+        Attr("__le__", method_obj_le),
+        Attr("__ge__", method_obj_ge),
+        Attr("__lt__", method_obj_lt),
+        Attr("__gt__", method_obj_gt),
+    )
+    rhs = object(
+        Attr("value", 1),
+        Attr("__le__", method_obj_le),
+        Attr("__ge__", method_obj_ge),
+        Attr("__lt__", method_obj_lt),
+        Attr("__gt__", method_obj_gt),
+    )
+    assert_true(lhs < rhs)
+    assert_false(lhs > rhs)
+    assert_true(lhs <= rhs)
+    assert_false(lhs >= rhs)
+    lhs.value = 10
+    rhs.value = 10
+    assert_true(lhs <= rhs)
+    assert_true(lhs >= rhs)
 
 
 def test_arithmetic_ops():

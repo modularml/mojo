@@ -566,7 +566,12 @@ struct _ObjectImpl(
 
 
 struct object(
-    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Writable
+    IntableRaising,
+    ImplicitlyBoolable,
+    Stringable,
+    Representable,
+    Writable,
+    Comparable,
 ):
     """Represents an object without a concrete type.
 
@@ -1039,7 +1044,7 @@ struct object(
             return 1
         return 0
 
-    fn __lt__(self, rhs: object) raises -> object:
+    fn __lt__(self, rhs: object) -> Bool:
         """Less-than comparator. This lexicographically compares strings and
         lists.
 
@@ -1049,20 +1054,33 @@ struct object(
         Returns:
             True if the object is less than the right hard argument.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string() < rhs._value.get_as_string()
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() < rhs._value.get_as_string()
 
-        if self._value.is_list() and rhs._value.is_list():
-            return self._compare(rhs) < 0
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) < 0
 
-        if self._value.is_tuple() and rhs._value.is_tuple():
-            return self._compare[list_or_tuple="tuple"](rhs) < 0
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) < 0
 
-        return Self._comparison_op[Float64.__lt__, Int64.__lt__, Bool.__lt__](
-            self, rhs
-        )
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__lt__"](self, rhs)
 
-    fn __le__(self, rhs: object) raises -> object:
+            return Self._comparison_op[
+                Float64.__lt__, Int64.__lt__, Bool.__lt__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
+
+    fn __le__(self, rhs: object) -> Bool:
         """Less-than-or-equal to comparator. This lexicographically
         compares strings and lists.
 
@@ -1072,18 +1090,31 @@ struct object(
         Returns:
             True if the object is less than or equal to the right hard argument.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string() <= rhs._value.get_as_string()
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() <= rhs._value.get_as_string()
 
-        if self._value.is_list() and rhs._value.is_list():
-            return self._compare(rhs) <= 0
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) <= 0
 
-        if self._value.is_tuple() and rhs._value.is_tuple():
-            return self._compare[list_or_tuple="tuple"](rhs) <= 0
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) <= 0
 
-        return Self._comparison_op[Float64.__le__, Int64.__le__, Bool.__le__](
-            self, rhs
-        )
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__le__"](self, rhs)
+
+            return Self._comparison_op[
+                Float64.__le__, Int64.__le__, Bool.__le__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
 
     fn __eq__(self, rhs: object) -> Bool:
         """Equality comparator. This compares the elements of strings
@@ -1113,6 +1144,7 @@ struct object(
             return bool(c)
         except e:
             # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
             # _comparison_op -> _comparison_type_check()
             debug_assert(
                 str(e) == "TypeError: not a valid comparison type",
@@ -1132,7 +1164,7 @@ struct object(
         """
         return not (self == rhs)
 
-    fn __gt__(self, rhs: object) raises -> object:
+    fn __gt__(self, rhs: object) -> Bool:
         """Greater-than comparator. This lexicographically compares the
         elements of strings and lists.
 
@@ -1142,18 +1174,30 @@ struct object(
         Returns:
             True if the left hand value is greater.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string() > rhs._value.get_as_string()
-        if self._value.is_list() and rhs._value.is_list():
-            return self._compare(rhs) > 0
-        if self._value.is_tuple() and rhs._value.is_tuple():
-            return self._compare[list_or_tuple="tuple"](rhs) > 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() > rhs._value.get_as_string()
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) > 0
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) > 0
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__gt__"](self, rhs)
 
-        return Self._comparison_op[Float64.__gt__, Int64.__gt__, Bool.__gt__](
-            self, rhs
-        )
+            return Self._comparison_op[
+                Float64.__gt__, Int64.__gt__, Bool.__gt__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
 
-    fn __ge__(self, rhs: object) raises -> object:
+    fn __ge__(self, rhs: object) -> Bool:
         """Greater-than-or-equal-to comparator. This lexicographically
         compares the elements of strings and lists.
 
@@ -1164,16 +1208,28 @@ struct object(
             True if the left hand value is greater than or equal to the right
             hand value.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._value.get_as_string() >= rhs._value.get_as_string()
-        if self._value.is_list() and rhs._value.is_list():
-            return self._compare(rhs) >= 0
-        if self._value.is_tuple() and rhs._value.is_tuple():
-            return self._compare[list_or_tuple="tuple"](rhs) >= 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() >= rhs._value.get_as_string()
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) >= 0
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) >= 0
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__ge__"](self, rhs)
 
-        return Self._comparison_op[Float64.__ge__, Int64.__ge__, Bool.__ge__](
-            self, rhs
-        )
+            return Self._comparison_op[
+                Float64.__ge__, Int64.__ge__, Bool.__ge__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
 
     # ===------------------------------------------------------------------=== #
     # Arithmetic Operators
