@@ -354,7 +354,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         """
 
         debug_assert(self.check_symbol(name), "symbol not found: " + name)
-        var v = _LITRefPackHelper(args._value).get_loaded_kgen_pack()
+        var v = args.get_loaded_kgen_pack()
         return self.get_function[fn (__type_of(v)) -> return_type](name)(v)
 
 
