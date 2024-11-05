@@ -94,7 +94,7 @@ def test_constructors():
     ptr[1] = ord("b")
     ptr[2] = ord("c")
     ptr[3] = 0
-    var s3 = String(ptr, 4)
+    var s3 = String(ptr=ptr, length=4)
     assert_equal(s3, "abc")
 
 

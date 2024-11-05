@@ -803,7 +803,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     if err:
         raise "Unable to query macOS version"
 
-    var osver = String(buf.steal_data(), buf_len)
+    var osver = String(ptr=buf.steal_data(), length=buf_len)
 
     var major = 0
     var minor = 0

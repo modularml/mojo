@@ -201,7 +201,7 @@ struct FileHandle:
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        return String(buf, int(size_copy) + 1)
+        return String(ptr=buf, length=int(size_copy) + 1)
 
     fn read[
         type: DType

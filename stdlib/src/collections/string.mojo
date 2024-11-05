@@ -146,7 +146,7 @@ fn chr(c: Int) -> String:
     #     p.free()
     #     return chr(0xFFFD)
     p[num_bytes] = 0
-    return String(ptr=p, len=num_bytes + 1)
+    return String(ptr=p, length=num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -819,7 +819,7 @@ struct String(
         self = literal.__str__()
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
+    fn __init__(inout self, *, ptr: UnsafePointer[Byte], length: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -827,14 +827,12 @@ struct String(
 
         Args:
             ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
+            length: The length of the buffer, including the null terminator.
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
         self = Self(
-            Self._buffer_type(
-                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
-            )
+            Self._buffer_type(unsafe_pointer=ptr, size=length, capacity=length)
         )
 
     # ===------------------------------------------------------------------=== #
@@ -957,7 +955,7 @@ struct String(
             buff: The buffer. This should have an existing terminator.
         """
 
-        return String(buff, len(StringRef(ptr=buff)) + 1)
+        return String(ptr=buff, length=len(StringRef(ptr=buff)) + 1)
 
     @staticmethod
     fn _from_bytes(owned buff: Self._buffer_type) -> String:
