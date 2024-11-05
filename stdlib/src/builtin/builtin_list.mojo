@@ -469,6 +469,9 @@ struct VariadicListMem[
 # ===----------------------------------------------------------------------===#
 
 
+alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
+
+
 @value
 struct _LITRefPackHelper[
     is_mutable: Bool, //,
@@ -539,9 +542,6 @@ struct _LITRefPackHelper[
 # ===----------------------------------------------------------------------===#
 # VariadicPack
 # ===----------------------------------------------------------------------===#
-
-
-alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 
 
 @register_passable
