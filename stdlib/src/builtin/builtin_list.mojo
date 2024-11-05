@@ -465,83 +465,11 @@ struct VariadicListMem[
 
 
 # ===----------------------------------------------------------------------===#
-# _LITRefPackHelper
+# VariadicPack
 # ===----------------------------------------------------------------------===#
 
 
 alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
-
-
-@value
-struct _LITRefPackHelper[
-    is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
-    address_space: __mlir_type.index,
-    element_trait: _AnyTypeMetaType,
-    *element_types: element_trait,
-]:
-    """This struct mirrors the !lit.ref.pack type, and provides aliases and
-    methods that are useful for working with it."""
-
-    alias _mlir_type = __mlir_type[
-        `!lit.ref.pack<:variadic<`,
-        element_trait,
-        `> `,
-        element_types,
-        `, `,
-        origin,
-        `, `,
-        address_space,
-        `>`,
-    ]
-
-    var storage: Self._mlir_type
-
-    # This is the element_types list lowered to `variadic<type>` type for kgen.
-    alias _kgen_element_types = rebind[
-        __mlir_type.`!kgen.variadic<!kgen.type>`
-    ](Self.element_types)
-
-    # Use variadic_ptr_map to construct the type list of the !kgen.pack that the
-    # !lit.ref.pack will lower to.  It exposes the pointers introduced by the
-    # references.
-    alias _variadic_pointer_types = __mlir_attr[
-        `#kgen.param.expr<variadic_ptr_map, `,
-        Self._kgen_element_types,
-        `, 0: index>: !kgen.variadic<!kgen.type>`,
-    ]
-
-    # This is the !kgen.pack type with pointer elements.
-    alias kgen_pack_with_pointer_type = __mlir_type[
-        `!kgen.pack<:variadic<type> `, Self._variadic_pointer_types, `>`
-    ]
-
-    # This rebinds `in_pack` to the equivalent `!kgen.pack` with kgen pointers.
-    @always_inline("nodebug")
-    fn get_as_kgen_pack(self) -> Self.kgen_pack_with_pointer_type:
-        return rebind[Self.kgen_pack_with_pointer_type](self.storage)
-
-    alias _variadic_with_pointers_removed = __mlir_attr[
-        `#kgen.param.expr<variadic_ptrremove_map, `,
-        Self._variadic_pointer_types,
-        `>: !kgen.variadic<!kgen.type>`,
-    ]
-
-    # This is the `!kgen.pack` type that happens if one loads all the elements
-    # of the pack.
-    alias loaded_kgen_pack_type = __mlir_type[
-        `!kgen.pack<:variadic<type> `, Self._variadic_with_pointers_removed, `>`
-    ]
-
-    # This returns the stored KGEN pack after loading all of the elements.
-    @always_inline("nodebug")
-    fn get_loaded_kgen_pack(self) -> Self.loaded_kgen_pack_type:
-        return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
-
-
-# ===----------------------------------------------------------------------===#
-# VariadicPack
-# ===----------------------------------------------------------------------===#
 
 
 @register_passable
@@ -695,3 +623,50 @@ struct VariadicPack[
         @parameter
         for i in range(Self.__len__()):
             func[i](self[i])
+
+    # ===-------------------------------------------------------------------===#
+    # C Pack Utilities
+    # ===-------------------------------------------------------------------===#
+
+    # This is the element_types list lowered to `variadic<type>` type for kgen.
+    alias _kgen_element_types = rebind[
+        __mlir_type.`!kgen.variadic<!kgen.type>`
+    ](Self.element_types)
+
+    # Use variadic_ptr_map to construct the type list of the !kgen.pack that the
+    # !lit.ref.pack will lower to.  It exposes the pointers introduced by the
+    # references.
+    alias _variadic_pointer_types = __mlir_attr[
+        `#kgen.param.expr<variadic_ptr_map, `,
+        Self._kgen_element_types,
+        `, 0: index>: !kgen.variadic<!kgen.type>`,
+    ]
+
+    # This is the !kgen.pack type with pointer elements.
+    alias _kgen_pack_with_pointer_type = __mlir_type[
+        `!kgen.pack<:variadic<type> `, Self._variadic_pointer_types, `>`
+    ]
+
+    # This rebinds `in_pack` to the equivalent `!kgen.pack` with kgen pointers.
+    @doc_private
+    @always_inline("nodebug")
+    fn get_as_kgen_pack(self) -> Self._kgen_pack_with_pointer_type:
+        return rebind[Self._kgen_pack_with_pointer_type](self._value)
+
+    alias _variadic_with_pointers_removed = __mlir_attr[
+        `#kgen.param.expr<variadic_ptrremove_map, `,
+        Self._variadic_pointer_types,
+        `>: !kgen.variadic<!kgen.type>`,
+    ]
+
+    # This is the `!kgen.pack` type that happens if one loads all the elements
+    # of the pack.
+    alias _loaded_kgen_pack_type = __mlir_type[
+        `!kgen.pack<:variadic<type> `, Self._variadic_with_pointers_removed, `>`
+    ]
+
+    # This returns the stored KGEN pack after loading all of the elements.
+    @doc_private
+    @always_inline("nodebug")
+    fn get_loaded_kgen_pack(self) -> Self._loaded_kgen_pack_type:
+        return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())

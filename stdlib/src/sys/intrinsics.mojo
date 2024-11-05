@@ -21,7 +21,6 @@ from sys import PrefetchLocality
 
 from .info import sizeof, triple_is_nvidia_cuda
 from ._assembly import inlined_assembly
-from builtin.builtin_list import _LITRefPackHelper
 import math
 
 from memory import AddressSpace, UnsafePointer
@@ -55,7 +54,7 @@ fn llvm_intrinsic[
       The result of calling the llvm intrinsic with no arguments.
     """
 
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
