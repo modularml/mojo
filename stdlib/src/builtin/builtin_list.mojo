@@ -472,6 +472,27 @@ struct VariadicListMem[
 alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 
 
+@value
+struct _LITRefPackHelper[
+    is_mutable: Bool, //,
+    origin: Origin[is_mutable].type,
+    address_space: __mlir_type.index,
+    element_trait: _AnyTypeMetaType,
+    *element_types: element_trait,
+]:
+    alias _mlir_type = __mlir_type[
+        `!lit.ref.pack<:variadic<`,
+        element_trait,
+        `> `,
+        element_types,
+        `, `,
+        origin,
+        `, `,
+        address_space,
+        `>`,
+    ]
+
+
 @register_passable
 struct VariadicPack[
     elt_is_mutable: __mlir_type.i1, //,

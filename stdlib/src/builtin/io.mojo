@@ -167,7 +167,7 @@ fn _printf[
         _ = external_call["vprintf", Int32](f, Pointer.address_of(loaded_pack))
     else:
         with _fdopen(file) as fd:
-            # FIXME: externall_call should handle this
+            # FIXME: external_call should handle this
             _ = __mlir_op.`pop.external_call`[
                 func = "KGEN_CompilerRT_fprintf".value,
                 variadicType = __mlir_attr[
