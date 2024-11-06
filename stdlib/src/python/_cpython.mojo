@@ -1723,9 +1723,7 @@ struct CPython:
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).
         """
         var r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
-            strslice.unsafe_ptr().bitcast[Int8](),
-            strslice.byte_length(),
-            "strict".unsafe_cstr_ptr(),
+            c_char_ptr(strslice), strslice.byte_length(), c_char_ptr("strict")
         )
 
         self.log(
