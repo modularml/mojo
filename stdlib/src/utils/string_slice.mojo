@@ -607,6 +607,26 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return _atof(self)
 
+    fn __mul__(self, n: Int) -> String:
+        """Concatenates the string `n` times.
+
+        Args:
+            n : The number of times to concatenate the string.
+
+        Returns:
+            The string concatenated `n` times.
+        """
+
+        len_self = self.byte_length()
+        count = len_self * n + 1
+        buf = String._buffer_type(capacity=count)
+        buf.size = count
+        b_ptr = buf.unsafe_ptr()
+        for i in range(n):
+            memcpy(b_ptr + len_self * i, self.unsafe_ptr(), len_self)
+        b_ptr[count - 1] = 0
+        return String(buf^)
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
