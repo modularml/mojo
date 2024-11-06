@@ -54,7 +54,7 @@ struct _Origin[is_mutable: Bool, //, origin: Origin[is_mutable].type]:
     ...
 
 
-fn origin[T: AnyType, //](v: T) -> _Origin[__origin_of(v)].origin:
+fn origin[T: AnyType, //](v: T) -> _Origin[__origin_of(v)].origin.type:
     """Get the origin of the argument.
 
     Args:
