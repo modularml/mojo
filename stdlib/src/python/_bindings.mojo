@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer, Box
+from memory import UnsafePointer
 
 from sys.ffi import c_int, OpaquePointer
 from sys.info import sizeof
@@ -52,6 +52,10 @@ trait ConvertibleFromPython(CollectionElement):
             If conversion was not successful.
         """
         ...
+
+
+trait PythonableAndConvertibleFromPython(Pythonable, ConvertibleFromPython):
+    pass
 
 
 # ===-----------------------------------------------------------------------===#

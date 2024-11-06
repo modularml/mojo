@@ -208,7 +208,7 @@ struct _StringSliceIter[
             return Self._S(unsafe_from_utf8_ptr=p, len=byte_len)
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         @parameter
         if forward:
             return self.index < self.length
