@@ -40,20 +40,3 @@ alias StaticConstantOrigin = __mlir_attr[
 
 alias OriginSet = __mlir_type.`!lit.origin.set`
 """A set of origin parameters."""
-
-
-# Helper to build a value of !lit.origin type.
-# TODO: Should be a parametric alias.
-struct Origin[is_mutable: Bool]:
-    """This represents a origin reference of potentially parametric type.
-    TODO: This should be replaced with a parametric type alias.
-
-    Parameters:
-        is_mutable: Whether the origin reference is mutable.
-    """
-
-    alias type = __mlir_type[
-        `!lit.origin<`,
-        is_mutable.value,
-        `>`,
-    ]

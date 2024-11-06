@@ -66,9 +66,9 @@ fn fail_initialization(owned err: Error) -> PythonObject:
 fn pointer_bitcast[
     To: AnyType
 ](ptr: Pointer) -> Pointer[To, ptr.origin, ptr.address_space, *_, **_] as out:
-    return __type_of(out)(
+    return type(out)(
         _mlir_value=__mlir_op.`lit.ref.from_pointer`[
-            _type = __type_of(out)._mlir_type
+            _type = type(out)._mlir_type
         ](
             UnsafePointer(__mlir_op.`lit.ref.to_pointer`(ptr._value))
             .bitcast[To]()

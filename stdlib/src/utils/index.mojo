@@ -56,7 +56,7 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
 @always_inline
 fn _int_tuple_binary_apply[
     binary_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Scalar[type],
-](a: IndexList, b: __type_of(a)) -> __type_of(a):
+](a: IndexList, b: type(a)) -> type(a):
     """Applies a given element binary function to each pair of corresponding
     elements in two tuples.
 
@@ -73,7 +73,7 @@ fn _int_tuple_binary_apply[
         Tuple containing the result.
     """
 
-    var c = __type_of(a)()
+    var c = type(a)()
 
     @parameter
     for i in range(a.size):
@@ -87,7 +87,7 @@ fn _int_tuple_binary_apply[
 @always_inline
 fn _int_tuple_compare[
     comp_fn: fn[type: DType] (Scalar[type], Scalar[type]) -> Bool,
-](a: IndexList, b: __type_of(a)) -> StaticTuple[Bool, a.size]:
+](a: IndexList, b: type(a)) -> StaticTuple[Bool, a.size]:
     """Applies a given element compare function to each pair of corresponding
     elements in two tuples and produces a tuple of Bools containing result.
 
@@ -769,11 +769,11 @@ struct IndexList[
         """
         constrained[type.is_integral(), "the target type must be integral"]()
 
-        var res = __type_of(result)()
+        var res = type(result)()
 
         @parameter
         for i in range(size):
-            res.data[i] = rebind[__type_of(result.data).element_type](
+            res.data[i] = rebind[type(result.data).element_type](
                 rebind[Scalar[Self.element_type]](
                     self.data.__getitem__[i]()
                 ).cast[result.element_type]()
@@ -803,9 +803,9 @@ struct IndexList[
             element_bitwidth == Self.element_bitwidth
             and unsigned == Self.unsigned
         ):
-            return rebind[__type_of(result)](self)
+            return rebind[type(result)](self)
 
-        return rebind[__type_of(result)](
+        return rebind[type(result)](
             self.cast[_type_of_width[element_bitwidth, unsigned]()]()
         )
 
@@ -835,7 +835,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x))
+    return type(result)(int(x))
 
 
 @always_inline
@@ -856,7 +856,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x))
+    return type(result)(int(x))
 
 
 @always_inline
@@ -884,7 +884,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x), int(y))
+    return type(result)(int(x), int(y))
 
 
 @always_inline
@@ -906,7 +906,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x), int(y))
+    return type(result)(int(x), int(y))
 
 
 @always_inline
@@ -937,7 +937,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x), int(y), int(z))
+    return type(result)(int(x), int(y), int(z))
 
 
 @always_inline
@@ -971,7 +971,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x), int(y), int(z), int(w))
+    return type(result)(int(x), int(y), int(z), int(w))
 
 
 @always_inline
@@ -1008,7 +1008,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return __type_of(result)(int(x), int(y), int(z), int(w), int(v))
+    return type(result)(int(x), int(y), int(z), int(w), int(v))
 
 
 # ===----------------------------------------------------------------------===#

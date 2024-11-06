@@ -175,7 +175,7 @@ fn max(x: UInt, y: UInt, /) -> UInt:
 
 
 @always_inline("nodebug")
-fn max(x: SIMD, y: __type_of(x), /) -> __type_of(x):
+fn max(x: SIMD, y: type(x), /) -> type(x):
     """Performs elementwise maximum of x and y.
 
     An element of the result SIMD vector will be the maximum of the
@@ -229,7 +229,7 @@ fn min(x: UInt, y: UInt, /) -> UInt:
 
 
 @always_inline("nodebug")
-fn min(x: SIMD, y: __type_of(x), /) -> __type_of(x):
+fn min(x: SIMD, y: type(x), /) -> type(x):
     """Gets the elementwise minimum of x and y.
 
     An element of the result SIMD vector will be the minimum of the
@@ -325,7 +325,7 @@ fn pow[T: Powable](base: T, exp: T) -> T:
     return base.__pow__(exp)
 
 
-fn pow(base: SIMD, exp: Int) -> __type_of(base):
+fn pow(base: SIMD, exp: Int) -> type(base):
     """Computes elementwise value of a SIMD vector raised to the power of the
     given integer.
 

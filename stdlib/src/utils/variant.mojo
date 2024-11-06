@@ -107,7 +107,7 @@ struct Variant[*Ts: CollectionElement](
     # Fields
     alias _sentinel: Int = -1
     alias _mlir_type = __mlir_type[
-        `!kgen.variant<[rebind(:`, __type_of(Ts), ` `, Ts, `)]>`
+        `!kgen.variant<[rebind(:`, type(Ts), ` `, Ts, `)]>`
     ]
     var _impl: Self._mlir_type
 

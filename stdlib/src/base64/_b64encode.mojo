@@ -287,7 +287,7 @@ fn _repeat_until[width: Int](v: SIMD) -> SIMD[v.type, width]:
     return _repeat_until[width](v.join(v))
 
 
-fn _rshift_bits_in_u16[shift: Int](input: Bytes) -> __type_of(input):
+fn _rshift_bits_in_u16[shift: Int](input: Bytes) -> type(input):
     var u16 = bitcast[DType.uint16, input.size // 2](input)
     var res = bit.rotate_bits_right[shift](u16)
     return bitcast[DType.uint8, input.size](res)

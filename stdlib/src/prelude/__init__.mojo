@@ -81,8 +81,8 @@ from builtin.type_aliases import (
     MutableAnyOrigin,
     StaticConstantOrigin,
     OriginSet,
-    Origin,
 )
+from builtin.type import Origin, type, origin
 from builtin.uint import UInt
 from builtin.value import (
     Movable,

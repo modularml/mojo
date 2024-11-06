@@ -1019,8 +1019,8 @@ def test_deinterleave():
 
     var tup4 = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
 
-    assert_equal(tup4[0], __type_of(tup4[0])(0, 2))
-    assert_equal(tup4[1], __type_of(tup4[0])(1, 3))
+    assert_equal(tup4[0], type(tup4[0])(0, 2))
+    assert_equal(tup4[1], type(tup4[0])(1, 3))
 
 
 def test_extract():
@@ -1586,8 +1586,8 @@ def test_modf():
 
 def test_split():
     var tup = SIMD[DType.index, 8](1, 2, 3, 4, 5, 6, 7, 8).split()
-    assert_equal(tup[0], __type_of(tup[0])(1, 2, 3, 4))
-    assert_equal(tup[1], __type_of(tup[1])(5, 6, 7, 8))
+    assert_equal(tup[0], type(tup[0])(1, 2, 3, 4))
+    assert_equal(tup[1], type(tup[1])(5, 6, 7, 8))
 
 
 def test_contains():

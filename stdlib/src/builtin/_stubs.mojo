@@ -75,20 +75,20 @@ struct _ParamForIterator[IteratorT: Copyable]:
 
 
 fn declval[T: AnyType]() -> T:
-    constrained[False, "should only be used inside __type_of"]()
+    constrained[False, "should only be used inside type"]()
     while True:
         pass
 
 
 fn parameter_for_generator[
     T: _IntIterable,
-](range: T) -> _ParamForIterator[__type_of(declval[T]().__iter__())]:
+](range: T) -> _ParamForIterator[type(declval[T]().__iter__())]:
     return _generator(range.__iter__())
 
 
 fn parameter_for_generator[
     T: _StridedIterable,
-](range: T) -> _ParamForIterator[__type_of(declval[T]().__iter__())]:
+](range: T) -> _ParamForIterator[type(declval[T]().__iter__())]:
     return _generator(range.__iter__())
 
 

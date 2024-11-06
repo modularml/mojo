@@ -209,12 +209,12 @@ fn sqrt(x: Int) -> Int:
 
 
 @always_inline
-fn _sqrt_nvvm(x: SIMD) -> __type_of(x):
+fn _sqrt_nvvm(x: SIMD) -> type(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
     ]()
     alias instruction = "llvm.nvvm.sqrt.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.sqrt.approx.d"
-    var res = __type_of(x)()
+    var res = type(x)()
 
     @parameter
     for i in range(x.size):
@@ -265,7 +265,7 @@ fn sqrt[
             return _sqrt_nvvm(x.cast[DType.float32]()).cast[x.type]()
         return _sqrt_nvvm(x)
 
-    return llvm_intrinsic["llvm.sqrt", __type_of(x), has_side_effect=False](x)
+    return llvm_intrinsic["llvm.sqrt", type(x), has_side_effect=False](x)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -274,13 +274,13 @@ fn sqrt[
 
 
 @always_inline
-fn _isqrt_nvvm(x: SIMD) -> __type_of(x):
+fn _isqrt_nvvm(x: SIMD) -> type(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
     ]()
 
     alias instruction = "llvm.nvvm.rsqrt.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.rsqrt.approx.d"
-    var res = __type_of(x)()
+    var res = type(x)()
 
     @parameter
     for i in range(x.size):
@@ -291,7 +291,7 @@ fn _isqrt_nvvm(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn isqrt(x: SIMD) -> __type_of(x):
+fn isqrt(x: SIMD) -> type(x):
     """Performs elementwise reciprocal square root on a SIMD vector.
 
     Args:
@@ -320,13 +320,13 @@ fn isqrt(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn _recip_nvvm(x: SIMD) -> __type_of(x):
+fn _recip_nvvm(x: SIMD) -> type(x):
     constrained[
         x.type in (DType.float32, DType.float64), "must be f32 or f64 type"
     ]()
 
     alias instruction = "llvm.nvvm.rcp.approx.ftz.f" if x.type is DType.float32 else "llvm.nvvm.rcp.approx.ftz.d"
-    var res = __type_of(x)()
+    var res = type(x)()
 
     @parameter
     for i in range(x.size):
@@ -337,7 +337,7 @@ fn _recip_nvvm(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn recip(x: SIMD) -> __type_of(x):
+fn recip(x: SIMD) -> type(x):
     """Performs elementwise reciprocal on a SIMD vector.
 
     Args:
@@ -420,7 +420,7 @@ fn exp2[
 
     var xc = x.clamp(-126, 126)
 
-    var m = xc.cast[__type_of(x.to_bits()).type]()
+    var m = xc.cast[type(x.to_bits()).type]()
 
     xc -= m.cast[type]()
 
@@ -434,7 +434,7 @@ fn exp2[
             1.33336498402e-3,
         ),
     ](xc)
-    return __type_of(r)(
+    return type(r)(
         from_bits=(r.to_bits() + (m << FPUtils[type].mantissa_width()))
     )
 
@@ -502,7 +502,7 @@ fn _ldexp_impl[
     alias integral_type = FPUtils[type].integral_type
     var m = exp.cast[integral_type]() + FPUtils[type].exponent_bias()
 
-    return x * __type_of(x)(from_bits=m << FPUtils[type].mantissa_width())
+    return x * type(x)(from_bits=m << FPUtils[type].mantissa_width())
 
 
 @always_inline
@@ -757,7 +757,7 @@ fn _log_base[
 
 
 @always_inline
-fn log(x: SIMD) -> __type_of(x):
+fn log(x: SIMD) -> type(x):
     """Performs elementwise natural log (base E) of a SIMD vector.
 
     Args:
@@ -791,7 +791,7 @@ fn log(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn log2(x: SIMD) -> __type_of(x):
+fn log2(x: SIMD) -> type(x):
     """Performs elementwise log (base 2) of a SIMD vector.
 
     Args:
@@ -1034,10 +1034,7 @@ fn isclose[
         var res = (a == b) | (
             isfinite(a)
             & isfinite(b)
-            & (
-                abs(a - b)
-                <= max(__type_of(a)(atol), rtol * max(abs(a), abs(b)))
-            )
+            & (abs(a - b) <= max(type(a)(atol), rtol * max(abs(a), abs(b))))
         )
 
         return res | both_nan if equal_nan else res
@@ -1278,7 +1275,7 @@ fn align_up(value: UInt, alignment: UInt) -> UInt:
 # ===----------------------------------------------------------------------=== #
 
 
-fn acos(x: SIMD) -> __type_of(x):
+fn acos(x: SIMD) -> type(x):
     """Computes the `acos` of the inputs.
 
     Constraints:
@@ -1298,7 +1295,7 @@ fn acos(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn asin(x: SIMD) -> __type_of(x):
+fn asin(x: SIMD) -> type(x):
     """Computes the `asin` of the inputs.
 
     Constraints:
@@ -1318,7 +1315,7 @@ fn asin(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn atan(x: SIMD) -> __type_of(x):
+fn atan(x: SIMD) -> type(x):
     """Computes the `atan` of the inputs.
 
     Constraints:
@@ -1454,7 +1451,7 @@ fn sin[
 # ===----------------------------------------------------------------------=== #
 
 
-fn tan(x: SIMD) -> __type_of(x):
+fn tan(x: SIMD) -> type(x):
     """Computes the `tan` of the inputs.
 
     Constraints:
@@ -1474,7 +1471,7 @@ fn tan(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn acosh(x: SIMD) -> __type_of(x):
+fn acosh(x: SIMD) -> type(x):
     """Computes the `acosh` of the inputs.
 
     Constraints:
@@ -1494,7 +1491,7 @@ fn acosh(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn asinh(x: SIMD) -> __type_of(x):
+fn asinh(x: SIMD) -> type(x):
     """Computes the `asinh` of the inputs.
 
     Constraints:
@@ -1514,7 +1511,7 @@ fn asinh(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn atanh(x: SIMD) -> __type_of(x):
+fn atanh(x: SIMD) -> type(x):
     """Computes the `atanh` of the inputs.
 
     Constraints:
@@ -1534,7 +1531,7 @@ fn atanh(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn cosh(x: SIMD) -> __type_of(x):
+fn cosh(x: SIMD) -> type(x):
     """Computes the `cosh` of the inputs.
 
     Constraints:
@@ -1554,7 +1551,7 @@ fn cosh(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn sinh(x: SIMD) -> __type_of(x):
+fn sinh(x: SIMD) -> type(x):
     """Computes the `sinh` of the inputs.
 
     Constraints:
@@ -1575,7 +1572,7 @@ fn sinh(x: SIMD) -> __type_of(x):
 
 
 @always_inline
-fn expm1(x: SIMD) -> __type_of(x):
+fn expm1(x: SIMD) -> type(x):
     """Computes the `expm1` of the inputs.
 
     Constraints:
@@ -1595,7 +1592,7 @@ fn expm1(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn log10(x: SIMD) -> __type_of(x):
+fn log10(x: SIMD) -> type(x):
     """Computes the `log10` of the inputs.
 
     Constraints:
@@ -1631,7 +1628,7 @@ fn log10(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn log1p(x: SIMD) -> __type_of(x):
+fn log1p(x: SIMD) -> type(x):
     """Computes the `log1p` of the inputs.
 
     Constraints:
@@ -1651,7 +1648,7 @@ fn log1p(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn logb(x: SIMD) -> __type_of(x):
+fn logb(x: SIMD) -> type(x):
     """Computes the `logb` of the inputs.
 
     Constraints:
@@ -1671,7 +1668,7 @@ fn logb(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn cbrt(x: SIMD) -> __type_of(x):
+fn cbrt(x: SIMD) -> type(x):
     """Computes the `cbrt` of the inputs.
 
     Constraints:
@@ -1741,7 +1738,7 @@ fn hypot[
 # ===----------------------------------------------------------------------=== #
 
 
-fn erfc(x: SIMD) -> __type_of(x):
+fn erfc(x: SIMD) -> type(x):
     """Computes the `erfc` of the inputs.
 
     Constraints:
@@ -1761,7 +1758,7 @@ fn erfc(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn lgamma(x: SIMD) -> __type_of(x):
+fn lgamma(x: SIMD) -> type(x):
     """Computes the `lgamma` of the inputs.
 
     Constraints:
@@ -1781,7 +1778,7 @@ fn lgamma(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn gamma(x: SIMD) -> __type_of(x):
+fn gamma(x: SIMD) -> type(x):
     """Computes the Gamma of the input.
 
     For details, see https://en.wikipedia.org/wiki/Gamma_function.
@@ -1856,7 +1853,7 @@ fn remainder[
 # ===----------------------------------------------------------------------=== #
 
 
-fn j0(x: SIMD) -> __type_of(x):
+fn j0(x: SIMD) -> type(x):
     """Computes the Bessel function of the first kind of order 0 for each input
     value.
 
@@ -1877,7 +1874,7 @@ fn j0(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn j1(x: SIMD) -> __type_of(x):
+fn j1(x: SIMD) -> type(x):
     """Computes the Bessel function of the first kind of order 1 for each input
     value.
 
@@ -1898,7 +1895,7 @@ fn j1(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn y0(x: SIMD) -> __type_of(x):
+fn y0(x: SIMD) -> type(x):
     """Computes the Bessel function of the second kind of order 0 for each input
     value.
 
@@ -1919,7 +1916,7 @@ fn y0(x: SIMD) -> __type_of(x):
 # ===----------------------------------------------------------------------=== #
 
 
-fn y1(x: SIMD) -> __type_of(x):
+fn y1(x: SIMD) -> type(x):
     """Computes the Bessel function of the second kind of order 1 for each input
     value.
 
@@ -2148,7 +2145,7 @@ fn lcm(*values: Int) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-fn modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
+fn modf(x: SIMD) -> Tuple[type(x), type(x)]:
     """Computes the integral and fractional part of the value.
 
     Args:
@@ -2252,9 +2249,7 @@ fn factorial(n: Int) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-fn clamp(
-    val: Int, lower_bound: __type_of(val), upper_bound: __type_of(val)
-) -> __type_of(val):
+fn clamp(val: Int, lower_bound: type(val), upper_bound: type(val)) -> type(val):
     """Clamps the integer value vector to be in a certain range.
 
     Args:
@@ -2269,8 +2264,8 @@ fn clamp(
 
 
 fn clamp(
-    val: UInt, lower_bound: __type_of(val), upper_bound: __type_of(val)
-) -> __type_of(val):
+    val: UInt, lower_bound: type(val), upper_bound: type(val)
+) -> type(val):
     """Clamps the integer value vector to be in a certain range.
 
     Args:
@@ -2285,8 +2280,8 @@ fn clamp(
 
 
 fn clamp(
-    val: SIMD, lower_bound: __type_of(val), upper_bound: __type_of(val)
-) -> __type_of(val):
+    val: SIMD, lower_bound: type(val), upper_bound: type(val)
+) -> type(val):
     """Clamps the values in a SIMD vector to be in a certain range.
 
     Clamp cuts values in the input SIMD vector off at the upper bound and

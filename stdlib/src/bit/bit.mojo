@@ -61,7 +61,7 @@ fn count_leading_zeros[
         leading zeros at position `i` of the input value.
     """
     constrained[type.is_integral(), "must be integral"]()
-    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
+    return llvm_intrinsic["llvm.ctlz", type(val), has_side_effect=False](
         val, False
     )
 
@@ -105,7 +105,7 @@ fn count_trailing_zeros[
         trailing zeros at position `i` of the input value.
     """
     constrained[type.is_integral(), "must be integral"]()
-    return llvm_intrinsic["llvm.cttz", __type_of(val), has_side_effect=False](
+    return llvm_intrinsic["llvm.cttz", type(val), has_side_effect=False](
         val, False
     )
 
@@ -149,9 +149,9 @@ fn bit_reverse[
         of an integer value of the element at position `i` of the input value.
     """
     constrained[type.is_integral(), "must be integral"]()
-    return llvm_intrinsic[
-        "llvm.bitreverse", __type_of(val), has_side_effect=False
-    ](val)
+    return llvm_intrinsic["llvm.bitreverse", type(val), has_side_effect=False](
+        val
+    )
 
 
 # ===----------------------------------------------------------------------===#
@@ -207,9 +207,7 @@ fn byte_swap[
         element at position `i` of the input value with its bytes swapped.
     """
     constrained[type.is_integral(), "must be integral"]()
-    return llvm_intrinsic["llvm.bswap", __type_of(val), has_side_effect=False](
-        val
-    )
+    return llvm_intrinsic["llvm.bswap", type(val), has_side_effect=False](val)
 
 
 # ===----------------------------------------------------------------------===#
@@ -251,9 +249,7 @@ fn pop_count[
         bits set in the element at position `i` of the input value.
     """
     constrained[type.is_integral(), "must be integral"]()
-    return llvm_intrinsic["llvm.ctpop", __type_of(val), has_side_effect=False](
-        val
-    )
+    return llvm_intrinsic["llvm.ctpop", type(val), has_side_effect=False](val)
 
 
 # ===----------------------------------------------------------------------===#
@@ -573,7 +569,7 @@ fn rotate_bits_left[
     elif shift < 0:
         return rotate_bits_right[-shift](x)
     else:
-        return llvm_intrinsic["llvm.fshl", __type_of(x), has_side_effect=False](
+        return llvm_intrinsic["llvm.fshl", type(x), has_side_effect=False](
             x, x, SIMD[type, width](shift)
         )
 
@@ -651,6 +647,6 @@ fn rotate_bits_right[
     elif shift < 0:
         return rotate_bits_left[-shift](x)
     else:
-        return llvm_intrinsic["llvm.fshr", __type_of(x), has_side_effect=False](
+        return llvm_intrinsic["llvm.fshr", type(x), has_side_effect=False](
             x, x, SIMD[type, width](shift)
         )

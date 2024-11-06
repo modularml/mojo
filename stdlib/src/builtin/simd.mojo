@@ -2879,9 +2879,7 @@ fn _tbl1(
 @always_inline
 fn _pow[
     BaseTy: DType, simd_width: Int, ExpTy: DType
-](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> __type_of(
-    base
-):
+](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> type(base):
     """Computes the power of the elements of a SIMD vector raised to the
     corresponding elements of another SIMD vector.
 
@@ -2908,7 +2906,7 @@ fn _pow[
         if all(exp == 3):
             return base * base * base
 
-        var result = __type_of(base)()
+        var result = type(base)()
 
         @parameter
         for i in range(simd_width):
@@ -2916,17 +2914,17 @@ fn _pow[
         return result
     else:
         constrained[False, "unsupported type combination"]()
-        return __type_of(base)()
+        return type(base)()
 
 
 @always_inline
-fn _powf_scalar(base: Scalar, exponent: Scalar) -> __type_of(base):
+fn _powf_scalar(base: Scalar, exponent: Scalar) -> type(base):
     constrained[
         exponent.type.is_floating_point(), "exponent must be floating point"
     ]()
 
-    var integral: __type_of(exponent)
-    var fractional: __type_of(exponent)
+    var integral: type(exponent)
+    var fractional: type(exponent)
     integral, fractional = _modf_scalar(exponent)
 
     if integral == exponent:
@@ -2941,12 +2939,12 @@ fn _powf_scalar(base: Scalar, exponent: Scalar) -> __type_of(base):
 @always_inline
 fn _powf[
     simd_width: Int
-](base: SIMD[_, simd_width], exp: SIMD[_, simd_width]) -> __type_of(base):
+](base: SIMD[_, simd_width], exp: SIMD[_, simd_width]) -> type(base):
     constrained[
         exp.type.is_floating_point(), "exponent must be floating point"
     ]()
 
-    var result = __type_of(base)()
+    var result = type(base)()
 
     @parameter
     for i in range(simd_width):
@@ -2956,7 +2954,7 @@ fn _powf[
 
 
 @always_inline
-fn _powi[type: DType](base: Scalar[type], exp: Int32) -> __type_of(base):
+fn _powi[type: DType](base: Scalar[type], exp: Int32) -> type(base):
     if type.is_integral() and exp < 0:
         # Not defined for Integers, this should raise an
         # exception.
@@ -3174,7 +3172,7 @@ fn _format_scalar[
 # ===----------------------------------------------------------------------=== #
 
 
-fn _modf_scalar(x: Scalar) -> Tuple[__type_of(x), __type_of(x)]:
+fn _modf_scalar(x: Scalar) -> Tuple[type(x), type(x)]:
     constrained[x.type.is_floating_point(), "the type must be floating point"]()
     if x < 1:
         if x < 0:
@@ -3188,15 +3186,15 @@ fn _modf_scalar(x: Scalar) -> Tuple[__type_of(x), __type_of(x)]:
     return (f, x - f)
 
 
-fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
+fn _modf(x: SIMD) -> Tuple[type(x), type(x)]:
     constrained[x.type.is_numeric(), "the type must be numeric"]()
 
     @parameter
     if x.type.is_integral():
-        return (x, __type_of(x)(0))
+        return (x, type(x)(0))
 
-    var result_int = __type_of(x)()
-    var result_frac = __type_of(x)()
+    var result_int = type(x)()
+    var result_frac = type(x)()
 
     @parameter
     for i in range(x.size):
@@ -3214,7 +3212,7 @@ fn _sub_with_saturation[
     DType.uint8, width
 ]:
     # generates a single `vpsubusb` on x86 with AVX
-    return llvm_intrinsic["llvm.usub.sat", __type_of(a)](a, b)
+    return llvm_intrinsic["llvm.usub.sat", type(a)](a, b)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -3222,7 +3220,7 @@ fn _sub_with_saturation[
 # ===----------------------------------------------------------------------=== #
 
 
-fn _floor(x: SIMD) -> __type_of(x):
+fn _floor(x: SIMD) -> type(x):
     @parameter
     if x.type.is_integral():
         return x
@@ -3243,4 +3241,4 @@ fn _floor(x: SIMD) -> __type_of(x):
         bits & ~((1 << (shift_factor - e)) - 1),
         bits,
     )
-    return __type_of(x)(from_bits=bits)
+    return type(x)(from_bits=bits)

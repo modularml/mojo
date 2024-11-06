@@ -114,7 +114,7 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
-fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
+fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> type(b):
     """UTF-8 byte type.
 
     Returns:
@@ -1195,7 +1195,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     @staticmethod
     fn format[T: Stringlike](fmt_src: T, args: Self._args_t) raises -> String:
-        alias len_pos_args = __type_of(args).__len__()
+        alias len_pos_args = type(args).__len__()
         entries, size_estimation = Self._create_entries(fmt_src, len_pos_args)
         var fmt_len = fmt_src.byte_length()
         var buf = String._buffer_type(capacity=fmt_len + size_estimation)

@@ -154,7 +154,7 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        return __type_of(result)(
+        return type(result)(
             __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg))
         )
 
