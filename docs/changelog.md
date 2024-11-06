@@ -158,8 +158,9 @@ what we publish.
   determining a default SDK to use. The user can select the default SDK to use
   with the `Mojo: Select the default MAX SDK` command.
 
-- Added a new [`Box`](/mojo/stdlib/memory/box/Box) type as a safe, single-owner,
-  non-nullable smart pointer with similar semantics to Rust's
+- Added a new [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer)
+  type as a safe, single-owner, non-nullable smart pointer with similar
+  semantics to Rust's
   [`Box<>`](https://doc.rust-lang.org/std/boxed/struct.Box.html) and C++'s
   [`std::unique_ptr`](https://en.cppreference.com/w/cpp/memory/unique_ptr).
 
