@@ -107,7 +107,7 @@ struct _DictEntryIter[
                 return Pointer.address_of(opt_entry_ref[].value())
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -149,7 +149,7 @@ struct _DictKeyIter[
         return Pointer.address_of(self.iter.__next__()[].key)
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -203,7 +203,7 @@ struct _DictValueIter[
         )
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -501,7 +501,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Example usage:
 
         ```mojo
-        var x = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+        from collections import Dict
+
+        var x = Dict[Int, Int](power_of_two_initial_capacity = 1024)
         # Insert (2/3 of 1024) entries without reallocation.
         ```
 
@@ -545,10 +547,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The new dictionary.
         """
-        var dict = Dict[K, V]()
+        var my_dict = Dict[K, V]()
         for key in keys:
-            dict[key[]] = value
-        return dict
+            my_dict[key[]] = value
+        return my_dict
 
     @staticmethod
     fn fromkeys(
@@ -700,6 +702,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
+        from collections import Dict
+
         var my_dict = Dict[Int, Float64]()
         my_dict[1] = 1.1
         my_dict[2] = 2.2
@@ -911,7 +915,13 @@ struct Dict[K: KeyElement, V: CollectionElement](
         access the key and value as attributes ie.
 
         ```mojo
-        for e in dict.items():
+        from collections import Dict
+
+        var my_dict = Dict[String, Int]()
+        my_dict["a"] = 1
+        my_dict["b"] = 2
+
+        for e in my_dict.items():
             print(e[].key, e[].value)
         ```
 
@@ -1255,7 +1265,13 @@ struct OwnedKwargsDict[V: CollectionElement](
         access the key and value as attributes ie.
 
         ```mojo
-        for e in dict.items():
+        from collections import Dict
+
+        var my_dict = Dict[String, Int]()
+        my_dict["a"] = 1
+        my_dict["b"] = 2
+
+        for e in my_dict.items():
             print(e[].key, e[].value)
         ```
 

@@ -23,6 +23,7 @@ from .math import (
     CeilDivable,
     CeilDivableRaising,
     Floorable,
+    Truncable,
     acos,
     acosh,
     align_down,

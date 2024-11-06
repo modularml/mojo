@@ -27,7 +27,6 @@ from sys.ffi import OpaquePointer
 
 from utils import Span, write_buffered, write_args
 from collections import InlineArray
-from builtin.builtin_list import _LITRefPackHelper
 from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer, memcpy
@@ -163,7 +162,7 @@ fn _printf[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if triple_is_nvidia_cuda():
@@ -210,7 +209,7 @@ fn _snprintf[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C snprintf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     return int(
         __mlir_op.`pop.external_call`[
