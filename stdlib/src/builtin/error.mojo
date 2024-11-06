@@ -211,6 +211,7 @@ struct Error(
         return String(StringRef(self.data, length))
 
 
+@doc_private
 fn __mojo_debugger_raise_hook():
     """This function is used internally by the Mojo Debugger."""
     pass
