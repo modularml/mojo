@@ -19,7 +19,6 @@ from utils import StringRef
 
 from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
 from .intrinsics import _mlirtype_is_eq
-from builtin.builtin_list import _LITRefPackHelper
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
 
@@ -317,6 +316,47 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         return res
 
+    @always_inline
+    fn call[
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+        *T: AnyType,
+    ](self, *args: *T) -> return_type:
+        """Call a function with any amount of arguments.
+
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+            T: The types of `args`.
+
+        Args:
+            args: The arguments.
+
+        Returns:
+            The result.
+        """
+        return self.call[name, return_type](args)
+
+    fn call[
+        name: StringLiteral, return_type: AnyTrivialRegType = NoneType
+    ](self, args: VariadicPack[element_trait=AnyType]) -> return_type:
+        """Call a function with any amount of arguments.
+
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            args: The arguments.
+
+        Returns:
+            The result.
+        """
+
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        var v = args.get_loaded_kgen_pack()
+        return self.get_function[fn (__type_of(v)) -> return_type](name)(v)
+
 
 # ===----------------------------------------------------------------------===#
 # Library Load
@@ -404,7 +444,7 @@ fn external_call[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
@@ -446,7 +486,7 @@ fn _external_call_const[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     return __mlir_op.`pop.external_call`[
         func = callee.value,
