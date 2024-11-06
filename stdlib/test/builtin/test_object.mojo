@@ -766,6 +766,62 @@ def test_object_iter():
     assert_equal(repr(results), "['one', 2]")
 
 
+def test_object_type_check():
+    x = object()
+    assert_true(x.is_none())
+    x = True
+    assert_true(x.is_bool())
+    x = object(Attr("value", 1))
+    assert_true(x.is_obj())
+    x = 1
+    assert_true(x.is_int())
+    x = 2.0
+    assert_true(x.is_float())
+    x = "three"
+    assert_true(x.is_str())
+    x = [0, 1, 2]
+    assert_true(x.is_list())
+    x = (0, 1, 2)
+    assert_true(x.is_tuple())
+    x = object.dict()
+    assert_true(x.is_dict())
+    x["one"] = 1
+    assert_true(x.is_dict())
+
+
+def test_object_as_ref():
+    x = object()
+    x = True
+    assert_equal(x.as_bool(), True)
+    x = object(Attr("value", 1.0))
+    assert_equal(x.as_obj()["value"], 1.0)
+    x = 1
+    assert_equal(x.as_int(), 1)
+    x = 2.0
+    assert_equal(x.as_float(), 2.0)
+    x = "three"
+    assert_equal(x.as_str(), "three")
+    x = [0, 1, 2]
+    assert_equal(x.as_list()[2], 2)
+    x = (0, 1, 2)
+    assert_equal(x.as_tuple()[1], 1)
+    x = object.dict()
+    assert_equal(len(x.as_dict()), 0)
+    x["one"] = 1
+    assert_equal(len(x.as_dict()), 1)
+    assert_equal(x.as_dict()["one"], 1)
+    x[2] = "two"
+    assert_equal(len(x.as_dict()), 2)
+    assert_equal(x.as_dict()[2], "two")
+    y = x.as_pointer()
+    y[]["one"] = 1.0
+    assert_equal(x.as_dict()["one"], 1.0)
+    assert_equal(y[].as_dict()["one"], 1.0)
+    assert_equal(x._value.ref_count(), 1)
+    _ = x
+    assert_equal(x._value.ref_count(), 1)
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -790,3 +846,5 @@ def main():
     test_object_get_type_id()
     test_object_getattr()
     test_object_iter()
+    test_object_type_check()
+    test_object_as_ref()

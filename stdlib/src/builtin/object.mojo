@@ -838,8 +838,7 @@ struct object(
         Args:
             existing: The object to move.
         """
-        self._value = existing._value
-        existing._value = _ObjectImpl(_NoneMarker {})
+        self._value = existing._value^
 
     @always_inline
     fn __init__(inout self, existing: object):
@@ -2202,6 +2201,114 @@ struct object(
             + "'"
             + " don't implement __iter__"
         )
+
+    # ===------------------------------------------------------------------=== #
+    # Type checking
+    # ===------------------------------------------------------------------=== #
+
+    fn is_none(self) -> Bool:
+        return self._value.is_none()
+
+    fn is_bool(self) -> Bool:
+        return self._value.is_bool()
+
+    fn is_func(self) -> Bool:
+        return self._value.is_func()
+
+    fn is_tuple(self) -> Bool:
+        return self._value.is_tuple()
+
+    fn is_obj(self) -> Bool:
+        return self._value.is_obj()
+
+    fn is_int(self) -> Bool:
+        return self._value.is_int()
+
+    fn is_float(self) -> Bool:
+        return self._value.is_float()
+
+    fn is_dict(self) -> Bool:
+        return self._value.is_dict()
+
+    fn is_list(self) -> Bool:
+        return self._value.is_list()
+
+    fn is_str(self) -> Bool:
+        return self._value.is_str()
+
+    # ===------------------------------------------------------------------=== #
+    # Ref/Deref
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline
+    fn as_list(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] List[
+        object
+    ]:
+        debug_assert(self._value.is_list(), "self is not a list")
+        return self._value.get_as_list()
+
+    @always_inline
+    fn as_tuple(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] List[
+        object
+    ]:
+        debug_assert(self._value.is_tuple(), "self is not a tuple")
+        return self._value.get_as_tuple()
+
+    @always_inline
+    fn as_obj(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] Dict[
+        StringLiteral, object
+    ]:
+        debug_assert(self._value.is_obj(), "self is not an attribute dict")
+        return self._value.get_as_obj()
+
+    @always_inline
+    fn as_dict(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] Dict[
+        object, object
+    ]:
+        debug_assert(self._value.is_dict(), "self is not a dictionary")
+        return self._value.get_as_dict()
+
+    @always_inline
+    fn as_float(ref [_]self) -> Float64:
+        debug_assert(self._value.is_float(), "self is not a float")
+        return self._value.value[Float64]
+
+    @always_inline
+    fn as_int(ref [_]self) -> Int:
+        debug_assert(self._value.is_int(), "self is not an integer")
+        return int(self._value.value[Int64])
+
+    @always_inline
+    fn as_bool(ref [_]self) -> Bool:
+        debug_assert(self._value.is_bool(), "self is not a bool")
+        return self._value.value[Bool]
+
+    @always_inline
+    fn as_str(
+        ref [_]self,
+    ) -> ref [
+        _lit_mut_cast[__origin_of(self._value.value), False].result
+    ] String:
+        debug_assert(self._value.is_str(), "self is not a string")
+        return self._value.get_as_string()
+
+    @always_inline
+    fn as_pointer(
+        ref [_]self,
+    ) -> Pointer[
+        Self, _lit_mut_cast[__origin_of(self._value.value), True].result
+    ]:
+        return Pointer[
+            Self, _lit_mut_cast[__origin_of(self._value.value), True].result
+        ].address_of(UnsafePointer.address_of(self)[])
 
 
 # ===----------------------------------------------------------------------=== #
