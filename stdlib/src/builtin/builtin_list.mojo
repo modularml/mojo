@@ -503,7 +503,6 @@ struct VariadicPack[
     var _value: Self._mlir_type
     var _is_owned: Bool
 
-
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
@@ -648,7 +647,6 @@ struct VariadicPack[
     ]
     """This is the !kgen.pack type with pointer elements."""
 
-
     @doc_private
     @always_inline("nodebug")
     fn get_as_kgen_pack(self) -> Self._kgen_pack_with_pointer_type:
@@ -674,4 +672,3 @@ struct VariadicPack[
         """This returns the stored KGEN pack after loading all of the elements.
         """
         return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
-
