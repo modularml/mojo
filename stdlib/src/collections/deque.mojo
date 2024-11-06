@@ -758,5 +758,5 @@ struct _DequeIter[
             return self.index
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
