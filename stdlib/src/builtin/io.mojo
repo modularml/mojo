@@ -159,7 +159,7 @@ fn _flush(file: FileDescriptor = stdout):
 fn _printf[
     fmt: StringLiteral, *types: AnyType
 ](*args: *types, file: FileDescriptor = stdout):
-    var loaded_pack = args._get_loaded_kgen_pack()
+    var loaded_pack = args.get_loaded_kgen_pack()
     var f = fmt.unsafe_ptr().bitcast[c_char]()
 
     @parameter
@@ -216,7 +216,7 @@ fn _snprintf[
             `) -> !pop.scalar<si32>`,
         ],
         _type=Int32,
-    ](str.bitcast[c_char](), size, f, args._get_loaded_kgen_pack())
+    ](str.bitcast[c_char](), size, f, args.get_loaded_kgen_pack())
     return int(num)
 
 

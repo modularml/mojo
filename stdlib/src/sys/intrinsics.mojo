@@ -53,7 +53,7 @@ fn llvm_intrinsic[
         The result of calling the llvm intrinsic with no arguments.
     """
 
-    var loaded_pack = args._get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():

@@ -158,7 +158,7 @@ struct _GPUAddressSpace(EqualityComparable):
 
 @value
 @register_passable("trivial")
-struct AddressSpace(EqualityComparable):
+struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Address space of the pointer."""
 
     var _value: Int
@@ -258,6 +258,31 @@ struct AddressSpace(EqualityComparable):
           True if the two address spaces are equal and False otherwise.
         """
         return self.value() != other.value()
+
+    @always_inline("nodebug")
+    fn __str__(self) -> String:
+        """Gets a string representation of the AddressSpace.
+
+        Returns:
+            The string representation of the AddressSpace.
+        """
+        return String.write(self)
+
+    @always_inline("nodebug")
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Formats the address space to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        if self is AddressSpace.GENERIC:
+            writer.write("AddressSpace.GENERIC")
+        else:
+            writer.write("AddressSpace(", self.value(), ")")
 
 
 # ===----------------------------------------------------------------------===#

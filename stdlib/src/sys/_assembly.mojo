@@ -28,7 +28,7 @@ fn inlined_assembly[
     has_side_effect: Bool = True,
 ](*args: *types) -> result_type:
     """Generates assembly via inline assembly."""
-    var loaded_pack = args._get_loaded_kgen_pack()
+    var loaded_pack = args.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[result_type, NoneType]():

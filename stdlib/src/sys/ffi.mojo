@@ -316,6 +316,47 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         return res
 
+    @always_inline
+    fn call[
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+        *T: AnyType,
+    ](self, *args: *T) -> return_type:
+        """Call a function with any amount of arguments.
+
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+            T: The types of `args`.
+
+        Args:
+            args: The arguments.
+
+        Returns:
+            The result.
+        """
+        return self.call[name, return_type](args)
+
+    fn call[
+        name: StringLiteral, return_type: AnyTrivialRegType = NoneType
+    ](self, args: VariadicPack[element_trait=AnyType]) -> return_type:
+        """Call a function with any amount of arguments.
+
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            args: The arguments.
+
+        Returns:
+            The result.
+        """
+
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        var v = args.get_loaded_kgen_pack()
+        return self.get_function[fn (__type_of(v)) -> return_type](name)(v)
+
 
 # ===----------------------------------------------------------------------===#
 # Library Load
@@ -418,7 +459,7 @@ fn external_call[
     Returns:
         The external call result.
     """
-    var p = args._get_loaded_kgen_pack()
+    var p = args.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[return_type, NoneType]():
@@ -465,4 +506,4 @@ fn _external_call_const[
             `inaccessibleMem = none>`,
         ],
         _type=return_type,
-    ](args._get_loaded_kgen_pack())
+    ](args.get_loaded_kgen_pack())
