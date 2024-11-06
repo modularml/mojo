@@ -28,6 +28,15 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
     return __mlir_attr.`#kgen.param.expr<current_target> : !kgen.target`
 
 
+fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
+    return __mlir_attr[
+        `#kgen.param.expr<target_get_field,`,
+        target,
+        `, "arch" : !kgen.string`,
+        `> : !kgen.string`,
+    ]
+
+
 @always_inline("nodebug")
 fn _current_arch() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
@@ -411,7 +420,7 @@ fn _is_sm_8x() -> Bool:
 
 @always_inline("nodebug")
 fn _is_sm_9x() -> Bool:
-    return triple_is_nvidia_cuda["sm_90"]() or triple_is_nvidia_cuda["sm_9a"]()
+    return triple_is_nvidia_cuda["sm_90"]() or triple_is_nvidia_cuda["sm_90a"]()
 
 
 @always_inline("nodebug")

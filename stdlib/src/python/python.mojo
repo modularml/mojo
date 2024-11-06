@@ -29,7 +29,13 @@ from memory import UnsafePointer
 from utils import StringRef
 
 from .python_object import PythonObject, TypedPythonObject
-from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
+from ._cpython import (
+    CPython,
+    Py_eval_input,
+    Py_file_input,
+    PyMethodDef,
+    Py_ssize_t,
+)
 
 
 fn _init_global(ignored: OpaquePointer) -> OpaquePointer:
@@ -436,3 +442,34 @@ struct Python:
             `PythonObject` representing `None`.
         """
         return PythonObject(None)
+
+    # ===-------------------------------------------------------------------===#
+    # Checked Conversions
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    fn py_long_as_ssize_t(obj: PythonObject) raises -> Py_ssize_t:
+        """Get the value of a Python `long` object.
+
+        Args:
+            obj: The Python `long` object.
+
+        Raises:
+            If `obj` is not a Python `long` object, or if the `long` object
+            value overflows `Py_ssize_t`.
+
+        Returns:
+            The value of the `long` object as a `Py_ssize_t`.
+        """
+        var cpython = Python().impl.cpython()
+
+        var long: Py_ssize_t = cpython.PyLong_AsSsize_t(
+            obj.unsafe_as_py_object_ptr()
+        )
+
+        # Disambiguate if this is an error return setinel, or a legitimate
+        # value.
+        if long == -1:
+            Python.throw_python_exception_if_error_state(cpython)
+
+        return long

@@ -31,7 +31,6 @@ from sys import (
     _libc as libc,
 )
 from collections import Optional
-from builtin.dtype import _integral_type_of
 from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #
