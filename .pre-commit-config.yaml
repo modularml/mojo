@@ -3,19 +3,19 @@ repos:
     hooks:
       - id: mojo-format
         name: mojo-format
-        entry: mojo format
+        entry: magic run mojo format
         language: system
         files: '\.(mojo|🔥|py)$'
         stages: [commit]
       - id: check-docstrings
         name: check-docstrings
-        entry: python3 ./stdlib/scripts/check-docstrings.py
+        entry: magic run python3 ./stdlib/scripts/check-docstrings.py
         language: system
         pass_filenames: false
         stages: [commit]
       - id: check-license
         name: check-license
-        entry: mojo stdlib/scripts/check_licenses.mojo
+        entry: magic run mojo stdlib/scripts/check_licenses.mojo
         language: system
         files: '\.(mojo|🔥|py)$'
         stages: [commit]
