@@ -87,6 +87,9 @@ struct UInt(IntLike, _HashableWithHasher):
         Args:
             value: The init value.
         """
+        debug_assert(
+            value >= 0, "Constructing UInt from negative Int is discouraged."
+        )
         self.value = value.value
 
     @always_inline("nodebug")
@@ -96,6 +99,9 @@ struct UInt(IntLike, _HashableWithHasher):
         Args:
             value: The init value.
         """
+        debug_assert(
+            value >= 0, "Constructing UInt from negative Int is discouraged."
+        )
         self = value.__uint__()
 
     @always_inline("nodebug")
