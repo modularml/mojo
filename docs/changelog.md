@@ -234,7 +234,7 @@ what we publish.
 
 - Added a `reserve` method and new constructor to the `String` struct to
   allocate additional capacity.
-  ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
+  ([PR #3751](https://github.com/modularml/mojo/pull/3751) by [@thatstoasty](https://github.com/thatstoasty)).
 
 ### 🦋 Changed
 
