@@ -115,7 +115,7 @@ struct _DictEntryIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -157,7 +157,7 @@ struct _DictKeyIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -211,7 +211,7 @@ struct _DictValueIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value

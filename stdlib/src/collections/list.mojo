@@ -84,7 +84,7 @@ struct _ListIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 struct List[T: CollectionElement, hint_trivial_type: Bool = False](

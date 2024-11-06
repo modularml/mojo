@@ -90,7 +90,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -128,7 +128,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -159,7 +159,7 @@ struct _StridedRangeIterator(Sized):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -221,7 +221,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @always_inline
@@ -378,7 +378,7 @@ struct _UIntZeroStartingRange(UIntSized):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -404,7 +404,7 @@ struct _UIntStridedRangeIterator(UIntSized):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -459,7 +459,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @always_inline
@@ -537,7 +537,7 @@ struct _ZeroStartingScalarRange[type: DType]:
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -575,7 +575,7 @@ struct _SequentialScalarRange[type: DType]:
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -604,7 +604,7 @@ struct _StridedScalarRangeIterator[type: DType]:
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value
@@ -694,11 +694,11 @@ trait _Iterator:
 #     fn __next__(inout self) -> T:
 #         ...
 
-#     fn __hasmore__(self) -> Bool:
+#     fn __has_next__(self) -> Bool:
 #         ...
 
 #     fn __bool__(self) -> Bool:
-#         return self.__hasmore__()
+#         return self.__has_next__()
 
 
 # trait _Iterable[T: AnyType]:

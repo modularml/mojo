@@ -242,7 +242,7 @@ struct _StringSliceIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 @value

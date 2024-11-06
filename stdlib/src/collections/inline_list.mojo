@@ -76,7 +76,7 @@ struct _InlineListIter[
 
     @always_inline
     fn __bool__(self) -> Bool:
-        return self.__hasmore__()
+        return self.__has_next__()
 
 
 # TODO: Provide a smarter default for the capacity.
