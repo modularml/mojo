@@ -766,6 +766,15 @@ struct String(
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
 
+    @always_inline
+    fn __init__(inout self, *, capacity: Int):
+        """Construct an uninitialized string with the given capacity.
+
+        Args:
+            capacity: The capacity of the string.
+        """
+        self._buffer = Self._buffer_type(capacity=capacity)
+
     fn __init__(inout self, *, other: Self):
         """Explicitly copy the provided value.
 
@@ -2295,6 +2304,17 @@ struct String(
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
         var result = String(buffer)
         return result^
+
+    fn reserve(inout self, new_capacity: Int):
+        """Reserves the requested capacity.
+
+        If the current capacity is greater or equal, this is a no-op.
+        Otherwise, the storage is reallocated and the date is moved.
+
+        Args:
+            new_capacity: The new capacity.
+        """
+        self._buffer.reserve(new_capacity)
 
 
 # ===----------------------------------------------------------------------=== #

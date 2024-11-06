@@ -232,6 +232,10 @@ what we publish.
 - Added `os.path.expandvars` to expand environment variables in a string.
   ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
 
+- Added a `reserve` method and new constructor to the `String` struct to
+  allocate additional capacity.
+  ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
