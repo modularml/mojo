@@ -19,7 +19,6 @@ from memory import UnsafePointer
 ```
 """
 
-from documentation import doc_private
 from sys import alignof, sizeof, triple_is_nvidia_cuda
 from sys.intrinsics import (
     _mlirtype_is_eq,
@@ -453,7 +452,11 @@ struct UnsafePointer[
 
     @always_inline("nodebug")
     fn load[
-        type: DType, //, width: Int = 1, *, volatile: Bool = False
+        type: DType, //,
+        width: Int = 1,
+        *,
+        volatile: Bool = False,
+        invariant: Bool = False,
     ](self: _UP[Scalar[type], *_, **_]) -> SIMD[type, width]:
         """Loads the value the pointer points to.
 
@@ -464,11 +467,16 @@ struct UnsafePointer[
             type: The data type of SIMD vector.
             width: The size of the SIMD vector.
             volatile: Whether the operation is volatile or not.
+            invariant: Whether the memory is load invariant.
 
         Returns:
             The loaded value.
         """
         constrained[width > 0, "width must be a positive integer value"]()
+        constrained[
+            not volatile or volatile ^ invariant,
+            "both volatile and invariant cannot be set at the same time",
+        ]()
 
         @parameter
         if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
@@ -488,25 +496,38 @@ struct UnsafePointer[
                         alignment = alignment.value,
                         isVolatile = __mlir_attr.unit,
                     ]((self + i).address)
+                elif invariant:
+                    v[i] = __mlir_op.`pop.load`[
+                        alignment = alignment.value,
+                        isInvariant = __mlir_attr.unit,
+                    ]((self + i).address)
                 else:
                     v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
                         (self + i).address
                     )
             return v
 
+        var address = self.bitcast[SIMD[type, width]]().address
+
         @parameter
         if volatile:
             return __mlir_op.`pop.load`[
                 alignment = alignment.value, isVolatile = __mlir_attr.unit
-            ](self.bitcast[SIMD[type, width]]().address)
+            ](address)
+        elif invariant:
+            return __mlir_op.`pop.load`[
+                alignment = alignment.value, isInvariant = __mlir_attr.unit
+            ](address)
         else:
-            return __mlir_op.`pop.load`[alignment = alignment.value](
-                self.bitcast[SIMD[type, width]]().address
-            )
+            return __mlir_op.`pop.load`[alignment = alignment.value](address)
 
     @always_inline
     fn load[
-        type: DType, //, width: Int = 1, *, volatile: Bool = False
+        type: DType, //,
+        width: Int = 1,
+        *,
+        volatile: Bool = False,
+        invariant: Bool = False,
     ](self: _UP[Scalar[type], *_, **_], offset: Scalar) -> SIMD[type, width]:
         """Loads the value the pointer points to with the given offset.
 
@@ -518,6 +539,7 @@ struct UnsafePointer[
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
             volatile: Whether the operation is volatile or not.
+            invariant: Whether the memory is load invariant.
 
         Args:
             offset: The offset to load from.
@@ -526,11 +548,20 @@ struct UnsafePointer[
             The loaded value.
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
-        return self.offset(int(offset)).load[width=width, volatile=volatile]()
+        return self.offset(int(offset)).load[
+            width=width,
+            volatile=volatile,
+            invariant=invariant,
+        ]()
 
     @always_inline("nodebug")
     fn load[
-        T: IntLike, type: DType, //, width: Int = 1, *, volatile: Bool = False
+        T: IntLike,
+        type: DType, //,
+        width: Int = 1,
+        *,
+        volatile: Bool = False,
+        invariant: Bool = False,
     ](self: _UP[Scalar[type], *_, **_], offset: T) -> SIMD[type, width]:
         """Loads the value the pointer points to with the given offset.
 
@@ -542,6 +573,7 @@ struct UnsafePointer[
             type: The data type of SIMD vector elements.
             width: The size of the SIMD vector.
             volatile: Whether the operation is volatile or not.
+            invariant: Whether the memory is load invariant.
 
         Args:
             offset: The offset to load from.
@@ -549,7 +581,11 @@ struct UnsafePointer[
         Returns:
             The loaded value.
         """
-        return self.offset(offset).load[width=width, volatile=volatile]()
+        return self.offset(offset).load[
+            width=width,
+            volatile=volatile,
+            invariant=invariant,
+        ]()
 
     @always_inline
     fn store[

@@ -74,4 +74,4 @@ fn getenv(name: String, default: String = "") -> String:
     var ptr = external_call["getenv", UnsafePointer[UInt8]](name.unsafe_ptr())
     if not ptr:
         return default
-    return String(StringRef(ptr))
+    return String(StringRef(ptr=ptr))

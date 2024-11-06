@@ -104,8 +104,9 @@ like:
 
 - Capture declarations in closures.
 - Lifetime checker: complain about invalid mutable references.
+- Lifetime checker: enforce argument exclusivity for mutable references.
 
-Mojo has support for a safe `Reference` type, and it is used in the standard
+Mojo has support for a safe `Pointer` type, and it is used in the standard
 library, but it is still under active development and not very pretty or nice
 to use right now.
 
@@ -378,73 +379,6 @@ Mojo currently supports similar functionality through the
 [`int()`](/mojo/stdlib/builtin/int/int-function) and
 [`len()`](/mojo/stdlib/builtin/len/len) functions. We'll continue to
 add traits support to the standard library to enable common use cases like this.
-
-### Parameter closure captures are unsafe references
-
-You may have seen nested functions, or "closures", annotated with the
-`@parameter` decorator. This creates a "parameter closure", which behaves
-differently than a normal "stateful" closure. A parameter closure declares a
-compile-time value, similar to an `alias` declaration. That means parameter
-closures can be passed as parameters:
-
-```mojo
-fn take_func[f: fn() capturing -> Int]():
-    pass
-
-fn call_it(a: Int):
-    @parameter
-    fn inner() -> Int:
-        return a # capture 'a'
-
-    take_func[inner]() # pass 'inner' as a parameter
-```
-
-Parameter closures can even be parametric and capturing:
-
-```mojo
-fn take_func[f: fn[a: Int]() capturing -> Int]():
-    pass
-
-fn call_it(a: Int):
-    @parameter
-    fn inner[b: Int]() -> Int:
-        return a + b # capture 'a'
-
-    take_func[inner]() # pass 'inner' as a parameter
-```
-
-However, note that parameter closures are always capture by *unsafe* reference.
-Mojo's lifetime tracking is not yet sophisticated enough to form safe references
-to objects (see above section). This means that variable lifetimes need to be
-manually extended according to the lifetime of the parametric closure:
-
-```mojo
-fn print_it[f: fn() capturing -> String]():
-    print(f())
-
-fn call_it():
-    var s: String = "hello world"
-    @parameter
-    fn inner() -> String:
-        return s # 's' captured by reference, so a copy is made here
-    # lifetime tracker destroys 's' here
-
-    print_it[inner]() # crash! 's' has been destroyed
-```
-
-The lifetime of the variable can be manually extended by discarding it
-explicitly.
-
-```mojo
-fn call_it():
-    var s: String = "hello world"
-    @parameter
-    fn inner() -> String:
-        return s
-
-    print_it[inner]()
-    _ = s^ # discard 's' explicitly
-```
 
 ### The standard library has limited exceptions use
 
