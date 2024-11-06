@@ -12,7 +12,6 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import abort
-from builtin._documentation import doc_private
 
 
 struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):

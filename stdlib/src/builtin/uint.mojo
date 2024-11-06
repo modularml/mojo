@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import bitwidthof
 from utils._visualizers import lldb_formatter_wrapping_type
-from builtin._documentation import doc_private
+from documentation import doc_private
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
@@ -28,7 +28,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 struct UInt(IntLike, _HashableWithHasher):
     """This type represents an unsigned integer.
 
-    An unsigned integer is represents a positive integral number.
+    An unsigned integer represents a positive integral number.
 
     The size of this unsigned integer is platform-dependent.
 

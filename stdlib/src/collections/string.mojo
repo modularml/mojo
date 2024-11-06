@@ -44,6 +44,7 @@ from utils.string_slice import (
     _shift_unicode_to_utf8,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
+    _to_string_list,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -615,7 +616,7 @@ fn _isspace(c: String) -> Bool:
     """Determines whether the given character is a whitespace character.
 
     This only respects the default "C" locale, i.e. returns True only if the
-    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    character specified is one of " \\t\\n\\v\\f\\r". For semantics similar
     to Python, use `String.isspace()`.
 
     Args:
@@ -631,7 +632,7 @@ fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
     This only respects the default "C" locale, i.e. returns True only if the
-    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    character specified is one of " \\t\\n\\v\\f\\r". For semantics similar
     to Python, use `String.isspace()`.
 
     Args:
@@ -956,7 +957,7 @@ struct String(
             buff: The buffer. This should have an existing terminator.
         """
 
-        return String(buff, len(StringRef(buff)) + 1)
+        return String(buff, len(StringRef(ptr=buff)) + 1)
 
     @staticmethod
     fn _from_bytes(owned buff: Self._buffer_type) -> String:
@@ -1036,7 +1037,17 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        return not (self != other)
+        if not self and not other:
+            return True
+        if len(self) != len(other):
+            return False
+        # same pointer and length, so equal
+        if self.unsafe_ptr() == other.unsafe_ptr():
+            return True
+        for i in range(len(self)):
+            if self.unsafe_ptr()[i] != other.unsafe_ptr()[i]:
+                return False
+        return True
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -1048,7 +1059,7 @@ struct String(
         Returns:
             True if the Strings are not equal and False otherwise.
         """
-        return self._strref_dangerous() != other._strref_dangerous()
+        return not (self == other)
 
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
@@ -1491,23 +1502,6 @@ struct String(
         buf.append(0)
         return String(buf^)
 
-    fn _strref_dangerous(self) -> StringRef:
-        """
-        Returns an inner pointer to the string as a StringRef.
-        This functionality is extremely dangerous because Mojo eagerly releases
-        strings.  Using this requires the use of the _strref_keepalive() method
-        to keep the underlying string alive long enough.
-        """
-        return StringRef(self.unsafe_ptr(), self.byte_length())
-
-    fn _strref_keepalive(self):
-        """
-        A noop that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
-        """
-        pass
-
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
@@ -1655,7 +1649,7 @@ struct String(
         python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
             True if the whole String is made up of whitespace characters
@@ -1742,7 +1736,7 @@ struct String(
         _ = String("      hello    world     ").split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
         _ = String(
-            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+            "hello \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
         ).split()  # ["hello", "world"]
         ```
         .
@@ -1792,9 +1786,9 @@ struct String(
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
-        [universal newlines](
+        [universal newlines:](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -1802,7 +1796,7 @@ struct String(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return self.as_string_slice().splitlines(keepends)
+        return _to_string_list(self.as_string_slice().splitlines(keepends))
 
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`

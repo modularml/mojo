@@ -13,6 +13,7 @@
 """Implements the collections package."""
 
 from .counter import Counter
+from .deque import Deque
 from .dict import Dict, KeyElement
 from .inline_array import InlineArray
 from .inline_list import InlineList

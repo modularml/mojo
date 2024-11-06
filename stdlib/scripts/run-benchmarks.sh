@@ -31,5 +31,5 @@ if [[ $# -gt 0 ]]; then
   BENCHMARK_PATH=$1
 fi
 
-# Run the benchmarks
-lit -sv "${BENCHMARK_PATH}"
+# Run the benchmarks sequentially
+lit --succinct --show-all --workers 1 ${BENCHMARK_PATH}
