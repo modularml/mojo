@@ -19,17 +19,17 @@ from test_utils import (
     ImplicitCopyOnly,
     ObservableDel,
 )
-from memory import Box, UnsafePointer
+from memory import OwnedPointer, UnsafePointer
 
 
 def test_basic_ref():
-    var b = Box(1)
+    var b = OwnedPointer(1)
     assert_equal(1, b[])
 
 
-def test_box_copy_constructor():
-    var b = Box(1)
-    var b2 = Box(copy_box=b)
+def test_owned_pointer_copy_constructor():
+    var b = OwnedPointer(1)
+    var b2 = OwnedPointer(other=b)
 
     assert_equal(1, b[])
     assert_equal(1, b2[])
@@ -39,7 +39,7 @@ def test_box_copy_constructor():
 
 def test_copying_constructor():
     var v = ImplicitCopyOnly(1)
-    var b = Box(v)
+    var b = OwnedPointer(v)
 
     assert_equal(b[].value, 1)
     assert_equal(b[].copy_count, 1)  # this should only ever require one copy
@@ -47,7 +47,7 @@ def test_copying_constructor():
 
 def test_explicitly_copying_constructor():
     var v = ExplicitCopyOnly(1)
-    var b = Box(copy_value=v)
+    var b = OwnedPointer(copy_value=v)
 
     assert_equal(b[].value, 1)
     assert_equal(b[].copy_count, 1)  # this should only ever require one copy
@@ -55,13 +55,13 @@ def test_explicitly_copying_constructor():
 
 def test_moving_constructor():
     var v = MoveOnly[Int](1)
-    var b = Box(v^)
+    var b = OwnedPointer(v^)
 
     assert_equal(b[].data, 1)
 
 
 def test_basic_ref_mutate():
-    var b = Box(1)
+    var b = OwnedPointer(1)
     assert_equal(1, b[])
 
     b[] = 2
@@ -70,7 +70,7 @@ def test_basic_ref_mutate():
 
 
 def test_multiple_refs():
-    var b = Box(1)
+    var b = OwnedPointer(1)
 
     var borrow1 = b[]
     var borrow2 = b[]
@@ -80,7 +80,7 @@ def test_multiple_refs():
 
 def test_basic_del():
     var deleted = False
-    var b = Box(ObservableDel(UnsafePointer.address_of(deleted)))
+    var b = OwnedPointer(ObservableDel(UnsafePointer.address_of(deleted)))
 
     assert_false(deleted)
 
@@ -90,14 +90,14 @@ def test_basic_del():
 
 
 def test_take():
-    var b = Box(1)
+    var b = OwnedPointer(1)
     var v = b^.take()
     assert_equal(1, v)
 
 
 def test_moveinit():
     var deleted = False
-    var b = Box(ObservableDel(UnsafePointer.address_of(deleted)))
+    var b = OwnedPointer(ObservableDel(UnsafePointer.address_of(deleted)))
     var p1 = b.unsafe_ptr()
 
     var b2 = b^
@@ -112,9 +112,11 @@ def test_moveinit():
 def test_steal_data():
     var deleted = False
 
-    var box = Box(ObservableDel(UnsafePointer.address_of(deleted)))
+    var owned_ptr = OwnedPointer(
+        ObservableDel(UnsafePointer.address_of(deleted))
+    )
 
-    var ptr = box^.steal_data()
+    var ptr = owned_ptr^.steal_data()
 
     # Check that `Box` did not deinitialize its pointee.
     assert_false(deleted)
@@ -125,7 +127,7 @@ def test_steal_data():
 
 def main():
     test_basic_ref()
-    test_box_copy_constructor()
+    test_owned_pointer_copy_constructor()
     test_moving_constructor()
     test_copying_constructor()
     test_explicitly_copying_constructor()

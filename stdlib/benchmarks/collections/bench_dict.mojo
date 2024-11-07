@@ -77,6 +77,7 @@ fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
     var items = make_dict[size]()
     var closest_divisor = ceil(100 / size)
 
+    @__copy_capture(closest_divisor)
     @always_inline
     @parameter
     fn call_fn() raises:

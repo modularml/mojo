@@ -562,14 +562,7 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
 
         @parameter
-        if _is_sm_9x() and type is DType.bfloat16:
-            return _call_ptx_intrinsic[
-                scalar_instruction="add.rn.bf16",
-                vector2_instruction="add.rn.bf16x2",
-                scalar_constraints="=h,h,h",
-                vector_constraints="=r,r,r",
-            ](self, rhs)
-        elif _is_sm_8x() and type.is_half_float():
+        if _is_sm_8x() and type.is_half_float():
             return self.fma(1, rhs)
 
         return __mlir_op.`pop.add`(self.value, rhs.value)
@@ -617,13 +610,6 @@ struct SIMD[type: DType, size: Int](
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
-        elif _is_sm_9x() and type is DType.bfloat16:
-            return _call_ptx_intrinsic[
-                scalar_instruction="mul.rn.bf16",
-                vector2_instruction="mul.rn.bf16x2",
-                scalar_constraints="=h,h,h",
-                vector_constraints="=r,r,r",
-            ](self, rhs)
         elif _is_sm_8x() and type.is_half_float():
             return self.fma(rhs, -0.0)
 
@@ -1597,54 +1583,73 @@ struct SIMD[type: DType, size: Int](
         @parameter
         if type == target:
             return rebind[SIMD[target, size]](self)
-        elif (
-            triple_is_nvidia_cuda()
-            and type is DType.float32
-            and target is DType.bfloat16
-            and size >= 2
-        ):
-            var res = SIMD[target, size]()
+
+        @parameter
+        if triple_is_nvidia_cuda():
 
             @parameter
-            for i in range(0, size, 2):
-                var bf16x2_as_uint32 = inlined_assembly[
-                    "cvt.rn.bf16x2.f32 $0, $1, $2;",
-                    UInt32,
-                    constraints="=r,f,f",
-                    has_side_effect=False,
-                ](rebind[Float32](self[i + 1]), rebind[Float32](self[i]))
-                res = res.insert[offset=i](bitcast[target, 2](bf16x2_as_uint32))
+            if size > 1 and type is DType.float32 and target.is_half_float():
+                # For size == 1, the LLVM backend generates the correct `cvt.rn.f16.f32`
+                # instruction. This is why we do not handle it here.
+                alias vector_asm_prefix = "cvt.rn.f16x2.f32" if target is DType.float16 else "cvt.rn.bf16x2.f32"
+                var res = SIMD[target, size]()
 
-            return res
+                @parameter
+                for i in range(0, size, 2):
+                    var bf16x2_as_uint32 = inlined_assembly[
+                        vector_asm_prefix + " $0, $1, $2;",
+                        UInt32,
+                        constraints="=r,f,f",
+                        has_side_effect=False,
+                    ](
+                        rebind[Float32](self[i + 1]),
+                        rebind[Float32](self[i]),
+                    )
+                    res = res.insert[offset=i](
+                        bitcast[target, 2](bf16x2_as_uint32)
+                    )
 
-        elif has_neon() and (
-            type is DType.bfloat16 or target == DType.bfloat16
-        ):
+                return res
+
+            elif type is DType.bfloat16 and target is DType.float64:
+                # Convert to F64 via a Float32 pathway. This would allow us to
+                # use the optimizations defined above.
+                return self.cast[DType.float32]().cast[target]()
+
+        @parameter
+        if has_neon() and (type is DType.bfloat16 or target == DType.bfloat16):
             # TODO(KERN-228): support BF16 on neon systems.
             return _unchecked_zero[target, size]()
-        elif type is DType.bool:
+
+        @parameter
+        if type is DType.bool:
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
-        elif target == DType.bool:
+
+        @parameter
+        if target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
-        elif type is DType.bfloat16 and not _has_native_bf16_support():
-            var cast_result = _bfloat16_to_f32(
-                rebind[SIMD[DType.bfloat16, size]](self)
-            ).cast[target]()
-            return rebind[SIMD[target, size]](cast_result)
-        elif target == DType.bfloat16 and not _has_native_bf16_support():
+
+        @parameter
+        if type is DType.bfloat16 and target is DType.float32:
+            return rebind[SIMD[target, size]](
+                _bfloat16_to_f32(rebind[SIMD[DType.bfloat16, size]](self))
+            )
+
+        @parameter
+        if type is DType.float32 and target == DType.bfloat16:
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
-        else:
-            return __mlir_op.`pop.cast`[
-                _type = __mlir_type[
-                    `!pop.simd<`,
-                    size.value,
-                    `, `,
-                    target.value,
-                    `>`,
-                ]
-            ](self.value)
+
+        return __mlir_op.`pop.cast`[
+            _type = __mlir_type[
+                `!pop.simd<`,
+                size.value,
+                `, `,
+                target.value,
+                `>`,
+            ]
+        ](self.value)
 
     @no_inline
     fn write_to[W: Writer](self, inout writer: W):
@@ -2996,10 +3001,17 @@ fn _bfloat16_to_f32_scalar(
         # TODO(KERN-228): support BF16 on neon systems.
         return _unchecked_zero[DType.float32, 1]()
 
-    var bfloat_bits = FPUtils[DType.bfloat16].bitcast_to_integer(val)
-    return FPUtils[DType.float32].bitcast_from_integer(
-        bfloat_bits << _fp32_bf16_mantissa_diff
-    )
+    # For bfloat16, we can just do a memcpy to perform the cast to float32.
+    @parameter
+    if triple_is_nvidia_cuda():
+        return inlined_assembly[
+            "cvt.f32.bf16 $0, $1;" if _is_sm_9x() else "mov.b32 $0, {0, $1};",
+            Scalar[DType.float32],
+            constraints="=f,h",
+            has_side_effect=False,
+        ](bitcast[DType.int16](val))
+
+    return bitcast[DType.float32, 1](SIMD[DType.bfloat16, 2](0, val))
 
 
 @always_inline
