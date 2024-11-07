@@ -2308,11 +2308,12 @@ struct String(
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
-        If the current capacity is greater or equal, this is a no-op.
-        Otherwise, the storage is reallocated and the date is moved.
-
         Args:
             new_capacity: The new capacity.
+
+        Notes:
+            If the current capacity is greater or equal, this is a no-op.
+            Otherwise, the storage is reallocated and the data is moved.
         """
         self._buffer.reserve(new_capacity)
 
