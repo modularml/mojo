@@ -204,7 +204,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
             The value at the specified position.
         """
         debug_assert(
-            int(idx.__mlir_index__()) < size, "index must be within bounds"
+            Int(idx.__mlir_index__()) < size, "index must be within bounds"
         )
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
@@ -230,7 +230,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
             val: The value to store.
         """
         debug_assert(
-            int(idx.__mlir_index__()) < size, "index must be within bounds"
+            Int(idx.__mlir_index__()) < size, "index must be within bounds"
         )
         var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(
