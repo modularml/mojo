@@ -97,6 +97,10 @@ def test_constructors():
     var s3 = String(ptr, 4)
     assert_equal(s3, "abc")
 
+    # Construction with capacity
+    var s4 = String(capacity=1)
+    assert_equal(s4._buffer.capacity, 1)
+
 
 def test_copy():
     var s0 = String("find")
@@ -1573,6 +1577,13 @@ def test_slice_contains():
     assert_false(
         String("hello world").as_string_slice().__contains__("not-found")
     )
+
+
+def test_reserve():
+    var s = String()
+    assert_true(s._buffer.capacity == 0)
+    s.reserve(1)
+    assert_true(s._buffer.capacity == 1)
 
 
 def main():
