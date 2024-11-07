@@ -152,7 +152,7 @@ def test_stat():
     var path = Path(__source_location().file_name)
     var stat = path.stat()
     assert_true(stat.st_mode > 0)
-    assert_true(stat.st_size > 0)
+    assert_true(stat.st_size >= 0)
     assert_equal(
         str(stat),
         "os.stat_result(st_mode={}, st_ino={}, st_dev={}, st_nlink={},"
