@@ -186,9 +186,7 @@ struct stat_result(Stringable, Writable):
         Returns:
           A string representation of stat_result.
         """
-        var output = String()
-        self.write_to(output)
-        return output
+        return String.write(self)
 
     fn __repr__(self) -> String:
         """Constructs a representation of stat_result.
