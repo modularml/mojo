@@ -1406,7 +1406,7 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The value as an integer.
         """
-        return UInt(self.__int__().value)
+        return uint(int(self))
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

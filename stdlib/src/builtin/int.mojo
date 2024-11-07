@@ -261,7 +261,7 @@ fn int(value: String, base: Int = 10) raises -> Int:
     return atol(value, base)
 
 
-fn int(value: UInt) -> Int:
+fn int[T: IntLike](value: T) -> Int:
     """Get the Int representation of the value.
 
     Args:
@@ -270,7 +270,7 @@ fn int(value: UInt) -> Int:
     Returns:
         The integral representation of the value.
     """
-    return value.value
+    return value.__mlir_index__()
 
 
 # ===----------------------------------------------------------------------=== #

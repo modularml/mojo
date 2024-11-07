@@ -22,6 +22,110 @@ from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
 
+# ===----------------------------------------------------------------------=== #
+#  UIntable
+# ===----------------------------------------------------------------------=== #
+
+
+trait UIntable(CollectionElement):
+    """The `UIntable` trait describes a type that can be converted to a `UInt`.
+    """
+
+    fn __uint__(self) -> UInt:
+        """Get the unsigned integral representation of the value.
+
+        Returns:
+            The unsigned integral representation of the value.
+        """
+        ...
+
+
+trait UIntableRaising:
+    """The `UIntableRaising` trait describes a type can be converted to a UInt,
+    but the conversion might raise an error.
+    """
+
+    fn __uint__(self) raises -> Int:
+        """Get the unsigned integral representation of the value.
+
+        Returns:
+            The unsigned integral representation of the type.
+
+        Raises:
+            If the type does not have an unsigned integral representation.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+#  uint
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn uint[T: UIntable](value: T) -> UInt:
+    """Get the `UInt` representation of the value.
+
+    Parameters:
+        T: The UIntable type.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The unsigned integral representation of the value.
+    """
+    return value.__uint__()
+
+
+@always_inline
+fn uint[T: UIntableRaising](value: T) raises -> UInt:
+    """Get the `UInt` representation of the value.
+
+    Parameters:
+        T: The UIntable type.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The unsigned integral representation of the value.
+
+    Raises:
+        If the type does not have an integral representation.
+    """
+    return value.__uint__()
+
+
+fn uint(value: IntLiteral) -> UInt:
+    """Get the UInt representation of the value.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The unsigned integral representation of the value.
+    """
+    return value.__uint__()
+
+
+fn uint[T: IntLike](value: T) -> UInt:
+    """Get the UInt representation of the value.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The unsigned integral representation of the value.
+    """
+    return value.__mlir_index__()
+
+
+# ===----------------------------------------------------------------------=== #
+#  UInt
+# ===----------------------------------------------------------------------=== #
+
+
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
@@ -82,29 +186,29 @@ struct UInt(IntLike, _HashableWithHasher):
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
-        """Construct UInt from the given index value.
+        """Construct `UInt` from the given `Int` value.
 
         Args:
             value: The init value.
         """
         debug_assert(
             value >= 0,
-            "Constructing UInt from negative Int is discouraged, ",
-            "use the MLIR value constructor if you are sure.",
+            "Constructing `UInt` from negative `Int` is discouraged, use the",
+            " `uint` builtin function (e.g. `uint(-1)`) if you are sure.",
         )
         self.value = value.value
 
     @always_inline("nodebug")
     fn __init__(inout self, value: IntLiteral):
-        """Construct UInt from the given IntLiteral value.
+        """Construct `UInt` from the given `IntLiteral` value.
 
         Args:
             value: The init value.
         """
         debug_assert(
             value >= 0,
-            "Constructing UInt from negative Int is discouraged, ",
-            "use the MLIR value constructor if you are sure.",
+            "Constructing `UInt` from negative `Int` is discouraged, use the",
+            " `uint` builtin function (e.g. `uint(-1)`) if you are sure.",
         )
         self = value.__uint__()
 

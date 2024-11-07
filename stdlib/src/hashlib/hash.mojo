@@ -182,7 +182,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> UInt:
             bitcast[int_type, 1](hash_data[i]).cast[DType.uint64](),
         )
 
-    return final_data.__uint__()
+    return uint(final_data)
 
 
 fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
