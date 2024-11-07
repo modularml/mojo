@@ -1377,9 +1377,7 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        var output = String()
-        StringRepr(self).write_to(output)
-        return output
+        return String.write(StringRepr(self))
 
     fn __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).
