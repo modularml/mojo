@@ -65,3 +65,12 @@ trait AnyType:
         end of this function.
         """
         ...
+
+
+# TODO: this needs to take/consume the value, not copy implicitly
+fn del(owned args: VariadicPack[element_trait=AnyType]):
+    __type_of(args).__del__(args^)
+
+# TODO: this needs to take/consume the value, not copy implicitly
+fn del[*T: AnyType](owned *args: *T):
+    del(args)

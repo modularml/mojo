@@ -149,8 +149,7 @@ struct Python:
                 )
             )
             Python.throw_python_exception_if_error_state(cpython)
-            _ = code^
-            _ = result^
+            del (code^, result^)
             return module
         else:
             # We use the result of evaluating the expression directly, and allow

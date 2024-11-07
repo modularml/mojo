@@ -390,8 +390,7 @@ fn _try_write_int[
 
         process_digits[neg_digit_value]()
 
-    _ = remaining_int
-    _ = digit_chars_array
+    del (remaining_int^, digit_chars_array^)
 
     # Re-add +1 byte since the loop ended so we didn't write another char.
     offset += 1

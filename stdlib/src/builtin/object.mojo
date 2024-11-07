@@ -1773,7 +1773,7 @@ struct object(
             value: The value to append.
         """
         if self._value.is_obj():
-            _ = object(self._value.get_obj_attr("append"))(self, value)
+            del object(self._value.get_obj_attr("append"))(self, value)^
             return
         if not self._value.is_list():
             raise Error("TypeError: can only append to lists")
@@ -1858,7 +1858,7 @@ struct object(
             value: The value to set.
         """
         if self._value.is_obj():
-            _ = object(self._value.get_obj_attr("__setitem__"))(self, i, value)
+            del object(self._value.get_obj_attr("__setitem__"))(self, i, value)^
             return
         if self._value.is_str():
             raise Error(

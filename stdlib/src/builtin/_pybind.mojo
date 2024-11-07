@@ -59,7 +59,7 @@ fn fail_initialization(owned err: Error) -> PythonObject:
         error_type,
         err.unsafe_cstr_ptr(),
     )
-    _ = err^
+    del err^
     return PythonObject(PyObjectPtr())
 
 

@@ -484,7 +484,7 @@ struct VariadicPack[
 
     Parameters:
         elt_is_mutable: True if the elements of the list are mutable for an
-                        inout or owned argument pack.
+            inout or owned argument pack.
         origin: The reference origin of the underlying elements.
         element_trait: The trait that each element of the pack conforms to.
         element_types: The list of types held by the argument pack.
@@ -526,13 +526,13 @@ struct VariadicPack[
         # Immutable variadics never own the memory underlying them,
         # microoptimize out a check of _is_owned.
         @parameter
-        if Bool(elt_is_mutable):
+        if elt_is_mutable:
             # If the elements are unowned, just return.
             if not self._is_owned:
                 return
 
             @parameter
-            for i in reversed(range(Self.__len__())):
+            for i in reversed(range(len(Self))):
                 UnsafePointer.address_of(self[i]).destroy_pointee()
 
     # ===-------------------------------------------------------------------===#

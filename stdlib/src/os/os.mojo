@@ -154,7 +154,7 @@ struct _DirHandle:
             if name_str == "." or name_str == "..":
                 continue
             res.append(name_str)
-            _ = name^
+            del name^
 
         return res
 
@@ -180,7 +180,7 @@ struct _DirHandle:
             if name_str == "." or name_str == "..":
                 continue
             res.append(name_str)
-            _ = name^
+            del name^
 
         return res
 

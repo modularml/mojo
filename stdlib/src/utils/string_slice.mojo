@@ -882,7 +882,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
                 continue
             else:
                 return False
-        _ = next_line, unicode_line_sep, unicode_paragraph_sep
+        del (next_line^, unicode_line_sep^, unicode_paragraph_sep^)
         return True
 
     fn isnewline[single_character: Bool = False](self) -> Bool:
@@ -1348,7 +1348,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 conversion_flag not in Self.supported_conversion_flags
             ):
                 var f = String(_build_slice(field_ptr, new_idx, field_len))
-                _ = field^
+                del field^
                 raise Error('Conversion flag "' + f + '" not recognised.')
             self.conversion_flag = conversion_flag
             field = _build_slice(field_ptr, 0, exclamation_index)

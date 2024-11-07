@@ -875,7 +875,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             break
 
         if key:
-            _ = self.pop(key.value())
+            del self.pop(key.value())^
             return DictEntry[K, V](key.value(), val.value())
 
         raise "KeyError: popitem(): dictionary is empty"

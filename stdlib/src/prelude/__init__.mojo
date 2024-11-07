@@ -14,7 +14,7 @@
   that are automatically imported into every Mojo program.
 """
 
-from builtin.anytype import AnyType
+from builtin.anytype import AnyType, del
 from builtin.bool import Boolable, ImplicitlyBoolable, Bool, bool, any, all
 from builtin.breakpoint import breakpoint
 from builtin.builtin_list import (

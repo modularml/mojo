@@ -593,7 +593,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for _ in range(len(self)):
             # Can't fail from an empty set
             try:
-                _ = self.pop()
+                del self.pop()^
             except:
                 pass
 

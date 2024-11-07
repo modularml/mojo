@@ -1462,7 +1462,7 @@ struct PythonObject(
             cpython.PyUnicode_AsUTF8AndSize(python_str.py_object)
         )
         # keep python object alive so the copy can occur
-        _ = python_str
+        del python_str^
         return mojo_str
 
     fn write_to[W: Writer](self, inout writer: W):
@@ -1523,7 +1523,7 @@ struct PythonObject(
         var result = UnsafePointer.address_of(tmp).bitcast[
             UnsafePointer[Scalar[type]]
         ]()[]
-        _ = tmp
+        del tmp^
         return result
 
     fn _get_ptr_as_int(self) -> Int:

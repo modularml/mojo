@@ -171,7 +171,7 @@ fn gather[
         mask,
         passthrough,
     )
-    _ = base
+    del base^
     return result
 
 
@@ -250,7 +250,7 @@ fn scatter[
         Int32(alignment),
         mask,
     )
-    _ = base
+    del base^
 
 
 # ===----------------------------------------------------------------------===#

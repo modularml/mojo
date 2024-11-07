@@ -337,7 +337,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var key = key_ref[]
             if key not in other:
                 try:
-                    _ = self.pop(key)
+                    del self.pop(key)^
                 except:
                     pass  # this should not happen
             else:
@@ -386,7 +386,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var key = key_ref[]
             if self.get(key, 0) <= 0:
                 try:
-                    _ = self.pop(key)
+                    del self.pop(key)^
                 except:
                     pass  # this should not happen
 

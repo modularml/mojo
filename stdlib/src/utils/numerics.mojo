@@ -404,7 +404,7 @@ struct FlushDenormals:
             llvm_intrinsic["llvm.x86.sse.ldmxcsr", NoneType](
                 UnsafePointer[Int32].address_of(mxcsr)
             )
-            _ = mxcsr
+            del mxcsr^
             return
 
         alias ARM_FPCR_FZ = Int64(1) << 24

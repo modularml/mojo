@@ -1050,7 +1050,7 @@ struct CPython:
             self._Py_REFCNT(value),
         )
 
-        _ = v
+        del v^
         return PyKeysValuePair {
             key: key,
             value: value,
@@ -1817,9 +1817,7 @@ struct CPython:
         )
 
         self._inc_total_rc()
-        _ = type
-        _ = value
-        _ = traceback
+        del (type^, value^, traceback^)
         return r
 
     fn PyErr_SetNone(inout self, type: PyObjectPtr):

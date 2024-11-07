@@ -225,7 +225,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
             result_type
         ]()[]
-        _ = opaque_function_ptr
+        del opaque_function_ptr^
         return result
 
     @always_inline
@@ -405,7 +405,7 @@ fn _get_dylib_function[
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
         var result = UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
-        _ = func_ptr
+        del func_ptr^
         return result
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)

@@ -363,9 +363,7 @@ fn sleep(sec: Float64):
     var req = UnsafePointer[_CTimeSpec].address_of(tv_spec)
     var rem = UnsafePointer[_CTimeSpec]()
     _ = external_call["nanosleep", Int32](req, rem)
-    _ = tv_spec
-    _ = req
-    _ = rem
+    del (tv_spec^, req^, rem^)
 
 
 fn sleep(sec: Int):

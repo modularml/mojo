@@ -213,7 +213,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
             UnsafePointer.address_of(arrayCopy).address, idx.__mlir_index__()
         )
         var result = UnsafePointer(ptr)[]
-        _ = arrayCopy
+        del arrayCopy^
         return result
 
     @always_inline("nodebug")

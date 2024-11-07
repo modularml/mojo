@@ -205,7 +205,7 @@ fn store_incomplete_simd[
     ]()
 
     memcpy(dest=pointer, src=tmp_buffer_pointer, count=nb_of_elements_to_store)
-    _ = simd_vector  # We make it live long enough
+    del simd_vector^  # We make it live long enough
 
 
 # TODO: Use Span instead of List as input when Span is easier to use
