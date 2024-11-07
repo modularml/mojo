@@ -395,7 +395,7 @@ struct DummyKey(KeyElement):
         self = other
 
     fn __hash__(self) -> UInt:
-        return self.value
+        return self.value.value
 
     fn __eq__(self, other: DummyKey) -> Bool:
         return self.value == other.value
