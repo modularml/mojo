@@ -27,7 +27,7 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 # ===----------------------------------------------------------------------=== #
 
 
-trait UIntable(CollectionElement):
+trait UIntable:
     """The `UIntable` trait describes a type that can be converted to a `UInt`.
     """
 
@@ -45,7 +45,7 @@ trait UIntableRaising:
     but the conversion might raise an error.
     """
 
-    fn __uint__(self) raises -> Int:
+    fn __uint__(self) raises -> UInt:
         """Get the unsigned integral representation of the value.
 
         Returns:
@@ -95,30 +95,6 @@ fn uint[T: UIntableRaising](value: T) raises -> UInt:
         If the type does not have an integral representation.
     """
     return value.__uint__()
-
-
-fn uint(value: IntLiteral) -> UInt:
-    """Get the UInt representation of the value.
-
-    Args:
-        value: The object to get the integral representation of.
-
-    Returns:
-        The unsigned integral representation of the value.
-    """
-    return value.__uint__()
-
-
-fn uint[T: IntLike](value: T) -> UInt:
-    """Get the UInt representation of the value.
-
-    Args:
-        value: The object to get the integral representation of.
-
-    Returns:
-        The unsigned integral representation of the value.
-    """
-    return value.__mlir_index__()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -220,6 +196,24 @@ struct UInt(IntLike, _HashableWithHasher):
             The corresponding __mlir_type.index value.
         """
         return self.value
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Gets the integral value.
+
+        Returns:
+            The value as an integer.
+        """
+        return self.value
+
+    @always_inline("nodebug")
+    fn __uint__(self) -> UInt:
+        """Gets the unsigned integral value.
+
+        Returns:
+            The value as an unsigned integer.
+        """
+        return self
 
     @no_inline
     fn __str__(self) -> String:

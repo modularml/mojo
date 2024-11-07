@@ -261,18 +261,6 @@ fn int(value: String, base: Int = 10) raises -> Int:
     return atol(value, base)
 
 
-fn int[T: IntLike](value: T) -> Int:
-    """Get the Int representation of the value.
-
-    Args:
-        value: The object to get the integral representation of.
-
-    Returns:
-        The integral representation of the value.
-    """
-    return value.__mlir_index__()
-
-
 # ===----------------------------------------------------------------------=== #
 #  Int
 # ===----------------------------------------------------------------------=== #
@@ -1020,12 +1008,21 @@ struct Int(
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
-        """Gets the integral value (this is an identity function for Int).
+        """Gets the integral value.
 
         Returns:
             The value as an integer.
         """
         return self
+
+    @always_inline("nodebug")
+    fn __uint__(self) -> UInt:
+        """Gets the unsigned integral value.
+
+        Returns:
+            The value as an unsigned integer.
+        """
+        return self.value
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self:
