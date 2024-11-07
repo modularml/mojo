@@ -329,8 +329,8 @@ struct DType(
             return False
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned.value),
-                UInt8(0).value,
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned._value),
+                UInt8(0)._value,
             )
         )
 
@@ -347,8 +347,8 @@ struct DType(
             return False
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned.value),
-                UInt8(0).value,
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsSigned._value),
+                UInt8(0)._value,
             )
         )
 
@@ -361,8 +361,8 @@ struct DType(
         """
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsInteger.value),
-                UInt8(0).value,
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsInteger._value),
+                UInt8(0)._value,
             )
         )
 
@@ -389,8 +389,8 @@ struct DType(
             return False
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsFloat.value),
-                UInt8(0).value,
+                __mlir_op.`pop.simd.and`(self._as_i8(), _mIsFloat._value),
+                UInt8(0)._value,
             )
         )
 
@@ -439,15 +439,15 @@ struct DType(
             return int(
                 UInt8(
                     __mlir_op.`pop.shl`(
-                        UInt8(1).value,
+                        UInt8(1)._value,
                         __mlir_op.`pop.sub`(
                             __mlir_op.`pop.shr`(
                                 __mlir_op.`pop.simd.and`(
-                                    self._as_i8(), _mIsNotInteger.value
+                                    self._as_i8(), _mIsNotInteger._value
                                 ),
-                                UInt8(1).value,
+                                UInt8(1)._value,
                             ),
-                            UInt8(3).value,
+                            UInt8(3)._value,
                         ),
                     )
                 )

@@ -84,7 +84,7 @@ struct Atomic[type: DType]:
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](
             ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]().address,
-            rhs.value,
+            rhs._value,
         )
 
     @always_inline
@@ -137,12 +137,12 @@ struct Atomic[type: DType]:
         Returns:
             The original value before subtraction.
         """
-        var value_addr = UnsafePointer.address_of(self.value.value)
+        var value_addr = UnsafePointer.address_of(self.value._value)
         return __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op sub>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-        ](value_addr.address, rhs.value)
+        ](value_addr.address, rhs._value)
 
     @always_inline
     fn __isub__(inout self, rhs: Scalar[type]):
@@ -301,8 +301,8 @@ fn _compare_exchange_weak_integral_impl[
         value_addr.bitcast[
             __mlir_type[`!pop.scalar<`, type.value, `>`]
         ]().address,
-        expected.value,
-        desired.value,
+        expected._value,
+        desired._value,
     )
     var ok = Bool(
         __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
@@ -323,7 +323,7 @@ fn _max_impl_base[
         bin_op = __mlir_attr.`#pop<bin_op max>`,
         ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
         _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-    ](value_addr.address, rhs.value)
+    ](value_addr.address, rhs._value)
 
 
 @always_inline
@@ -335,7 +335,7 @@ fn _min_impl_base[
         bin_op = __mlir_attr.`#pop<bin_op min>`,
         ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
         _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
-    ](value_addr.address, rhs.value)
+    ](value_addr.address, rhs._value)
 
 
 @always_inline

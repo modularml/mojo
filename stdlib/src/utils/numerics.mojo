@@ -569,7 +569,7 @@ fn isnan[
     alias quiet_nan_test: UInt32 = 0x0002
     return llvm_intrinsic[
         "llvm.is.fpclass", SIMD[DType.bool, simd_width], has_side_effect=False
-    ](val.value, (signaling_nan_test | quiet_nan_test))
+    ](val._value, (signaling_nan_test | quiet_nan_test))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -888,7 +888,7 @@ fn isinf[
     alias negative_infinity_test: UInt32 = 0x0004
     alias positive_infinity_test: UInt32 = 0x0200
     return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
-        val.value, (negative_infinity_test | positive_infinity_test)
+        val._value, (negative_infinity_test | positive_infinity_test)
     )
 
 
@@ -921,7 +921,7 @@ fn isfinite[
         return True
 
     return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
-        val.value, UInt32(0x1F8)
+        val._value, UInt32(0x1F8)
     )
 
 
