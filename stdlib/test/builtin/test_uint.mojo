@@ -153,7 +153,7 @@ def test_round():
     assert_equal(
         UInt.__round__(UInt(Int(-5).value), UInt(1)), UInt(Int(-5).value)
     )
-    assert_equal(UInt.__round__(UInt(100), UInt(Int(-2))), UInt(100))
+    assert_equal(UInt.__round__(UInt(100), UInt(Int(-2).value)), UInt(100))
 
 
 def test_trunc():
@@ -205,15 +205,15 @@ def test_abs():
 
 def test_string_conversion():
     assert_equal(UInt(3).__str__(), "3")
-    assert_equal(UInt(Int(-3)).__str__(), "18446744073709551613")
+    assert_equal(UInt(Int(-3).value).__str__(), "18446744073709551613")
     assert_equal(UInt(0).__str__(), "0")
     assert_equal(UInt(100).__str__(), "100")
-    assert_equal(UInt(Int(-100)).__str__(), "18446744073709551516")
+    assert_equal(UInt(Int(-100).value).__str__(), "18446744073709551516")
 
 
 def test_int_representation():
     assert_equal(UInt(3).__repr__(), "UInt(3)")
-    assert_equal(UInt(Int(-3)).__repr__(), "UInt(18446744073709551613)")
+    assert_equal(UInt(Int(-3).value).__repr__(), "UInt(18446744073709551613)")
     assert_equal(UInt(0).__repr__(), "UInt(0)")
     assert_equal(UInt(100).__repr__(), "UInt(100)")
     assert_equal(UInt(Int(-100).value).__repr__(), "UInt(18446744073709551516)")
