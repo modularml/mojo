@@ -88,7 +88,9 @@ struct UInt(IntLike, _HashableWithHasher):
             value: The init value.
         """
         debug_assert(
-            value >= 0, "Constructing UInt from negative Int is discouraged."
+            value >= 0,
+            "Constructing UInt from negative Int is discouraged, ",
+            "use the MLIR value constructor if you are sure.",
         )
         self.value = value.value
 
@@ -100,7 +102,9 @@ struct UInt(IntLike, _HashableWithHasher):
             value: The init value.
         """
         debug_assert(
-            value >= 0, "Constructing UInt from negative Int is discouraged."
+            value >= 0,
+            "Constructing UInt from negative Int is discouraged, ",
+            "use the MLIR value constructor if you are sure.",
         )
         self = value.__uint__()
 

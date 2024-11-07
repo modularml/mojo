@@ -97,18 +97,25 @@ def test_properties():
 
 def test_add():
     assert_equal(UInt.__add__(UInt(3), UInt(3)), UInt(6))
-    assert_equal(UInt.__add__(UInt(Int(-2)), UInt(3)), UInt(1))
-    assert_equal(UInt.__add__(UInt(2), UInt(Int(-3))), UInt(Int(-1)))
-    assert_equal(UInt.__add__(UInt(5), UInt(Int(-5))), UInt(0))
-    assert_equal(UInt.__add__(UInt(Int(-5)), UInt(Int(-4))), UInt(Int(-9)))
+    assert_equal(UInt.__add__(UInt(Int(-2).value), UInt(3)), UInt(1))
+    assert_equal(
+        UInt.__add__(UInt(2), UInt(Int(-3).value)), UInt(Int(-1).value)
+    )
+    assert_equal(UInt.__add__(UInt(5), UInt(Int(-5).value)), UInt(0))
+    assert_equal(
+        UInt.__add__(UInt(Int(-5).value), UInt(Int(-4).value)),
+        UInt(Int(-9).value),
+    )
 
 
 def test_sub():
     assert_equal(UInt.__sub__(UInt(3), UInt(3)), UInt(0))
-    assert_equal(UInt.__sub__(UInt(Int(-2)), UInt(3)), UInt(Int(-5)))
-    assert_equal(UInt.__sub__(UInt(2), UInt(Int(-3))), UInt(5))
+    assert_equal(
+        UInt.__sub__(UInt(Int(-2).value), UInt(3)), UInt(Int(-5).value)
+    )
+    assert_equal(UInt.__sub__(UInt(2), UInt(Int(-3).value)), UInt(5))
     assert_equal(UInt.__sub__(UInt(5), UInt(4)), UInt(1))
-    assert_equal(UInt.__sub__(UInt(4), UInt(5)), UInt(Int(-1)))
+    assert_equal(UInt.__sub__(UInt(4), UInt(5)), UInt(Int(-1).value))
 
 
 def test_div():
@@ -128,22 +135,24 @@ def test_pow():
 def test_ceil():
     assert_equal(UInt.__ceil__(UInt(5)), UInt(5))
     assert_equal(UInt.__ceil__(UInt(0)), UInt(0))
-    assert_equal(UInt.__ceil__(UInt(Int(-5))), UInt(Int(-5)))
+    assert_equal(UInt.__ceil__(UInt(Int(-5).value)), UInt(Int(-5).value))
 
 
 def test_floor():
     assert_equal(UInt.__floor__(UInt(5)), UInt(5))
     assert_equal(UInt.__floor__(UInt(0)), UInt(0))
-    assert_equal(UInt.__floor__(UInt(Int(-5))), UInt(Int(-5)))
+    assert_equal(UInt.__floor__(UInt(Int(-5).value)), UInt(Int(-5).value))
 
 
 def test_round():
     assert_equal(UInt.__round__(UInt(5)), UInt(5))
     assert_equal(UInt.__round__(UInt(0)), UInt(0))
-    assert_equal(UInt.__round__(UInt(Int(-5))), UInt(Int(-5)))
+    assert_equal(UInt.__round__(UInt(Int(-5).value)), UInt(Int(-5).value))
     assert_equal(UInt.__round__(UInt(5), UInt(1)), UInt(5))
     assert_equal(UInt.__round__(UInt(0), UInt(1)), UInt(0))
-    assert_equal(UInt.__round__(UInt(Int(-5)), UInt(1)), UInt(Int(-5)))
+    assert_equal(
+        UInt.__round__(UInt(Int(-5).value), UInt(1)), UInt(Int(-5).value)
+    )
     assert_equal(UInt.__round__(UInt(100), UInt(Int(-2))), UInt(100))
 
 
@@ -156,20 +165,20 @@ def test_floordiv():
     assert_equal(UInt(1), UInt.__floordiv__(UInt(2), UInt(2)))
     assert_equal(UInt(0), UInt.__floordiv__(UInt(2), UInt(3)))
     assert_equal(UInt(2), UInt.__floordiv__(UInt(100), UInt(50)))
-    assert_equal(UInt(0), UInt.__floordiv__(UInt(2), UInt(Int(-2))))
-    assert_equal(UInt(0), UInt.__floordiv__(UInt(99), UInt(Int(-2))))
+    assert_equal(UInt(0), UInt.__floordiv__(UInt(2), UInt(Int(-2).value)))
+    assert_equal(UInt(0), UInt.__floordiv__(UInt(99), UInt(Int(-2).value)))
 
 
 def test_mod():
     assert_equal(UInt(0), UInt.__mod__(UInt(99), UInt(1)))
     assert_equal(UInt(0), UInt.__mod__(UInt(99), UInt(3)))
-    assert_equal(UInt(99), UInt.__mod__(UInt(99), UInt(Int(-2))))
+    assert_equal(UInt(99), UInt.__mod__(UInt(99), UInt(Int(-2).value)))
     assert_equal(UInt(3), UInt.__mod__(UInt(99), UInt(8)))
-    assert_equal(UInt(99), UInt.__mod__(UInt(99), UInt(Int(-8))))
-    assert_equal(UInt(2), UInt.__mod__(UInt(2), UInt(Int(-1))))
-    assert_equal(UInt(2), UInt.__mod__(UInt(2), UInt(Int(-2))))
-    assert_equal(UInt(3), UInt.__mod__(UInt(3), UInt(Int(-2))))
-    assert_equal(UInt(1), UInt.__mod__(UInt(Int(-3)), UInt(2)))
+    assert_equal(UInt(99), UInt.__mod__(UInt(99), UInt(Int(-8).value)))
+    assert_equal(UInt(2), UInt.__mod__(UInt(2), UInt(Int(-1).value)))
+    assert_equal(UInt(2), UInt.__mod__(UInt(2), UInt(Int(-2).value)))
+    assert_equal(UInt(3), UInt.__mod__(UInt(3), UInt(Int(-2).value)))
+    assert_equal(UInt(1), UInt.__mod__(UInt(Int(-3).value), UInt(2)))
 
 
 def test_divmod():
@@ -189,7 +198,7 @@ def test_divmod():
 
 
 def test_abs():
-    assert_equal(UInt(Int(-5)).__abs__(), UInt(18446744073709551611))
+    assert_equal(UInt(Int(-5).value).__abs__(), UInt(18446744073709551611))
     assert_equal(UInt(2).__abs__(), UInt(2))
     assert_equal(UInt(0).__abs__(), UInt(0))
 
@@ -207,7 +216,7 @@ def test_int_representation():
     assert_equal(UInt(Int(-3)).__repr__(), "UInt(18446744073709551613)")
     assert_equal(UInt(0).__repr__(), "UInt(0)")
     assert_equal(UInt(100).__repr__(), "UInt(100)")
-    assert_equal(UInt(Int(-100)).__repr__(), "UInt(18446744073709551516)")
+    assert_equal(UInt(Int(-100).value).__repr__(), "UInt(18446744073709551516)")
 
 
 def test_indexer():

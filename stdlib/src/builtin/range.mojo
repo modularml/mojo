@@ -389,7 +389,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
             step != 0, "range() arg 3 (the step size) must not be zero"
         )
         debug_assert(
-            step != UInt(Int(-1)),
+            step != UInt(Int(-1).value),
             (
                 "range() arg 3 (the step size) cannot be -1.  Reverse range is"
                 " not supported yet for UInt ranges."
