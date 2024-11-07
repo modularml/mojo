@@ -1109,9 +1109,9 @@ struct Int(
         """Hash the int using builtin hash.
 
         Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
+            A 64-bit hash value. This value is **_not_** suitable for
+            cryptographic uses. Its intended usage is for data structures. See
+            the `hash` builtin documentation for more details.
         """
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.int64](self))
