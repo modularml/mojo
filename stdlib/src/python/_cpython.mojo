@@ -195,7 +195,7 @@ struct PyObjectPtr:
     # ===-------------------------------------------------------------------===#
 
     fn try_cast_to_mojo_value[
-        T: Pythonable,
+        T: AnyType,
     ](
         owned self,
         # TODO: Make this part of the trait bound
@@ -218,14 +218,12 @@ struct PyObjectPtr:
             return None
 
     fn unchecked_cast_to_mojo_object[
-        T: Pythonable
+        T: AnyType
     ](owned self) -> UnsafePointer[PyMojoObject[T]]:
         """Assume that this Python object contains a wrapped Mojo value."""
         return self.unsized_obj_ptr.bitcast[PyMojoObject[T]]()
 
-    fn unchecked_cast_to_mojo_value[
-        T: Pythonable
-    ](owned self) -> UnsafePointer[T]:
+    fn unchecked_cast_to_mojo_value[T: AnyType](owned self) -> UnsafePointer[T]:
         var mojo_obj_ptr = self.unchecked_cast_to_mojo_object[T]()
 
         # TODO(MSTDL-950): Should use something like `addr_of!`
@@ -315,7 +313,7 @@ struct PyMethodDef:
 
     var method_name: UnsafePointer[c_char]
     """A pointer to the name of the method as a C string.
-    
+
     Notes:
         called `ml_name` in CPython.
     """
