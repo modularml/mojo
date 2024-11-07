@@ -122,12 +122,12 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/lz4-c-1.9.4-hcb278e6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/markdown-it-py-3.0.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/markupsafe-3.0.2-py312h178313f_0.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110605-release.conda
-      - conda: https://conda.modular.com/max-nightly/linux-64/max-core-24.6.0.dev2024110605-release.conda
-      - conda: https://conda.modular.com/max-nightly/linux-64/max-python-24.6.0.dev2024110605-3.12release.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110605-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110705-release.conda
+      - conda: https://conda.modular.com/max-nightly/linux-64/max-core-24.6.0.dev2024110705-release.conda
+      - conda: https://conda.modular.com/max-nightly/linux-64/max-python-24.6.0.dev2024110705-3.12release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110705-release.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/mdurl-0.1.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110605-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110705-release.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/multidict-6.1.0-py312h178313f_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/multiprocess-0.70.15-py312h98912ed_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.0.0-pyha770c72_0.conda
@@ -137,6 +137,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-api-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-otlp-proto-common-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-otlp-proto-http-1.27.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-prometheus-1.12.0rc1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-proto-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-sdk-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-semantic-conventions-0.48b0-pyhd8ed1ab_0.conda
@@ -145,6 +146,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pandas-2.2.3-py312hf9745cd_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-0.12.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.3.6-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.21.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/propcache-0.2.0-py312h66e93f0_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/protobuf-4.25.3-py312h83439f5_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyarrow-17.0.0-py312h9cebb41_2.conda
@@ -168,7 +170,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyzmq-26.2.0-py312hbf22597_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/re2-2023.09.01-h7f4b329_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8228510_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/regex-2024.9.11-py312h66e93f0_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/regex-2024.11.6-py312h66e93f0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/requests-2.32.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/rich-13.9.4-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/s2n-1.5.5-h3931f03_0.conda
@@ -183,7 +185,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.13-noxft_h4845f30_101.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tokenizers-0.20.3-py312h8360d73_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tornado-6.4.1-py312h66e93f0_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.66.6-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.67.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/traitlets-5.14.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/transformers-4.46.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/typer-0.12.5-pyhd8ed1ab_0.conda
@@ -324,12 +326,12 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/lz4-c-1.9.4-hd600fc2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/markdown-it-py-3.0.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/markupsafe-3.0.2-py312h74ce7d3_0.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110605-release.conda
-      - conda: https://conda.modular.com/max-nightly/linux-aarch64/max-core-24.6.0.dev2024110605-release.conda
-      - conda: https://conda.modular.com/max-nightly/linux-aarch64/max-python-24.6.0.dev2024110605-3.12release.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110605-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110705-release.conda
+      - conda: https://conda.modular.com/max-nightly/linux-aarch64/max-core-24.6.0.dev2024110705-release.conda
+      - conda: https://conda.modular.com/max-nightly/linux-aarch64/max-python-24.6.0.dev2024110705-3.12release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110705-release.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/mdurl-0.1.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110605-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110705-release.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/multidict-6.1.0-py312hcc812fe_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/multiprocess-0.70.15-py312hdd3e373_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.0.0-pyha770c72_0.conda
@@ -339,6 +341,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-api-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-otlp-proto-common-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-otlp-proto-http-1.27.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-prometheus-1.12.0rc1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-proto-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-sdk-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-semantic-conventions-0.48b0-pyhd8ed1ab_0.conda
@@ -347,6 +350,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pandas-2.2.3-py312ha2895bd_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-0.12.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.3.6-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.21.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/propcache-0.2.0-py312hb2c0f52_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/protobuf-4.25.3-py312h8a04735_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyarrow-17.0.0-py312h55cb1a1_2.conda
@@ -370,7 +374,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/pyzmq-26.2.0-py312h2427ae1_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/re2-2023.09.01-h9caee61_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/readline-8.2-h8fc344f_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/regex-2024.9.11-py312hb2c0f52_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/regex-2024.11.6-py312hb2c0f52_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/requests-2.32.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/rich-13.9.4-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/s2n-1.5.5-hc6ade00_0.conda
@@ -385,7 +389,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/tk-8.6.13-h194ca79_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/tokenizers-0.20.3-py312ha0d6ea1_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/tornado-6.4.1-py312h52516f5_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.66.6-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.67.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/traitlets-5.14.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/transformers-4.46.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/typer-0.12.5-pyhd8ed1ab_0.conda
@@ -517,12 +521,12 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/lz4-c-1.9.4-hb7217d7_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/markdown-it-py-3.0.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/markupsafe-3.0.2-py312ha0ccf2a_0.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110605-release.conda
-      - conda: https://conda.modular.com/max-nightly/osx-arm64/max-core-24.6.0.dev2024110605-release.conda
-      - conda: https://conda.modular.com/max-nightly/osx-arm64/max-python-24.6.0.dev2024110605-3.12release.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110605-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110705-release.conda
+      - conda: https://conda.modular.com/max-nightly/osx-arm64/max-core-24.6.0.dev2024110705-release.conda
+      - conda: https://conda.modular.com/max-nightly/osx-arm64/max-python-24.6.0.dev2024110705-3.12release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110705-release.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/mdurl-0.1.2-pyhd8ed1ab_0.conda
-      - conda: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110605-release.conda
+      - conda: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110705-release.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/multidict-6.1.0-py312hdb8e49c_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/multiprocess-0.70.15-py312h02f2b3b_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/mypy_extensions-1.0.0-pyha770c72_0.conda
@@ -532,6 +536,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-api-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-otlp-proto-common-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-otlp-proto-http-1.27.0-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-prometheus-1.12.0rc1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-proto-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-sdk-1.27.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-semantic-conventions-0.48b0-pyhd8ed1ab_0.conda
@@ -540,6 +545,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pandas-2.2.3-py312hcd31e36_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pathspec-0.12.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/platformdirs-4.3.6-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.21.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/propcache-0.2.0-py312h024a12e_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/protobuf-4.25.3-py312he4aa971_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyarrow-17.0.0-py312ha814d7c_2.conda
@@ -563,7 +569,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyzmq-26.2.0-py312hf8a1cbd_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/re2-2023.09.01-h4cba328_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/readline-8.2-h92ec313_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/regex-2024.9.11-py312h024a12e_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/regex-2024.11.6-py312hea69d52_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/requests-2.32.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/rich-13.9.4-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/safetensors-0.4.5-py312he431725_0.conda
@@ -577,7 +583,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tk-8.6.13-h5083fa2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tokenizers-0.20.3-py312hf3e4074_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tornado-6.4.1-py312h024a12e_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.66.6-pyhd8ed1ab_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.67.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/traitlets-5.14.3-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/transformers-4.46.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/typer-0.12.5-pyhd8ed1ab_0.conda
@@ -5352,76 +5358,76 @@ packages:
   timestamp: 1729351534830
 - kind: conda
   name: max
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: release
   subdir: noarch
   noarch: python
-  url: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110605-release.conda
-  sha256: 1ea0dc89ca870e0a3c07b8b114552cf7f2027da77d123461536e47d9c1634b29
-  md5: 2550d99437980c05b27fd7dd5af4a8fb
+  url: https://conda.modular.com/max-nightly/noarch/max-24.6.0.dev2024110705-release.conda
+  sha256: 7e97b011b75ef260c44820b6cbe26e522ba4aa9d63455a8a08c77cd9d070d2c5
+  md5: d621bc334a806e596fff24151dcb2421
   depends:
-  - max-core ==24.6.0.dev2024110605 release
-  - max-python >=24.6.0.dev2024110605,<25.0a0
-  - mojo-jupyter ==24.6.0.dev2024110605 release
-  - mblack ==24.6.0.dev2024110605 release
+  - max-core ==24.6.0.dev2024110705 release
+  - max-python >=24.6.0.dev2024110705,<25.0a0
+  - mojo-jupyter ==24.6.0.dev2024110705 release
+  - mblack ==24.6.0.dev2024110705 release
   license: LicenseRef-Modular-Proprietary
   size: 9925
-  timestamp: 1730870435927
+  timestamp: 1730956759269
 - kind: conda
   name: max-core
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: release
   subdir: linux-64
-  url: https://conda.modular.com/max-nightly/linux-64/max-core-24.6.0.dev2024110605-release.conda
-  sha256: 9c73e9704f605597eb934d073ed47b51bbbc478e7fc61bb5a81d6274e20424c9
-  md5: 9b106fdf79de7e28aea5f87f37f8b14c
+  url: https://conda.modular.com/max-nightly/linux-64/max-core-24.6.0.dev2024110705-release.conda
+  sha256: bfc9eaa3999be24295096bef0434a8e787e73ff23bfe4e49675d316b1992479f
+  md5: cb9219fad7323829bc591bb84c822f5d
   depends:
-  - mblack ==24.6.0.dev2024110605 release
+  - mblack ==24.6.0.dev2024110705 release
   arch: x86_64
   platform: linux
   license: LicenseRef-Modular-Proprietary
-  size: 249918952
-  timestamp: 1730870435925
+  size: 250018898
+  timestamp: 1730956759268
 - kind: conda
   name: max-core
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: release
   subdir: linux-aarch64
-  url: https://conda.modular.com/max-nightly/linux-aarch64/max-core-24.6.0.dev2024110605-release.conda
-  sha256: e51712451719a1abe82e210c9c4746e0efb98cc39c1b98d6f0c650dae57876ff
-  md5: 484178e675e74c28aa901b6b63e891a0
+  url: https://conda.modular.com/max-nightly/linux-aarch64/max-core-24.6.0.dev2024110705-release.conda
+  sha256: c227302f08e206733be945b3c40895bd002c70b141c978de8499525c9c66032d
+  md5: 617873e11beeddb3d0e162bf7d4e2832
   depends:
-  - mblack ==24.6.0.dev2024110605 release
+  - mblack ==24.6.0.dev2024110705 release
   arch: aarch64
   platform: linux
   license: LicenseRef-Modular-Proprietary
-  size: 253754305
-  timestamp: 1730870417979
+  size: 253885370
+  timestamp: 1730956878532
 - kind: conda
   name: max-core
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: release
   subdir: osx-arm64
-  url: https://conda.modular.com/max-nightly/osx-arm64/max-core-24.6.0.dev2024110605-release.conda
-  sha256: b28b8d31cf97ef7b0845846593bcaf347c06c310d9964e2c1528fc93cc38dc9d
-  md5: f821af8af4dbbde26a1da3263989f235
+  url: https://conda.modular.com/max-nightly/osx-arm64/max-core-24.6.0.dev2024110705-release.conda
+  sha256: 34313cee93fe531bd5460da02e5fc3aff0fd5cb54196f2b12ad60df8486a5718
+  md5: c0c14b75691c3c7f38e4ea3f91fdc585
   depends:
-  - mblack ==24.6.0.dev2024110605 release
+  - mblack ==24.6.0.dev2024110705 release
   arch: arm64
   platform: osx
   license: LicenseRef-Modular-Proprietary
-  size: 214052557
-  timestamp: 1730870539271
+  size: 214141550
+  timestamp: 1730956669387
 - kind: conda
   name: max-python
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: 3.12release
   subdir: linux-64
-  url: https://conda.modular.com/max-nightly/linux-64/max-python-24.6.0.dev2024110605-3.12release.conda
-  sha256: ebf536894d004691e87ff622ea3925dafc9efd8c50a6b0c8aa2013bbaaf586ff
-  md5: 0ad551861bf58aba11998a62c3939fc0
+  url: https://conda.modular.com/max-nightly/linux-64/max-python-24.6.0.dev2024110705-3.12release.conda
+  sha256: 18a1c3a763ba1f42d8ddfa514280747ac4b88ada4fd774acf3e56d1214871d6d
+  md5: 8387513b515fdfd7be82c9d197442a7d
   depends:
-  - max-core ==24.6.0.dev2024110605 release
+  - max-core ==24.6.0.dev2024110705 release
   - python 3.12.*
   - numpy >=1.18,<2.0
   - fastapi
@@ -5430,23 +5436,24 @@ packages:
   - transformers
   - opentelemetry-sdk >=1.27.0
   - opentelemetry-exporter-otlp-proto-http >=1.27.0
+  - opentelemetry-exporter-prometheus >=0.48b0
   - python-json-logger
   - python_abi 3.12.* *_cp312
   arch: x86_64
   platform: linux
   license: LicenseRef-Modular-Proprietary
-  size: 125091238
-  timestamp: 1730870435936
+  size: 125113593
+  timestamp: 1730956759279
 - kind: conda
   name: max-python
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: 3.12release
   subdir: linux-aarch64
-  url: https://conda.modular.com/max-nightly/linux-aarch64/max-python-24.6.0.dev2024110605-3.12release.conda
-  sha256: b5411b0e9fe3924fc0ad13f7d33f37ce0237831037c33406dc4f6721163aeda3
-  md5: 57ece5d07d421be25a9ccb6b1713e95c
+  url: https://conda.modular.com/max-nightly/linux-aarch64/max-python-24.6.0.dev2024110705-3.12release.conda
+  sha256: ee846e6c5e51088814b99cfed9e9aa9a9d00360c35e0610b0b74684bdddbba22
+  md5: 91332cdc8322ba1bbf43defa36953fd4
   depends:
-  - max-core ==24.6.0.dev2024110605 release
+  - max-core ==24.6.0.dev2024110705 release
   - python 3.12.*
   - numpy >=1.18,<2.0
   - fastapi
@@ -5455,23 +5462,24 @@ packages:
   - transformers
   - opentelemetry-sdk >=1.27.0
   - opentelemetry-exporter-otlp-proto-http >=1.27.0
+  - opentelemetry-exporter-prometheus >=0.48b0
   - python-json-logger
   - python_abi 3.12.* *_cp312
   arch: aarch64
   platform: linux
   license: LicenseRef-Modular-Proprietary
-  size: 128641044
-  timestamp: 1730870417991
+  size: 128666576
+  timestamp: 1730956878544
 - kind: conda
   name: max-python
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: 3.12release
   subdir: osx-arm64
-  url: https://conda.modular.com/max-nightly/osx-arm64/max-python-24.6.0.dev2024110605-3.12release.conda
-  sha256: a44e24fe42594abd8ecb40441dc8ee96f3f80a80658f469b5760316fc8489dd8
-  md5: 2ed935cecf559d391496da0878382918
+  url: https://conda.modular.com/max-nightly/osx-arm64/max-python-24.6.0.dev2024110705-3.12release.conda
+  sha256: f4ffa64c55dd2677827264d1430bdd10cf2f48e0aaa0ce9ec6c7ab978ca71a85
+  md5: 0549e3929474934f006cbfbc1007a822
   depends:
-  - max-core ==24.6.0.dev2024110605 release
+  - max-core ==24.6.0.dev2024110705 release
   - python 3.12.*
   - numpy >=1.18,<2.0
   - fastapi
@@ -5480,22 +5488,23 @@ packages:
   - transformers
   - opentelemetry-sdk >=1.27.0
   - opentelemetry-exporter-otlp-proto-http >=1.27.0
+  - opentelemetry-exporter-prometheus >=0.48b0
   - python-json-logger
   - python_abi 3.12.* *_cp312
   arch: arm64
   platform: osx
   license: LicenseRef-Modular-Proprietary
-  size: 114808446
-  timestamp: 1730870539274
+  size: 114850962
+  timestamp: 1730956669390
 - kind: conda
   name: mblack
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: release
   subdir: noarch
   noarch: python
-  url: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110605-release.conda
-  sha256: 5a57b56bce08df93a312a2573640fa78243f858646cc15e94c12243160640948
-  md5: d879bf770a6e192452cb270422994729
+  url: https://conda.modular.com/max-nightly/noarch/mblack-24.6.0.dev2024110705-release.conda
+  sha256: 4bf6e18148f3230440b9888477d339e14c16d6cd2af0c4dc1fcdf81ddf2e36e9
+  md5: d658caade45b4ed683d67fa36b3b388c
   depends:
   - python >=3.9,<3.13
   - click >=8.0.0
@@ -5506,7 +5515,7 @@ packages:
   - python
   license: MIT
   size: 130423
-  timestamp: 1730870435932
+  timestamp: 1730956759274
 - kind: conda
   name: mdurl
   version: 0.1.2
@@ -5524,21 +5533,21 @@ packages:
   timestamp: 1704317789138
 - kind: conda
   name: mojo-jupyter
-  version: 24.6.0.dev2024110605
+  version: 24.6.0.dev2024110705
   build: release
   subdir: noarch
   noarch: python
-  url: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110605-release.conda
-  sha256: 1d198c3c1fdacf27951dabafdb6d1eebfd16137fa443a5768631f260a3e72da1
-  md5: bf4cab55725d54ec0faedc00e0b07e66
+  url: https://conda.modular.com/max-nightly/noarch/mojo-jupyter-24.6.0.dev2024110705-release.conda
+  sha256: cde930aec02b1d1fe79152bd42c6a3158176866de7081cf746def8d43e2e0924
+  md5: c9e58bf71dcceb81d362531c3f60fb4e
   depends:
-  - max-core ==24.6.0.dev2024110605 release
+  - max-core ==24.6.0.dev2024110705 release
   - python >=3.9,<3.13
   - jupyter_client >=8.6.2,<8.7
   - python
   license: LicenseRef-Modular-Proprietary
-  size: 22952
-  timestamp: 1730870435934
+  size: 22950
+  timestamp: 1730956759274
 - kind: conda
   name: multidict
   version: 6.1.0
@@ -5877,6 +5886,24 @@ packages:
   size: 16982
   timestamp: 1724969540619
 - kind: conda
+  name: opentelemetry-exporter-prometheus
+  version: 1.12.0rc1
+  build: pyhd8ed1ab_0
+  subdir: noarch
+  noarch: python
+  url: https://conda.anaconda.org/conda-forge/noarch/opentelemetry-exporter-prometheus-1.12.0rc1-pyhd8ed1ab_0.conda
+  sha256: b8239230dbbdb491401e41b53bd9f21d60551cedef1a8d5807fca1bf9bdd331c
+  md5: 1ddc95052b31147d1e10d818cf519cf5
+  depends:
+  - opentelemetry-api >=1.10.0
+  - opentelemetry-sdk >=1.10.0
+  - prometheus_client >=0.5.0,<1.0.0
+  - python >=3.6
+  license: Apache-2.0
+  license_family: APACHE
+  size: 14721
+  timestamp: 1695214221489
+- kind: conda
   name: opentelemetry-proto
   version: 1.27.0
   build: pyhd8ed1ab_0
@@ -6107,6 +6134,21 @@ packages:
   license_family: MIT
   size: 20625
   timestamp: 1726613611845
+- kind: conda
+  name: prometheus_client
+  version: 0.21.0
+  build: pyhd8ed1ab_0
+  subdir: noarch
+  noarch: python
+  url: https://conda.anaconda.org/conda-forge/noarch/prometheus_client-0.21.0-pyhd8ed1ab_0.conda
+  sha256: 01f0c3dd00081637ed920a922b17bcc8ed49608404ee466ced806856e671f6b9
+  md5: 07e9550ddff45150bfc7da146268e165
+  depends:
+  - python >=3.8
+  license: Apache-2.0
+  license_family: Apache
+  size: 49024
+  timestamp: 1726902073034
 - kind: conda
   name: propcache
   version: 0.2.0
@@ -7002,29 +7044,12 @@ packages:
   timestamp: 1679532511311
 - kind: conda
   name: regex
-  version: 2024.9.11
-  build: py312h024a12e_0
-  subdir: osx-arm64
-  url: https://conda.anaconda.org/conda-forge/osx-arm64/regex-2024.9.11-py312h024a12e_0.conda
-  sha256: c4dbb0a7195e3b5ec6059a6d280b44be3905ee8bf0d1622443efd8865dd90cf4
-  md5: 796612a39474f5f08f7fc910d161a395
-  depends:
-  - __osx >=11.0
-  - python >=3.12,<3.13.0a0
-  - python >=3.12,<3.13.0a0 *_cpython
-  - python_abi 3.12.* *_cp312
-  license: Python-2.0
-  license_family: PSF
-  size: 366013
-  timestamp: 1726095775313
-- kind: conda
-  name: regex
-  version: 2024.9.11
+  version: 2024.11.6
   build: py312h66e93f0_0
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/regex-2024.9.11-py312h66e93f0_0.conda
-  sha256: d841a27a17a8dc1a39b4b00145fd9a27a2832d838c18fbb8ba48f5bc63a02d6d
-  md5: f998667df44480bb9a365998290d8c93
+  url: https://conda.anaconda.org/conda-forge/linux-64/regex-2024.11.6-py312h66e93f0_0.conda
+  sha256: fcb5687d3ec5fff580b64b8fb649d9d65c999a91a5c3108a313ecdd2de99f06b
+  md5: 647770db979b43f9c9ca25dcfa7dc4e4
   depends:
   - __glibc >=2.17,<3.0.a0
   - libgcc >=13
@@ -7032,16 +7057,16 @@ packages:
   - python_abi 3.12.* *_cp312
   license: Python-2.0
   license_family: PSF
-  size: 405100
-  timestamp: 1726095738310
+  size: 402821
+  timestamp: 1730952378415
 - kind: conda
   name: regex
-  version: 2024.9.11
+  version: 2024.11.6
   build: py312hb2c0f52_0
   subdir: linux-aarch64
-  url: https://conda.anaconda.org/conda-forge/linux-aarch64/regex-2024.9.11-py312hb2c0f52_0.conda
-  sha256: 40987610104a3dccda167690dbbff8b77c217c94e2317b2aa4b2b34ee2cb7233
-  md5: 6fbfec5e5aa2a0f507962bd6ec72e1d4
+  url: https://conda.anaconda.org/conda-forge/linux-aarch64/regex-2024.11.6-py312hb2c0f52_0.conda
+  sha256: ec2c416860de29224e447e2031f8686a05476759c17da1f32f61d4307e540ec8
+  md5: fa8b589107567f532fa1380e66f91776
   depends:
   - libgcc >=13
   - python >=3.12,<3.13.0a0
@@ -7049,8 +7074,25 @@ packages:
   - python_abi 3.12.* *_cp312
   license: Python-2.0
   license_family: PSF
-  size: 399142
-  timestamp: 1726095874328
+  size: 398947
+  timestamp: 1730952477463
+- kind: conda
+  name: regex
+  version: 2024.11.6
+  build: py312hea69d52_0
+  subdir: osx-arm64
+  url: https://conda.anaconda.org/conda-forge/osx-arm64/regex-2024.11.6-py312hea69d52_0.conda
+  sha256: dcdec32f2c7dd37986baa692bedf9db126ad34e92e5e9b64f707cba3d04d2525
+  md5: e73cda1f18846b608284bd784f061eac
+  depends:
+  - __osx >=11.0
+  - python >=3.12,<3.13.0a0
+  - python >=3.12,<3.13.0a0 *_cpython
+  - python_abi 3.12.* *_cp312
+  license: Python-2.0
+  license_family: PSF
+  size: 366374
+  timestamp: 1730952427552
 - kind: conda
   name: requests
   version: 2.32.3
@@ -7484,19 +7526,19 @@ packages:
   timestamp: 1724956252424
 - kind: conda
   name: tqdm
-  version: 4.66.6
+  version: 4.67.0
   build: pyhd8ed1ab_0
   subdir: noarch
   noarch: python
-  url: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.66.6-pyhd8ed1ab_0.conda
-  sha256: 32c39424090a8cafe7994891a816580b3bd253eb4d4f5473bdefcf6a81ebc061
-  md5: 92718e1f892e1e4623dcc59b9f9c4e55
+  url: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.67.0-pyhd8ed1ab_0.conda
+  sha256: fb25b18cec1ebae56e7d7ebbd3e504f063b61a0fac17b1ca798fcaf205bdc874
+  md5: 196a9e6ab4e036ceafa516ea036619b0
   depends:
   - colorama
   - python >=3.7
   license: MPL-2.0 or MIT
-  size: 89367
-  timestamp: 1730145312554
+  size: 89434
+  timestamp: 1730926216380
 - kind: conda
   name: traitlets
   version: 5.14.3
