@@ -2207,33 +2207,83 @@ struct object(
     # ===------------------------------------------------------------------=== #
 
     fn is_none(self) -> Bool:
+        """Check if self is None.
+
+        Returns:
+            True if self is None.
+        """
         return self._value.is_none()
 
     fn is_bool(self) -> Bool:
+        """Check if self is bool.
+
+        Returns:
+            True if self is bool.
+        """
         return self._value.is_bool()
 
     fn is_func(self) -> Bool:
+        """Check if self is a function.
+
+        Returns:
+            True if self is a function.
+        """
         return self._value.is_func()
 
     fn is_tuple(self) -> Bool:
+        """Check if self is tuple.
+
+        Returns:
+            True if self is a tuple.
+        """
         return self._value.is_tuple()
 
     fn is_obj(self) -> Bool:
+        """Check if self is an attribute object.
+
+        Returns:
+            True if self is an attribute object.
+        """
         return self._value.is_obj()
 
     fn is_int(self) -> Bool:
+        """Check if self is int.
+
+        Returns:
+            True if self is a int.
+        """
         return self._value.is_int()
 
     fn is_float(self) -> Bool:
+        """Check if self is float.
+
+        Returns:
+            True if self is float.
+        """
         return self._value.is_float()
 
     fn is_dict(self) -> Bool:
+        """Check if self is a dictionary.
+
+        Returns:
+            True if self is a dictionary.
+        """
         return self._value.is_dict()
 
     fn is_list(self) -> Bool:
+        """Check if self is a list.
+
+        Returns:
+            True if self is a list.
+        """
         return self._value.is_list()
 
     fn is_str(self) -> Bool:
+        """Check if self is str.
+
+        Returns:
+            True if self is str.
+        """
         return self._value.is_str()
 
     # ===------------------------------------------------------------------=== #
@@ -2246,6 +2296,13 @@ struct object(
     ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] List[
         object
     ]:
+        """Returns a ref to the typed List.
+
+        Returns:
+            A ref to the ´List[object]´.
+
+        Note: it is not a cast, please type check with the method `is_list()`.
+        """
         debug_assert(self._value.is_list(), "self is not a list")
         return self._value.get_as_list()
 
@@ -2255,6 +2312,15 @@ struct object(
     ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] List[
         object
     ]:
+        """Returns a ref to the typed Tuple.
+
+        Returns:
+            A ref to the ´List[object]´.
+
+        Note: tuple is implemented with a List.
+
+        Note: it is not a cast, please type check with the method `is_tuple()`.
+        """
         debug_assert(self._value.is_tuple(), "self is not a tuple")
         return self._value.get_as_tuple()
 
@@ -2264,6 +2330,13 @@ struct object(
     ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] Dict[
         StringLiteral, object
     ]:
+        """Returns a ref to the typed attribute object.
+
+        Returns:
+            A ref to the ´Dict[StringLiteral, object]´.
+
+        Note: it is not a cast, please type check with the method `is_obj()`.
+        """
         debug_assert(self._value.is_obj(), "self is not an attribute dict")
         return self._value.get_as_obj()
 
@@ -2273,21 +2346,49 @@ struct object(
     ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] Dict[
         object, object
     ]:
+        """Returns a ref to the dictionary.
+
+        Returns:
+            A ref to the ´Dict[object, object]´.
+
+        Note: it is not a cast, please type check with the method `is_dict()`.
+        """
         debug_assert(self._value.is_dict(), "self is not a dictionary")
         return self._value.get_as_dict()
 
     @always_inline
     fn as_float(ref [_]self) -> Float64:
+        """Returns self as a `Float64` value.
+
+        Returns:
+            The `Float64´ value.
+
+        Note: it is not a cast, please type check with the method `is_float()`.
+        """
         debug_assert(self._value.is_float(), "self is not a float")
         return self._value.value[Float64]
 
     @always_inline
     fn as_int(ref [_]self) -> Int:
+        """Returns self as an `Int` value.
+
+        Returns:
+            The `Int` value.
+
+        Note: it is not a cast, please type check with the method `is_int()`.
+        """
         debug_assert(self._value.is_int(), "self is not an integer")
         return int(self._value.value[Int64])
 
     @always_inline
     fn as_bool(ref [_]self) -> Bool:
+        """Returns self as a `Bool` value.
+
+        Returns:
+            The `Bool` value.
+
+        Note: it is not a cast, please type check with the method `is_bool()`.
+        """
         debug_assert(self._value.is_bool(), "self is not a bool")
         return self._value.value[Bool]
 
@@ -2297,6 +2398,13 @@ struct object(
     ) -> ref [
         _lit_mut_cast[__origin_of(self._value.value), False].result
     ] String:
+        """Returns a ref to the `String`.
+
+        Returns:
+            A ref to the `String` value.
+
+        Note: it is not a cast, please type check with the method `is_str()`.
+        """
         debug_assert(self._value.is_str(), "self is not a string")
         return self._value.get_as_string()
 
@@ -2306,6 +2414,11 @@ struct object(
     ) -> Pointer[
         Self, _lit_mut_cast[__origin_of(self._value.value), True].result
     ]:
+        """Returns a `Pointer` to self (mutable).
+
+        Returns:
+            A mutable `Pointer` to self.
+        """
         return Pointer[
             Self, _lit_mut_cast[__origin_of(self._value.value), True].result
         ].address_of(UnsafePointer.address_of(self)[])
