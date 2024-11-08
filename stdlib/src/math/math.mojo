@@ -677,7 +677,7 @@ fn frexp[
     constrained[type.is_floating_point(), "must be a floating point value"]()
     alias T = SIMD[type, simd_width]
     alias zero = T(0)
-    alias max_exponent = FPUtils[type].max_exponent() - 2
+    alias max_exponent = FPUtils[type].max_exponent() - 1
     alias mantissa_width = FPUtils[type].mantissa_width()
     var mask1 = _frexp_mask1[simd_width, type]()
     var mask2 = _frexp_mask2[simd_width, type]()
