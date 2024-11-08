@@ -1441,22 +1441,20 @@ def test_format_conversion_flags():
 
     var b = 21.1
     assert_true(
-        "21.100000000000001 SIMD[DType.float64, 1](2"
-        in String("{} {!r}").format(b, b),
+        "21.1 SIMD[DType.float64, 1](2" in String("{} {!r}").format(b, b),
     )
     assert_true(
-        "21.100000000000001 SIMD[DType.float64, 1](2"
-        in String("{!s} {!r}").format(b, b),
+        "21.1 SIMD[DType.float64, 1](2" in String("{!s} {!r}").format(b, b),
     )
 
     var c = 1e100
     assert_equal(
         String("{} {!r}").format(c, c),
-        "1e+100 SIMD[DType.float64, 1](1.0000000000000000e+100)",
+        "1e+100 SIMD[DType.float64, 1](1e+100)",
     )
     assert_equal(
         String("{!s} {!r}").format(c, c),
-        "1e+100 SIMD[DType.float64, 1](1.0000000000000000e+100)",
+        "1e+100 SIMD[DType.float64, 1](1e+100)",
     )
 
     var d = 42
@@ -1486,7 +1484,7 @@ def test_format_conversion_flags():
 
     assert_equal(
         String("{3} {2} {1} {0}").format(a, d, c, b),
-        "21.100000000000001 1e+100 42 Mojo",
+        "21.1 1e+100 42 Mojo",
     )
 
     assert_true(

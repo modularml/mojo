@@ -40,6 +40,8 @@ from builtin.dtype import _uint_type_of_width
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.format_int import _try_write_int
+from builtin._format_float import _write_float
+from builtin.io import _snprintf
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
@@ -60,7 +62,6 @@ from .dtype import (
     _unsigned_integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _printf, _snprintf_scalar
 from collections.string import (
     _calc_format_buffer_size,
     _calc_initial_buffer_size,
@@ -1439,20 +1440,17 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The representation of the SIMD value.
         """
-
         var output = String()
-        self.write_to[use_scientific_notation=True](output)
-
-        var values = output.as_string_slice()
-
-        @parameter
-        if size > 1:
-            # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes()[1:-1])
-
-        return (
-            "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
-        )
+        output.write("SIMD[" + type.__repr__() + ", ", size, "](")
+        # Write each element.
+        for i in range(size):
+            var element = self[i]
+            # Write separators between each element.
+            if i != 0:
+                output.write(", ")
+            _write_scalar(output, element)
+        output.write(")")
+        return output
 
     @always_inline("nodebug")
     fn __floor__(self) -> Self:
@@ -1662,82 +1660,21 @@ struct SIMD[type: DType, size: Int](
         Args:
             writer: The object to write to.
         """
-        self.write_to[use_scientific_notation=False](writer)
 
-    # This overload is required to keep SIMD compliant with the Writable
-    # trait, and the call to `String.write(self)` in SIMD.__str__ will
-    # fail to compile.
-    @no_inline
-    fn write_to[
-        W: Writer, use_scientific_notation: Bool
-    ](self, inout writer: W):
-        """
-        Formats this SIMD value to the provided Writer.
-
-        Parameters:
-            W: A type conforming to the Writable trait.
-            use_scientific_notation: Whether floats should use scientific
-                notation. This parameter does not apply to integer types.
-
-        Args:
-            writer: The object to write to.
-        """
-
-        # Print an opening `[`.
+        # Write an opening `[`.
         @parameter
         if size > 1:
             writer.write("[")
 
-        # Print each element.
+        # Write each element.
         for i in range(size):
             var element = self[i]
-            # Print separators between each element.
+            # Write separators between each element.
             if i != 0:
                 writer.write(", ")
+            _write_scalar(writer, element)
 
-            @parameter
-            if triple_is_nvidia_cuda():
-                # FIXME(MSTDL-406):
-                #   The uses of `printf` below prints "out of band" with the
-                #   `Writer` passed in, meaning this will only work if
-                #   `Writer` is an unbuffered wrapper around printf (which
-                #   Writer.stdout currently is by default).
-                #
-                #   This is a workaround to permit debug formatting of
-                #   floating-point values on GPU, where printing to stdout
-                #   is the only way the Writer framework is currently
-                #   used.
-
-                @parameter
-                if type is DType.float64:
-                    # get_dtype_printf_format hardcodes 17 digits of precision.
-                    _printf["%g"](element)
-                elif type.is_floating_point():
-                    # We need to cast the value to float64 to print it, to avoid
-                    # an ABI mismatch.
-                    _printf["%g"](element.cast[DType.float64]())
-                elif type.is_integral():
-                    var err = _try_write_int(writer, element)
-                    if err:
-                        abort(
-                            "unreachable: unexpected write int failure"
-                            " condition: "
-                            + str(err.value())
-                        )
-                else:
-                    _printf[_get_dtype_printf_format[type]()](element)
-            else:
-
-                @parameter
-                if use_scientific_notation and type.is_floating_point():
-                    alias float_format = "%." + _scientific_notation_digits[
-                        type
-                    ]() + "e"
-                    _format_scalar[float_format](writer, element)
-                else:
-                    _format_scalar(writer, element)
-
-        # Print a closing `]`.
+        # Write a closing `]`.
         @parameter
         if size > 1:
             writer.write("]")
@@ -3154,34 +3091,6 @@ fn _simd_apply[
 
 
 # ===----------------------------------------------------------------------=== #
-# Scalar Formatting
-# ===----------------------------------------------------------------------=== #
-
-
-fn _format_scalar[
-    dtype: DType,
-    W: Writer, //,
-    float_format: StringLiteral = "%.17g",
-](inout writer: W, value: Scalar[dtype]):
-    # Stack allocate enough bytes to store any formatted Scalar value of any
-    # type.
-    alias size: Int = _calc_format_buffer_size[dtype]()
-
-    var buf = InlineArray[UInt8, size](fill=0)
-
-    var wrote = _snprintf_scalar[dtype, float_format](
-        buf.unsafe_ptr(),
-        size,
-        value,
-    )
-
-    # SAFETY:
-    #   Create a slice to only those bytes in `buf` that have been initialized.
-    var span = Span[Byte](buf)[:wrote]
-    writer.write_bytes(span)
-
-
-# ===----------------------------------------------------------------------=== #
 # modf
 # ===----------------------------------------------------------------------=== #
 
@@ -3256,3 +3165,40 @@ fn _floor(x: SIMD) -> __type_of(x):
         bits,
     )
     return __type_of(x)(from_bits=bits)
+
+
+fn _write_scalar[
+    dtype: DType,
+    W: Writer, //,
+](inout writer: W, value: Scalar[dtype]):
+    @parameter
+    if dtype == DType.bool:
+        if value:
+            writer.write("True")
+        else:
+            writer.write("False")
+
+    elif dtype.is_floating_point():
+        _write_float(writer, value)
+
+    # TODO: bring in modern int formatter and remove GPU specific code
+    elif dtype.is_integral():
+
+        @parameter
+        if triple_is_nvidia_cuda():
+            var err = _try_write_int(writer, value)
+            if err:
+                abort(
+                    "unreachable: unexpected write int failure condition: "
+                    + str(err.value())
+                )
+        else:
+            # Stack allocate enough bytes to store any formatted Scalar value.
+            alias size: Int = _calc_format_buffer_size[dtype]()
+            var buf = InlineArray[UInt8, size](fill=0)
+            var wrote = _snprintf[_get_dtype_printf_format[dtype]()](
+                buf.unsafe_ptr(), size, value
+            )
+            # SAFETY:
+            #   Create a slice to only those bytes in `buf` that have been initialized.
+            writer.write_bytes(Span[Byte](buf)[:wrote])

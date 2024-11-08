@@ -264,7 +264,9 @@ struct _WriteBuffer[W: MovableWriter, //, capacity: Int](Writer):
 
 
 fn write_buffered[
-    buffer_size: Int, W: MovableWriter, *Ts: Writable
+    W: MovableWriter, //,
+    *Ts: Writable,
+    buffer_size: Int,
 ](
     owned writer: W,
     args: VariadicPack[_, Writable, *Ts],
@@ -279,9 +281,9 @@ fn write_buffered[
 
 
     Parameters:
-        buffer_size: How many bytes to write to a buffer before writing out.
         W: The type of the `Writer` to write to.
         Ts: The types of each arg to write. Each type must satisfy `Writable`.
+        buffer_size: How many bytes to write to a buffer before writing out.
 
     Args:
         writer: The `Writer` to write to.
