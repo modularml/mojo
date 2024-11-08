@@ -28,6 +28,15 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
     return __mlir_attr.`#kgen.param.expr<current_target> : !kgen.target`
 
 
+fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
+    return __mlir_attr[
+        `#kgen.param.expr<target_get_field,`,
+        target,
+        `, "arch" : !kgen.string`,
+        `> : !kgen.string`,
+    ]
+
+
 @always_inline("nodebug")
 fn _current_arch() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
@@ -521,13 +530,13 @@ fn is_64bit[target: __mlir_type.`!kgen.target` = _current_target()]() -> Bool:
 fn simdbitwidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
-    """Returns the vector size (in bits) of the host system.
+    """Returns the vector size (in bits) of the specified target.
 
     Parameters:
         target: The target architecture.
 
     Returns:
-        The vector size (in bits) of the host system.
+        The vector size (in bits) of the specified target.
     """
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
@@ -541,7 +550,7 @@ fn simdbitwidth[
 fn simdbytewidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
-    """Returns the vector size (in bytes) of the host system.
+    """Returns the vector size (in bytes) of the specified target.
 
     Parameters:
         target: The target architecture.
@@ -551,6 +560,26 @@ fn simdbytewidth[
     """
     alias CHAR_BIT = 8
     return simdbitwidth[target]() // CHAR_BIT
+
+
+@always_inline("nodebug")
+fn warpsize[
+    target: __mlir_type.`!kgen.target` = _current_target()
+]() -> IntLiteral:
+    """Returns the warp size of the specified target.
+
+    Parameters:
+        target: The target architecture.
+
+    Returns:
+        The warp size of the specified target.
+    """
+    return __mlir_attr[
+        `#kgen.param.expr<target_get_field,`,
+        target,
+        `, "warp_size" : !kgen.string`,
+        `> : !kgen.int_literal`,
+    ]
 
 
 @always_inline("nodebug")

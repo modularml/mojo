@@ -13,7 +13,7 @@
 from memory import UnsafePointer, stack_allocation, memcpy
 
 
-struct Box[T: AnyType]:
+struct OwnedPointer[T: AnyType]:
     """A safe, owning, smart pointer.
 
     This smart pointer is designed for cases where there is clear ownership
@@ -22,7 +22,7 @@ struct Box[T: AnyType]:
     may exist.
 
     Parameters:
-        T: The type to be stored in the Box[].
+        T: The type to be stored in the OwnedPointer[].
     """
 
     var _inner: UnsafePointer[T, AddressSpace.GENERIC]
@@ -31,58 +31,62 @@ struct Box[T: AnyType]:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__[T: Movable](inout self: Box[T], owned value: T):
-        """Construct a new Box[] by moving the passed value into a new backing allocation.
+    fn __init__[T: Movable](inout self: OwnedPointer[T], owned value: T):
+        """Construct a new OwnedPointer[] by moving the passed value into a new backing allocation.
 
         Parameters:
             T: The type of the data to store. It is restricted to `Movable` here to allow efficient move construction.
 
         Args:
-            value: The value to move into the Box[].
+            value: The value to move into the OwnedPointer[].
         """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_move(value^)
 
-    fn __init__[T: ExplicitlyCopyable](inout self: Box[T], *, copy_value: T):
-        """Construct a new Box[] by explicitly copying the passed value into a new backing allocation.
+    fn __init__[
+        T: ExplicitlyCopyable
+    ](inout self: OwnedPointer[T], *, copy_value: T):
+        """Construct a new OwnedPointer[] by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
             T: The type of the data to store.
 
         Args:
-            copy_value: The value to explicitly copy into the Box[].
+            copy_value: The value to explicitly copy into the OwnedPointer[].
         """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_explicit_copy(copy_value)
 
-    fn __init__[T: Copyable, U: NoneType = None](inout self: Box[T], value: T):
-        """Construct a new Box[] by copying the passed value into a new backing allocation.
+    fn __init__[
+        T: Copyable, U: NoneType = None
+    ](inout self: OwnedPointer[T], value: T):
+        """Construct a new OwnedPointer[] by copying the passed value into a new backing allocation.
 
         Parameters:
             T: The type of the data to store.
             U: A dummy type parameter, to lower the selection priority of this ctor.
 
         Args:
-            value: The value to copy into the Box[].
+            value: The value to copy into the OwnedPointer[].
         """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_copy(value)
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: Box[T], *, copy_box: Box[T],):
-        """Construct a new Box[] by explicitly copying the value from another Box[].
+    ](inout self: OwnedPointer[T], *, other: OwnedPointer[T],):
+        """Construct a new OwnedPointer[] by explicitly copying the value from another OwnedPointer[].
 
         Parameters:
             T: The type of the data to store.
 
         Args:
-            copy_box: The Box[] to copy.
+            other: The OwnedPointer[] to copy.
         """
-        self.__init__(copy_value=copy_box[])
+        self.__init__(copy_value=other[])
 
     fn __moveinit__(inout self, owned existing: Self):
-        """Move this Box[].
+        """Move this OwnedPointer[].
 
         Args:
             existing: The value to move.
@@ -90,8 +94,8 @@ struct Box[T: AnyType]:
         self._inner = existing._inner
         existing._inner = UnsafePointer[T]()
 
-    fn __del__(owned self: Box[T]):
-        """Destroy the Box[]."""
+    fn __del__(owned self: OwnedPointer[T]):
+        """Destroy the OwnedPointer[]."""
         self._inner.destroy_pointee()
         self._inner.free()
 
@@ -102,10 +106,10 @@ struct Box[T: AnyType]:
     fn __getitem__(
         ref [_, AddressSpace.GENERIC._value.value]self
     ) -> ref [self, AddressSpace.GENERIC._value.value] T:
-        """Returns a reference to the box's underlying data with parametric mutability.
+        """Returns a reference to the pointers's underlying data with parametric mutability.
 
         Returns:
-            A reference to the data underlying the Box[].
+            A reference to the data underlying the OwnedPointer[].
         """
         # This should have a widening conversion here that allows
         # the mutable ref that is always (potentially unsafely)
@@ -120,24 +124,25 @@ struct Box[T: AnyType]:
     # ===-------------------------------------------------------------------===#
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
-        """UNSAFE: returns the backing pointer for this Box[].
+        """UNSAFE: returns the backing pointer for this OwnedPointer[].
 
         Returns:
-            An UnsafePointer to the backing allocation for this Box[].
+            An UnsafePointer to the backing allocation for this OwnedPointer[].
         """
         return self._inner
 
-    fn take[T: Movable](owned self: Box[T]) -> T:
-        """Move the value within the Box[] out of it, consuming the Box[] in the process.
+    fn take[T: Movable](owned self: OwnedPointer[T]) -> T:
+        """Move the value within the OwnedPointer[] out of it, consuming the
+        OwnedPointer[] in the process.
 
         Parameters:
-            T: The type of the data backing this Box[]. `take()` only exists for T: Movable
+            T: The type of the data backing this OwnedPointer[]. `take()` only exists for T: Movable
                 since this consuming operation only makes sense for types that you want to avoid copying.
                 For types that are Copy or ExplicitlyCopy but are not Movable, you can copy them through
-                `__getitem__` as in `var v = some_box_var[]`.
+                `__getitem__` as in `var v = some_ptr_var[]`.
 
         Returns:
-            The data that is (was) backing the Box[].
+            The data that is (was) backing the OwnedPointer[].
         """
         var r = self._inner.take_pointee()
         self._inner.free()
@@ -146,7 +151,8 @@ struct Box[T: AnyType]:
         return r^
 
     fn steal_data(owned self) -> UnsafePointer[T]:
-        """Take ownership over the heap allocated pointer backing this `Box`.
+        """Take ownership over the heap allocated pointer backing this
+        `OwnedPointer`.
 
         Safety:
             This function is not unsafe to call, as a memory leak is not
@@ -157,7 +163,7 @@ struct Box[T: AnyType]:
             Failure to do so will leak memory.
 
         Returns:
-            The pointer owned by this box.
+            The pointer owned by this instance.
         """
 
         var ptr = self._inner
