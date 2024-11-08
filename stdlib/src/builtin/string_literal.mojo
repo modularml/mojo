@@ -444,9 +444,7 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StaticString(
-            unsafe_from_utf8_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return StaticString(ptr=self.unsafe_ptr(), length=self.byte_length())
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:

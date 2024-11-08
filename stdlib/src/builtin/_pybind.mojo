@@ -31,6 +31,7 @@ from python._bindings import (
     ConvertibleFromPython,
     PythonableAndConvertibleFromPython,
     PyMojoObject,
+    python_type_object,
     py_c_function_wrapper,
     check_argument_type,
     # Imported for use by the compiler
@@ -85,7 +86,7 @@ fn gen_pytype_wrapper[
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
     # TODO(MOCO-1307): Add support for constructor generation.
 
-    var type_obj = PyMojoObject[T].python_type_object[name](
+    var type_obj = python_type_object[T, name](
         methods=List[PyMethodDef](),
     )
 
