@@ -14,6 +14,9 @@
 
 from collections import InlineArray
 from memory import memcpy, UnsafePointer
+from utils import Span, StaticString
+from sys.info import triple_is_nvidia_cuda
+from builtin.io import _printf
 
 
 # ===----------------------------------------------------------------------===#
@@ -220,7 +223,54 @@ trait MovableWriter(Movable, Writer):
     ...
 
 
-struct _WriteBuffer[W: MovableWriter, //, capacity: Int](Writer):
+struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
+    var data: UnsafePointer[UInt8]
+    var pos: Int
+    var writer: W
+
+    fn __init__(inout self, owned writer: W):
+        self.data = UnsafePointer[
+            UInt8,
+            address_space = AddressSpace.GENERIC,
+        ].alloc(capacity)
+        self.pos = 0
+        self.writer = writer^
+
+    fn flush(inout self):
+        self.writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](unsafe_ptr=self.data, len=self.pos)
+        )
+        self.pos = 0
+
+    @always_inline
+    fn write_bytes(inout self, bytes: Span[UInt8, _]):
+        len_bytes = len(bytes)
+        # If empty then return
+        if len_bytes == 0:
+            return
+        # If span is too large to fit in buffer, write directly and return
+        if len_bytes > capacity:
+            self.flush()
+            self.writer.write_bytes(bytes)
+            return
+        # If buffer would overflow, flush writer and reset pos to 0.
+        if self.pos + len_bytes > capacity:
+            self.flush()
+        ptr = bytes.unsafe_ptr()
+        # Continue writing to buffer
+        for i in range(len_bytes):
+            self.data[i + self.pos] = ptr[i]
+        self.pos += len_bytes
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+
+struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
     var data: InlineArray[UInt8, capacity]
     var pos: Int
     var writer: W
@@ -311,6 +361,12 @@ fn write_buffered[
     ```
     .
     """
-    var buffer = _WriteBuffer[buffer_size](writer^)
-    write_args(buffer, args, sep=sep, end=end)
-    buffer.flush()
+    if triple_is_nvidia_cuda():
+        # Stack space is very small on GPU due to many threads, so use heap
+        var buffer = _WriteBufferHeap[buffer_size](writer^)
+        write_args(buffer, args, sep=sep, end=end)
+        buffer.flush()
+    else:
+        var buffer = _WriteBufferStack[buffer_size](writer^)
+        write_args(buffer, args, sep=sep, end=end)
+        buffer.flush()
