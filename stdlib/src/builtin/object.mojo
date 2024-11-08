@@ -2489,11 +2489,11 @@ struct _ObjectIter[
         raise "Error in _ObjectIter.__next__"
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         if self.hint_type == Self.list_iter_hint:
-            return self.iterator[Self.list_iter].__hasmore__()
+            return self.iterator[Self.list_iter].__has_next__()
         if self.hint_type == Self.dict_iter_hint:
-            return self.iterator[Self.dict_iter].__hasmore__()
+            return self.iterator[Self.dict_iter].__has_next__()
         return False
 
     fn __len__(self) raises -> Int:
