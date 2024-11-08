@@ -419,6 +419,35 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.write_to(output)
         return output^
 
+    fn write_bytes(inout self, bytes: Span[Byte, _]):
+        """
+        Write a byte span to this List. `T` **must** be of type `Byte`.
+
+        Args:
+            bytes: The byte span to write to this String. Must NOT be
+              null terminated.
+        """
+        constrained[_type_is_eq[T, Byte]()]()
+        self.extend(rebind[Span[T, bytes.origin]](bytes))
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
+        `T` **must** be of type `Byte`.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this Writer.
+        """
+        constrained[_type_is_eq[T, Byte]()]()
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to[__type_of(self)](self)
+
+        args.each[write_arg]()
+
     @no_inline
     fn write_to[
         W: Writer, U: RepresentableCollectionElement, //
@@ -591,6 +620,18 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         # Update the size now that all new elements have been moved into this
         # list.
         self.size = final_size
+
+    fn extend(inout self, other: Span[T]):
+        """Extends this list by copying the elements of `other`.
+
+        Args:
+            other: Span whose elements will be added in order at the end of this list.
+        """
+        var final_size = len(self) + len(other)
+        self.reserve(final_size)
+
+        for item in other:
+            self.append(item[])
 
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.

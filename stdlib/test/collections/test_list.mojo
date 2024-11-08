@@ -922,6 +922,19 @@ def test_list_repr():
     assert_equal(empty.__repr__(), "[]")
 
 
+def test_writer():
+    var l = List[Byte]()
+    var s = "abc".as_bytes()
+    l.write_bytes(s)
+    assert_equal(l[0], ord("a"))
+    assert_equal(l[1], ord("b"))
+    assert_equal(l[2], ord("c"))
+    var l2 = List[Byte]()
+    assert_equal(l2[0], 0)
+    assert_equal(l2[1], 1)
+    assert_equal(l2[2], 2)
+
+
 # ===-------------------------------------------------------------------===#
 # main
 # ===-------------------------------------------------------------------===#
