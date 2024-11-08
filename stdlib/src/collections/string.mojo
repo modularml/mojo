@@ -1118,9 +1118,9 @@ struct String(
         var rhs_ptr = rhs.unsafe_ptr()
         alias S = StringSlice[ImmutableAnyOrigin]
         if lhs_len == 0:
-            return String(S(unsafe_from_utf8_ptr=rhs_ptr, len=rhs_len))
+            return String(S(ptr=rhs_ptr, length=rhs_len))
         elif rhs_len == 0:
-            return String(S(unsafe_from_utf8_ptr=lhs_ptr, len=lhs_len))
+            return String(S(ptr=lhs_ptr, length=lhs_len))
         var sum_len = lhs_len + rhs_len
         var buffer = Self._buffer_type(capacity=sum_len + 1)
         var ptr = buffer.unsafe_ptr()
@@ -1211,7 +1211,7 @@ struct String(
         var o_ptr = other.unsafe_ptr()
         if s_len == 0:
             alias S = StringSlice[ImmutableAnyOrigin]
-            self = String(S(unsafe_from_utf8_ptr=o_ptr, len=o_len))
+            self = String(S(ptr=o_ptr, length=o_len))
             return
         elif o_len == 0:
             return
@@ -2031,12 +2031,12 @@ struct String(
         """
         if end == -1:
             return StringSlice[__origin_of(self)](
-                unsafe_from_utf8_ptr=self.unsafe_ptr() + start,
-                len=self.byte_length() - start,
+                ptr=self.unsafe_ptr() + start,
+                length=self.byte_length() - start,
             ).startswith(prefix.as_string_slice())
 
         return StringSlice[__origin_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+            ptr=self.unsafe_ptr() + start, length=end - start
         ).startswith(prefix.as_string_slice())
 
     fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
@@ -2053,12 +2053,12 @@ struct String(
         """
         if end == -1:
             return StringSlice[__origin_of(self)](
-                unsafe_from_utf8_ptr=self.unsafe_ptr() + start,
-                len=self.byte_length() - start,
+                ptr=self.unsafe_ptr() + start,
+                length=self.byte_length() - start,
             ).endswith(suffix.as_string_slice())
 
         return StringSlice[__origin_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+            ptr=self.unsafe_ptr() + start, length=end - start
         ).endswith(suffix.as_string_slice())
 
     fn removeprefix(self, prefix: String, /) -> String:
