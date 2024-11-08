@@ -254,14 +254,12 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
-
     # TODO: Implement a float formatter for GPU to enable buffering to global
     # memory. PTX isn't able to call snprintf to format floats.
+    write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
+
     @parameter
-    if triple_is_nvidia_cuda():
-        write_args(file, values, sep=sep, end=end)
-    else:
-        write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
+    if not triple_is_nvidia_cuda():
         if flush:
             _flush(file=file)
 
