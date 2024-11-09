@@ -198,9 +198,18 @@ struct Span[
         var end: Int
         var step: Int
         start, end, step = slc.indices(len(self))
-        debug_assert(
-            step == 1, "Slice must be within bounds and step must be 1"
-        )
+
+        if step < 0:
+            step = -step
+            var new_len = (start - end + step - 1) // step
+            var buff = UnsafePointer[T].alloc(new_len)
+            i = 0
+            while start > end:
+                buff[i] = self._data[start]
+                start -= step
+                i += 1
+            return Span[T, origin](ptr=buff, length=new_len)
+
         var res = Self(
             ptr=(self._data + start), length=len(range(start, end, step))
         )
