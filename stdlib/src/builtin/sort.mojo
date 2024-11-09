@@ -222,7 +222,7 @@ fn _quicksort[
         var imm_interval = stack.pop()
         var ptr = imm_interval.unsafe_ptr()
         var len = len(imm_interval)
-        var interval = Span[type, origin](unsafe_ptr=ptr, len=len)
+        var interval = Span[type, origin](ptr=ptr, length=len)
 
         if len <= 5:
             _delegate_small_sort[cmp_fn](interval)
@@ -242,19 +242,17 @@ fn _quicksort[
             var pivot = _quicksort_partition_left[cmp_fn](interval)
             if len > pivot + 2:
                 stack.append(
-                    ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
+                    ImmSpan(ptr=ptr + pivot + 1, length=len - pivot - 1)
                 )
             continue
 
         var pivot = _quicksort_partition_right[cmp_fn](interval)
 
         if len > pivot + 2:
-            stack.append(
-                ImmSpan(unsafe_ptr=ptr + pivot + 1, len=len - pivot - 1)
-            )
+            stack.append(ImmSpan(ptr=ptr + pivot + 1, length=len - pivot - 1))
 
         if pivot > 1:
-            stack.append(ImmSpan(unsafe_ptr=ptr, len=pivot))
+            stack.append(ImmSpan(ptr=ptr, length=pivot))
 
 
 # ===----------------------------------------------------------------------===#
@@ -357,7 +355,7 @@ fn _stable_sort[
 ](span: Span[type, origin]):
     var temp_buff = UnsafePointer[type].alloc(len(span))
     var temp_buff_span = Span[type, __origin_of(temp_buff)](
-        unsafe_ptr=temp_buff, len=len(span)
+        ptr=temp_buff, length=len(span)
     )
     _stable_sort_impl[cmp_fn](span, temp_buff_span)
     temp_buff.free()

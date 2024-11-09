@@ -464,8 +464,7 @@ struct StringLiteral(
         """
 
         return Span[Byte, StaticConstantOrigin](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
+            ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline
@@ -480,8 +479,7 @@ struct StringLiteral(
         """
         # Does NOT include the NUL terminator.
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
+            ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline
