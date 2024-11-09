@@ -236,7 +236,7 @@ what we publish.
   allocate additional capacity.
   ([PR #3755](https://github.com/modularml/mojo/pull/3755) by [@thatstoasty](https://github.com/thatstoasty)).
 
-- Introduced a new `Deque` (double-ended queue) collection type, based on a 
+- Introduced a new `Deque` (double-ended queue) collection type, based on a
   dynamically resizing circular buffer for efficient O(1) additions and removals
   at both ends as well as O(1) direct access to all elements.
   
