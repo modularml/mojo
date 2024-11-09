@@ -716,7 +716,7 @@ def test_constructor_from_pointer():
     new_pointer[2] = 2
     # rest is not initialized
 
-    var some_list = List[Int8](unsafe_pointer=new_pointer, size=3, capacity=5)
+    var some_list = List[Int8](ptr=new_pointer, length=3, capacity=5)
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
     assert_equal(some_list[2], 2)
@@ -731,7 +731,7 @@ def test_constructor_from_other_list_through_pointer():
     var size = len(initial_list)
     var capacity = initial_list.capacity
     var some_list = List[Int8](
-        unsafe_pointer=initial_list.steal_data(), size=size, capacity=capacity
+        ptr=initial_list.steal_data(), length=size, capacity=capacity
     )
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
