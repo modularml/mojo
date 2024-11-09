@@ -175,21 +175,17 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.append(value[])
 
     fn __init__(
-        inout self,
-        *,
-        unsafe_pointer: UnsafePointer[T],
-        size: Int,
-        capacity: Int,
+        inout self, *, ptr: UnsafePointer[T], length: Int, capacity: Int
     ):
-        """Constructs a list from a pointer, its size, and its capacity.
+        """Constructs a list from a pointer, its length, and its capacity.
 
         Args:
-            unsafe_pointer: The pointer to the data.
-            size: The number of elements in the list.
+            ptr: The pointer to the data.
+            length: The number of elements in the list.
             capacity: The capacity of the list.
         """
-        self.data = unsafe_pointer
-        self.size = size
+        self.data = ptr
+        self.size = length
         self.capacity = capacity
 
     fn __moveinit__(inout self, owned existing: Self):

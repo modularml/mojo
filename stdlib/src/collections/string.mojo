@@ -758,7 +758,7 @@ struct String(
         var size = impl.size
         var capacity = impl.capacity
         self._buffer = Self._buffer_type(
-            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
+            ptr=impl.steal_data(), length=size, capacity=capacity
         )
 
     @always_inline
@@ -840,9 +840,7 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(
-            Self._buffer_type(unsafe_pointer=ptr, size=length, capacity=length)
-        )
+        self = Self(Self._buffer_type(ptr=ptr, length=length, capacity=length))
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
