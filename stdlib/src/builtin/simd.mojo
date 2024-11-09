@@ -1628,12 +1628,6 @@ struct SIMD[type: DType, size: Int](
             return rebind[SIMD[target, size]](self != 0)
 
         @parameter
-        if type is DType.bfloat16 and target is DType.float32:
-            return rebind[SIMD[target, size]](
-                _bfloat16_to_f32(rebind[SIMD[DType.bfloat16, size]](self))
-            )
-
-        @parameter
         if type is DType.float32 and target == DType.bfloat16:
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
