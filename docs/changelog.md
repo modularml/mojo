@@ -408,6 +408,23 @@ what we publish.
   print(p[i])
   ```
 
+  - Float32 and Float64 are now printed and converted to strings with roundtrip
+  guarantee and shortest representation:
+
+  ```plaintext
+  Value                       Old                       New
+  Float64(0.3)                0.29999999999999999       0.3
+  Float32(0.3)                0.30000001192092896       0.3
+  Float64(0.0001)             0.0001                    0.0001
+  Float32(0.0001)             9.9999997473787516e-05    0.0001
+  Float64(-0.00001)           -1.0000000000000001e-05   -1e-05
+  Float32(-0.00001)           -9.9999997473787516e-06   -1e-05
+  Float32(0.00001234)         1.2339999557298142e-05    1.234e-05
+  Float32(-0.00000123456)     -1.2345600453045336e-06   -1.23456e-06
+  Float64(1.1234567e-320)     1.1235052786429946e-320   1.1235e-320
+  Float64(1.234 * 10**16)     12340000000000000.0       1.234e+16
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
