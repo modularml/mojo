@@ -636,16 +636,16 @@ struct Deque[ElementType: CollectionElement](
         """Returns the index of the first occurrence of a `value` in a deque
         restricted by the range given the `start` and `stop` bounds.
 
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the `EqualityComparableCollectionElement` trait.
+
         Args:
             value: The value to search for.
             start: The starting index of the search, treated as a slice index
                 (defaults to 0).
             stop: The ending index of the search, treated as a slice index
                 (defaults to None, which means the end of the deque).
-
-        Parameters:
-            EqualityElementType: The type of the elements in the deque.
-                Must implement the `EqualityComparableCollectionElement` trait.
 
         Returns:
             The index of the first occurrence of the value in the deque.
@@ -726,6 +726,10 @@ struct Deque[ElementType: CollectionElement](
         value: EqualityElementType,
     ) raises:
         """Removes the first occurrence of the `value`.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the `EqualityComparableCollectionElement` trait.
 
         Args:
             value: The value to remove.
