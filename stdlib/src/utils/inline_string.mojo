@@ -292,9 +292,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
 
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=len(self),
+            ptr=self.unsafe_ptr(), length=len(self)
         )
 
 
@@ -532,7 +530,5 @@ struct _FixedString[CAP: Int](
         """
 
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=self.size,
+            ptr=self.unsafe_ptr(), length=self.size
         )

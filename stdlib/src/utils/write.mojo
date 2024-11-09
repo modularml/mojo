@@ -238,7 +238,7 @@ struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
 
     fn flush(inout self):
         self.writer.write_bytes(
-            Span[Byte, ImmutableAnyOrigin](unsafe_ptr=self.data, len=self.pos)
+            Span[Byte, ImmutableAnyOrigin](ptr=self.data, length=self.pos)
         )
         self.pos = 0
 
@@ -283,7 +283,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
     fn flush(inout self):
         self.writer.write_bytes(
             Span[Byte, ImmutableAnyOrigin](
-                unsafe_ptr=self.data.unsafe_ptr(), len=self.pos
+                ptr=self.data.unsafe_ptr(), length=self.pos
             )
         )
         self.pos = 0
