@@ -304,15 +304,6 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
-        alias max_unsigned_value = 2 ** bitwidthof[type]()
-        debug_assert[assert_mode="safe"](
-            UInt(value) < max_unsigned_value,
-            "Overflow on ",
-            type,
-            " construction. Maximum unsigned value for this DType is ",
-            max_unsigned_value,
-            ". Construct a SIMD[DType.index] if you are sure.",
-        )
 
         var tn1 = __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.si128
