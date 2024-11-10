@@ -55,6 +55,18 @@ def test_cast():
     assert_equal(int(b.cast[DType.int8]()), -128)
     assert_equal(int(b.cast[DType.int16]()), 128)
 
+    @parameter
+    if not has_neon():
+        assert_equal(
+            BFloat16(33.0).cast[DType.float32]().cast[DType.bfloat16](), 33
+        )
+        assert_equal(
+            Float16(33.0).cast[DType.float32]().cast[DType.float16](), 33
+        )
+        assert_equal(
+            Float64(33.0).cast[DType.float32]().cast[DType.float16](), 33
+        )
+
 
 def test_simd_variadic():
     assert_equal(str(SIMD[DType.index, 4](52, 12, 43, 5)), "[52, 12, 43, 5]")
