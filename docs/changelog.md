@@ -432,6 +432,9 @@ what we publish.
 - Lifetime tracking is now fully field sensitive, which makes the uninitialized
   variable checker more precise.
 
+- [Issue #1632](https://github.com/modularml/mojo/issues/1632) - Mojo produces
+  weird error when inout function is used in non mutating function
+
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
 
