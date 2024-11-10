@@ -279,7 +279,7 @@ struct SIMD[type: DType, size: Int](
             "Overflow on ",
             type,
             " construction. Maximum unsigned value for this DType is ",
-            max_unsigned_value,
+            max_unsigned_value - 1,
             ". Construct a SIMD[DType.index] if you are sure.",
         )
 
@@ -2109,7 +2109,7 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.extract",
             SIMD[type, output_width],
             has_side_effect=False,
-        ](self, Int64(offset))
+        ](self, Scalar[DType.index](offset).cast[DType.uint64]())
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
