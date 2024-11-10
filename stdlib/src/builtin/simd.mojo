@@ -1615,7 +1615,7 @@ struct SIMD[type: DType, size: Int](
                 return self.cast[DType.float32]().cast[target]()
 
         @parameter
-        if has_neon() and (type is DType.bfloat16 or target == DType.bfloat16):
+        if has_neon() and (type is DType.bfloat16 or target is DType.bfloat16):
             # TODO(KERN-228): support BF16 on neon systems.
             return _unchecked_zero[target, size]()
 
@@ -1624,11 +1624,17 @@ struct SIMD[type: DType, size: Int](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
 
         @parameter
-        if target == DType.bool:
+        if target is DType.bool:
             return rebind[SIMD[target, size]](self != 0)
 
         @parameter
-        if type is DType.float32 and target == DType.bfloat16:
+        if type is DType.bfloat16 and not _has_native_bf16_support():
+            return _bfloat16_to_f32(
+                rebind[SIMD[DType.bfloat16, size]](self)
+            ).cast[target]()
+
+        @parameter
+        if target is DType.bfloat16 and not _has_native_bf16_support():
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
