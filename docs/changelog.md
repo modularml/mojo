@@ -447,6 +447,9 @@ what we publish.
 - [Issue #3627](https://github.com/modularml/mojo/issues/3627) - Compiler
   overlooked exclusivity violation caused by `ref [MutableAnyOrigin] T`
 
+- [Issue #3710](https://github.com/modularml/mojo/issues/3710) - Mojo frees
+  memory while reference to it is still in use.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
