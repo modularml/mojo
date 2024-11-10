@@ -456,3 +456,17 @@ what we publish.
 
 - The VS Code extension now allows invoking a mojo formatter from SDK
   installations that contain white spaces in their path.
+
+- Error messages that include type names no longer include inferred or defaulted
+  parameters when they aren't needed.  For example, previously Mojo complained
+  about things like:
+  
+  ```plaintext
+  ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
+  ```
+
+  it now complains more helpfully that:
+
+  ```plaintext
+  ... cannot be converted from 'UnsafePointer[UInt]' to 'UnsafePointer[Int]'
+  ```
