@@ -273,6 +273,15 @@ struct SIMD[type: DType, size: Int](
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
+        alias max_value = 2 ** bitwidthof[type]()
+        debug_assert(
+            UInt(value) < max_value,
+            "Overflow on ",
+            type,
+            " construction. Maximum unsigned value for this DType is ",
+            max_value,
+            ". Construct a SIMD[DType.index] if you are sure.",
+        )
 
         var t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<index>`
@@ -295,6 +304,15 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        alias max_value = 2 ** bitwidthof[type]()
+        debug_assert(
+            UInt(value) < max_value,
+            "Overflow on ",
+            type,
+            " construction. Maximum unsigned value for this DType is ",
+            max_value,
+            ". Construct a SIMD[DType.index] if you are sure.",
+        )
 
         var tn1 = __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.si128
