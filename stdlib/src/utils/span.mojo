@@ -114,15 +114,15 @@ struct Span[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self, *, unsafe_ptr: UnsafePointer[T], len: Int):
+    fn __init__(inout self, *, ptr: UnsafePointer[T], length: Int):
         """Unsafe construction from a pointer and length.
 
         Args:
-            unsafe_ptr: The underlying pointer of the span.
-            len: The length of the view.
+            ptr: The underlying pointer of the span.
+            length: The length of the view.
         """
-        self._data = unsafe_ptr
-        self._len = len
+        self._data = ptr
+        self._len = length
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -198,12 +198,20 @@ struct Span[
         var end: Int
         var step: Int
         start, end, step = slc.indices(len(self))
-        debug_assert(
-            step == 1, "Slice must be within bounds and step must be 1"
-        )
+
+        if step < 0:
+            step = -step
+            var new_len = (start - end + step - 1) // step
+            var buff = UnsafePointer[T].alloc(new_len)
+            i = 0
+            while start > end:
+                buff[i] = self._data[start]
+                start -= step
+                i += 1
+            return Span[T, origin](ptr=buff, length=new_len)
+
         var res = Self(
-            unsafe_ptr=(self._data + start),
-            len=len(range(start, end, step)),
+            ptr=(self._data + start), length=len(range(start, end, step))
         )
 
         return res
@@ -351,5 +359,5 @@ struct Span[
             A span covering the same elements, but without mutability.
         """
         return Span[T, _lit_mut_cast[origin, False].result](
-            unsafe_ptr=self._data, len=self._len
+            ptr=self._data, length=self._len
         )

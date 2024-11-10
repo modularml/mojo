@@ -120,17 +120,17 @@ def test_simd_repr():
     assert_equal(Int32(4).__repr__(), "SIMD[DType.int32, 1](4)")
     assert_equal(
         Float64(235234523.3452).__repr__(),
-        "SIMD[DType.float64, 1](2.3523452334520000e+08)",
+        "SIMD[DType.float64, 1](235234523.3452)",
     )
     assert_equal(
-        Float32(2897239).__repr__(), "SIMD[DType.float32, 1](2.89723900e+06)"
+        Float32(2897239).__repr__(), "SIMD[DType.float32, 1](2897239.0)"
     )
-    assert_equal(Float16(324).__repr__(), "SIMD[DType.float16, 1](3.2400e+02)")
+    assert_equal(Float16(324).__repr__(), "SIMD[DType.float16, 1](324.0)")
     assert_equal(
         SIMD[DType.float32, 4](
             Float32.MAX, Float32.MIN, -0.0, nan[DType.float32]()
         ).__repr__(),
-        "SIMD[DType.float32, 4](inf, -inf, -0.00000000e+00, nan)",
+        "SIMD[DType.float32, 4](inf, -inf, -0.0, nan)",
     )
 
 

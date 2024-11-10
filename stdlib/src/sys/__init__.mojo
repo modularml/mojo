@@ -46,6 +46,7 @@ from .info import (
     simdbitwidth,
     simdbytewidth,
     simdwidthof,
+    warpsize,
     sizeof,
     triple_is_nvidia_cuda,
 )

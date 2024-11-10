@@ -530,13 +530,13 @@ fn is_64bit[target: __mlir_type.`!kgen.target` = _current_target()]() -> Bool:
 fn simdbitwidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
-    """Returns the vector size (in bits) of the host system.
+    """Returns the vector size (in bits) of the specified target.
 
     Parameters:
         target: The target architecture.
 
     Returns:
-        The vector size (in bits) of the host system.
+        The vector size (in bits) of the specified target.
     """
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
@@ -550,7 +550,7 @@ fn simdbitwidth[
 fn simdbytewidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
-    """Returns the vector size (in bytes) of the host system.
+    """Returns the vector size (in bytes) of the specified target.
 
     Parameters:
         target: The target architecture.
@@ -560,6 +560,26 @@ fn simdbytewidth[
     """
     alias CHAR_BIT = 8
     return simdbitwidth[target]() // CHAR_BIT
+
+
+@always_inline("nodebug")
+fn warpsize[
+    target: __mlir_type.`!kgen.target` = _current_target()
+]() -> IntLiteral:
+    """Returns the warp size of the specified target.
+
+    Parameters:
+        target: The target architecture.
+
+    Returns:
+        The warp size of the specified target.
+    """
+    return __mlir_attr[
+        `#kgen.param.expr<target_get_field,`,
+        target,
+        `, "warp_size" : !kgen.string`,
+        `> : !kgen.int_literal`,
+    ]
 
 
 @always_inline("nodebug")
@@ -812,7 +832,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     if err:
         raise "Unable to query macOS version"
 
-    var osver = String(buf.steal_data(), buf_len)
+    var osver = String(ptr=buf.steal_data(), length=buf_len)
 
     var major = 0
     var minor = 0

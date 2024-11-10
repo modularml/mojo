@@ -201,7 +201,7 @@ struct FileHandle:
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        return String(buf, int(size_copy) + 1)
+        return String(ptr=buf, length=int(size_copy) + 1)
 
     fn read[
         type: DType
@@ -345,7 +345,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
 
         var list = List[UInt8](
-            unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
+            ptr=buf, length=int(size_copy), capacity=int(size_copy)
         )
 
         return list
