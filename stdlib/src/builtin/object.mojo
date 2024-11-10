@@ -1830,7 +1830,7 @@ struct object(
         return i._value.get_as_int().value
 
     @always_inline
-    fn __getitem__(self, i: object) raises -> object:
+    fn __getitem__(ref[_]self, i: object) raises -> object:
         """Gets the i-th item from the object. This is only valid for strings,
         lists, and dictionaries.
 
@@ -1890,7 +1890,7 @@ struct object(
         return self[tmp_tuple]
 
     @always_inline
-    fn __setitem__(self, i: object, value: object) raises -> None:
+    fn __setitem__(ref[_]self, i: object, value: object) raises -> None:
         """Sets the i-th item in the object. This is only valid for strings,
         lists, and dictionaries.
 
@@ -1920,7 +1920,7 @@ struct object(
         self._value.get_as_list()[index.value] = value
 
     @always_inline
-    fn __setitem__(self, i: object, j: object, value: object) raises:
+    fn __setitem__(ref[_]self, i: object, j: object, value: object) raises:
         """Sets the (i, j)-th element in the object.
 
         FIXME: We need this because `obj[i, j] = value` will attempt to invoke
@@ -1939,8 +1939,10 @@ struct object(
 
     @always_inline
     fn __getattr__(
-        self, key: StringLiteral
-    ) raises -> ref [self._value.value] object:
+        ref[_]self, key: StringLiteral
+    ) raises -> ref [
+        _lit_mut_cast[__origin_of(self._value.value), True].result
+    ] object:
         """Gets the named attribute.
 
         Args:
@@ -1969,32 +1971,6 @@ struct object(
                 + "'"
             )
 
-    @always_inline
-    fn __setattr__(inout self, key: StringLiteral, value: object) raises:
-        """Sets the named attribute.
-
-        Args:
-            key: The attribute name.
-            value: The attribute value.
-        """
-        if not self._value.is_obj():
-            raise Error(
-                "TypeError: Type '"
-                + self._value._get_type_name()
-                + "' does not have attribute '"
-                + key
-                + "'"
-            )
-        try:
-            self._value.get_as_obj()._find_ref(key) = value
-            return
-        except e:
-            debug_assert(str(e) == "KeyError")
-            raise Error(
-                "AttributeError: Object does not have an attribute of name '"
-                + key
-                + "'"
-            )
 
     @always_inline
     fn __call__(self) raises -> object:
