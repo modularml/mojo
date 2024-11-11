@@ -63,7 +63,7 @@ struct _CTimeSpec(Stringable):
     var tv_sec: Int  # Seconds
     var tv_subsec: Int  # subsecond (nanoseconds on linux and usec on mac)
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.tv_sec = 0
         self.tv_subsec = 0
 
@@ -85,7 +85,7 @@ struct _FILETIME:
     var dwLowDateTime: UInt32
     var dwHighDateTime: UInt32
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.dwLowDateTime = 0
         self.dwHighDateTime = 0
 

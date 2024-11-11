@@ -114,7 +114,7 @@ struct Span[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self, *, ptr: UnsafePointer[T], length: Int):
+    fn __init__(out self, *, ptr: UnsafePointer[T], length: Int):
         """Unsafe construction from a pointer and length.
 
         Args:
@@ -125,7 +125,7 @@ struct Span[
         self._len = length
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly construct a deep copy of the provided Span.
 
         Args:
@@ -135,7 +135,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
-    fn __init__(inout self, ref [origin]list: List[T, *_]):
+    fn __init__(out self, ref [origin]list: List[T, *_]):
         """Construct a Span from a List.
 
         Args:

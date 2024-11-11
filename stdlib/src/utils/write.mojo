@@ -228,7 +228,7 @@ struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
     var pos: Int
     var writer: W
 
-    fn __init__(inout self, owned writer: W):
+    fn __init__(out self, owned writer: W):
         self.data = UnsafePointer[
             UInt8,
             address_space = AddressSpace.GENERIC,
@@ -275,7 +275,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
     var pos: Int
     var writer: W
 
-    fn __init__(inout self, owned writer: W):
+    fn __init__(out self, owned writer: W):
         self.data = InlineArray[UInt8, capacity](unsafe_uninitialized=True)
         self.pos = 0
         self.writer = writer^

@@ -34,7 +34,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     var _array: Self.type
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """The memory is now considered uninitialized."""
         self._array = __mlir_op.`kgen.param.constant`[
             _type = Self.type,
@@ -43,7 +43,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
 
     @doc_private
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """It is not possible to call this method.
 
         Trying to call this method will abort.
@@ -77,7 +77,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         self.write(value^)
 
     @always_inline
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Copy another object.
 
         This method should never be called as implicit copy should not
@@ -131,7 +131,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         self.unsafe_ptr().init_pointee_explicit_copy(other)
 
     @always_inline
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         """Move another object.
 
         This method should never be called as implicit moves should not

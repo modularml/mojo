@@ -70,7 +70,7 @@ struct StringLiteral(
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self.type):
+    fn __init__(out self, value: Self.type):
         """Create a string literal from a builtin string type.
 
         Args:
@@ -79,7 +79,7 @@ struct StringLiteral(
         self.value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy constructor.
 
         Args:

@@ -47,7 +47,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, owned *args: *element_types):
+    fn __init__(out self, owned *args: *element_types):
         """Construct the tuple.
 
         Args:
@@ -92,7 +92,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             UnsafePointer.address_of(self[i]).destroy_pointee()
 
     @always_inline("nodebug")
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy construct the tuple.
 
         Args:
@@ -108,7 +108,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             UnsafePointer.address_of(self[i]).init_pointee_copy(existing[i])
 
     @always_inline("nodebug")
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move construct the tuple.
 
         Args:

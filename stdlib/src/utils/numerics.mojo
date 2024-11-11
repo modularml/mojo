@@ -421,7 +421,7 @@ struct FlushDenormals:
     """The current state."""
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initializes the FlushDenormals."""
         self.state = Self._current_state()
 

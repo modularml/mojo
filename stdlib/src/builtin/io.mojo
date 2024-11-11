@@ -43,7 +43,7 @@ from utils import StringRef, StaticString, StringSlice
 struct _fdopen[mode: StringLiteral = "a"]:
     var handle: OpaquePointer
 
-    fn __init__(inout self, stream_id: FileDescriptor):
+    fn __init__(out self, stream_id: FileDescriptor):
         """Creates a file handle to the stdout/stderr stream.
 
         Args:

@@ -95,7 +95,7 @@ struct _DirHandle:
 
     var _handle: OpaquePointer
 
-    fn __init__(inout self, path: String) raises:
+    fn __init__(out self, path: String) raises:
         """Construct the _DirHandle using the path provided.
 
         Args:

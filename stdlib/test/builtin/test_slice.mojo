@@ -38,7 +38,7 @@ struct BoringSlice:
 
 
 struct Sliceable:
-    fn __init__(inout self):
+    fn __init__(out self):
         pass
 
     fn __getitem__(self, a: FunnySlice) -> FunnySlice:
@@ -63,7 +63,7 @@ def test_slicable():
 
 
 struct SliceStringable:
-    fn __init__(inout self):
+    fn __init__(out self):
         pass
 
     fn __getitem__(self, a: Slice) -> String:

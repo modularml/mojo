@@ -40,7 +40,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self, owned *args: *Ts):
+    fn __init__(out self, owned *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:
@@ -49,7 +49,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         self.storage = Tuple(storage=args^)
 
     @always_inline
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy construct the tuple.
 
         Args:
@@ -57,7 +57,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         """
         self.storage = existing.storage
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move construct the list.
 
         Args:
@@ -164,7 +164,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
     alias IterType = _VariadicListIter[type]
 
     @always_inline
-    fn __init__(inout self, *value: type):
+    fn __init__(out self, *value: type):
         """Constructs a VariadicList from a variadic list of arguments.
 
         Args:
@@ -175,7 +175,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 
     @doc_private
     @always_inline
-    fn __init__(inout self, value: Self._mlir_type):
+    fn __init__(out self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -327,7 +327,7 @@ struct VariadicListMem[
     # Provide support for borrowed variadic arguments.
     @doc_private
     @always_inline
-    fn __init__(inout self, value: Self._mlir_type):
+    fn __init__(out self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -344,7 +344,7 @@ struct VariadicListMem[
     ]
 
     @always_inline
-    fn __init__(inout self, value: Self._inout_variadic_type):
+    fn __init__(out self, value: Self._inout_variadic_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -364,7 +364,7 @@ struct VariadicListMem[
     ]
 
     @always_inline
-    fn __init__(inout self, value: Self._owned_variadic_type):
+    fn __init__(out self, value: Self._owned_variadic_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -377,7 +377,7 @@ struct VariadicListMem[
         self._is_owned = True
 
     @always_inline
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Moves constructor.
 
         Args:
@@ -509,7 +509,7 @@ struct VariadicPack[
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self._mlir_type, is_owned: Bool):
+    fn __init__(out self, value: Self._mlir_type, is_owned: Bool):
         """Constructs a VariadicPack from the internal representation.
 
         Args:
