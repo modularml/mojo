@@ -734,7 +734,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, owned impl: List[UInt8, *_]):
+    fn __init__(out self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
         The buffer must be terminated with a null byte:
@@ -762,12 +762,12 @@ struct String(
         )
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
 
     @always_inline
-    fn __init__(inout self, *, capacity: Int):
+    fn __init__(out self, *, capacity: Int):
         """Construct an uninitialized string with the given capacity.
 
         Args:
@@ -775,7 +775,7 @@ struct String(
         """
         self._buffer = Self._buffer_type(capacity=capacity)
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -783,7 +783,7 @@ struct String(
         """
         self.__copyinit__(other)
 
-    fn __init__(inout self, str: StringRef):
+    fn __init__(out self, str: StringRef):
         """Construct a string from a StringRef object.
 
         Args:
@@ -796,7 +796,7 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
-    fn __init__(inout self, str_slice: StringSlice):
+    fn __init__(out self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
         This will allocate a new string that copies the string contents from
@@ -819,7 +819,7 @@ struct String(
         self = Self(buffer^)
 
     @always_inline
-    fn __init__(inout self, literal: StringLiteral):
+    fn __init__(out self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
@@ -828,7 +828,7 @@ struct String(
         self = literal.__str__()
 
     @always_inline
-    fn __init__(inout self, *, ptr: UnsafePointer[Byte], length: Int):
+    fn __init__(out self, *, ptr: UnsafePointer[Byte], length: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
