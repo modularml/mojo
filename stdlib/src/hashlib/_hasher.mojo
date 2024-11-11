@@ -21,7 +21,7 @@ trait _HashableWithHasher:
 
 
 trait _Hasher:
-    fn __init__(inout self):
+    fn __init__(out self):
         ...
 
     fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):

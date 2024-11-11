@@ -267,7 +267,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self: StaticString, lit: StringLiteral):
+    fn __init__(out self: StaticString, lit: StringLiteral):
         """Construct a new `StringSlice` from a `StringLiteral`.
 
         Args:
@@ -288,7 +288,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         self = StaticString(unsafe_from_utf8=lit.as_bytes())
 
     @always_inline
-    fn __init__(inout self, *, owned unsafe_from_utf8: Span[Byte, origin]):
+    fn __init__(out self, *, owned unsafe_from_utf8: Span[Byte, origin]):
         """Construct a new `StringSlice` from a sequence of UTF-8 encoded bytes.
 
         Args:
@@ -300,7 +300,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         self._slice = unsafe_from_utf8^
 
-    fn __init__(inout self, *, unsafe_from_utf8_strref: StringRef):
+    fn __init__(out self, *, unsafe_from_utf8_strref: StringRef):
         """Construct a new StringSlice from a `StringRef` pointing to UTF-8
         encoded bytes.
 
@@ -323,7 +323,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         self = Self(unsafe_from_utf8=byte_slice)
 
     @always_inline
-    fn __init__(inout self, *, ptr: UnsafePointer[Byte], length: Int):
+    fn __init__(out self, *, ptr: UnsafePointer[Byte], length: Int):
         """Construct a `StringSlice` from a pointer to a sequence of UTF-8
         encoded bytes and a length.
 
@@ -340,7 +340,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         self._slice = Span[Byte, origin](ptr=ptr, length=length)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly construct a deep copy of the provided `StringSlice`.
 
         Args:
@@ -1162,7 +1162,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     alias _args_t = VariadicPack[element_trait=_CurlyEntryFormattable, *_]
     """Args types that are formattable by curly entry."""
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.first_curly = other.first_curly
         self.last_curly = other.last_curly
         self.conversion_flag = other.conversion_flag

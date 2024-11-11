@@ -23,7 +23,7 @@ struct _SourceLocation(Writable, Stringable):
     var col: Int
     var file_name: StringLiteral
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
     @no_inline

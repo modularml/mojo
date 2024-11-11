@@ -551,11 +551,11 @@ struct CopyCountedStruct(CollectionElement):
     var counter: CopyCounter
     var value: String
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.counter = CopyCounter(other=other.counter)
         self.value = String(other=other.value)
 
-    fn __init__(inout self, value: String):
+    fn __init__(out self, value: String):
         self.counter = CopyCounter()
         self.value = value
 
@@ -876,16 +876,16 @@ struct DtorCounter(CollectionElement):
     # NOTE: payload is required because List does not support zero sized structs.
     var payload: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.payload = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.payload = other.payload
 
-    fn __copyinit__(inout self, existing: Self, /):
+    fn __copyinit__(out self, existing: Self, /):
         self.payload = existing.payload
 
-    fn __moveinit__(inout self, owned existing: Self, /):
+    fn __moveinit__(out self, owned existing: Self, /):
         self.payload = existing.payload
         existing.payload = 0
 

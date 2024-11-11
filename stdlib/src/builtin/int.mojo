@@ -308,11 +308,11 @@ struct Int(
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -322,7 +322,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.index):
+    fn __init__(out self, value: __mlir_type.index):
         """Construct Int from the given index value.
 
         Args:
@@ -332,7 +332,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si16>`):
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
 
         Args:
@@ -346,7 +346,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si32>`):
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
 
         Args:
@@ -360,7 +360,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si64>`):
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
 
         Args:
@@ -374,7 +374,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
 
         Args:
@@ -385,7 +385,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    fn __init__(out self, value: IntLiteral):
         """Construct Int from the given IntLiteral value.
 
         Args:
@@ -406,7 +406,7 @@ struct Int(
         self = value.__index__()
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: UInt):
+    fn __init__(out self, value: UInt):
         """Construct Int from the given UInt value.
 
         Args:

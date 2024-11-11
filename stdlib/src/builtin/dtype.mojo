@@ -93,7 +93,7 @@ struct DType(
     on the system."""
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy this DType.
 
         Args:

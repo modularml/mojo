@@ -132,7 +132,7 @@ struct Deque[ElementType: CollectionElement](
         if elements is not None:
             self.extend(elements.value())
 
-    fn __init__(inout self, owned *values: ElementType):
+    fn __init__(out self, owned *values: ElementType):
         """Constructs a deque from the given values.
 
         Args:
@@ -167,7 +167,7 @@ struct Deque[ElementType: CollectionElement](
 
         self._tail = args_length
 
-    fn __init__(inout self, other: Self):
+    fn __init__(out self, other: Self):
         """Creates a deepcopy of the given deque.
 
         Args:
@@ -185,7 +185,7 @@ struct Deque[ElementType: CollectionElement](
 
         self._tail = len(other)
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Moves data of an existing deque into a new one.
 
         Args:

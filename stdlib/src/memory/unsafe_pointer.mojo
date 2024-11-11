@@ -98,13 +98,13 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Create a null pointer."""
         self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @doc_private
     @always_inline
-    fn __init__(inout self, value: Self._mlir_type):
+    fn __init__(out self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
         Args:
@@ -113,7 +113,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
-    fn __init__(inout self, other: UnsafePointer[type, address_space, *_, **_]):
+    fn __init__(out self, other: UnsafePointer[type, address_space, *_, **_]):
         """Exclusivity parameter cast a pointer.
 
         Args:
@@ -124,7 +124,7 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
