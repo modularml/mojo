@@ -18,8 +18,11 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import Dict, List
 from sys.intrinsics import _type_is_eq
 from sys.ffi import OpaquePointer
-
+from builtin.builtin_list import _lit_mut_cast
 from memory import Arc, memcmp, memcpy, UnsafePointer
+
+from collections.dict import _DictEntryIter
+from collections.list import _ListIter
 
 from utils import StringRef, Variant
 
@@ -36,38 +39,7 @@ struct _NoneMarker(CollectionElementNew):
         pass
 
 
-@register_passable("trivial")
-struct _ImmutableString(CollectionElement, CollectionElementNew):
-    """Python strings are immutable. This class is marked as trivially register
-    passable because its memory will be managed by `_ObjectImpl`. It is a
-    pointer and integer pair. Memory will be dynamically allocated.
-    """
-
-    var data: UnsafePointer[UInt8]
-    """The pointer to the beginning of the string contents. It is not
-    null-terminated."""
-    var length: Int
-    """The length of the string."""
-
-    @always_inline
-    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
-        self.data = data
-        self.length = length
-
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        self = other
-
-    @always_inline
-    fn string_compare(self, rhs: _ImmutableString) -> Int:
-        var res = memcmp(self.data, rhs.data, min(self.length, rhs.length))
-        if res != 0:
-            return -1 if res < 0 else 1
-        if self.length == rhs.length:
-            return 0
-        return -1 if self.length < rhs.length else 1
-
-
+@value
 struct _RefCountedList:
     """Python objects have the behavior that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
@@ -75,38 +47,33 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    var impl: Arc[List[_ObjectImpl]]
+    var impl: Arc[List[object]]
     """The list value."""
 
     fn __init__(inout self):
-        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
+        self.impl = Arc[List[object]](List[object]())
 
 
-@register_passable("trivial")
-struct _RefCountedListRef(CollectionElement, CollectionElementNew):
-    # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    var lst: OpaquePointer
-    """The reference to the list."""
+@value
+struct _RefCountedTuple:
+    """Tuple implementation is similar to List."""
 
-    @always_inline
+    var impl: Arc[List[object]]
+    """The list value."""
+
     fn __init__(inout self):
-        var ptr = UnsafePointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
-        self.lst = ptr.bitcast[NoneType]()
+        self.impl = Arc[List[object]](List[object]())
 
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        self.lst = other.lst
-
-    @always_inline
-    fn copy(self) -> Self:
-        _ = self.lst.bitcast[_RefCountedList]()[].impl
-        return Self {lst: self.lst}
-
-    fn release(self):
-        var ptr = self.lst.bitcast[_RefCountedList]()[].impl
+    fn __init__(inout self, capacity: Int):
+        self.impl = Arc[List[object]](List[object](capacity=capacity))
 
 
+@value
+struct _RefCountedString(CollectionElement):
+    var impl: Arc[String]
+
+
+@value
 struct _RefCountedAttrsDict:
     """This type contains the attribute dictionary for a dynamic object. The
     attribute dictionary is constructed once with a fixed number of elements.
@@ -115,38 +82,15 @@ struct _RefCountedAttrsDict:
     directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
-    var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
+    var impl: Arc[Dict[StringLiteral, object]]
     """The implementation of the map."""
 
-    fn __init__(inout self):
-        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
-            Dict[StringLiteral, _ObjectImpl]()
-        )
-
-    @always_inline
-    fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
-        if key in self.impl[]:
-            self.impl[][key].destroy()
-            self.impl[][key] = value
-            return
-        raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
-        )
-
-    @always_inline
-    fn get(self, key: StringLiteral) raises -> _ObjectImpl:
-        var iter = self.impl[].find(key)
-        if iter:
-            return iter.value()
-        raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
-        )
+    @staticmethod
+    fn initialized_dict() -> Self:
+        return Arc[Dict[StringLiteral, object]](Dict[StringLiteral, object]())
 
 
+@value
 struct Attr:
     """A generic object's attributes are set on construction, after which the
     attributes can be read and modified, but no attributes may be removed or
@@ -170,34 +114,78 @@ struct Attr:
         self.value = value^
 
 
-@register_passable("trivial")
-struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
-    # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    # FIXME(#12604): Distinguish this type from _RefCountedListRef.
-    var attrs: UnsafePointer[Int8]
-    """The reference to the dictionary."""
+trait WrappeableStruct(CollectionElement):
+    """Types that implements this trait can be used in dynamic objects."""
 
-    @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _]):
-        var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
-        # Elements can only be added on construction.
-        for i in range(len(values)):
-            ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
+    alias classname: StringLiteral
 
-        self.attrs = ptr.bitcast[Int8]()
+    fn __init__(inout self):
+        """Initialize an value (default initiliazer)."""
+        # TODO: remove it, we need it to create the trait
+        # (can be replaced later with __getattr__ and __setattr__)
+        ...
 
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        self = other
 
-    @always_inline
-    fn copy(self) -> Self:
-        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
-        return Self {attrs: self.attrs}
+@value
+struct WrappedStruct:
+    """This type contains wrapped structs for a dynamic object."""
 
-    fn release(self):
-        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
+    var ptr: UnsafePointer[NoneType]
+    """The memory to store the value."""
+    var classname: StringLiteral
+    """A type name (for type checking)."""
+    # TODO: type checking in a better way
+    var _del: fn (UnsafePointer[NoneType]) -> None
+    """The `__del__` function for type `T` (Self.`__init__[T]`)."""
+
+    # where attributes ? in RefAttrDict or in struct?
+    # parametrized var _getattr _setattr ?
+    fn __init__[T: WrappeableStruct](inout self, owned arg: T):
+        """Initialize `self` by moving a value in.
+
+        Args:
+            arg: The value of type `T` to move in.
+
+        Parameters:
+            T: The type of arg.
+        """
+
+        fn _del(_self: UnsafePointer[NoneType]):
+            _self.bitcast[T]().destroy_pointee()
+
+        tmp_ptr = UnsafePointer[T].alloc(1)
+        tmp_ptr.init_pointee_move(arg^)
+        self.ptr = tmp_ptr.bitcast[NoneType]()
+        self._del = _del
+        self.classname = T.classname
+
+    fn __del__(owned self):
+        """Deinitiliaze self."""
+        debug_assert(self.ptr.__bool__(), "WrappedStruct.ptr is not allocated")
+        self._del(self.ptr)
+        self.ptr.free()
+
+
+@value
+struct _RefCountedStruct:
+    """This type contains the dictionary implementation for a dynamic object."""
+
+    var impl: Arc[WrappedStruct]
+    """The implementation of the WrappedStruct."""
+
+    fn __init__(inout self, owned arg: WrappedStruct):
+        self.impl = Arc[WrappedStruct](arg^)
+
+
+@value
+struct _RefCountedDict:
+    """This type contains the dictionary implementation for a dynamic object."""
+
+    var impl: Arc[Dict[object, object]]
+    """The implementation of the map."""
+
+    fn __init__(inout self):
+        self.impl = Arc[Dict[object, object]](Dict[object, object]())
 
 
 @register_passable("trivial")
@@ -253,7 +241,6 @@ struct _Function(CollectionElement, CollectionElementNew):
 
 struct _ObjectImpl(
     CollectionElement,
-    CollectionElementNew,
     Stringable,
     Representable,
     Writable,
@@ -271,10 +258,13 @@ struct _ObjectImpl(
         Bool,
         Int64,
         Float64,
-        _ImmutableString,
-        _RefCountedListRef,
+        _RefCountedString,
+        _RefCountedList,
+        _RefCountedDict,
         _Function,
-        _RefCountedAttrsDictRef,
+        _RefCountedAttrsDict,
+        _RefCountedTuple,
+        _RefCountedStruct,
     ]
     """The variant value type."""
     var value: Self.type
@@ -293,52 +283,22 @@ struct _ObjectImpl(
     """Type discriminator indicating a string."""
     alias list: Int = 5
     """Type discriminator indicating a list."""
-    alias dict: Int = 8  # TODO
+    alias dict: Int = 8
     """Type discriminator indicating a dictionary."""
     alias function: Int = 6
     """Type discriminator indicating a function."""
     alias obj: Int = 7
     """Type discriminator indicating an object."""
+    alias tuple: Int = 9
+    """Type discriminator indicating a tuple."""
 
     # ===------------------------------------------------------------------=== #
     # Constructors
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, value: Self.type):
-        self.value = value
-
-    @always_inline
-    fn __init__(inout self):
-        self.value = Self.type(_NoneMarker {})
-
-    @always_inline
-    fn __init__(inout self, value: Bool):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
-        @parameter
-        if dt.is_integral():
-            self.value = Self.type(value)
-        else:
-            self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: _ImmutableString):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: _RefCountedListRef):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: _Function):
-        self.value = Self.type(value)
-
-    @always_inline
-    fn __init__(inout self, value: _RefCountedAttrsDictRef):
-        self.value = Self.type(value)
+    fn __init__(inout self, owned arg: Self.type):
+        self.value = arg^
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -347,43 +307,15 @@ struct _ObjectImpl(
         Args:
             other: The value to copy.
         """
-        self = other.value
+        self = other
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
-        self = existing.value
+        self.value = existing.value
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
-        self = other.value^
-
-    @always_inline
-    fn copy(self) -> Self:
-        if self.is_str():
-            var str = self.get_as_string()
-            var impl = _ImmutableString(
-                UnsafePointer[UInt8].alloc(str.length), str.length
-            )
-            memcpy(
-                dest=impl.data,
-                src=str.data,
-                count=str.length,
-            )
-            return impl
-        if self.is_list():
-            return self.get_as_list().copy()
-        if self.is_obj():
-            return self.get_obj_attrs().copy()
-        return self
-
-    @always_inline
-    fn destroy(self):
-        if self.is_str():
-            self.get_as_string().data.free()
-        elif self.is_list():
-            self.get_as_list().release()
-        elif self.is_obj():
-            self.get_obj_attrs().release()
+        self.value = other.value^
 
     # ===------------------------------------------------------------------=== #
     # Value Query
@@ -407,15 +339,15 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_str(self) -> Bool:
-        return self.value.isa[_ImmutableString]()
+        return self.value.isa[_RefCountedString]()
 
     @always_inline
     fn is_list(self) -> Bool:
-        return self.value.isa[_RefCountedListRef]()
+        return self.value.isa[_RefCountedList]()
 
     @always_inline
     fn is_dict(self) -> Bool:
-        return False
+        return self.value.isa[_RefCountedDict]()
 
     @always_inline
     fn is_func(self) -> Bool:
@@ -423,7 +355,15 @@ struct _ObjectImpl(
 
     @always_inline
     fn is_obj(self) -> Bool:
-        return self.value.isa[_RefCountedAttrsDictRef]()
+        return self.value.isa[_RefCountedAttrsDict]()
+
+    @always_inline
+    fn is_tuple(self) -> Bool:
+        return self.value.isa[_RefCountedTuple]()
+
+    @always_inline
+    fn is_struct(self) -> Bool:
+        return self.value.isa[_RefCountedStruct]()
 
     # get a copy
     @always_inline
@@ -439,20 +379,52 @@ struct _ObjectImpl(
         return self.value[Float64]
 
     @always_inline
-    fn get_as_string(self) -> _ImmutableString:
-        return self.value[_ImmutableString]
+    fn get_as_string(ref [_]self) -> ref [self.value] String:
+        return UnsafePointer.address_of(self.value[_RefCountedString].impl[])[]
 
     @always_inline
-    fn get_as_list(self) -> _RefCountedListRef:
-        return self.value[_RefCountedListRef]
+    fn get_as_list(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] List[object]:
+        return UnsafePointer.address_of(self.value[_RefCountedList].impl[])[]
 
     @always_inline
     fn get_as_func(self) -> _Function:
         return self.value[_Function]
 
     @always_inline
-    fn get_obj_attrs(self) -> _RefCountedAttrsDictRef:
-        return self.value[_RefCountedAttrsDictRef]
+    fn get_as_obj(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] Dict[
+        StringLiteral, object
+    ]:
+        return UnsafePointer.address_of(
+            self.value[_RefCountedAttrsDict].impl[]
+        )[]
+
+    @always_inline
+    fn get_as_dict(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] Dict[
+        object, object
+    ]:
+        return UnsafePointer.address_of(self.value[_RefCountedDict].impl[])[]
+
+    @always_inline
+    fn get_as_tuple(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self.value), True].result] List[object]:
+        return UnsafePointer.address_of(self.value[_RefCountedTuple].impl[])[]
+
+    @always_inline
+    fn get_as_struct[
+        T: WrappeableStruct
+    ](
+        ref [_]self,
+    ) -> ref [
+        _lit_mut_cast[__origin_of(self.value), True].result
+    ] T:
+        return self.value[_RefCountedStruct].impl[].ptr.bitcast[T]()[]
 
     @always_inline
     fn get_type_id(self) -> Int:
@@ -470,7 +442,14 @@ struct _ObjectImpl(
             return Self.list
         if self.is_func():
             return Self.function
-        debug_assert(self.is_obj(), "expected a generic object")
+        if self.is_dict():
+            return Self.dict
+        if self.is_tuple():
+            return Self.tuple
+        debug_assert(
+            self.is_obj(),
+            "expected a generic object, not a " + self._get_type_name(),
+        )
         return Self.obj
 
     @always_inline
@@ -490,8 +469,29 @@ struct _ObjectImpl(
             return "list"
         if self.is_func():
             return "function"
+        if self.is_dict():
+            return "dict"
+        if self.is_tuple():
+            return "tuple"
+        if self.is_struct():
+            return self.value[_RefCountedStruct].impl[].classname
         debug_assert(self.is_obj(), "expected a generic object")
         return "obj"
+
+    def ref_count(ref [_]self) -> Int:
+        if self.is_dict():
+            return int(self.value[_RefCountedDict].impl.count())
+        if self.is_obj():
+            return int(self.value[_RefCountedAttrsDict].impl.count())
+        if self.is_str():
+            return int(self.value[_RefCountedString].impl.count())
+        if self.is_list():
+            return int(self.value[_RefCountedList].impl.count())
+        if self.is_tuple():
+            return int(self.value[_RefCountedTuple].impl.count())
+        if self.is_struct():
+            return int(self.value[_RefCountedStruct].impl.count())
+        raise self._get_type_name() + " is not ref counted"
 
     # ===------------------------------------------------------------------=== #
     # Type Conversion
@@ -581,15 +581,7 @@ struct _ObjectImpl(
             writer.write(str(self.get_as_float()))
             return
         if self.is_str():
-            writer.write(
-                "'"
-                + str(
-                    StringRef(
-                        self.get_as_string().data, self.get_as_string().length
-                    )
-                )
-                + "'"
-            )
+            writer.write("'", self.get_as_string(), "'")
             return
         if self.is_func():
             writer.write(
@@ -598,25 +590,39 @@ struct _ObjectImpl(
             return
         if self.is_list():
             writer.write(String("["))
-            for j in range(self.get_list_length()):
+            for j in range(len(self.get_as_list())):
                 if j != 0:
                     writer.write(", ")
-                writer.write(str(object(self.get_list_element(j))))
+                writer.write(repr(self.get_as_list()[j]))
             writer.write("]")
             return
 
-        var ptr = self.get_obj_attrs_ptr()
+        if self.is_tuple():
+            writer.write(String("("))
+            for j in range(len(self.get_as_tuple())):
+                if j != 0:
+                    writer.write(", ")
+                writer.write(repr(self.get_as_tuple()[j]))
+            writer.write(")")
+            return
+
+        if self.is_dict():
+            writer.write(String("{"))
+            var print_sep = False
+            for entry in self.get_as_dict().items():
+                if print_sep:
+                    writer.write(", ")
+                writer.write(repr(entry[].key), " = ", repr(entry[].value))
+                print_sep = True
+            writer.write("}")
+            return
+
         writer.write(String("{"))
         var print_sep = False
-        for entry in ptr[].impl[].items():
+        for entry in self.get_as_obj().items():
             if print_sep:
                 writer.write(", ")
-            writer.write(
-                "'"
-                + str(entry[].key)
-                + "' = "
-                + str(object(entry[].value.copy()))
-            )
+            writer.write("'" + str(entry[].key) + "' = " + repr(entry[].value))
             print_sep = True
         writer.write("}")
         return
@@ -641,51 +647,6 @@ struct _ObjectImpl(
         """
         return String.write(self)
 
-    # ===------------------------------------------------------------------=== #
-    # List Functions
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
-        return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
-
-    @always_inline
-    fn list_append(self, value: Self):
-        var ptr = self.get_list_ptr()
-        ptr[].append(value.value)
-
-    @always_inline
-    fn get_list_length(self) -> Int:
-        var ptr = self.get_list_ptr()
-        return len(ptr[])
-
-    @always_inline
-    fn get_list_element(self, i: Int) -> _ObjectImpl:
-        var ptr = self.get_list_ptr()
-        return ptr[][i].copy()
-
-    @always_inline
-    fn set_list_element(self, i: Int, value: _ObjectImpl):
-        var ptr = self.get_list_ptr()
-        ptr[][i].destroy()
-        ptr[][i] = value
-
-    # ===------------------------------------------------------------------=== #
-    # Object Attribute Functions
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn get_obj_attrs_ptr(self) -> UnsafePointer[_RefCountedAttrsDict]:
-        return self.get_obj_attrs().attrs.bitcast[_RefCountedAttrsDict]()
-
-    @always_inline
-    fn set_obj_attr(self, key: StringLiteral, value: _ObjectImpl) raises:
-        self.get_obj_attrs_ptr()[].set(key, value)
-
-    @always_inline
-    fn get_obj_attr(self, key: StringLiteral) raises -> _ObjectImpl:
-        return self.get_obj_attrs_ptr()[].get(key).copy()
-
 
 # ===----------------------------------------------------------------------=== #
 # object
@@ -693,7 +654,12 @@ struct _ObjectImpl(
 
 
 struct object(
-    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Writable
+    IntableRaising,
+    ImplicitlyBoolable,
+    Stringable,
+    Representable,
+    Writable,
+    Comparable,
 ):
     """Represents an object without a concrete type.
 
@@ -706,15 +672,6 @@ struct object(
     var _value: _ObjectImpl
     """The underlying value of the object."""
 
-    alias nullary_function = _Function.fn0
-    """Nullary function type."""
-    alias unary_function = _Function.fn1
-    """Unary function type."""
-    alias binary_function = _Function.fn2
-    """Binary function type."""
-    alias ternary_function = _Function.fn3
-    """Ternary function type."""
-
     # ===------------------------------------------------------------------=== #
     # Constructors
     # ===------------------------------------------------------------------=== #
@@ -722,17 +679,7 @@ struct object(
     @always_inline
     fn __init__(inout self):
         """Initializes the object with a `None` value."""
-        self._value = _ObjectImpl()
-
-    @always_inline
-    fn __init__(inout self, impl: _ObjectImpl):
-        """Initializes the object with an implementation value. This is meant for
-        internal use only.
-
-        Args:
-            impl: The object implementation.
-        """
-        self._value = impl
+        self._value = _ObjectImpl(_NoneMarker {})
 
     @always_inline
     fn __init__(inout self, none: NoneType):
@@ -741,7 +688,7 @@ struct object(
         Args:
             none: None.
         """
-        self._value = _ObjectImpl()
+        self._value = _ObjectImpl(_NoneMarker {})
 
     @always_inline
     fn __init__(inout self, value: Int):
@@ -753,16 +700,7 @@ struct object(
         self._value = Int64(value)
 
     @always_inline
-    fn __init__(inout self, value: Float64):
-        """Initializes the object with an floating-point value.
-
-        Args:
-            value: The float value.
-        """
-        self._value = value
-
-    @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    fn __init__[dt: DType](inout self, value: Scalar[dt]):
         """Initializes the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
         converted to the appropriate integer or floating point type.
@@ -778,7 +716,12 @@ struct object(
         if dt == DType.bool:
             self._value = value.__bool__()
         else:
-            self._value = value
+
+            @parameter
+            if dt.is_integral():
+                self._value = value.cast[DType.int64]()
+            else:
+                self._value = value.cast[DType.float64]()
 
     @always_inline
     fn __init__(inout self, value: Bool):
@@ -790,13 +733,22 @@ struct object(
         self._value = value
 
     @always_inline
+    fn __init__(inout self, value: String):
+        """Initializes the object from a string.
+
+        Args:
+            value: The string value.
+        """
+        self._value = _RefCountedString(value)
+
+    @always_inline
     fn __init__(inout self, value: StringLiteral):
         """Initializes the object from a string literal.
 
         Args:
             value: The string value.
         """
-        self = object(StringRef(value))
+        self = Self(StringRef(value))
 
     @always_inline
     fn __init__(inout self, value: StringRef):
@@ -805,15 +757,7 @@ struct object(
         Args:
             value: The string value.
         """
-        var impl = _ImmutableString(
-            UnsafePointer[UInt8].alloc(value.length), value.length
-        )
-        memcpy(
-            dest=impl.data,
-            src=value.unsafe_ptr(),
-            count=value.length,
-        )
-        self._value = impl
+        self = String(value)
 
     @always_inline
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
@@ -825,7 +769,7 @@ struct object(
         Args:
             value: The list value.
         """
-        self._value = _RefCountedListRef()
+        self._value = _RefCountedList()
 
         @parameter
         for i in range(len(VariadicList(Ts))):
@@ -835,22 +779,68 @@ struct object(
 
             @parameter
             if _type_is_eq[T, Int]():
-                self._append(value.get[i, Int]())
+                self._value.get_as_list().append(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
-                self._append(value.get[i, Float64]())
+                self._value.get_as_list().append(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
-                self._append(value.get[i, Bool]())
+                self._value.get_as_list().append(value.get[i, Bool]())
+            elif _type_is_eq[T, String]():
+                self._value.get_as_list().append(value.get[i, String]())
             elif _type_is_eq[T, StringRef]():
-                self._append(value.get[i, StringRef]())
+                self._value.get_as_list().append(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
-                self._append(value.get[i, StringLiteral]())
+                self._value.get_as_list().append(value.get[i, StringLiteral]())
+            elif _type_is_eq[T, _ObjectImpl]():
+                constrained[
+                    False, "implicit conversion from _ObjectImpl to object"
+                ]()
             else:
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
 
     @always_inline
-    fn __init__(inout self, func: Self.nullary_function):
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
+        """Initializes the object from a tuple literal.
+
+        Parameters:
+            Ts: The tuple element types.
+
+        Args:
+            value: The tuple value.
+        """
+        self._value = _ObjectImpl(_RefCountedTuple())
+
+        @parameter
+        for i in range(len(VariadicList(Ts))):
+            # We need to rebind the element to one we know how to convert from.
+            # FIXME: This doesn't handle implicit conversions or nested lists.
+            alias T = Ts[i]
+
+            @parameter
+            if _type_is_eq[T, Int]():
+                self._value.get_as_tuple().append(value.get[i, Int]())
+            elif _type_is_eq[T, Float64]():
+                self._value.get_as_tuple().append(value.get[i, Float64]())
+            elif _type_is_eq[T, Bool]():
+                self._value.get_as_tuple().append(value.get[i, Bool]())
+            elif _type_is_eq[T, String]():
+                self._value.get_as_tuple().append(value.get[i, String]())
+            elif _type_is_eq[T, StringRef]():
+                self._value.get_as_tuple().append(value.get[i, StringRef]())
+            elif _type_is_eq[T, StringLiteral]():
+                self._value.get_as_tuple().append(value.get[i, StringLiteral]())
+            elif _type_is_eq[T, _ObjectImpl]():
+                constrained[
+                    False, "implicit conversion from _ObjectImpl to object"
+                ]()
+            else:
+                constrained[
+                    False, "cannot convert nested list element to object"
+                ]()
+
+    @always_inline
+    fn __init__(inout self, func: _Function.fn0):
         """Initializes an object from a function that takes no arguments.
 
         Args:
@@ -859,7 +849,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.unary_function):
+    fn __init__(inout self, func: _Function.fn1):
         """Initializes an object from a function that takes one argument.
 
         Args:
@@ -868,7 +858,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.binary_function):
+    fn __init__(inout self, func: _Function.fn2):
         """Initializes an object from a function that takes two arguments.
 
         Args:
@@ -877,7 +867,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.ternary_function):
+    fn __init__(inout self, func: _Function.fn3):
         """Initializes an object from a function that takes three arguments.
 
         Args:
@@ -886,13 +876,56 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
+    fn __init__(inout self, owned arg: _RefCountedDict):
+        """Initializes the object with a _RefCountedDict.
+
+        Args:
+            arg: The ref counted dictionary.
+        """
+        self._value = arg^
+
+    @always_inline
+    fn __init__(inout self, owned arg: _RefCountedTuple):
+        """Initializes the object with a _RefCountedTuple.
+
+        Args:
+            arg: The ref counted dictionary.
+        """
+        self._value = arg^
+
+    @always_inline
     fn __init__(inout self, *attrs: Attr):
         """Initializes the object with a sequence of zero or more attributes.
 
         Args:
             attrs: Zero or more attributes.
         """
-        self._value = _RefCountedAttrsDictRef(attrs)
+        self._value = _RefCountedAttrsDict.initialized_dict()
+        # Elements can only be added on construction.
+        for a in attrs:
+            self._value.get_as_obj()._insert(a[].key, a[].value)
+
+    fn __init__(inout self, attrs: List[Attr]):
+        """Initializes the object with a list of zero or more attributes.
+
+        Args:
+            attrs: Zero or more attributes.
+        """
+        self._value = _RefCountedAttrsDict.initialized_dict()
+        # Elements can only be added on construction.
+        for i in range(len(attrs)):
+            self._value.get_as_obj()._insert(attrs[i].key, attrs[i].value)
+
+    fn __init__[T: WrappeableStruct](inout self, owned arg: T):
+        """Initializes the object with a struct.
+
+        Args:
+            arg: A value of type T.
+
+        Parameters:
+            T: The type of arg, that implements the `Wrappeableobject` trait.
+        """
+        self._value = _RefCountedStruct(WrappedStruct(arg^))
 
     @always_inline
     fn __moveinit__(inout self, owned existing: object):
@@ -901,8 +934,16 @@ struct object(
         Args:
             existing: The object to move.
         """
+        self._value = existing._value^
+
+    @always_inline
+    fn __init__(inout self, existing: object):
+        """Copies the object. Used to remove implicit conversions.
+
+        Args:
+            existing: The object to copy.
+        """
         self._value = existing._value
-        existing._value = _ObjectImpl()
 
     @always_inline
     fn __copyinit__(inout self, existing: object):
@@ -912,12 +953,12 @@ struct object(
         Args:
             existing: The object to copy.
         """
-        self._value = existing._value.copy()
+        self._value = existing._value
 
     @always_inline
     fn __del__(owned self):
         """Delete the object and release any owned memory."""
-        self._value.destroy()
+        ...
 
     # ===------------------------------------------------------------------=== #
     # Conversion
@@ -940,9 +981,16 @@ struct object(
             return (self._value.get_as_float() != 0.0).__bool__()
         if self._value.is_str():
             # Strings are true if they are non-empty.
-            return self._value.get_as_string().length != 0
-        debug_assert(self._value.is_list(), "expected a list")
-        return self._value.get_list_length() != 0
+            return bool(self._value.get_as_string())
+        if self._value.is_list():
+            return len(self._value.get_as_list()) != 0
+        if self._value.is_dict():
+            return len(self._value.get_as_dict()) != 0
+        if self._value.is_tuple():
+            return len(self._value.get_as_tuple()) != 0
+        # TODO: __bool__ in RefCountedAttrsDict
+        debug_assert(self._value.is_obj(), "expected an RefCountedAttrsDict")
+        return False
 
     fn __int__(self) raises -> Int:
         """Performs conversion to integer according to Python
@@ -959,6 +1007,9 @@ struct object(
 
         if self._value.is_float():
             return int(self._value.get_as_float())
+
+        if self._value.is_str():
+            return int(self._value.get_as_string())
 
         raise "object type cannot be converted to an integer"
 
@@ -992,6 +1043,8 @@ struct object(
         Returns:
             The String representation of the object.
         """
+        if self._value.is_str():
+            return self._value.get_as_string()
         return String.write(self._value)
 
     @no_inline
@@ -1052,22 +1105,36 @@ struct object(
         return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
 
     @always_inline
-    fn _string_compare(self, rhs: object) -> Int:
-        return self._value.get_as_string().string_compare(
-            rhs._value.get_as_string()
-        )
+    fn _compare[
+        list_or_tuple: StringLiteral = "list"
+    ](self, rhs: object) raises -> Int:
+        var llen: Int
+        var rlen: Int
+        var lptr: Pointer[
+            List[object],
+            _lit_mut_cast[__origin_of(self._value.value), True].result,
+        ]
+        var rptr: Pointer[
+            List[object],
+            _lit_mut_cast[__origin_of(rhs._value.value), True].result,
+        ]
 
-    @always_inline
-    fn _list_compare(self, rhs: object) raises -> Int:
-        var llen = self._value.get_list_length()
-        var rlen = self._value.get_list_length()
+        @parameter
+        if list_or_tuple == "list":
+            llen = len(self._value.get_as_list())
+            rlen = len(rhs._value.get_as_list())
+            lptr = Pointer.address_of(self._value.get_as_list())
+            rptr = Pointer.address_of(rhs._value.get_as_list())
+        else:
+            llen = len(self._value.get_as_tuple())
+            rlen = len(rhs._value.get_as_tuple())
+            lptr = Pointer.address_of(self._value.get_as_tuple())
+            rptr = Pointer.address_of(rhs._value.get_as_tuple())
         var cmp_len = min(llen, rlen)
         for i in range(cmp_len):
-            var lelt: object = self._value.get_list_element(i)
-            var relt: object = rhs._value.get_list_element(i)
-            if lelt < relt:
+            if lptr[][i] < rptr[][i]:
                 return -1
-            if lelt > relt:
+            if lptr[][i] > rptr[][i]:
                 return 1
         if llen < rlen:
             return -1
@@ -1075,7 +1142,7 @@ struct object(
             return 1
         return 0
 
-    fn __lt__(self, rhs: object) raises -> object:
+    fn __lt__(self, rhs: object) -> Bool:
         """Less-than comparator. This lexicographically compares strings and
         lists.
 
@@ -1085,20 +1152,33 @@ struct object(
         Returns:
             True if the object is less than the right hard argument.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) < 0
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) < 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() < rhs._value.get_as_string()
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return not lhs and rhs
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) < 0
 
-        return Self._comparison_op[Float64.__lt__, Int64.__lt__, bool_fn](
-            self, rhs
-        )
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) < 0
 
-    fn __le__(self, rhs: object) raises -> object:
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__lt__"](self, rhs)
+
+            return Self._comparison_op[
+                Float64.__lt__, Int64.__lt__, Bool.__lt__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
+
+    fn __le__(self, rhs: object) -> Bool:
         """Less-than-or-equal to comparator. This lexicographically
         compares strings and lists.
 
@@ -1108,20 +1188,33 @@ struct object(
         Returns:
             True if the object is less than or equal to the right hard argument.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) <= 0
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) <= 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() <= rhs._value.get_as_string()
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs == rhs or not lhs
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) <= 0
 
-        return Self._comparison_op[Float64.__le__, Int64.__le__, bool_fn](
-            self, rhs
-        )
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) <= 0
 
-    fn __eq__(self, rhs: object) raises -> object:
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__le__"](self, rhs)
+
+            return Self._comparison_op[
+                Float64.__le__, Int64.__le__, Bool.__le__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
+
+    fn __eq__(self, rhs: object) -> Bool:
         """Equality comparator. This compares the elements of strings
         and lists.
 
@@ -1131,20 +1224,33 @@ struct object(
         Returns:
             True if the objects are equal.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) == 0
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) == 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() == rhs._value.get_as_string()
+            if self._value.is_list() and rhs._value.is_list():
+                return self._value.get_as_list() == rhs._value.get_as_list()
+            if self._value.is_dict() and rhs._value.is_dict():
+                return repr(self) == repr(rhs)
+            if self._value.is_obj() and rhs._value.is_obj():
+                return repr(self) == repr(rhs)
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._value.get_as_tuple() == rhs._value.get_as_tuple()
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs == rhs
+            c = Self._comparison_op[Float64.__eq__, Int64.__eq__, Bool.__eq__](
+                self, rhs
+            )
+            return bool(c)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
 
-        return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
-            self, rhs
-        )
-
-    fn __ne__(self, rhs: object) raises -> object:
+    fn __ne__(self, rhs: object) -> Bool:
         """Inequality comparator. This compares the elements of strings
         and lists.
 
@@ -1154,20 +1260,9 @@ struct object(
         Returns:
             True if the objects are not equal.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) != 0
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) != 0
+        return not (self == rhs)
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs != rhs
-
-        return Self._comparison_op[Float64.__ne__, Int64.__ne__, bool_fn](
-            self, rhs
-        )
-
-    fn __gt__(self, rhs: object) raises -> object:
+    fn __gt__(self, rhs: object) -> Bool:
         """Greater-than comparator. This lexicographically compares the
         elements of strings and lists.
 
@@ -1177,20 +1272,30 @@ struct object(
         Returns:
             True if the left hand value is greater.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) > 0
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) > 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() > rhs._value.get_as_string()
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) > 0
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) > 0
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__gt__"](self, rhs)
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs and not rhs
+            return Self._comparison_op[
+                Float64.__gt__, Int64.__gt__, Bool.__gt__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
 
-        return Self._comparison_op[Float64.__gt__, Int64.__gt__, bool_fn](
-            self, rhs
-        )
-
-    fn __ge__(self, rhs: object) raises -> object:
+    fn __ge__(self, rhs: object) -> Bool:
         """Greater-than-or-equal-to comparator. This lexicographically
         compares the elements of strings and lists.
 
@@ -1201,18 +1306,28 @@ struct object(
             True if the left hand value is greater than or equal to the right
             hand value.
         """
-        if self._value.is_str() and rhs._value.is_str():
-            return self._string_compare(rhs) >= 0
-        if self._value.is_list() and rhs._value.is_list():
-            return self._list_compare(rhs) >= 0
+        try:
+            if self._value.is_str() and rhs._value.is_str():
+                return self._value.get_as_string() >= rhs._value.get_as_string()
+            if self._value.is_list() and rhs._value.is_list():
+                return self._compare(rhs) >= 0
+            if self._value.is_tuple() and rhs._value.is_tuple():
+                return self._compare[list_or_tuple="tuple"](rhs) >= 0
+            if self._value.is_obj():
+                return self._value.get_as_obj()["__ge__"](self, rhs)
 
-        @always_inline
-        fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
-            return lhs == rhs or lhs
-
-        return Self._comparison_op[Float64.__ge__, Int64.__ge__, bool_fn](
-            self, rhs
-        )
+            return Self._comparison_op[
+                Float64.__ge__, Int64.__ge__, Bool.__ge__
+            ](self, rhs)
+        except e:
+            # TODO: re-raise error from _comparison_type_check
+            # TODO: re-raise attribute undefined if self._value.is_obj()
+            # _comparison_op -> _comparison_type_check()
+            debug_assert(
+                str(e) == "TypeError: not a valid comparison type",
+                "expecting error: TypeError: not a valid comparison type",
+            )
+            return False
 
     # ===------------------------------------------------------------------=== #
     # Arithmetic Operators
@@ -1326,23 +1441,24 @@ struct object(
             The sum or concatenated values.
         """
         if self._value.is_str() and rhs._value.is_str():
-            var lhsStr = self._value.get_as_string()
-            var rhsStr = rhs._value.get_as_string()
-            var length = lhsStr.length + rhsStr.length
-            var impl = _ImmutableString(
-                UnsafePointer[UInt8].alloc(length), length
-            )
-            memcpy(impl.data, lhsStr.data, lhsStr.length)
-            memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
-            var result = object()
-            result._value = impl
-            return result
+            return self._value.get_as_string() + rhs._value.get_as_string()
         if self._value.is_list() and rhs._value.is_list():
             var result2 = object([])
             for i in range(self.__len__()):
                 result2.append(self[i])
             for j in range(rhs.__len__()):
                 result2.append(rhs[j])
+            return result2
+        if self._value.is_tuple() and rhs._value.is_tuple():
+            var result2 = object(())
+            for i in range(self.__len__()):
+                result2._value.get_as_tuple().append(
+                    self._value.get_as_tuple()[i]
+                )
+            for j in range(rhs.__len__()):
+                result2._value.get_as_tuple().append(
+                    rhs._value.get_as_tuple()[j]
+                )
             return result2
 
         return Self._arithmetic_binary_op[Float64.__add__, Int64.__add__](
@@ -1773,15 +1889,11 @@ struct object(
             value: The value to append.
         """
         if self._value.is_obj():
-            _ = object(self._value.get_obj_attr("append"))(self, value)
+            _ = self._value.get_as_obj()["append"](self, value)
             return
         if not self._value.is_list():
             raise Error("TypeError: can only append to lists")
-        self._append(value)
-
-    @always_inline
-    fn _append(self, value: object):
-        self._value.list_append(value._value.copy())
+        self._value.get_as_list().append(value)
 
     @always_inline
     fn __len__(self) raises -> Int:
@@ -1790,13 +1902,19 @@ struct object(
 
         Returns:
             The length of the string value or the number of elements in the list
-            or dictionary value.
+            , dictionary or tuple value.
         """
         if self._value.is_str():
-            return self._value.get_as_string().length
+            return len(self._value.get_as_string())
         if self._value.is_list():
-            return self._value.get_list_length()
-        raise Error("TypeError: only strings and lists have length")
+            return len(self._value.get_as_list())
+        if self._value.is_dict():
+            return len(self._value.get_as_dict())
+        if self._value.is_tuple():
+            return len(self._value.get_as_tuple())
+        raise Error(
+            "TypeError: only strings, lists, dicts and tuples have length"
+        )
 
     @staticmethod
     @always_inline
@@ -1808,7 +1926,7 @@ struct object(
         return i._value.get_as_int().value
 
     @always_inline
-    fn __getitem__(self, i: object) raises -> object:
+    fn __getitem__(ref [_]self, i: object) raises -> object:
         """Gets the i-th item from the object. This is only valid for strings,
         lists, and dictionaries.
 
@@ -1819,19 +1937,38 @@ struct object(
             The value at the index or key.
         """
         if self._value.is_obj():
-            return object(self._value.get_obj_attr("__getitem__"))(self, i)
+            return self._value.get_as_obj()["__getitem__"](self, i)
 
-        if not self._value.is_str() and not self._value.is_list():
-            raise Error("TypeError: can only index into lists and strings")
+        if self._value.is_dict():
+            return self._value.get_as_dict()[i]
+
+        if (
+            not self._value.is_str()
+            and not self._value.is_list()
+            and not self._value.is_tuple()
+        ):
+            raise Error(
+                "TypeError: can only index into lists, strings and tuples"
+            )
+
+        if i._value.is_tuple():
+            raise Error(
+                "'"
+                + self._value._get_type_name()
+                + "'"
+                + " object does not support "
+                + i._value._get_type_name()
+                + " as an index"
+            )
 
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             # Construct a new single-character string.
-            var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
-            var char = self._value.get_as_string().data[index]
-            impl.data.init_pointee_move(char)
-            return _ObjectImpl(impl)
-        return self._value.get_list_element(i._value.get_as_int().value)
+            return self._value.get_as_string()[index]
+
+        if self._value.is_tuple():
+            return self._value.get_as_tuple()[i._value.get_as_int().value]
+        return self._value.get_as_list()[i._value.get_as_int().value]
 
     @always_inline
     fn __getitem__(self, *index: object) raises -> object:
@@ -1843,13 +1980,13 @@ struct object(
         Returns:
             The value at the index.
         """
-        var value = self
+        var tmp_tuple = object(_RefCountedTuple(capacity=len(index)))
         for i in index:
-            value = value[i[]]
-        return value
+            tmp_tuple._value.get_as_tuple().append(i[])
+        return self[tmp_tuple]
 
     @always_inline
-    fn __setitem__(self, i: object, value: object) raises -> None:
+    fn __setitem__(ref [_]self, i: object, value: object) raises -> None:
         """Sets the i-th item in the object. This is only valid for strings,
         lists, and dictionaries.
 
@@ -1858,7 +1995,10 @@ struct object(
             value: The value to set.
         """
         if self._value.is_obj():
-            _ = object(self._value.get_obj_attr("__setitem__"))(self, i, value)
+            _ = self._value.get_as_obj()["__setitem__"](self, i, value)
+            return
+        if self._value.is_dict():
+            self._value.get_as_dict()[i] = value
             return
         if self._value.is_str():
             raise Error(
@@ -1866,11 +2006,17 @@ struct object(
             )
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
+        if not i._value.is_int():
+            raise Error(
+                "'list' object does not support "
+                + self._value._get_type_name()
+                + " as an index"
+            )
         var index = Self._convert_index_to_int(i)
-        self._value.set_list_element(index.value, value._value.copy())
+        self._value.get_as_list()[index.value] = value
 
     @always_inline
-    fn __setitem__(self, i: object, j: object, value: object) raises:
+    fn __setitem__(ref [_]self, i: object, j: object, value: object) raises:
         """Sets the (i, j)-th element in the object.
 
         FIXME: We need this because `obj[i, j] = value` will attempt to invoke
@@ -1882,10 +2028,17 @@ struct object(
             j: The second index.
             value: The value to set.
         """
-        self[i][j] = value
+        var tmp_tuple = object(_RefCountedTuple(capacity=2))
+        tmp_tuple._value.get_as_tuple().append(i)
+        tmp_tuple._value.get_as_tuple().append(j)
+        self[tmp_tuple] = value
 
     @always_inline
-    fn __getattr__(self, key: StringLiteral) raises -> object:
+    fn __getattr__(
+        ref [_]self, key: StringLiteral
+    ) raises -> ref [
+        _lit_mut_cast[__origin_of(self._value.value), True].result
+    ] object:
         """Gets the named attribute.
 
         Args:
@@ -1902,25 +2055,17 @@ struct object(
                 + key
                 + "'"
             )
-        return self._value.get_obj_attr(key)
-
-    @always_inline
-    fn __setattr__(inout self, key: StringLiteral, value: object) raises:
-        """Sets the named attribute.
-
-        Args:
-            key: The attribute name.
-            value: The attribute value.
-        """
-        if not self._value.is_obj():
+        try:
+            return UnsafePointer.address_of(
+                self._value.get_as_obj()._find_ref(key)
+            )[]
+        except e:
+            debug_assert(str(e) == "KeyError")
             raise Error(
-                "TypeError: Type '"
-                + self._value._get_type_name()
-                + "' does not have attribute '"
+                "AttributeError: Object does not have an attribute of name '"
                 + key
                 + "'"
             )
-        self._value.set_obj_attr(key, value._value.copy())
 
     @always_inline
     fn __call__(self) raises -> object:
@@ -1979,3 +2124,494 @@ struct object(
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)
+
+    fn __contains__(self, value: Self) raises -> Bool:
+        """Returns `True` if value is in `self` (`dict` key or `list` element).
+
+        Args:
+            value: The value that is compared.
+
+        Example:
+        ```mojo
+        a = object([1, "two"])
+        if "two" in a:
+            print("two is in a")
+        ```
+
+        Returns:
+            A `Bool` (`True` or `False`).
+        """
+        if self._value.is_list():
+            return value in self._value.get_as_list()
+        if self._value.is_dict():
+            return value in self._value.get_as_dict()
+        if self._value.is_tuple():
+            return value in self._value.get_as_tuple()
+        raise "only lists, dicts and tuples implements the __contains__ dunder"
+
+    fn pop(self, value: Self = None) raises -> object:
+        """Removes an element and returns it.
+
+        Args:
+            value: The index for lists, the key for dicts.
+
+        Returns:
+            The element.
+
+        Example
+        ```mojo
+        x = object.dict()
+        x["one"] = 1
+        x["two"] = 2
+        y = x.pop("two")
+        print(y == 2)
+        ```
+        Note: implemented for list and dictionary.
+        """
+        if self._value.is_list():
+            self_len = len(self._value.get_as_list())
+            if value._value.is_int():
+                tmp_i = int(value._value.get_as_int())
+                if not (-self_len <= tmp_i < self_len):
+                    raise "pop index out of range"
+                return self._value.get_as_list().pop(tmp_i)
+            if value._value.is_none():
+                if self_len == 0:
+                    raise "List is empty"
+                return self._value.get_as_list().pop()
+            raise "List uses non float numbers as indexes"
+        if self._value.is_dict():
+            try:
+                if value._value.is_none():
+                    raise "usage: .pop(key) for dictionaries"
+                return self._value.get_as_dict().pop(value)
+            except e:
+                raise e
+        raise "self is not a list or a dict"
+
+    # ===------------------------------------------------------------------=== #
+    # Factory methods
+    # ===------------------------------------------------------------------=== #
+    @staticmethod
+    fn dict() -> Self:
+        """Construct an empty dictionary.
+
+        Returns:
+            The constructed empty dictionary.
+
+        Example:
+        ```mojo
+        x = object.dict()
+        x["one"] = 1
+        x[2] = "two"
+        x[3.0] = [3.0]
+        ```
+
+        Note: supported key types are `Float64`, `Int64` and `String`.
+
+        Values can be object of any types.
+        """
+        return Self(_RefCountedDict())
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+    fn __hash__(self) -> UInt:
+        """Compute the hash of `self`.
+
+        Returns:
+            An `UInt`.
+
+        Note: `hash(repr(self))` is returned if `self` type is not hashable.
+
+        The hashables types are `String`, `Int64` and `Float64`.
+        """
+        if self._value.is_str():
+            return hash(self._value.get_as_string())
+        if self._value.is_int():
+            return hash(self._value.get_as_int())
+        if self._value.is_float():
+            return hash(self._value.get_as_float())
+        # FIXME: hash(repr(self)) as fallback
+        return hash(repr(self))
+
+    fn __iter__(
+        ref [_]self,
+    ) raises -> _ObjectIter[__origin_of(self._value.value)]:
+        """Iterate over the object.
+
+        Returns:
+            An iterator object.
+
+        Raises:
+            If the object is not iterable.
+
+        Example:
+        ```mojo
+        x = object([0, True, 2.0, "three"])
+        for i in x:
+            print(i[])
+        ```
+
+        Note: iteration of lists and dicts keys are currently implemented.
+        """
+        # Note: we iterate by reference, it should be fast for the user.
+        if self._value.is_list():
+            return _ObjectIter[__origin_of(self._value.value)](
+                _ObjectIter[__origin_of(self._value.value)].list_iter_hint,
+                self._value.get_as_list().__iter__(),
+            )
+        if self._value.is_dict():
+            return _ObjectIter[__origin_of(self._value.value)](
+                _ObjectIter[__origin_of(self._value.value)].dict_iter_hint,
+                self._value.get_as_dict().items(),
+            )
+        raise (
+            "'"
+            + self._value._get_type_name()
+            + "'"
+            + " don't implement __iter__"
+        )
+
+    # ===------------------------------------------------------------------=== #
+    # Type checking
+    # ===------------------------------------------------------------------=== #
+
+    fn is_none(self) -> Bool:
+        """Check if self is None.
+
+        Returns:
+            True if self is None.
+        """
+        return self._value.is_none()
+
+    fn is_bool(self) -> Bool:
+        """Check if self is bool.
+
+        Returns:
+            True if self is bool.
+        """
+        return self._value.is_bool()
+
+    fn is_func(self) -> Bool:
+        """Check if self is a function.
+
+        Returns:
+            True if self is a function.
+        """
+        return self._value.is_func()
+
+    fn is_tuple(self) -> Bool:
+        """Check if self is tuple.
+
+        Returns:
+            True if self is a tuple.
+        """
+        return self._value.is_tuple()
+
+    fn is_obj(self) -> Bool:
+        """Check if self is an attribute object.
+
+        Returns:
+            True if self is an attribute object.
+        """
+        return self._value.is_obj()
+
+    fn is_int(self) -> Bool:
+        """Check if self is int.
+
+        Returns:
+            True if self is a int.
+        """
+        return self._value.is_int()
+
+    fn is_float(self) -> Bool:
+        """Check if self is float.
+
+        Returns:
+            True if self is float.
+        """
+        return self._value.is_float()
+
+    fn is_dict(self) -> Bool:
+        """Check if self is a dictionary.
+
+        Returns:
+            True if self is a dictionary.
+        """
+        return self._value.is_dict()
+
+    fn is_list(self) -> Bool:
+        """Check if self is a list.
+
+        Returns:
+            True if self is a list.
+        """
+        return self._value.is_list()
+
+    fn is_str(self) -> Bool:
+        """Check if self is str.
+
+        Returns:
+            True if self is str.
+        """
+        return self._value.is_str()
+
+    fn is_struct[T: WrappeableStruct](self) -> Bool:
+        """Check if `self` is a `WrappedStruct` of type `T`.
+
+        Parameters:
+            T: The type to compare.
+
+        Returns:
+            True if `self.classname` == `T.classname`.
+        """
+        return (
+            self._value.is_struct()
+            and self._value.value[_RefCountedStruct].impl[].classname
+            == T.classname
+        )
+
+    # ===------------------------------------------------------------------=== #
+    # Ref/Deref
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline
+    fn as_list(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] List[
+        object
+    ]:
+        """Returns a ref to the typed List.
+
+        Returns:
+            A ref to the ´List[object]´.
+
+        Note: it is not a cast, please type check with the method `is_list()`.
+        """
+        debug_assert(self._value.is_list(), "self is not a list")
+        return self._value.get_as_list()
+
+    @always_inline
+    fn as_tuple(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] List[
+        object
+    ]:
+        """Returns a ref to the typed Tuple.
+
+        Returns:
+            A ref to the ´List[object]´.
+
+        Note: tuple is implemented with a List.
+
+        Note: it is not a cast, please type check with the method `is_tuple()`.
+        """
+        debug_assert(self._value.is_tuple(), "self is not a tuple")
+        return self._value.get_as_tuple()
+
+    @always_inline
+    fn as_obj(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] Dict[
+        StringLiteral, object
+    ]:
+        """Returns a ref to the typed attribute object.
+
+        Returns:
+            A ref to the ´Dict[StringLiteral, object]´.
+
+        Note: it is not a cast, please type check with the method `is_obj()`.
+        """
+        debug_assert(self._value.is_obj(), "self is not an attribute dict")
+        return self._value.get_as_obj()
+
+    @always_inline
+    fn as_dict(
+        ref [_]self,
+    ) -> ref [_lit_mut_cast[__origin_of(self._value.value), True].result] Dict[
+        object, object
+    ]:
+        """Returns a ref to the dictionary.
+
+        Returns:
+            A ref to the ´Dict[object, object]´.
+
+        Note: it is not a cast, please type check with the method `is_dict()`.
+        """
+        debug_assert(self._value.is_dict(), "self is not a dictionary")
+        return self._value.get_as_dict()
+
+    @always_inline
+    fn as_float(ref [_]self) -> Float64:
+        """Returns self as a `Float64` value.
+
+        Returns:
+            The `Float64´ value.
+
+        Note: it is not a cast, please type check with the method `is_float()`.
+        """
+        debug_assert(self._value.is_float(), "self is not a float")
+        return self._value.value[Float64]
+
+    @always_inline
+    fn as_int(ref [_]self) -> Int:
+        """Returns self as an `Int` value.
+
+        Returns:
+            The `Int` value.
+
+        Note: it is not a cast, please type check with the method `is_int()`.
+        """
+        debug_assert(self._value.is_int(), "self is not an integer")
+        return int(self._value.value[Int64])
+
+    @always_inline
+    fn as_bool(ref [_]self) -> Bool:
+        """Returns self as a `Bool` value.
+
+        Returns:
+            The `Bool` value.
+
+        Note: it is not a cast, please type check with the method `is_bool()`.
+        """
+        debug_assert(self._value.is_bool(), "self is not a bool")
+        return self._value.value[Bool]
+
+    @always_inline
+    fn as_str(
+        ref [_]self,
+    ) -> ref [
+        _lit_mut_cast[__origin_of(self._value.value), False].result
+    ] String:
+        """Returns a ref to the `String`.
+
+        Returns:
+            A ref to the `String` value.
+
+        Note: it is not a cast, please type check with the method `is_str()`.
+        """
+        debug_assert(self._value.is_str(), "self is not a string")
+        return self._value.get_as_string()
+
+    @always_inline
+    fn as_pointer(
+        ref [_]self,
+    ) -> Pointer[
+        Self, _lit_mut_cast[__origin_of(self._value.value), True].result
+    ]:
+        """Returns a `Pointer` to self (mutable).
+
+        Returns:
+            A mutable `Pointer` to self.
+        """
+        return Pointer[
+            Self, _lit_mut_cast[__origin_of(self._value.value), True].result
+        ].address_of(UnsafePointer.address_of(self)[])
+
+    @always_inline
+    fn as_struct[
+        T: WrappeableStruct
+    ](
+        ref [_]self,
+    ) -> ref [
+        _lit_mut_cast[__origin_of(self._value.value), True].result
+    ] T:
+        """Returns a ref to the struct.
+
+        Parameters:
+            T: The type of the wrapped struct in self.
+
+        Returns:
+            A mutable ref to self.
+
+        Note: consider `is_struct[T]()` before for type checking.
+        """
+        debug_assert(
+            self.is_struct[T](),
+            "dereferenced as: "
+            + T.classname
+            + ", self is: "
+            + self._value._get_type_name(),
+        )
+        return self._value.get_as_struct[T]()
+
+
+# ===----------------------------------------------------------------------=== #
+# _ObjectIter
+# ===----------------------------------------------------------------------=== #
+
+
+@value
+struct _ObjectIter[
+    iter_mutability: Bool, //,
+    iter_origin: Origin[iter_mutability].type,
+]:
+    """Iterator for object (list or dict).
+
+    Parameters:
+        iter_mutability: Whether the reference to the iterated value is mutable.
+        iter_origin: The origin of the iterator
+    """
+
+    # Note:  Return type is not mutable, because dict keys should not be mutated.
+
+    alias list_iter = _ListIter[object, False, iter_origin]
+    """The iterator type for List"""
+    alias dict_iter = _DictEntryIter[object, object, iter_origin]
+    """The iterator type for dict"""
+    alias list_iter_hint: Int = 0
+    """The value used as a type hint for list iterators"""
+    alias dict_iter_hint: Int = 1
+    """The value used as a type hint for dict iterators"""
+
+    var hint_type: Int
+    "Specifies the type of the iterator in the variant"
+    alias storage_type = Variant[Self.list_iter, Self.dict_iter]
+    "Variant type used to store an iterator"
+
+    var iterator: Self.storage_type
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(
+        inout self,
+    ) raises -> Pointer[object, _lit_mut_cast[iter_origin, False].result]:
+        """Return the next item and update to point to subsequent item.
+
+        Returns:
+            The next item in the iterable object that this iterator points to.
+        """
+        if self.hint_type == Self.list_iter_hint:
+            return Pointer[
+                object, _lit_mut_cast[iter_origin, False].result
+            ].address_of(
+                UnsafePointer.address_of(
+                    self.iterator[Self.list_iter].__next__()[]
+                )[]
+            )
+        if self.hint_type == Self.dict_iter_hint:
+            return Pointer[
+                object, _lit_mut_cast[iter_origin, False].result
+            ].address_of(
+                UnsafePointer.address_of(
+                    self.iterator[Self.dict_iter].__next__()[].key
+                )[]
+            )
+        raise "Error in _ObjectIter.__next__"
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        if self.hint_type == Self.list_iter_hint:
+            return self.iterator[Self.list_iter].__has_next__()
+        if self.hint_type == Self.dict_iter_hint:
+            return self.iterator[Self.dict_iter].__has_next__()
+        return False
+
+    fn __len__(self) raises -> Int:
+        if self.hint_type == Self.list_iter_hint:
+            return self.iterator[Self.list_iter].__len__()
+        if self.hint_type == Self.dict_iter_hint:
+            return self.iterator[Self.dict_iter].__len__()
+        raise "Error in _ObjectIter.__len__"

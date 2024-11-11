@@ -15,6 +15,7 @@
 from random import random_float64
 
 from testing import assert_equal, assert_false, assert_raises, assert_true
+from memory import UnsafePointer
 
 
 def test_object_ctors():
@@ -41,15 +42,81 @@ def test_object_ctors():
     b = object([2, 4])
     assert_true(a < b)
 
+    a = String("hello world")
+    assert_true(a == object("hello world"))
+    a += "!"
+    assert_true(a == "hello world!")
+
+    b = object.dict()
+    b["one"] = 1
+    b[2] = 2
+    b[3.0] = "three"
+    assert_equal(len(b), 3)
+    assert_equal(b["one"], 1)
+    assert_equal(b[2], 2)
+    assert_equal(b[3.0], "three")
+
+    a = (0, True, 2.0, "three")
+    assert_true(bool(a))
+    assert_equal(len(a), 4)
+    assert_equal(a[0], 0)
+    assert_equal(a[1], True)
+    assert_equal(a[2], 2.0)
+    assert_equal(a[3], "three")
+
+    b["tuple"] = a
+    assert_equal(b["tuple"], a)
+    assert_equal(b._value.ref_count(), 1)
+    assert_equal(a._value.ref_count(), 2)
+    _ = b^
+    assert_equal(a._value.ref_count(), 1)
+
+
+def method_obj_gt(self, rhs):
+    return self.value > rhs.value
+
+
+def method_obj_lt(self, rhs):
+    return self.value < rhs.value
+
+
+def method_obj_ge(self, rhs):
+    return self.value >= rhs.value
+
+
+def method_obj_le(self, rhs):
+    return self.value <= rhs.value
+
 
 def test_comparison_ops():
     assert_true(object(False) < True)
     assert_false(object(True) < True)
+    assert_true(object(False) < object(True))
+    assert_false(object(True) < object(True))
+    assert_false(object(False) < object(False))
+    assert_false(object(True) < object(True))
+    assert_false(object(False) > object(True))
+    assert_true(object(True) > object(False))
+    assert_false(object(True) > object(True))
+    assert_false(object(False) > object(False))
+    assert_true(object(False) <= object(True))
+    assert_false(object(True) <= object(False))
+    assert_true(object(True) <= object(True))
+    assert_true(object(False) <= object(False))
+    assert_false(object(False) >= object(True))
+    assert_true(object(True) >= object(False))
+    assert_true(object(True) >= object(True))
+    assert_true(object(False) >= object(False))
+    assert_true(object(1) > False)
     assert_true(object(1) > False)
     assert_true(object(2) == 2)
     assert_false(object(True) != 1)
     assert_true(object(True) <= 1.0)
     assert_false(object(False) >= 0.5)
+    assert_true(object(True) == object(True))
+    assert_false(object(True) == object(False))
+    assert_false(object(False) == object(True))
+    assert_true(object(False) == object(False))
 
     lhs = object("aaa")
     rhs = object("bbb")
@@ -59,6 +126,121 @@ def test_comparison_ops():
     assert_true(lhs <= rhs)
     assert_false(lhs > rhs)
     assert_false(lhs >= rhs)
+
+    lhs = [False, 1, "two", 3.0]
+    rhs = [False, 1, "two", 3.0]
+    assert_true(lhs == rhs)
+    lhs.append(4)
+    assert_false(lhs == rhs)
+
+    lhs = (False, 1, "two", 3.0)
+    rhs = (False, 1, "two", 3.0)
+    assert_true(lhs == rhs)
+    assert_false(lhs != rhs)
+
+    lhs = object.dict()
+    rhs = object.dict()
+    lhs["one"] = [2, 3.0]
+    rhs["one"] = [2, 3.0]
+    assert_true(lhs == rhs)
+    rhs["one"].append(4)
+    assert_false(lhs == rhs)
+    assert_true(lhs != rhs)
+
+    lhs = object(Attr("value", [1, 2.0]))
+    rhs = object(Attr("value", [1, 2.0]))
+    assert_true(lhs == rhs)
+    rhs.value = 1
+    assert_false(lhs == rhs)
+    assert_true(lhs != rhs)
+
+    lhs = object.dict()
+    rhs = object([1, 2])
+    assert_false(lhs == rhs)
+    lhs = 1
+    assert_false(lhs == rhs)
+    lhs = object(Attr("value", 1))
+    assert_false(lhs == rhs)
+    rhs = object.dict()
+    assert_false(lhs == rhs)
+
+    lhs = []
+    lhs.append(object.dict())
+    lhs[0]["one"] = 1
+    assert_equal(lhs[0]["one"], 1)
+    rhs = []
+    assert_false(lhs == rhs)
+    rhs.append(object.dict())
+    assert_false(lhs == rhs)
+    rhs[0]["one"] = 1
+    assert_true(lhs == rhs)
+
+    lhs = (0, True, 2.0, "three")
+    rhs = (0, True, 2.0, "three")
+    assert_true(lhs == rhs)
+    assert_equal(lhs[2], rhs[2])
+    assert_equal(lhs[2], 2.0)
+    rhs = (0, 1, 2)
+    assert_false(lhs == rhs)
+
+    lhs = [1.0, 0.0, -1.0]
+    rhs = [1.0, 0.0, -2.0]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+    lhs = [1, 0, -1]
+    rhs = [1, 0, -2]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+    lhs = [1.0, 0.0, -1.0]
+    rhs = [1, 0, -2]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+    lhs = [True, True]
+    rhs = [True, False]
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+    assert_false(rhs == lhs)
+
+    lhs = (1.0, 0.0, -1.0)
+    rhs = (1.0, 0.0, -2.0)
+    assert_true(rhs < lhs)
+    assert_false(rhs > lhs)
+
+    lhs = (1.0, 0.0, -1.0)
+    rhs = (1.0, 0.0, -2.0)
+    assert_true(rhs <= lhs)
+    assert_false(rhs >= lhs)
+
+    lhs = (1.0, 0.0, -1.0)
+    rhs = (1.0, 0.0, -1.0)
+    assert_true(rhs <= lhs)
+    assert_true(rhs >= lhs)
+
+    lhs = object(
+        Attr("value", 0),
+        Attr("__le__", method_obj_le),
+        Attr("__ge__", method_obj_ge),
+        Attr("__lt__", method_obj_lt),
+        Attr("__gt__", method_obj_gt),
+    )
+    rhs = object(
+        Attr("value", 1),
+        Attr("__le__", method_obj_le),
+        Attr("__ge__", method_obj_ge),
+        Attr("__lt__", method_obj_lt),
+        Attr("__gt__", method_obj_gt),
+    )
+    assert_true(lhs < rhs)
+    assert_false(lhs > rhs)
+    assert_true(lhs <= rhs)
+    assert_false(lhs >= rhs)
+    lhs.value = 10
+    rhs.value = 10
+    assert_true(lhs <= rhs)
+    assert_true(lhs >= rhs)
 
 
 def test_arithmetic_ops():
@@ -205,11 +387,11 @@ def test_non_object_getattr():
 
 
 def matrix_getitem(self, i) -> object:
-    return self.value[i]
+    return self.value[i[0]][i[1]]
 
 
 def matrix_setitem(self, i, value) -> object:
-    self.value[i] = value
+    self.value[i[0]][i[1]] = value
     return None
 
 
@@ -254,9 +436,9 @@ def test_matrix():
         C.append(row_zero)
 
     matmul_untyped(C, A, B)
-    assert_equal(str(C[0]), "[5, 8, 11]")
-    assert_equal(str(C[1]), "[8, 14, 20]")
-    assert_equal(str(C[2]), "[11, 20, 29]")
+    assert_equal(str(C.value[0]), "[5, 8, 11]")
+    assert_equal(str(C.value[1]), "[8, 14, 20]")
+    assert_equal(str(C.value[2]), "[11, 20, 29]")
 
 
 def test_convert_to_string():
@@ -267,7 +449,7 @@ def test_convert_to_string():
     a = 2.5
     assert_equal(str(a), "2.5")
     a = "hello"
-    assert_equal(str(a), "'hello'")
+    assert_equal(str(a), "hello")
     a = []
     assert_equal(str(a), "[]")
     a.append(3)
@@ -278,9 +460,9 @@ def test_convert_to_string():
     b.append("baz")
     a.append(b)
     assert_equal(str(a), "[3, False, 5.5, ['foo', 'baz']]")
-    assert_equal(str(a[3, 1]), "'baz'")
-    a[3, 1] = "bar"
-    assert_equal(str(a[3, 1]), "'bar'")
+    assert_equal(str(a[3][1]), "baz")
+    a[3][1] = "bar"
+    assert_equal(str(a[3][1]), "bar")
     var c = a + b
     assert_equal(str(c), "[3, False, 5.5, ['foo', 'bar'], 'foo', 'bar']")
     b.append(False)
@@ -291,17 +473,404 @@ def test_convert_to_string():
     assert_equal(str(a), "[3, False, 5.5, ['foo', None, False]]")
     a = "abc"
     b = a[True]
-    assert_equal(str(b), "'b'")
+    assert_equal(str(b), "b")
     b = a[2]
-    assert_equal(str(b), "'c'")
+    assert_equal(str(b), "c")
     a = [1, 1.2, False, "true"]
     assert_equal(str(a), "[1, 1.2, False, 'true']")
 
     a = object(Attr("foo", 5), Attr("bar", "hello"), Attr("baz", False))
-    assert_equal(str(a.bar), "'hello'")
+    assert_equal(str(a.bar), "hello")
     a.bar = [1, 2]
     assert_equal(str(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
     assert_equal(repr(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
+
+    a = object.dict()
+    a["one"] = 1
+    a[2] = "two"
+    assert_equal(str(a["one"]), "1")
+    assert_equal(str(a[2]), "two")
+    assert_equal(str(a), "{'one' = 1, 2 = 'two'}")
+    b = object.dict()
+    b["three"] = 1
+    a["nested"] = b
+    assert_equal(str(a), "{'one' = 1, 2 = 'two', 'nested' = {'three' = 1}}")
+    b["three"] = True
+    assert_equal(str(a), "{'one' = 1, 2 = 'two', 'nested' = {'three' = True}}")
+
+    a = object(Attr("value", object.dict()))
+    b = object(Attr("value", object.dict()))
+    a.value["function"] = matrix_append
+    b.value["function"] = matrix_append
+    assert_equal(repr(a), repr(b))
+
+    a = (0, True, 1.0, "Three")
+    assert_equal(str(a), "(0, True, 1.0, 'Three')")
+    b = []
+    b.append(a)
+    b.append(4)
+    assert_equal(str(b), "[(0, True, 1.0, 'Three'), 4]")
+
+
+def test_object_dict():
+    a = object.dict()
+    a["one"] = 1
+    a[2] = "two"
+    assert_equal(a["one"], 1)
+    assert_equal(a[2], "two")
+    assert_equal(str(a[2]), "two")
+    b = a
+    assert_equal(a._value.ref_count(), 2)
+    # asap __del__ of a
+    assert_equal(b._value.ref_count(), 1)
+
+    ref_counted_list = object([1, 2, 3])
+    assert_equal(ref_counted_list._value.ref_count(), 1)
+    b["ref_counted_list"] = ref_counted_list
+    assert_equal(ref_counted_list._value.ref_count(), 2)
+    ref_counted_list.append(4)
+    assert_equal(b["ref_counted_list"], [1, 2, 3, 4])
+    # asap __del__ of b
+    assert_equal(ref_counted_list._value.ref_count(), 1)
+
+
+def test_object_dict_contains():
+    a = object.dict()
+    a["one"] = 1
+    a["twothree"] = [2, 3]
+    a[4] = "four"
+    a[5.5] = 6
+    assert_equal("twothree" in a, True)
+    assert_equal("one" in a, True)
+    assert_equal("two" in a, False)
+    assert_equal(4 in a, True)
+    assert_equal(5 in a, False)
+    assert_equal(5.5 in a, True)
+    assert_equal(6.5 in a, False)
+
+
+def test_object_dict_pop():
+    a = object.dict()
+    a["one"] = 1
+    a["twothree"] = [2, 3]
+    a[4] = "four"
+    a[5.5] = 6
+    assert_equal(len(a), 4)
+    tmp_element = a.pop(4)
+    assert_equal(tmp_element, "four")
+    assert_equal(len(a), 3)
+    tmp_element = a.pop("twothree")
+    assert_equal(tmp_element, [2, 3])
+    assert_equal(len(a), 2)
+    assert_equal(tmp_element._value.ref_count(), 1)
+
+    with assert_raises(contains="usage: .pop(key) for dictionaries"):
+        a.pop()
+
+    with assert_raises(contains="KeyError"):
+        a.pop("key")
+
+
+def test_object_cast():
+    a = object()
+    a = "1"
+    assert_equal(int(a) + 1, 2)
+
+
+def test_object_init_list_attr():
+    attrs = List[Attr]()
+    attrs.append(Attr("val", [1, 2]))
+    attrs.append(Attr("add", test_function))
+    y = object(attrs)
+    assert_equal(y.val, [1, 2])
+    assert_equal(y.add(10, 20), 30)
+
+
+def test_object_list_contains():
+    a = object([1, "two", True, 1.5])
+    assert_equal(1 in a, True)
+    assert_equal(2 in a, False)
+    assert_equal("two" in a, True)
+    assert_equal("three" in a, False)
+    assert_equal(1.5 in a, True)
+    assert_equal(2.0 in a, False)
+    assert_equal(True in a, True)
+    assert_equal(False in a, False)
+
+
+def test_object_list_pop():
+    a = object([1, "two", 3.0])
+    assert_equal(len(a), 3)
+    tmp_element = a.pop(2)
+    assert_equal(len(a), 2)
+    assert_equal(tmp_element, 3.0)
+    tmp_element = a.pop(0)
+    assert_equal(len(a), 1)
+    assert_equal(tmp_element, 1)
+    res = a.pop()
+    assert_equal(res, "two")
+    with assert_raises(contains="List is empty"):
+        a.pop()
+
+    a = object([1, "two", 3.0])
+    with assert_raises(contains="pop index out of range"):
+        a.pop(3)
+    assert_equal(len(a), 3)
+    b = a.pop(-1)
+    assert_equal(b, 3.0)
+    with assert_raises(contains="List uses non float numbers as indexes"):
+        a.pop(3.5)
+
+
+def test_object_hash():
+    a = Int(1)
+    b = Float64(2.5)
+    c = String("hello world")
+    assert_equal(hash(a), hash(object(a)))
+    assert_equal(hash(b), hash(object(b)))
+    assert_equal(hash(c), hash(object(c)))
+
+    abc = object([a, b, c])
+    abc_repr = repr(abc)
+    assert_equal(hash(abc), hash("[1, 2.5, 'hello world']"))
+
+
+def test_object_RefCountedCowString():
+    a = object(String("Hello world"))
+    b = a
+    assert_equal(a._value.ref_count(), 2)
+    assert_equal(b._value.ref_count(), 2)
+    # asap del of b
+    assert_equal(a._value.ref_count(), 1)
+    c = a
+    assert_equal(a._value.ref_count(), 2)
+    assert_equal(c._value.ref_count(), 2)
+    c += "!"
+    assert_equal(a._value.ref_count(), 1)
+    assert_equal(c._value.ref_count(), 1)
+    assert_equal(str(a), "Hello world")
+    assert_equal(str(c), "Hello world!")
+
+    a = object.dict()
+    c = object("hello world")
+    a[1] = c
+    assert_equal(c._value.ref_count(), 2)
+    a[1] += "!"
+    assert_equal(c, "hello world")
+    assert_equal(c._value.ref_count(), 1)
+    assert_equal(a[1], "hello world!")
+    a = a.pop(1)
+    assert_equal(a._value.ref_count(), 1)
+
+
+def test_object_tuple_contains():
+    a = object((1, "two", True, 1.5))
+    assert_equal(1 in a, True)
+    assert_equal(2 in a, False)
+    assert_equal("two" in a, True)
+    assert_equal("three" in a, False)
+    assert_equal(1.5 in a, True)
+    assert_equal(2.0 in a, False)
+    assert_equal(True in a, True)
+    assert_equal(False in a, False)
+
+
+def test_object_tuple_add():
+    a = object((0, 1))
+    b = object(("two", "three"))
+    c = a + b
+    assert_equal(len(c), 4)
+    assert_equal(len(a), 2)
+    assert_equal(len(b), 2)
+    assert_equal(c[2], "two")
+
+
+def test_object_get_type_id():
+    var x = object()
+    assert_equal(x._value.get_type_id(), x._value.none)
+    x = 1
+    assert_equal(x._value.get_type_id(), x._value.int)
+    x = 1.0
+    assert_equal(x._value.get_type_id(), x._value.float)
+    x = "hello world"
+    assert_equal(x._value.get_type_id(), x._value.str)
+    x = object(Attr("value", 1))
+    assert_equal(x._value.get_type_id(), x._value.obj)
+    x = [1, 2.0, "three"]
+    assert_equal(x._value.get_type_id(), x._value.list)
+    x = (1, 2.0, "three")
+    assert_equal(x._value.get_type_id(), x._value.tuple)
+    x = object.dict()
+    x["one"] = 1
+    assert_equal(x._value.get_type_id(), x._value.dict)
+
+
+def test_object_getattr():
+    # test cow 1:
+    x = object(Attr("value", "hello world"))
+    y = x.value
+    assert_equal(x.value, y)
+    x.value = "hello world!"
+    assert_equal(x.value, "hello world!")
+    assert_equal(y, "hello world")
+
+    # test cow 2:
+    x = object(Attr("value", "hello world"))
+    y = object(Attr("value", x.value))
+    assert_equal(y.value, "hello world")
+    x.value = "hello world!"
+    assert_equal(x.value, "hello world!")
+    assert_equal(y.value, "hello world")
+
+    with assert_raises(contains="does not have an attribute of name 'value2'"):
+        _ = x.value2
+    with assert_raises(
+        contains="does not have an attribute of name 'new_attr'"
+    ):
+        x.new_attr = 1
+
+
+def test_object_iter():
+    var value = [0, 1]
+    x = object([0, True, 2.0, "three"])
+    x.append(value)
+    # asap del of value
+    assert_equal(x._value.get_as_list()[4]._value.ref_count(), 1)
+    i = 0
+    y = object([])
+    for element in x:
+        assert_equal(element[], x[i])
+        y.append(element[])
+        if i == 0:
+            x[4].append(3)
+        i += 1
+    assert_equal(i, 5)
+    assert_equal(x, y)
+    assert_equal(repr(y), "[0, True, 2.0, 'three', [0, 1, 3]]")
+    assert_equal(x._value.get_as_list()[4]._value.ref_count(), 2)
+    _ = y
+
+    x = object.dict()
+    x["one"] = 1
+    x[2] = 2.0
+    i = 0
+    results = object([])
+    for element in x:
+        if i == 0:
+            # assert_equal(x["one"], x[element[]])
+            assert_equal(element[], object("one"))
+        elif i == 1:
+            assert_equal(element[], object(2))
+        results.append(element[])
+        i += 1
+    assert_equal(i, 2)
+    assert_equal(repr(results), "['one', 2]")
+
+
+def test_object_type_check():
+    x = object()
+    assert_true(x.is_none())
+    x = True
+    assert_true(x.is_bool())
+    x = object(Attr("value", 1))
+    assert_true(x.is_obj())
+    x = 1
+    assert_true(x.is_int())
+    x = 2.0
+    assert_true(x.is_float())
+    x = "three"
+    assert_true(x.is_str())
+    x = [0, 1, 2]
+    assert_true(x.is_list())
+    x = (0, 1, 2)
+    assert_true(x.is_tuple())
+    x = object.dict()
+    assert_true(x.is_dict())
+    x["one"] = 1
+    assert_true(x.is_dict())
+
+
+def test_object_as_ref():
+    x = object()
+    x = True
+    assert_equal(x.as_bool(), True)
+    x = object(Attr("value", 1.0))
+    assert_equal(x.as_obj()["value"], 1.0)
+    x = 1
+    assert_equal(x.as_int(), 1)
+    x = 2.0
+    assert_equal(x.as_float(), 2.0)
+    x = "three"
+    assert_equal(x.as_str(), "three")
+    x = [0, 1, 2]
+    assert_equal(x.as_list()[2], 2)
+    x = (0, 1, 2)
+    assert_equal(x.as_tuple()[1], 1)
+    x = object.dict()
+    assert_equal(len(x.as_dict()), 0)
+    x["one"] = 1
+    assert_equal(len(x.as_dict()), 1)
+    assert_equal(x.as_dict()["one"], 1)
+    x[2] = "two"
+    assert_equal(len(x.as_dict()), 2)
+    assert_equal(x.as_dict()[2], "two")
+    y = x.as_pointer()
+    y[]["one"] = 1.0
+    assert_equal(x.as_dict()["one"], 1.0)
+    assert_equal(y[].as_dict()["one"], 1.0)
+    assert_equal(x._value.ref_count(), 1)
+    _ = x
+    assert_equal(x._value.ref_count(), 1)
+
+
+@value
+struct MyStruct:
+    alias classname = "mystruct"
+    var value: Int
+    var value2: object
+    var del_: UnsafePointer[Bool]
+
+    fn __init__(inout self):
+        self.value = 0
+        self.value2 = []
+        self.del_ = UnsafePointer[Bool]()
+
+    # def getattr
+    # fn getattr[]()
+    fn increment(inout self):
+        self.value += 1
+
+    fn __del__(owned self):
+        if self.del_:
+            self.del_[] = True
+
+
+def test_wrapped_struct():
+    del_ = False
+    a = object(MyStruct(1, [0, 1, 2], UnsafePointer.address_of(del_)))
+    assert_equal(a._value._get_type_name(), "mystruct")
+    assert_true(a.is_struct[MyStruct]())
+    assert_equal(a.as_struct[MyStruct]().value, 1)
+    assert_equal(a._value.ref_count(), 1)
+    b = a
+    b.as_struct[MyStruct]().increment()
+    a.as_struct[MyStruct]().increment()
+    assert_equal(a._value.ref_count(), 2)
+    assert_equal(a.as_struct[MyStruct]().value, 3)
+    assert_equal(b.as_struct[MyStruct]().value, 3)
+    b.as_struct[MyStruct]().value += 1
+    assert_equal(a.as_struct[MyStruct]().value, 4)
+
+    b = a.as_struct[MyStruct]().value2
+    # b is ref_counted, no _del yet:
+    assert_equal(del_, False)
+    assert_equal(b._value.ref_count(), 2)
+    assert_equal(a._value.ref_count(), 1)
+    b.append(3)
+    assert_equal(len(a.as_struct[MyStruct]().value2), 4)
+    _ = a^
+    assert_equal(b._value.ref_count(), 1)
+    assert_equal(del_, True)
 
 
 def main():
@@ -314,3 +883,20 @@ def main():
     test_non_object_getattr()
     test_matrix()
     test_convert_to_string()
+    test_object_hash()
+    test_object_dict()
+    test_object_dict_contains()
+    test_object_dict_pop()
+    test_object_cast()
+    test_object_init_list_attr()
+    test_object_list_contains()
+    test_object_list_pop()
+    test_object_RefCountedCowString()
+    test_object_tuple_contains()
+    test_object_tuple_add()
+    test_object_get_type_id()
+    test_object_getattr()
+    test_object_iter()
+    test_object_type_check()
+    test_object_as_ref()
+    test_wrapped_struct()
