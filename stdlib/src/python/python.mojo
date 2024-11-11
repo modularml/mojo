@@ -22,7 +22,7 @@ from python import Python
 from collections import Dict
 from os import abort, getenv
 from sys import external_call, sizeof
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi.utils import _get_global, OpaquePointer
 
 from memory import UnsafePointer
 

@@ -26,7 +26,7 @@ There are a few main tools in this module:
 """
 
 import random
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi.utils import _get_global, OpaquePointer
 from sys import simdwidthof, bitwidthof
 from collections import InlineArray
 
