@@ -17,8 +17,8 @@ from memory import UnsafePointer
 
 from utils import StringRef
 
-from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
-from .intrinsics import _mlirtype_is_eq
+from sys.info import os_is_linux, os_is_windows, is_64bit, os_is_macos
+from sys.intrinsics import _mlirtype_is_eq
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
 

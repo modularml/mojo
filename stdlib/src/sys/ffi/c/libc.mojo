@@ -1,8 +1,20 @@
-"""Libc POSIX file syscalls."""
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2024, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+"""Libc POSIX implementation."""
 
 from collections import Optional
 from memory import UnsafePointer, stack_allocation
-from sys.ffi import external_call, DLHandle
+from sys.ffi.utils import external_call, DLHandle
 from sys.info import os_is_windows, triple_is_nvidia_cuda
 
 from .types import C
