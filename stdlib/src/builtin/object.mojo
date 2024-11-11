@@ -141,7 +141,14 @@ struct WrappedStruct:
     # where attributes ? in RefAttrDict or in struct?
     # parametrized var _getattr _setattr ?
     fn __init__[T: WrappeableStruct](inout self, owned arg: T):
-        """Initialize `self` by moving a value in."""
+        """Initialize `self` by moving a value in.
+
+        Args:
+            arg: The value of type `T` to move in.
+
+        Parameters:
+            T: The type of arg.
+        """
 
         fn _del(_self: UnsafePointer[NoneType]):
             _self.bitcast[T]().destroy_pointee()
@@ -2351,10 +2358,13 @@ struct object(
         return self._value.is_str()
 
     fn is_struct[T: WrappeableStruct](self) -> Bool:
-        """Check if self is a WrappedStruct.
+        """Check if `self` is a `WrappedStruct` of type `T`.
+
+        Parameters:
+            T: The type to compare.
 
         Returns:
-            True if self is a WrappedStruct.
+            True if `self.classname` == `T.classname`.
         """
         return (
             self._value.is_struct()
