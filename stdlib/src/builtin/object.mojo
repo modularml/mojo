@@ -114,6 +114,53 @@ struct Attr:
         self.value = value^
 
 
+trait WrappeableStruct(CollectionElement):
+    """Types that implements this trait can be used in dynamic objects."""
+    alias classname: StringLiteral
+
+    fn __init__(inout self):
+        ...
+
+
+@value
+struct WrappedStruct:
+    """This type contains wrapped structs for a dynamic object."""
+    var ptr: UnsafePointer[NoneType]
+    var classname: StringLiteral
+    var _del: fn (UnsafePointer[NoneType]) -> None
+
+    # where attributes ? in RefAttrDict or in struct?
+    # parametrized var _getattr _setattr ?
+    fn __init__[T: WrappeableStruct](inout self, owned arg: T):
+        fn _del(_self: UnsafePointer[NoneType]):
+            _self.bitcast[T]().destroy_pointee()
+
+        tmp_ptr = UnsafePointer[T].alloc(1)
+        tmp_ptr.init_pointee_move(arg^)
+        self.ptr = tmp_ptr.bitcast[NoneType]()
+        self._del = _del
+        self.classname = T.classname
+
+    fn __del__(owned self):
+        debug_assert(
+            self.ptr.__bool__(),
+            "WrappedStruct.ptr is not allocated"
+        )
+        self._del(self.ptr)
+        self.ptr.free()
+
+
+@value
+struct _RefCountedStruct:
+    """This type contains the dictionary implementation for a dynamic object."""
+
+    var impl: Arc[WrappedStruct]
+    """The implementation of the WrappedStruct."""
+
+    fn __init__(inout self, owned arg: WrappedStruct):
+        self.impl = Arc[WrappedStruct](arg^)
+
+
 @value
 struct _RefCountedDict:
     """This type contains the dictionary implementation for a dynamic object."""
@@ -201,6 +248,7 @@ struct _ObjectImpl(
         _Function,
         _RefCountedAttrsDict,
         _RefCountedTuple,
+        _RefCountedStruct,
     ]
     """The variant value type."""
     var value: Self.type
@@ -297,6 +345,10 @@ struct _ObjectImpl(
     fn is_tuple(self) -> Bool:
         return self.value.isa[_RefCountedTuple]()
 
+    @always_inline
+    fn is_struct(self) -> Bool:
+        return self.value.isa[_RefCountedStruct]()
+
     # get a copy
     @always_inline
     fn get_as_bool(self) -> Bool:
@@ -349,6 +401,16 @@ struct _ObjectImpl(
         return UnsafePointer.address_of(self.value[_RefCountedTuple].impl[])[]
 
     @always_inline
+    fn get_as_struct[
+        T: WrappeableStruct
+    ](
+        ref [_]self,
+    ) -> ref [
+        _lit_mut_cast[__origin_of(self.value), True].result
+    ] T:
+        return self.value[_RefCountedStruct].impl[].ptr.bitcast[T]()[]
+
+    @always_inline
     fn get_type_id(self) -> Int:
         if self.is_none():
             return Self.none
@@ -368,7 +430,10 @@ struct _ObjectImpl(
             return Self.dict
         if self.is_tuple():
             return Self.tuple
-        debug_assert(self.is_obj(), "expected a generic object")
+        debug_assert(
+            self.is_obj(),
+            "expected a generic object, not a " + self._get_type_name(),
+        )
         return Self.obj
 
     @always_inline
@@ -392,6 +457,8 @@ struct _ObjectImpl(
             return "dict"
         if self.is_tuple():
             return "tuple"
+        if self.is_struct():
+            return self.value[_RefCountedStruct].impl[].classname
         debug_assert(self.is_obj(), "expected a generic object")
         return "obj"
 
@@ -406,6 +473,8 @@ struct _ObjectImpl(
             return int(self.value[_RefCountedList].impl.count())
         if self.is_tuple():
             return int(self.value[_RefCountedTuple].impl.count())
+        if self.is_struct():
+            return int(self.value[_RefCountedStruct].impl.count())
         raise self._get_type_name() + " is not ref counted"
 
     # ===------------------------------------------------------------------=== #
@@ -830,6 +899,17 @@ struct object(
         # Elements can only be added on construction.
         for i in range(len(attrs)):
             self._value.get_as_obj()._insert(attrs[i].key, attrs[i].value)
+
+    fn __init__[T: WrappeableStruct](inout self, owned arg: T):
+        """Initializes the object with a struct.
+
+        Args:
+            arg: A value of type T.
+        
+        Parameters:
+            T: The type of arg, that implements the `Wrappeableobject` trait.
+        """
+        self._value = _RefCountedStruct(WrappedStruct(arg^))
 
     @always_inline
     fn __moveinit__(inout self, owned existing: object):
@@ -1830,7 +1910,7 @@ struct object(
         return i._value.get_as_int().value
 
     @always_inline
-    fn __getitem__(ref[_]self, i: object) raises -> object:
+    fn __getitem__(ref [_]self, i: object) raises -> object:
         """Gets the i-th item from the object. This is only valid for strings,
         lists, and dictionaries.
 
@@ -1890,7 +1970,7 @@ struct object(
         return self[tmp_tuple]
 
     @always_inline
-    fn __setitem__(ref[_]self, i: object, value: object) raises -> None:
+    fn __setitem__(ref [_]self, i: object, value: object) raises -> None:
         """Sets the i-th item in the object. This is only valid for strings,
         lists, and dictionaries.
 
@@ -1920,7 +2000,7 @@ struct object(
         self._value.get_as_list()[index.value] = value
 
     @always_inline
-    fn __setitem__(ref[_]self, i: object, j: object, value: object) raises:
+    fn __setitem__(ref [_]self, i: object, j: object, value: object) raises:
         """Sets the (i, j)-th element in the object.
 
         FIXME: We need this because `obj[i, j] = value` will attempt to invoke
@@ -1939,7 +2019,7 @@ struct object(
 
     @always_inline
     fn __getattr__(
-        ref[_]self, key: StringLiteral
+        ref [_]self, key: StringLiteral
     ) raises -> ref [
         _lit_mut_cast[__origin_of(self._value.value), True].result
     ] object:
@@ -1970,7 +2050,6 @@ struct object(
                 + key
                 + "'"
             )
-
 
     @always_inline
     fn __call__(self) raises -> object:
@@ -2262,6 +2341,18 @@ struct object(
         """
         return self._value.is_str()
 
+    fn is_struct[T: WrappeableStruct](self) -> Bool:
+        """Check if self is str.
+
+        Returns:
+            True if self is str.
+        """
+        return (
+            self._value.is_struct()
+            and self._value.value[_RefCountedStruct].impl[].classname
+            == T.classname
+        )
+
     # ===------------------------------------------------------------------=== #
     # Ref/Deref
     # ===------------------------------------------------------------------=== #
@@ -2398,6 +2489,21 @@ struct object(
         return Pointer[
             Self, _lit_mut_cast[__origin_of(self._value.value), True].result
         ].address_of(UnsafePointer.address_of(self)[])
+
+    @always_inline
+    fn as_struct[
+        T: WrappeableStruct
+    ](
+        ref [_]self,
+    ) -> ref [
+        _lit_mut_cast[__origin_of(self._value.value), True].result
+    ] T:
+        """Returns a ref to the struct.
+
+        Returns:
+            A mutable `Pointer` to self.
+        """
+        return self._value.get_as_struct[T]()
 
 
 # ===----------------------------------------------------------------------=== #

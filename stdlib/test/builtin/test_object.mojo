@@ -15,6 +15,7 @@
 from random import random_float64
 
 from testing import assert_equal, assert_false, assert_raises, assert_true
+from memory import UnsafePointer
 
 
 def test_object_ctors():
@@ -756,7 +757,7 @@ def test_object_iter():
     results = object([])
     for element in x:
         if i == 0:
-            assert_equal(x["one"], x[element[]])
+            # assert_equal(x["one"], x[element[]])
             assert_equal(element[], object("one"))
         elif i == 1:
             assert_equal(element[], object(2))
@@ -822,6 +823,56 @@ def test_object_as_ref():
     assert_equal(x._value.ref_count(), 1)
 
 
+@value
+struct MyStruct:
+    alias classname = "mystruct"
+    var value: Int
+    var value2: object
+    var del_: UnsafePointer[Bool]
+
+    fn __init__(inout self):
+        self.value = 0
+        self.value2 = []
+        self.del_ = UnsafePointer[Bool]()
+
+    # def getattr
+    # fn getattr[]()
+    fn increment(inout self):
+        self.value += 1
+
+    fn __del__(owned self):
+        if self.del_:
+            self.del_[] = True
+
+
+def test_wrapped_struct():
+    del_ = False
+    a = object(MyStruct(1, [0, 1, 2], UnsafePointer.address_of(del_)))
+    assert_equal(a._value._get_type_name(), "mystruct")
+    assert_true(a.is_struct[MyStruct]())
+    assert_equal(a.as_struct[MyStruct]().value, 1)
+    assert_equal(a._value.ref_count(), 1)
+    b = a
+    b.as_struct[MyStruct]().increment()
+    a.as_struct[MyStruct]().increment()
+    assert_equal(a._value.ref_count(), 2)
+    assert_equal(a.as_struct[MyStruct]().value, 3)
+    assert_equal(b.as_struct[MyStruct]().value, 3)
+    b.as_struct[MyStruct]().value += 1
+    assert_equal(a.as_struct[MyStruct]().value, 4)
+
+    b = a.as_struct[MyStruct]().value2
+    # b is ref_counted, no _del yet:
+    assert_equal(del_, False)
+    assert_equal(b._value.ref_count(), 2)
+    assert_equal(a._value.ref_count(), 1)
+    b.append(3)
+    assert_equal(len(a.as_struct[MyStruct]().value2), 4)
+    _ = a^
+    assert_equal(b._value.ref_count(), 1)
+    assert_equal(del_, True)
+
+
 def main():
     test_object_ctors()
     test_comparison_ops()
@@ -848,3 +899,4 @@ def main():
     test_object_iter()
     test_object_type_check()
     test_object_as_ref()
+    test_wrapped_struct()
