@@ -116,22 +116,33 @@ struct Attr:
 
 trait WrappeableStruct(CollectionElement):
     """Types that implements this trait can be used in dynamic objects."""
+
     alias classname: StringLiteral
 
     fn __init__(inout self):
+        """Initialize an value (default initiliazer)."""
+        # TODO: remove it, we need it to create the trait
+        # (can be replaced later with __getattr__ and __setattr__)
         ...
 
 
 @value
 struct WrappedStruct:
     """This type contains wrapped structs for a dynamic object."""
+
     var ptr: UnsafePointer[NoneType]
+    """The memory to store the value."""
     var classname: StringLiteral
+    """A type name (for type checking)."""
+    # TODO: type checking in a better way
     var _del: fn (UnsafePointer[NoneType]) -> None
+    """The `__del__` function for type `T` (Self.`__init__[T]`)."""
 
     # where attributes ? in RefAttrDict or in struct?
     # parametrized var _getattr _setattr ?
     fn __init__[T: WrappeableStruct](inout self, owned arg: T):
+        """Initialize `self` by moving a value in."""
+
         fn _del(_self: UnsafePointer[NoneType]):
             _self.bitcast[T]().destroy_pointee()
 
@@ -142,10 +153,8 @@ struct WrappedStruct:
         self.classname = T.classname
 
     fn __del__(owned self):
-        debug_assert(
-            self.ptr.__bool__(),
-            "WrappedStruct.ptr is not allocated"
-        )
+        """Deinitiliaze self."""
+        debug_assert(self.ptr.__bool__(), "WrappedStruct.ptr is not allocated")
         self._del(self.ptr)
         self.ptr.free()
 
@@ -905,7 +914,7 @@ struct object(
 
         Args:
             arg: A value of type T.
-        
+
         Parameters:
             T: The type of arg, that implements the `Wrappeableobject` trait.
         """
@@ -2342,10 +2351,10 @@ struct object(
         return self._value.is_str()
 
     fn is_struct[T: WrappeableStruct](self) -> Bool:
-        """Check if self is str.
+        """Check if self is a WrappedStruct.
 
         Returns:
-            True if self is str.
+            True if self is a WrappedStruct.
         """
         return (
             self._value.is_struct()
@@ -2500,9 +2509,21 @@ struct object(
     ] T:
         """Returns a ref to the struct.
 
+        Parameters:
+            T: The type of the wrapped struct in self.
+
         Returns:
-            A mutable `Pointer` to self.
+            A mutable ref to self.
+
+        Note: consider `is_struct[T]()` before for type checking.
         """
+        debug_assert(
+            self.is_struct[T](),
+            "dereferenced as: "
+            + T.classname
+            + ", self is: "
+            + self._value._get_type_name(),
+        )
         return self._value.get_as_struct[T]()
 
 
