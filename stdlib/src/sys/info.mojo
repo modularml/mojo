@@ -574,12 +574,7 @@ fn warpsize[
     Returns:
         The warp size of the specified target.
     """
-    return __mlir_attr[
-        `#kgen.param.expr<target_get_field,`,
-        target,
-        `, "warp_size" : !kgen.string`,
-        `> : !kgen.int_literal`,
-    ]
+    return 32
 
 
 @always_inline("nodebug")
