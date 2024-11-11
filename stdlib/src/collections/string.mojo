@@ -26,7 +26,6 @@ from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
 from sys.intrinsics import _type_is_eq
-from hashlib._hasher import _HashableWithHasher, _Hasher
 
 from utils import (
     Span,
@@ -705,7 +704,6 @@ struct String(
     Writer,
     CollectionElementNew,
     FloatableRaising,
-    _HashableWithHasher,
 ):
     """Represents a mutable string."""
 
@@ -1948,17 +1946,7 @@ struct String(
             l_idx += 1
         return self[l_idx:]
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.as_string_slice())
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, inout hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:

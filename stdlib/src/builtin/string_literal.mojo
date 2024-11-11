@@ -19,7 +19,7 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
-from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hasher import Hashable, Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -50,7 +50,6 @@ struct StringLiteral(
     Stringable,
     FloatableRaising,
     BytesCollectionElement,
-    _HashableWithHasher,
 ):
     """This type represents a string literal.
 
@@ -335,17 +334,7 @@ struct StringLiteral(
         """
         return self.__str__().__repr__()
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.unsafe_ptr(), len(self))
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, inout hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:

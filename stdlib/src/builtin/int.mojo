@@ -18,8 +18,6 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from math import Ceilable, CeilDivable, Floorable, Truncable
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
@@ -289,7 +287,6 @@ struct Int(
     KeyElement,
     Roundable,
     IntLike,
-    _HashableWithHasher,
 ):
     """This type represents an integer value."""
 
@@ -1105,18 +1102,7 @@ struct Int(
         """
         return str(self)
 
-    fn __hash__(self) -> UInt:
-        """Hash the int using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        # TODO(MOCO-636): switch to DType.index
-        return _hash_simd(Scalar[DType.int64](self))
-
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, inout hasher: H):
         """Updates hasher with this int value.
 
         Parameters:
