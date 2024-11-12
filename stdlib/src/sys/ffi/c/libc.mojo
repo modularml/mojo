@@ -15,9 +15,9 @@
 from collections import Optional
 from memory import UnsafePointer, stack_allocation
 from sys.ffi.utils import external_call, DLHandle
-from sys.info import os_is_windows, os_is_macos
+from sys.info import os_is_windows, os_is_macos, os_is_linux, is_nvidia_gpu
 
-from .types import C
+from .types import C, char_ptr, char_ptr_to_string
 
 
 @value
@@ -63,8 +63,8 @@ struct Libc[*, static: Bool]:
 
     Notes:
 
-        - Some exceptions are made for Microsoft Windows. Pull requests to extend
-            support are welcome.
+        - Exceptions are made for Microsoft Windows, Mac OS, and NVIDIA GPUs.
+            Pull requests to extend support are welcome.
         - All reference links point to the POSIX section of the linux manual
             pages, to read the linux documentation which is often more thorough
             in explaining caveats (applicable to Linux, but similar in other
@@ -792,9 +792,18 @@ struct Libc[*, static: Bool]:
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/printf.3p.html).
         """
+        a = args.get_loaded_kgen_pack()
 
         @parameter
-        if static:
+        if is_nvidia_gpu():
+            p = UnsafePointer.address_of(a)
+
+            @parameter
+            if static:
+                return external_call["vprintf", C.int](format, p)
+            else:
+                return self.lib.value().call["vprintf", C.int](format, p)
+        elif static:
             # FIXME: externall_call should handle this
             num = __mlir_op.`pop.external_call`[
                 func = "printf".value,
@@ -804,13 +813,10 @@ struct Libc[*, static: Bool]:
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type = C.int,
-            ](format, args.get_loaded_kgen_pack())
+            ](format, a)
             return int(num)
         else:
-            num = self._lib.value().call["printf", C.int](
-                format, args.get_loaded_kgen_pack()
-            )
-            return int(num)
+            return int(self._lib.value().call["printf", C.int](format, a))
 
     @always_inline
     fn printf[
@@ -952,7 +958,7 @@ struct Libc[*, static: Bool]:
         """
 
         @parameter
-        if static:
+        if static and os_is_linux():
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[
                 func = "dprintf".value,
@@ -964,10 +970,15 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](fd, format, args.get_loaded_kgen_pack())
-        else:
+        elif os_is_linux():
             return self._lib.value().call["dprintf", C.int](
                 fd, format, args.get_loaded_kgen_pack()
             )
+        else:
+            stream = self.fdopen(fd, char_ptr(FM_WRITE))
+            num = self.fprintf(stream, format, args)
+            _ = self.fclose(stream)
+            return num
 
     @always_inline
     fn dprintf[

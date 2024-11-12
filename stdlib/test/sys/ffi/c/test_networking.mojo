@@ -272,6 +272,8 @@ def _test_setsockopt(libc: Libc):
             assert_true(err != -1)
             err = libc.setsockopt(fd, SOL_TCP, TCP_KEEPCNT, null_ptr, size)
             assert_true(err != -1)
+            err = libc.shutdown(fd, SHUT_RDWR)
+            assert_true(err != -1)
         elif os_is_windows():
             # TODO
             # tcp_keepalive keepaliveParams;
@@ -292,6 +294,8 @@ def _test_setsockopt(libc: Libc):
             err = libc.setsockopt(
                 fd, IPPROTO_TCP, TCP_KEEPALIVE, null_ptr, size
             )
+            assert_true(err != -1)
+            err = libc.shutdown(fd, SHUT_RDWR)
             assert_true(err != -1)
         else:
             constrained[False, "Unsupported test"]()
