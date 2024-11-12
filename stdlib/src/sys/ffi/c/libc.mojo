@@ -974,9 +974,9 @@ struct Libc[*, static: Bool]:
                 fd, format, args.get_loaded_kgen_pack()
             )
         else:
-            stream = self.fdopen(fd, char_ptr(FM_WRITE))
+            stream = self.fdopen(fd, char_ptr(FM_READ_WRITE)) # don't truncate
             num = self.fprintf(stream, format, args)
-            sent = self.fflush(stream) == 0
+            sent = self.feof(stream) != 0 and self.fflush(stream) == 0
             return num * int(sent) - int(not sent)
 
     @always_inline
