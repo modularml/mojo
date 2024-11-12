@@ -34,7 +34,7 @@ def _test_open_close(libc: Libc, suffix: String):
         sleep(0.05)
         assert_true(libc.close(filedes) != -1)
         for s in List(O_RDONLY, O_WRONLY, O_RDWR):
-            filedes = libc.open(ptr, s[])
+            filedes = libc.open(ptr, s[] | O_NONBLOCK)
             assert_true(filedes != -1)
             sleep(0.05)
             assert_true(libc.close(filedes) != -1)
@@ -217,11 +217,11 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
         stream = libc.fopen(ptr, char_ptr(FM_WRITE))
         assert_true(stream != C.NULL.bitcast[FILE]())
         size = 100
-        a = UnsafePointer[Byte].alloc(size)
+        a = UnsafePointer[C.char].alloc(size)
         for i in range(size - 1):
             a[i] = i + 1
         a[size - 1] = 0
-        num_bytes = libc.fprintf(stream, char_ptr(a))
+        num_bytes = libc.fprintf(stream, a)
         assert_equal(num_bytes, size - 1)
 
         assert_true(libc.fflush(stream) != EOF)  # flush stream
