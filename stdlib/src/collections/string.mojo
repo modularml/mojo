@@ -691,7 +691,7 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-struct StringRepr(Writable):
+struct _StringRepr(Writable):
     """Represents a string representation of an String."""
 
     var _value: StringSlice[ImmutableAnyOrigin]
@@ -1382,7 +1382,7 @@ struct String(
         Returns:
             A new representation of the string.
         """
-        return String.write(StringRepr(self))
+        return String.write(_StringRepr(self))
 
     fn __fspath__(self) -> String:
         """Return the file system path representation (just the string itself).

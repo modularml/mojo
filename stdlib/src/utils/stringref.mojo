@@ -15,7 +15,7 @@
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from collections.string import _atol, _isspace, StringRepr
+from collections.string import _atol, _isspace, _StringRepr
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
@@ -408,7 +408,7 @@ struct StringRef(
         var to_str = str(self)
 
         output.write("StringRef(")
-        StringRepr(to_str).write_to(output)
+        _StringRepr(to_str).write_to(output)
         output.write(")")
         _ = to_str
         return output
