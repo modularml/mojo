@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof, triple_is_nvidia_cuda
+from sys import alignof, sizeof, is_nvidia_gpu
 from sys.intrinsics import (
     _mlirtype_is_eq,
     _type_is_eq,
@@ -40,7 +40,7 @@ from memory.memory import _free, _malloc
 
 @always_inline
 fn _default_alignment[type: AnyType]() -> Int:
-    return alignof[type]() if triple_is_nvidia_cuda() else 1
+    return alignof[type]() if is_nvidia_gpu() else 1
 
 
 @always_inline
@@ -478,7 +478,7 @@ struct UnsafePointer[
         ]()
 
         @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+        if is_nvidia_gpu() and sizeof[type]() == 1 and alignment == 1:
             # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
             # regardless of the alignment that is passed. This causes issues if
             # this method is called on an unaligned pointer.
@@ -842,9 +842,7 @@ struct UnsafePointer[
         type: DType, //,
         *,
         width: Int = 1,
-        alignment: Int = alignof[
-            SIMD[type, width]
-        ]() if triple_is_nvidia_cuda() else 1,
+        alignment: Int = alignof[SIMD[type, width]]() if is_nvidia_gpu() else 1,
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: SIMD[_, width],

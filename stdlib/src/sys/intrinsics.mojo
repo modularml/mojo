@@ -19,7 +19,7 @@ from sys import PrefetchLocality
 ```
 """
 
-from .info import sizeof, triple_is_nvidia_cuda
+from .info import sizeof, is_nvidia_gpu
 from ._assembly import inlined_assembly
 import math
 
@@ -480,7 +480,7 @@ fn prefetch[
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         inlined_assembly[
             "prefetch.global.L2 [$0];",
             NoneType,

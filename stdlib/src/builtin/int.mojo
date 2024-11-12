@@ -32,7 +32,7 @@ from memory import UnsafePointer
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
-from sys import triple_is_nvidia_cuda, bitwidthof
+from sys import is_nvidia_gpu, bitwidthof
 from sys.ffi import OpaquePointer
 
 # ===----------------------------------------------------------------------=== #

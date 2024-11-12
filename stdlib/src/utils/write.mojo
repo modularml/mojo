@@ -15,7 +15,7 @@
 from collections import InlineArray
 from memory import memcpy, UnsafePointer
 from utils import Span, StaticString
-from sys.info import triple_is_nvidia_cuda
+from sys.info import is_nvidia_gpu
 from builtin.io import _printf
 
 
@@ -361,7 +361,7 @@ fn write_buffered[
     ```
     .
     """
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         # Stack space is very small on GPU due to many threads, so use heap
         var buffer = _WriteBufferHeap[buffer_size](writer^)
         write_args(buffer, args, sep=sep, end=end)

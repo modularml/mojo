@@ -19,7 +19,7 @@ from sys import (
     bitwidthof,
     external_call,
     stdout,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     _libc as libc,
 )
 from sys._libc import dup, fclose, fdopen, fflush
@@ -165,7 +165,7 @@ fn _printf[
     var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
@@ -257,7 +257,7 @@ fn print[
     write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
 
     @parameter
-    if not triple_is_nvidia_cuda():
+    if not is_nvidia_gpu():
         if flush:
             _flush(file=file)
 

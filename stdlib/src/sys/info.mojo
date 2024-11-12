@@ -412,19 +412,19 @@ fn is_triple[triple: StringLiteral]() -> Bool:
 @always_inline("nodebug")
 fn _is_sm_8x() -> Bool:
     return (
-        triple_is_nvidia_cuda["sm_80"]()
-        or triple_is_nvidia_cuda["sm_86"]()
-        or triple_is_nvidia_cuda["sm_89"]()
+        is_nvidia_gpu["sm_80"]()
+        or is_nvidia_gpu["sm_86"]()
+        or is_nvidia_gpu["sm_89"]()
     )
 
 
 @always_inline("nodebug")
 fn _is_sm_9x() -> Bool:
-    return triple_is_nvidia_cuda["sm_90"]() or triple_is_nvidia_cuda["sm_90a"]()
+    return is_nvidia_gpu["sm_90"]() or is_nvidia_gpu["sm_90a"]()
 
 
 @always_inline("nodebug")
-fn triple_is_nvidia_cuda() -> Bool:
+fn is_nvidia_gpu() -> Bool:
     """Returns True if the target triple of the compiler is `nvptx64-nvidia-cuda`
     False otherwise.
 
@@ -435,7 +435,7 @@ fn triple_is_nvidia_cuda() -> Bool:
 
 
 @always_inline("nodebug")
-fn triple_is_nvidia_cuda[subarch: StringLiteral]() -> Bool:
+fn is_nvidia_gpu[subarch: StringLiteral]() -> Bool:
     """Returns True if the target triple of the compiler is `nvptx64-nvidia-cuda`
     and we are compiling for the specified sub-architecture and False otherwise.
 
@@ -445,7 +445,7 @@ fn triple_is_nvidia_cuda[subarch: StringLiteral]() -> Bool:
     Returns:
         True if the triple target is cuda and False otherwise.
     """
-    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) == subarch
+    return is_nvidia_gpu() and StringLiteral(_current_arch()) == subarch
 
 
 @always_inline("nodebug")

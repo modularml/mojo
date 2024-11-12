@@ -26,7 +26,7 @@ f.close()
 from utils import Span
 from builtin.io import _printf
 from sys.ffi import external_call, OpaquePointer
-from sys.info import triple_is_nvidia_cuda
+from sys.info import is_nvidia_gpu
 from memory import UnsafePointer
 
 
@@ -65,7 +65,7 @@ struct FileDescriptor(Writer):
         var len_bytes = len(bytes)
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
             _printf["%*s"](len_bytes, bytes.unsafe_ptr())
         else:
             written = external_call["write", Int32](
