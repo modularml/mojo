@@ -1197,6 +1197,7 @@ struct Int(
             type: The type of the integer.
             big_endian: Whether the byte array is big-endian.
 
+
         Returns:
             The integer value.
         """
