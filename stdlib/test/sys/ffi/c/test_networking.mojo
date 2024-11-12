@@ -255,7 +255,7 @@ def _test_setsockopt(libc: Libc):
         err = libc.setsockopt(
             fd,
             SOL_SOCKET,
-            SO_DEBUG,
+            SO_KEEPALIVE,
             value_ptr.bitcast[C.void](),
             sizeof[C.int](),
         )

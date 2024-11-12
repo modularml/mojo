@@ -74,11 +74,11 @@ struct Libc[*, static: Bool]:
 
     var _lib: Optional[DLHandle]
 
-    fn __init__(inout self: Libc[static=True]):
+    fn __init__(out self: Libc[static=True]):
         """Construct a Libc instance."""
         self._lib = None
 
-    fn __init__(inout self: Libc[static=False], path: StringLiteral):
+    fn __init__(out self: Libc[static=False], path: StringLiteral):
         """Construct a Libc instance.
 
         Args:
@@ -86,7 +86,7 @@ struct Libc[*, static: Bool]:
         """
         self._lib = DLHandle(path)
 
-    fn __init__(inout self: Libc[static=False]):
+    fn __init__(out self: Libc[static=False]):
         """Construct a Libc instance using the default dylib location for the
         given OS."""
 

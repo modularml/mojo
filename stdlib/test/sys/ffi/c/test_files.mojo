@@ -29,7 +29,7 @@ def _test_open_close(libc: Libc, suffix: String):
     file = str(_dir_of_current_file() / ("dummy_test_open_close" + suffix))
     ptr = char_ptr(file)
     with TryLibc(libc):
-        filedes = libc.open(ptr, O_RDWR | O_CREAT | O_TRUNC, 0o666)
+        filedes = libc.open(ptr, O_RDWR | O_CREAT | O_TRUNC | O_NONBLOCK, 0o666)
         assert_true(filedes != -1)
         sleep(0.05)
         assert_true(libc.close(filedes) != -1)
