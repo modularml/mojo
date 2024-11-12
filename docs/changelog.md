@@ -16,6 +16,10 @@ what we publish.
 
 ### ⭐️ New
 
+- New `Int.from_bytes()` functions to convert a list of bytes to an integer,
+  accepting the endianess as an argument. Similar to Python `int.from_bytes()`
+  function.
+
 - `StringRef` is now representable so `repr(StringRef("hello"))` will return
   `StringRef('hello')`.
 
