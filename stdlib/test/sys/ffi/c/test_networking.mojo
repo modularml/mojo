@@ -264,20 +264,32 @@ def test_static_setsockopt():
 
 
 def _test_bind_listen(libc: Libc):
-    fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_IP)
-    port = libc.htons(8001)
-    ip_buf = stack_allocation[4, C.void]()
-    ip_ptr = char_ptr("0.0.0.0")
-    err = libc.inet_pton(AF_INET, ip_ptr, ip_buf)
-    assert_true(err != 0)
-    ip = ip_buf.bitcast[C.u_int]().load()
-    zero = StaticTuple[C.char, 8]()
-    ai = sockaddr_in(AF_INET, port, ip, zero)
-    ai_ptr = UnsafePointer.address_of(ai).bitcast[sockaddr]()
-    assert_true(libc.bind(fd, ai_ptr, sizeof[sockaddr_in]()) != -1)
-    _ = ai
-    assert_true(libc.listen(fd, C.int(0)) != -1)
-    assert_true(libc.shutdown(fd, SHUT_RDWR) != -1)
+    with TryLibc(libc):
+        fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_IP)
+        assert_true(fd != -1)
+        value_ptr = stack_allocation[1, C.int]()
+        value_ptr[0] = 1
+        err = libc.setsockopt(
+            fd,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            value_ptr.bitcast[C.void](),
+            sizeof[C.int](),
+        )
+        assert_true(err != -1)
+        port = libc.htons(8001)
+        ip_buf = stack_allocation[4, C.void]()
+        ip_ptr = char_ptr("0.0.0.0")
+        err = libc.inet_pton(AF_INET, ip_ptr, ip_buf)
+        assert_true(err != 0)
+        ip = ip_buf.bitcast[C.u_int]().load()
+        zero = StaticTuple[C.char, 8]()
+        ai = sockaddr_in(AF_INET, port, ip, zero)
+        ai_ptr = UnsafePointer.address_of(ai).bitcast[sockaddr]()
+        assert_true(libc.bind(fd, ai_ptr, sizeof[sockaddr_in]()) != -1)
+        _ = ai
+        assert_true(libc.listen(fd, C.int(0)) != -1)
+        assert_true(libc.shutdown(fd, SHUT_RDWR) != -1)
 
 
 def test_dynamic_bind_listen():

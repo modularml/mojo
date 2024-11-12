@@ -41,8 +41,11 @@ struct TryLibc[static: Bool]:
     fn __exit__(self, error: Error) raises -> Bool:
         """Exit a context with an error.
 
-        Arguments:
+        Args:
             error: The error.
+
+        Returns:
+            The exit value.
         """
         raise Error(
             str(error)
@@ -72,11 +75,17 @@ struct Libc[*, static: Bool]:
     var _lib: Optional[DLHandle]
 
     fn __init__(inout self: Libc[static=True]):
+        """Construct a Libc instance."""
         self._lib = None
 
     fn __init__(
         inout self: Libc[static=False], path: StringLiteral = "libc.so.6"
     ):
+        """Construct a Libc instance.
+
+        Args:
+            path: The path to the dynamic library file.
+        """
         self._lib = DLHandle(path)
 
     # ===------------------------------------------------------------------=== #
@@ -208,6 +217,9 @@ struct Libc[*, static: Bool]:
         *T: AnyType
     ](self, priority: C.int, format: UnsafePointer[C.char], *args: *T):
         """Libc POSIX `syslog` function.
+
+        Parameters:
+            T: The type of the arguments.
 
         Args:
             priority: A File Descriptor to open the file with.
