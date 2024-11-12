@@ -44,7 +44,7 @@ struct _GPUAddressSpace(EqualityComparable):
     """Local address space."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         self._value = value
 
     @always_inline("nodebug")
@@ -167,7 +167,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Generic address space."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Initializes the address space from the underlying integral value.
 
         Args:
@@ -176,7 +176,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         self._value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: _GPUAddressSpace):
+    fn __init__(out self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integral value.
 
         Args:
@@ -326,7 +326,7 @@ struct Pointer[
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, *, _mlir_value: Self._mlir_type):
+    fn __init__(out self, *, _mlir_value: Self._mlir_type):
         """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
@@ -347,7 +347,7 @@ struct Pointer[
         """
         return Pointer(_mlir_value=__get_mvalue_as_litref(value))
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Constructs a copy from another Pointer.
 
         Note that this does **not** copy the underlying data.

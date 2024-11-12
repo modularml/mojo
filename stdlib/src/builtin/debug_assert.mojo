@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_defined, triple_is_nvidia_cuda
+from sys import is_defined, is_nvidia_gpu
 from sys._build import is_debug_build
 from sys.param_env import env_get_string
 from sys.ffi import external_call, c_uint, c_size_t, c_char
@@ -44,7 +44,7 @@ fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
     ]()
 
     @parameter
-    if defined_mode == "none" or (triple_is_nvidia_cuda() and cpu_only):
+    if defined_mode == "none" or (is_nvidia_gpu() and cpu_only):
         return False
     elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
         return True
@@ -295,7 +295,7 @@ fn _debug_assert_msg(
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         external_call["__assertfail", NoneType](
             "debug_assert message must be a single StringLiteral on GPU"
             .unsafe_cstr_ptr(),
@@ -328,7 +328,7 @@ fn _debug_assert_msg_literal(message: StringLiteral, loc: _SourceLocation):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         external_call["__assertfail", NoneType](
             message.unsafe_cstr_ptr(),
             loc.file_name.unsafe_cstr_ptr(),

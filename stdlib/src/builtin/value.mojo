@@ -24,10 +24,10 @@ trait Movable:
 
     ```mojo
     struct Foo(Movable):
-        fn __init__(inout self):
+        fn __init__(out self):
             pass
 
-        fn __moveinit__(inout self, owned existing: Self):
+        fn __moveinit__(out self, owned existing: Self):
             print("moving")
     ```
 
@@ -47,7 +47,7 @@ trait Movable:
     ```
     """
 
-    fn __moveinit__(inout self, owned existing: Self, /):
+    fn __moveinit__(out self, owned existing: Self, /):
         """Create a new instance of the value by moving the value of another.
 
         Args:
@@ -66,10 +66,10 @@ trait Copyable:
     struct Foo(Copyable):
         var s: String
 
-        fn __init__(inout self, s: String):
+        fn __init__(out self, s: String):
             self.s = s
 
-        fn __copyinit__(inout self, other: Self):
+        fn __copyinit__(out self, other: Self):
             print("copying value")
             self.s = other.s
     ```
@@ -90,7 +90,7 @@ trait Copyable:
     ```
     """
 
-    fn __copyinit__(inout self, existing: Self, /):
+    fn __copyinit__(out self, existing: Self, /):
         """Create a new instance of the value by copying an existing one.
 
         Args:
@@ -117,10 +117,10 @@ trait ExplicitlyCopyable:
     struct Foo(ExplicitlyCopyable):
         var s: String
 
-        fn __init__(inout self, s: String):
+        fn __init__(out self, s: String):
             self.s = s
 
-        fn __init__(inout self, copy: Self):
+        fn __init__(out self, copy: Self):
             print("explicitly copying value")
             self.s = copy.s
     ```
@@ -145,7 +145,7 @@ trait ExplicitlyCopyable:
     #   `other` is a required named argument for the time being to minimize
     #   implicit conversion overload ambiguity errors, particularly
     #   with SIMD and Int.
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly construct a deep copy of the provided value.
 
         Args:
@@ -164,7 +164,7 @@ trait Defaultable:
     struct Foo(Defaultable):
         var s: String
 
-        fn __init__(inout self):
+        fn __init__(out self):
             self.s = "default"
     ```
 
@@ -183,7 +183,7 @@ trait Defaultable:
     ```
     """
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Create a default instance of the value."""
         ...
 

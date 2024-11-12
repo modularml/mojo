@@ -235,7 +235,32 @@ what we publish.
 - Added `os.path.expandvars` to expand environment variables in a string.
   ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
 
+- Added a `reserve` method and new constructor to the `String` struct to
+  allocate additional capacity.
+  ([PR #3755](https://github.com/modularml/mojo/pull/3755) by [@thatstoasty](https://github.com/thatstoasty)).
+
 ### 🦋 Changed
+
+- The argument convention for `__init__` methods has been changed from `inout`
+  to `out`, reflecting that an `__init__` method initializes its `self` without
+  reading from it.  This also enables spelling the type of an initializer
+  correctly, which was not supported before:
+
+  ```mojo
+  struct Foo:
+      fn __init__(out self): pass
+
+  fn test():
+      # This works now
+      var fnPtr : fn(out x: Foo)->None = Foo.__init__
+
+      var someFoo : Foo
+      fnPtr(someFoo)  # initializes someFoo.
+  ```
+
+  The previous `fn __init__(inout self)` syntax is still supported in this
+  release of Mojo, but will be removed in the future.  Please migrate to the
+  new syntax.
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
   module from the Mojo standard library.
@@ -407,12 +432,32 @@ what we publish.
   print(p[i])
   ```
 
+  - Float32 and Float64 are now printed and converted to strings with roundtrip
+  guarantee and shortest representation:
+
+  ```plaintext
+  Value                       Old                       New
+  Float64(0.3)                0.29999999999999999       0.3
+  Float32(0.3)                0.30000001192092896       0.3
+  Float64(0.0001)             0.0001                    0.0001
+  Float32(0.0001)             9.9999997473787516e-05    0.0001
+  Float64(-0.00001)           -1.0000000000000001e-05   -1e-05
+  Float32(-0.00001)           -9.9999997473787516e-06   -1e-05
+  Float32(0.00001234)         1.2339999557298142e-05    1.234e-05
+  Float32(-0.00000123456)     -1.2345600453045336e-06   -1.23456e-06
+  Float64(1.1234567e-320)     1.1235052786429946e-320   1.1235e-320
+  Float64(1.234 * 10**16)     12340000000000000.0       1.234e+16
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
 
 - Lifetime tracking is now fully field sensitive, which makes the uninitialized
   variable checker more precise.
+
+- [Issue #1632](https://github.com/modularml/mojo/issues/1632) - Mojo produces
+  weird error when inout function is used in non mutating function
 
 - [Issue #3444](https://github.com/modularml/mojo/issues/3444) - Raising init
   causing use of uninitialized variable
@@ -426,6 +471,9 @@ what we publish.
 - [Issue #3627](https://github.com/modularml/mojo/issues/3627) - Compiler
   overlooked exclusivity violation caused by `ref [MutableAnyOrigin] T`
 
+- [Issue #3710](https://github.com/modularml/mojo/issues/3710) - Mojo frees
+  memory while reference to it is still in use.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
@@ -435,3 +483,17 @@ what we publish.
 
 - The VS Code extension now allows invoking a mojo formatter from SDK
   installations that contain white spaces in their path.
+
+- Error messages that include type names no longer include inferred or defaulted
+  parameters when they aren't needed.  For example, previously Mojo complained
+  about things like:
+  
+  ```plaintext
+  ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
+  ```
+
+  it now complains more helpfully that:
+
+  ```plaintext
+  ... cannot be converted from 'UnsafePointer[UInt]' to 'UnsafePointer[Int]'
+  ```

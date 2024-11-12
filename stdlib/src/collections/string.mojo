@@ -146,7 +146,7 @@ fn chr(c: Int) -> String:
     #     p.free()
     #     return chr(0xFFFD)
     p[num_bytes] = 0
-    return String(ptr=p, len=num_bytes + 1)
+    return String(ptr=p, length=num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -791,7 +791,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, owned impl: List[UInt8, *_]):
+    fn __init__(out self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
         The buffer must be terminated with a null byte:
@@ -815,15 +815,24 @@ struct String(
         var size = impl.size
         var capacity = impl.capacity
         self._buffer = Self._buffer_type(
-            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
+            ptr=impl.steal_data(), length=size, capacity=capacity
         )
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
 
-    fn __init__(inout self, *, other: Self):
+    @always_inline
+    fn __init__(out self, *, capacity: Int):
+        """Construct an uninitialized string with the given capacity.
+
+        Args:
+            capacity: The capacity of the string.
+        """
+        self._buffer = Self._buffer_type(capacity=capacity)
+
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -831,7 +840,7 @@ struct String(
         """
         self.__copyinit__(other)
 
-    fn __init__(inout self, str: StringRef):
+    fn __init__(out self, str: StringRef):
         """Construct a string from a StringRef object.
 
         Args:
@@ -844,7 +853,7 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
-    fn __init__(inout self, str_slice: StringSlice):
+    fn __init__(out self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
         This will allocate a new string that copies the string contents from
@@ -867,7 +876,7 @@ struct String(
         self = Self(buffer^)
 
     @always_inline
-    fn __init__(inout self, literal: StringLiteral):
+    fn __init__(out self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
@@ -876,7 +885,7 @@ struct String(
         self = literal.__str__()
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
+    fn __init__(out self, *, ptr: UnsafePointer[Byte], length: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -884,15 +893,11 @@ struct String(
 
         Args:
             ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
+            length: The length of the buffer, including the null terminator.
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(
-            Self._buffer_type(
-                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
-            )
-        )
+        self = Self(Self._buffer_type(ptr=ptr, length=length, capacity=length))
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
@@ -1014,7 +1019,7 @@ struct String(
             buff: The buffer. This should have an existing terminator.
         """
 
-        return String(buff, len(StringRef(ptr=buff)) + 1)
+        return String(ptr=buff, length=len(StringRef(ptr=buff)) + 1)
 
     @staticmethod
     fn _from_bytes(owned buff: Self._buffer_type) -> String:
@@ -1563,7 +1568,7 @@ struct String(
 
         # Does NOT include the NUL terminator.
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
+            ptr=self._buffer.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline
@@ -2166,19 +2171,7 @@ struct String(
         Returns:
             The string concatenated `n` times.
         """
-        if n <= 0:
-            return ""
-        var len_self = self.byte_length()
-        var count = len_self * n + 1
-        var buf = Self._buffer_type(capacity=count)
-        buf.resize(count, 0)
-        for i in range(n):
-            memcpy(
-                dest=buf.data + len_self * i,
-                src=self.unsafe_ptr(),
-                count=len_self,
-            )
-        return String(buf^)
+        return self.as_string_slice() * n
 
     @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
@@ -2325,6 +2318,18 @@ struct String(
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
         var result = String(buffer)
         return result^
+
+    fn reserve(inout self, new_capacity: Int):
+        """Reserves the requested capacity.
+
+        Args:
+            new_capacity: The new capacity.
+
+        Notes:
+            If the current capacity is greater or equal, this is a no-op.
+            Otherwise, the storage is reallocated and the data is moved.
+        """
+        self._buffer.reserve(new_capacity)
 
 
 # ===----------------------------------------------------------------------=== #
