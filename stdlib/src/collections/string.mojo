@@ -692,7 +692,7 @@ fn isprintable(c: UInt8) -> Bool:
 
 
 struct _StringRepr(Writable):
-    """Represents a string representation of an String."""
+    """Represents a string representation of a String."""
 
     var _value: StringSlice[ImmutableAnyOrigin]
     """The string representation of the String."""
