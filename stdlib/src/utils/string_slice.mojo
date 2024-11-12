@@ -1396,7 +1396,7 @@ fn _split_impl[
             rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
-        output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
+        output.append(Span[Byte, O](ptr=ptr + lhs, length=rhs - lhs))
         lhs = rhs + sep_len
 
 
@@ -1419,7 +1419,7 @@ fn _split_impl[
 
     @always_inline("nodebug")
     fn _build_slice(p: UnsafePointer[Byte], start: Int, end: Int) -> S:
-        return S(unsafe_from_utf8_ptr=p + start, len=end - start)
+        return S(ptr=p + start, length=end - start)
 
     while lhs <= str_byte_len:
         # Python adds all "whitespace chars" as one separator
@@ -1443,7 +1443,7 @@ fn _split_impl[
             rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
-        output.append(Span[Byte, O](unsafe_ptr=ptr + lhs, len=rhs - lhs))
+        output.append(Span[Byte, O](ptr=ptr + lhs, length=rhs - lhs))
         lhs = rhs
 
 
