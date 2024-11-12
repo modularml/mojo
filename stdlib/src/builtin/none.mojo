@@ -33,12 +33,12 @@ struct NoneType(
     var _value: Self._mlir_type
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct an instance of the `None` type."""
         self._value = None
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicit copy constructor.
 
         Args:

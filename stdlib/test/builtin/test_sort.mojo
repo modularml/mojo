@@ -497,7 +497,7 @@ fn test_sort_stress() raises:
 struct MyStruct(CollectionElement):
     var val: Int
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.val = other.val
 
 
@@ -550,7 +550,7 @@ struct Person(ComparableCollectionElement):
     var name: String
     var age: Int
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.name = String(other=other.name)
         self.age = other.age
 

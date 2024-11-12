@@ -526,7 +526,7 @@ struct assert_raises:
     """Assigned the value returned by __call_locations() at Self.__init__."""
 
     @always_inline
-    fn __init__(inout self, *, location: Optional[_SourceLocation] = None):
+    fn __init__(out self, *, location: Optional[_SourceLocation] = None):
         """Construct a context manager with no message pattern.
 
         Args:

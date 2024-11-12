@@ -25,18 +25,18 @@ struct TestCounter(CollectionElement):
     var copied: Int
     var moved: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.copied = 0
         self.moved = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         self.copied = other.copied + 1
         self.moved = other.moved
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         self.copied = other.copied
         self.moved = other.moved + 1
 
@@ -65,16 +65,16 @@ fn _destroy_poison(p: OpaquePointer):
 
 
 struct Poison(CollectionElement):
-    fn __init__(inout self):
+    fn __init__(out self):
         pass
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         _poison_ptr().init_pointee_move(True)
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         _poison_ptr().init_pointee_move(True)
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         _poison_ptr().init_pointee_move(True)
 
     fn __del__(owned self):
