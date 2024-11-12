@@ -974,10 +974,15 @@ struct Libc[*, static: Bool]:
                 fd, format, args.get_loaded_kgen_pack()
             )
         else:
-            stream = self.fdopen(fd, char_ptr(FM_READ_WRITE)) # don't truncate
+            stream = self.fdopen(fd, char_ptr(FM_READ_WRITE))  # don't truncate
+            if stream == C.NULL.bitcast[FILE]():
+                return -1
             num = self.fprintf(stream, format, args)
-            sent = self.feof(stream) != 0 and self.fflush(stream) == 0
-            return num * int(sent) - int(not sent)
+            if num < 0:
+                return -1
+            if self.fflush(stream) != 0:
+                return -1
+            return num
 
     @always_inline
     fn dprintf[
