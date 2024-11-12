@@ -287,6 +287,7 @@ def _test_setsockopt(libc: Libc):
             value_ptr[0] = C.int(1)
             fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
             assert_true(fd != -1)
+            assert_equal(size, 4)
             err = libc.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, null_ptr, size)
             assert_true(err != -1)
             err = libc.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, null_ptr, size)
