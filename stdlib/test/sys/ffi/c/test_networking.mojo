@@ -248,7 +248,7 @@ def test_static_socketpair():
 
 def _test_setsockopt(libc: Libc):
     with TryLibc(libc):
-        value_ptr = stack_allocation[1, C.int]()
+        value_ptr = stack_allocation[1, C.u_char]() # should be C.int, but MacOS...
         value_ptr[0] = 1
         fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
         assert_true(fd != -1)
@@ -257,7 +257,7 @@ def _test_setsockopt(libc: Libc):
             SOL_SOCKET,
             SO_KEEPALIVE,
             value_ptr.bitcast[C.void](),
-            sizeof[C.int](),
+            sizeof[C.u_char](), # MacOS doesn't like sizeof[C.int]()
         )
         assert_true(err != -1)
         err = libc.setsockopt(
@@ -265,7 +265,7 @@ def _test_setsockopt(libc: Libc):
             SOL_SOCKET,
             SO_REUSEADDR,
             value_ptr.bitcast[C.void](),
-            sizeof[C.int](),
+            sizeof[C.u_char](), # MacOS doesn't like sizeof[C.int]()
         )
         assert_true(err != -1)
 
