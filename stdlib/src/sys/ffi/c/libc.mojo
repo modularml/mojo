@@ -15,7 +15,7 @@
 from collections import Optional
 from memory import UnsafePointer, stack_allocation
 from sys.ffi.utils import external_call, DLHandle
-from sys.info import os_is_windows, triple_is_nvidia_cuda, os_is_macos
+from sys.info import os_is_windows, os_is_macos
 
 from .types import C
 
