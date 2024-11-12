@@ -976,8 +976,8 @@ struct Libc[*, static: Bool]:
         else:
             stream = self.fdopen(fd, char_ptr(FM_WRITE))
             num = self.fprintf(stream, format, args)
-            _ = self.fclose(stream)
-            return num
+            sent = self.fflush(stream) == 0
+            return num * int(sent) - int(not sent)
 
     @always_inline
     fn dprintf[

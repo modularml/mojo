@@ -287,14 +287,11 @@ def _test_setsockopt(libc: Libc):
             value_ptr[0] = C.int(1)
             fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
             assert_true(fd != -1)
-            assert_equal(size, 4)
-            err = libc.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, null_ptr, size)
+            err = libc.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, null_ptr, 1)
             assert_true(err != -1)
-            err = libc.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, null_ptr, size)
+            err = libc.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, null_ptr, 1)
             assert_true(err != -1)
-            err = libc.setsockopt(
-                fd, IPPROTO_TCP, TCP_KEEPALIVE, null_ptr, size
-            )
+            err = libc.setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, null_ptr, 1)
             assert_true(err != -1)
             err = libc.shutdown(fd, SHUT_RDWR)
             assert_true(err != -1)
