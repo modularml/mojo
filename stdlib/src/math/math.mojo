@@ -27,7 +27,7 @@ from sys import (
     bitwidthof,
     has_avx512f,
     simdwidthof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     sizeof,
 )
 
@@ -258,7 +258,7 @@ fn sqrt[
         for i in range(simd_width):
             res[i] = sqrt(int(x[i]))
         return res
-    elif triple_is_nvidia_cuda():
+    elif is_nvidia_gpu():
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
@@ -303,7 +303,7 @@ fn isqrt(x: SIMD) -> __type_of(x):
     constrained[x.type.is_floating_point(), "type must be floating point"]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
@@ -349,7 +349,7 @@ fn recip(x: SIMD) -> __type_of(x):
     constrained[x.type.is_floating_point(), "type must be floating point"]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
@@ -385,7 +385,7 @@ fn exp2[
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if type is DType.float16:
@@ -589,7 +589,7 @@ fn exp[
     alias inv_lg2 = 1.442695040888963407359924681001892137426646
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if type in (DType.float16, DType.float32):
@@ -677,7 +677,7 @@ fn frexp[
     constrained[type.is_floating_point(), "must be a floating point value"]()
     alias T = SIMD[type, simd_width]
     alias zero = T(0)
-    alias max_exponent = FPUtils[type].max_exponent() - 2
+    alias max_exponent = FPUtils[type].max_exponent() - 1
     alias mantissa_width = FPUtils[type].mantissa_width()
     var mask1 = _frexp_mask1[simd_width, type]()
     var mask2 = _frexp_mask2[simd_width, type]()
@@ -768,7 +768,7 @@ fn log(x: SIMD) -> __type_of(x):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias ln2 = 0.69314718055966295651160180568695068359375
 
         @parameter
@@ -802,7 +802,7 @@ fn log2(x: SIMD) -> __type_of(x):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if sizeof[x.type]() < sizeof[DType.float32]():
@@ -936,7 +936,7 @@ fn tanh[
     ]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias instruction = "tanh.approx.f32"
 
         @parameter
@@ -1408,7 +1408,7 @@ fn cos[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and sizeof[type]() <= sizeof[DType.float32]():
+    if is_nvidia_gpu() and sizeof[type]() <= sizeof[DType.float32]():
         return _call_ptx_intrinsic[
             instruction="cos.approx.ftz.f32", constraints="=f,f"
         ](x)
@@ -1441,7 +1441,7 @@ fn sin[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and sizeof[type]() <= sizeof[DType.float32]():
+    if is_nvidia_gpu() and sizeof[type]() <= sizeof[DType.float32]():
         return _call_ptx_intrinsic[
             instruction="sin.approx.ftz.f32", constraints="=f,f"
         ](x)
@@ -1609,7 +1609,7 @@ fn log10(x: SIMD) -> __type_of(x):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias log10_2 = 0.301029995663981195213738894724493027
 
         @parameter
@@ -2328,7 +2328,7 @@ fn _call_libm[
         arg_type == result_type, "the argument type must match the result type"
     ]()
     constrained[
-        not triple_is_nvidia_cuda(),
+        not is_nvidia_gpu(),
         "the libm operation is not available on the CUDA target",
     ]()
 

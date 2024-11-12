@@ -93,7 +93,7 @@ struct AHasher[key: U256](_Hasher):
     var pad: UInt64
     var extra_keys: U128
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize the hasher."""
         alias pi_key = key ^ U256(
             0x243F_6A88_85A3_08D3,

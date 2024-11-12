@@ -21,7 +21,7 @@ from utils import Span
 fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:
     var p = UnsafePointer[SIMD[D, 1]].alloc(size)
     rand[D](p, size)
-    sort(Span[Scalar[D], MutableAnyOrigin](unsafe_ptr=p, len=size))
+    sort(Span[Scalar[D], MutableAnyOrigin](ptr=p, length=size))
     for i in range(1, size - 1):
         if p[i] < p[i - 1]:
             print(name, "size:", size, "max:", max, "incorrect sort")

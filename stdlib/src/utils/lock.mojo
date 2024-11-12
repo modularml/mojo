@@ -29,7 +29,7 @@ struct SpinWaiter:
     var storage: OpaquePointer
     """Pointer to the underlying SpinWaiter instance."""
 
-    fn __init__(inout self: Self):
+    fn __init__(out self: Self):
         """Initializes a SpinWaiter instance."""
         self.storage = external_call[
             "KGEN_CompilerRT_AsyncRT_InitializeSpinWaiter",
@@ -60,7 +60,7 @@ struct BlockingSpinLock:
     var counter: Atomic[DType.int64]
     """The atomic counter implementing the spin lock."""
 
-    fn __init__(inout self: Self):
+    fn __init__(out self: Self):
         """Default constructor."""
 
         self.counter = Atomic[DType.int64](Self.UNLOCKED)

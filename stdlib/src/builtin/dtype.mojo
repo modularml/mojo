@@ -94,7 +94,7 @@ struct DType(
     on the system."""
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy this DType.
 
         Args:
@@ -712,6 +712,38 @@ fn _integral_type_of[type: DType]() -> DType:
     @parameter
     if type is DType.float64:
         return DType.int64
+
+    return type.invalid
+
+
+@always_inline("nodebug")
+fn _uint_type_of[type: DType]() -> DType:
+    """Gets the unsigned integral type which has the same bitwidth as the input
+    type."""
+
+    @parameter
+    if type.is_integral() and type.is_unsigned():
+        return type
+
+    @parameter
+    if type.is_float8() or type is DType.int8:
+        return DType.uint8
+
+    @parameter
+    if type.is_half_float() or type is DType.int16:
+        return DType.uint16
+
+    @parameter
+    if (
+        type is DType.float32
+        or type is DType.tensor_float32
+        or type is DType.int32
+    ):
+        return DType.uint32
+
+    @parameter
+    if type is DType.float64 or type is DType.int64:
+        return DType.uint64
 
     return type.invalid
 

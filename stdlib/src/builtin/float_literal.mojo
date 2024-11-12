@@ -49,7 +49,7 @@ struct FloatLiteral(
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self.fp_type):
+    fn __init__(out self, value: Self.fp_type):
         """Create a FloatLiteral value from a kgen.float_literal value.
 
         Args:
@@ -58,7 +58,7 @@ struct FloatLiteral(
         self.value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    fn __init__(out self, value: IntLiteral):
         """Convert an IntLiteral to a FloatLiteral value.
 
         Args:
