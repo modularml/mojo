@@ -34,6 +34,7 @@ def _test_open_close(libc: Libc, suffix: String):
         sleep(0.05)
         assert_true(libc.close(filedes) != -1)
         for s in List(O_RDONLY, O_WRONLY, O_RDWR):
+            print(s[])
             filedes = libc.open(ptr, s[])
             assert_true(filedes != -1)
             sleep(0.05)

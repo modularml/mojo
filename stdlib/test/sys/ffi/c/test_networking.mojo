@@ -211,6 +211,7 @@ def _test_socket_create(libc: Libc):
             alias socket_protocol = combo.get[2, Int]()
             if socket_protocol == IPPROTO_SCTP and os_is_macos():
                 continue
+            print(address_family, socket_type, socket_protocol)
             fd = libc.socket(address_family, socket_type, socket_protocol)
             assert_true(fd != -1)
 
