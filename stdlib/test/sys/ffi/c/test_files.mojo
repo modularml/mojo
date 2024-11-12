@@ -18,7 +18,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from pathlib import _dir_of_current_file
 from time import sleep
 from memory import UnsafePointer, memset, memcpy, memcmp, stack_allocation
-from random import random_ui64
+from sys.info import os_is_macos
 
 from sys.ffi.c.types import C, char_ptr, FILE
 from sys.ffi.c.libc import TryLibc, Libc
@@ -34,7 +34,7 @@ def _test_open_close(libc: Libc, suffix: String):
         sleep(0.05)
         assert_true(libc.close(filedes) != -1)
         for s in List(O_RDONLY, O_WRONLY, O_RDWR):
-            if os_is_macos() and s[] == O_WRONLY: # no idea why...
+            if os_is_macos() and s[] == O_WRONLY:  # no idea why...
                 continue
             filedes = libc.open(ptr, s[] | O_NONBLOCK)
             assert_true(filedes != -1)

@@ -795,13 +795,34 @@ alias SO_DETACH_REUSEPORT_BPF = 68
 
 # TCP level options (IPPROTO_TCP)
 alias TCP_NODELAY = 1
-"""Constant: TCP_NODELAY."""
-alias TCP_KEEPIDLE = 2
-"""Constant: TCP_KEEPIDLE."""
-alias TCP_KEEPINTVL = 3
-"""Constant: TCP_KEEPINTVL."""
-alias TCP_KEEPCNT = 4
-"""Constant: TCP_KEEPCNT."""
+"""Don't delay send to coalesce packets."""
+alias TCP_MAXSEG = 2
+"""Set maximum segment size."""
+alias TCP_CORK = 3
+"""Control sending of partial frames."""
+alias TCP_KEEPIDLE = 4
+"""Start keeplives after this period."""
+alias TCP_KEEPINTVL = 5
+"""Interval between keepalives."""
+alias TCP_KEEPCNT = 6
+"""Number of keepalives before death."""
+alias TCP_SYNCNT = 7
+"""Number of SYN retransmits."""
+alias TCP_LINGER2 = 8
+"""Life time of orphaned FIN-WAIT-2 state."""
+alias TCP_DEFER_ACCEPT = 9
+"""Wake up listener only when data arrive."""
+alias TCP_WINDOW_CLAMP = 10
+"""Bound advertised window."""
+alias TCP_INFO = 11
+"""Information about this connection.."""
+alias TCP_QUICKACK = 12
+"""Bock/reenable quick ACKs."""
+alias TCP_CONGESTION = 13
+"""Congestion control algorithm."""
+alias TCP_MD5SIG = 14
+"""TCP MD5 Signature (RFC2385)."""
+
 
 # IPv4 level options (IPPROTO_IP)
 alias IP_TOS = 1

@@ -248,26 +248,49 @@ def test_static_socketpair():
 
 def _test_setsockopt(libc: Libc):
     with TryLibc(libc):
-        value_ptr = stack_allocation[1, C.u_char]() # should be C.int, but MacOS...
-        value_ptr[0] = 1
-        fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
-        assert_true(fd != -1)
-        err = libc.setsockopt(
-            fd,
-            SOL_SOCKET,
-            SO_KEEPALIVE,
-            value_ptr.bitcast[C.void](),
-            sizeof[C.u_char](), # MacOS doesn't like sizeof[C.int]()
-        )
-        assert_true(err != -1)
-        err = libc.setsockopt(
-            fd,
-            SOL_SOCKET,
-            SO_REUSEADDR,
-            value_ptr.bitcast[C.void](),
-            sizeof[C.u_char](), # MacOS doesn't like sizeof[C.int]()
-        )
-        assert_true(err != -1)
+        value_ptr = stack_allocation[1, C.int]()
+        value_ptr[0] = C.int(1)
+        null_ptr = value_ptr.bitcast[C.void]()
+        size = sizeof[C.int]()
+
+        @parameter
+        if os_is_linux():
+            fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+            assert_true(fd != -1)
+            err = libc.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, null_ptr, size)
+            assert_true(err != -1)
+            err = libc.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, null_ptr, size)
+            assert_true(err != -1)
+            value_ptr[0] = C.int(20)
+            err = libc.setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, null_ptr, size)
+            assert_true(err != -1)
+            err = libc.setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, null_ptr, size)
+            assert_true(err != -1)
+            err = libc.setsockopt(fd, SOL_TCP, TCP_KEEPCNT, null_ptr, size)
+            assert_true(err != -1)
+        elif os_is_windows():
+            # TODO
+            # tcp_keepalive keepaliveParams;
+            # DWORD ret = 0;
+            # keepaliveParams.onoff = 1;
+            # keepaliveParams.keepaliveinterval = keepaliveParams.keepalivetime = keepaliveIntervalSec * 1000;
+            # WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &keepaliveParams, sizeof(keepaliveParams), NULL, 0, &ret, NULL, NULL);
+            constrained[False, "Unsupported test"]()
+        elif os_is_macos():
+            value_ptr = stack_allocation[1, C.int]()
+            value_ptr[0] = C.int(1)
+            fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+            assert_true(fd != -1)
+            err = libc.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, null_ptr, size)
+            assert_true(err != -1)
+            err = libc.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, null_ptr, size)
+            assert_true(err != -1)
+            err = libc.setsockopt(
+                fd, IPPROTO_TCP, TCP_KEEPALIVE, null_ptr, size
+            )
+            assert_true(err != -1)
+        else:
+            constrained[False, "Unsupported test"]()
 
 
 def test_dynamic_setsockopt():
