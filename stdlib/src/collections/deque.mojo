@@ -132,7 +132,7 @@ struct Deque[ElementType: CollectionElement](
         if elements is not None:
             self.extend(elements.value())
 
-    fn __init__(inout self, owned *values: ElementType):
+    fn __init__(out self, owned *values: ElementType):
         """Constructs a deque from the given values.
 
         Args:
@@ -167,7 +167,7 @@ struct Deque[ElementType: CollectionElement](
 
         self._tail = args_length
 
-    fn __init__(inout self, other: Self):
+    fn __init__(out self, other: Self):
         """Creates a deepcopy of the given deque.
 
         Args:
@@ -185,7 +185,7 @@ struct Deque[ElementType: CollectionElement](
 
         self._tail = len(other)
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Moves data of an existing deque into a new one.
 
         Args:
@@ -205,6 +205,157 @@ struct Deque[ElementType: CollectionElement](
             offset = self._physical_index(self._head + i)
             (self._data + offset).destroy_pointee()
         self._data.free()
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
+    fn __add__(self, other: Self) -> Self:
+        """Concatenates self with other and returns the result as a new deque.
+
+        Args:
+            other: Deque whose elements will be appended to the elements of self.
+
+        Returns:
+            The newly created deque with the properties of `self`.
+        """
+        new = Self(other=self)
+        for element in other:
+            new.append(element[])
+        return new^
+
+    fn __iadd__(inout self, other: Self):
+        """Appends the elements of other deque into self.
+
+        Args:
+            other: Deque whose elements will be appended to self.
+        """
+        for element in other:
+            self.append(element[])
+
+    fn __mul__(self, n: Int) -> Self:
+        """Concatenates `n` deques of `self` and returns a new deque.
+
+        Args:
+            n: The multiplier number.
+
+        Returns:
+            The new deque.
+        """
+        if n <= 0:
+            return Self(
+                capacity=self._min_capacity,
+                min_capacity=self._min_capacity,
+                maxlen=self._maxlen,
+                shrink=self._shrink,
+            )
+        new = Self(other=self)
+        for _ in range(n - 1):
+            for element in self:
+                new.append(element[])
+        return new^
+
+    fn __imul__(inout self, n: Int):
+        """Concatenates self `n` times in place.
+
+        Args:
+            n: The multiplier number.
+        """
+        if n <= 0:
+            self.clear()
+            return
+
+        orig = Self(other=self)
+        for _ in range(n - 1):
+            for element in orig:
+                self.append(element[])
+
+    fn __eq__[
+        EqualityElementType: EqualityComparableCollectionElement, //
+    ](
+        self: Deque[EqualityElementType], other: Deque[EqualityElementType]
+    ) -> Bool:
+        """Checks if two deques are equal.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the trait `EqualityComparableCollectionElement`.
+
+        Args:
+            other: The deque to compare with.
+
+        Returns:
+            `True` if the deques are equal, `False` otherwise.
+        """
+        if len(self) != len(other):
+            return False
+
+        for i in range(len(self)):
+            offset_self = self._physical_index(self._head + i)
+            offset_other = other._physical_index(other._head + i)
+            if (self._data + offset_self)[] != (other._data + offset_other)[]:
+                return False
+        return True
+
+    fn __ne__[
+        EqualityElementType: EqualityComparableCollectionElement, //
+    ](
+        self: Deque[EqualityElementType], other: Deque[EqualityElementType]
+    ) -> Bool:
+        """Checks if two deques are not equal.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the trait `EqualityComparableCollectionElement`.
+
+        Args:
+            other: The deque to compare with.
+
+        Returns:
+            `True` if the deques are not equal, `False` otherwise.
+        """
+        return not (self == other)
+
+    fn __contains__[
+        EqualityElementType: EqualityComparableCollectionElement, //
+    ](self: Deque[EqualityElementType], value: EqualityElementType) -> Bool:
+        """Verify if a given value is present in the deque.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the trait `EqualityComparableCollectionElement`.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the deque, False otherwise.
+        """
+        for i in range(len(self)):
+            offset = self._physical_index(self._head + i)
+            if (self._data + offset)[] == value:
+                return True
+        return False
+
+    fn __iter__(
+        ref [_]self,
+    ) -> _DequeIter[ElementType, __origin_of(self)]:
+        """Iterates over elements of the deque, returning the references.
+
+        Returns:
+            An iterator of the references to the deque elements.
+        """
+        return _DequeIter(0, Pointer.address_of(self))
+
+    fn __reversed__(
+        ref [_]self,
+    ) -> _DequeIter[ElementType, __origin_of(self), False]:
+        """Iterate backwards over the deque, returning the references.
+
+        Returns:
+            A reversed iterator of the references to the deque elements.
+        """
+        return _DequeIter[forward=False](len(self), Pointer.address_of(self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -253,6 +404,87 @@ struct Deque[ElementType: CollectionElement](
         offset = self._physical_index(self._head + normalized_idx)
         return (self._data + offset)[]
 
+    @no_inline
+    fn write_to[
+        RepresentableElementType: RepresentableCollectionElement,
+        WriterType: Writer, //,
+    ](self: Deque[RepresentableElementType], inout writer: WriterType):
+        """Writes `my_deque.__str__()` to a `Writer`.
+
+        Parameters:
+            RepresentableElementType: The type of the Deque elements.
+                Must implement the trait `RepresentableCollectionElement`.
+            WriterType: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        writer.write("Deque(")
+        for i in range(len(self)):
+            offset = self._physical_index(self._head + i)
+            writer.write(repr((self._data + offset)[]))
+            if i < len(self) - 1:
+                writer.write(", ")
+        writer.write(")")
+
+    @no_inline
+    fn __str__[
+        RepresentableElementType: RepresentableCollectionElement, //
+    ](self: Deque[RepresentableElementType]) -> String:
+        """Returns a string representation of a `Deque`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        my_deque = Deque[Int](1, 2, 3)
+        print(my_deque.__str__())
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_deque)` will
+        be enough.
+
+        The elements' type must implement the `__repr__()` method for this to work.
+
+        Parameters:
+            RepresentableElementType: The type of the elements in the deque.
+                Must implement the trait `RepresentableCollectionElement`.
+
+        Returns:
+            A string representation of the deque.
+        """
+        output = String()
+        self.write_to(output)
+        return output^
+
+    @no_inline
+    fn __repr__[
+        RepresentableElementType: RepresentableCollectionElement, //
+    ](self: Deque[RepresentableElementType]) -> String:
+        """Returns a string representation of a `Deque`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        my_deque = Deque[Int](1, 2, 3)
+        print(my_deque.__repr__())
+        ```
+
+        When the compiler supports conditional methods, then a simple `repr(my_deque)` will
+        be enough.
+
+        The elements' type must implement the `__repr__()` for this to work.
+
+        Parameters:
+            RepresentableElementType: The type of the elements in the deque.
+                Must implement the trait `RepresentableCollectionElement`.
+
+        Returns:
+            A string representation of the deque.
+        """
+        return self.__str__()
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
@@ -273,6 +505,37 @@ struct Deque[ElementType: CollectionElement](
 
         if self._head == self._tail:
             self._realloc(self._capacity << 1)
+
+    fn appendleft(inout self, owned value: ElementType):
+        """Appends a value to the left side of the deque.
+
+        Args:
+            value: The value to append.
+        """
+        # checking for positive _maxlen first is important for speed
+        if self._maxlen > 0 and len(self) == self._maxlen:
+            self._tail = self._physical_index(self._tail - 1)
+            (self._data + self._tail).destroy_pointee()
+
+        self._head = self._physical_index(self._head - 1)
+        (self._data + self._head).init_pointee_move(value^)
+
+        if self._head == self._tail:
+            self._realloc(self._capacity << 1)
+
+    fn clear(inout self):
+        """Removes all elements from the deque leaving it with length 0.
+
+        Resets the underlying storage capacity to `_min_capacity`.
+        """
+        for i in range(len(self)):
+            offset = self._physical_index(self._head + i)
+            (self._data + offset).destroy_pointee()
+        self._data.free()
+        self._capacity = self._min_capacity
+        self._data = UnsafePointer[ElementType].alloc(self._capacity)
+        self._head = 0
+        self._tail = 0
 
     fn extend(inout self, owned values: List[ElementType]):
         """Extends the right side of the deque by consuming elements of the list argument.
@@ -305,6 +568,40 @@ struct Deque[ElementType: CollectionElement](
         for i in range(n_move_values):
             (src + i).move_pointee_into(self._data + self._tail)
             self._tail = self._physical_index(self._tail + 1)
+
+    fn extendleft(inout self, owned values: List[ElementType]):
+        """Extends the left side of the deque by consuming elements from the list argument.
+
+        Acts as series of left appends resulting in reversed order of elements in the list argument.
+
+        Args:
+            values: List whose elements will be added at the left side of the deque.
+        """
+        n_move_total, n_move_self, n_move_values, n_pop_self, n_pop_values = (
+            self._compute_pop_and_move_counts(len(self), len(values))
+        )
+
+        # pop excess `self` elements
+        for _ in range(n_pop_self):
+            self._tail = self._physical_index(self._tail - 1)
+            (self._data + self._tail).destroy_pointee()
+
+        # move from `self` to new location if we have to re-allocate
+        if n_move_total >= self._capacity:
+            self._prepare_for_new_elements(n_move_total, n_move_self)
+
+        # we will consume all elements of `values`
+        values_data = values.steal_data()
+
+        # pop excess elements from `values`
+        for i in range(n_pop_values):
+            (values_data + i).destroy_pointee()
+
+        # move remaining elements from `values`
+        src = values_data + n_pop_values
+        for i in range(n_move_values):
+            self._head = self._physical_index(self._head - 1)
+            (src + i).move_pointee_into(self._data + self._head)
 
     fn _compute_pop_and_move_counts(
         self, len_self: Int, len_values: Int
@@ -418,3 +715,48 @@ struct Deque[ElementType: CollectionElement](
             self._data.free()
         self._data = new_data
         self._capacity = new_capacity
+
+
+@value
+struct _DequeIter[
+    deque_mutability: Bool, //,
+    ElementType: CollectionElement,
+    deque_lifetime: Origin[deque_mutability].type,
+    forward: Bool = True,
+]:
+    """Iterator for Deque.
+
+    Parameters:
+        deque_mutability: Whether the reference to the deque is mutable.
+        ElementType: The type of the elements in the deque.
+        deque_lifetime: The lifetime of the Deque.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    alias deque_type = Deque[ElementType]
+
+    var index: Int
+    var src: Pointer[Self.deque_type, deque_lifetime]
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> Pointer[ElementType, deque_lifetime]:
+        @parameter
+        if forward:
+            self.index += 1
+            return Pointer.address_of(self.src[][self.index - 1])
+        else:
+            self.index -= 1
+            return Pointer.address_of(self.src[][self.index])
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0

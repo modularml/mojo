@@ -220,7 +220,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
     var value: V
     """The value associated with the key."""
 
-    fn __init__(inout self, owned key: K, owned value: V):
+    fn __init__(out self, owned key: K, owned value: V):
         """Create an entry from a key and value, computing the hash.
 
         Args:
@@ -231,7 +231,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.key = key^
         self.value = value^
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy an existing entry.
 
         Args:
@@ -270,7 +270,7 @@ struct _DictIndex:
     var data: OpaquePointer
 
     @always_inline
-    fn __init__(inout self, reserved: Int):
+    fn __init__(out self, reserved: Int):
         if reserved <= 128:
             var data = UnsafePointer[Int8].alloc(reserved)
             for i in range(reserved):
@@ -312,7 +312,7 @@ struct _DictIndex:
             memcpy(new_data, data, reserved)
         return index^
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.data = existing.data
 
     fn get_index(self, reserved: Int, slot: Int) -> Int:
@@ -472,7 +472,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize an empty dictiontary."""
         self.size = 0
         self._n_entries = 0
@@ -480,7 +480,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(len(self._entries))
 
     @always_inline
-    fn __init__(inout self, *, power_of_two_initial_capacity: Int):
+    fn __init__(out self, *, power_of_two_initial_capacity: Int):
         """Initialize an empty dictiontary with a pre-reserved initial capacity.
 
         Args:
@@ -513,7 +513,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return len(self._entries)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy an existing dictiontary.
 
         Args:
@@ -555,7 +555,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return Dict[K, Optional[V]].fromkeys(keys, value)
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy an existing dictiontary.
 
         Args:
@@ -566,7 +566,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = existing._index.copy(existing._reserved())
         self._entries = existing._entries
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move data of an existing dict into a new one.
 
         Args:
@@ -1083,11 +1083,11 @@ struct OwnedKwargsDict[V: CollectionElement](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize an empty keyword dictionary."""
         self._dict = Dict[Self.key_type, V]()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy an existing keyword dictionary.
 
         Args:
@@ -1095,7 +1095,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         self._dict = other._dict
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy an existing keyword dictionary.
 
         Args:
@@ -1103,7 +1103,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         self._dict = existing._dict
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move data of an existing keyword dictionary into a new one.
 
         Args:

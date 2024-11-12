@@ -59,10 +59,10 @@ fn _get_global_python_itf() -> _PythonInterfaceImpl:
 struct _PythonInterfaceImpl:
     var _cpython: UnsafePointer[CPython]
 
-    fn __init__(inout self, cpython: UnsafePointer[CPython]):
+    fn __init__(out self, cpython: UnsafePointer[CPython]):
         self._cpython = cpython
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self._cpython = existing._cpython
 
     fn cpython(self) -> CPython:
@@ -79,11 +79,11 @@ struct Python:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor."""
         self.impl = _get_global_python_itf()
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy constructor.
 
         Args:

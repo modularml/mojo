@@ -59,13 +59,13 @@ struct Error(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor."""
         self.data = UnsafePointer[UInt8]()
         self.loaded_length = 0
 
     @always_inline
-    fn __init__(inout self, value: StringLiteral):
+    fn __init__(out self, value: StringLiteral):
         """Construct an Error object with a given string literal.
 
         Args:
@@ -74,7 +74,7 @@ struct Error(
         self.data = value.unsafe_ptr()
         self.loaded_length = len(value)
 
-    fn __init__(inout self, src: String):
+    fn __init__(out self, src: String):
         """Construct an Error object with a given string.
 
         Args:
@@ -91,7 +91,7 @@ struct Error(
         self.data = dest
         self.loaded_length = -length
 
-    fn __init__(inout self, src: StringRef):
+    fn __init__(out self, src: StringRef):
         """Construct an Error object with a given string ref.
 
         Args:
@@ -108,7 +108,7 @@ struct Error(
         self.data = dest
         self.loaded_length = -length
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -121,7 +121,7 @@ struct Error(
         if self.loaded_length < 0:
             self.data.free()
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Creates a deep copy of an existing error.
 
         Args:

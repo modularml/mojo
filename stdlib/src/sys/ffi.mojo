@@ -154,7 +154,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn __init__(inout self, path: String, flags: Int = DEFAULT_RTLD):
+    fn __init__(out self, path: String, flags: Int = DEFAULT_RTLD):
         """Initialize a DLHandle object by loading the dynamic library at the
         given path.
 
@@ -173,7 +173,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         else:
             self.handle = OpaquePointer()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
