@@ -19,6 +19,8 @@ from testing import assert_equal, assert_true, assert_false, assert_raises
 from python import PythonObject
 from memory import UnsafePointer
 
+alias Bytes = List[Byte]
+
 
 def test_properties():
     assert_equal(Int.MAX, (1 << bitwidthof[DType.index]() - 1) - 1)
@@ -246,6 +248,45 @@ def test_conversion_from_python():
     assert_equal(Int.try_from_python(PythonObject(-1)), -1)
 
 
+def test_from_bytes():
+    assert_equal(Int.from_bytes[DType.int16](Bytes(0, 16), big_endian=True), 16)
+    assert_equal(
+        Int.from_bytes[DType.int16](Bytes(0, 16), big_endian=False), 4096
+    )
+    assert_equal(
+        Int.from_bytes[DType.int16](Bytes(252, 0), big_endian=True), -1024
+    )
+    assert_equal(
+        Int.from_bytes[DType.uint16](Bytes(252, 0), big_endian=True), 64512
+    )
+    assert_equal(
+        Int.from_bytes[DType.int16](Bytes(252, 0), big_endian=False), 252
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32](Bytes(0, 0, 0, 1), big_endian=True), 1
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32](Bytes(0, 0, 0, 1), big_endian=False),
+        16777216,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32](Bytes(1, 0, 0, 0), big_endian=True),
+        16777216,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32](Bytes(1, 0, 0, 1), big_endian=True),
+        16777217,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32](Bytes(1, 0, 0, 1), big_endian=False),
+        16777217,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32](Bytes(255, 0, 0, 0), big_endian=True),
+        -16777216,
+    )
+
+
 def main():
     test_properties()
     test_add()
@@ -269,3 +310,4 @@ def main():
     test_int_uint()
     test_float_conversion()
     test_conversion_from_python()
+    test_from_bytes()
