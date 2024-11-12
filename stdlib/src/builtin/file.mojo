@@ -44,7 +44,7 @@ struct _OwnedStringRef(Boolable):
     var data: UnsafePointer[UInt8]
     var length: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.data = UnsafePointer[UInt8]()
         self.length = 0
 
@@ -73,11 +73,11 @@ struct FileHandle:
     var handle: OpaquePointer
     """The underlying pointer to the file handle."""
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor."""
         self.handle = OpaquePointer()
 
-    fn __init__(inout self, path: String, mode: String) raises:
+    fn __init__(out self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
 
         Args:
@@ -86,7 +86,7 @@ struct FileHandle:
         """
         self.__init__(path.as_string_slice(), mode.as_string_slice())
 
-    fn __init__(inout self, path: StringSlice, mode: StringSlice) raises:
+    fn __init__(out self, path: StringSlice, mode: StringSlice) raises:
         """Construct the FileHandle using the file path and string.
 
         Args:
@@ -126,7 +126,7 @@ struct FileHandle:
 
         self.handle = OpaquePointer()
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Moves constructor for the file handle.
 
         Args:
@@ -201,7 +201,7 @@ struct FileHandle:
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        return String(buf, int(size_copy) + 1)
+        return String(ptr=buf, length=int(size_copy) + 1)
 
     fn read[
         type: DType
@@ -345,7 +345,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
 
         var list = List[UInt8](
-            unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
+            ptr=buf, length=int(size_copy), capacity=int(size_copy)
         )
 
         return list

@@ -34,7 +34,7 @@ fn doc_private():
     ```mojo
     struct Foo:
         @doc_private
-        fn __init__(inout self):
+        fn __init__(out self):
             "This should not be called directly, use `Foo.create` instead."
             return
 

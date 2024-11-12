@@ -50,7 +50,7 @@ struct _c_stat(Stringable):
     var st_lspare: Int32  # RESERVED: DO NOT USE!
     var st_qspare: InlineArray[Int64, 2]  # RESERVED: DO NOT USE!
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.st_dev = 0
         self.st_mode = 0
         self.st_nlink = 0

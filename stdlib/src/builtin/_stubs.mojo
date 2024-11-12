@@ -68,7 +68,7 @@ struct _ParamForIterator[IteratorT: Copyable]:
     var value: Int
     var stop: Bool
 
-    fn __init__(inout self, next_it: IteratorT, value: Int, stop: Bool):
+    fn __init__(out self, next_it: IteratorT, value: Int, stop: Bool):
         self.next_it = next_it
         self.value = value
         self.stop = stop

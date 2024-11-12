@@ -29,7 +29,9 @@ from python._cpython import (
 from python._bindings import (
     Pythonable,
     ConvertibleFromPython,
+    PythonableAndConvertibleFromPython,
     PyMojoObject,
+    python_type_object,
     py_c_function_wrapper,
     check_argument_type,
     # Imported for use by the compiler
@@ -84,7 +86,7 @@ fn gen_pytype_wrapper[
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
     # TODO(MOCO-1307): Add support for constructor generation.
 
-    var type_obj = PyMojoObject[T].python_type_object[name](
+    var type_obj = python_type_object[T, name](
         methods=List[PyMethodDef](),
     )
 
@@ -125,7 +127,30 @@ fn check_and_get_arg[
     return check_argument_type[T](func_name, type_name_id, py_args[index])
 
 
-fn try_convert_arg[
+fn check_and_get_or_convert_arg[
+    T: PythonableAndConvertibleFromPython
+](
+    func_name: StringLiteral,
+    type_name_id: StringLiteral,
+    py_args: TypedPythonObject["Tuple"],
+    index: Int,
+    converted_arg_ptr: UnsafePointer[T],
+) raises -> UnsafePointer[T]:
+    try:
+        return check_and_get_arg[T](func_name, type_name_id, py_args, index)
+    except e:
+        converted_arg_ptr.init_pointee_move(
+            _try_convert_arg[T](
+                func_name,
+                type_name_id,
+                py_args,
+                index,
+            )
+        )
+        return converted_arg_ptr
+
+
+fn _try_convert_arg[
     T: ConvertibleFromPython
 ](
     func_name: StringLiteral,

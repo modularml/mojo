@@ -44,7 +44,7 @@ struct _GPUAddressSpace(EqualityComparable):
     """Local address space."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         self._value = value
 
     @always_inline("nodebug")
@@ -158,7 +158,7 @@ struct _GPUAddressSpace(EqualityComparable):
 
 @value
 @register_passable("trivial")
-struct AddressSpace(EqualityComparable):
+struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Address space of the pointer."""
 
     var _value: Int
@@ -167,7 +167,7 @@ struct AddressSpace(EqualityComparable):
     """Generic address space."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Initializes the address space from the underlying integral value.
 
         Args:
@@ -176,7 +176,7 @@ struct AddressSpace(EqualityComparable):
         self._value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: _GPUAddressSpace):
+    fn __init__(out self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integral value.
 
         Args:
@@ -259,6 +259,31 @@ struct AddressSpace(EqualityComparable):
         """
         return self.value() != other.value()
 
+    @always_inline("nodebug")
+    fn __str__(self) -> String:
+        """Gets a string representation of the AddressSpace.
+
+        Returns:
+            The string representation of the AddressSpace.
+        """
+        return String.write(self)
+
+    @always_inline("nodebug")
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Formats the address space to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        if self is AddressSpace.GENERIC:
+            writer.write("AddressSpace.GENERIC")
+        else:
+            writer.write("AddressSpace(", self.value(), ")")
+
 
 # ===----------------------------------------------------------------------===#
 # Pointer
@@ -301,7 +326,7 @@ struct Pointer[
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, *, _mlir_value: Self._mlir_type):
+    fn __init__(out self, *, _mlir_value: Self._mlir_type):
         """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
@@ -322,7 +347,7 @@ struct Pointer[
         """
         return Pointer(_mlir_value=__get_mvalue_as_litref(value))
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Constructs a copy from another Pointer.
 
         Note that this does **not** copy the underlying data.
