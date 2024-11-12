@@ -15,7 +15,7 @@
 from collections import Optional
 from memory import UnsafePointer, stack_allocation
 from sys.ffi.utils import external_call, DLHandle
-from sys.info import os_is_windows, triple_is_nvidia_cuda
+from sys.info import os_is_windows, triple_is_nvidia_cuda, os_is_macos
 
 from .types import C
 
@@ -111,7 +111,7 @@ struct Libc[*, static: Bool]:
                 _ = self._lib.value().call["_get_errno", C.void](errno)
             return errno[]
         else:
-            alias loc = "___error" if os_is_macos() else "__errno_location"
+            alias loc = "__error" if os_is_macos() else "__errno_location"
 
             @parameter
             if static:
@@ -135,7 +135,7 @@ struct Libc[*, static: Bool]:
             else:
                 _ = self._lib.value().call["_set_errno", C.int](errno)
         else:
-            alias loc = "___error" if os_is_macos() else "__errno_location"
+            alias loc = "__error" if os_is_macos() else "__errno_location"
 
             @parameter
             if static:
