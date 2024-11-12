@@ -802,10 +802,10 @@ struct Libc[*, static: Bool]:
             if static:
                 return external_call["vprintf", C.int](format, p)
             else:
-                return self.lib.value().call["vprintf", C.int](format, p)
+                return self._lib.value().call["vprintf", C.int](format, p)
         elif static:
             # FIXME: externall_call should handle this
-            num = __mlir_op.`pop.external_call`[
+            return __mlir_op.`pop.external_call`[
                 func = "printf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -814,9 +814,8 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](format, a)
-            return int(num)
         else:
-            return int(self._lib.value().call["printf", C.int](format, a))
+            return self._lib.value().call["printf", C.int](format, a)
 
     @always_inline
     fn printf[
