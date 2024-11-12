@@ -85,7 +85,7 @@ struct Deque[ElementType: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     fn __init__(
-        inout self,
+        out self,
         *,
         owned elements: Optional[List[ElementType]] = None,
         capacity: Int = self.default_capacity,
