@@ -490,35 +490,35 @@ alias SOCK_PACKET = 10
 # Updated from http://www.iana.org/assignments/protocol-numbers and other
 # sources.
 alias IPPROTO_IP = 0
-"""internet protocol, pseudo protocol number."""
+"""Internet protocol, pseudo protocol number."""
 alias IPPROTO_HOPOPT = 0
 """IPv6 Hop-by-Hop Option [RFC1883]."""
 alias IPPROTO_ICMP = 1
-"""internet control message protocol."""
+"""Internet control message protocol."""
 alias IPPROTO_IGMP = 2
 """Internet Group Management."""
 alias IPPROTO_GGP = 3
-"""gateway-gateway protocol."""
+"""Gateway-gateway protocol."""
 alias IPPROTO_IP_ENCAP = 4
 """IP encapsulated in IP (officially ``IP'')."""
 alias IPPROTO_ST = 5
 """ST datagram mode."""
 alias IPPROTO_TCP = 6
-"""transmission control protocol."""
+"""Transmission control protocol."""
 alias IPPROTO_EGP = 8
-"""exterior gateway protocol."""
+"""Exterior gateway protocol."""
 alias IPPROTO_IGP = 9
-"""any private interior gateway (Cisco)."""
+"""Any private interior gateway (Cisco)."""
 alias IPPROTO_PUP = 12
 """PARC universal packet protocol."""
 alias IPPROTO_UDP = 17
-"""user datagram protocol."""
+"""User datagram protocol."""
 alias IPPROTO_HMP = 20
-"""host monitoring protocol."""
+"""Host monitoring protocol."""
 alias IPPROTO_XNS_IDP = 22
 """Xerox NS IDP."""
 alias IPPROTO_RDP = 27
-""""reliable datagram" protocol."""
+""""Reliable datagram" protocol."""
 alias IPPROTO_ISO_TP4 = 29
 """ISO Transport Protocol class 4 [RFC905]."""
 alias IPPROTO_DCCP = 33

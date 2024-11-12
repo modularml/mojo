@@ -27,6 +27,7 @@ from sys.ffi.c.types import (
     sockaddr_in,
     sockaddr,
     addrinfo,
+    socklen_t,
 )
 from sys.ffi.c.constants import *
 
@@ -251,7 +252,7 @@ def _test_setsockopt(libc: Libc):
         value_ptr = stack_allocation[1, C.int]()
         value_ptr[0] = C.int(1)
         null_ptr = value_ptr.bitcast[C.void]()
-        size = sizeof[C.int]()
+        size = socklen_t(sizeof[C.int]())
 
         @parameter
         if os_is_linux():

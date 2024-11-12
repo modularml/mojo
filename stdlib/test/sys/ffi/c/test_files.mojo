@@ -221,8 +221,8 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
         size = ord("~") - ord(" ")
         a = UnsafePointer[C.char].alloc(size)
         idx = 0
-        for i in reversed(range(ord(" "), ord("~"))):
-            if i == ord("^"): # otherwise starts an ascii escape sequence
+        for i in range(ord(" "), ord("~")):
+            if i == ord("\\"): # otherwise escapes
                 a[idx] = i + 1
             else:
                 a[idx] = i
