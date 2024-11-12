@@ -21,7 +21,7 @@ from sys.ffi.c.constants import *
 
 
 alias error_message = (
-    (SUCCESS, "Success"),
+    # (SUCCESS, "Success"), # 'Undefined error: 0' in MacOS 14
     (EPERM, "Operation not permitted"),
     (ENOENT, "No such file or directory"),
     (ESRCH, "No such process"),

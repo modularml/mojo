@@ -192,10 +192,10 @@ def test_static_inet_ntoa():
 alias socket_combinations = (
     (AF_INET, SOCK_STREAM, IPPROTO_IP),
     (AF_INET, SOCK_DGRAM, IPPROTO_IP),
-    (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP),
+    # (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP), # unsupported MacOS 14
     (AF_INET6, SOCK_STREAM, IPPROTO_IP),
     (AF_INET6, SOCK_DGRAM, IPPROTO_IP),
-    (AF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP),
+    # (AF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP), # unsupported MacOS 14
 )
 
 
