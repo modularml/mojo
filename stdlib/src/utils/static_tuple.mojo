@@ -126,7 +126,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     """The underlying storage for the static tuple."""
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[size]()
         self.array = __mlir_op.`kgen.param.constant`[
@@ -135,7 +135,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         ]()
 
     @always_inline
-    fn __init__(inout self, *elems: Self.element_type):
+    fn __init__(out self, *elems: Self.element_type):
         """Constructs a static tuple given a set of arguments.
 
         Args:
@@ -145,7 +145,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self.array = _create_array[size](elems)
 
     @always_inline
-    fn __init__(inout self, values: VariadicList[Self.element_type]):
+    fn __init__(out self, values: VariadicList[Self.element_type]):
         """Creates a tuple constant using the specified values.
 
         Args:
@@ -154,7 +154,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         _static_tuple_construction_checks[size]()
         self.array = _create_array[size, Self.element_type](values)
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided StaticTuple.
 
         Args:

@@ -134,13 +134,13 @@ struct UInt(IntLike, _HashableWithHasher):
     """
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.index):
+    fn __init__(out self, value: __mlir_type.index):
         """Construct UInt from the given index value.
 
         Args:
@@ -150,7 +150,7 @@ struct UInt(IntLike, _HashableWithHasher):
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct UInt from the given Index value.
 
         Args:
@@ -161,7 +161,7 @@ struct UInt(IntLike, _HashableWithHasher):
         )
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Construct `UInt` from the given `Int` value.
 
         Args:
@@ -175,7 +175,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self.value = value.value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    fn __init__(out self, value: IntLiteral):
         """Construct `UInt` from the given `IntLiteral` value.
 
         Args:
