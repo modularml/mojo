@@ -25,7 +25,7 @@ from sys import (
     llvm_intrinsic,
     prefetch,
     simdwidthof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     bitwidthof,
 )
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
@@ -152,12 +152,12 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
-    return triple_is_nvidia_cuda()
+    return is_nvidia_gpu()
 
 
 @always_inline("nodebug")
 fn _has_native_f8_support() -> Bool:
-    return _is_sm_9x() or triple_is_nvidia_cuda["sm_89"]()
+    return _is_sm_9x() or is_nvidia_gpu["sm_89"]()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -218,9 +218,7 @@ struct SIMD[type: DType, size: Int](
     alias MIN_FINITE = Self(_min_finite[type]())
     """Returns the minimum (lowest) finite value of SIMD value."""
 
-    alias _default_alignment = alignof[
-        Scalar[type]
-    ]() if triple_is_nvidia_cuda() else 1
+    alias _default_alignment = alignof[Scalar[type]]() if is_nvidia_gpu() else 1
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -1494,7 +1492,7 @@ struct SIMD[type: DType, size: Int](
         elif type.is_floating_point():
 
             @parameter
-            if triple_is_nvidia_cuda():
+            if is_nvidia_gpu():
 
                 @parameter
                 if type.is_half_float():
@@ -1583,7 +1581,7 @@ struct SIMD[type: DType, size: Int](
             return rebind[SIMD[target, size]](self)
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
 
             @parameter
             if size > 1 and type is DType.float32 and target.is_half_float():
@@ -2940,7 +2938,7 @@ fn _bfloat16_to_f32_scalar(
 
     # For bfloat16, we can just do a memcpy to perform the cast to float32.
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         return inlined_assembly[
             "cvt.f32.bf16 $0, $1;" if _is_sm_9x() else "mov.b32 $0, {0, $1};",
             Scalar[DType.float32],
@@ -3185,7 +3183,7 @@ fn _write_scalar[
     elif dtype.is_integral():
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
             var err = _try_write_int(writer, value)
             if err:
                 abort(

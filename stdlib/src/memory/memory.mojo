@@ -24,7 +24,7 @@ from sys import (
     alignof,
     llvm_intrinsic,
     sizeof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     external_call,
     simdwidthof,
     simdbitwidth,
@@ -155,7 +155,7 @@ fn _memcpy_impl(
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias chunk_size = simdbitwidth()
         var vector_end = _align_down(n, chunk_size)
         for i in range(0, vector_end, chunk_size):
@@ -349,7 +349,7 @@ fn stack_allocation[
     count: Int,
     type: DType,
     /,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if is_nvidia_gpu() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> UnsafePointer[Scalar[type], address_space]:
     """Allocates data buffer space on the stack given a data type and number of
@@ -376,7 +376,7 @@ fn stack_allocation[
     type: AnyType,
     /,
     name: Optional[StringLiteral] = None,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if is_nvidia_gpu() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> UnsafePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
@@ -394,7 +394,7 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         # On NVGPU, SHARED and PARAM address spaces lower to global memory.
         @parameter
         if address_space in (_GPUAddressSpace.SHARED, _GPUAddressSpace.PARAM):
@@ -436,12 +436,12 @@ fn _malloc[
     type: AnyType,
     /,
     *,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if is_nvidia_gpu() else 1,
 ](size: Int, /) -> UnsafePointer[
     type, AddressSpace.GENERIC, alignment=alignment
 ]:
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         return external_call[
             "malloc", UnsafePointer[NoneType, AddressSpace.GENERIC]
         ](size).bitcast[type]()
@@ -459,7 +459,7 @@ fn _malloc[
 @always_inline
 fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         libc.free(ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)
