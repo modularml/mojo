@@ -704,8 +704,8 @@ struct StringRepr(Writable):
             value: The string to represent.
         """
         self._value = StringSlice[ImmutableAnyOrigin](
-            unsafe_from_utf8_ptr=value.unsafe_ptr(),
-            len=len(value),
+            ptr=value.unsafe_ptr(),
+            length=len(value),
         )
 
     fn write_to[W: Writer](self, inout writer: W):
