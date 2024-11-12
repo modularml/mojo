@@ -25,7 +25,7 @@ from sys import (
     llvm_intrinsic,
     prefetch,
     simdwidthof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     bitwidthof,
 )
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
@@ -152,12 +152,12 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
-    return triple_is_nvidia_cuda()
+    return is_nvidia_gpu()
 
 
 @always_inline("nodebug")
 fn _has_native_f8_support() -> Bool:
-    return _is_sm_9x() or triple_is_nvidia_cuda["sm_89"]()
+    return _is_sm_9x() or is_nvidia_gpu["sm_89"]()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -218,16 +218,14 @@ struct SIMD[type: DType, size: Int](
     alias MIN_FINITE = Self(_min_finite[type]())
     """Returns the minimum (lowest) finite value of SIMD value."""
 
-    alias _default_alignment = alignof[
-        Scalar[type]
-    ]() if triple_is_nvidia_cuda() else 1
+    alias _default_alignment = alignof[Scalar[type]]() if is_nvidia_gpu() else 1
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default initializer of the SIMD vector.
 
         By default the SIMD vectors are initialized to all zeros.
@@ -237,7 +235,7 @@ struct SIMD[type: DType, size: Int](
 
     # FIXME(MOCO-1291): Can't implement this due to ambiguity.
     # @always_inline("nodebug")
-    # fn __init__(inout self, *, other: SIMD[type, size]):
+    # fn __init__(out self, *, other: SIMD[type, size]):
     #    """Explicitly copy the provided value.
 
     #    Args:
@@ -246,7 +244,7 @@ struct SIMD[type: DType, size: Int](
     #    self.__copyinit__(other)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: UInt):
+    fn __init__(out self, value: UInt):
         """Initializes the SIMD vector with an unsigned integer.
 
         The unsigned integer value is splatted across all the elements of the SIMD
@@ -258,7 +256,7 @@ struct SIMD[type: DType, size: Int](
         self = Self(value.value)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Initializes the SIMD vector with a signed integer.
 
         The signed integer value is splatted across all the elements of the SIMD
@@ -271,7 +269,7 @@ struct SIMD[type: DType, size: Int](
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.index):
+    fn __init__(out self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
 
         var t0 = __mlir_op.`pop.cast_from_builtin`[
@@ -285,7 +283,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    fn __init__(out self, value: IntLiteral):
         """Initializes the SIMD vector with an integer.
 
         The integer value is splatted across all the elements of the SIMD
@@ -310,7 +308,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
-    fn __init__(inout self: SIMD[DType.bool, size], value: Bool, /):
+    fn __init__(out self: SIMD[DType.bool, size], value: Bool, /):
         """Initializes the SIMD vector with a bool value.
 
         The bool value is splatted across all elements of the SIMD vector.
@@ -341,7 +339,7 @@ struct SIMD[type: DType, size: Int](
         self.value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Scalar[type], /):
+    fn __init__(out self, value: Scalar[type], /):
         """Constructs a SIMD vector by splatting a scalar value.
 
         The input value is splatted across all elements of the SIMD vector.
@@ -357,7 +355,7 @@ struct SIMD[type: DType, size: Int](
         ](value.value)
 
     @always_inline("nodebug")
-    fn __init__(inout self, *elems: Scalar[type]):
+    fn __init__(out self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
         The input values are assigned to the corresponding elements of the SIMD
@@ -396,7 +394,7 @@ struct SIMD[type: DType, size: Int](
             self[i] = elems[i]
 
     @always_inline
-    fn __init__(inout self, value: FloatLiteral):
+    fn __init__(out self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
         The value is splatted across all the elements of the SIMD
@@ -1494,7 +1492,7 @@ struct SIMD[type: DType, size: Int](
         elif type.is_floating_point():
 
             @parameter
-            if triple_is_nvidia_cuda():
+            if is_nvidia_gpu():
 
                 @parameter
                 if type.is_half_float():
@@ -1583,7 +1581,7 @@ struct SIMD[type: DType, size: Int](
             return rebind[SIMD[target, size]](self)
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
 
             @parameter
             if size > 1 and type is DType.float32 and target.is_half_float():
@@ -2940,7 +2938,7 @@ fn _bfloat16_to_f32_scalar(
 
     # For bfloat16, we can just do a memcpy to perform the cast to float32.
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         return inlined_assembly[
             "cvt.f32.bf16 $0, $1;" if _is_sm_9x() else "mov.b32 $0, {0, $1};",
             Scalar[DType.float32],
@@ -3185,7 +3183,7 @@ fn _write_scalar[
     elif dtype.is_integral():
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
             var err = _try_write_int(writer, value)
             if err:
                 abort(

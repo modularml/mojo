@@ -47,7 +47,7 @@ struct PrintChecker:
     var call_location: _SourceLocation
 
     @always_inline
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         self.tmp = NamedTemporaryFile("rw")
         self.call_location = __call_location()
         self.cursor = 0
@@ -55,7 +55,7 @@ struct PrintChecker:
     fn __enter__(owned self) -> Self:
         return self^
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.tmp = existing.tmp^
         self.cursor = existing.cursor
         self.call_location = existing.call_location

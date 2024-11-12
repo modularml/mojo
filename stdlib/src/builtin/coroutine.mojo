@@ -120,7 +120,7 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
         )
 
     @always_inline
-    fn __init__(inout self, handle: AnyCoroutine):
+    fn __init__(out self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:
@@ -200,7 +200,7 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
         )
 
     @always_inline
-    fn __init__(inout self, handle: AnyCoroutine):
+    fn __init__(out self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:

@@ -50,7 +50,7 @@ struct _MulParity:
     var parity: Bool
     var is_integer: Bool
 
-    fn __init__(inout self, parity: Bool, is_integer: Bool):
+    fn __init__(out self, parity: Bool, is_integer: Bool):
         self.parity = parity
         self.is_integer = is_integer
 

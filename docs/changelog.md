@@ -238,6 +238,27 @@ what we publish.
 
 ### 🦋 Changed
 
+- The argument convention for `__init__` methods has been changed from `inout`
+  to `out`, reflecting that an `__init__` method initializes its `self` without
+  reading from it.  This also enables spelling the type of an initializer
+  correctly, which was not supported before:
+
+  ```mojo
+  struct Foo:
+      fn __init__(out self): pass
+
+  fn test():
+      # This works now
+      var fnPtr : fn(out x: Foo)->None = Foo.__init__
+
+      var someFoo : Foo
+      fnPtr(someFoo)  # initializes someFoo.
+  ```
+
+  The previous `fn __init__(inout self)` syntax is still supported in this
+  release of Mojo, but will be removed in the future.  Please migrate to the
+  new syntax.
+
 - More things have been removed from the auto-exported set of entities in the `prelude`
   module from the Mojo standard library.
   - `UnsafePointer` has been removed. Please explicitly import it via

@@ -269,7 +269,7 @@ trait Powable:
         var numerator: Float64
         var denominator: Float64
 
-        fn __init__(inout self, numerator: Float64, denominator: Float64):
+        fn __init__(out self, numerator: Float64, denominator: Float64):
             self.numerator = numerator
             self.denominator = denominator
 

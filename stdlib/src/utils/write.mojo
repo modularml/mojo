@@ -15,7 +15,7 @@
 from collections import InlineArray
 from memory import memcpy, UnsafePointer
 from utils import Span, StaticString
-from sys.info import triple_is_nvidia_cuda
+from sys.info import is_nvidia_gpu
 from builtin.io import _printf
 
 
@@ -228,7 +228,7 @@ struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
     var pos: Int
     var writer: W
 
-    fn __init__(inout self, owned writer: W):
+    fn __init__(out self, owned writer: W):
         self.data = UnsafePointer[
             UInt8,
             address_space = AddressSpace.GENERIC,
@@ -275,7 +275,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
     var pos: Int
     var writer: W
 
-    fn __init__(inout self, owned writer: W):
+    fn __init__(out self, owned writer: W):
         self.data = InlineArray[UInt8, capacity](unsafe_uninitialized=True)
         self.pos = 0
         self.writer = writer^
@@ -361,7 +361,7 @@ fn write_buffered[
     ```
     .
     """
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         # Stack space is very small on GPU due to many threads, so use heap
         var buffer = _WriteBufferHeap[buffer_size](writer^)
         write_args(buffer, args, sep=sep, end=end)
