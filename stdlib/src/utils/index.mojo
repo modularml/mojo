@@ -194,13 +194,13 @@ struct IndexList[
     """The underlying storage of the tuple value."""
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a static int tuple of the given size."""
         self = 0
 
     @doc_private
     @always_inline
-    fn __init__(inout self, value: __mlir_type.index):
+    fn __init__(out self, value: __mlir_type.index):
         """Constructs a sized 1 static int tuple of given the element value.
 
         Args:
@@ -210,7 +210,7 @@ struct IndexList[
         self = Int(value)
 
     @always_inline
-    fn __init__(inout self, elems: (Int, Int)):
+    fn __init__(out self, elems: (Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -235,7 +235,7 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, elems: (Int, Int, Int)):
+    fn __init__(out self, elems: (Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -260,7 +260,7 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, elems: (Int, Int, Int, Int)):
+    fn __init__(out self, elems: (Int, Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -285,7 +285,7 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, *elems: Int):
+    fn __init__(out self, *elems: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
@@ -308,7 +308,7 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, elem: Int):
+    fn __init__(out self, elem: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
@@ -321,7 +321,7 @@ struct IndexList[
             ]
         ](Self._int_type(elem))
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy constructor.
 
         Args:
@@ -330,7 +330,7 @@ struct IndexList[
         self.data = other.data
 
     @always_inline
-    fn __init__(inout self, values: VariadicList[Int]):
+    fn __init__(out self, values: VariadicList[Int]):
         """Creates a tuple constant using the specified values.
 
         Args:

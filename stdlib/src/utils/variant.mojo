@@ -115,7 +115,7 @@ struct Variant[*Ts: CollectionElement](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self, *, unsafe_uninitialized: ()):
+    fn __init__(out self, *, unsafe_uninitialized: ()):
         """Unsafely create an uninitialized Variant.
 
         Args:
@@ -138,7 +138,7 @@ struct Variant[*Ts: CollectionElement](
         self._get_discr() = idx
         self._get_ptr[T]().init_pointee_move(value^)
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly creates a deep copy of an existing variant.
 
         Args:
@@ -154,7 +154,7 @@ struct Variant[*Ts: CollectionElement](
                 self._get_ptr[T]().init_pointee_move(other._get_ptr[T]()[])
                 return
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Creates a deep copy of an existing variant.
 
         Args:
@@ -164,7 +164,7 @@ struct Variant[*Ts: CollectionElement](
         # Delegate to explicit copy initializer.
         self = Self(other=other)
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         """Move initializer for the variant.
 
         Args:

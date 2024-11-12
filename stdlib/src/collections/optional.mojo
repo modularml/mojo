@@ -38,7 +38,7 @@ from utils import Variant
 # TODO(27780): NoneType can't currently conform to traits
 @value
 struct _NoneType(CollectionElement, CollectionElementNew):
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         pass
 
 
@@ -88,11 +88,11 @@ struct Optional[T: CollectionElement](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct an empty Optional."""
         self._value = Self._type(_NoneType())
 
-    fn __init__(inout self, owned value: T):
+    fn __init__(out self, owned value: T):
         """Construct an Optional containing a value.
 
         Args:
@@ -104,7 +104,7 @@ struct Optional[T: CollectionElement](
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
-    fn __init__(inout self, value: NoneType._mlir_type):
+    fn __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
         Args:
@@ -112,7 +112,7 @@ struct Optional[T: CollectionElement](
         """
         self = Self(value=NoneType(value))
 
-    fn __init__(inout self, value: NoneType):
+    fn __init__(out self, value: NoneType):
         """Construct an empty Optional.
 
         Args:
@@ -120,7 +120,7 @@ struct Optional[T: CollectionElement](
         """
         self = Self()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy construct an Optional.
 
         Args:
@@ -403,11 +403,11 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Create an optional with a value of None."""
         self = Self(None)
 
-    fn __init__(inout self, value: T):
+    fn __init__(out self, value: T):
         """Create an optional with a value.
 
         Args:
@@ -421,7 +421,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
-    fn __init__(inout self, value: NoneType._mlir_type):
+    fn __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
         Args:
@@ -429,7 +429,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         """
         self = Self(value=NoneType(value))
 
-    fn __init__(inout self, value: NoneType):
+    fn __init__(out self, value: NoneType):
         """Create an optional without a value from a None literal.
 
         Args:
