@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
+from bit import byte_swap
 from math import Ceilable, CeilDivable, Floorable, Truncable
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
@@ -29,10 +30,11 @@ from python import Python, PythonObject
 from python._cpython import Py_ssize_t
 from memory import UnsafePointer
 
-from utils import Writable, Writer
+from utils import Span, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
 from sys import is_nvidia_gpu, bitwidthof
+from sys.info import is_big_endian
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -1193,6 +1195,37 @@ struct Int(
                 writer.write(" ")
 
         writer.write(self)
+
+    @staticmethod
+    fn from_bytes[
+        type: DType
+    ](bytes: List[Byte], big_endian: Bool = False) raises -> Self:
+        """Converts a byte array to an integer.
+
+        Args:
+            bytes: The byte array to convert.
+            big_endian: Whether the byte array is big-endian.
+
+        Parameters:
+            type: The type of the integer.
+
+        Returns:
+            The integer value.
+        """
+        if type.sizeof() != len(bytes):
+            raise Error("Byte array size does not match the integer size.")
+        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(bytes[0])
+        var type_ptr: UnsafePointer[Scalar[type]] = ptr.bitcast[Scalar[type]]()
+        var value = type_ptr[]
+
+        @parameter
+        if is_big_endian():
+            if not big_endian:
+                value = byte_swap(value)
+        else:
+            if big_endian:
+                value = byte_swap(value)
+        return int(value)
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
