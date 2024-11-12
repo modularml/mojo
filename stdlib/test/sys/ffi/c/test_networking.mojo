@@ -16,7 +16,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from sys.info import is_big_endian, sizeof
 from memory import stack_allocation, UnsafePointer
 from utils import StaticTuple
-from sys.info import os_is_macos
+from sys.info import os_is_macos, os_is_linux, os_is_windows
 
 from sys.ffi.c.libc import Libc, TryLibc
 from sys.ffi.c.types import (
