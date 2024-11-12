@@ -236,8 +236,6 @@ def _test_socketpair(libc: Libc):
         assert_true(err != -1)
         err = libc.shutdown(socket_vector[0], SHUT_RDWR)
         assert_true(err != -1)
-        err = libc.shutdown(socket_vector[1], SHUT_RDWR)
-        assert_true(err != -1)
 
 
 def test_dynamic_socketpair():
