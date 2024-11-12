@@ -1343,9 +1343,7 @@ fn _split_slice[
     for item in items:
         (out_ptr + i).init_pointee_move(StringSlice[O](unsafe_from_utf8=item[]))
         i += 1
-    output = __type_of(output)(
-        unsafe_pointer=out_ptr, size=i_len, capacity=i_len
-    )
+    output = __type_of(output)(ptr=out_ptr, size=i_len, capacity=i_len)
 
 
 fn _split_impl[
@@ -1365,9 +1363,7 @@ fn _split_impl[
             out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes[False, O]())
             i += 1
         out_ptr[i] = src_str.as_bytes[False, O]()[-1:-1]
-        output = __type_of(output)(
-            unsafe_pointer=out_ptr, size=i_len, capacity=i_len
-        )
+        output = __type_of(output)(ptr=out_ptr, size=i_len, capacity=i_len)
         return
 
     alias prealloc = 32  # guessing, Python's implementation uses 12
