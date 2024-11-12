@@ -857,11 +857,12 @@ struct Libc[*, static: Bool]:
             Fn signature: `int fprintf(FILE *restrict stream,
                 const char *restrict format, ...)`.
         """
+        alias add_macos_bug = C.int(os_is_macos())
 
         @parameter
         if static:
             # FIXME: externall_call should handle this
-            return __mlir_op.`pop.external_call`[
+            num = __mlir_op.`pop.external_call`[
                 func = "fprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -871,10 +872,12 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](stream, format, args.get_loaded_kgen_pack())
+            return num + add_macos_bug * int(num > 0)
         else:
-            return self._lib.value().call["fprintf", C.int](
+            num = self._lib.value().call["fprintf", C.int](
                 stream, format, args.get_loaded_kgen_pack()
             )
+            return num + add_macos_bug * int(num > 0)
 
     @always_inline
     fn fprintf[

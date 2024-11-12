@@ -16,6 +16,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from sys.info import is_big_endian, sizeof
 from memory import stack_allocation, UnsafePointer
 from utils import StaticTuple
+from sys.info import os_is_macos
 
 from sys.ffi.c.libc import Libc, TryLibc
 from sys.ffi.c.types import (
@@ -193,8 +194,8 @@ alias socket_combinations = (
     (AF_INET, SOCK_STREAM, IPPROTO_IP),
     (AF_INET, SOCK_DGRAM, IPPROTO_IP),
     # (AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP), # unsupported MacOS 14
-    (AF_INET6, SOCK_STREAM, IPPROTO_IP),
-    (AF_INET6, SOCK_DGRAM, IPPROTO_IP),
+    (AF_INET6, SOCK_STREAM, IPPROTO_IP if not os_is_macos() else IPPROTO_IPV6),
+    (AF_INET6, SOCK_DGRAM, IPPROTO_IP if not os_is_macos() else IPPROTO_IPV6),
     # (AF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP), # unsupported MacOS 14
 )
 

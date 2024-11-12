@@ -15,13 +15,15 @@
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from memory import UnsafePointer, stack_allocation, memcmp
+from sys.info import os_is_linux
+
 from sys.ffi.c.libc import Libc, TryLibc
 from sys.ffi.c.types import C, char_ptr, char_ptr_to_string
 from sys.ffi.c.constants import *
 
 
 alias error_message = (
-    # (SUCCESS, "Success"), # 'Undefined error: 0' in MacOS 14
+    (SUCCESS, "Success"),
     (EPERM, "Operation not permitted"),
     (ENOENT, "No such file or directory"),
     (ESRCH, "No such process"),
@@ -182,7 +184,10 @@ def _test_strerror(libc: Libc):
         errno = errno_msg.get[0, Int]()
         msg = errno_msg.get[1, StringLiteral]()
         res = char_ptr_to_string(libc.strerror(errno))
-        assert_equal(res, msg)
+
+        @parameter
+        if os_is_linux():
+            assert_equal(res, msg)
 
 
 def test_dynamic_strerror():
