@@ -260,6 +260,14 @@ def _test_setsockopt(libc: Libc):
             sizeof[C.int](),
         )
         assert_true(err != -1)
+        err = libc.setsockopt(
+            fd,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            value_ptr.bitcast[C.void](),
+            sizeof[C.int](),
+        )
+        assert_true(err != -1)
 
 
 def test_dynamic_setsockopt():
