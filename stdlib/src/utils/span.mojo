@@ -419,7 +419,7 @@ struct Span[
         else:
             n_s = normalize_index["Span", ignore_zero_length=True](start, self)
         var s_ptr = self.unsafe_ptr()
-        var haystack = __type_of(self)(unsafe_ptr=s_ptr + n_s, len=_len - n_s)
+        var haystack = __type_of(self)(ptr=s_ptr + n_s, length=_len - n_s)
         var loc: UnsafePointer[Scalar[D]]
 
         @parameter
