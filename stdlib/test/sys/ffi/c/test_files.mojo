@@ -218,12 +218,13 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
         assert_true(stream != C.NULL.bitcast[FILE]())
         # MacOS seems to execute backspace instead of printing it, so lets just
         # test textual characters
-        base = ord(" ")
-        size = ord("~") - base
+        size = ord("~") - ord(" ")
         a = UnsafePointer[C.char].alloc(size)
-        for i in range(base, base + size - 1):
-            a[i] = i + 1
-        a[base + size - 1] = 0
+        idx = 0
+        for i in reversed(range(ord(" "), ord("~"))):
+            a[idx] = i
+            idx += 1
+        a[size - 1] = 0
         num_bytes = libc.fprintf(stream, a)
         assert_equal(num_bytes, size - 1)
 
