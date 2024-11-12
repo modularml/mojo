@@ -1179,7 +1179,7 @@ struct Int(
     @staticmethod
     fn from_bytes[
         type: DType
-    ](bytes: List[Byte], big_endian: Bool = False) raises -> Self:
+    ](bytes: Span[Byte], big_endian: Bool = False) raises -> Self:
         """Converts a byte array to an integer.
 
         Args:
