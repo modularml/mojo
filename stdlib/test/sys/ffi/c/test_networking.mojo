@@ -42,7 +42,7 @@ def _test_htonl(libc: Libc):
 
 
 def test_dynamic_htonl():
-    _test_htonl(Libc[static=False]("libc.so.6"))
+    _test_htonl(Libc[static=False]())
 
 
 def test_static_htonl():
@@ -61,7 +61,7 @@ def _test_htons(libc: Libc):
 
 
 def test_dynamic_htons():
-    _test_htons(Libc[static=False]("libc.so.6"))
+    _test_htons(Libc[static=False]())
 
 
 def test_static_htons():
@@ -80,7 +80,7 @@ def _test_ntohl(libc: Libc):
 
 
 def test_dynamic_ntohl():
-    _test_ntohl(Libc[static=False]("libc.so.6"))
+    _test_ntohl(Libc[static=False]())
 
 
 def test_static_ntohl():
@@ -99,7 +99,7 @@ def _test_ntohs(libc: Libc):
 
 
 def test_dynamic_ntohs():
-    _test_ntohs(Libc[static=False]("libc.so.6"))
+    _test_ntohs(Libc[static=False]())
 
 
 def test_static_ntohs():
@@ -111,7 +111,7 @@ def _test_inet_ntop(libc: Libc):
 
 
 def test_dynamic_inet_ntop():
-    _test_inet_ntop(Libc[static=False]("libc.so.6"))
+    _test_inet_ntop(Libc[static=False]())
 
 
 def test_static_inet_ntop():
@@ -123,7 +123,7 @@ def _test_inet_pton(libc: Libc):
 
 
 def test_dynamic_inet_pton():
-    _test_inet_pton(Libc[static=False]("libc.so.6"))
+    _test_inet_pton(Libc[static=False]())
 
 
 def test_static_inet_pton():
@@ -135,7 +135,7 @@ def _test_inet_addr(libc: Libc):
 
 
 def test_dynamic_inet_addr():
-    _test_inet_addr(Libc[static=False]("libc.so.6"))
+    _test_inet_addr(Libc[static=False]())
 
 
 def test_static_inet_addr():
@@ -160,7 +160,7 @@ def _test_inet_aton(libc: Libc):
 
 
 def test_dynamic_inet_aton():
-    _test_inet_aton(Libc[static=False]("libc.so.6"))
+    _test_inet_aton(Libc[static=False]())
 
 
 def test_static_inet_aton():
@@ -182,7 +182,7 @@ def _test_inet_ntoa(libc: Libc):
 
 
 def test_dynamic_inet_ntoa():
-    _test_inet_ntoa(Libc[static=False]("libc.so.6"))
+    _test_inet_ntoa(Libc[static=False]())
 
 
 def test_static_inet_ntoa():
@@ -213,7 +213,7 @@ def _test_socket_create(libc: Libc):
 
 
 def test_dynamic_socket_create():
-    _test_socket_create(Libc[static=False]("libc.so.6"))
+    _test_socket_create(Libc[static=False]())
 
 
 def test_static_socket_create():
@@ -232,7 +232,7 @@ def _test_socketpair(libc: Libc):
 
 
 def test_dynamic_socketpair():
-    _test_socketpair(Libc[static=False]("libc.so.6"))
+    _test_socketpair(Libc[static=False]())
 
 
 def test_static_socketpair():
@@ -256,7 +256,7 @@ def _test_setsockopt(libc: Libc):
 
 
 def test_dynamic_setsockopt():
-    _test_setsockopt(Libc[static=False]("libc.so.6"))
+    _test_setsockopt(Libc[static=False]())
 
 
 def test_static_setsockopt():
@@ -293,7 +293,7 @@ def _test_bind_listen(libc: Libc):
 
 
 def test_dynamic_bind_listen():
-    _test_bind_listen(Libc[static=False]("libc.so.6"))
+    _test_bind_listen(Libc[static=False]())
 
 
 def test_static_bind_listen():
@@ -397,7 +397,7 @@ def _test_getaddrinfo(libc: Libc):
 
 
 def test_dynamic_getaddrinfo():
-    _test_getaddrinfo(Libc[static=False]("libc.so.6"))
+    _test_getaddrinfo(Libc[static=False]())
 
 
 def test_static_getaddrinfo():
@@ -433,7 +433,7 @@ def _test_gai_strerror(libc: Libc):
 
 
 def test_dynamic_gai_strerror():
-    _test_gai_strerror(Libc[static=False]("libc.so.6"))
+    _test_gai_strerror(Libc[static=False]())
 
 
 def test_static_gai_strerror():

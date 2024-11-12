@@ -44,7 +44,7 @@ def _test_open_close(libc: Libc, suffix: String):
 
 
 def test_dynamic_open_close():
-    _test_open_close(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_open_close(Libc[static=False](), "_dynamic")
 
 
 def test_static_open_close():
@@ -75,7 +75,7 @@ def _test_fopen_fclose(libc: Libc, suffix: String):
 
 
 def test_dynamic_fopen_fclose():
-    _test_fopen_fclose(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fopen_fclose(Libc[static=False](), "_dynamic")
 
 
 def test_static_fopen_fclose():
@@ -108,7 +108,7 @@ def _test_fdopen_fclose(libc: Libc, suffix: String):
 
 
 def test_dynamic_fdopen_fclose():
-    _test_fdopen_fclose(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fdopen_fclose(Libc[static=False](), "_dynamic")
 
 
 def test_static_fdopen_fclose():
@@ -130,7 +130,7 @@ def _test_creat_openat(libc: Libc, suffix: String):
 
 
 def test_dynamic_creat_openat():
-    _test_creat_openat(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_creat_openat(Libc[static=False](), "_dynamic")
 
 
 def test_static_creat_openat():
@@ -155,7 +155,7 @@ def _test_freopen(libc: Libc, suffix: String):
 
 
 def test_dynamic_freopen():
-    _test_freopen(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_freopen(Libc[static=False](), "_dynamic")
 
 
 def test_static_freopen():
@@ -199,7 +199,7 @@ def _test_fmemopen_fprintf(libc: Libc, suffix: String):
 
 
 def test_dynamic_fmemopen_fprintf():
-    _test_fmemopen_fprintf(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fmemopen_fprintf(Libc[static=False](), "_dynamic")
 
 
 def test_static_fmemopen_fprintf():
@@ -243,7 +243,7 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
 
 
 def test_dynamic_fseek_ftell():
-    _test_fseek_ftell(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fseek_ftell(Libc[static=False](), "_dynamic")
 
 
 def test_static_fseek_ftell():
@@ -299,7 +299,7 @@ def _test_fput_fget(libc: Libc, suffix: String):
 
 
 def test_dynamic_fput_fget():
-    _test_fput_fget(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fput_fget(Libc[static=False](), "_dynamic")
 
 
 def test_static_fput_fget():
@@ -365,7 +365,7 @@ def _test_dprintf(libc: Libc, suffix: String):
 
 
 def test_dynamic_dprintf():
-    _test_dprintf(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_dprintf(Libc[static=False](), "_dynamic")
 
 
 def test_static_dprintf():
@@ -399,7 +399,7 @@ def _test_printf(libc: Libc, suffix: String):
 
 
 def test_dynamic_printf():
-    _test_printf(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_printf(Libc[static=False](), "_dynamic")
 
 
 def test_static_printf():
@@ -441,7 +441,7 @@ def _test_sprintf(libc: Libc, suffix: String):
 
 
 def test_dynamic_sprintf():
-    _test_sprintf(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_sprintf(Libc[static=False](), "_dynamic")
 
 
 def test_static_sprintf():
@@ -485,7 +485,7 @@ def _test_snprintf(libc: Libc, suffix: String):
 
 
 def test_dynamic_snprintf():
-    _test_snprintf(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_snprintf(Libc[static=False](), "_dynamic")
 
 
 def test_static_snprintf():
@@ -530,7 +530,7 @@ def _test_fscanf(libc: Libc, suffix: String):
 
 
 def test_dynamic_fscanf():
-    _test_fscanf(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fscanf(Libc[static=False](), "_dynamic")
 
 
 def test_static_fscanf():
@@ -543,7 +543,7 @@ def _test_fcntl(libc: Libc, suffix: String):
     with TryLibc(libc):
         filedes = libc.creat(ptr, 0o666)
         assert_true(filedes != -1)
-        filedes = libc.fcntl(filedes, F_DUPFD)
+        filedes = libc.fcntl(filedes, F_GETFD)
         assert_true(filedes != -1)
         filedes = libc.openat(filedes, ptr, O_RDWR)
         assert_true(filedes != -1)
@@ -554,7 +554,7 @@ def _test_fcntl(libc: Libc, suffix: String):
 
 
 def test_dynamic_fcntl():
-    _test_fcntl(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_fcntl(Libc[static=False](), "_dynamic")
 
 
 def test_static_fcntl():
@@ -572,7 +572,7 @@ def _test_ioctl(libc: Libc, suffix: String):
 
 
 def test_dynamic_ioctl():
-    _test_ioctl(Libc[static=False]("libc.so.6"), "_dynamic")
+    _test_ioctl(Libc[static=False](), "_dynamic")
 
 
 def test_static_ioctl():

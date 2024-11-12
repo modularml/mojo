@@ -78,15 +78,25 @@ struct Libc[*, static: Bool]:
         """Construct a Libc instance."""
         self._lib = None
 
-    fn __init__(
-        inout self: Libc[static=False], path: StringLiteral = "libc.so.6"
-    ):
+    fn __init__(inout self: Libc[static=False], path: StringLiteral):
         """Construct a Libc instance.
 
         Args:
             path: The path to the dynamic library file.
         """
         self._lib = DLHandle(path)
+
+    fn __init__(inout self: Libc[static=False]):
+        """Construct a Libc instance using the default dylib location for the
+        given OS."""
+
+        @parameter
+        if os_is_windows():
+            self._lib = DLHandle("msvcrt")
+        elif os_is_macos():
+            self._lib = DLHandle("libc.dylib")
+        else:
+            self._lib = DLHandle("libc.so.6")
 
     # ===------------------------------------------------------------------=== #
     # Logging

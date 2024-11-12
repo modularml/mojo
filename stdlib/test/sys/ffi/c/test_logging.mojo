@@ -168,7 +168,7 @@ def _test_errno(libc: Libc):
 
 
 def test_dynamic_errno():
-    _test_errno(Libc[static=False]("libc.so.6"))
+    _test_errno(Libc[static=False]())
 
 
 def test_static_errno():
@@ -186,7 +186,7 @@ def _test_strerror(libc: Libc):
 
 
 def test_dynamic_strerror():
-    _test_strerror(Libc[static=False]("libc.so.6"))
+    _test_strerror(Libc[static=False]())
 
 
 def test_static_strerror():
@@ -204,7 +204,7 @@ def _test_perror(libc: Libc):
 
 
 def test_dynamic_perror():
-    _test_perror(Libc[static=False]("libc.so.6"))
+    _test_perror(Libc[static=False]())
 
 
 def test_static_perror():
@@ -271,7 +271,7 @@ def _test_log(libc: Libc):
 
 
 def test_dynamic_log():
-    _test_log(Libc[static=False]("libc.so.6"))
+    _test_log(Libc[static=False]())
 
 
 def test_static_log():
