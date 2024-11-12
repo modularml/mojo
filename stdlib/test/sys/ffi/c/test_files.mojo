@@ -218,7 +218,7 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
         assert_true(filedes != -1)
         stream = libc.fdopen(filedes, char_ptr(FM_WRITE))
         assert_true(stream != C.NULL.bitcast[FILE]())
-        size = 255
+        size = 100
         a = UnsafePointer[Byte].alloc(size)
         for i in range(size - 1):
             a[i] = i + 1
