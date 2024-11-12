@@ -21,7 +21,7 @@ from math import floor
 
 from collections import List
 from sys._assembly import inlined_assembly
-from sys.ffi import _external_call_const
+from sys.ffi.utils import _external_call_const
 from sys import (
     llvm_intrinsic,
     bitwidthof,
