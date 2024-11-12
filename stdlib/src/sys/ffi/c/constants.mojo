@@ -822,6 +822,8 @@ alias TCP_CONGESTION = 13
 """Congestion control algorithm."""
 alias TCP_MD5SIG = 14
 """TCP MD5 Signature (RFC2385)."""
+alias TCP_KEEPALIVE = 0x10
+"""Idle time used when SO_KEEPALIVE is enabled."""
 
 
 # IPv4 level options (IPPROTO_IP)

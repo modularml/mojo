@@ -34,7 +34,7 @@ def _test_open_close(libc: Libc, suffix: String):
         sleep(0.05)
         assert_true(libc.close(filedes) != -1)
         for s in List(O_RDONLY, O_WRONLY, O_RDWR):
-            if os_is_macos() and s[] != O_RDONLY:  # no idea why...
+            if os_is_macos() and s[] != O_RDONLY:  # Permission denied
                 continue
             filedes = libc.open(ptr, s[] | O_NONBLOCK)
             assert_true(filedes != -1)
@@ -222,7 +222,7 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
         a = UnsafePointer[C.char].alloc(size)
         idx = 0
         for i in reversed(range(ord(" "), ord("~"))):
-            if i == ord("\\"):
+            if i == ord("^"): # otherwise starts an ascii escape sequence
                 a[idx] = i + 1
             else:
                 a[idx] = i
