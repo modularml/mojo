@@ -209,9 +209,14 @@ def _test_socket_create(libc: Libc):
             alias address_family = combo.get[0, Int]()
             alias socket_type = combo.get[1, Int]()
             alias socket_protocol = combo.get[2, Int]()
-            if socket_protocol == IPPROTO_SCTP and os_is_macos():
-                continue
-            print(address_family, socket_type, socket_protocol)
+
+            @parameter
+            if os_is_macos():
+                if (
+                    socket_protocol == IPPROTO_SCTP  # default unsupported
+                    or address_family == AF_INET6  # default disabled
+                ):
+                    continue
             fd = libc.socket(address_family, socket_type, socket_protocol)
             assert_true(fd != -1)
 
