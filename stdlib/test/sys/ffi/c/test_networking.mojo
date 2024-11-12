@@ -250,11 +250,11 @@ def _test_setsockopt(libc: Libc):
     with TryLibc(libc):
         value_ptr = stack_allocation[1, C.int]()
         value_ptr[0] = 0
-        fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_IP)
+        fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
         assert_true(fd != -1)
         err = libc.setsockopt(
             fd,
-            SOL_SOCKET,
+            SOL_SOCKET if not os_is_macos() else SOL_TCP,
             SO_REUSEADDR,
             value_ptr.bitcast[C.void](),
             sizeof[C.int](),
@@ -272,7 +272,7 @@ def test_static_setsockopt():
 
 def _test_bind_listen(libc: Libc):
     with TryLibc(libc):
-        fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_IP)
+        fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
         assert_true(fd != -1)
         value_ptr = stack_allocation[1, C.int]()
         value_ptr[0] = 1

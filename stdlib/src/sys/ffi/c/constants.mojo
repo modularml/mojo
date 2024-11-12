@@ -631,6 +631,22 @@ alias SHUT_RDWR = 2
 # Socket level options (SOL_SOCKET)
 alias SOL_SOCKET = 1
 """Constant: SOL_SOCKET."""
+# Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx
+alias SOL_IP = 0
+"""Constant: `SOL_IP`."""
+alias SOL_IPX = 256
+"""Constant: `SOL_IPX`."""
+alias SOL_AX25 = 257
+"""Constant: `SOL_AX25`."""
+alias SOL_ATALK = 258
+"""Constant: `SOL_ATALK`."""
+alias SOL_NETROM = 259
+"""Constant: `SOL_NETROM`."""
+alias SOL_TCP = 6
+"""Constant: `SOL_TCP`."""
+alias SOL_UDP = 17
+"""Constant: `SOL_UDP`."""
+
 
 alias SO_DEBUG = 1
 """Constant: SO_DEBUG."""
