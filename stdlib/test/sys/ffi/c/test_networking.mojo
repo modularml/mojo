@@ -220,6 +220,9 @@ def _test_socket_create(libc: Libc):
                     continue
             fd = libc.socket(address_family, socket_type, socket_protocol)
             assert_true(fd != -1)
+            if socket_protocol == SOCK_STREAM:
+                err = libc.shutdown(fd, SHUT_RDWR)
+                assert_true(err != -1)
 
 
 def test_dynamic_socket_create():
