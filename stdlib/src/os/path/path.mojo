@@ -19,9 +19,10 @@ from os.path import isdir
 ```
 """
 
-from collections import List
+from collections import List, InlineArray
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
+from utils import Span, StringSlice
 
 from .. import PathLike
 from .._linux_aarch64 import _lstat as _lstat_linux_arm
@@ -390,3 +391,151 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
 #         paths_str.append(cur_path[].__fspath__())
 
 #     return join(path.__fspath__(), *paths_str)
+
+
+# ===----------------------------------------------------------------------=== #
+# expandvars
+# ===----------------------------------------------------------------------=== #
+
+
+fn _is_shell_special_variable(byte: Byte) -> Bool:
+    """Checks if `$` + `byte` identifies a special shell variable, such as `$@`.
+
+    Args:
+        byte: The byte to check.
+
+    Returns:
+        True if the byte is a special shell variable and False otherwise.
+    """
+    alias shell_variables = InlineArray[Int, 17](
+        ord("*"),
+        ord("#"),
+        ord("$"),
+        ord("@"),
+        ord("!"),
+        ord("?"),
+        ord("-"),
+        ord("0"),
+        ord("1"),
+        ord("2"),
+        ord("3"),
+        ord("4"),
+        ord("5"),
+        ord("6"),
+        ord("7"),
+        ord("8"),
+        ord("9"),
+    )
+    return int(byte) in shell_variables
+
+
+fn _is_alphanumeric(byte: Byte) -> Bool:
+    """Checks if `byte` is an ASCII letter, number, or underscore.
+
+    Args:
+        byte: The byte to check.
+
+    Returns:
+        True if the byte is an ASCII letter, number, or underscore and False otherwise.
+    """
+    var b = int(byte)
+    return (
+        b == ord("_")
+        or ord("0") <= b
+        and b <= ord("9")
+        or ord("a") <= b
+        and b <= ord("z")
+        or ord("A") <= b
+        and b <= ord("Z")
+    )
+
+
+fn _parse_variable_name[
+    immutable: ImmutableOrigin
+](bytes: Span[Byte, immutable]) -> Tuple[StringSlice[immutable], Int]:
+    """Returns the environment variable name and the byte count required to extract it.
+    For `${}` expansions, two additional bytes are added to the byte count to account for the braces.
+
+    Args:
+        bytes: The bytes to extract the environment variable name from.
+
+    Returns:
+        The environment variable name and the byte count required to extract it.
+    """
+    if bytes[0] == ord("{"):
+        if (
+            len(bytes) > 2
+            and _is_shell_special_variable(bytes[1])
+            and bytes[2] == ord("}")
+        ):
+            return StringSlice(unsafe_from_utf8=bytes[1:2]), 3
+
+        # Scan until the closing brace or the end of the bytes.
+        var i = 1
+        while i < len(bytes):
+            if bytes[i] == ord("}"):
+                return StringSlice(unsafe_from_utf8=bytes[1:i]), i + 1
+            i += 1
+        return StringSlice(unsafe_from_utf8=bytes[1:i]), i + 1
+    elif _is_shell_special_variable(bytes[0]):
+        return StringSlice(unsafe_from_utf8=bytes[0:1]), 1
+
+    # Scan until we hit an invalid character in environment variable names.
+    var i = 0
+    while i < len(bytes) and _is_alphanumeric(bytes[i]):
+        i += 1
+
+    return StringSlice(unsafe_from_utf8=bytes[:i]), i
+
+
+fn expandvars[PathLike: os.PathLike, //](path: PathLike) -> String:
+    """Replaces `${var}` or `$var` in the path with values from the current environment variables.
+    Malformed variable names and references to non-existing variables are left unchanged.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path that is being expanded.
+
+    Returns:
+        The expanded path.
+    """
+    var path_str = path.__fspath__()
+    var bytes = path_str.as_bytes().get_immutable()
+    var buf = String()
+
+    # Byte scanning should be fine, ${} is ASCII.
+    i = 0
+    j = 0
+    while j < len(bytes):
+        if bytes[j] == ord("$") and j + 1 < len(bytes):
+            if not buf:
+                buf._buffer.reserve(new_capacity=2 * len(bytes))
+            buf.write_bytes(bytes[i:j])
+
+            name, length = _parse_variable_name(bytes[j + 1 :])
+
+            # Invalid syntax (`${}` or `${`) or $ was not followed by a name; write as is.
+            if name.startswith("{") or name == "":
+                buf.write_bytes(bytes[j : j + length + 1])
+            # Shell variable (eg `$@` or `$*`); write as is.
+            elif _is_shell_special_variable(name.as_bytes()[0]):
+                buf.write_bytes(bytes[j : j + 2])
+            # Environment variable; expand it. If no value, write as is.
+            else:
+                value = os.getenv(String(name))
+                if value != "":
+                    buf.write(value)
+                else:
+                    buf.write_bytes(bytes[j : j + length + 1])
+
+            j += length
+            i = j + 1
+        j += 1
+
+    if not buf:
+        return path_str
+
+    buf.write_bytes(bytes[i:])
+    return buf

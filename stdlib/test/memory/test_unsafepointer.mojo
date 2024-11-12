@@ -23,12 +23,12 @@ struct MoveOnlyType(Movable):
     var actions: UnsafePointer[List[String]]
     var value: Int
 
-    fn __init__(inout self, value: Int, actions: UnsafePointer[List[String]]):
+    fn __init__(out self, value: Int, actions: UnsafePointer[List[String]]):
         self.actions = actions
         self.value = value
         self.actions[0].append("__init__")
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.actions = existing.actions
         self.value = existing.value
         self.actions[0].append("__moveinit__")

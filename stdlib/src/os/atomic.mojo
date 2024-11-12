@@ -21,7 +21,7 @@ from os import Atomic
 
 from builtin.dtype import _integral_type_of, _unsigned_integral_type_of
 from memory import UnsafePointer, bitcast
-from sys.info import triple_is_nvidia_cuda
+from sys.info import is_nvidia_gpu
 
 
 struct Atomic[type: DType]:
@@ -41,7 +41,7 @@ struct Atomic[type: DType]:
     """
 
     @always_inline
-    fn __init__(inout self, value: Scalar[type]):
+    fn __init__(out self, value: Scalar[type]):
         """Constructs a new atomic value.
 
         Args:
@@ -343,7 +343,7 @@ fn _max_impl[
     type: DType, //
 ](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
     @parameter
-    if triple_is_nvidia_cuda() and type.is_floating_point():
+    if is_nvidia_gpu() and type.is_floating_point():
         alias integral_type = _integral_type_of[type]()
         alias unsigned_integral_type = _unsigned_integral_type_of[type]()
         if rhs >= 0:
@@ -365,7 +365,7 @@ fn _min_impl[
     type: DType, //
 ](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
     @parameter
-    if triple_is_nvidia_cuda() and type.is_floating_point():
+    if is_nvidia_gpu() and type.is_floating_point():
         alias integral_type = _integral_type_of[type]()
         alias unsigned_integral_type = _unsigned_integral_type_of[type]()
         if rhs >= 0:

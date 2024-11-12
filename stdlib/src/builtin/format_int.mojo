@@ -322,13 +322,12 @@ fn _try_write_int[
         # Construct a null-terminated buffer of single-byte char.
         var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
 
+        # TODO(MSTDL-720):
+        #   Support printing non-null-terminated strings on GPU and switch
+        #   back to this code without a workaround.
+        # ptr=digit_chars_array,
         var zero = StringSlice[ImmutableAnyOrigin](
-            # TODO(MSTDL-720):
-            #   Support printing non-null-terminated strings on GPU and switch
-            #   back to this code without a workaround.
-            # unsafe_from_utf8_ptr=digit_chars_array,
-            unsafe_from_utf8_ptr=zero_buf.unsafe_ptr(),
-            len=1,
+            ptr=zero_buf.unsafe_ptr(), length=1
         )
         writer.write(zero)
 
@@ -404,10 +403,7 @@ fn _try_write_int[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[__origin_of(buf)](
-        unsafe_from_utf8_ptr=buf_ptr,
-        len=len,
-    )
+    var str_slice = StringSlice[__origin_of(buf)](ptr=buf_ptr, length=len)
 
     writer.write(str_slice)
 

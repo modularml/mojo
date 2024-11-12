@@ -13,7 +13,7 @@
 """Implements the os package."""
 
 from .atomic import Atomic
-from .env import getenv, setenv
+from .env import getenv, setenv, unsetenv
 from .fstat import lstat, stat, stat_result
 from .os import (
     SEEK_CUR,
