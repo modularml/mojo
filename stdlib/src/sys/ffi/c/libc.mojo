@@ -299,26 +299,26 @@ struct Libc[*, static: Bool]:
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn close(self, fildes: C.int) -> C.int:
-        """Libc POSIX `open` function. The argument flags must include one of
-        the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
+    fn fileno(self, stream: UnsafePointer[FILE]) -> C.int:
+        """Libc POSIX `fileno` function.
 
         Args:
-            fildes: A File Descriptor to close.
+            stream: The stream.
 
         Returns:
-            Value `0` on success, `-1` on error and `errno` is set.
+            The file descriptor associated with the stream on success, otherwise
+            `-1` and `errno` is set.
 
         Notes:
-            [Reference](https://man7.org/linux/man-pages/man3/close.3p.html).
-            Fn signature: `int close(int fildes)`.
+            [Reference](https://man7.org/linux/man-pages/man3/fileno.3p.html).
+            Fn signature: `int fileno(FILE *stream)`.
         """
 
         @parameter
         if static:
-            return external_call["close", C.int](fildes)
+            return external_call["fileno", C.int](stream)
         else:
-            return self._lib.value().call["close", C.int](fildes)
+            return self._lib.value().call["fileno", C.int](stream)
 
     @always_inline
     fn open(
@@ -347,11 +347,30 @@ struct Libc[*, static: Bool]:
             return self._lib.value().call["open", C.int](path, oflag, mode)
 
     @always_inline
-    fn remove[*T: AnyType](self, pathname: UnsafePointer[C.char]) -> C.int:
-        """Libc POSIX `open` function.
+    fn close(self, fildes: C.int) -> C.int:
+        """Libc POSIX `open` function. The argument flags must include one of
+        the following access modes: O_RDONLY, O_WRONLY, or O_RDWR.
 
-        Parameters:
-            T: The type of the arguments.
+        Args:
+            fildes: A File Descriptor to close.
+
+        Returns:
+            Value `0` on success, `-1` on error and `errno` is set.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/close.3p.html).
+            Fn signature: `int close(int fildes)`.
+        """
+
+        @parameter
+        if static:
+            return external_call["close", C.int](fildes)
+        else:
+            return self._lib.value().call["close", C.int](fildes)
+
+    @always_inline
+    fn remove(self, pathname: UnsafePointer[C.char]) -> C.int:
+        """Libc POSIX `remove` function.
 
         Args:
             pathname: A path to a file.
@@ -793,7 +812,6 @@ struct Libc[*, static: Bool]:
             [Reference](https://man7.org/linux/man-pages/man3/printf.3p.html).
         """
         a = args.get_loaded_kgen_pack()
-        idx = 0
 
         @parameter
         if is_nvidia_gpu():
@@ -805,13 +823,10 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            idx = self.strlen(format)
-            format[idx] = C.char(ord("\n"))
-
-        @parameter
-        if static:
+            return self.dprintf(STDOUT_FILENO, format, args)
+        elif static:
             # FIXME: externall_call should handle this
-            num = __mlir_op.`pop.external_call`[
+            return __mlir_op.`pop.external_call`[
                 func = "printf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -821,12 +836,7 @@ struct Libc[*, static: Bool]:
                 _type = C.int,
             ](format, a)
         else:
-            num = self._lib.value().call["printf", C.int](format, a)
-
-        @parameter
-        if os_is_macos():
-            format[idx] = C.char(0)
-        return num
+            return self._lib.value().call["printf", C.int](format, a)
 
     @always_inline
     fn printf[
@@ -874,17 +884,17 @@ struct Libc[*, static: Bool]:
                 const char *restrict format, ...)`.
         """
 
-        idx = 0
-
         @parameter
         if os_is_macos():  # workaround for non null termination of fprintf
-            idx = self.strlen(format)
-            format[idx] = C.char(ord("\n"))
-
-        @parameter
-        if static:
+            length = self.strlen(format)
+            buf = UnsafePointer[C.char].alloc(length + 1)
+            _ = self.snprintf(buf, length, format, args)
+            num = self.write(self.fileno(stream), buf, self.strlen(buf))
+            buf.free()
+            return num
+        elif static:
             # FIXME: externall_call should handle this
-            num = __mlir_op.`pop.external_call`[
+            return __mlir_op.`pop.external_call`[
                 func = "fprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -896,14 +906,9 @@ struct Libc[*, static: Bool]:
             ](stream, format, args.get_loaded_kgen_pack())
 
         else:
-            num = self._lib.value().call["fprintf", C.int](
+            return self._lib.value().call["fprintf", C.int](
                 stream, format, args.get_loaded_kgen_pack()
             )
-
-        @parameter
-        if os_is_macos():
-            format[idx] = C.char(0)
-        return num
 
     @always_inline
     fn fprintf[
@@ -2195,8 +2200,8 @@ struct Libc[*, static: Bool]:
                 int option_name, const void *option_value, socklen_t option_len
                 )`.
         """
-        var l = C.int(map_constant_to_native(int(level), self))
-        var o = C.int(map_constant_to_native(int(option_name), self))
+        var l = C.int(map_constant_to_native(int(level)))
+        var o = C.int(map_constant_to_native(int(option_name)))
 
         @parameter
         if static:
