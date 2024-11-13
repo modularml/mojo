@@ -1198,16 +1198,16 @@ struct Int(
 
     @staticmethod
     fn from_bytes[
-        type: DType
-    ](bytes: Span[Byte], big_endian: Bool = False) raises -> Self:
+        type: DType, big_endian: Bool = False
+    ](bytes: Span[Byte]) raises -> Self:
         """Converts a byte array to an integer.
 
         Args:
             bytes: The byte array to convert.
-            big_endian: Whether the byte array is big-endian.
 
         Parameters:
             type: The type of the integer.
+            big_endian: Whether the byte array is big-endian.
 
         Returns:
             The integer value.
@@ -1219,12 +1219,10 @@ struct Int(
         var value = type_ptr[]
 
         @parameter
-        if is_big_endian():
-            if not big_endian:
-                value = byte_swap(value)
-        else:
-            if big_endian:
-                value = byte_swap(value)
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
         return int(value)
 
     @always_inline("nodebug")
