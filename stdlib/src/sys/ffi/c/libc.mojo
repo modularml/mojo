@@ -793,6 +793,7 @@ struct Libc[*, static: Bool]:
             [Reference](https://man7.org/linux/man-pages/man3/printf.3p.html).
         """
         a = args.get_loaded_kgen_pack()
+        idx = 0
 
         @parameter
         if is_nvidia_gpu():
@@ -803,9 +804,14 @@ struct Libc[*, static: Bool]:
                 return external_call["vprintf", C.int](format, p)
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
-        elif static:
+        elif os_is_macos():  # workaround for non null termination of printf
+            idx = self.strlen(format)
+            format[idx] = C.char(ord("\n"))
+
+        @parameter
+        if static:
             # FIXME: externall_call should handle this
-            return __mlir_op.`pop.external_call`[
+            num = __mlir_op.`pop.external_call`[
                 func = "printf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -815,7 +821,12 @@ struct Libc[*, static: Bool]:
                 _type = C.int,
             ](format, a)
         else:
-            return self._lib.value().call["printf", C.int](format, a)
+            num = self._lib.value().call["printf", C.int](format, a)
+
+        @parameter
+        if os_is_macos():
+            format[idx] = C.char(0)
+        return num
 
     @always_inline
     fn printf[
@@ -863,10 +874,17 @@ struct Libc[*, static: Bool]:
                 const char *restrict format, ...)`.
         """
 
+        idx = 0
+
+        @parameter
+        if os_is_macos():  # workaround for non null termination of fprintf
+            idx = self.strlen(format)
+            format[idx] = C.char(ord("\n"))
+
         @parameter
         if static:
             # FIXME: externall_call should handle this
-            return __mlir_op.`pop.external_call`[
+            num = __mlir_op.`pop.external_call`[
                 func = "fprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -876,10 +894,16 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](stream, format, args.get_loaded_kgen_pack())
+
         else:
-            return self._lib.value().call["fprintf", C.int](
+            num = self._lib.value().call["fprintf", C.int](
                 stream, format, args.get_loaded_kgen_pack()
             )
+
+        @parameter
+        if os_is_macos():
+            format[idx] = C.char(0)
+        return num
 
     @always_inline
     fn fprintf[
@@ -975,14 +999,9 @@ struct Libc[*, static: Bool]:
             )
         else:
             stream = self.fdopen(fd, char_ptr(FM_READ_WRITE))  # don't truncate
-            if stream == C.NULL.bitcast[FILE]():
-                return -1
             num = self.fprintf(stream, format, args)
-            if num < 0:
-                return -1
-            if self.fflush(stream) != 0:
-                return -1
-            return num
+            success = self.fflush(stream) == 0
+            return num * int(success) - int(not success)
 
     @always_inline
     fn dprintf[
@@ -2176,8 +2195,8 @@ struct Libc[*, static: Bool]:
                 int option_name, const void *option_value, socklen_t option_len
                 )`.
         """
-        var l = map_constant_to_native(int(level))
-        var o = map_constant_to_native(int(option_name))
+        var l = C.int(map_constant_to_native(int(level), self))
+        var o = C.int(map_constant_to_native(int(option_name), self))
 
         @parameter
         if static:

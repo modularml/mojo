@@ -222,14 +222,12 @@ def _test_fseek_ftell(libc: Libc, suffix: String):
         a = UnsafePointer[C.char].alloc(size)
         idx = 0
         for i in range(ord(" "), ord("~")):
-            if i == ord("\\"):  # otherwise escapes
-                a[idx] = i + 1
-            elif i == ord("%"):
 
-                @parameter
-                if os_is_macos():
-                    # MacOS is not compliant with ASCII
-                    # triggers format specifier if it's not '%%'
+            @parameter
+            if os_is_macos():
+                # MacOS is not actually compliant with ANSI C89
+                # triggers format specifier if it's not '%%'
+                if i == ord("%"):
                     a[idx] = i + 1
                 else:
                     a[idx] = i

@@ -13,6 +13,8 @@
 """Libc POSIX constants."""
 
 from sys.info import os_is_linux, os_is_macos, os_is_windows
+from .libc import Libc
+from .types import C
 
 # ===----------------------------------------------------------------------=== #
 # Error constants (errno.h)
@@ -1372,19 +1374,45 @@ alias LOG_FACMASK = 0x03F8
 
 # TODO: maybe this could call the macros by being passed the libc instance
 @always_inline
-fn map_constant_to_native(constant: Int) -> Int:
+fn map_constant_to_native(constant: Int, libc: Libc) -> Int:
+    """Maps a constant value from this file to it's native value in cases of
+    discrepancy.
+
+    Args:
+        constant: The constant value.
+        libc: The libc to call the macros from.
+
+    Returns:
+        The native value.
+
+    Notes:
+        Pull Requests to extend support are welcome.
+    """
+
     @parameter
     if os_is_linux():
         return constant
     elif os_is_macos():
         if constant == SOL_SOCKET:
-            return 0xFFFF
+            # return 0xFFFF
+            if not libc._lib:
+                return int(external_call["SOL_SOCKET", C.int]())
+            else:
+                return int(libc._lib.value().call["SOL_SOCKET", C.int]())
         elif constant == SO_ACCEPTCONN:
             return 0x0002
         elif constant == SO_REUSEADDR:
-            return 0x0004
+            # return 0x0004
+            if not libc._lib:
+                return int(external_call["SO_REUSEADDR", C.int]())
+            else:
+                return int(libc._lib.value().call["SO_REUSEADDR", C.int]())
         elif constant == SO_KEEPALIVE:
-            return 0x0008
+            # return 0x0008
+            if not libc._lib:
+                return int(external_call["SO_KEEPALIVE", C.int]())
+            else:
+                return int(libc._lib.value().call["SO_KEEPALIVE", C.int]())
         elif constant == SO_DONTROUTE:
             return 0x0010
         elif constant == SO_BROADCAST:
