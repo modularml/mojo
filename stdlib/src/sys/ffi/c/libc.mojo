@@ -889,7 +889,7 @@ struct Libc[*, static: Bool]:
             length = self.strlen(format)
             buf = UnsafePointer[C.char].alloc(length + 1)
             _ = self.snprintf(buf, length, format, args)
-            num = self.write(self.fileno(stream), buf, self.strlen(buf))
+            num = self.write(self.fileno(stream), buf, self.strlen(buf) + 1)
             buf.free()
             return num
         elif static:
