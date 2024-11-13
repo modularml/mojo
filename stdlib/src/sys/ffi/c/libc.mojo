@@ -922,7 +922,9 @@ struct Libc[*, static: Bool]:
             elif self.feof(stream) == 0 and self.ferror(stream) == 0:
                 self.set_errno(0)
                 num = self.fwrite(buf, 1, b_len, stream)
-                if num == 0 and self.ferror(stream) != 0:
+                if (num == 0 and self.ferror(stream) != 0) or self.fflush(
+                    stream
+                ) != 0:
                     num = -1
             else:
                 num = -1
