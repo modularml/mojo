@@ -893,9 +893,22 @@ struct Libc[*, static: Bool]:
             fd = self.fileno(stream)
             if fd != -1:
                 num = self.write(fd, buf, b_len)
-            else:  # this is very unsafe hehe
-                memcpy(stream.bitcast[C.char](), buf, b_len)
-                num = b_len
+            elif self.feof(stream) == 0 and self.ferror(stream) == 0:
+                self.set_errno(0)
+
+                @parameter
+                if static:
+                    _ = external_call["setbuffer", C.void](stream, buf, b_len)
+                else:
+                    _ = self._lib.value().call["setbuffer", C.void](
+                        stream, buf, b_len
+                    )
+                if self.fflush(stream) == 0:
+                    num = b_len
+                else:
+                    num = -1
+            else:
+                num = -1
             buf.free()
             return num
         elif static:

@@ -1391,6 +1391,8 @@ fn map_constant_to_native(constant: Int) -> Int:
     elif os_is_macos():
         # https://gist.github.com/cyberroadie/3490843
         # https://newosxbook.com/src.jl?tree=xnu-4903.221.2&file=/bsd/sys/socket.h
+        # https://newosxbook.com/src.jl?tree=xnu&file=bsd/netinet/in.h
+        # https://github.com/apple/darwin-xnu/blob/main/bsd/netinet/tcp.h
         if constant == SOL_SOCKET:
             return 0xFFFF
         elif constant == SO_ACCEPTCONN:
