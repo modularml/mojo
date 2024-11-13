@@ -26,6 +26,7 @@ f.close()
 from utils import Span
 from builtin.io import _printf
 from sys.ffi import external_call, OpaquePointer
+from sys.ffi.c import C, Libc
 from sys.info import is_nvidia_gpu
 from memory import UnsafePointer
 
@@ -68,8 +69,8 @@ struct FileDescriptor(Writer):
         if is_nvidia_gpu():
             _printf["%*s"](len_bytes, bytes.unsafe_ptr())
         else:
-            written = external_call["write", Int32](
-                self.value, bytes.unsafe_ptr(), len(bytes)
+            written = Libc[static=True]().write(
+                self.value, bytes.unsafe_ptr().bitcast[C.void](), len(bytes)
             )
             debug_assert(
                 written == len(bytes),
