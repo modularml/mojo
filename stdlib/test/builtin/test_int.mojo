@@ -249,40 +249,40 @@ def test_conversion_from_python():
 
 
 def test_from_bytes():
-    assert_equal(Int.from_bytes[DType.int16](Bytes(0, 16), big_endian=True), 16)
+    assert_equal(Int.from_bytes[DType.int16, big_endian=True](Bytes(0, 16)), 16)
     assert_equal(
-        Int.from_bytes[DType.int16](Bytes(0, 16), big_endian=False), 4096
+        Int.from_bytes[DType.int16, big_endian=False](Bytes(0, 16)), 4096
     )
     assert_equal(
-        Int.from_bytes[DType.int16](Bytes(252, 0), big_endian=True), -1024
+        Int.from_bytes[DType.int16, big_endian=True](Bytes(252, 0)), -1024
     )
     assert_equal(
-        Int.from_bytes[DType.uint16](Bytes(252, 0), big_endian=True), 64512
+        Int.from_bytes[DType.uint16, big_endian=True](Bytes(252, 0)), 64512
     )
     assert_equal(
-        Int.from_bytes[DType.int16](Bytes(252, 0), big_endian=False), 252
+        Int.from_bytes[DType.int16, big_endian=False](Bytes(252, 0)), 252
     )
     assert_equal(
-        Int.from_bytes[DType.int32](Bytes(0, 0, 0, 1), big_endian=True), 1
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(0, 0, 0, 1)), 1
     )
     assert_equal(
-        Int.from_bytes[DType.int32](Bytes(0, 0, 0, 1), big_endian=False),
+        Int.from_bytes[DType.int32, big_endian=False](Bytes(0, 0, 0, 1)),
         16777216,
     )
     assert_equal(
-        Int.from_bytes[DType.int32](Bytes(1, 0, 0, 0), big_endian=True),
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(1, 0, 0, 0)),
         16777216,
     )
     assert_equal(
-        Int.from_bytes[DType.int32](Bytes(1, 0, 0, 1), big_endian=True),
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(1, 0, 0, 1)),
         16777217,
     )
     assert_equal(
-        Int.from_bytes[DType.int32](Bytes(1, 0, 0, 1), big_endian=False),
+        Int.from_bytes[DType.int32, big_endian=False](Bytes(1, 0, 0, 1)),
         16777217,
     )
     assert_equal(
-        Int.from_bytes[DType.int32](Bytes(255, 0, 0, 0), big_endian=True),
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(255, 0, 0, 0)),
         -16777216,
     )
 
