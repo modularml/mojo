@@ -578,6 +578,32 @@ struct Libc[*, static: Bool]:
             )
 
     @always_inline
+    fn setbuffer(
+        self,
+        stream: UnsafePointer[FILE],
+        buf: UnsafePointer[C.void],
+        size: size_t,
+    ):
+        """Libc POSIX `setbuffer` function.
+
+        Args:
+            stream: The stream.
+            buf: A pointer to a buffer.
+            size: The size of the buffer.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/setbuffer.3.html).
+            Fn signature: `FILE *setbuffer(FILE *stream, void *restrict buf,
+                size_t size)`.
+        """
+
+        @parameter
+        if static:
+            _ = external_call["setbuffer", C.void](stream, buf, size)
+        else:
+            _ = self._lib.value().call["setbuffer", C.void](stream, buf, size)
+
+    @always_inline
     fn creat(self, path: UnsafePointer[C.char], mode: mode_t) -> C.int:
         """Libc POSIX `creat` function.
 
@@ -895,17 +921,8 @@ struct Libc[*, static: Bool]:
                 num = self.write(fd, buf, b_len)
             elif self.feof(stream) == 0 and self.ferror(stream) == 0:
                 self.set_errno(0)
-
-                @parameter
-                if static:
-                    _ = external_call["setbuffer", C.void](stream, buf, b_len)
-                else:
-                    _ = self._lib.value().call["setbuffer", C.void](
-                        stream, buf, b_len
-                    )
-                if self.fflush(stream) == 0:
-                    num = b_len
-                else:
+                num = self.fwrite(buf, 1, b_len, stream)
+                if num == 0 and self.ferror(stream) != 0:
                     num = -1
             else:
                 num = -1
@@ -1464,44 +1481,6 @@ struct Libc[*, static: Bool]:
             return self._lib.value().call["sscanf", C.int](s, format)
 
     @always_inline
-    fn fread(
-        self,
-        ptr: UnsafePointer[C.void],
-        size: size_t,
-        nitems: size_t,
-        stream: UnsafePointer[FILE],
-    ) -> size_t:
-        """Libc POSIX `fread` function.
-
-        Args:
-            ptr: A pointer to a buffer to store the read string.
-            size: The size of the buffer.
-            nitems: The number of items to read.
-            stream: A pointer to a stream.
-
-        Returns:
-            The number of elements successfully read which is less than nitems
-            only if a read error or end-of-file is encountered. If size or
-            nitems is 0, `fread()` shall return 0 and the contents of the array
-            and the state of the stream remain unchanged. Otherwise, if a read
-            error occurs, the error indicator for the stream shall be set, and
-            `errno` shall be set to indicate the error.
-
-        Notes:
-            [Reference](https://man7.org/linux/man-pages/man3/fread.3p.html).
-            Fn signature: `size_t fread(void *restrict ptr, size_t size,
-                size_t nitems, FILE *restrict stream)`.
-        """
-
-        @parameter
-        if static:
-            return external_call["fread", size_t](ptr, size, nitems, stream)
-        else:
-            return self._lib.value().call["fread", size_t](
-                ptr, size, nitems, stream
-            )
-
-    @always_inline
     fn rewind(self, stream: UnsafePointer[FILE]):
         """Libc POSIX `rewind` function.
 
@@ -1596,6 +1575,31 @@ struct Libc[*, static: Bool]:
             )
 
     @always_inline
+    fn read(
+        self, fildes: C.int, buf: UnsafePointer[C.void], nbyte: size_t
+    ) -> ssize_t:
+        """Libc POSIX `read` function.
+
+        Args:
+            fildes: A File Descriptor to open the file with.
+            buf: A pointer to a buffer to store the read string.
+            nbyte: The maximum number of characters to read.
+
+        Returns:
+            The number of bytes read. Otherwise -1 and `errno` is set.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/read.3p.html).
+            Fn signature: `size_t read(int fildes, void *buf, size_t nbyte)`.
+        """
+
+        @parameter
+        if static:
+            return external_call["read", ssize_t](fildes, buf, nbyte)
+        else:
+            return self._lib.value().call["read", ssize_t](fildes, buf, nbyte)
+
+    @always_inline
     fn pread(
         self,
         fildes: C.int,
@@ -1629,29 +1633,68 @@ struct Libc[*, static: Bool]:
             )
 
     @always_inline
-    fn read(
-        self, fildes: C.int, buf: UnsafePointer[C.void], nbyte: size_t
-    ) -> ssize_t:
-        """Libc POSIX `read` function.
+    fn fread(
+        self,
+        ptr: UnsafePointer[C.void],
+        size: size_t,
+        nitems: size_t,
+        stream: UnsafePointer[FILE],
+    ) -> size_t:
+        """Libc POSIX `fread` function.
 
         Args:
-            fildes: A File Descriptor to open the file with.
-            buf: A pointer to a buffer to store the read string.
-            nbyte: The maximum number of characters to read.
+            ptr: A pointer to a buffer to store the read string.
+            size: The size of the buffer.
+            nitems: The number of items to read.
+            stream: A pointer to a stream.
 
         Returns:
-            The number of bytes read. Otherwise -1 and `errno` is set.
+            The number of elements successfully read which is less than nitems
+            only if a read error or end-of-file is encountered. If size or
+            nitems is 0, `fread()` shall return 0 and the contents of the array
+            and the state of the stream remain unchanged. Otherwise, if a read
+            error occurs, the error indicator for the stream shall be set, and
+            `errno` shall be set to indicate the error.
 
         Notes:
-            [Reference](https://man7.org/linux/man-pages/man3/read.3p.html).
-            Fn signature: `size_t read(int fildes, void *buf, size_t nbyte)`.
+            [Reference](https://man7.org/linux/man-pages/man3/fread.3p.html).
+            Fn signature: `size_t fread(void *restrict ptr, size_t size,
+                size_t nitems, FILE *restrict stream)`.
         """
 
         @parameter
         if static:
-            return external_call["read", ssize_t](fildes, buf, nbyte)
+            return external_call["fread", size_t](ptr, size, nitems, stream)
         else:
-            return self._lib.value().call["read", ssize_t](fildes, buf, nbyte)
+            return self._lib.value().call["fread", size_t](
+                ptr, size, nitems, stream
+            )
+
+    @always_inline
+    fn write(
+        self, fildes: C.int, buf: UnsafePointer[C.void], nbyte: size_t
+    ) -> ssize_t:
+        """Libc POSIX `write` function.
+
+        Args:
+            fildes: A File Descriptor to open the file with.
+            buf: A pointer to a buffer to store.
+            nbyte: The maximum number of characters to write.
+
+        Returns:
+            The number of bytes written. Otherwise -1 and `errno` is set.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/write.3p.html).
+            Fn signature: `ssize_t write(int fildes, const void *buf,
+                size_t nbyte)`.
+        """
+
+        @parameter
+        if static:
+            return external_call["write", ssize_t](fildes, buf, nbyte)
+        else:
+            return self._lib.value().call["write", ssize_t](fildes, buf, nbyte)
 
     @always_inline
     fn pwrite(
@@ -1687,30 +1730,42 @@ struct Libc[*, static: Bool]:
             )
 
     @always_inline
-    fn write(
-        self, fildes: C.int, buf: UnsafePointer[C.void], nbyte: size_t
-    ) -> ssize_t:
-        """Libc POSIX `write` function.
+    fn fwrite(
+        self,
+        ptr: UnsafePointer[C.void],
+        size: size_t,
+        nmemb: size_t,
+        stream: UnsafePointer[FILE],
+    ) -> size_t:
+        """Libc POSIX `fwrite` function.
 
         Args:
-            fildes: A File Descriptor to open the file with.
-            buf: A pointer to a buffer to store.
-            nbyte: The maximum number of characters to write.
+            ptr: The buffer to read from.
+            size: The byte length of each item.
+            nmemb: The amount of items to write.
+            stream: The stream.
 
         Returns:
-            The number of bytes written. Otherwise -1 and `errno` is set.
+            Number of elements successfully written, which may be less than
+            nitems if a write error is encountered. If size or nitems is 0,
+            `fwrite()` shall return 0 and the state of the stream remains
+            unchanged. Otherwise, if a write error occurs, the error indicator
+            for the stream shall be set, and errno shall be set to indicate the
+            error.
 
         Notes:
-            [Reference](https://man7.org/linux/man-pages/man3/write.3p.html).
-            Fn signature: `ssize_t write(int fildes, const void *buf,
-                size_t nbyte)`.
+            [Reference](https://man7.org/linux/man-pages/man3/fwrite.3p.html).
+            Fn signature: `size_t fwrite(const void *restrict ptr, size_t size,
+                size_t nmemb, FILE *restrict stream)`.
         """
 
         @parameter
         if static:
-            return external_call["write", ssize_t](fildes, buf, nbyte)
+            return external_call["fwrite", size_t](ptr, size, nmemb, stream)
         else:
-            return self._lib.value().call["write", ssize_t](fildes, buf, nbyte)
+            return self._lib.value().call["fwrite", size_t](
+                ptr, size, nmemb, stream
+            )
 
     @always_inline
     fn ftell(self, stream: UnsafePointer[FILE]) -> C.long:
