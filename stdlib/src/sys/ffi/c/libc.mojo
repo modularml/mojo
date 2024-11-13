@@ -887,17 +887,16 @@ struct Libc[*, static: Bool]:
         @parameter
         if os_is_macos():  # workaround for non null termination of fprintf
             length = self.strlen(format)
+            buf = UnsafePointer[C.char].alloc(length + 1)
+            _ = self.snprintf(buf, length + 1, format, args)
+            b_len = self.strlen(buf)
             fd = self.fileno(stream)
             if fd != -1:
-                buf = UnsafePointer[C.char].alloc(length + 1)
-                _ = self.snprintf(buf, length + 1, format, args)
-                num = self.write(fd, buf, self.strlen(buf))
-                buf.free()
+                num = self.write(fd, buf, b_len)
             else:  # this is very unsafe hehe
-                couldve = self.snprintf(
-                    stream.bitcast[C.char](), length + 1, format, args
-                )
-                num = min(UInt(int(couldve)), length)
+                memcpy(stream.bitcast[C.char](), buf, b_len)
+                num = b_len
+            buf.free()
             return num
         elif static:
             # FIXME: externall_call should handle this

@@ -1427,6 +1427,10 @@ fn map_constant_to_native(constant: Int) -> Int:
             return 0x1007
         elif constant == SO_TYPE:
             return 0x1008
+        elif constant == TCP_KEEPINTVL:
+            return 0x101
+        elif constant == TCP_KEEPCNT:
+            return 0x102
         return constant
     elif os_is_windows():
         return constant

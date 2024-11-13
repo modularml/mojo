@@ -281,14 +281,13 @@ def _test_setsockopt(libc: Libc):
             # WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &keepaliveParams, sizeof(keepaliveParams), NULL, 0, &ret, NULL, NULL);
             constrained[False, "Unsupported test"]()
         elif os_is_macos():
-            value_ptr = stack_allocation[1, C.int]()
-            value_ptr[0] = C.int(1)
             fd = libc.socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
             assert_true(fd != -1)
             err = libc.setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, null_ptr, size)
             assert_true(err != -1)
             err = libc.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, null_ptr, size)
             assert_true(err != -1)
+            value_ptr[0] = C.int(20)
             err = libc.setsockopt(
                 fd, IPPROTO_TCP, TCP_KEEPALIVE, null_ptr, size
             )
