@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Libc POSIX constants."""
 
+from sys.info import os_is_linux, os_is_macos, os_is_windows
 
 # ===----------------------------------------------------------------------=== #
 # Error constants (errno.h)
@@ -793,6 +794,57 @@ alias SO_SNDTIMEO_NEW = 67
 alias SO_DETACH_REUSEPORT_BPF = 68
 """Constant: SO_DETACH_REUSEPORT_BPF."""
 
+
+# Apple
+alias SO_TIMESTAMP_MONOTONIC = 0x0800
+"""Monotonically increasing timestamp on rcvd dgram."""
+alias SO_ACCEPTFILTER = 0x1000
+"""There is an accept filter."""
+alias SO_DONTTRUNC = 0x2000
+"""APPLE: Retain unread data."""
+alias SO_WANTMORE = 0x4000
+"""APPLE: Give hint when more data ready."""
+alias SO_WANTOOBFLAG = 0x8000
+"""APPLE: Want OOB in MSG_FLAG on receive."""
+
+
+alias SO_LABEL = 0x1010
+"""Socket's MAC label."""
+alias SO_PEERLABEL = 0x1011
+"""Socket's peer MAC label."""
+alias SO_NREAD = 0x1020
+"""APPLE: get 1st-packet byte count."""
+alias SO_NKE = 0x1021
+"""APPLE: Install socket-level NKE."""
+alias SO_NOSIGPIPE = 0x1022
+"""APPLE: No SIGPIPE on EPIPE."""
+alias SO_NOADDRERR = 0x1023
+"""APPLE: Returns EADDRNOTAVAIL when src is not available anymore."""
+alias SO_NWRITE = 0x1024
+"""APPLE: Get number of bytes currently in send socket buffer."""
+alias SO_REUSESHAREUID = 0x1025
+"""APPLE: Allow reuse of port/socket by different userids."""
+alias SO_NOTIFYCONFLICT = 0x1026
+"""APPLE: send notification if there is a bind on a port which is already in
+use."""
+alias SO_UPCALLCLOSEWAIT = 0x1027
+"""APPLE: block on close until an upcall returns."""
+alias SO_LINGER_SEC = 0x1080
+"""Linger on close if data present (in seconds)."""
+alias SO_RESTRICTIONS = 0x1081
+"""APPLE: deny inbound/outbound/both/flag set."""
+alias SO_RESTRICT_DENYIN = 0x00000001
+"""Flag for SO_RESTRICTIONS - deny inbound."""
+alias SO_RESTRICT_DENYOUT = 0x00000002
+"""Flag for SO_RESTRICTIONS - deny outbound."""
+alias SO_RESTRICT_DENYSET = 0x80000000
+"""Flag for SO_RESTRICTIONS - deny has been set."""
+alias SO_RANDOMPORT = 0x1082
+"""APPLE: request local port randomization."""
+alias SO_NP_EXTENSIONS = 0x1083
+"""To turn off some POSIX behavior."""
+
+
 # TCP level options (IPPROTO_TCP)
 alias TCP_NODELAY = 1
 """Don't delay send to coalesce packets."""
@@ -1311,3 +1363,58 @@ alias LOG_NFACILITIES = 24
 """Current number of facilities."""
 alias LOG_FACMASK = 0x03F8
 """Mask to extract facility part."""
+
+
+# ===----------------------------------------------------------------------=== #
+# utils
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO: maybe this could call the macros by being passed the libc instance
+@always_inline
+fn map_constant_to_native(constant: Int) -> Int:
+    @parameter
+    if os_is_linux():
+        return constant
+    elif os_is_macos():
+        if constant == SOL_SOCKET:
+            return 0xFFFF
+        elif constant == SO_ACCEPTCONN:
+            return 0x0002
+        elif constant == SO_REUSEADDR:
+            return 0x0004
+        elif constant == SO_KEEPALIVE:
+            return 0x0008
+        elif constant == SO_DONTROUTE:
+            return 0x0010
+        elif constant == SO_BROADCAST:
+            return 0x0020
+        elif constant == SO_LINGER:
+            return 0x1080
+        elif constant == SO_OOBINLINE:
+            return 0x0100
+        elif constant == SO_REUSEPORT:
+            return 0x0200
+        elif constant == SO_TIMESTAMP:
+            return 0x0400
+        elif constant == SO_SNDBUF:
+            return 0x1001
+        elif constant == SO_RCVBUF:
+            return 0x1002
+        elif constant == SO_SNDLOWAT:
+            return 0x1003
+        elif constant == SO_RCVLOWAT:
+            return 0x1004
+        elif constant == SO_SNDTIMEO:
+            return 0x1005
+        elif constant == SO_RCVTIMEO:
+            return 0x1006
+        elif constant == SO_ERROR:
+            return 0x1007
+        elif constant == SO_TYPE:
+            return 0x1008
+        return constant
+    elif os_is_windows():
+        return constant
+    else:
+        return constant

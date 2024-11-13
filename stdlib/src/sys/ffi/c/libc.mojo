@@ -2176,15 +2176,17 @@ struct Libc[*, static: Bool]:
                 int option_name, const void *option_value, socklen_t option_len
                 )`.
         """
+        var l = map_constant_to_native(int(level))
+        var o = map_constant_to_native(int(option_name))
 
         @parameter
         if static:
             return external_call["setsockopt", C.int](
-                socket, level, option_name, option_value, option_len
+                socket, l, o, option_value, option_len
             )
         else:
             return self._lib.value().call["setsockopt", C.int](
-                socket, level, option_name, option_value, option_len
+                socket, l, o, option_value, option_len
             )
 
     fn bind(
