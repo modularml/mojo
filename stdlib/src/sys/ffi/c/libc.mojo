@@ -888,8 +888,8 @@ struct Libc[*, static: Bool]:
         if os_is_macos():  # workaround for non null termination of fprintf
             length = self.strlen(format)
             buf = UnsafePointer[C.char].alloc(length + 1)
-            _ = self.snprintf(buf, length, format, args)
-            num = self.write(self.fileno(stream), buf, self.strlen(buf) + 1)
+            _ = self.snprintf(buf, length + 1, format, args)
+            num = self.write(self.fileno(stream), buf, self.strlen(buf))
             buf.free()
             return num
         elif static:
