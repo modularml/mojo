@@ -19,6 +19,8 @@ from memory import Pointer
 ```
 """
 
+from sys import is_nvidia_gpu
+
 # ===----------------------------------------------------------------------===#
 # AddressSpace
 # ===----------------------------------------------------------------------===#
@@ -30,17 +32,18 @@ struct _GPUAddressSpace(EqualityComparable):
     var _value: Int
 
     # See https://docs.nvidia.com/cuda/nvvm-ir-spec/#address-space
+    # And https://llvm.org/docs/AMDGPUUsage.html#address-spaces
     alias GENERIC = AddressSpace(0)
     """Generic address space."""
     alias GLOBAL = AddressSpace(1)
     """Global address space."""
-    alias CONSTANT = AddressSpace(2)
+    alias CONSTANT = AddressSpace(2) if is_nvidia_gpu() else AddressSpace(4)
     """Constant address space."""
     alias SHARED = AddressSpace(3)
     """Shared address space."""
     alias PARAM = AddressSpace(4)
     """Param address space."""
-    alias LOCAL = AddressSpace(5)
+    alias LOCAL = AddressSpace(5) if is_nvidia_gpu() else AddressSpace(3)
     """Local address space."""
 
     @always_inline("nodebug")
