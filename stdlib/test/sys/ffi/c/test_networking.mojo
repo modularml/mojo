@@ -317,7 +317,7 @@ def _test_bind_listen(libc: Libc):
         err = libc.setsockopt(
             fd,
             SOL_SOCKET,
-            SO_REUSEADDR,
+            SO_REUSEPORT,
             value_ptr.bitcast[C.void](),
             sizeof[C.int](),
         )
