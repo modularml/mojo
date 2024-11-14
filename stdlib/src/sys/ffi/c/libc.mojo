@@ -1154,16 +1154,15 @@ struct Libc[*, static: Bool]:
 
         @parameter
         if static:
-            var buf = UnsafePointer[C.char]()
+            var buf = format
             var length = 0
 
             @parameter
             if os_is_macos():
                 # workaround for mac static libc prints beyond null
-                length = self.strnlen(format, n)
-                buf = buf.alloc(n - length)
-                memcpy(buf, format + length, n - length)
-                memset_zero(format + length, n - length)
+                length = self.strnlen(format, n) + 1
+                buf = buf.alloc(length)
+                memcpy(buf, format, length)
 
             # FIXME: externall_call should handle this
             num = __mlir_op.`pop.external_call`[
@@ -1176,7 +1175,7 @@ struct Libc[*, static: Bool]:
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type = C.int,
-            ](s, n, format, args.get_loaded_kgen_pack())
+            ](s, n, buf, args.get_loaded_kgen_pack())
 
             @parameter
             if os_is_macos():
