@@ -1177,6 +1177,13 @@ struct CPython:
         """
         return self.lib.call["PyType_FromSpec", PyObjectPtr](spec)
 
+    fn PyType_GenericAlloc(
+        inout self,
+        type: UnsafePointer[PyTypeObject],
+        nitems: Py_ssize_t,
+    ) -> PyObjectPtr:
+        return self.lib.call["PyType_GenericAlloc", PyObjectPtr](type, nitems)
+
     # ===-------------------------------------------------------------------===#
     # Python Evaluation
     # ===-------------------------------------------------------------------===#

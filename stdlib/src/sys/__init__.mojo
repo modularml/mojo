@@ -49,6 +49,7 @@ from .info import (
     warpsize,
     sizeof,
     is_nvidia_gpu,
+    is_gpu,
 )
 from .intrinsics import (
     PrefetchCache,
