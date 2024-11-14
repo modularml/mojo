@@ -498,7 +498,7 @@ struct Libc[*, static: Bool]:
             stream: A pointer to a stream.
 
         Returns:
-            Value 0 on success, otherwise `EOF` (usually -1) and `errno` is set.
+            Value 0 on success, otherwise `EOF` and `errno` is set.
 
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/fclose.3p.html).
@@ -720,8 +720,7 @@ struct Libc[*, static: Bool]:
             stream: A pointer to a stream.
 
         Returns:
-            The value it has written. Otherwise `EOF` (usually -1) and `errno`
-            is set.
+            The value it has written. Otherwise `EOF` and `errno` is set.
 
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/fputc.3p.html).
@@ -745,7 +744,7 @@ struct Libc[*, static: Bool]:
             stream: A pointer to a stream.
 
         Returns:
-            Positive number. Otherwise `EOF` (usually -1) and `errno` is set.
+            Positive number. Otherwise `EOF` and `errno` is set.
 
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/fputs.3p.html).
@@ -1110,7 +1109,7 @@ struct Libc[*, static: Bool]:
         @parameter
         if static:
             # FIXME: externall_call should handle this
-            var num = __mlir_op.`pop.external_call`[
+            return __mlir_op.`pop.external_call`[
                 func = "sprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -1120,12 +1119,10 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](str, format, args.get_loaded_kgen_pack())
-            return int(num)
         else:
-            var num = self._lib.value().call["sprintf", C.int](
+            return self._lib.value().call["sprintf", C.int](
                 str, format, args.get_loaded_kgen_pack()
             )
-            return int(num)
 
     @always_inline
     fn snprintf(
@@ -1153,10 +1150,12 @@ struct Libc[*, static: Bool]:
                 const char *restrict format, ...)`.
         """
 
+        var num = C.int(-1)
+
         @parameter
         if static:
             # FIXME: externall_call should handle this
-            var num = __mlir_op.`pop.external_call`[
+            num = __mlir_op.`pop.external_call`[
                 func = "snprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -1167,12 +1166,21 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](s, n, format, args.get_loaded_kgen_pack())
-            return int(num)
-        else:
-            var num = self._lib.value().call["snprintf", C.int](
+        elif os_is_macos():  # workaround for mac libc.dylib prints beyond null
+            var length = self.strnlen(format, n)
+            var buf = UnsafePointer[C.char].alloc(n - length)
+            memcpy(buf, format + length, n - length)
+            memset_zero(format + length, n - length)
+            num = self._lib.value().call["snprintf", C.int](
                 s, n, format, args.get_loaded_kgen_pack()
             )
-            return int(num)
+            memcpy(format + length, buf, n - length)
+            buf.free()
+        else:
+            num = self._lib.value().call["snprintf", C.int](
+                s, n, format, args.get_loaded_kgen_pack()
+            )
+        return num
 
     @always_inline
     fn snprintf[
@@ -1854,7 +1862,7 @@ struct Libc[*, static: Bool]:
             stream: The stream.
 
         Returns:
-            Value 0 on success, otherwise `EOF` (usually -1) and `errno` is set.
+            Value 0 on success, otherwise `EOF` and `errno` is set.
 
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/fflush.3p.html).
@@ -2682,7 +2690,7 @@ struct Libc[*, static: Bool]:
             s: A pointer to a C string.
 
         Returns:
-            The length of the string.
+            The length of the string (excluding terminating null byte).
 
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/strlen.3p.html).
@@ -2694,3 +2702,24 @@ struct Libc[*, static: Bool]:
             return external_call["strlen", size_t](s)
         else:
             return self._lib.value().call["strlen", size_t](s)
+
+    fn strnlen(self, s: UnsafePointer[C.char], maxlen: size_t) -> size_t:
+        """Libc POSIX `strnlen` function.
+
+        Args:
+            s: A pointer to a C string.
+            maxlen: The maximum length to read.
+
+        Returns:
+            The length of the string (excluding terminating null byte).
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/strnlen.3p.html).
+            Fn signature: `size_t strnlen(const char *s, size_t maxlen)`.
+        """
+
+        @parameter
+        if static:
+            return external_call["strnlen", size_t](s, maxlen)
+        else:
+            return self._lib.value().call["strnlen", size_t](s, maxlen)
