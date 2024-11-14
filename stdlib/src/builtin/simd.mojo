@@ -91,6 +91,10 @@ alias Int64 = Scalar[DType.int64]
 alias UInt64 = Scalar[DType.uint64]
 """Represents a 64-bit unsigned scalar integer."""
 
+alias Float8e5m2 = Scalar[DType.float8e5m2]
+"""Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+alias Float8e4m3 = Scalar[DType.float8e4m3]
+"""Represents a FP8E4M3 floating point format whose bitwidth is 8."""
 alias BFloat16 = Scalar[DType.bfloat16]
 """Represents a 16-bit brain floating point value."""
 alias Float16 = Scalar[DType.float16]
