@@ -112,7 +112,7 @@ struct Libc[*, static: Bool]:
 
         @parameter
         if os_is_windows():
-            errno = stack_allocation[1, C.int]()
+            var errno = stack_allocation[1, C.int]()
 
             @parameter
             if static:
@@ -837,7 +837,7 @@ struct Libc[*, static: Bool]:
         Notes:
             [Reference](https://man7.org/linux/man-pages/man3/printf.3p.html).
         """
-        a = args.get_loaded_kgen_pack()
+        var a = args.get_loaded_kgen_pack()
 
         @parameter
         if is_nvidia_gpu():
@@ -849,8 +849,8 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            length = self.strlen(format)
-            buf = UnsafePointer[C.char].alloc(length + 1)
+            var length = self.strlen(format)
+            var buf = UnsafePointer[C.char].alloc(length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
             return self.write(STDOUT_FILENO, buf, self.strlen(buf))
         elif static:
@@ -921,8 +921,7 @@ struct Libc[*, static: Bool]:
             memset_zero(buf, length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
             print("value after snprintf:", char_ptr_to_string(buf))
-            var b_len = self.strlen(buf)
-            var num = self.fwrite(buf, 1, b_len, stream)
+            var num = self.fwrite(buf, 1, self.strlen(buf), stream)
             if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                 num = -1
             buf.free()
@@ -1046,7 +1045,8 @@ struct Libc[*, static: Bool]:
                 fd, format, args.get_loaded_kgen_pack()
             )
         else:
-            stream = self.fdopen(fd, char_ptr(FM_READ_WRITE))  # don't truncate
+            # don't truncate
+            var stream = self.fdopen(fd, char_ptr(FM_READ_WRITE))
             return self.fprintf(stream, format, args)
 
     @always_inline
@@ -1105,7 +1105,7 @@ struct Libc[*, static: Bool]:
         @parameter
         if static:
             # FIXME: externall_call should handle this
-            num = __mlir_op.`pop.external_call`[
+            var num = __mlir_op.`pop.external_call`[
                 func = "sprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -1117,7 +1117,7 @@ struct Libc[*, static: Bool]:
             ](str, format, args.get_loaded_kgen_pack())
             return int(num)
         else:
-            num = self._lib.value().call["sprintf", C.int](
+            var num = self._lib.value().call["sprintf", C.int](
                 str, format, args.get_loaded_kgen_pack()
             )
             return int(num)
@@ -1151,7 +1151,7 @@ struct Libc[*, static: Bool]:
         @parameter
         if static:
             # FIXME: externall_call should handle this
-            num = __mlir_op.`pop.external_call`[
+            var num = __mlir_op.`pop.external_call`[
                 func = "snprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -1164,7 +1164,7 @@ struct Libc[*, static: Bool]:
             ](s, n, format, args.get_loaded_kgen_pack())
             return int(num)
         else:
-            num = self._lib.value().call["snprintf", C.int](
+            var num = self._lib.value().call["snprintf", C.int](
                 s, n, format, args.get_loaded_kgen_pack()
             )
             return int(num)
