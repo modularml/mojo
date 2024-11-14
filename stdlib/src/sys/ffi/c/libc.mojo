@@ -848,7 +848,6 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            # return self.dprintf(STDOUT_FILENO, format, args)
             var length = self.strlen(format)
             var buf = UnsafePointer[C.char].alloc(length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
