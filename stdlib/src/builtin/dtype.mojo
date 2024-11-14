@@ -217,7 +217,7 @@ struct DType(
         Returns:
             The representation of the dtype.
         """
-        return "DType." + str(self)
+        return String.write("DType.", self)
 
     @always_inline("nodebug")
     fn get_value(self) -> __mlir_type.`!kgen.dtype`:
