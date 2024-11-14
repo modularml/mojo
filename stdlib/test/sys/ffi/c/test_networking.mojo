@@ -425,7 +425,7 @@ def test_static_bind_listen():
 
 def _test_getaddrinfo(libc: Libc):
     hints = addrinfo()
-    hints.ai_family = AF_INET6
+    hints.ai_family = AF_INET
     hints.ai_socktype = SOCK_STREAM
     hints.ai_flags = 0
     hints.ai_protocol = IPPROTO_IP

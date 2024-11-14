@@ -852,8 +852,8 @@ struct Libc[*, static: Bool]:
             length = self.strlen(format)
             buf = UnsafePointer[C.char].alloc(length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
-            b_len = self.strlen(buf)
-            return self.write(STDOUT_FILENO, buf, b_len)
+            print("valuve inside printf:", char_ptr_to_string(buf))
+            return self.write(STDOUT_FILENO, buf, self.strlen(buf))
         elif static:
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[
@@ -2276,17 +2276,15 @@ struct Libc[*, static: Bool]:
                 int option_name, const void *option_value, socklen_t option_len
                 )`.
         """
-        var l = C.int(map_constant_to_native(int(level)))
-        var o = C.int(map_constant_to_native(int(option_name)))
 
         @parameter
         if static:
             return external_call["setsockopt", C.int](
-                socket, l, o, option_value, option_len
+                socket, level, option_name, option_value, option_len
             )
         else:
             return self._lib.value().call["setsockopt", C.int](
-                socket, l, o, option_value, option_len
+                socket, level, option_name, option_value, option_len
             )
 
     fn bind(

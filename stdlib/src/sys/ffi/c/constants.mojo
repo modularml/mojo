@@ -10,7 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Libc POSIX constants."""
+"""Libc POSIX constants.
+
+Notes:
+    If you find any errors in the constants given for a specific platform, pull
+    requests to extend support are welcome.
+"""
 
 from sys.info import os_is_linux, os_is_macos, os_is_windows
 
@@ -608,14 +613,26 @@ alias AI_CANONNAME = 2
 """Constant: AI_CANONNAME."""
 alias AI_NUMERICHOST = 4
 """Constant: AI_NUMERICHOST."""
-alias AI_V4MAPPED = 8
+alias AI_V4MAPPED = 8 if not os_is_macos() else 0x800
 """Constant: AI_V4MAPPED."""
-alias AI_ALL = 16
+alias AI_ALL = 16 if not os_is_macos() else 0x100
 """Constant: AI_ALL."""
-alias AI_ADDRCONFIG = 32
+alias AI_ADDRCONFIG = 32 if not os_is_macos() else 0x400
 """Constant: AI_ADDRCONFIG."""
 alias AI_IDN = 64
 """Constant: AI_IDN."""
+
+alias NI_NUMERICHOST = 1 if not os_is_macos() else 2
+"""Return the host address, not the name."""
+alias NI_NUMERICSERV = 2 if not os_is_macos() else 8
+"""Return the service address, not the name."""
+alias NI_NOFQDN = 4 if not os_is_macos() else 1
+"""Return a short name if in the local domain."""
+alias NI_NAMEREQD = 8 if not os_is_macos() else 4
+"""Fail if either host or service name is unknown."""
+alias NI_DGRAM = 16
+"""Look up datagram service instead of stream."""
+
 
 alias INET_ADDRSTRLEN = 16
 """Constant: INET_ADDRSTRLEN."""
@@ -629,10 +646,16 @@ alias SHUT_WR = 1
 alias SHUT_RDWR = 2
 """Constant: SHUT_RDWR."""
 
-# Socket level options (SOL_SOCKET)
-alias SOL_SOCKET = 1
+# Apple
+# https://gist.github.com/cyberroadie/3490843
+# https://newosxbook.com/src.jl?tree=xnu-4903.221.2&file=/bsd/sys/socket.h
+# https://newosxbook.com/src.jl?tree=xnu&file=bsd/netinet/in.h
+# https://github.com/apple/darwin-xnu/blob/main/bsd/netinet/tcp.h
+# https://github.com/lunarmodules/luasocket/issues/242
+
+# Socket level options
+alias SOL_SOCKET = 1 if not os_is_macos() else 0xFFFF
 """Constant: SOL_SOCKET."""
-# Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx
 alias SOL_IP = 0
 """Constant: `SOL_IP`."""
 alias SOL_IPX = 256
@@ -651,45 +674,45 @@ alias SOL_UDP = 17
 
 alias SO_DEBUG = 1
 """Constant: SO_DEBUG."""
-alias SO_REUSEADDR = 2
+alias SO_REUSEADDR = 2 if not os_is_macos() else 0x0004
 """Constant: SO_REUSEADDR."""
-alias SO_TYPE = 3
+alias SO_TYPE = 3 if not os_is_macos() else 0x1008
 """Constant: SO_TYPE."""
-alias SO_ERROR = 4
+alias SO_ERROR = 4 if not os_is_macos() else 0x1007
 """Constant: SO_ERROR."""
-alias SO_DONTROUTE = 5
+alias SO_DONTROUTE = 5 if not os_is_macos() else 0x0010
 """Constant: SO_DONTROUTE."""
-alias SO_BROADCAST = 6
+alias SO_BROADCAST = 6 if not os_is_macos() else 0x0020
 """Constant: SO_BROADCAST."""
-alias SO_SNDBUF = 7
+alias SO_SNDBUF = 7 if not os_is_macos() else 0x1001
 """Constant: SO_SNDBUF."""
-alias SO_RCVBUF = 8
+alias SO_RCVBUF = 8 if not os_is_macos() else 0x1002
 """Constant: SO_RCVBUF."""
-alias SO_KEEPALIVE = 9
+alias SO_KEEPALIVE = 9 if not os_is_macos() else 0x0008
 """Constant: SO_KEEPALIVE."""
-alias SO_OOBINLINE = 10
+alias SO_OOBINLINE = 10 if not os_is_macos() else 0x0100
 """Constant: SO_OOBINLINE."""
 alias SO_NO_CHECK = 11
 """Constant: SO_NO_CHECK."""
 alias SO_PRIORITY = 12
 """Constant: SO_PRIORITY."""
-alias SO_LINGER = 13
+alias SO_LINGER = 13 if not os_is_macos() else 0x1080
 """Constant: SO_LINGER."""
 alias SO_BSDCOMPAT = 14
 """Constant: SO_BSDCOMPAT."""
-alias SO_REUSEPORT = 15
+alias SO_REUSEPORT = 15 if not os_is_macos() else 0x0200
 """Constant: SO_REUSEPORT."""
 alias SO_PASSCRED = 16
 """Constant: SO_PASSCRED."""
 alias SO_PEERCRED = 17
 """Constant: SO_PEERCRED."""
-alias SO_RCVLOWAT = 18
+alias SO_RCVLOWAT = 18 if not os_is_macos() else 0x1004
 """Constant: SO_RCVLOWAT."""
-alias SO_SNDLOWAT = 19
+alias SO_SNDLOWAT = 19 if not os_is_macos() else 0x1003
 """Constant: SO_SNDLOWAT."""
-alias SO_RCVTIMEO = 20
+alias SO_RCVTIMEO = 20 if not os_is_macos() else 0x1006
 """Constant: SO_RCVTIMEO."""
-alias SO_SNDTIMEO = 21
+alias SO_SNDTIMEO = 21 if not os_is_macos() else 0x1005
 """Constant: SO_SNDTIMEO."""
 alias SO_SECURITY_AUTHENTICATION = 22
 """Constant: SO_SECURITY_AUTHENTICATION."""
@@ -707,9 +730,9 @@ alias SO_GET_FILTER = SO_ATTACH_FILTER
 """Constant: SO_GET_FILTER."""
 alias SO_PEERNAME = 28
 """Constant: SO_PEERNAME."""
-alias SO_TIMESTAMP = 29
+alias SO_TIMESTAMP = 29 if not os_is_macos() else 0x0400
 """Constant: SO_TIMESTAMP."""
-alias SO_ACCEPTCONN = 30
+alias SO_ACCEPTCONN = 30 if not os_is_macos() else 0x0002
 """Constant: SO_ACCEPTCONN."""
 alias SO_PEERSEC = 31
 """Constant: SO_PEERSEC."""
@@ -854,9 +877,9 @@ alias TCP_CORK = 3
 """Control sending of partial frames."""
 alias TCP_KEEPIDLE = 4
 """Start keeplives after this period."""
-alias TCP_KEEPINTVL = 5
+alias TCP_KEEPINTVL = 5 if not os_is_macos() else 0x101
 """Interval between keepalives."""
-alias TCP_KEEPCNT = 6
+alias TCP_KEEPCNT = 6 if not os_is_macos() else 0x102
 """Number of keepalives before death."""
 alias TCP_SYNCNT = 7
 """Number of SYN retransmits."""
@@ -1030,33 +1053,33 @@ alias IPV6_PMTUDISC_PROBE = 3
 """Ignore dst pmtu."""
 
 # netdb.h
-alias EAI_BADFLAGS = -1
+alias EAI_BADFLAGS = -1 if not os_is_macos() else 3
 """Bad value for ai_flags."""
-alias EAI_NONAME = -2
+alias EAI_NONAME = -2 if not os_is_macos() else 8
 """Name or service not known."""
-alias EAI_AGAIN = -3
+alias EAI_AGAIN = -3 if not os_is_macos() else 2
 """Temporary failure in name resolution."""
-alias EAI_FAIL = -4
+alias EAI_FAIL = -4 if not os_is_macos() else 4
 """Non-recoverable failure in name resolution."""
-alias EAI_NODATA = -5
+alias EAI_NODATA = -5 if not os_is_macos() else 7
 """No address associated with hostname."""
-alias EAI_FAMILY = -6
+alias EAI_FAMILY = -6 if not os_is_macos() else 5
 """Error: ai_family not supported."""
-alias EAI_SOCKTYPE = -7
+alias EAI_SOCKTYPE = -7 if not os_is_macos() else 10
 """Error: ai_socktype not supported."""
-alias EAI_SERVICE = -8
+alias EAI_SERVICE = -8 if not os_is_macos() else 9
 """Servname not supported for ai_socktype."""
-alias EAI_ADDRFAMILY = -9
+alias EAI_ADDRFAMILY = -9 if not os_is_macos() else 1
 """Address family for hostname not supported."""
-alias EAI_MEMORY = -10
+alias EAI_MEMORY = -10 if not os_is_macos() else 6
 """Memory allocation failure."""
-alias EAI_SYSTEM = -11
+alias EAI_SYSTEM = -11 if not os_is_macos() else 11
 """System error."""
-alias EAI_BADHINTS = -12
+alias EAI_BADHINTS = -12 if not os_is_macos() else 12
 """Bad value for hints."""
-alias EAI_PROTOCOL = -13
+alias EAI_PROTOCOL = -13 if not os_is_macos() else 13
 """Resolved protocol is unknown."""
-alias EAI_OVERFLOW = -14
+alias EAI_OVERFLOW = -14 if not os_is_macos() else 14
 """Argument buffer overflow."""
 
 # ===----------------------------------------------------------------------=== #
@@ -1363,78 +1386,3 @@ alias LOG_NFACILITIES = 24
 """Current number of facilities."""
 alias LOG_FACMASK = 0x03F8
 """Mask to extract facility part."""
-
-
-# ===----------------------------------------------------------------------=== #
-# utils
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn map_constant_to_native(constant: Int) -> Int:
-    """Maps a constant value from this file to it's native value in cases of
-    discrepancy.
-
-    Args:
-        constant: The constant value.
-
-    Returns:
-        The native value.
-
-    Notes:
-        Pull Requests to extend support are welcome.
-    """
-
-    @parameter
-    if os_is_linux():
-        return constant
-    elif os_is_macos():
-        # https://gist.github.com/cyberroadie/3490843
-        # https://newosxbook.com/src.jl?tree=xnu-4903.221.2&file=/bsd/sys/socket.h
-        # https://newosxbook.com/src.jl?tree=xnu&file=bsd/netinet/in.h
-        # https://github.com/apple/darwin-xnu/blob/main/bsd/netinet/tcp.h
-        if constant == SOL_SOCKET:
-            return 0xFFFF
-        elif constant == SO_ACCEPTCONN:
-            return 0x0002
-        elif constant == SO_REUSEADDR:
-            return 0x0004
-        elif constant == SO_KEEPALIVE:
-            return 0x0008
-        elif constant == SO_DONTROUTE:
-            return 0x0010
-        elif constant == SO_BROADCAST:
-            return 0x0020
-        elif constant == SO_LINGER:
-            return 0x1080
-        elif constant == SO_OOBINLINE:
-            return 0x0100
-        elif constant == SO_REUSEPORT:
-            return 0x0200
-        elif constant == SO_TIMESTAMP:
-            return 0x0400
-        elif constant == SO_SNDBUF:
-            return 0x1001
-        elif constant == SO_RCVBUF:
-            return 0x1002
-        elif constant == SO_SNDLOWAT:
-            return 0x1003
-        elif constant == SO_RCVLOWAT:
-            return 0x1004
-        elif constant == SO_SNDTIMEO:
-            return 0x1005
-        elif constant == SO_RCVTIMEO:
-            return 0x1006
-        elif constant == SO_ERROR:
-            return 0x1007
-        elif constant == SO_TYPE:
-            return 0x1008
-        elif constant == TCP_KEEPINTVL:
-            return 0x101
-        elif constant == TCP_KEEPCNT:
-            return 0x102
-        return constant
-    elif os_is_windows():
-        return constant
-    else:
-        return constant
