@@ -17,7 +17,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from pathlib import _dir_of_current_file
 from time import sleep
-from memory import UnsafePointer, memset, memcpy, memcmp, stack_allocation
+from memory import UnsafePointer, memset, memcmp, stack_allocation
 from sys.info import os_is_macos
 
 from sys.ffi.c.types import C, char_ptr, FILE
