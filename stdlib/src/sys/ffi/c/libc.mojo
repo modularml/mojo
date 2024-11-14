@@ -922,9 +922,7 @@ struct Libc[*, static: Bool]:
             elif self.feof(stream) == 0 and self.ferror(stream) == 0:
                 self.set_errno(0)
                 num = self.fwrite(buf, 1, b_len, stream)
-                if (num == 0 and self.ferror(stream) != 0) or self.fflush(
-                    stream
-                ) != 0:
+                if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                     num = -1
             else:
                 num = -1
@@ -1042,9 +1040,7 @@ struct Libc[*, static: Bool]:
             )
         else:
             stream = self.fdopen(fd, char_ptr(FM_READ_WRITE))  # don't truncate
-            num = self.fprintf(stream, format, args)
-            success = self.fflush(stream) == 0
-            return num * int(success) - int(not success)
+            return self.fprintf(stream, format, args)
 
     @always_inline
     fn dprintf[

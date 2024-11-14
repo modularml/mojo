@@ -337,6 +337,7 @@ def _test_dprintf(libc: Libc, suffix: String):
         filedes = libc.open(ptr, O_RDWR)
         assert_true(filedes != -1)
         a[0], a[1], a[2], a[3], a[4] = `%`, `d`, `%`, `d`, C.char(0)
+        libc.printf(a, C.int(1), C.int(1))  # FIXME: remove
         num_bytes = libc.dprintf(filedes, a, C.int(1), C.int(1))
         assert_equal(num_bytes, 2)
         assert_true(libc.close(filedes) != -1)
