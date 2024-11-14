@@ -918,6 +918,7 @@ struct Libc[*, static: Bool]:
             length = self.strlen(format)
             buf = UnsafePointer[C.char].alloc(length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
+            print("value after snprintf:", char_ptr_to_string(buf))
             b_len = self.strlen(buf)
             fd = self.fileno(stream)
             if fd != -1:
