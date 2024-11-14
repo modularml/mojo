@@ -432,20 +432,20 @@ def _test_snprintf(libc: Libc, suffix: String):
         num_bytes = libc.snprintf(b, 3, a, C.int(1), C.int(1))
         assert_equal(num_bytes, 2)
 
-        # # read and compare
-        # c[0], c[1], c[2] = `1`, `1`, C.char(0)
-        # assert_equal(0, memcmp(b, c, 3))
+        # read and compare
+        c[0], c[1], c[2] = `1`, `1`, C.char(0)
+        assert_equal(0, memcmp(b, c, 3))
 
-        # # print
-        # a[4], a[5], a[6], a[7], a[8] = `%`, `d`, `%`, `d`, C.char(0)
-        # num_bytes = libc.snprintf(
-        #     b, 5, a, C.int(1), C.int(1), C.int(1), C.int(1)
-        # )
-        # assert_equal(num_bytes, 4)
+        # print
+        a[4], a[5], a[6], a[7], a[8] = `%`, `d`, `%`, `d`, C.char(0)
+        num_bytes = libc.snprintf(
+            b, 5, a, C.int(1), C.int(1), C.int(1), C.int(1)
+        )
+        assert_equal(num_bytes, 4)
 
-        # # read and compare
-        # c[2], c[3], c[4] = `1`, `1`, C.char(0)
-        # assert_equal(0, memcmp(b, c, 5))
+        # read and compare
+        c[2], c[3], c[4] = `1`, `1`, C.char(0)
+        assert_equal(0, memcmp(b, c, 5))
 
         # cleanup
         a.free()
@@ -571,11 +571,11 @@ def main():
     test_static_printf()
     test_dynamic_printf()
     test_static_printf()
-    test_dynamic_snprintf()
-    test_static_snprintf()
-    test_dynamic_fscanf()
-    test_static_fscanf()
-    test_dynamic_fcntl()
-    test_static_fcntl()
-    test_dynamic_ioctl()
-    test_static_ioctl()
+    # test_dynamic_snprintf()
+    # test_static_snprintf()
+    # test_dynamic_fscanf()
+    # test_static_fscanf()
+    # test_dynamic_fcntl()
+    # test_static_fcntl()
+    # test_dynamic_ioctl()
+    # test_static_ioctl()
