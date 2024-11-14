@@ -849,7 +849,10 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            return self.dprintf(STDOUT_FILENO, format, args)
+            length = self.strlen(format)
+            buf = UnsafePointer[C.char].alloc(length + 1)
+            _ = self.snprintf(buf, length + 1, format, args)
+            return self.write(STDOUT_FILENO, buf, self.strlen(buf))
         elif static:
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[

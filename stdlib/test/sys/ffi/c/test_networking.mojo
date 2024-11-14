@@ -449,11 +449,8 @@ def test_static_getaddrinfo():
     _test_getaddrinfo(Libc[static=True]())
 
 
-alias error_message = (
-    (
-        EAI_BADFLAGS,
-        "Bad value for ai_flags" if not os_is_macos() else "Invalid value for ai_flags",
-    ),
+alias gai_err_msg_linux = (
+    (EAI_BADFLAGS, "Bad value for ai_flags"),
     (EAI_NONAME, "Name or service not known"),
     (EAI_AGAIN, "Temporary failure in name resolution"),
     (EAI_FAIL, "Non-recoverable failure in name resolution"),
@@ -464,16 +461,46 @@ alias error_message = (
     (EAI_ADDRFAMILY, "Address family for hostname not supported"),
     (EAI_MEMORY, "Memory allocation failure"),
     (EAI_SYSTEM, "System error"),
-    # (EAI_BADHINTS, "Bad value for hints"), # 'Unknown error' on Ubuntu 22.04
-    # (EAI_PROTOCOL, "Resolved protocol is unknown"), # 'Unknown error' on Ubuntu 22.04
-    # (EAI_OVERFLOW, "Argument buffer overflow"), # 'Unknown error' on Ubuntu 22.04
+    (EAI_BADHINTS, "Invalid value for hints"),
+    (EAI_PROTOCOL, "Resolved protocol is unknown"),
+    (EAI_OVERFLOW, "Argument buffer overflow"),
+)
+alias gai_err_msg_apple = (
+    (EAI_BADFLAGS, "Invalid value for ai_flags"),
+    (EAI_NONAME, "nodename nor servname provided, or not known"),
+    (EAI_AGAIN, "Temporary failure in name resolution"),
+    (EAI_FAIL, "Non-recoverable failure in name resolution"),
+    (EAI_NODATA, "No address associated with hostname"),
+    (EAI_FAMILY, "ai_family not supported"),
+    (EAI_SOCKTYPE, "ai_socktype not supported"),
+    (EAI_SERVICE, "Servname not supported for ai_socktype"),
+    (EAI_ADDRFAMILY, "Address family for hostname not supported"),
+    (EAI_MEMORY, "Memory allocation failure"),
+    (EAI_SYSTEM, "System error"),
+    (EAI_BADHINTS, "Invalid value for hints"),
+    (EAI_PROTOCOL, "Resolved protocol is unknown"),
+    (EAI_OVERFLOW, "Argument buffer overflow"),
+)
+alias gai_err_msg_windows = (
+    (EAI_BADFLAGS, "Invalid argument"),
+    (EAI_NONAME, "Host not found"),
+    (EAI_AGAIN, "Nonauthoritative host not found"),
+    (EAI_FAIL, "This is a nonrecoverable error"),
+    (EAI_FAMILY, "Address family not supported by protocol family"),
+    (EAI_SOCKTYPE, "Socket type not supported"),
+    (EAI_SERVICE, "Class type not found"),
+    (EAI_MEMORY, "Insufficient memory available"),
 )
 
 
 def _test_gai_strerror(libc: Libc):
+    gai_err_msg = gai_err_msg_apple if os_is_macos() else (
+        gai_err_msg_windows if os_is_windows() else gai_err_msg_linux
+    )
+
     @parameter
-    for i in range(len(error_message)):
-        errno_msg = error_message.get[i, Tuple[Int, StringLiteral]]()
+    for i in range(len(gai_err_msg)):
+        errno_msg = gai_err_msg.get[i, Tuple[Int, StringLiteral]]()
         errno = errno_msg.get[0, Int]()
         msg = errno_msg.get[1, StringLiteral]()
         res = char_ptr_to_string(libc.gai_strerror(errno))
