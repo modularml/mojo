@@ -482,7 +482,7 @@ def _test_fscanf(libc: Libc, suffix: String):
         num_bytes = libc.fputs(a, stream)
 
         # read and compare
-        value = stack_allocation[3, C.int]()
+        value = UnsafePointer[C.int].alloc(1)
         value[0] = 0
         assert_true(libc.fseek(stream, 0) != -1)
         scanned = libc.fscanf(stream, char_ptr("%d"), value)
@@ -495,6 +495,7 @@ def _test_fscanf(libc: Libc, suffix: String):
         assert_true(libc.close(filedes) != -1)
         assert_true(libc.remove(ptr) != -1)
         a.free()
+        value.free()
     _ = file^
 
 
