@@ -1087,11 +1087,11 @@ alias EAI_MEMORY = -10 if not _mac_or_windows else (6 if not _windows else 8)
 """Memory allocation failure."""
 alias EAI_SYSTEM = -11 if not _mac else 11
 """System error."""
-alias EAI_BADHINTS = -12 if not _mac_or_linux else 12
+alias EAI_BADHINTS = -12 if not _mac else 12
 """Invalid value for hints."""
-alias EAI_PROTOCOL = -13 if not _mac_or_linux else 13
+alias EAI_PROTOCOL = -13 if not _mac else 13
 """Resolved protocol is unknown."""
-alias EAI_OVERFLOW = -14 if not _mac_or_linux else 14
+alias EAI_OVERFLOW = -14 if not _mac else 14
 """Argument buffer overflow."""
 alias EAI_IDN_ENCODE = 15
 """Parameter string not correctly encoded."""

@@ -461,11 +461,8 @@ alias gai_err_msg_linux = (
     (EAI_ADDRFAMILY, "Address family for hostname not supported"),
     (EAI_MEMORY, "Memory allocation failure"),
     (EAI_SYSTEM, "System error"),
-    (EAI_BADHINTS, "Invalid value for hints"),
-    (EAI_PROTOCOL, "Resolved protocol is unknown"),
-    (EAI_OVERFLOW, "Argument buffer overflow"),
 )
-alias gai_err_msg_apple = (
+alias gai_err_msg_macos = (
     (EAI_BADFLAGS, "Invalid value for ai_flags"),
     (EAI_NONAME, "nodename nor servname provided, or not known"),
     (EAI_AGAIN, "Temporary failure in name resolution"),
@@ -494,17 +491,34 @@ alias gai_err_msg_windows = (
 
 
 def _test_gai_strerror(libc: Libc):
-    gai_err_msg = gai_err_msg_apple if os_is_macos() else (
-        gai_err_msg_windows if os_is_windows() else gai_err_msg_linux
-    )
-
     @parameter
-    for i in range(len(gai_err_msg)):
-        errno_msg = gai_err_msg.get[i, Tuple[Int, StringLiteral]]()
-        errno = errno_msg.get[0, Int]()
-        msg = errno_msg.get[1, StringLiteral]()
-        res = char_ptr_to_string(libc.gai_strerror(errno))
-        assert_equal(res, msg)
+    if os_is_macos():
+
+        @parameter
+        for i in range(len(gai_err_msg_macos)):
+            errno_msg = gai_err_msg_macos.get[i, Tuple[Int, StringLiteral]]()
+            errno = errno_msg.get[0, Int]()
+            msg = errno_msg.get[1, StringLiteral]()
+            res = char_ptr_to_string(libc.gai_strerror(errno))
+            assert_equal(res, msg)
+    elif os_is_windows():
+
+        @parameter
+        for i in range(len(gai_err_msg_windows)):
+            errno_msg = gai_err_msg_windows.get[i, Tuple[Int, StringLiteral]]()
+            errno = errno_msg.get[0, Int]()
+            msg = errno_msg.get[1, StringLiteral]()
+            res = char_ptr_to_string(libc.gai_strerror(errno))
+            assert_equal(res, msg)
+    else:
+
+        @parameter
+        for i in range(len(gai_err_msg_linux)):
+            errno_msg = gai_err_msg_linux.get[i, Tuple[Int, StringLiteral]]()
+            errno = errno_msg.get[0, Int]()
+            msg = errno_msg.get[1, StringLiteral]()
+            res = char_ptr_to_string(libc.gai_strerror(errno))
+            assert_equal(res, msg)
 
 
 def test_dynamic_gai_strerror():
