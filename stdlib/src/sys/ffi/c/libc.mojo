@@ -831,7 +831,7 @@ struct Libc[*, static: Bool]:
             args: The arguments to be added into the format string.
 
         Returns:
-            The number of bytes transmitted excluding the terminating null byte.
+            The number of bytes printed excluding the terminating null byte.
             Otherwise a negative value and `errno` is set.
 
         Notes:
@@ -849,7 +849,11 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            return self.dprintf(STDOUT_FILENO, format, args)
+            length = self.strlen(format)
+            buf = UnsafePointer[C.char].alloc(length + 1)
+            _ = self.snprintf(buf, length + 1, format, args)
+            b_len = self.strlen(buf)
+            return self.write(STDOUT_FILENO, buf, b_len)
         elif static:
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[
