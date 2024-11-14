@@ -13,7 +13,7 @@
 """Libc POSIX implementation."""
 
 from collections import Optional
-from memory import UnsafePointer, stack_allocation, memset_zero
+from memory import UnsafePointer, stack_allocation
 from sys.ffi.utils import external_call, DLHandle
 from sys.info import os_is_windows, os_is_macos, os_is_linux, is_nvidia_gpu
 
@@ -848,10 +848,11 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            var length = self.strlen(format)
-            var buf = UnsafePointer[C.char].alloc(length + 1)
-            _ = self.snprintf(buf, length + 1, format, args)
-            return self.write(STDOUT_FILENO, buf, self.strlen(buf))
+            return self.dprintf(STDOUT_FILENO, format, args)
+            # var length = self.strlen(format)
+            # var buf = UnsafePointer[C.char].alloc(length + 1)
+            # _ = self.snprintf(buf, length + 1, format, args)
+            # return self.write(STDOUT_FILENO, buf, self.strlen(buf))
         elif static:
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[
@@ -915,16 +916,8 @@ struct Libc[*, static: Bool]:
         @parameter
         if os_is_macos():  # workaround for non null termination of fprintf
             var length = self.strlen(format)
-            print("incoming format string:", char_ptr_to_string(format))
             var buf = UnsafePointer[C.char].alloc(length + 1)
-            memset_zero(buf, length + 1)
-            var wouldve = self.snprintf(buf, length + 1, format, args)
-            print(
-                "value after snprintf:",
-                char_ptr_to_string(buf),
-                "wouldve:",
-                wouldve,
-            )
+            _ = self.snprintf(buf, length + 1, format, args)
             var num = C.int(self.fwrite(buf, 1, self.strlen(buf), stream))
             if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                 num = -1
@@ -1049,7 +1042,7 @@ struct Libc[*, static: Bool]:
                 fd, format, args.get_loaded_kgen_pack()
             )
         else:
-            # don't truncate
+            # open for write but don't truncate
             var stream = self.fdopen(fd, char_ptr(FM_READ_WRITE))
             return self.fprintf(stream, format, args)
 
@@ -1077,52 +1070,6 @@ struct Libc[*, static: Bool]:
                 ...)`.
         """
         return self.dprintf(fd, format, args)
-
-    @always_inline
-    fn sprintf[
-        *T: AnyType
-    ](
-        self,
-        str: UnsafePointer[C.char],
-        format: UnsafePointer[C.char],
-        *args: *T,
-    ) -> C.int:
-        """Libc POSIX `sprintf` function.
-
-        Parameters:
-            T: The type of the arguments.
-
-        Args:
-            str: A pointer to a buffer to store the read string.
-            format: A format string.
-            args: The arguments to be added into the format string.
-
-        Returns:
-            The number of bytes written, excluding the terminating null byte.
-
-        Notes:
-            [Reference](https://man7.org/linux/man-pages/man3/sprintf.3p.html).
-            Fn signature: `int sprintf(char *restrict str,
-                const char *restrict format, ...)`.
-        """
-
-        @parameter
-        if static:
-            # FIXME: externall_call should handle this
-            return __mlir_op.`pop.external_call`[
-                func = "sprintf".value,
-                variadicType = __mlir_attr[
-                    `(`,
-                    `!kgen.pointer<scalar<si8>>,`,
-                    `!kgen.pointer<scalar<si8>>`,
-                    `) -> !pop.scalar<si32>`,
-                ],
-                _type = C.int,
-            ](str, format, args.get_loaded_kgen_pack())
-        else:
-            return self._lib.value().call["sprintf", C.int](
-                str, format, args.get_loaded_kgen_pack()
-            )
 
     @always_inline
     fn snprintf(

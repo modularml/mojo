@@ -418,48 +418,6 @@ def test_static_printf():
     _test_printf(Libc[static=True](), "_static")
 
 
-def _test_sprintf(libc: Libc, suffix: String):
-    with TryLibc(libc):
-        # setup
-        alias `%` = C.char(ord("%"))
-        alias `d` = C.char(ord("d"))
-        alias `1` = C.char(ord("1"))
-        a = UnsafePointer[C.char].alloc(9)
-        b = UnsafePointer[C.char].alloc(5)
-        c = UnsafePointer[C.char].alloc(5)
-
-        # print
-        a[0], a[1], a[2], a[3], a[4] = `%`, `d`, `%`, `d`, C.char(0)
-        num_bytes = libc.sprintf(b, a, C.int(1), C.int(1))
-        assert_equal(num_bytes, 2)
-
-        # read and compare
-        c[0], c[1], c[2] = `1`, `1`, C.char(0)
-        assert_equal(0, memcmp(b, c, 3))
-
-        # print
-        a[4], a[5], a[6], a[7], a[8] = `%`, `d`, `%`, `d`, C.char(0)
-        num_bytes = libc.sprintf(b, a, C.int(1), C.int(1), C.int(1), C.int(1))
-        assert_equal(num_bytes, 4)
-
-        # read and compare
-        c[2], c[3], c[4] = `1`, `1`, C.char(0)
-        assert_equal(0, memcmp(b, c, 5))
-
-        # cleanup
-        a.free()
-        b.free()
-        c.free()
-
-
-def test_dynamic_sprintf():
-    _test_sprintf(Libc[static=False](), "_dynamic")
-
-
-def test_static_sprintf():
-    _test_sprintf(Libc[static=True](), "_static")
-
-
 def _test_snprintf(libc: Libc, suffix: String):
     with TryLibc(libc):
         # setup
