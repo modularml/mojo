@@ -169,6 +169,25 @@ fn test_stringref_split() raises:
     assert_equal(res4[1], "o")
 
 
+def test_str_and_ref():
+    assert_equal(StringRef("abc").__str__(), "abc")
+    assert_equal(StringRef("abc").__repr__(), "StringRef('abc')")
+    assert_equal(StringRef("\0").__repr__(), r"StringRef('\x00')")
+    assert_equal(StringRef("\x09").__repr__(), r"StringRef('\t')")
+    assert_equal(StringRef("\n").__repr__(), r"StringRef('\n')")
+    assert_equal(StringRef("\x0d").__repr__(), r"StringRef('\r')")
+    assert_equal(StringRef("'").__repr__(), 'StringRef("\'")')
+
+    # Multi-byte characters.__repr__()
+    assert_equal(
+        StringRef("Örnsköldsvik").__repr__(), "StringRef('Örnsköldsvik')"
+    )  # 2-byte
+    assert_equal(StringRef("你好!").__repr__(), "StringRef('你好!')")  # 3-byte
+    assert_equal(
+        StringRef("hello 🔥!").__repr__(), "StringRef('hello 🔥!')"
+    )  # 4-byte
+
+
 def main():
     test_strref_from_start()
     test_stringref_split()
@@ -177,3 +196,4 @@ def main():
     test_indexing()
     test_find()
     test_endswith()
+    test_str_and_ref()

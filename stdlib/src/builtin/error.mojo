@@ -180,7 +180,7 @@ struct Error(
         Returns:
             A printable representation of the error message.
         """
-        return "Error(" + repr(self._message()) + ")"
+        return String.write("Error(", repr(self._message()), ")")
 
     # ===-------------------------------------------------------------------===#
     # Methods
