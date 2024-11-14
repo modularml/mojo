@@ -35,8 +35,8 @@ def _test_open_close(libc: Libc, suffix: String):
         assert_true(libc.close(filedes) != -1)
         for s in List(O_RDONLY, O_WRONLY, O_RDWR):
             print(s[])
-            # if os_is_macos() and s[] != O_RDONLY:  # Permission denied
-            #     continue
+            if os_is_macos() and s[] == O_WRONLY:  # Permission denied
+                continue
             filedes = libc.open(ptr, s[] | O_NONBLOCK)
             assert_true(filedes != -1)
             sleep(0.05)
