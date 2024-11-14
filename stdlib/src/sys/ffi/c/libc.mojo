@@ -915,14 +915,14 @@ struct Libc[*, static: Bool]:
 
         @parameter
         if os_is_macos():  # workaround for non null termination of fprintf
-            length = self.strlen(format)
+            var length = self.strlen(format)
             print("incoming format string:", char_ptr_to_string(format))
-            buf = UnsafePointer[C.char].alloc(length + 1)
+            var buf = UnsafePointer[C.char].alloc(length + 1)
             memset_zero(buf, length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
             print("value after snprintf:", char_ptr_to_string(buf))
-            b_len = self.strlen(buf)
-            num = self.fwrite(buf, 1, b_len, stream)
+            var b_len = self.strlen(buf)
+            var num = self.fwrite(buf, 1, b_len, stream)
             if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                 num = -1
             buf.free()
@@ -994,7 +994,15 @@ struct Libc[*, static: Bool]:
             Fn signature: `int fprintf(FILE *restrict stream,
                 const char *restrict format, ...)`.
         """
-        return self.fprintf(stream, format, None)
+
+        @parameter
+        if os_is_macos():  # workaround for non null termination of fprintf
+            var num = self.fwrite(format, 1, self.strlen(format), stream)
+            if self.ferror(stream) != 0 or self.fflush(stream) != 0:
+                num = -1
+            return num
+        else:
+            return self.fprintf(stream, format, None)
 
     @always_inline
     fn dprintf(
