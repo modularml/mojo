@@ -1377,7 +1377,7 @@ struct Libc[*, static: Bool]:
         """
 
         @parameter
-        if static or os_is_macos():  # libc.dylib segfaults on MacOS
+        if static or os_is_macos():  # libc.dylib fscanf segfaults on MacOS
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[
                 func = "fscanf".value,
