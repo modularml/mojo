@@ -449,6 +449,27 @@ fn is_nvidia_gpu[subarch: StringLiteral]() -> Bool:
 
 
 @always_inline("nodebug")
+fn is_amd_gpu() -> Bool:
+    """Returns True if the target triple of the compiler is `amdgcn-amd-amdhsa`
+    False otherwise.
+
+    Returns:
+        True if the triple target is amdgpu and False otherwise.
+    """
+    return is_triple["amdgcn-amd-amdhsa"]()
+
+
+@always_inline("nodebug")
+fn is_gpu() -> Bool:
+    """Returns True if the target triple is GPU and  False otherwise.
+
+    Returns:
+        True if the triple target is GPU and False otherwise.
+    """
+    return is_nvidia_gpu() or is_amd_gpu()
+
+
+@always_inline("nodebug")
 fn is_little_endian[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> Bool:
