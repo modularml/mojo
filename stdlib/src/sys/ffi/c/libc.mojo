@@ -996,7 +996,7 @@ struct Libc[*, static: Bool]:
 
         @parameter
         if os_is_macos():  # workaround for non null termination of fprintf
-            var num = self.fwrite(format, 1, self.strlen(format), stream)
+            var num = C.int(self.fwrite(format, 1, self.strlen(format), stream))
             if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                 num = -1
             return num
