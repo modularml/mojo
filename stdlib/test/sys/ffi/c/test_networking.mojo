@@ -470,7 +470,7 @@ alias gai_err_msg_macos = (
     (EAI_NODATA, "No address associated with nodename"),
     (EAI_FAMILY, "ai_family not supported"),
     (EAI_SOCKTYPE, "ai_socktype not supported"),
-    (EAI_SERVICE, "Servname not supported for ai_socktype"),
+    (EAI_SERVICE, "servname not supported for ai_socktype"),
     (EAI_ADDRFAMILY, "Address family for nodename not supported"),
     (EAI_MEMORY, "Memory allocation failure"),
     (EAI_SYSTEM, "System error"),

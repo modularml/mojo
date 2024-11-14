@@ -916,6 +916,7 @@ struct Libc[*, static: Bool]:
         @parameter
         if os_is_macos():  # workaround for non null termination of fprintf
             length = self.strlen(format)
+            print("incoming format string:", char_ptr_to_string(format))
             buf = UnsafePointer[C.char].alloc(length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
             print("value after snprintf:", char_ptr_to_string(buf))
