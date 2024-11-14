@@ -482,7 +482,7 @@ def _test_fscanf(libc: Libc, suffix: String):
         num_bytes = libc.fputs(a, stream)
 
         # read and compare
-        value = stack_allocation[2, C.int]()
+        value = stack_allocation[3, C.int]()
         value[0] = 0
         assert_true(libc.fseek(stream, 0) != -1)
         scanned = libc.fscanf(stream, char_ptr("%d"), value)
