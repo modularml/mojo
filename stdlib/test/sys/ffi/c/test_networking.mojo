@@ -450,7 +450,10 @@ def test_static_getaddrinfo():
 
 
 alias error_message = (
-    (EAI_BADFLAGS, "Bad value for ai_flags"),
+    (
+        EAI_BADFLAGS,
+        "Bad value for ai_flags" if not os_is_macos() else "Invalid value for ai_flags",
+    ),
     (EAI_NONAME, "Name or service not known"),
     (EAI_AGAIN, "Temporary failure in name resolution"),
     (EAI_FAIL, "Non-recoverable failure in name resolution"),

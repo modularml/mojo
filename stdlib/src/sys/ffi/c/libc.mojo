@@ -849,11 +849,7 @@ struct Libc[*, static: Bool]:
             else:
                 return self._lib.value().call["vprintf", C.int](format, p)
         elif os_is_macos():  # workaround for non null termination of printf
-            length = self.strlen(format)
-            buf = UnsafePointer[C.char].alloc(length + 1)
-            _ = self.snprintf(buf, length + 1, format, args)
-            print("valuve inside printf:", char_ptr_to_string(buf))
-            return self.write(STDOUT_FILENO, buf, self.strlen(buf))
+            return self.dprintf(STDOUT_FILENO, format, args)
         elif static:
             # FIXME: externall_call should handle this
             return __mlir_op.`pop.external_call`[
@@ -1120,19 +1116,14 @@ struct Libc[*, static: Bool]:
             return int(num)
 
     @always_inline
-    fn snprintf[
-        *T: AnyType
-    ](
+    fn snprintf(
         self,
         s: UnsafePointer[C.char],
         n: size_t,
         format: UnsafePointer[C.char],
-        *args: *T,
+        args: VariadicPack[element_trait=AnyType],
     ) -> C.int:
         """Libc POSIX `snprintf` function.
-
-        Parameters:
-            T: The type of the arguments.
 
         Args:
             s: A pointer to a buffer to store the read string.
@@ -1170,6 +1161,38 @@ struct Libc[*, static: Bool]:
                 s, n, format, args.get_loaded_kgen_pack()
             )
             return int(num)
+
+    @always_inline
+    fn snprintf[
+        *T: AnyType
+    ](
+        self,
+        s: UnsafePointer[C.char],
+        n: size_t,
+        format: UnsafePointer[C.char],
+        *args: *T,
+    ) -> C.int:
+        """Libc POSIX `snprintf` function.
+
+        Parameters:
+            T: The type of the arguments.
+
+        Args:
+            s: A pointer to a buffer to store the read string.
+            n: The maximum number of characters to read.
+            format: A format string.
+            args: The arguments to be added into the format string.
+
+        Returns:
+            The number of bytes that would be written to s had n been
+            sufficiently large excluding the terminating null byte.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/snprintf.3p.html).
+            Fn signature: `int snprintf(char *restrict s, size_t n,
+                const char *restrict format, ...)`.
+        """
+        return self.snprintf(s, n, format, args)
 
     # TODO: add va_list builder and test
     # @always_inline
