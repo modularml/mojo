@@ -476,7 +476,7 @@ alias gai_err_msg_macos = (
     (EAI_SYSTEM, "System error"),
     (EAI_BADHINTS, "Bad hints"),
     (EAI_PROTOCOL, "ai_protocol not supported"),
-    (EAI_OVERFLOW, "Argument buffer overflow"),
+    (EAI_OVERFLOW, "argument buffer overflow"),
 )
 alias gai_err_msg_windows = (
     (EAI_BADFLAGS, "Invalid argument"),

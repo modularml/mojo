@@ -919,7 +919,7 @@ struct Libc[*, static: Bool]:
             print("incoming format string:", char_ptr_to_string(format))
             buf = UnsafePointer[C.char].alloc(length + 1)
             memset_zero(buf, length + 1)
-            _ = self.snprintf(buf, length + 1, format, args)
+            _ = self.sprintf(buf, format, args)
             print("value after snprintf:", char_ptr_to_string(buf))
             b_len = self.strlen(buf)
             fd = self.fileno(stream)
@@ -1074,18 +1074,13 @@ struct Libc[*, static: Bool]:
         return self.dprintf(fd, format, args)
 
     @always_inline
-    fn sprintf[
-        *T: AnyType
-    ](
+    fn sprintf(
         self,
         str: UnsafePointer[C.char],
         format: UnsafePointer[C.char],
-        *args: *T,
+        args: VariadicPack[element_trait=AnyType],
     ) -> C.int:
         """Libc POSIX `sprintf` function.
-
-        Parameters:
-            T: The type of the arguments.
 
         Args:
             str: A pointer to a buffer to store the read string.
@@ -1120,6 +1115,35 @@ struct Libc[*, static: Bool]:
                 str, format, args.get_loaded_kgen_pack()
             )
             return int(num)
+
+    @always_inline
+    fn sprintf[
+        *T: AnyType
+    ](
+        self,
+        str: UnsafePointer[C.char],
+        format: UnsafePointer[C.char],
+        *args: *T,
+    ) -> C.int:
+        """Libc POSIX `sprintf` function.
+
+        Parameters:
+            T: The type of the arguments.
+
+        Args:
+            str: A pointer to a buffer to store the read string.
+            format: A format string.
+            args: The arguments to be added into the format string.
+
+        Returns:
+            The number of bytes written, excluding the terminating null byte.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/sprintf.3p.html).
+            Fn signature: `int sprintf(char *restrict str,
+                const char *restrict format, ...)`.
+        """
+        return self.sprintf(str, format, args)
 
     @always_inline
     fn snprintf(
