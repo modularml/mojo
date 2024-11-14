@@ -1150,12 +1150,11 @@ struct Libc[*, static: Bool]:
                 const char *restrict format, ...)`.
         """
 
-        var num = C.int(-1)
-
+        # workaround for mac libc.dylib snprintf prints beyond null
         @parameter
-        if static:
+        if static or os_is_macos():
             # FIXME: externall_call should handle this
-            num = __mlir_op.`pop.external_call`[
+            return __mlir_op.`pop.external_call`[
                 func = "snprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -1168,23 +1167,9 @@ struct Libc[*, static: Bool]:
             ](s, n, format, args.get_loaded_kgen_pack())
 
         else:
-            var buf = format
-
-            @parameter
-            if os_is_macos():
-                # workaround for mac libc.dylib prints beyond null
-                var length = self.strnlen(format, n) + 1
-                buf = buf.alloc(length)
-                memcpy(buf, format, length)
-
-            num = self._lib.value().call["snprintf", C.int](
-                s, n, buf, args.get_loaded_kgen_pack()
+            return self._lib.value().call["snprintf", C.int](
+                s, n, format, args.get_loaded_kgen_pack()
             )
-
-            @parameter
-            if os_is_macos():
-                buf.free()
-        return num
 
     @always_inline
     fn snprintf[
