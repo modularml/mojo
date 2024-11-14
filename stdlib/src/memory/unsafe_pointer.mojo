@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof, is_nvidia_gpu
+from sys import alignof, sizeof, is_nvidia_gpu, is_gpu
 from sys.intrinsics import (
     _mlirtype_is_eq,
     _type_is_eq,
@@ -40,7 +40,7 @@ from memory.memory import _free, _malloc
 
 @always_inline
 fn _default_alignment[type: AnyType]() -> Int:
-    return alignof[type]() if is_nvidia_gpu() else 1
+    return alignof[type]() if is_gpu() else 1
 
 
 @always_inline
@@ -842,7 +842,7 @@ struct UnsafePointer[
         type: DType, //,
         *,
         width: Int = 1,
-        alignment: Int = alignof[SIMD[type, width]]() if is_nvidia_gpu() else 1,
+        alignment: Int = _default_alignment[type, width](),
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: SIMD[_, width],
