@@ -1154,6 +1154,17 @@ struct Libc[*, static: Bool]:
 
         @parameter
         if static:
+            var buf = UnsafePointer[C.char]()
+            var length = 0
+
+            @parameter
+            if os_is_macos():
+                # workaround for mac static libc prints beyond null
+                length = self.strnlen(format, n)
+                buf = buf.alloc(n - length)
+                memcpy(buf, format + length, n - length)
+                memset_zero(format + length, n - length)
+
             # FIXME: externall_call should handle this
             num = __mlir_op.`pop.external_call`[
                 func = "snprintf".value,
@@ -1166,16 +1177,11 @@ struct Libc[*, static: Bool]:
                 ],
                 _type = C.int,
             ](s, n, format, args.get_loaded_kgen_pack())
-        elif os_is_macos():  # workaround for mac libc.dylib prints beyond null
-            var length = self.strnlen(format, n)
-            var buf = UnsafePointer[C.char].alloc(n - length)
-            memcpy(buf, format + length, n - length)
-            memset_zero(format + length, n - length)
-            num = self._lib.value().call["snprintf", C.int](
-                s, n, format, args.get_loaded_kgen_pack()
-            )
-            memcpy(format + length, buf, n - length)
-            buf.free()
+
+            @parameter
+            if os_is_macos():
+                memcpy(format + length, buf, n - length)
+                buf.free()
         else:
             num = self._lib.value().call["snprintf", C.int](
                 s, n, format, args.get_loaded_kgen_pack()
