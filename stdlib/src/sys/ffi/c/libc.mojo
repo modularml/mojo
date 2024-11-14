@@ -921,7 +921,7 @@ struct Libc[*, static: Bool]:
             memset_zero(buf, length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
             print("value after snprintf:", char_ptr_to_string(buf))
-            var num = self.fwrite(buf, 1, self.strlen(buf), stream)
+            var num = C.int(self.fwrite(buf, 1, self.strlen(buf), stream))
             if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                 num = -1
             buf.free()
