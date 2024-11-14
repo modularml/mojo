@@ -645,17 +645,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return StringSlice[origin](ptr=ptr + start, length=end - start)
 
     @always_inline
-    fn as_bytes[
-        is_mutable: Bool = is_mutable,
-        origin: Origin[is_mutable]
-        .type = _lit_mut_cast[origin, is_mutable]
-        .result,
-    ](self) -> Span[Byte, origin]:
+    fn as_bytes(self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
 
         Returns:
             A contiguous slice pointing to bytes.
@@ -663,7 +654,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Notes:
             This does not include the trailing null terminator.
         """
-        return rebind[Span[Byte, origin]](self._slice)
+        return self._slice
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -1030,7 +1021,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
+trait Stringlike(CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
