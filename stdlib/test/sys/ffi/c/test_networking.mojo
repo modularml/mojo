@@ -474,7 +474,7 @@ alias gai_err_msg_macos = (
     (EAI_ADDRFAMILY, "Address family for nodename not supported"),
     (EAI_MEMORY, "Memory allocation failure"),
     (EAI_SYSTEM, "System error"),
-    (EAI_BADHINTS, "Invalid value for hints"),
+    (EAI_BADHINTS, "Bad hints"),
     (EAI_PROTOCOL, "Resolved protocol is unknown"),
     (EAI_OVERFLOW, "Argument buffer overflow"),
 )
