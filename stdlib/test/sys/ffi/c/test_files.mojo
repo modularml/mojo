@@ -482,14 +482,14 @@ def _test_fscanf(libc: Libc, suffix: String):
         num_bytes = libc.fputs(a, stream)
 
         # read and compare
-        # value = stack_allocation[1, C.int]()
-        # value[0] = 0
-        # assert_true(libc.fseek(stream, 0) != -1)
-        # scanned = libc.fscanf(stream, char_ptr("%d"), value)
-        # assert_true(libc.fflush(stream) != EOF)
-        # assert_equal(num_bytes, 1)
-        # assert_equal(scanned, 1)
-        # assert_equal(value[0], 1)
+        value = stack_allocation[2, C.int]()
+        value[0] = 0
+        assert_true(libc.fseek(stream, 0) != -1)
+        scanned = libc.fscanf(stream, char_ptr("%d"), value)
+        assert_true(libc.fflush(stream) != EOF)
+        assert_equal(num_bytes, 1)
+        assert_equal(scanned, 1)
+        assert_equal(value[0], 1)
 
         # cleanup
         assert_true(libc.close(filedes) != -1)
