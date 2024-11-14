@@ -13,7 +13,7 @@
 """Libc POSIX implementation."""
 
 from collections import Optional
-from memory import UnsafePointer, stack_allocation
+from memory import UnsafePointer, stack_allocation, memset_zero
 from sys.ffi.utils import external_call, DLHandle
 from sys.info import os_is_windows, os_is_macos, os_is_linux, is_nvidia_gpu
 
@@ -918,6 +918,7 @@ struct Libc[*, static: Bool]:
             length = self.strlen(format)
             print("incoming format string:", char_ptr_to_string(format))
             buf = UnsafePointer[C.char].alloc(length + 1)
+            memset_zero(buf, length + 1)
             _ = self.snprintf(buf, length + 1, format, args)
             print("value after snprintf:", char_ptr_to_string(buf))
             b_len = self.strlen(buf)

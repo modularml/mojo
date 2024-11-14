@@ -475,7 +475,7 @@ alias gai_err_msg_macos = (
     (EAI_MEMORY, "Memory allocation failure"),
     (EAI_SYSTEM, "System error"),
     (EAI_BADHINTS, "Bad hints"),
-    (EAI_PROTOCOL, "Resolved protocol is unknown"),
+    (EAI_PROTOCOL, "ai_protocol not supported"),
     (EAI_OVERFLOW, "Argument buffer overflow"),
 )
 alias gai_err_msg_windows = (
