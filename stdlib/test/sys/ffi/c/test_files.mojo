@@ -471,18 +471,17 @@ def _test_fscanf(libc: Libc, suffix: String):
         # setup
         alias `1` = C.char(ord("1"))
         a = UnsafePointer[C.char].alloc(2)
+        a[0], a[1] = `1`, C.char(0)
 
         filedes = libc.open(ptr, O_RDWR)
         assert_true(filedes != -1)
-        a[0], a[1] = `1`, C.char(0)
-
         stream = libc.fdopen(filedes, char_ptr(FM_READ_WRITE))
 
         # print
         num_bytes = libc.fputs(a, stream)
 
         # read and compare
-        value = UnsafePointer[C.int].alloc(1)
+        value = UnsafePointer[C.int].alloc(10)
         value[0] = 0
         assert_true(libc.fseek(stream, 0) != -1)
         scanned = libc.fscanf(stream, char_ptr("%d"), value)
