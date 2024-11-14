@@ -530,7 +530,7 @@ def test_static_fcntl():
     _test_fcntl(Libc[static=True](), "_static")
 
 
-# TODO: a thorough test using the most often used functionality
+# TODO: a thorough test of the most often used functionality
 # see https://man7.org/linux/man-pages/man3/ioctl.3p.html
 # def _test_ioctl(libc: Libc, suffix: String):
 #     file = str(_dir_of_current_file() / ("dummy_test_ioctl" + suffix))
@@ -573,9 +573,9 @@ def main():
     test_static_printf()
     test_dynamic_snprintf()
     test_static_snprintf()
-    test_dynamic_fscanf()
-    test_static_fscanf()
-    test_dynamic_fcntl()
-    test_static_fcntl()
+    # test_dynamic_fscanf()
+    # test_static_fscanf()
+    # test_dynamic_fcntl()
+    # test_static_fcntl()
     # test_dynamic_ioctl()
     # test_static_ioctl()

@@ -891,6 +891,22 @@ struct Libc[*, static: Bool]:
         return self.printf(format, args)
 
     @always_inline
+    fn printf(self, format: UnsafePointer[C.char]) -> C.int:
+        """Libc POSIX `printf` function.
+
+        Args:
+            format: The format string.
+
+        Returns:
+            The number of bytes transmitted excluding the terminating null byte.
+            Otherwise a negative value and `errno` is set.
+
+        Notes:
+            [Reference](https://man7.org/linux/man-pages/man3/printf.3p.html).
+        """
+        return self.write(STDOUT_FILENO, format, self.strlen(format))
+
+    @always_inline
     fn fprintf(
         self,
         stream: UnsafePointer[FILE],
@@ -992,14 +1008,10 @@ struct Libc[*, static: Bool]:
                 const char *restrict format, ...)`.
         """
 
-        @parameter
-        if os_is_macos():  # workaround for non null termination of fprintf
-            var num = C.int(self.fwrite(format, 1, self.strlen(format), stream))
-            if self.ferror(stream) != 0 or self.fflush(stream) != 0:
-                num = -1
-            return num
-        else:
-            return self.fprintf(stream, format, None)
+        var num = C.int(self.fwrite(format, 1, self.strlen(format), stream))
+        if self.ferror(stream) != 0 or self.fflush(stream) != 0:
+            num = -1
+        return num
 
     @always_inline
     fn dprintf(
