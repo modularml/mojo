@@ -919,8 +919,13 @@ struct Libc[*, static: Bool]:
             print("incoming format string:", char_ptr_to_string(format))
             var buf = UnsafePointer[C.char].alloc(length + 1)
             memset_zero(buf, length + 1)
-            _ = self.snprintf(buf, length + 1, format, args)
-            print("value after snprintf:", char_ptr_to_string(buf))
+            var wouldve = self.snprintf(buf, length + 1, format, args)
+            print(
+                "value after snprintf:",
+                char_ptr_to_string(buf),
+                "wouldve:",
+                wouldve,
+            )
             var num = C.int(self.fwrite(buf, 1, self.strlen(buf), stream))
             if self.ferror(stream) != 0 or self.fflush(stream) != 0:
                 num = -1
