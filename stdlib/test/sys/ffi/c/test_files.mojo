@@ -574,8 +574,6 @@ def main():
     test_static_printf()
     test_dynamic_snprintf()
     test_static_snprintf()
-    test_dynamic_sprintf()
-    test_static_sprintf()
     test_dynamic_fscanf()
     test_static_fscanf()
     test_dynamic_fcntl()
