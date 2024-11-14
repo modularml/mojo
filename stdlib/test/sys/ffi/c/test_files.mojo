@@ -31,16 +31,11 @@ def _test_open_close(libc: Libc, suffix: String):
     with TryLibc(libc):
         filedes = libc.open(ptr, O_RDWR | O_CREAT | O_TRUNC | O_NONBLOCK, 0o666)
         assert_true(filedes != -1)
-        sleep(0.05)
-        assert_true(libc.close(filedes) != -1)
         for s in List(O_RDONLY, O_WRONLY, O_RDWR):
-            if os_is_macos() and s[] != O_RDONLY:  # Permission denied
-                continue
             filedes = libc.open(ptr, s[] | O_NONBLOCK)
             assert_true(filedes != -1)
-            sleep(0.05)
-            assert_true(libc.close(filedes) != -1)
 
+        assert_true(libc.close(filedes) != -1)
         assert_true(libc.remove(ptr) != -1)
     _ = file^
 
