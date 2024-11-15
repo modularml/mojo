@@ -22,7 +22,7 @@ from python import Python
 from collections import Dict
 from os import abort, getenv
 from sys import external_call, sizeof
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi import _Global
 
 from memory import UnsafePointer
 
@@ -37,22 +37,29 @@ from ._cpython import (
     Py_ssize_t,
 )
 
-
-fn _init_global(ignored: OpaquePointer) -> OpaquePointer:
-    var ptr = UnsafePointer[CPython].alloc(1)
-    ptr[] = CPython()
-    return ptr.bitcast[NoneType]()
+alias _PYTHON_GLOBAL = _Global["Python", _PythonGlobal, _init_python_global]
 
 
-fn _destroy_global(python: OpaquePointer):
-    var p = python.bitcast[CPython]()
-    CPython.destroy(p[])
-    python.free()
+fn _init_python_global() -> _PythonGlobal:
+    return _PythonGlobal()
+
+
+struct _PythonGlobal:
+    var cpython: CPython
+
+    fn __moveinit__(inout self, owned other: Self):
+        self.cpython = other.cpython^
+
+    fn __init__(inout self):
+        self.cpython = CPython()
+
+    fn __del__(owned self):
+        CPython.destroy(self.cpython)
 
 
 @always_inline
 fn _get_global_python_itf() -> _PythonInterfaceImpl:
-    var ptr = _get_global["Python", _init_global, _destroy_global]()
+    var ptr = _PYTHON_GLOBAL.get_or_create_ptr()
     return ptr.bitcast[CPython]()
 
 

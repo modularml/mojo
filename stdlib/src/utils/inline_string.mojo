@@ -19,7 +19,6 @@ from collections import InlineArray
 from os import abort
 from collections import Optional
 from sys import sizeof
-from sys.ffi import OpaquePointer
 
 from memory import UnsafePointer, memcpy
 
