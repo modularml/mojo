@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi.utils import _get_global, OpaquePointer
 
 from memory import UnsafePointer
 from testing import assert_equal, assert_false, assert_true

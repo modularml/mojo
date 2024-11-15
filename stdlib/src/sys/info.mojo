@@ -19,7 +19,7 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
+from sys.ffi.utils import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
 
 

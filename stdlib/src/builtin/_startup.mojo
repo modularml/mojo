@@ -14,7 +14,7 @@
 
 from memory import UnsafePointer
 from sys import external_call
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi.utils import _get_global, OpaquePointer
 
 
 fn _init_global_runtime(ignored: OpaquePointer) -> OpaquePointer:
