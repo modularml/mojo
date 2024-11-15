@@ -678,8 +678,8 @@ trait _Iterator:
 #     is_mutable: Bool,
 #     origin: Origin[is_mutable].type,
 #     T: AnyType,
-#     I: _Iterable[T],
-# ](value: I) -> T:
+#     I: _Iterator[T, origin],
+# ](value: I) -> ref [origin]T:
 #     debug_assert(bool(value), "iterator has no next value to yield")
 #     return value.__next__()
 
