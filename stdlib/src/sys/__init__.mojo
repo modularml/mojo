@@ -46,7 +46,6 @@ from .info import (
     simdbitwidth,
     simdbytewidth,
     simdwidthof,
-    warpsize,
     sizeof,
     is_nvidia_gpu,
     is_gpu,

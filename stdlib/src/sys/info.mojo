@@ -29,11 +29,8 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
 
 
 @always_inline("nodebug")
-fn _accelerator_arch() -> String:
-    alias arch = String(
-        __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
-    )
-    return arch
+fn _accelerator_arch() -> StringLiteral:
+    return __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
 
 
 fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
@@ -589,21 +586,6 @@ fn simdbytewidth[
     """
     alias CHAR_BIT = 8
     return simdbitwidth[target]() // CHAR_BIT
-
-
-@always_inline("nodebug")
-fn warpsize[
-    target: __mlir_type.`!kgen.target` = _current_target()
-]() -> IntLiteral:
-    """Returns the warp size of the specified target.
-
-    Parameters:
-        target: The target architecture.
-
-    Returns:
-        The warp size of the specified target.
-    """
-    return 32
 
 
 @always_inline("nodebug")
