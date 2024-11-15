@@ -400,6 +400,9 @@ struct PythonObject(
     fn __init__[O: ImmutableOrigin](out self, strref: StringSlice[O]):
         """Initialize the object from a string reference.
 
+        Parameters:
+            O: The origin of the reference.
+
         Args:
             strref: The string reference.
         """

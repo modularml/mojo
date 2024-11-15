@@ -94,6 +94,9 @@ struct Python:
     fn eval[O: ImmutableOrigin](inout self, code: StringSlice[O]) -> Bool:
         """Executes the given Python code.
 
+        Parameters:
+            O: The origin of the code.
+
         Args:
             code: The python code to execute.
 
@@ -113,6 +116,9 @@ struct Python:
         name: StaticString = "__main__",
     ) raises -> PythonObject:
         """Executes the given Python code.
+
+        Parameters:
+            O: The origin of the expression.
 
         Args:
             expr: The Python expression to evaluate.
@@ -202,6 +208,9 @@ struct Python:
         O: ImmutableOrigin
     ](module: StringSlice[O]) raises -> PythonObject:
         """Imports a Python module.
+
+        Parameters:
+            O: The origin of the module name.
 
         This provides you with a module object you can use just like you would
         in Python. For example:
