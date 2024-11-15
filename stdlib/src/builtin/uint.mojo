@@ -149,7 +149,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             The string representation of this UInt.
         """
-        return "UInt(" + str(self) + ")"
+        return String.write("UInt(", str(self), ")")
 
     fn __hash__(self) -> UInt:
         """Hash the UInt using builtin hash.

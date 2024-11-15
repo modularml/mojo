@@ -28,6 +28,14 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
     return __mlir_attr.`#kgen.param.expr<current_target> : !kgen.target`
 
 
+@always_inline("nodebug")
+fn _accelerator_arch() -> String:
+    alias arch = String(
+        __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
+    )
+    return arch
+
+
 fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
