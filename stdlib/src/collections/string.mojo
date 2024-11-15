@@ -1450,12 +1450,14 @@ struct String(
 
     @always_inline
     fn as_bytes[
-        is_mutable: Bool = False
-    ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
+        mutate: Bool = False
+    ](ref [_]self) -> Span[
+        Byte, _lit_mut_cast[__origin_of(self), mutate].result
+    ]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Parameters:
-            is_mutable: Whether the result will be mutable.
+            mutate: Whether the result will be mutable.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
@@ -1463,18 +1465,17 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-        return self.as_bytes[
-            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
-        ]()
+        return self.as_bytes[mutate, __origin_of(self)]()
 
     @always_inline
     fn as_bytes[
-        is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> Span[Byte, origin]:
+        is_mutable: Bool, //, mutate: Bool, origin: Origin[is_mutable].type
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
         """Returns a contiguous slice of bytes.
 
         Parameters:
-            is_mutable: Whether the result will be mutable.
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
             origin: The origin of the data.
 
         Returns:
@@ -1483,7 +1484,7 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-        return Span[Byte, origin](
+        return Span[Byte, _lit_mut_cast[origin, mutate].result](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 

@@ -30,12 +30,13 @@ trait AsBytes:
     """
 
     fn as_bytes[
-        is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> Span[Byte, origin]:
+        is_mutable: Bool, //, mutate: Bool, origin: Origin[is_mutable].type
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
         """Returns a contiguous slice of bytes.
 
         Parameters:
-            is_mutable: Whether the result will be mutable.
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
             origin: The origin of the data.
 
         Returns:

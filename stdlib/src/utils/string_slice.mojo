@@ -644,15 +644,34 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
 
     @always_inline
     fn as_bytes[
-        is_mutable: Bool = Self.is_mutable,
-        origin: Origin[is_mutable]
-        .type = _lit_mut_cast[Self.origin, is_mutable]
-        .result,
-    ](self) -> Span[Byte, origin]:
+        mutate: Bool = is_mutable
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
         """Returns a contiguous slice of bytes.
 
         Parameters:
-            is_mutable: Whether the result will be mutable.
+            mutate: Whether the result will be mutable.
+
+        Returns:
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return self.as_bytes[mutate=mutate, origin=origin]()
+
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, //,
+        mutate: Bool = Self.is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[Self.origin, is_mutable]
+        .result,
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
             origin: The origin of the data.
 
         Returns:
@@ -661,7 +680,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         Notes:
             This does not include the trailing null terminator.
         """
-        return rebind[Span[Byte, origin]](self._slice)
+        return rebind[Span[Byte, _lit_mut_cast[origin, mutate].result]](
+            self._slice
+        )
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -925,9 +946,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         # This can hugely improve the performance on large lists
         for e in elems:
             len_elems += len(
-                e[].as_bytes[
-                    False, _lit_mut_cast[__origin_of(e), False].result
-                ]()
+                e[].as_bytes[mutate=False, origin = __origin_of(e)]()
             )
         var capacity = s_len * (n_elems - int(n_elems > 0)) + len_elems + 1
         var buf = String._buffer_type(capacity=capacity)
@@ -940,7 +959,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
             offset += s_len * int(not_first)
             not_first = True
             var e_span = elems.unsafe_get(i).as_bytes[
-                False, _lit_mut_cast[__origin_of(elems[i]), False].result
+                mutate=False, origin = __origin_of(elems[i])
             ]()
             e_len = len(e_span)
             memcpy(dest=b_ptr + offset, src=e_span.unsafe_ptr(), count=e_len)

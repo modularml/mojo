@@ -460,15 +460,17 @@ struct StringLiteral(
 
     @always_inline
     fn as_bytes[
-        is_mutable: Bool = False,
+        is_mutable: Bool, //,
+        mutate: Bool = False,
         origin: Origin[is_mutable]
         .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
         .result,
-    ](self) -> Span[Byte, origin]:
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
         """Returns a contiguous slice of bytes.
 
         Parameters:
-            is_mutable: Whether the result will be mutable.
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
             origin: The origin of the data.
 
         Returns:
@@ -477,8 +479,8 @@ struct StringLiteral(
         Notes:
             This does not include the trailing null terminator.
         """
-        constrained[not is_mutable, "StringLiteral can't be mutated"]()
-        return Span[Byte, origin](
+        constrained[not mutate, "StringLiteral can't be mutated"]()
+        return Span[Byte, _lit_mut_cast[origin, mutate].result](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
