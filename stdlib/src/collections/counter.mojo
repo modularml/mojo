@@ -51,12 +51,12 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # Life cycle methods
     # ===------------------------------------------------------------------=== #
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Create a new, empty Counter object."""
         self._data = Dict[V, Int]()
 
     # TODO: Change List to Iterable when it is supported in Mojo
-    fn __init__(inout self, items: List[V, *_]):
+    fn __init__(out self, items: List[V, *_]):
         """Create a from an input iterable.
 
         Args:
@@ -68,7 +68,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             self._data[item] = self._data.get(item, 0) + 1
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Create a new Counter by copying another Counter.
 
         Args:
@@ -616,7 +616,7 @@ struct CountTuple[V: KeyElement](
     # Life cycle methods
     # ===------------------------------------------------------------------=== #
 
-    fn __init__(inout self, value: V, count: Int):
+    fn __init__(out self, value: V, count: Int):
         """Create a new CountTuple.
 
         Args:
@@ -626,7 +626,7 @@ struct CountTuple[V: KeyElement](
         self._value = value
         self._count = count
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Create a new CountTuple by copying another CountTuple.
 
         Args:
@@ -635,7 +635,7 @@ struct CountTuple[V: KeyElement](
         self._value = other._value
         self._count = other._count
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         """Create a new CountTuple by moving another CountTuple.
 
         Args:

@@ -67,7 +67,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """This constructor will always cause a compile time error if used.
         It is used to steer users away from uninitialized memory.
         """
@@ -85,7 +85,7 @@ struct InlineArray[
         ]()
 
     @always_inline
-    fn __init__(inout self, *, unsafe_uninitialized: Bool):
+    fn __init__(out self, *, unsafe_uninitialized: Bool):
         """Create an InlineArray with uninitialized memory.
 
         Note that this is highly unsafe and should be used with caution.
@@ -139,7 +139,7 @@ struct InlineArray[
             )
 
     @always_inline
-    fn __init__(inout self, fill: Self.ElementType):
+    fn __init__(out self, fill: Self.ElementType):
         """Constructs an empty array where each element is the supplied `fill`.
 
         Args:
@@ -157,7 +157,7 @@ struct InlineArray[
             ptr.init_pointee_copy(fill)
 
     @always_inline
-    fn __init__(inout self, owned *elems: Self.ElementType):
+    fn __init__(out self, owned *elems: Self.ElementType):
         """Constructs an array given a set of arguments.
 
         Args:
@@ -194,7 +194,7 @@ struct InlineArray[
         # Mark the elements as already destroyed.
         storage._is_owned = False
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -207,7 +207,7 @@ struct InlineArray[
             var ptr = self.unsafe_ptr() + idx
             ptr.init_pointee_copy(other[idx])
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Copy construct the array.
 
         Args:

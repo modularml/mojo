@@ -57,7 +57,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var end: Int
 
     @always_inline
-    fn __init__(inout self, end: Int):
+    fn __init__(out self, end: Int):
         self.curr = max(0, end)
         self.end = self.curr
 
@@ -164,7 +164,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var step: Int
 
     @always_inline
-    fn __init__(inout self, start: Int, end: Int):
+    fn __init__(out self, start: Int, end: Int):
         self.start = start
         self.end = end
         self.step = 1
@@ -341,7 +341,7 @@ struct _UIntZeroStartingRange(UIntSized):
     var end: UInt
 
     @always_inline
-    fn __init__(inout self, end: UInt):
+    fn __init__(out self, end: UInt):
         self.curr = max(0, end)
         self.end = self.curr
 
@@ -403,7 +403,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     var step: UInt
 
     @always_inline
-    fn __init__(inout self, start: UInt, end: UInt, step: UInt):
+    fn __init__(out self, start: UInt, end: UInt, step: UInt):
         self.start = start
         self.end = end
         debug_assert(
@@ -487,7 +487,7 @@ struct _ZeroStartingScalarRange[type: DType]:
     var end: Scalar[type]
 
     @always_inline
-    fn __init__(inout self, end: Scalar[type]):
+    fn __init__(out self, end: Scalar[type]):
         self.curr = max(0, end)
         self.end = self.curr
 

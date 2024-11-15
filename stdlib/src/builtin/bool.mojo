@@ -116,12 +116,12 @@ struct Bool(
     """The underlying storage of the boolean value."""
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct a default, `False` Bool."""
         self = False
 
     @always_inline("nodebug")
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly construct a deep copy of the provided value.
 
         Args:
@@ -131,7 +131,7 @@ struct Bool(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.i1):
+    fn __init__(out self, value: __mlir_type.i1):
         """Construct a Bool value given a __mlir_type.i1 value.
 
         Args:
@@ -141,7 +141,7 @@ struct Bool(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<bool>`):
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<bool>`):
         """Construct a Bool value given a `!pop.scalar<bool>` value.
 
         Args:
@@ -164,7 +164,7 @@ struct Bool(
         self = value.__bool__()
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: SIMD[DType.bool, 1]):
+    fn __init__(out self, value: SIMD[DType.bool, 1]):
         """Convert a scalar SIMD value to a Bool.
 
         Args:

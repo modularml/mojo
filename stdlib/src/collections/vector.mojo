@@ -114,7 +114,7 @@ struct InlinedFixedVector[
     """The maximum number of elements that can fit in the vector."""
 
     @always_inline
-    fn __init__(inout self, capacity: Int):
+    fn __init__(out self, capacity: Int):
         """Constructs `InlinedFixedVector` with the given capacity.
 
         The dynamically allocated portion is `capacity - size`.
@@ -130,7 +130,7 @@ struct InlinedFixedVector[
         self.capacity = capacity
 
     @always_inline
-    fn __init__(inout self, existing: Self):
+    fn __init__(out self, existing: Self):
         """
         Copy constructor.
 
@@ -148,7 +148,7 @@ struct InlinedFixedVector[
         self.capacity = existing.capacity
 
     @always_inline
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """
         Move constructor.
 

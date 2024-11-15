@@ -54,10 +54,6 @@ trait ConvertibleFromPython(CollectionElement):
         ...
 
 
-trait PythonableAndConvertibleFromPython(Pythonable, ConvertibleFromPython):
-    pass
-
-
 # ===-----------------------------------------------------------------------===#
 # Mojo Object
 # ===-----------------------------------------------------------------------===#
@@ -77,65 +73,65 @@ trait Pythonable(Defaultable, Representable):
     pass
 
 
-struct PyMojoObject[T: Pythonable]:
+struct PyMojoObject[T: AnyType]:
     """Storage backing a PyObject* wrapping a Mojo value."""
 
     var ob_base: PyObject
     var mojo_value: T
 
-    @staticmethod
-    fn python_type_object[
-        type_name: StringLiteral,
-    ](owned methods: List[PyMethodDef]) raises -> TypedPythonObject["Type"]:
-        """Construct a Python 'type' describing PyMojoObject[T].
 
-        Parameters:
-            type_name: The name of the Mojo type.
-        """
+fn python_type_object[
+    T: Pythonable,
+    type_name: StringLiteral,
+](owned methods: List[PyMethodDef]) raises -> TypedPythonObject["Type"]:
+    """Construct a Python 'type' describing PyMojoObject[T].
 
-        var cpython = _get_global_python_itf().cpython()
+    Parameters:
+        T: The mojo type to wrap.
+        type_name: The name of the Mojo type.
+    """
 
-        var slots = List[PyType_Slot](
-            # All wrapped Mojo types are allocated generically.
-            PyType_Slot.tp_new(
-                cpython.lib.get_function[newfunc]("PyType_GenericNew")
-            ),
-            PyType_Slot.tp_init(empty_tp_init_wrapper[T]),
-            PyType_Slot.tp_dealloc(tp_dealloc_wrapper[T]),
-            PyType_Slot.tp_repr(tp_repr_wrapper[T]),
+    var cpython = _get_global_python_itf().cpython()
+
+    var slots = List[PyType_Slot](
+        # All wrapped Mojo types are allocated generically.
+        PyType_Slot.tp_new(
+            cpython.lib.get_function[newfunc]("PyType_GenericNew")
+        ),
+        PyType_Slot.tp_init(empty_tp_init_wrapper[T]),
+        PyType_Slot.tp_dealloc(tp_dealloc_wrapper[T]),
+        PyType_Slot.tp_repr(tp_repr_wrapper[T]),
+    )
+
+    if methods:
+        # FIXME: Avoid leaking the methods data pointer in this way.
+        slots.append(PyType_Slot.tp_methods(methods.steal_data()))
+
+    # Zeroed item terminator
+    slots.append(PyType_Slot.null())
+
+    var type_spec = PyType_Spec {
+        # FIXME(MOCO-1306): This should be `T.__name__`.
+        name: type_name.unsafe_cstr_ptr(),
+        basicsize: sizeof[PyMojoObject[T]](),
+        itemsize: 0,
+        flags: Py_TPFLAGS_DEFAULT,
+        # Note: This pointer is only "borrowed" by PyType_FromSpec.
+        slots: slots.unsafe_ptr(),
+    }
+
+    # Construct a Python 'type' object from our type spec.
+    var type_obj = cpython.PyType_FromSpec(UnsafePointer.address_of(type_spec))
+
+    if type_obj.is_null():
+        Python.throw_python_exception_if_error_state(cpython)
+        return abort[TypedPythonObject["Type"]](
+            "expected to raise after getting NULL type object"
         )
 
-        if methods:
-            # FIXME: Avoid leaking the methods data pointer in this way.
-            slots.append(PyType_Slot.tp_methods(methods.steal_data()))
-
-        # Zeroed item terminator
-        slots.append(PyType_Slot.null())
-
-        var type_spec = PyType_Spec {
-            # FIXME(MOCO-1306): This should be `T.__name__`.
-            name: type_name.unsafe_cstr_ptr(),
-            basicsize: sizeof[PyMojoObject[T]](),
-            itemsize: 0,
-            flags: Py_TPFLAGS_DEFAULT,
-            # Note: This pointer is only "borrowed" by PyType_FromSpec.
-            slots: slots.unsafe_ptr(),
-        }
-
-        # Construct a Python 'type' object from our type spec.
-        var type_obj = cpython.PyType_FromSpec(
-            UnsafePointer.address_of(type_spec)
-        )
-
-        if type_obj.is_null():
-            Python.throw_python_exception_if_error_state(cpython)
-            return abort[TypedPythonObject["Type"]](
-                "expected to raise after getting NULL type object"
-            )
-
-        return TypedPythonObject["Type"](
-            unsafe_unchecked_from=PythonObject(type_obj)
-        )
+    return TypedPythonObject["Type"](
+        unsafe_unchecked_from=PythonObject(type_obj)
+    )
 
 
 # Impedance match between:
@@ -348,7 +344,7 @@ fn check_arguments_arity(
 
 
 fn check_argument_type[
-    T: Pythonable,
+    T: AnyType
 ](
     func_name: StringLiteral,
     type_name_id: StringLiteral,
