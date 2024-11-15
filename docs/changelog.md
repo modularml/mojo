@@ -455,6 +455,9 @@ what we publish.
 
 ### ❌ Removed
 
+- The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
+  `DType` in a `Scalar[my_dtype]` to call the only overload of `bitcast` now.
+
 ### 🛠️ Fixed
 
 - Lifetime tracking is now fully field sensitive, which makes the uninitialized
