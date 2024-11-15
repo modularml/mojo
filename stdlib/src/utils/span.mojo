@@ -193,6 +193,10 @@ struct Span[
 
         Returns:
             A new span that points to the same data as the current span.
+
+        Allocation:
+            This function allocates when the step is negative, to avoid a memory
+            leak, take ownership of the value.
         """
         var start: Int
         var end: Int
