@@ -23,7 +23,7 @@ from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
 from collections import Dict
-from utils import StringRef
+from utils import StringSlice, StringRef
 
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
@@ -397,7 +397,7 @@ struct PythonObject(
         """
         self = PythonObject(str(value))
 
-    fn __init__(out self, strref: StringRef):
+    fn __init__[O: ImmutableOrigin](out self, strref: StringSlice[O]):
         """Initialize the object from a string reference.
 
         Args:
@@ -732,9 +732,9 @@ struct PythonObject(
         cpython.Py_DecRef(key_obj)
         cpython.Py_DecRef(value.py_object)
 
-    fn _call_zero_arg_method(
-        self, method_name: StringRef
-    ) raises -> PythonObject:
+    fn _call_zero_arg_method[
+        O: ImmutableOrigin
+    ](self, method_name: StringSlice[O]) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(0)
         var callable_obj = cpython.PyObject_GetAttrString(
@@ -747,8 +747,10 @@ struct PythonObject(
         cpython.Py_DecRef(callable_obj)
         return PythonObject(result)
 
-    fn _call_single_arg_method(
-        self, method_name: StringRef, rhs: PythonObject
+    fn _call_single_arg_method[
+        O: ImmutableOrigin
+    ](
+        self, method_name: StringSlice[O], rhs: PythonObject
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
@@ -766,9 +768,9 @@ struct PythonObject(
         cpython.Py_DecRef(callable_obj)
         return PythonObject(result_obj)
 
-    fn _call_single_arg_inplace_method(
-        inout self, method_name: StringRef, rhs: PythonObject
-    ) raises:
+    fn _call_single_arg_inplace_method[
+        O: ImmutableOrigin
+    ](inout self, method_name: StringSlice[O], rhs: PythonObject) raises:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
         var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)

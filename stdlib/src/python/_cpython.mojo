@@ -39,7 +39,7 @@ from python._bindings import Typed_initproc, PyMojoObject, Pythonable
 
 from memory import UnsafePointer
 
-from utils import StringRef, StringSlice
+from utils import StringSlice
 
 
 # ===-----------------------------------------------------------------------===#
@@ -259,7 +259,7 @@ struct PythonVersion:
     var patch: Int
     """The patch version number."""
 
-    fn __init__(out self, version: StringRef):
+    fn __init__[O: ImmutableOrigin](out self, version: StringSlice[O]):
         """Initialize a PythonVersion object from a version string.
 
         Args:
@@ -288,8 +288,16 @@ struct PythonVersion:
         self = PythonVersion(components[0], components[1], components[2])
 
 
-fn _py_get_version(lib: DLHandle) -> StringRef:
-    return StringRef(ptr=lib.call["Py_GetVersion", UnsafePointer[c_char]]())
+fn _py_get_version(lib: DLHandle) -> StringSlice[ImmutableAnyOrigin]:
+    var ptr = lib.call["Py_GetVersion", UnsafePointer[c_char]]()
+    var length = 0
+    for i in range(50):
+        if ptr[i] == 0:
+            length = i
+            break
+    return StringSlice[ImmutableAnyOrigin](
+        ptr=ptr.bitcast[Byte](), length=length
+    )
 
 
 fn _py_finalize(lib: DLHandle):
@@ -741,7 +749,7 @@ struct CPython:
     """The version of the Python runtime."""
     var total_ref_count: UnsafePointer[Int]
     """The total reference count of all Python objects."""
-    var init_error: StringRef
+    var init_error: StringSlice[ImmutableAnyOrigin]
     """An error message if initialization failed."""
 
     # ===-------------------------------------------------------------------===#
@@ -771,9 +779,17 @@ struct CPython:
 
         # TODO(MOCO-772) Allow raises to propagate through function pointers
         # and make this initialization a raising function.
-        self.init_error = external_call[
+        var ptr = external_call[
             "KGEN_CompilerRT_Python_SetPythonPath", UnsafePointer[c_char]
         ]()
+        var length = 0
+        for i in range(1_000):
+            if ptr[i] == 0:
+                length = i
+                break
+        self.init_error = StringSlice[ImmutableAnyOrigin](
+            ptr=ptr.bitcast[Byte](), length=length
+        )
 
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
 
@@ -1060,15 +1076,16 @@ struct CPython:
     # Python Module operations
     # ===-------------------------------------------------------------------===#
 
-    fn PyImport_ImportModule(
-        inout self,
-        name: StringRef,
-    ) -> PyObjectPtr:
+    fn PyImport_ImportModule[
+        O: ImmutableOrigin
+    ](inout self, name: StringSlice[O]) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/import.html#c.PyImport_ImportModule).
         """
 
-        var r = self.lib.call["PyImport_ImportModule", PyObjectPtr](name.data)
+        var r = self.lib.call["PyImport_ImportModule", PyObjectPtr](
+            name.unsafe_ptr().bitcast[c_char]()
+        )
 
         self.log(
             r._get_ptr_as_int(),
@@ -1081,7 +1098,9 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
+    fn PyImport_AddModule[
+        O: ImmutableOrigin
+    ](inout self, name: StringSlice[O]) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/import.html#c.PyImport_AddModule).
         """
@@ -1188,7 +1207,9 @@ struct CPython:
     # Python Evaluation
     # ===-------------------------------------------------------------------===#
 
-    fn PyRun_SimpleString(inout self, strref: StringRef) -> Bool:
+    fn PyRun_SimpleString[
+        O: ImmutableOrigin
+    ](inout self, strref: StringSlice[O]) -> Bool:
         """Executes the given Python code.
 
         Args:
@@ -1203,12 +1224,17 @@ struct CPython:
             https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_SimpleString).
         """
         return (
-            self.lib.call["PyRun_SimpleString", c_int](strref.unsafe_ptr()) == 0
+            self.lib.call["PyRun_SimpleString", c_int](
+                strref.unsafe_ptr().bitcast[c_char]()
+            )
+            == 0
         )
 
-    fn PyRun_String(
+    fn PyRun_String[
+        O: ImmutableOrigin
+    ](
         inout self,
-        strref: StringRef,
+        strref: StringSlice[O],
         globals: PyObjectPtr,
         locals: PyObjectPtr,
         run_mode: Int,
@@ -1217,7 +1243,10 @@ struct CPython:
         https://docs.python.org/3/c-api/veryhigh.html#c.PyRun_String).
         """
         var result = self.lib.call["PyRun_String", PyObjectPtr](
-            strref.unsafe_ptr(), Int32(run_mode), globals, locals
+            strref.unsafe_ptr().bitcast[c_char](),
+            Int32(run_mode),
+            globals,
+            locals,
         )
 
         self.log(
@@ -1254,10 +1283,12 @@ struct CPython:
         """
         return self.lib.call["PyEval_GetBuiltins", PyObjectPtr]()
 
-    fn Py_CompileString(
+    fn Py_CompileString[
+        O1: ImmutableOrigin, O2: ImmutableOrigin
+    ](
         inout self,
-        strref: StringRef,
-        filename: StringRef,
+        strref: StringSlice[O1],
+        filename: StringSlice[O2],
         compile_mode: Int,
     ) -> PyObjectPtr:
         """[Reference](
@@ -1265,7 +1296,9 @@ struct CPython:
         """
 
         var r = self.lib.call["Py_CompileString", PyObjectPtr](
-            strref.unsafe_ptr(), filename.unsafe_ptr(), Int32(compile_mode)
+            strref.unsafe_ptr().bitcast[c_char](),
+            filename.unsafe_ptr().bitcast[c_char](),
+            Int32(compile_mode),
         )
         self._inc_total_rc()
         return r
@@ -1351,17 +1384,15 @@ struct CPython:
 
         return r
 
-    fn PyObject_GetAttrString(
-        inout self,
-        obj: PyObjectPtr,
-        name: StringRef,
-    ) -> PyObjectPtr:
+    fn PyObject_GetAttrString[
+        O: ImmutableOrigin
+    ](inout self, obj: PyObjectPtr, name: StringSlice[O],) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetAttrString).
         """
 
         var r = self.lib.call["PyObject_GetAttrString", PyObjectPtr](
-            obj, name.data
+            obj, name.unsafe_ptr().bitcast[c_char]()
         )
 
         self.log(
@@ -1377,15 +1408,20 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyObject_SetAttrString(
-        inout self, obj: PyObjectPtr, name: StringRef, new_value: PyObjectPtr
+    fn PyObject_SetAttrString[
+        O: ImmutableOrigin
+    ](
+        inout self,
+        obj: PyObjectPtr,
+        name: StringSlice[O],
+        new_value: PyObjectPtr,
     ) -> c_int:
         """[Reference](
         https://docs.python.org/3/c-api/object.html#c.PyObject_SetAttrString).
         """
 
         var r = self.lib.call["PyObject_SetAttrString", c_int](
-            obj, name.data, new_value
+            obj, name.unsafe_ptr().bitcast[c_char](), new_value
         )
 
         self.log(
@@ -1402,9 +1438,7 @@ struct CPython:
         return r
 
     fn PyObject_CallObject(
-        inout self,
-        callable_obj: PyObjectPtr,
-        args: PyObjectPtr,
+        inout self, callable_obj: PyObjectPtr, args: PyObjectPtr
     ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/call.html#c.PyObject_CallObject).
@@ -1703,15 +1737,17 @@ struct CPython:
     # Unicode Objects
     # ===-------------------------------------------------------------------===#
 
-    fn PyUnicode_DecodeUTF8(inout self, strref: StringRef) -> PyObjectPtr:
+    fn PyUnicode_DecodeUTF8[
+        O: ImmutableOrigin
+    ](inout self, strref: StringSlice[O]) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).
         """
 
         var r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
-            strref.unsafe_ptr().bitcast[Int8](),
-            strref.length,
-            "strict".unsafe_cstr_ptr(),
+            strref.unsafe_ptr().bitcast[c_char](),
+            strref.byte_length(),
+            "strict".unsafe_ptr().bitcast[c_char](),
         )
 
         self.log(
@@ -1720,27 +1756,6 @@ struct CPython:
             self._Py_REFCNT(r),
             ", str:",
             strref,
-        )
-
-        self._inc_total_rc()
-        return r
-
-    fn PyUnicode_DecodeUTF8(inout self, strslice: StringSlice) -> PyObjectPtr:
-        """[Reference](
-        https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).
-        """
-        var r = self.lib.call["PyUnicode_DecodeUTF8", PyObjectPtr](
-            strslice.unsafe_ptr().bitcast[Int8](),
-            strslice.byte_length(),
-            "strict".unsafe_cstr_ptr(),
-        )
-
-        self.log(
-            r._get_ptr_as_int(),
-            " NEWREF PyUnicode_DecodeUTF8, refcnt:",
-            self._Py_REFCNT(r),
-            ", str:",
-            strslice,
         )
 
         self._inc_total_rc()
@@ -1773,16 +1788,18 @@ struct CPython:
 
         return py_slice
 
-    fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
+    fn PyUnicode_AsUTF8AndSize(
+        inout self, py_object: PyObjectPtr
+    ) -> StringSlice[MutableAnyOrigin]:
         """[Reference](
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize).
         """
 
-        var s = StringRef()
-        s.data = self.lib.call[
+        var length = 0
+        var ptr = self.lib.call[
             "PyUnicode_AsUTF8AndSize", UnsafePointer[c_char]
-        ](py_object, UnsafePointer.address_of(s.length)).bitcast[UInt8]()
-        return s
+        ](py_object, UnsafePointer.address_of(length)).bitcast[Byte]()
+        return StringSlice[MutableAnyOrigin](ptr=ptr, length=length)
 
     # ===-------------------------------------------------------------------===#
     # Python Error operations
