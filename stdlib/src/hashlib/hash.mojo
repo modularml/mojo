@@ -26,7 +26,8 @@ There are a few main tools in this module:
 """
 
 import random
-from sys.ffi import _get_global, OpaquePointer
+
+from sys.ffi import _Global
 from sys import simdwidthof, bitwidthof
 from collections import InlineArray
 
@@ -44,24 +45,15 @@ from memory import memcpy, memset_zero, stack_allocation, bitcast, UnsafePointer
 # var HASH_SECRET = int(random.random_ui64(0, UInt64.MAX)
 
 
+fn _init_hash_secret() -> Int:
+    return int(random.random_ui64(0, UInt64.MAX))
+
+
+alias _HASH_SECRET_VALUE = _Global["HASH_SECRET", Int, _init_hash_secret]
+
+
 fn _HASH_SECRET() -> UInt:
-    var ptr = _get_global[
-        "HASH_SECRET", _initialize_hash_secret, _destroy_hash_secret
-    ]()
-    return ptr.bitcast[UInt]()[0]
-
-
-fn _initialize_hash_secret(
-    payload: OpaquePointer,
-) -> OpaquePointer:
-    var secret = random.random_ui64(0, UInt64.MAX)
-    var data = UnsafePointer[Int].alloc(1)
-    data[] = int(secret)
-    return data.bitcast[NoneType]()
-
-
-fn _destroy_hash_secret(p: OpaquePointer):
-    p.free()
+    return UInt(_HASH_SECRET_VALUE.get_or_create_ptr()[])
 
 
 trait Hashable:

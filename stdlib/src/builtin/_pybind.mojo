@@ -14,7 +14,6 @@
 from memory import UnsafePointer, stack_allocation
 
 from sys import sizeof, alignof
-from sys.ffi import OpaquePointer
 
 import python._cpython as cp
 from python import TypedPythonObject, Python, PythonObject

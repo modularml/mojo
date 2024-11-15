@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char, OpaquePointer
+from sys.ffi import c_char
 from utils import StaticString, write_args
 
 from bit import count_leading_zeros
