@@ -1513,7 +1513,7 @@ struct String(
         # to prevent alloc syscalls as we know the buffer size.
         # This can hugely improve the performance on large lists
         for e_ref in elems:
-            len_elems += len(e_ref[].as_bytes[False, __origin_of(e_ref)]())
+            len_elems += len(e_ref[].as_bytes())
         var capacity = len_self * (n_elems - 1) + len_elems
         var buf = Self._buffer_type(capacity=capacity)
         var self_ptr = self.unsafe_ptr()
@@ -1527,7 +1527,7 @@ struct String(
             else:
                 memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
                 offset += len_self
-            var e = elems[i].as_bytes[False, __origin_of(elems[i])]()
+            var e = elems[i].as_bytes()
             var e_len = len(e)
             memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
             offset += e_len
@@ -1555,13 +1555,8 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes[
-        is_mutable: Bool = False
-    ](self) -> Span[Byte, _lit_mut_cast[__origin_of(self), is_mutable].result]:
+    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of bytes.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
 
         Returns:
             A contiguous slice pointing to bytes.
@@ -1569,28 +1564,7 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
-        return self.as_bytes[
-            is_mutable, _lit_mut_cast[__origin_of(self), is_mutable].result
-        ]()
-
-    @always_inline
-    fn as_bytes[
-        is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> Span[Byte, origin]:
-        """Returns a contiguous slice of bytes.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
-
-        Returns:
-            A contiguous slice pointing to bytes.
-
-        Notes:
-            This does not include the trailing null terminator.
-        """
-
-        return Span[Byte, origin](
+        return Span[Byte, __origin_of(self)](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 

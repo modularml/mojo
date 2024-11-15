@@ -363,7 +363,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Args:
             value: The string value.
         """
-        self = StringSlice[O](unsafe_from_utf8=value.as_bytes[False, O]())
+        self = StringSlice[O](unsafe_from_utf8=value.as_bytes())
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -664,17 +664,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return StringSlice[origin](ptr=ptr + start, length=end - start)
 
     @always_inline
-    fn as_bytes[
-        is_mutable: Bool = is_mutable,
-        origin: Origin[is_mutable]
-        .type = _lit_mut_cast[origin, is_mutable]
-        .result,
-    ](self) -> Span[Byte, origin]:
+    fn as_bytes(self) -> Span[Byte, origin]:
         """Returns a contiguous slice of bytes.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
 
         Returns:
             A contiguous slice pointing to bytes.
@@ -682,7 +673,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Notes:
             This does not include the trailing null terminator.
         """
-        return rebind[Span[Byte, origin]](self._slice)
+        return self._slice
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Byte]:
@@ -827,23 +818,21 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             The offset of `substr` relative to the beginning of the string.
         """
 
-        var sub = substr.as_bytes[False, __origin_of(substr)]()
-        var sub_len = len(sub)
+        var sub = substr.unsafe_ptr()
+        var sub_len = substr.byte_length()
         if sub_len == 0:
             return 0
 
-        var s_span = self.as_bytes[False, __origin_of(substr)]()
+        var s_span = self.as_bytes()
         if len(s_span) < sub_len + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        var haystack = self._from_start(start).as_bytes[
-            False, __origin_of(substr)
-        ]()
+        var haystack = self._from_start(start).as_bytes()
 
         var loc = stringref._memmem(
-            haystack.unsafe_ptr(), len(haystack), sub.unsafe_ptr(), sub_len
+            haystack.unsafe_ptr(), len(haystack), sub, sub_len
         )
 
         if not loc:
@@ -1176,7 +1165,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike(AsBytes, CollectionElement, CollectionElementNew):
+trait Stringlike(CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -1352,17 +1341,17 @@ fn _split_impl[
     O: ImmutableOrigin, //,
     has_maxsplit: Bool,
 ](ref [O]src_str: T0, sep: T1, maxsplit: Int) -> List[Span[Byte, O]] as output:
-    var sep_len = len(sep.as_bytes[False, O]())
+    var sep_len = sep.byte_length()
     if sep_len == 0:
         var iterator = src_str.__iter__[False, __origin_of(src_str)]()
         var i_len = len(iterator) + 2
         var out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
-        out_ptr[0] = src_str.as_bytes[False, O]()[0:0]
+        out_ptr[0] = rebind[Span[Byte, O]]("".as_bytes())
         i = 1
         for s in iterator:
-            out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes[False, O]())
+            out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes())
             i += 1
-        out_ptr[i] = src_str.as_bytes[False, O]()[-1:-1]
+        out_ptr[i] = rebind[Span[Byte, O]]("".as_bytes())
         output = __type_of(output)(ptr=out_ptr, length=i_len, capacity=i_len)
         return
 
@@ -1373,11 +1362,11 @@ fn _split_impl[
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    var str_byte_len = len(src_str.as_bytes[False, O]())
+    var str_byte_len = src_str.byte_length()
     var lhs = 0
     var rhs = 0
     var items = 0
-    var ptr = src_str.as_bytes[False, O]().unsafe_ptr()
+    var ptr = src_str.unsafe_ptr()
     # var str_span = src_str.as_bytes[False, O]() # FIXME: solve #3526 with #3548
     # var sep_span = sep.as_bytes[False, O]() # FIXME: solve #3526 with #3548
 
@@ -1406,11 +1395,11 @@ fn _split_impl[
     if has_maxsplit:
         amnt = maxsplit + 1 if maxsplit < prealloc else prealloc
     output = __type_of(output)(capacity=amnt)
-    var str_byte_len = len(src_str.as_bytes[False, O]())
+    var str_byte_len = src_str.byte_length()
     var lhs = 0
     var rhs = 0
     var items = 0
-    var ptr = src_str.as_bytes[False, O]().unsafe_ptr()
+    var ptr = src_str.unsafe_ptr()
     alias S = StringSlice[StaticConstantOrigin]
 
     @always_inline("nodebug")
