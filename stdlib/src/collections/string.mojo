@@ -847,14 +847,13 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     fn write_bytes(inout self, bytes: Span[Byte, _]):
-        """
-        Write a byte span to this String.
+        """Write a byte span to this String.
 
         Args:
             bytes: The byte span to write to this String. Must NOT be
-              null terminated.
+                null terminated.
         """
-        self._iadd[True](bytes)
+        self._iadd[False](bytes)
 
     fn write[*Ts: Writable](inout self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
