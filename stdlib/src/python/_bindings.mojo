@@ -54,10 +54,6 @@ trait ConvertibleFromPython(CollectionElement):
         ...
 
 
-trait PythonableAndConvertibleFromPython(Pythonable, ConvertibleFromPython):
-    pass
-
-
 # ===-----------------------------------------------------------------------===#
 # Mojo Object
 # ===-----------------------------------------------------------------------===#
@@ -348,7 +344,7 @@ fn check_arguments_arity(
 
 
 fn check_argument_type[
-    T: Pythonable,
+    T: AnyType
 ](
     func_name: StringLiteral,
     type_name_id: StringLiteral,

@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+import os
 from pathlib import Path
 
 import lit.formats
@@ -29,7 +30,7 @@ config.excludes = [
     # No RUN: directive, just bare examples
     "hello_interop.mojo",
     "matmul.mojo",
-]
+] + [path.name for path in os.scandir("examples") if path.is_dir()]
 
 # Have the examples run in the build directory.
 # The `run-examples.sh` script creates the build directory.

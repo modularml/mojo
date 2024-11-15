@@ -2661,7 +2661,7 @@ trait Truncable:
         var im: Float64
 
         fn __trunc__(self) -> Self:
-            return Self(trunc(re), trunc(im))
+            return Self(trunc(self.re), trunc(self.im))
     ```
     """
 
