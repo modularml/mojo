@@ -28,7 +28,7 @@ from sys.intrinsics import (
     strided_load,
     strided_store,
 )
-
+from builtin.builtin_list import _lit_mut_cast, _is_mutable_origin
 from bit import is_power_of_two
 from memory.memory import _free, _malloc
 
@@ -48,12 +48,19 @@ fn _default_alignment[type: DType, width: Int = 1]() -> Int:
     return _default_alignment[Scalar[type]]()
 
 
+alias _must_be_mut_err = "UnsafePointer must be mutable for this operation"
+
+
 @register_passable("trivial")
 struct UnsafePointer[
     type: AnyType,
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
-    origin: Origin[True].type = MutableAnyOrigin,
+    *,
+    is_mutable: Bool = True,
+    origin: Origin[is_mutable]
+    .type = _lit_mut_cast[MutableAnyOrigin, is_mutable]
+    .result,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -69,6 +76,7 @@ struct UnsafePointer[
         type: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
         alignment: The minimum alignment of this pointer known statically.
+        is_mutable: Whether the origin is mutable.
         origin: The origin of the memory being addressed.
     """
 
@@ -143,8 +151,8 @@ struct UnsafePointer[
     ) -> UnsafePointer[
         type,
         address_space,
-        1,
-        # TODO: Propagate origin of the argument.
+        is_mutable = _is_mutable_origin[__origin_of(arg)].result,
+        origin = __origin_of(arg),
     ] as result:
         """Gets the address of the argument.
 
@@ -180,9 +188,7 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __getitem__(
-        self,
-    ) -> ref [origin, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space._value.value] type:
         """Return a reference to the underlying data.
 
         Returns:
@@ -193,9 +199,7 @@ struct UnsafePointer[
         alias _ref_type = Pointer[type, origin, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[type, address_space, alignment, origin](
-                    self
-                ).address
+                self.address
             )
         )
 
@@ -351,7 +355,8 @@ struct UnsafePointer[
             rhs: The value of the other pointer.
 
         Returns:
-            True if this pointer represents a higher than or equal address and False otherwise.
+            True if this pointer represents a higher than or equal address and
+            False otherwise.
         """
         return int(self) > int(rhs)
 
@@ -365,7 +370,8 @@ struct UnsafePointer[
             rhs: The value of the other pointer.
 
         Returns:
-            True if this pointer represents a higher than or equal address and False otherwise.
+            True if this pointer represents a higher than or equal address and
+            False otherwise.
         """
         return int(self) >= int(rhs)
 
@@ -391,7 +397,7 @@ struct UnsafePointer[
         """
         return self.__bool__()
 
-    @always_inline
+    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -429,9 +435,7 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn as_noalias_ptr(
-        self,
-    ) -> UnsafePointer[type, address_space, alignment, origin]:
+    fn as_noalias_ptr(self) -> Self:
         """Cast the pointer to a new pointer that is known not to locally alias
         any other pointer. In other words, the pointer transitively does not
         alias any other memory value declared in the local function context.
@@ -624,6 +628,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         self.offset(offset)._store[alignment=alignment, volatile=volatile](val)
 
     @always_inline
@@ -656,6 +661,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         self.offset(offset).store[alignment=alignment, volatile=volatile](val)
 
     @always_inline
@@ -685,6 +691,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         constrained[offset_type.is_integral(), "offset must be integer"]()
         self.offset(int(offset))._store[alignment=alignment, volatile=volatile](
             val
@@ -719,6 +726,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         constrained[offset_type.is_integral(), "offset must be integer"]()
         self.offset(int(offset))._store[alignment=alignment, volatile=volatile](
             val
@@ -744,6 +752,7 @@ struct UnsafePointer[
         Args:
             val: The value to store.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         self._store[alignment=alignment, volatile=volatile](val)
 
     @always_inline("nodebug")
@@ -768,6 +777,7 @@ struct UnsafePointer[
         Args:
             val: The value to store.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         self._store[alignment=alignment, volatile=volatile](val)
 
     @always_inline("nodebug")
@@ -778,6 +788,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
     ](self: UnsafePointer[Scalar[type], *_, **_], val: SIMD[type, width]):
+        constrained[is_mutable, _must_be_mut_err]()
         constrained[width > 0, "width must be a positive integer value"]()
         constrained[
             alignment > 0, "alignment must be a positive integer value"
@@ -835,6 +846,7 @@ struct UnsafePointer[
             val: The SIMD value to store.
             stride: The stride between stores.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         strided_store(val, self, int(stride), True)
 
     @always_inline("nodebug")
@@ -934,6 +946,7 @@ struct UnsafePointer[
             mask: The SIMD vector of boolean values, indicating for each
                 element whether to store at memory or not.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         constrained[
             offset.type.is_integral(),
             "offset type must be an integral type",
@@ -957,14 +970,21 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        origin: Origin[True].type = Self.origin,
-    ](self) -> UnsafePointer[T, address_space, alignment, origin]:
+        *,
+        is_mutable: Bool = Self.is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[Self.origin, is_mutable]
+        .result,
+    ](self) -> UnsafePointer[
+        T, address_space, alignment, is_mutable=is_mutable, origin=origin
+    ]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
+            is_mutable: Whether the origin is mutable.
             origin: Origin of the destination pointer.
 
         Returns:
@@ -983,14 +1003,25 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        origin: Origin[True].type = Self.origin,
-    ](self) -> UnsafePointer[Scalar[T], address_space, alignment, origin]:
+        *,
+        is_mutable: Bool = Self.is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[Self.origin, is_mutable]
+        .result,
+    ](self) -> UnsafePointer[
+        Scalar[T],
+        address_space,
+        alignment,
+        is_mutable=is_mutable,
+        origin=origin,
+    ]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
+            is_mutable: Whether the origin is mutable.
             origin: Origin of the destination pointer.
 
         Returns:
@@ -998,7 +1029,11 @@ struct UnsafePointer[
             as the original UnsafePointer.
         """
         return self.bitcast[
-            Scalar[T], address_space=address_space, alignment=alignment
+            Scalar[T],
+            address_space=address_space,
+            alignment=alignment,
+            is_mutable=is_mutable,
+            origin=origin,
         ]()
 
     @always_inline
@@ -1013,6 +1048,7 @@ struct UnsafePointer[
         more efficient because it doesn't invoke `__moveinit__`.
 
         """
+        constrained[is_mutable, _must_be_mut_err]()
         _ = __get_address_as_owned_value(self.address)
 
     @always_inline
@@ -1035,6 +1071,7 @@ struct UnsafePointer[
         Returns:
             The value at the pointer.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         return __get_address_as_owned_value(self.address)
 
     # TODO: Allow overloading on more specific traits
@@ -1058,6 +1095,7 @@ struct UnsafePointer[
         Args:
             value: The value to emplace.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(self.address) = value^
 
     @always_inline
@@ -1080,6 +1118,7 @@ struct UnsafePointer[
         Args:
             value: The value to emplace.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(self.address) = value
 
     @always_inline
@@ -1103,6 +1142,7 @@ struct UnsafePointer[
         Args:
             value: The value to emplace.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(self.address) = T(other=value)
 
     @always_inline
@@ -1137,6 +1177,7 @@ struct UnsafePointer[
         Args:
             dst: Destination pointer that the value will be moved into.
         """
+        constrained[is_mutable, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(
             dst.address
         ) = __get_address_as_owned_value(self.address)

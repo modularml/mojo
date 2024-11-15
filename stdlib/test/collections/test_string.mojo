@@ -1257,15 +1257,6 @@ def test_string_iter():
         concat += v
     assert_equal(321, atol(concat))
 
-    for v in vs:
-        v.unsafe_ptr()[] = ord("1")
-
-    # Borrow immutably
-    for v in vs:
-        concat += v
-
-    assert_equal(321111, atol(concat))
-
     var idx = -1
     vs = String("mojo🔥")
     for item in vs:
