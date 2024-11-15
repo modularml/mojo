@@ -114,8 +114,6 @@ struct _DictEntryIter[
         return len(self.src[]) - self.seen
 
 
-
-
 @value
 struct _DictKeyIter[
     dict_mutability: Bool, //,
@@ -152,8 +150,6 @@ struct _DictKeyIter[
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
-
-
 
 
 @value
@@ -204,8 +200,6 @@ struct _DictValueIter[
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
-
-
 
 
 @value

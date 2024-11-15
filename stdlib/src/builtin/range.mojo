@@ -89,8 +89,6 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
         return range(self.end - 1, -1, -1)
 
 
-
-
 @value
 @register_passable("trivial")
 struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
@@ -125,8 +123,6 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
         return range(self.end - 1, self.start - 1, -1)
 
 
-
-
 @value
 @register_passable("trivial")
 struct _StridedRangeIterator(Sized):
@@ -152,8 +148,6 @@ struct _StridedRangeIterator(Sized):
     @always_inline
     fn __has_next__(self) -> Bool:
         return self.__len__() > 0
-
-
 
 
 @value
@@ -212,8 +206,6 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         var end = self.start - self.step
         var step = -self.step
         return range(start, end, step)
-
-
 
 
 @always_inline
@@ -369,8 +361,6 @@ struct _UIntZeroStartingRange(UIntSized):
         return idx
 
 
-
-
 @value
 @register_passable("trivial")
 struct _UIntStridedRangeIterator(UIntSized):
@@ -391,8 +381,6 @@ struct _UIntStridedRangeIterator(UIntSized):
     @always_inline
     fn __has_next__(self) -> Bool:
         return self.__len__() > 0
-
-
 
 
 @value
@@ -444,8 +432,6 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
     fn __getitem__(self, idx: UInt) -> UInt:
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + idx * self.step
-
-
 
 
 @always_inline
@@ -522,8 +508,6 @@ struct _ZeroStartingScalarRange[type: DType]:
         return range(self.end - 1, Scalar[type](-1), Scalar[type](-1))
 
 
-
-
 @value
 @register_passable("trivial")
 struct _SequentialScalarRange[type: DType]:
@@ -558,8 +542,6 @@ struct _SequentialScalarRange[type: DType]:
         return range(self.end - 1, self.start - 1, -1)
 
 
-
-
 @value
 @register_passable("trivial")
 struct _StridedScalarRangeIterator[type: DType]:
@@ -583,8 +565,6 @@ struct _StridedScalarRangeIterator[type: DType]:
         var result = self.start
         self.start += self.step
         return result
-
-
 
 
 @value
