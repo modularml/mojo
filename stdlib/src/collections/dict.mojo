@@ -113,9 +113,7 @@ struct _DictEntryIter[
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -155,9 +153,7 @@ struct _DictKeyIter[
     fn __len__(self) -> Int:
         return self.iter.__len__()
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -209,9 +205,7 @@ struct _DictValueIter[
     fn __len__(self) -> Int:
         return self.iter.__len__()
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value

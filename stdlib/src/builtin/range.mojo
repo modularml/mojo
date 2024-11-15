@@ -88,9 +88,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, -1, -1)
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -126,9 +124,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -157,9 +153,7 @@ struct _StridedRangeIterator(Sized):
     fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -219,9 +213,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         var step = -self.step
         return range(start, end, step)
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @always_inline
@@ -376,9 +368,7 @@ struct _UIntZeroStartingRange(UIntSized):
         debug_assert(idx < self.__len__(), "index out of range")
         return idx
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -402,9 +392,7 @@ struct _UIntStridedRangeIterator(UIntSized):
     fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -457,9 +445,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
         debug_assert(idx < self.__len__(), "index out of range")
         return self.start + idx * self.step
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @always_inline
@@ -535,9 +521,7 @@ struct _ZeroStartingScalarRange[type: DType]:
         ]()
         return range(self.end - 1, Scalar[type](-1), Scalar[type](-1))
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -573,9 +557,7 @@ struct _SequentialScalarRange[type: DType]:
     fn __reversed__(self) -> _StridedRange:
         return range(self.end - 1, self.start - 1, -1)
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value
@@ -602,9 +584,7 @@ struct _StridedScalarRangeIterator[type: DType]:
         self.start += self.step
         return result
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
+
 
 
 @value

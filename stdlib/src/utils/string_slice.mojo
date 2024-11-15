@@ -240,10 +240,6 @@ struct _StringSliceIter[
         else:
             return self.index - self.continuation_bytes
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
-
 
 @value
 struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](

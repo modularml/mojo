@@ -146,10 +146,6 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
     fn __len__(self) -> Int:
         return len(self.src) - self.index
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
-
 
 @register_passable("trivial")
 struct VariadicList[type: AnyTrivialRegType](Sized):
@@ -260,10 +256,6 @@ struct _VariadicListMemIter[
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
-
-    @always_inline
-    fn __bool__(self) -> Bool:
-        return self.__has_next__()
 
 
 # Helper to compute the union of two origins:
