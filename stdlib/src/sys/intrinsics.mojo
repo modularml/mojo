@@ -19,9 +19,8 @@ from sys import PrefetchLocality
 ```
 """
 
-from .info import sizeof, triple_is_nvidia_cuda
+from .info import sizeof, is_nvidia_gpu
 from ._assembly import inlined_assembly
-from builtin.builtin_list import _LITRefPackHelper
 import math
 
 from memory import AddressSpace, UnsafePointer
@@ -55,7 +54,7 @@ fn llvm_intrinsic[
       The result of calling the llvm intrinsic with no arguments.
     """
 
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
@@ -280,7 +279,7 @@ struct PrefetchLocality:
     """Extremely local locality (keep in cache)."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Constructs a prefetch locality option.
 
         Args:
@@ -302,7 +301,7 @@ struct PrefetchRW:
     """Write prefetch."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Constructs a prefetch read-write option.
 
         Args:
@@ -325,7 +324,7 @@ struct PrefetchCache:
     """The data prefetching option."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    fn __init__(out self, value: Int):
         """Constructs a prefetch option.
 
         Args:
@@ -360,7 +359,7 @@ struct PrefetchOptions:
     """Indicates i-cache or d-cache prefetching."""
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs an instance of PrefetchOptions with default params."""
         self.rw = PrefetchRW.READ
         self.locality = PrefetchLocality.HIGH
@@ -481,7 +480,7 @@ fn prefetch[
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         inlined_assembly[
             "prefetch.global.L2 [$0];",
             NoneType,

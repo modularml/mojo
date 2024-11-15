@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof, triple_is_nvidia_cuda
+from sys import alignof, sizeof, is_nvidia_gpu, is_gpu
 from sys.intrinsics import (
     _mlirtype_is_eq,
     _type_is_eq,
@@ -40,7 +40,7 @@ from memory.memory import _free, _malloc
 
 @always_inline
 fn _default_alignment[type: AnyType]() -> Int:
-    return alignof[type]() if triple_is_nvidia_cuda() else 1
+    return alignof[type]() if is_gpu() else 1
 
 
 @always_inline
@@ -98,13 +98,13 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Create a null pointer."""
         self.address = __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @doc_private
     @always_inline
-    fn __init__(inout self, value: Self._mlir_type):
+    fn __init__(out self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
         Args:
@@ -113,7 +113,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
-    fn __init__(inout self, other: UnsafePointer[type, address_space, *_, **_]):
+    fn __init__(out self, other: UnsafePointer[type, address_space, *_, **_]):
         """Exclusivity parameter cast a pointer.
 
         Args:
@@ -124,7 +124,7 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -451,6 +451,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
+        invariant: Bool = False,
     ](self: UnsafePointer[Scalar[type], *_, **_]) -> SIMD[type, width]:
         """Loads the value the pointer points to.
 
@@ -462,6 +463,7 @@ struct UnsafePointer[
             width: The size of the SIMD vector.
             alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
+            invariant: Whether the memory is load invariant.
 
         Returns:
             The loaded value.
@@ -470,9 +472,13 @@ struct UnsafePointer[
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
+        constrained[
+            not volatile or volatile ^ invariant,
+            "both volatile and invariant cannot be set at the same time",
+        ]()
 
         @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+        if is_nvidia_gpu() and sizeof[type]() == 1 and alignment == 1:
             # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
             # regardless of the alignment that is passed. This causes issues if
             # this method is called on an unaligned pointer.
@@ -489,21 +495,30 @@ struct UnsafePointer[
                         alignment = alignment.value,
                         isVolatile = __mlir_attr.unit,
                     ]((self + i).address)
+                elif invariant:
+                    v[i] = __mlir_op.`pop.load`[
+                        alignment = alignment.value,
+                        isInvariant = __mlir_attr.unit,
+                    ]((self + i).address)
                 else:
                     v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
                         (self + i).address
                     )
             return v
 
+        var address = self.bitcast[SIMD[type, width]]().address
+
         @parameter
         if volatile:
             return __mlir_op.`pop.load`[
                 alignment = alignment.value, isVolatile = __mlir_attr.unit
-            ](self.bitcast[SIMD[type, width]]().address)
+            ](address)
+        elif invariant:
+            return __mlir_op.`pop.load`[
+                alignment = alignment.value, isInvariant = __mlir_attr.unit
+            ](address)
         else:
-            return __mlir_op.`pop.load`[alignment = alignment.value](
-                self.bitcast[SIMD[type, width]]().address
-            )
+            return __mlir_op.`pop.load`[alignment = alignment.value](address)
 
     @always_inline
     fn load[
@@ -512,6 +527,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
+        invariant: Bool = False,
     ](self: UnsafePointer[Scalar[type], *_, **_], offset: Scalar) -> SIMD[
         type, width
     ]:
@@ -526,6 +542,7 @@ struct UnsafePointer[
             width: The size of the SIMD vector.
             alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
+            invariant: Whether the memory is load invariant.
 
         Args:
             offset: The offset to load from.
@@ -535,7 +552,10 @@ struct UnsafePointer[
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
         return self.offset(int(offset)).load[
-            width=width, alignment=alignment, volatile=volatile
+            width=width,
+            alignment=alignment,
+            volatile=volatile,
+            invariant=invariant,
         ]()
 
     @always_inline("nodebug")
@@ -546,6 +566,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
+        invariant: Bool = False,
     ](self: UnsafePointer[Scalar[type], *_, **_], offset: T) -> SIMD[
         type, width
     ]:
@@ -560,6 +581,7 @@ struct UnsafePointer[
             width: The size of the SIMD vector.
             alignment: The minimal alignment of the address.
             volatile: Whether the operation is volatile or not.
+            invariant: Whether the memory is load invariant.
 
         Args:
             offset: The offset to load from.
@@ -568,7 +590,10 @@ struct UnsafePointer[
             The loaded value.
         """
         return self.offset(offset).load[
-            width=width, alignment=alignment, volatile=volatile
+            width=width,
+            alignment=alignment,
+            volatile=volatile,
+            invariant=invariant,
         ]()
 
     @always_inline
@@ -817,9 +842,7 @@ struct UnsafePointer[
         type: DType, //,
         *,
         width: Int = 1,
-        alignment: Int = alignof[
-            SIMD[type, width]
-        ]() if triple_is_nvidia_cuda() else 1,
+        alignment: Int = _default_alignment[type, width](),
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: SIMD[_, width],

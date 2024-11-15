@@ -1,0 +1,14 @@
+[project]
+name = "Operators for custom Mojo struct"
+version = "0.1.0"
+description = "An example of implementing operators for a custom Mojo struct"
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+
+[dependencies]
+max = "*"
+
+[tasks]
+main = "mojo run main.mojo"
+tests = "mojo test test_*.mojo"

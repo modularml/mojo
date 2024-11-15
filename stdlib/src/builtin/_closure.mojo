@@ -21,11 +21,11 @@ struct __ParameterClosureCaptureList[
     # Parameter closure invariant requires this function be marked 'capturing'.
     @parameter
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         self.value = __mlir_op.`kgen.capture_list.create`[callee=fn_ref]()
 
     @always_inline
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self.value = __mlir_op.`kgen.capture_list.copy`[callee=fn_ref](
             existing.value
         )

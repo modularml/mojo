@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer
+from memory import UnsafePointer, stack_allocation
 
 from sys import sizeof, alignof
 from sys.ffi import OpaquePointer
@@ -30,6 +30,7 @@ from python._bindings import (
     Pythonable,
     ConvertibleFromPython,
     PyMojoObject,
+    python_type_object,
     py_c_function_wrapper,
     check_argument_type,
     # Imported for use by the compiler
@@ -84,7 +85,7 @@ fn gen_pytype_wrapper[
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
     # TODO(MOCO-1307): Add support for constructor generation.
 
-    var type_obj = PyMojoObject[T].python_type_object[name](
+    var type_obj = python_type_object[T, name](
         methods=List[PyMethodDef](),
     )
 
@@ -115,7 +116,7 @@ fn add_wrapper_to_module[
 
 
 fn check_and_get_arg[
-    T: Pythonable
+    T: AnyType
 ](
     func_name: StringLiteral,
     type_name_id: StringLiteral,
@@ -125,7 +126,40 @@ fn check_and_get_arg[
     return check_argument_type[T](func_name, type_name_id, py_args[index])
 
 
-fn try_convert_arg[
+# NOTE:
+#   @always_inline is needed so that the stack_allocation() that appears in
+#   the definition below is valid in the _callers_ stack frame, effectively
+#   allowing us to "return" a pointer to stack-allocated data from this
+#   function.
+@always_inline
+fn check_and_get_or_convert_arg[
+    T: ConvertibleFromPython
+](
+    func_name: StringLiteral,
+    type_name_id: StringLiteral,
+    py_args: TypedPythonObject["Tuple"],
+    index: Int,
+) raises -> UnsafePointer[T]:
+    # Stack space to hold a converted value for this argument, if needed.
+    var converted_arg_ptr: UnsafePointer[T] = stack_allocation[1, T]()
+
+    try:
+        return check_and_get_arg[T](func_name, type_name_id, py_args, index)
+    except e:
+        converted_arg_ptr.init_pointee_move(
+            _try_convert_arg[T](
+                func_name,
+                type_name_id,
+                py_args,
+                index,
+            )
+        )
+        # Return a pointer to stack data. Only valid because this function is
+        # @always_inline.
+        return converted_arg_ptr
+
+
+fn _try_convert_arg[
     T: ConvertibleFromPython
 ](
     func_name: StringLiteral,

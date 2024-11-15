@@ -53,13 +53,13 @@ struct IntLiteral(
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor."""
         self.value = __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!kgen.int_literal`):
+    fn __init__(out self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
 
         Args:
