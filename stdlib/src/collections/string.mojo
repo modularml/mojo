@@ -1276,7 +1276,7 @@ struct String(
 
     fn __iter__[
         is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> _StringSliceIter[origin]:
+    ](self) -> _StringSliceIter[_lit_mut_cast[origin, is_mutable].result]:
         """Iterate over the string unicode characters.
 
         Parameters:
@@ -1286,13 +1286,15 @@ struct String(
         Returns:
             An iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[origin](
+        return _StringSliceIter[_lit_mut_cast[origin, is_mutable].result](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__[
         is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> _StringSliceIter[origin, forward=False]:
+    ](self) -> _StringSliceIter[
+        _lit_mut_cast[origin, is_mutable].result, forward=False
+    ]:
         """Iterate backwards over the string unicode characters.
 
         Parameters:
@@ -1302,9 +1304,9 @@ struct String(
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[origin, forward=False](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
+        return _StringSliceIter[
+            _lit_mut_cast[origin, is_mutable].result, forward=False
+        ](unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations

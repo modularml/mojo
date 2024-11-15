@@ -374,7 +374,7 @@ struct StringLiteral(
         origin: Origin[is_mutable]
         .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
         .result,
-    ](self) -> _StringSliceIter[origin]:
+    ](self) -> _StringSliceIter[_lit_mut_cast[origin, is_mutable].result]:
         """Iterate over the string unicode characters.
 
         Parameters:
@@ -394,7 +394,9 @@ struct StringLiteral(
         origin: Origin[is_mutable]
         .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
         .result,
-    ](self) -> _StringSliceIter[origin, forward=False]:
+    ](self) -> _StringSliceIter[
+        _lit_mut_cast[origin, is_mutable].result, forward=False
+    ]:
         """Iterate backwards over the string unicode characters.
 
         Parameters:
