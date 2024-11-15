@@ -66,6 +66,9 @@ def test_repr():
     assert_equal(repr("\\"), r"'\\'")
     assert_equal(repr("\x7f"), r"'\x7f'")
 
+    assert_equal(repr("0'123'4"), r'''"0'123'4"''')
+    assert_equal(ascii("0'123'4"), r'''"0'123'4"''')
+
     # Multi-byte characters
     # 2-byte
     assert_equal(ascii("Örnsköldsvik"), r"'\xd6rnsk\xf6ldsvik'")

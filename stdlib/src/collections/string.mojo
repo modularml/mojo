@@ -273,24 +273,23 @@ fn _repr[T: Stringlike, //](value: T) -> String:
     alias `\r` = Byte(ord("\r"))
     alias `r` = Byte(ord("r"))
 
-    span = Span[Byte, __origin_of(value)](
+    var span = Span[Byte, ImmutableAnyOrigin](
         ptr=value.unsafe_ptr(), length=value.byte_length()
     )
-    span_len = len(span)
+    var span_len = len(span)
     debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
-    nonprintable_python = span.count[func=_nonprintable_python]()
-    hex_prefix = 3 * nonprintable_python  # \xHH
-    b_len = value.byte_length()
-    length = b_len + hex_prefix + 2  # for the quotes
-    buf = String._buffer_type(capacity=length + 1)  # null terminator
+    var nonprintable_python = span.count[func=_nonprintable_python]()
+    var hex_prefix = 3 * nonprintable_python  # \xHH
+    var length = span_len + hex_prefix + 2  # for the quotes
+    var buf = String._buffer_type(capacity=length + 1)  # null terminator
 
-    use_dquote = False
+    var use_dquote = False
     v_ptr, b_ptr = value.unsafe_ptr(), buf.unsafe_ptr()
     v_idx, b_idx = 0, 1
 
     while v_idx < span_len:
-        b0 = v_ptr[v_idx]
-        seq_len = _utf8_first_byte_sequence_length(b0)
+        var b0 = v_ptr[v_idx]
+        var seq_len = _utf8_first_byte_sequence_length(b0)
         use_dquote = use_dquote or (b0 == `'`)
         # Python escapes backslashes but they are ASCII printable
         if b0 == `\\`:
@@ -457,7 +456,7 @@ fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], codepoint: Int):
         p[1] = `u`
     else:
         p[1] = `U`
-    idx = 2
+    var idx = 2
 
     @parameter
     for i in reversed(range(amnt_hex_bytes)):
@@ -489,28 +488,27 @@ fn _ascii[T: Stringlike, //](value: T) -> String:
     alias `'` = Byte(ord("'"))
     alias `"` = Byte(ord('"'))
 
-    span = Span[Byte, __origin_of(value)](
+    var span = Span[Byte, ImmutableAnyOrigin](
         ptr=value.unsafe_ptr(), length=value.byte_length()
     )
-    span_len = len(span)
+    var span_len = len(span)
     debug_assert(_is_valid_utf8(span), "invalid utf8 sequence")
-    non_printable_ascii = span.count[func=_nonprintable_ascii]()
-    continuation_bytes = span.count[func=_is_continuation_byte]()
-    hex_prefix = 3 * (non_printable_ascii + continuation_bytes)
-    b_len = value.byte_length()
-    length = b_len + hex_prefix + 2  # for the quotes
-    buf = String._buffer_type(capacity=length + 1)  # null terminator
+    var non_printable_ascii = span.count[func=_nonprintable_ascii]()
+    var continuation_bytes = span.count[func=_is_continuation_byte]()
+    var hex_prefix = 3 * (non_printable_ascii + continuation_bytes)
+    var length = span_len + hex_prefix + 2  # for the quotes
+    var buf = String._buffer_type(capacity=length + 1)  # null terminator
 
-    use_dquote = False
+    var use_dquote = False
     v_ptr, b_ptr = value.unsafe_ptr(), buf.unsafe_ptr()
     v_idx, b_idx = 0, 1
 
     while v_idx < span_len:
-        b0 = v_ptr[v_idx]
+        var b0 = v_ptr[v_idx]
         use_dquote = use_dquote or (b0 == `'`)
-        seq_len = _utf8_first_byte_sequence_length(b0)
-        b1 = v_ptr[v_idx + int(seq_len > 1)]
-        is_2byte_short = seq_len == 2 and b0 <= 0xC3
+        var seq_len = _utf8_first_byte_sequence_length(b0)
+        var b1 = v_ptr[v_idx + int(seq_len > 1)]
+        var is_2byte_short = seq_len == 2 and b0 <= 0xC3
         if isprintable(b0):
             b_ptr[b_idx] = b0
             b_idx += 1

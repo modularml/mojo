@@ -328,7 +328,7 @@ struct StringLiteral(
         string._buffer = buffer^
         return string
 
-    @always_inline
+    @no_inline
     fn __repr__(self) -> String:
         """Return a representation of the string instance. You don't need to
         call this method directly, use `repr("...")` instead.
