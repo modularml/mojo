@@ -25,7 +25,7 @@ f.close()
 """
 from utils import Span
 from builtin.io import _printf
-from sys.ffi import external_call, OpaquePointer
+from sys.ffi import external_call
 from sys.info import is_nvidia_gpu
 from memory import UnsafePointer
 

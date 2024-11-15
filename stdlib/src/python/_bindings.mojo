@@ -13,7 +13,7 @@
 
 from memory import UnsafePointer
 
-from sys.ffi import c_int, OpaquePointer
+from sys.ffi import c_int
 from sys.info import sizeof
 
 from os import abort
