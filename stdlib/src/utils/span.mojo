@@ -362,21 +362,21 @@ struct Span[
     fn count[
         D: DType, //, func: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w]
     ](self: Span[Scalar[D]]) -> Int:
-        """Count the amount of times the function returns True.
+        """Count the amount of times the function returns `True`.
 
         Parameters:
             D: The DType.
             func: The function to evaluate.
 
         Returns:
-            The amount of times the function returns True.
+            The amount of times the function returns `True`.
         """
 
         alias widths = (256, 128, 64, 32, 16, 8)
-        ptr = self.unsafe_ptr()
-        num_bytes = len(self)
-        amnt = 0
-        processed = 0
+        var ptr = self.unsafe_ptr()
+        var num_bytes = len(self)
+        var amnt = 0
+        var processed = 0
 
         @parameter
         for i in range(len(widths)):
@@ -384,8 +384,7 @@ struct Span[
 
             @parameter
             if simdwidthof[D]() >= w:
-                rest = num_bytes - processed
-                for _ in range(rest // w):
+                for _ in range((num_bytes - processed) // w):
                     var vec = (ptr + processed).load[width=w]()
 
                     @parameter
