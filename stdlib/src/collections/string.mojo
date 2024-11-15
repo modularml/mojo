@@ -855,7 +855,10 @@ struct String(
         """
         # TODO: maybe check byte by byte that there is no 0 ?
         # need Span.count() to be faster
-        debug_assert(bytes[-1] != 0, "byte Span must not be null terminated")
+        if len(bytes) > 0:
+            debug_assert(
+                bytes[-1] != 0, "byte Span must not be null terminated"
+            )
         self._iadd[False](bytes)
 
     fn write[*Ts: Writable](inout self, *args: *Ts):
