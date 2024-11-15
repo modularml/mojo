@@ -814,7 +814,7 @@ fn next[T: DType](inout value: _ZeroStartingScalarRange[T]) -> Scalar[T]:
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -830,7 +830,7 @@ fn next[T: DType](inout value: _SequentialScalarRange[T]) -> Scalar[T]:
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -846,7 +846,7 @@ fn next[T: DType](inout value: _StridedScalarRangeIterator[T]) -> Scalar[T]:
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -859,7 +859,7 @@ fn next(inout value: _UIntZeroStartingRange) -> UInt:
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -872,7 +872,7 @@ fn next(inout value: _UIntStridedRangeIterator) -> UInt:
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -891,7 +891,7 @@ fn next[
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -912,7 +912,7 @@ fn next[
     Returns:
         The iterator of the dict values.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
 
 
@@ -933,7 +933,7 @@ fn next[
     Returns:
         The iterator of the dict items.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     output = rebind[__type_of(output)](value.__next__())
 
 
@@ -947,5 +947,5 @@ fn next(inout value: _StringSliceIter) -> StringSlice[__type_of(value).origin]:
     Returns:
         The type's Iterator.
     """
-    debug_assert(bool(value), "iterator has no next value to yield")
+    debug_assert(value.__has_next__(), "iterator has no next value to yield")
     return value.__next__()
