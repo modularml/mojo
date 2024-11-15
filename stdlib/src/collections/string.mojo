@@ -136,19 +136,19 @@ fn _ord[O: ImmutableOrigin, //](s: StringSlice[O]) -> Int:
 
     if s.byte_length() == 0:
         return 0
-    p = s.unsafe_ptr()
-    b0 = p[0]
-    num_bytes = _utf8_first_byte_sequence_length(b0)
+    var p = s.unsafe_ptr()
+    var b0 = p[0]
+    var num_bytes = _utf8_first_byte_sequence_length(b0)
     debug_assert(
         s.byte_length() == num_bytes, "input string must be one character"
     )
     debug_assert(1 <= num_bytes <= 4, "invalid UTF-8 byte ", b0, " at index 0")
     alias c_byte_mask = 0b0011_1111
-    b0_mask = 0b1111_1111 >> (num_bytes + int(num_bytes > 1))
-    shift = int((6 * (num_bytes - 1)))
-    result = int(b0 & b0_mask) << shift
+    var b0_mask = 0b1111_1111 >> (num_bytes + int(num_bytes > 1))
+    var shift = int((6 * (num_bytes - 1)))
+    var result = int(b0 & b0_mask) << shift
     for i in range(1, num_bytes):
-        b = p[i]
+        var b = p[i]
         debug_assert(
             _is_continuation_byte(b), "invalid UTF-8 byte ", b, " at index ", i
         )
@@ -184,7 +184,7 @@ fn _ord[num_bytes: Int](*args: Byte) -> Int:
 
     @parameter
     for i in range(1, num_bytes):
-        b = args[i]
+        var b = args[i]
         debug_assert(
             _is_continuation_byte(b), "invalid UTF-8 byte ", b, " at index ", i
         )
@@ -234,8 +234,8 @@ fn chr(c: Int) -> String:
     .
     """
 
-    num_bytes = _unicode_codepoint_utf8_byte_length(c)
-    p = UnsafePointer[UInt8].alloc(num_bytes + 1)
+    var num_bytes = _unicode_codepoint_utf8_byte_length(c)
+    var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
     _shift_unicode_to_utf8(p, c, num_bytes)
     # TODO: decide whether to use replacement char (�) or raise ValueError
     # if not _is_valid_utf8(p, num_bytes):
