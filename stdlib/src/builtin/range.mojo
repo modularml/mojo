@@ -645,31 +645,41 @@ trait _Iterator:
     fn __iter__(self) -> Self:
         ...
 
+    fn __has_next__(self) -> Bool:
+        ...
+
 
 # TODO: this is the goal
-# trait _Iterator[T: AnyType]:
-#     fn __iter__(self) -> Self:
+#     fn __next__(inout self) -> ref [origin]T:
 #         ...
 
-#     fn __next__(inout self) -> T:
-#         ...
-
-#     fn __has_next__(self) -> Bool:
-#         ...
 
 #     fn __bool__(self) -> Bool:
 #         return self.__has_next__()
 
 
 # trait _Iterable[T: AnyType]:
-#     fn __iter__(ref [_]self) -> _Iterator[T]:
+#     fn __iter__[
+#         is_mutable: Bool, origin: Origin[is_mutable].type
+#     ](ref [_]self) -> _Iterator[T, origin]:
 #         ...
 
 
-# fn iter[T: AnyType, I: _Iterable[T]](ref [_]value: I) -> _Iterator[T]:
-#     return value.__iter__()
+# fn iter[
+#     is_mutable: Bool,
+#     origin: Origin[is_mutable].type,
+#     T: AnyType,
+#     I: _Iterable[T],
+# ](ref [_]value: I) -> _Iterator[T, origin]:
+#     return value.__iter__[is_mutable, origin]()
 
-# fn next[T: AnyType, I: _Iterable[T]](value: I) -> T:
+
+# fn next[
+#     is_mutable: Bool,
+#     origin: Origin[is_mutable].type,
+#     T: AnyType,
+#     I: _Iterable[T],
+# ](value: I) -> T:
 #     debug_assert(bool(value), "iterator has no next value to yield")
 #     return value.__next__()
 
