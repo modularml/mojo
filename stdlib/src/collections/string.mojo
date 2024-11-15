@@ -76,8 +76,8 @@ fn ord[T: Stringlike, //](ref [_]s: T) -> Int:
     .
     """
 
-    # FIXME(#933): llvm intrinsic can't recognize pop value when trying to
-    # fold ctlz at comp time
+    # FIXME(#933): llvm intrinsic can't recognize !pop.scalar<ui8> value when
+    # trying to fold ctlz at comp time
     @parameter
     if _type_is_eq[T, StringLiteral]():
         var v = rebind[StringLiteral](s)
@@ -182,6 +182,7 @@ fn _ord[num_bytes: Int](*args: Byte) -> Int:
         "invalid first byte",
     )
 
+    @parameter
     for i in range(1, num_bytes):
         b = args[i]
         debug_assert(
