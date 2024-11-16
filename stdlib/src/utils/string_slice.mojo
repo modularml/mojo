@@ -267,6 +267,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     # ===------------------------------------------------------------------===#
 
     @always_inline
+    @implicit
     fn __init__(out self: StaticString, lit: StringLiteral):
         """Construct a new `StringSlice` from a `StringLiteral`.
 
@@ -348,6 +349,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         self._slice = other._slice
 
+    @implicit
     fn __init__[
         O: ImmutableOrigin, //
     ](inout self: StringSlice[O], ref [O]value: String):

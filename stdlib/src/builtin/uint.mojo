@@ -60,6 +60,7 @@ struct UInt(IntLike, _HashableWithHasher):
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         """Construct UInt from the given index value.
 
@@ -70,6 +71,7 @@ struct UInt(IntLike, _HashableWithHasher):
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct UInt from the given Index value.
 
@@ -81,6 +83,7 @@ struct UInt(IntLike, _HashableWithHasher):
         )
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Construct UInt from the given index value.
 
@@ -90,6 +93,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self.value = value.value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Construct UInt from the given IntLiteral value.
 

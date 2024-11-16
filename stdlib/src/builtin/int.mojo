@@ -321,6 +321,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         """Construct Int from the given index value.
 
@@ -331,6 +332,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
 
@@ -345,6 +347,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
 
@@ -359,6 +362,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
 
@@ -373,6 +377,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
 
@@ -384,6 +389,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Construct Int from the given IntLiteral value.
 
@@ -393,6 +399,7 @@ struct Int(
         self = value.__int__()
 
     @always_inline("nodebug")
+    @implicit
     fn __init__[IndexerTy: Indexer](inout self, value: IndexerTy):
         """Construct Int from the given Indexer value.
 
@@ -405,6 +412,7 @@ struct Int(
         self = value.__index__()
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: UInt):
         """Construct Int from the given UInt value.
 
