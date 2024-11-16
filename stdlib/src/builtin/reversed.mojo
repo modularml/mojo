@@ -15,7 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import Dict
+from collections import Deque, Dict
+from collections.deque import _DequeIter
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
 
@@ -93,6 +94,25 @@ fn reversed[
 
     Returns:
         The reversed iterator of the list.
+    """
+    return value.__reversed__()
+
+
+fn reversed[
+    T: CollectionElement
+](ref [_]value: Deque[T]) -> _DequeIter[T, __origin_of(value), False]:
+    """Get a reversed iterator of the deque.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        T: The type of the elements in the deque.
+
+    Args:
+        value: The deque to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the deque.
     """
     return value.__reversed__()
 
