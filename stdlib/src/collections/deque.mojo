@@ -85,7 +85,7 @@ struct Deque[ElementType: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     fn __init__(
-        inout self,
+        out self,
         *,
         owned elements: Optional[List[ElementType]] = None,
         capacity: Int = self.default_capacity,
@@ -537,6 +537,28 @@ struct Deque[ElementType: CollectionElement](
         self._head = 0
         self._tail = 0
 
+    fn count[
+        EqualityElementType: EqualityComparableCollectionElement, //
+    ](self: Deque[EqualityElementType], value: EqualityElementType) -> Int:
+        """Counts the number of occurrences of a `value` in the deque.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the trait `EqualityComparableCollectionElement`.
+
+        Args:
+            value: The value to count.
+
+        Returns:
+            The number of occurrences of the value in the deque.
+        """
+        count = 0
+        for i in range(len(self)):
+            offset = self._physical_index(self._head + i)
+            if (self._data + offset)[] == value:
+                count += 1
+        return count
+
     fn extend(inout self, owned values: List[ElementType]):
         """Extends the right side of the deque by consuming elements of the list argument.
 
@@ -602,6 +624,259 @@ struct Deque[ElementType: CollectionElement](
         for i in range(n_move_values):
             self._head = self._physical_index(self._head - 1)
             (src + i).move_pointee_into(self._data + self._head)
+
+    fn index[
+        EqualityElementType: EqualityComparableCollectionElement, //
+    ](
+        self: Deque[EqualityElementType],
+        value: EqualityElementType,
+        start: Int = 0,
+        stop: Optional[Int] = None,
+    ) raises -> Int:
+        """Returns the index of the first occurrence of a `value` in a deque
+        restricted by the range given the `start` and `stop` bounds.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the `EqualityComparableCollectionElement` trait.
+
+        Args:
+            value: The value to search for.
+            start: The starting index of the search, treated as a slice index
+                (defaults to 0).
+            stop: The ending index of the search, treated as a slice index
+                (defaults to None, which means the end of the deque).
+
+        Returns:
+            The index of the first occurrence of the value in the deque.
+
+        Raises:
+            ValueError: If the value is not found in the deque.
+        """
+        start_normalized = start
+
+        if stop is None:
+            stop_normalized = len(self)
+        else:
+            stop_normalized = stop.value()
+
+        if start_normalized < 0:
+            start_normalized += len(self)
+        if stop_normalized < 0:
+            stop_normalized += len(self)
+
+        start_normalized = max(0, min(start_normalized, len(self)))
+        stop_normalized = max(0, min(stop_normalized, len(self)))
+
+        for idx in range(start_normalized, stop_normalized):
+            offset = self._physical_index(self._head + idx)
+            if (self._data + offset)[] == value:
+                return idx
+        raise "ValueError: Given element is not in deque"
+
+    fn insert(inout self, idx: Int, owned value: ElementType) raises:
+        """Inserts the `value` into the deque at position `idx`.
+
+        Args:
+            idx: The position to insert the value into.
+            value: The value to insert.
+
+        Raises:
+            IndexError: If deque is already at its maximum size.
+        """
+        deque_len = len(self)
+
+        if deque_len == self._maxlen:
+            raise "IndexError: Deque is already at its maximum size"
+
+        normalized_idx = idx
+
+        if normalized_idx < -deque_len:
+            normalized_idx = 0
+
+        if normalized_idx > deque_len:
+            normalized_idx = deque_len
+
+        if normalized_idx < 0:
+            normalized_idx += deque_len
+
+        if normalized_idx <= deque_len // 2:
+            for i in range(normalized_idx):
+                src = self._physical_index(self._head + i)
+                dst = self._physical_index(src - 1)
+                (self._data + src).move_pointee_into(self._data + dst)
+            self._head = self._physical_index(self._head - 1)
+        else:
+            for i in range(deque_len - normalized_idx):
+                dst = self._physical_index(self._tail - i)
+                src = self._physical_index(dst - 1)
+                (self._data + src).move_pointee_into(self._data + dst)
+            self._tail = self._physical_index(self._tail + 1)
+
+        offset = self._physical_index(self._head + normalized_idx)
+        (self._data + offset).init_pointee_move(value^)
+
+        if self._head == self._tail:
+            self._realloc(self._capacity << 1)
+
+    fn remove[
+        EqualityElementType: EqualityComparableCollectionElement, //
+    ](
+        inout self: Deque[EqualityElementType],
+        value: EqualityElementType,
+    ) raises:
+        """Removes the first occurrence of the `value`.
+
+        Parameters:
+            EqualityElementType: The type of the elements in the deque.
+                Must implement the `EqualityComparableCollectionElement` trait.
+
+        Args:
+            value: The value to remove.
+
+        Raises:
+            ValueError: If the value is not found in the deque.
+        """
+        deque_len = len(self)
+        for idx in range(deque_len):
+            offset = self._physical_index(self._head + idx)
+            if (self._data + offset)[] == value:
+                (self._data + offset).destroy_pointee()
+
+                if idx < deque_len // 2:
+                    for i in reversed(range(idx)):
+                        src = self._physical_index(self._head + i)
+                        dst = self._physical_index(src + 1)
+                        (self._data + src).move_pointee_into(self._data + dst)
+                    self._head = self._physical_index(self._head + 1)
+                else:
+                    for i in range(idx + 1, deque_len):
+                        src = self._physical_index(self._head + i)
+                        dst = self._physical_index(src - 1)
+                        (self._data + src).move_pointee_into(self._data + dst)
+                    self._tail = self._physical_index(self._tail - 1)
+
+                if (
+                    self._shrink
+                    and self._capacity > self._min_capacity
+                    and self._capacity // 4 >= len(self)
+                ):
+                    self._realloc(self._capacity >> 1)
+
+                return
+
+        raise "ValueError: Given element is not in deque"
+
+    fn peek(self) raises -> ElementType:
+        """Inspect the last (rightmost) element of the deque without removing it.
+
+        Returns:
+            The the last (rightmost) element of the deque.
+
+        Raises:
+            IndexError: If the deque is empty.
+        """
+        if self._head == self._tail:
+            raise "IndexError: Deque is empty"
+
+        return (self._data + self._physical_index(self._tail - 1))[]
+
+    fn peekleft(self) raises -> ElementType:
+        """Inspect the first (leftmost) element of the deque without removing it.
+
+        Returns:
+            The the first (leftmost) element of the deque.
+
+        Raises:
+            IndexError: If the deque is empty.
+        """
+        if self._head == self._tail:
+            raise "IndexError: Deque is empty"
+
+        return (self._data + self._head)[]
+
+    fn pop(inout self) raises -> ElementType as element:
+        """Removes and returns the element from the right side of the deque.
+
+        Returns:
+            The popped value.
+
+        Raises:
+            IndexError: If the deque is empty.
+        """
+        if self._head == self._tail:
+            raise "IndexError: Deque is empty"
+
+        self._tail = self._physical_index(self._tail - 1)
+        element = (self._data + self._tail).take_pointee()
+
+        if (
+            self._shrink
+            and self._capacity > self._min_capacity
+            and self._capacity // 4 >= len(self)
+        ):
+            self._realloc(self._capacity >> 1)
+
+        return
+
+    fn popleft(inout self) raises -> ElementType as element:
+        """Removes and returns the element from the left side of the deque.
+
+        Returns:
+            The popped value.
+
+        Raises:
+            IndexError: If the deque is empty.
+        """
+        if self._head == self._tail:
+            raise "IndexError: Deque is empty"
+
+        element = (self._data + self._head).take_pointee()
+        self._head = self._physical_index(self._head + 1)
+
+        if (
+            self._shrink
+            and self._capacity > self._min_capacity
+            and self._capacity // 4 >= len(self)
+        ):
+            self._realloc(self._capacity >> 1)
+
+        return
+
+    fn reverse(inout self):
+        """Reverses the elements of the deque in-place."""
+        last = self._head + len(self) - 1
+        for i in range(len(self) // 2):
+            src = self._physical_index(self._head + i)
+            dst = self._physical_index(last - i)
+            tmp = (self._data + dst).take_pointee()
+            (self._data + src).move_pointee_into(self._data + dst)
+            (self._data + src).init_pointee_move(tmp^)
+
+    fn rotate(inout self, n: Int = 1):
+        """Rotates the deque by `n` steps.
+
+        If `n` is positive, rotates to the right.
+        If `n` is negative, rotates to the left.
+
+        Args:
+            n: Number of steps to rotate the deque
+                (defaults to 1).
+        """
+        if n < 0:
+            for _ in range(-n):
+                (self._data + self._head).move_pointee_into(
+                    self._data + self._tail
+                )
+                self._tail = self._physical_index(self._tail + 1)
+                self._head = self._physical_index(self._head + 1)
+        else:
+            for _ in range(n):
+                self._tail = self._physical_index(self._tail - 1)
+                self._head = self._physical_index(self._head - 1)
+                (self._data + self._tail).move_pointee_into(
+                    self._data + self._head
+                )
 
     fn _compute_pop_and_move_counts(
         self, len_self: Int, len_values: Int
