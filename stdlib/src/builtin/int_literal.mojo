@@ -59,6 +59,7 @@ struct IntLiteral(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
 

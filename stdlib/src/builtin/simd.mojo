@@ -248,6 +248,7 @@ struct SIMD[type: DType, size: Int](
     #    self.__copyinit__(other)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: UInt):
         """Initializes the SIMD vector with an unsigned integer.
 
@@ -260,6 +261,7 @@ struct SIMD[type: DType, size: Int](
         self = Self(value.value)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Initializes the SIMD vector with a signed integer.
 
@@ -273,6 +275,7 @@ struct SIMD[type: DType, size: Int](
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
 
@@ -287,6 +290,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Initializes the SIMD vector with an integer.
 
@@ -312,6 +316,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self: SIMD[DType.bool, size], value: Bool, /):
         """Initializes the SIMD vector with a bool value.
 
@@ -330,6 +335,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(
         inout self,
         value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
@@ -343,6 +349,7 @@ struct SIMD[type: DType, size: Int](
         self.value = value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Scalar[type], /):
         """Constructs a SIMD vector by splatting a scalar value.
 
