@@ -34,12 +34,14 @@ fn _accelerator_arch() -> StringLiteral:
 
 
 fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
-    return __mlir_attr[
-        `#kgen.param.expr<target_get_field,`,
-        target,
-        `, "arch" : !kgen.string`,
-        `> : !kgen.string`,
-    ]
+    return String(
+        __mlir_attr[
+            `#kgen.param.expr<target_get_field,`,
+            target,
+            `, "arch" : !kgen.string`,
+            `> : !kgen.string`,
+        ]
+    )
 
 
 @always_inline("nodebug")
