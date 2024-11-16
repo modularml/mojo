@@ -734,6 +734,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
+    @implicit
     fn __init__(out self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
@@ -783,6 +784,7 @@ struct String(
         """
         self.__copyinit__(other)
 
+    @implicit
     fn __init__(out self, str: StringRef):
         """Construct a string from a StringRef object.
 
@@ -796,6 +798,7 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
+    @implicit
     fn __init__(out self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
@@ -819,6 +822,7 @@ struct String(
         self = Self(buffer^)
 
     @always_inline
+    @implicit
     fn __init__(out self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 

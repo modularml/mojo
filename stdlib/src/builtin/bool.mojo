@@ -131,6 +131,7 @@ struct Bool(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.i1):
         """Construct a Bool value given a __mlir_type.i1 value.
 
@@ -141,6 +142,7 @@ struct Bool(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<bool>`):
         """Construct a Bool value given a `!pop.scalar<bool>` value.
 
@@ -152,6 +154,7 @@ struct Bool(
         )
 
     @always_inline("nodebug")
+    @implicit
     fn __init__[T: ImplicitlyBoolable, //](inout self, value: T):
         """Convert an ImplicitlyBoolable value to a Bool.
 
@@ -164,6 +167,7 @@ struct Bool(
         self = value.__bool__()
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: SIMD[DType.bool, 1]):
         """Convert a scalar SIMD value to a Bool.
 
@@ -252,7 +256,7 @@ struct Bool(
         Returns:
             1 if the Bool is True, 0 otherwise.
         """
-        return _select_register_value(self.value, Int(1), Int(0))
+        return _select_register_value(self, Int(1), Int(0))
 
     @always_inline("nodebug")
     fn __float__(self) -> Float64:
@@ -261,7 +265,7 @@ struct Bool(
         Returns:
             1.0 if True else 0.0 otherwise.
         """
-        return _select_register_value(self.value, Float64(1.0), Float64(0.0))
+        return _select_register_value(self, Float64(1.0), Float64(0.0))
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:
