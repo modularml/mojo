@@ -40,6 +40,11 @@ struct FromNone:
     fn __init__(out self, none: NoneType):
         self.value = -1
 
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @always_inline
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        self = NoneType()
+
     fn __init__(out self, value: Int):
         self.value = value
 

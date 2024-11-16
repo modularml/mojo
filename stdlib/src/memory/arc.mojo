@@ -56,7 +56,7 @@ struct _ArcInner[T: Movable]:
 
     fn __init__(out self, owned value: T):
         """Create an initialized instance of this with a refcount of 1."""
-        self.refcount = 1
+        self.refcount = Scalar[DType.uint64](1)
         self.payload = value^
 
     fn add_ref(inout self):

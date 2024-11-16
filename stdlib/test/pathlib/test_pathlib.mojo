@@ -91,7 +91,7 @@ fn get_user_path() -> Path:
     @parameter
     if os_is_windows():
         return Path("C:") / "Users" / "user"
-    return "/home/user"
+    return Path("/home/user")
 
 
 fn get_current_home() -> String:
