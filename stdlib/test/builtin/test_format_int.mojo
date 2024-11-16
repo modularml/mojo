@@ -17,14 +17,14 @@ from testing import assert_equal
 
 
 fn test_format_int() raises:
-    assert_equal(_format_int[DType.index](123), "123")
-    assert_equal(_format_int[DType.index](4, 2), "100")
-    assert_equal(_format_int[DType.index](255, 2), "11111111")
-    assert_equal(_format_int[DType.index](254, 2), "11111110")
-    assert_equal(_format_int[DType.index](255, 36), "73")
+    assert_equal(_format_int(Int64(123)), "123")
+    assert_equal(_format_int(Int64(4), 2), "100")
+    assert_equal(_format_int(Int64(255), 2), "11111111")
+    assert_equal(_format_int(Int64(254), 2), "11111110")
+    assert_equal(_format_int(Int64(255), 36), "73")
 
-    assert_equal(_format_int[DType.index](-123, 10), "-123")
-    assert_equal(_format_int[DType.index](-999_999_999, 10), "-999999999")
+    assert_equal(_format_int(Int64(-123), 10), "-123")
+    assert_equal(_format_int(Int64(-999_999_999), 10), "-999999999")
 
     #
     # Max and min i64 values in base 10
@@ -152,6 +152,11 @@ def test_different_prefix():
     assert_equal(oct(Scalar[DType.bool](True), prefix="test"), "test1")
 
 
+def test_comptime():
+    alias hex_str = hex(31)
+    assert_equal(hex_str, "0x1f")
+
+
 def main():
     test_format_int()
     test_hex()
@@ -162,3 +167,4 @@ def main():
     test_oct_scalar()
     test_oct_bool()
     test_oct_int()
+    test_comptime()

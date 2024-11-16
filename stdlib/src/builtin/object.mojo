@@ -572,29 +572,25 @@ struct _ObjectImpl(
             writer.write("None")
             return
         if self.is_bool():
-            writer.write(str(self.get_as_bool()))
+            writer.write(self.get_as_bool())
             return
         if self.is_int():
-            writer.write(str(self.get_as_int()))
+            writer.write(self.get_as_int())
             return
         if self.is_float():
-            writer.write(str(self.get_as_float()))
+            writer.write(self.get_as_float())
             return
         if self.is_str():
             writer.write(
-                "'"
-                + str(
-                    StringRef(
-                        self.get_as_string().data, self.get_as_string().length
-                    )
-                )
-                + "'"
+                "'",
+                StringRef(
+                    self.get_as_string().data, self.get_as_string().length
+                ),
+                "'",
             )
             return
         if self.is_func():
-            writer.write(
-                "Function at address " + hex(int(self.get_as_func().value))
-            )
+            writer.write("Function at address ", self.get_as_func().value)
             return
         if self.is_list():
             writer.write(String("["))
