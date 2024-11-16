@@ -239,6 +239,19 @@ what we publish.
   allocate additional capacity.
   ([PR #3755](https://github.com/modularml/mojo/pull/3755) by [@thatstoasty](https://github.com/thatstoasty)).
 
+- Introduced a new `Deque` (double-ended queue) collection type, based on a
+  dynamically resizing circular buffer for efficient O(1) additions and removals
+  at both ends as well as O(1) direct access to all elements.
+  
+  The `Deque` supports the full Python `collections.deque` API, ensuring that all
+  expected deque operations perform as in Python.
+
+  Enhancements to the standard Python API include `peek()` and `peekleft()`
+  methods for non-destructive access to the last and first elements, and advanced
+  constructor options (`capacity`, `min_capacity`, and `shrink`) for customizing
+  memory allocation and performance. These options allow for optimized memory usage
+  and reduced buffer reallocations, providing flexibility based on application requirements.
+
 ### 🦋 Changed
 
 - The argument convention for `__init__` methods has been changed from `inout`

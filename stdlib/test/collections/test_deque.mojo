@@ -218,6 +218,77 @@ fn test_impl_append_with_maxlen() raises:
     assert_equal((q._data + 3)[], 3)
 
 
+fn test_impl_appendleft() raises:
+    q = Deque[Int](capacity=2)
+
+    q.appendleft(0)
+    # head wrapped to the end of the buffer
+    assert_equal(q._head, 1)
+    assert_equal(q._tail, 0)
+    assert_equal(q._capacity, 2)
+    assert_equal((q._data + 1)[], 0)
+
+    q.appendleft(1)
+    # re-allocated buffer and moved all elements
+    assert_equal(q._head, 0)
+    assert_equal(q._tail, 2)
+    assert_equal(q._capacity, 4)
+    assert_equal((q._data + 0)[], 1)
+    assert_equal((q._data + 1)[], 0)
+
+    q.appendleft(2)
+    # head wrapped to the end of the buffer
+    assert_equal(q._head, 3)
+    assert_equal(q._tail, 2)
+    assert_equal(q._capacity, 4)
+    assert_equal((q._data + 3)[], 2)
+    assert_equal((q._data + 0)[], 1)
+    assert_equal((q._data + 1)[], 0)
+
+    # simulate pop()
+    q._tail -= 1
+    q.appendleft(3)
+    assert_equal(q._head, 2)
+    assert_equal(q._tail, 1)
+    assert_equal(q._capacity, 4)
+    assert_equal((q._data + 2)[], 3)
+    assert_equal((q._data + 3)[], 2)
+    assert_equal((q._data + 0)[], 1)
+
+    q.appendleft(4)
+    # re-allocated buffer and moved all elements
+    assert_equal(q._head, 0)
+    assert_equal(q._tail, 4)
+    assert_equal(q._capacity, 8)
+    assert_equal((q._data + 0)[], 4)
+    assert_equal((q._data + 1)[], 3)
+    assert_equal((q._data + 2)[], 2)
+    assert_equal((q._data + 3)[], 1)
+
+
+fn test_impl_appendleft_with_maxlen() raises:
+    q = Deque[Int](maxlen=3)
+
+    assert_equal(q._maxlen, 3)
+    assert_equal(q._capacity, 4)
+
+    q.appendleft(0)
+    q.appendleft(1)
+    q.appendleft(2)
+    assert_equal(q._head, 1)
+    assert_equal(q._tail, 0)
+
+    q.appendleft(3)
+    # first popped the rightmost element
+    # so there was no re-allocation of buffer
+    assert_equal(q._head, 0)
+    assert_equal(q._tail, 3)
+    assert_equal(q._capacity, 4)
+    assert_equal((q._data + 0)[], 3)
+    assert_equal((q._data + 1)[], 2)
+    assert_equal((q._data + 2)[], 1)
+
+
 fn test_impl_extend() raises:
     q = Deque[Int](maxlen=4)
     lst = List[Int](0, 1, 2)
@@ -278,6 +349,122 @@ fn test_impl_extend() raises:
     assert_equal((q._data + 9)[], 3)
     assert_equal((q._data + 14)[], 8)
     assert_equal((q._data + 15)[], 9)
+
+
+fn test_impl_extendleft() raises:
+    q = Deque[Int](maxlen=4)
+    lst = List[Int](0, 1, 2)
+
+    q.extendleft(lst)
+    # head wrapped to the end of the buffer
+    assert_equal(q._capacity, 8)
+    assert_equal(q._head, 5)
+    assert_equal(q._tail, 0)
+    assert_equal((q._data + 5)[], 2)
+    assert_equal((q._data + 6)[], 1)
+    assert_equal((q._data + 7)[], 0)
+
+    q.extendleft(lst)
+    # popped the last 2 elements
+    assert_equal(q._capacity, 8)
+    assert_equal(q._head, 2)
+    assert_equal(q._tail, 6)
+    assert_equal((q._data + 2)[], 2)
+    assert_equal((q._data + 3)[], 1)
+    assert_equal((q._data + 4)[], 0)
+    assert_equal((q._data + 5)[], 2)
+
+    # turn off `maxlen` restriction
+    q._maxlen = -1
+    q.extendleft(lst)
+    assert_equal(q._capacity, 8)
+    assert_equal(q._head, 7)
+    assert_equal(q._tail, 6)
+    assert_equal((q._data + 7)[], 2)
+    assert_equal((q._data + 0)[], 1)
+    assert_equal((q._data + 1)[], 0)
+    assert_equal((q._data + 2)[], 2)
+    assert_equal((q._data + 3)[], 1)
+    assert_equal((q._data + 4)[], 0)
+    assert_equal((q._data + 5)[], 2)
+
+    # turn on `maxlen` and force to re-allocate
+    q._maxlen = 8
+    q.extendleft(lst)
+    assert_equal(q._capacity, 16)
+    assert_equal(q._head, 13)
+    assert_equal(q._tail, 5)
+    # has to popleft the last 2 elements
+    assert_equal((q._data + 13)[], 2)
+    assert_equal((q._data + 14)[], 1)
+    assert_equal((q._data + 3)[], 2)
+    assert_equal((q._data + 4)[], 1)
+
+    # extend with the list that is longer than `maxlen`
+    # has to pop all deque elements and some initial
+    # elements from the list as well
+    lst = List(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    q.extendleft(lst)
+    assert_equal(q._capacity, 16)
+    assert_equal(q._head, 5)
+    assert_equal(q._tail, 13)
+    assert_equal((q._data + 5)[], 9)
+    assert_equal((q._data + 6)[], 8)
+    assert_equal((q._data + 11)[], 3)
+    assert_equal((q._data + 12)[], 2)
+
+
+fn test_impl_insert() raises:
+    q = Deque[Int](0, 1, 2, 3, 4, 5)
+
+    q.insert(0, 6)
+    assert_equal(q._head, q.default_capacity - 1)
+    assert_equal((q._data + q._head)[], 6)
+    assert_equal((q._data + 0)[], 0)
+
+    q.insert(1, 7)
+    assert_equal(q._head, q.default_capacity - 2)
+    assert_equal((q._data + q._head + 0)[], 6)
+    assert_equal((q._data + q._head + 1)[], 7)
+
+    q.insert(8, 8)
+    assert_equal(q._tail, 7)
+    assert_equal((q._data + q._tail - 1)[], 8)
+    assert_equal((q._data + q._tail - 2)[], 5)
+
+    q.insert(8, 9)
+    assert_equal(q._tail, 8)
+    assert_equal((q._data + q._tail - 1)[], 8)
+    assert_equal((q._data + q._tail - 2)[], 9)
+
+
+fn test_impl_pop() raises:
+    q = Deque[Int](capacity=2, min_capacity=2)
+    with assert_raises():
+        _ = q.pop()
+
+    q.append(1)
+    q.appendleft(2)
+    assert_equal(q._capacity, 4)
+    assert_equal(q.pop(), 1)
+    assert_equal(len(q), 1)
+    assert_equal(q[0], 2)
+    assert_equal(q._capacity, 2)
+
+
+fn test_popleft() raises:
+    q = Deque[Int](capacity=2, min_capacity=2)
+    assert_equal(q._capacity, 2)
+    with assert_raises():
+        _ = q.popleft()
+
+    q.appendleft(1)
+    q.append(2)
+    assert_equal(q._capacity, 4)
+    assert_equal(q.popleft(), 1)
+    assert_equal(len(q), 1)
+    assert_equal(q[0], 2)
+    assert_equal(q._capacity, 2)
 
 
 fn test_impl_clear() raises:
@@ -587,11 +774,198 @@ fn test_ne() raises:
     assert_true(q != p)
 
 
+fn test_count() raises:
+    q = Deque(1, 2, 1, 2, 3, 1)
+
+    assert_equal(q.count(1), 3)
+    assert_equal(q.count(2), 2)
+    assert_equal(q.count(3), 1)
+    assert_equal(q.count(4), 0)
+
+    q.appendleft(2)
+    assert_equal(q.count(2), 3)
+
+
 fn test_contains() raises:
     q = Deque[Int](1, 2, 3)
 
     assert_true(1 in q)
     assert_false(4 in q)
+
+
+fn test_index() raises:
+    q = Deque(1, 2, 1, 2, 3, 1)
+
+    assert_equal(q.index(2), 1)
+    assert_equal(q.index(2, 1), 1)
+    assert_equal(q.index(2, 1, 3), 1)
+    assert_equal(q.index(2, stop=4), 1)
+    assert_equal(q.index(1, -12, 10), 0)
+    assert_equal(q.index(1, -4), 2)
+    assert_equal(q.index(1, -3), 5)
+    with assert_raises():
+        _ = q.index(4)
+
+
+fn test_insert() raises:
+    q = Deque[Int](capacity=4, maxlen=7)
+
+    # negative index outbound
+    q.insert(-10, 0)
+    # Deque(0)
+    assert_equal(q[0], 0)
+    assert_equal(len(q), 1)
+
+    # zero index
+    q.insert(0, 1)
+    # Deque(1, 0)
+    assert_equal(q[0], 1)
+    assert_equal(q[1], 0)
+    assert_equal(len(q), 2)
+
+    # # positive index eq length
+    q.insert(2, 2)
+    # Deque(1, 0, 2)
+    assert_equal(q[2], 2)
+    assert_equal(q[1], 0)
+
+    # # positive index outbound
+    q.insert(10, 3)
+    # Deque(1, 0, 2, 3)
+    assert_equal(q[3], 3)
+    assert_equal(q[2], 2)
+
+    # assert deque buffer reallocated
+    assert_equal(len(q), 4)
+    assert_equal(q._capacity, 8)
+
+    # # positive index inbound
+    q.insert(1, 4)
+    # Deque(1, 4, 0, 2, 3)
+    assert_equal(q[1], 4)
+    assert_equal(q[0], 1)
+    assert_equal(q[2], 0)
+
+    # # positive index inbound
+    q.insert(3, 5)
+    # Deque(1, 4, 0, 5, 2, 3)
+    assert_equal(q[3], 5)
+    assert_equal(q[2], 0)
+    assert_equal(q[4], 2)
+
+    # # negative index inbound
+    q.insert(-3, 6)
+    # Deque(1, 4, 0, 6, 5, 2, 3)
+    assert_equal(q[3], 6)
+    assert_equal(q[2], 0)
+    assert_equal(q[4], 5)
+
+    # deque is at its maxlen
+    assert_equal(len(q), 7)
+    with assert_raises():
+        q.insert(3, 7)
+
+
+fn test_remove() raises:
+    q = Deque[Int](min_capacity=32)
+    q.extend(List(0, 1, 0, 2, 3, 0, 4, 5))
+    assert_equal(len(q), 8)
+    assert_equal(q._capacity, 64)
+
+    # remove first
+    q.remove(0)
+    # Deque(1, 0, 2, 3, 0, 4, 5)
+    assert_equal(len(q), 7)
+    assert_equal(q[0], 1)
+    # had to shrink its capacity
+    assert_equal(q._capacity, 32)
+
+    # remove last
+    q.remove(5)
+    # Deque(1, 0, 2, 3, 0, 4)
+    assert_equal(len(q), 6)
+    assert_equal(q[5], 4)
+    # should not shrink further
+    assert_equal(q._capacity, 32)
+
+    # remove in the first half
+    q.remove(0)
+    # Deque(1, 2, 3, 0, 4)
+    assert_equal(len(q), 5)
+    assert_equal(q[1], 2)
+
+    # remove in the last half
+    q.remove(0)
+    # Deque(1, 2, 3, 4)
+    assert_equal(len(q), 4)
+    assert_equal(q[3], 4)
+
+    # assert raises when not found
+    with assert_raises():
+        q.remove(5)
+
+
+fn test_peek_and_peekleft() raises:
+    q = Deque[Int](capacity=4)
+    assert_equal(q._capacity, 4)
+
+    with assert_raises():
+        _ = q.peek()
+    with assert_raises():
+        _ = q.peekleft()
+
+    q.extend(List(1, 2, 3))
+    assert_equal(q.peekleft(), 1)
+    assert_equal(q.peek(), 3)
+
+    _ = q.popleft()
+    assert_equal(q.peekleft(), 2)
+    assert_equal(q.peek(), 3)
+
+    q.append(4)
+    assert_equal(q._capacity, 4)
+    assert_equal(q.peekleft(), 2)
+    assert_equal(q.peek(), 4)
+
+    q.append(5)
+    assert_equal(q._capacity, 8)
+    assert_equal(q.peekleft(), 2)
+    assert_equal(q.peek(), 5)
+
+
+fn test_reverse() raises:
+    q = Deque(0, 1, 2, 3)
+
+    q.reverse()
+    assert_equal(q[0], 3)
+    assert_equal(q[1], 2)
+    assert_equal(q[2], 1)
+    assert_equal(q[3], 0)
+
+    q.appendleft(4)
+    q.reverse()
+    assert_equal(q[0], 0)
+    assert_equal(q[4], 4)
+
+
+fn test_rotate() raises:
+    q = Deque(0, 1, 2, 3)
+
+    q.rotate()
+    assert_equal(q[0], 3)
+    assert_equal(q[3], 2)
+
+    q.rotate(-1)
+    assert_equal(q[0], 0)
+    assert_equal(q[3], 3)
+
+    q.rotate(3)
+    assert_equal(q[0], 1)
+    assert_equal(q[3], 0)
+
+    q.rotate(-3)
+    assert_equal(q[0], 0)
+    assert_equal(q[3], 3)
 
 
 fn test_iter() raises:
@@ -641,8 +1015,7 @@ fn test_reversed_iter() raises:
     q = Deque(1, 2, 3)
 
     i = 0
-    # change to reversed(q) when implemented in builtin for Deque
-    for e in q.__reversed__():
+    for e in reversed(q):
         i -= 1
         assert_equal(e[], q[i])
     assert_equal(-i, len(q))
@@ -678,7 +1051,13 @@ def main():
     test_impl_bool()
     test_impl_append()
     test_impl_append_with_maxlen()
+    test_impl_appendleft()
+    test_impl_appendleft_with_maxlen()
     test_impl_extend()
+    test_impl_extendleft()
+    test_impl_insert()
+    test_impl_pop()
+    test_popleft()
     test_impl_clear()
     test_impl_add()
     test_impl_iadd()
@@ -692,7 +1071,14 @@ def main():
     test_setitem()
     test_eq()
     test_ne()
+    test_count()
     test_contains()
+    test_index()
+    test_insert()
+    test_remove()
+    test_peek_and_peekleft()
+    test_reverse()
+    test_rotate()
     test_iter()
     test_iter_with_list()
     test_reversed_iter()
