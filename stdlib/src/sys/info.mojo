@@ -387,31 +387,36 @@ fn os_is_windows() -> Bool:
 
 
 @always_inline("nodebug")
-fn _triple_attr() -> __mlir_type.`!kgen.string`:
+fn _triple_attr[
+    triple: __mlir_type.`!kgen.target` = _current_target()
+]() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
-        _current_target(),
+        triple,
         `, "triple" : !kgen.string`,
         `> : !kgen.string`,
     ]
 
 
 @always_inline("nodebug")
-fn is_triple[triple: StringLiteral]() -> Bool:
+fn is_triple[
+    name: StringLiteral, target: __mlir_type.`!kgen.target` = _current_target()
+]() -> Bool:
     """Returns True if the target triple of the compiler matches the input and
     False otherwise.
 
     Parameters:
-      triple: The triple value to be checked against.
+      name: The name of the triple value.
+      target: The triple value to be checked against.
 
     Returns:
         True if the triple matches and False otherwise.
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _triple_attr(),
+        _triple_attr[target](),
         `, `,
-        triple.value,
+        name.value,
         `> : i1`,
     ]
 
