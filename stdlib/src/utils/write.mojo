@@ -361,6 +361,8 @@ fn write_buffered[
     ```
     .
     """
+
+    @parameter
     if is_nvidia_gpu():
         # Stack space is very small on GPU due to many threads, so use heap
         var buffer = _WriteBufferHeap[buffer_size](writer^)
