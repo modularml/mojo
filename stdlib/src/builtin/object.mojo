@@ -743,6 +743,17 @@ struct object(
         """
         self._value = _ObjectImpl()
 
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @doc_private
+    @always_inline
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        """Initializes a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = NoneType()
+
     @always_inline
     fn __init__(out self, value: Int):
         """Initializes the object with an integer value.

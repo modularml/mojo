@@ -60,7 +60,7 @@ struct _PythonGlobal:
 @always_inline
 fn _get_global_python_itf() -> _PythonInterfaceImpl:
     var ptr = _PYTHON_GLOBAL.get_or_create_ptr()
-    return ptr.bitcast[CPython]()
+    return _PythonInterfaceImpl(ptr.bitcast[CPython]())
 
 
 struct _PythonInterfaceImpl:
