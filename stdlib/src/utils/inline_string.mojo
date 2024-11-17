@@ -267,7 +267,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref self: Self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -280,7 +280,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref self: Self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -505,7 +505,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref self: Self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -518,7 +518,7 @@ struct _FixedString[CAP: Int](
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref self: Self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 

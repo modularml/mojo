@@ -32,7 +32,7 @@ from utils import StringRef, StringSlice
 
 @value
 struct AString(Stringable):
-    fn __str__(self: Self) -> String:
+    fn __str__(self) -> String:
         return "a string"
 
 
