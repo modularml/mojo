@@ -617,9 +617,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self.find(key).__bool__()
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[K, V, __origin_of(self)]:
+    fn __iter__(ref self) -> _DictKeyIter[K, V, __origin_of(self)]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -627,9 +625,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return _DictKeyIter(_DictEntryIter(0, 0, self))
 
-    fn __reversed__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[K, V, __origin_of(self), False]:
+    fn __reversed__(ref self) -> _DictKeyIter[K, V, __origin_of(self), False]:
         """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
@@ -761,7 +757,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     # TODO(MOCO-604): Return Optional[Pointer] instead of raising
     fn _find_ref(
-        ref [_]self: Self, key: K
+        ref self, key: K
     ) raises -> ref [self._entries[0].value().value] Self.V:
         """Find a value in the dictionary by key.
 
@@ -880,7 +876,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         raise "KeyError: popitem(): dictionary is empty"
 
-    fn keys(ref [_]self: Self) -> _DictKeyIter[K, V, __origin_of(self)]:
+    fn keys(ref self) -> _DictKeyIter[K, V, __origin_of(self)]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -888,7 +884,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return Self.__iter__(self)
 
-    fn values(ref [_]self: Self) -> _DictValueIter[K, V, __origin_of(self)]:
+    fn values(ref self) -> _DictValueIter[K, V, __origin_of(self)]:
         """Iterate over the dict's values as references.
 
         Returns:
@@ -896,7 +892,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return _DictValueIter(_DictEntryIter(0, 0, self))
 
-    fn items(ref [_]self: Self) -> _DictEntryIter[K, V, __origin_of(self)]:
+    fn items(ref self) -> _DictEntryIter[K, V, __origin_of(self)]:
         """Iterate over the dict's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -1215,7 +1211,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.pop(key)
 
     fn __iter__(
-        ref [_]self: Self,
+        ref self,
     ) -> _DictKeyIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dict's keys as immutable references.
 
@@ -1225,7 +1221,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.keys()
 
     fn keys(
-        ref [_]self: Self,
+        ref self,
     ) -> _DictKeyIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dict's keys as immutable references.
 
@@ -1235,7 +1231,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.keys()
 
     fn values(
-        ref [_]self: Self,
+        ref self,
     ) -> _DictValueIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dict's values as references.
 
@@ -1245,7 +1241,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.values()
 
     fn items(
-        ref [_]self: Self,
+        ref self,
     ) -> _DictEntryIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dictionary's entries as immutable references.
 

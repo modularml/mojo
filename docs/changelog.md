@@ -180,6 +180,14 @@ what we publish.
       return a
   ```
 
+- `ref` function arguments without an origin clause are now treated as
+  `ref [_]`, which is more syntactically convenient and consistent:
+
+  ```mojo
+  fn takes_and_return_ref(ref a: String) -> ref [a] String:
+      return a
+  ```
+
 - `Slice.step` is now an `Optional[Int]`, matching the optionality of
   `slice.step` in Python.
   ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
