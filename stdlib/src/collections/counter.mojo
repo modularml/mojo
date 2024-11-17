@@ -121,7 +121,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data[value] = count
 
-    fn __iter__(self: Self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
+    fn __iter__(self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:

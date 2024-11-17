@@ -140,7 +140,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     fn __getitem__[
         self_life: ImmutableOrigin
     ](
-        ref [self_life]self: Self,
+        ref [self_life]self,
     ) -> ref [
         _lit_mut_cast[self_life, result_mutable=True].result
     ] T:
