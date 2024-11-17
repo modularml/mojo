@@ -521,3 +521,6 @@ what we publish.
   ```plaintext
   ... cannot be converted from 'UnsafePointer[UInt]' to 'UnsafePointer[Int]'
   ```
+
+- Tooling now prints the origins of `ref` arguments and results correctly, and
+  prints `self` instead of `self: Self` in methods.
