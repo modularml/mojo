@@ -213,7 +213,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
 
     @always_inline
     fn assume_initialized(
-        ref [_]self: Self,
+        ref self: Self,
     ) -> ref [self] Self.ElementType:
         """Returns a reference to the internal value.
 

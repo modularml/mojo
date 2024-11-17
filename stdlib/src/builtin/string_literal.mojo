@@ -364,7 +364,7 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantOrigin]:
+    fn __iter__(ref self) -> _StringSliceIter[StaticConstantOrigin]:
         """Return an iterator over the string literal.
 
         Returns:
@@ -468,7 +468,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:

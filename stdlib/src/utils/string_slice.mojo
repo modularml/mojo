@@ -566,7 +566,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         buf.append(0)
         return String(buf^)
 
-    fn __contains__(ref [_]self, substr: StringSlice[_]) -> Bool:
+    fn __contains__(ref self, substr: StringSlice[_]) -> Bool:
         """Returns True if the substring is contained within the current string.
 
         Args:
@@ -784,7 +784,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(ref [_]self, substr: StringSlice, start: Int = 0) -> Int:
+    fn find(ref self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
 
@@ -1186,19 +1186,19 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         self.format_spec = format_spec
 
     @always_inline
-    fn is_escaped_brace(ref [_]self) -> Bool:
+    fn is_escaped_brace(ref self) -> Bool:
         return self.field.isa[Bool]()
 
     @always_inline
-    fn is_kwargs_field(ref [_]self) -> Bool:
+    fn is_kwargs_field(ref self) -> Bool:
         return self.field.isa[String]()
 
     @always_inline
-    fn is_automatic_indexing(ref [_]self) -> Bool:
+    fn is_automatic_indexing(ref self) -> Bool:
         return self.field.isa[NoneType]()
 
     @always_inline
-    fn is_manual_indexing(ref [_]self) -> Bool:
+    fn is_manual_indexing(ref self) -> Bool:
         return self.field.isa[Int]()
 
     @staticmethod

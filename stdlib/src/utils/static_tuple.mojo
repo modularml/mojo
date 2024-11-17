@@ -33,7 +33,7 @@ fn _set_array_elem[
     type: AnyTrivialRegType,
 ](
     val: type,
-    ref [_]array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+    ref array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
 ):
     """Sets the array element at position `index` with the value `val`.
 
