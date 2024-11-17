@@ -354,9 +354,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[T, NoneType, __origin_of(self._data)]:
+    fn __iter__(ref self) -> _DictKeyIter[T, NoneType, __origin_of(self._data)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
