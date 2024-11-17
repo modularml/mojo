@@ -232,8 +232,11 @@ what we publish.
   of variables that are handled as synthetic types, e.g. `List` from Mojo or
   `std::vector` from C++.
 
-- Added `os.path.expandvars` to expand environment variables in a string.
+- Added `os.path.expandvars` to expand environment variables in a path.
   ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
+
+- Added `os.path.splitroot` to split a path into drive, root and tail.
+  ([PR #3780](https://github.com/modularml/mojo/pull/3780) by [@thatstoasty](https://github.com/thatstoasty)).
 
 - Added a `reserve` method and new constructor to the `String` struct to
   allocate additional capacity.

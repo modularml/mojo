@@ -22,5 +22,6 @@ from .path import (
     islink,
     join,
     split,
+    splitroot,
     lexists,
 )
