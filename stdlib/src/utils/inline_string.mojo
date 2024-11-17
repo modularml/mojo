@@ -57,7 +57,6 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         var fixed = _FixedString[Self.SMALL_CAP]()
         self._storage = Self.Layout(fixed^)
 
-    @implicit
     fn __init__(out self, literal: StringLiteral):
         """Constructs a InlineString value given a string literal.
 
@@ -82,7 +81,6 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             var heap = String(literal)
             self._storage = Self.Layout(heap^)
 
-    @implicit
     fn __init__(out self, owned heap_string: String):
         """Construct a new small string by taking ownership of an existing
         heap-allocated String.
@@ -269,7 +267,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self: Self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -282,7 +280,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self: Self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -507,7 +505,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self: Self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -520,7 +518,7 @@ struct _FixedString[CAP: Int](
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self: Self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
