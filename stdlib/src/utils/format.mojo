@@ -103,7 +103,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         self.format_spec = format_spec
 
     @always_inline
-    fn is_escaped_brace(ref [_]self) -> Bool:
+    fn is_escaped_brace(ref self) -> Bool:
         """Whether the field is escaped_brace.
 
         Returns:
@@ -112,7 +112,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[Bool]()
 
     @always_inline
-    fn is_kwargs_field(ref [_]self) -> Bool:
+    fn is_kwargs_field(ref self) -> Bool:
         """Whether the field is kwargs_field.
 
         Returns:
@@ -121,7 +121,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[String]()
 
     @always_inline
-    fn is_automatic_indexing(ref [_]self) -> Bool:
+    fn is_automatic_indexing(ref self) -> Bool:
         """Whether the field is automatic_indexing.
 
         Returns:
@@ -130,7 +130,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[NoneType]()
 
     @always_inline
-    fn is_manual_indexing(ref [_]self) -> Bool:
+    fn is_manual_indexing(ref self) -> Bool:
         """Whether the field is manual_indexing.
 
         Returns:
