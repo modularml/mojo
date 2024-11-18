@@ -270,6 +270,7 @@ struct _DictIndex:
     var data: OpaquePointer
 
     @always_inline
+    @implicit
     fn __init__(out self, reserved: Int):
         if reserved <= 128:
             var data = UnsafePointer[Int8].alloc(reserved)

@@ -104,6 +104,7 @@ struct UnsafePointer[
 
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
@@ -113,6 +114,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
+    @implicit
     fn __init__(out self, other: UnsafePointer[type, address_space, *_, **_]):
         """Exclusivity parameter cast a pointer.
 

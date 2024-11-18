@@ -70,6 +70,7 @@ struct StringLiteral(
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Self.type):
         """Create a string literal from a builtin string type.
 

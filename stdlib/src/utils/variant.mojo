@@ -123,6 +123,7 @@ struct Variant[*Ts: CollectionElement](
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, Self._mlir_type]
 
+    @implicit
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
 

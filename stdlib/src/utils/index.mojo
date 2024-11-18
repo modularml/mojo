@@ -198,8 +198,19 @@ struct IndexList[
         """Constructs a static int tuple of the given size."""
         self = 0
 
+    @always_inline
+    @implicit
+    fn __init__(out self, data: StaticTuple[Self._int_type, size]):
+        """Constructs a static int tuple of the given size.
+
+        Args:
+            data: The StaticTuple to construct the IndexList from.
+        """
+        self.data = data
+
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         """Constructs a sized 1 static int tuple of given the element value.
 
@@ -210,6 +221,7 @@ struct IndexList[
         self = Int(value)
 
     @always_inline
+    @implicit
     fn __init__(out self, elems: (Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
@@ -235,6 +247,7 @@ struct IndexList[
         self = tup
 
     @always_inline
+    @implicit
     fn __init__(out self, elems: (Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
@@ -260,6 +273,7 @@ struct IndexList[
         self = tup
 
     @always_inline
+    @implicit
     fn __init__(out self, elems: (Int, Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
@@ -285,6 +299,7 @@ struct IndexList[
         self = tup
 
     @always_inline
+    @implicit
     fn __init__(out self, *elems: Int):
         """Constructs a static int tuple given a set of arguments.
 
@@ -308,6 +323,7 @@ struct IndexList[
         self = tup
 
     @always_inline
+    @implicit
     fn __init__(out self, elem: Int):
         """Constructs a static int tuple given a set of arguments.
 
@@ -330,6 +346,7 @@ struct IndexList[
         self.data = other.data
 
     @always_inline
+    @implicit
     fn __init__(out self, values: VariadicList[Int]):
         """Creates a tuple constant using the specified values.
 
