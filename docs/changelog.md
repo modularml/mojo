@@ -444,7 +444,7 @@ what we publish.
   These operators can't be evaluated at runtime, as a `StringLiteral` must be
   written into the binary during compilation.
 
-  - You can now index into `UnsafePointer` using SIMD scalar integral types:
+- You can now index into `UnsafePointer` using SIMD scalar integral types:
 
   ```mojo
   p = UnsafePointer[Int].alloc(1)
@@ -453,7 +453,7 @@ what we publish.
   print(p[i])
   ```
 
-  - Float32 and Float64 are now printed and converted to strings with roundtrip
+- Float32 and Float64 are now printed and converted to strings with roundtrip
   guarantee and shortest representation:
 
   ```plaintext
@@ -468,6 +468,49 @@ what we publish.
   Float32(-0.00000123456)     -1.2345600453045336e-06   -1.23456e-06
   Float64(1.1234567e-320)     1.1235052786429946e-320   1.1235e-320
   Float64(1.234 * 10**16)     12340000000000000.0       1.234e+16
+  ```
+
+- Single argument constructors now require a `@implicit` decorator to allow
+  for implicit conversions. Previously you could define an `__init__` that
+  takes a single argument:
+
+  ```mojo
+  struct Foo:
+      var value: Int
+
+      fn __init__(out self, value: Int):
+          self.value = value
+  ```
+
+  And this would allow you to pass an `Int` in the position of `Foo`:
+
+  ```mojo
+  fn func(foo: Foo):
+      print("implicitly converted Int to Foo:", foo.value)
+
+  fn main():
+      func(Int(42))
+  ```
+
+  This can result in difficult to reason about behaviour as the chain of
+  implicit conversions grow. By default this implicit behavior is now turned
+  off so you have to explicitly construct `Foo`:
+
+  ```mojo
+  fn main():
+      func(Foo(42))
+  ```
+
+  But you can still opt into implicit conversions by adding the `@implicit`
+  decorator:
+
+  ```mojo
+  struct Foo:
+      var value: Int
+
+      @implicit
+      fn __init__(out self, value: Int):
+          self.value = value
   ```
 
 ### ❌ Removed
