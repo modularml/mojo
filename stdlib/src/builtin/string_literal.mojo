@@ -23,11 +23,9 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
     _StringSliceIter,
-    _FormatCurlyEntry,
-    _CurlyEntryFormattable,
     _to_string_list,
 )
 

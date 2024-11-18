@@ -37,13 +37,12 @@ from utils import (
     Writable,
     Writer,
 )
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
     _utf8_byte_type,
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
     _shift_unicode_to_utf8,
-    _FormatCurlyEntry,
-    _CurlyEntryFormattable,
     _to_string_list,
 )
 
