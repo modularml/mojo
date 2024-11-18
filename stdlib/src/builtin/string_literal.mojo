@@ -198,6 +198,30 @@ struct StringLiteral(
         return StringRef(self) != StringRef(rhs)
 
     @always_inline("nodebug")
+    fn __eq__(self, rhs: StringSlice) -> Bool:
+        """Compare two string literals for equality.
+
+        Args:
+            rhs: The string to compare.
+
+        Returns:
+            True if they are equal.
+        """
+        return not (self != rhs)
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: StringSlice) -> Bool:
+        """Compare two string literals for inequality.
+
+        Args:
+            rhs: The string to compare.
+
+        Returns:
+            True if they are not equal.
+        """
+        return self.as_string_slice() != rhs
+
+    @always_inline("nodebug")
     fn __lt__(self, rhs: StringLiteral) -> Bool:
         """Compare this StringLiteral to the RHS using LT comparison.
 
