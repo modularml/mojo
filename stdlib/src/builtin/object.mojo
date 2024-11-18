@@ -755,6 +755,7 @@ struct object(
     # FIXME: None literal should be of NoneType not !kgen.none.
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, none: __mlir_type.`!kgen.none`):
         """Initializes a none value object from a `None` literal.
 
