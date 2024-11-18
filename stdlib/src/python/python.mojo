@@ -66,6 +66,7 @@ fn _get_global_python_itf() -> _PythonInterfaceImpl:
 struct _PythonInterfaceImpl:
     var _cpython: UnsafePointer[CPython]
 
+    @implicit
     fn __init__(out self, cpython: UnsafePointer[CPython]):
         self._cpython = cpython
 

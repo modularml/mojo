@@ -56,6 +56,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self._data = Dict[V, Int]()
 
     # TODO: Change List to Iterable when it is supported in Mojo
+    @implicit
     fn __init__(out self, items: List[V, *_]):
         """Create a from an input iterable.
 

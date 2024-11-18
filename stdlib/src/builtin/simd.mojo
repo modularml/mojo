@@ -366,6 +366,7 @@ struct SIMD[type: DType, size: Int](
         ](value.value)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
@@ -405,6 +406,7 @@ struct SIMD[type: DType, size: Int](
             self[i] = elems[i]
 
     @always_inline
+    @implicit
     fn __init__(out self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 

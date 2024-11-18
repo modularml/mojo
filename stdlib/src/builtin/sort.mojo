@@ -34,6 +34,10 @@ alias insertion_sort_threshold = 32
 struct _SortWrapper[type: CollectionElement](CollectionElement):
     var data: type
 
+    @implicit
+    fn __init__(out self, data: type):
+        self.data = data
+
     fn __init__(out self, *, other: Self):
         self.data = other.data
 
