@@ -566,7 +566,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         buf.append(0)
         return String(buf^)
 
-    fn __contains__(ref [_]self, substr: StringSlice[_]) -> Bool:
+    fn __contains__(ref self, substr: StringSlice[_]) -> Bool:
         """Returns True if the substring is contained within the current string.
 
         Args:
@@ -784,7 +784,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(ref [_]self, substr: StringSlice, start: Int = 0) -> Int:
+    fn find(ref self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
 

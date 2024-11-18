@@ -38,6 +38,7 @@ struct FileDescriptor(Writer):
     var value: Int
     """The underlying value of the file descriptor."""
 
+    @implicit
     fn __init__(out self, value: Int = 1):
         """Constructs the file descriptor from an integer.
 
@@ -46,6 +47,7 @@ struct FileDescriptor(Writer):
         """
         self.value = value
 
+    @implicit
     fn __init__(out self, f: FileHandle):
         """Constructs the file descriptor from a file handle.
 

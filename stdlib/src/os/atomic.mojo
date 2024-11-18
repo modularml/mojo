@@ -41,6 +41,7 @@ struct Atomic[type: DType]:
     """
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Scalar[type]):
         """Constructs a new atomic value.
 

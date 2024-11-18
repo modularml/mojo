@@ -31,7 +31,7 @@ trait AsBytes:
     span.
     """
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -135,6 +135,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
+    @implicit
     fn __init__(out self, ref [origin]list: List[T, *_]):
         """Construct a Span from a List.
 

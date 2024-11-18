@@ -180,6 +180,14 @@ what we publish.
       return a
   ```
 
+- `ref` function arguments without an origin clause are now treated as
+  `ref [_]`, which is more syntactically convenient and consistent:
+
+  ```mojo
+  fn takes_and_return_ref(ref a: String) -> ref [a] String:
+      return a
+  ```
+
 - `Slice.step` is now an `Optional[Int]`, matching the optionality of
   `slice.step` in Python.
   ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
@@ -436,7 +444,7 @@ what we publish.
   These operators can't be evaluated at runtime, as a `StringLiteral` must be
   written into the binary during compilation.
 
-  - You can now index into `UnsafePointer` using SIMD scalar integral types:
+- You can now index into `UnsafePointer` using SIMD scalar integral types:
 
   ```mojo
   p = UnsafePointer[Int].alloc(1)
@@ -445,7 +453,7 @@ what we publish.
   print(p[i])
   ```
 
-  - Float32 and Float64 are now printed and converted to strings with roundtrip
+- Float32 and Float64 are now printed and converted to strings with roundtrip
   guarantee and shortest representation:
 
   ```plaintext
@@ -462,6 +470,49 @@ what we publish.
   Float64(1.234 * 10**16)     12340000000000000.0       1.234e+16
   ```
 
+- Single argument constructors now require a `@implicit` decorator to allow
+  for implicit conversions. Previously you could define an `__init__` that
+  takes a single argument:
+
+  ```mojo
+  struct Foo:
+      var value: Int
+
+      fn __init__(out self, value: Int):
+          self.value = value
+  ```
+
+  And this would allow you to pass an `Int` in the position of a `Foo`:
+
+  ```mojo
+  fn func(foo: Foo):
+      print("implicitly converted Int to Foo:", foo.value)
+
+  fn main():
+      func(Int(42))
+  ```
+
+  This can result in complicated errors that are difficult to debug. By default
+  this implicit behavior is now turned off, so you have to explicitly construct
+  `Foo`:
+
+  ```mojo
+  fn main():
+      func(Foo(42))
+  ```
+
+  You can still opt into implicit conversions by adding the `@implicit`
+  decorator. For example, to enable implicit conversions from `Int` to `Foo`:
+
+  ```mojo
+  struct Foo:
+      var value: Int
+
+      @implicit
+      fn __init__(out self, value: Int):
+          self.value = value
+  ```
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -471,6 +522,9 @@ what we publish.
 
 - Lifetime tracking is now fully field sensitive, which makes the uninitialized
   variable checker more precise.
+
+- [Issue #1310](https://github.com/modularml/mojo/issues/1310) - Mojo permits
+  the use of any constructor for implicit conversions
 
 - [Issue #1632](https://github.com/modularml/mojo/issues/1632) - Mojo produces
   weird error when inout function is used in non mutating function
@@ -513,3 +567,6 @@ what we publish.
   ```plaintext
   ... cannot be converted from 'UnsafePointer[UInt]' to 'UnsafePointer[Int]'
   ```
+
+- Tooling now prints the origins of `ref` arguments and results correctly, and
+  prints `self` instead of `self: Self` in methods.

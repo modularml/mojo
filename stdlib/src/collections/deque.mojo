@@ -132,6 +132,7 @@ struct Deque[ElementType: CollectionElement](
         if elements is not None:
             self.extend(elements.value())
 
+    @implicit
     fn __init__(out self, owned *values: ElementType):
         """Constructs a deque from the given values.
 
@@ -167,6 +168,7 @@ struct Deque[ElementType: CollectionElement](
 
         self._tail = args_length
 
+    @implicit
     fn __init__(out self, other: Self):
         """Creates a deepcopy of the given deque.
 
@@ -338,7 +340,7 @@ struct Deque[ElementType: CollectionElement](
         return False
 
     fn __iter__(
-        ref [_]self,
+        ref self,
     ) -> _DequeIter[ElementType, __origin_of(self)]:
         """Iterates over elements of the deque, returning the references.
 
@@ -348,7 +350,7 @@ struct Deque[ElementType: CollectionElement](
         return _DequeIter(0, Pointer.address_of(self))
 
     fn __reversed__(
-        ref [_]self,
+        ref self,
     ) -> _DequeIter[ElementType, __origin_of(self), False]:
         """Iterate backwards over the deque, returning the references.
 
@@ -379,7 +381,7 @@ struct Deque[ElementType: CollectionElement](
         """
         return (self._tail - self._head) & (self._capacity - 1)
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [self] ElementType:
+    fn __getitem__(ref self, idx: Int) -> ref [self] ElementType:
         """Gets the deque element at the given index.
 
         Args:

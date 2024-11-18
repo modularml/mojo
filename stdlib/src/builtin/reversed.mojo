@@ -79,7 +79,7 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 
 fn reversed[
     T: CollectionElement
-](ref [_]value: List[T, *_]) -> _ListIter[
+](ref value: List[T, *_]) -> _ListIter[
     T, __type_of(value).hint_trivial_type, __origin_of(value), False
 ]:
     """Get a reversed iterator of the input list.
@@ -100,7 +100,7 @@ fn reversed[
 
 fn reversed[
     T: CollectionElement
-](ref [_]value: Deque[T]) -> _DequeIter[T, __origin_of(value), False]:
+](ref value: Deque[T]) -> _DequeIter[T, __origin_of(value), False]:
     """Get a reversed iterator of the deque.
 
     **Note**: iterators are currently non-raising.
@@ -120,7 +120,7 @@ fn reversed[
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
-](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
+](ref value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
@@ -143,7 +143,7 @@ fn reversed[
     V: CollectionElement,
     dict_mutability: Bool,
     dict_origin: Origin[dict_mutability].type,
-](ref [_]value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
+](ref value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict values.
@@ -170,7 +170,7 @@ fn reversed[
     V: CollectionElement,
     dict_mutability: Bool,
     dict_origin: Origin[dict_mutability].type,
-](ref [_]value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
+](ref value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict items.
