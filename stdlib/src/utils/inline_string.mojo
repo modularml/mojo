@@ -57,6 +57,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         var fixed = _FixedString[Self.SMALL_CAP]()
         self._storage = Self.Layout(fixed^)
 
+    @implicit
     fn __init__(out self, literal: StringLiteral):
         """Constructs a InlineString value given a string literal.
 
@@ -81,6 +82,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             var heap = String(literal)
             self._storage = Self.Layout(heap^)
 
+    @implicit
     fn __init__(out self, owned heap_string: String):
         """Construct a new small string by taking ownership of an existing
         heap-allocated String.

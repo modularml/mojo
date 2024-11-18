@@ -54,6 +54,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
+    @implicit
     fn __init__(out self, *ts: T):
         """Construct a set from initial elements.
 
@@ -64,6 +65,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for t in ts:
             self.add(t[])
 
+    @implicit
     fn __init__(out self, elements: Self):
         """Explicitly copy another Set instance.
 
@@ -74,6 +76,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
+    @implicit
     fn __init__(out self, elements: List[T, *_]):
         """Construct a set from a List of elements.
 

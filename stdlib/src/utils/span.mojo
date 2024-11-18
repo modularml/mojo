@@ -135,6 +135,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
+    @implicit
     fn __init__(out self, ref [origin]list: List[T, *_]):
         """Construct a Span from a List.
 

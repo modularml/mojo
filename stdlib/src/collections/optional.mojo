@@ -92,6 +92,7 @@ struct Optional[T: CollectionElement](
         """Construct an empty Optional."""
         self._value = Self._type(_NoneType())
 
+    @implicit
     fn __init__(out self, owned value: T):
         """Construct an Optional containing a value.
 
@@ -104,6 +105,7 @@ struct Optional[T: CollectionElement](
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
+    @implicit
     fn __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -112,6 +114,7 @@ struct Optional[T: CollectionElement](
         """
         self = Self(value=NoneType(value))
 
+    @implicit
     fn __init__(out self, value: NoneType):
         """Construct an empty Optional.
 
@@ -407,6 +410,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         """Create an optional with a value of None."""
         self = Self(None)
 
+    @implicit
     fn __init__(out self, value: T):
         """Create an optional with a value.
 
@@ -421,6 +425,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
+    @implicit
     fn __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -429,6 +434,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         """
         self = Self(value=NoneType(value))
 
+    @implicit
     fn __init__(out self, value: NoneType):
         """Create an optional without a value from a None literal.
 

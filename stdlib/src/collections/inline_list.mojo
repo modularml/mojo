@@ -109,6 +109,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
+    @implicit
     fn __init__(out self, *values: ElementType):
         """Constructs a list from the given values.
 

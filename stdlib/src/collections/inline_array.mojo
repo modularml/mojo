@@ -139,6 +139,7 @@ struct InlineArray[
             )
 
     @always_inline
+    @implicit
     fn __init__(out self, fill: Self.ElementType):
         """Constructs an empty array where each element is the supplied `fill`.
 
@@ -157,6 +158,7 @@ struct InlineArray[
             ptr.init_pointee_copy(fill)
 
     @always_inline
+    @implicit
     fn __init__(out self, owned *elems: Self.ElementType):
         """Constructs an array given a set of arguments.
 

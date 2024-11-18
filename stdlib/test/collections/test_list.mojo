@@ -555,6 +555,7 @@ struct CopyCountedStruct(CollectionElement):
         self.counter = CopyCounter(other=other.counter)
         self.value = String(other=other.value)
 
+    @implicit
     fn __init__(out self, value: String):
         self.counter = CopyCounter()
         self.value = value

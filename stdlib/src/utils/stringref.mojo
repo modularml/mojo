@@ -85,6 +85,7 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
+    @implicit
     fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
@@ -127,6 +128,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
+    @implicit
     fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 

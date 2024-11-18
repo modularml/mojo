@@ -135,6 +135,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.size = 0
         self.capacity = capacity
 
+    @implicit
     fn __init__(out self, owned *values: T):
         """Constructs a list from the given values.
 
@@ -164,6 +165,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         self.size = length
 
+    @implicit
     fn __init__(out self, span: Span[T]):
         """Constructs a list from the a Span of values.
 
