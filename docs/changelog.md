@@ -486,7 +486,7 @@ what we publish.
           self.value = value
   ```
 
-  And this would allow you to pass an `Int` in the position of `Foo`:
+  And this would allow you to pass an `Int` in the position of a `Foo`:
 
   ```mojo
   fn func(foo: Foo):
@@ -496,17 +496,17 @@ what we publish.
       func(Int(42))
   ```
 
-  This can result in difficult to reason about behaviour as the chain of
-  implicit conversions grow. By default this implicit behavior is now turned
-  off so you have to explicitly construct `Foo`:
+  This can result in complicated errors that are difficult to debug. By default
+  this implicit behavior is now turned off, so you have to explicitly construct
+  `Foo`:
 
   ```mojo
   fn main():
       func(Foo(42))
   ```
 
-  But you can still opt into implicit conversions by adding the `@implicit`
-  decorator:
+  You can still opt into implicit conversions by adding the `@implicit`
+  decorator. For example, to enable implicit conversions from `Int` to `Foo`:
 
   ```mojo
   struct Foo:
@@ -526,6 +526,9 @@ what we publish.
 
 - Lifetime tracking is now fully field sensitive, which makes the uninitialized
   variable checker more precise.
+
+- [Issue #1310](https://github.com/modularml/mojo/issues/1310) - Mojo permits
+  the use of any constructor for implicit conversions
 
 - [Issue #1632](https://github.com/modularml/mojo/issues/1632) - Mojo produces
   weird error when inout function is used in non mutating function
