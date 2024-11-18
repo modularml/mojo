@@ -258,7 +258,7 @@ struct SIMD[type: DType, size: Int](
         Args:
             value: The input value.
         """
-        self = Self(value.value)
+        self = Self(value._value)
 
     @always_inline("nodebug")
     @implicit
