@@ -47,6 +47,7 @@ struct FromNone:
     fn __init__(out self, none: __mlir_type.`!kgen.none`):
         self = NoneType()
 
+    @implicit
     fn __init__(out self, value: Int):
         self.value = value
 
