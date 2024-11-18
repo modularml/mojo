@@ -92,6 +92,7 @@ struct _SpanIter[
 
 
 @value
+@register_passable("trivial")
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
