@@ -241,6 +241,7 @@ struct _StringSliceIter[
 
 
 @value
+@register_passable("trivial")
 struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     Stringable,
     Sized,
@@ -299,7 +300,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
         """
 
-        self._slice = unsafe_from_utf8^
+        self._slice = unsafe_from_utf8
 
     fn __init__(out self, *, unsafe_from_utf8_strref: StringRef):
         """Construct a new StringSlice from a `StringRef` pointing to UTF-8
@@ -692,7 +693,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         if end == -1:
             return self.find(prefix, start) == start
-        return StringSlice[__origin_of(self)](
+        return StringSlice[origin](
             ptr=self.unsafe_ptr() + start, length=end - start
         ).startswith(prefix)
 
@@ -714,7 +715,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             return False
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
-        return StringSlice[__origin_of(self)](
+        return StringSlice[origin](
             ptr=self.unsafe_ptr() + start, length=end - start
         ).endswith(suffix)
 
@@ -1010,7 +1011,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
             str_len = eol_start - offset + int(keepends) * eol_length
             s = StringSlice[O](ptr=ptr + offset, length=str_len)
-            output.append(s^)
+            output.append(s)
             offset = eol_start + eol_length
 
         return output^
@@ -1046,7 +1047,7 @@ trait Stringlike:
 
 
 fn _to_string_list[
-    T: CollectionElement, //,
+    T: CollectionElement,  # TODO(MOCO-1446): Make `T` parameter inferred
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
@@ -1088,7 +1089,7 @@ fn _to_string_list[
     fn len_fn(v: StringSlice[O]) -> Int:
         return v.byte_length()
 
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
 
 
 @always_inline
@@ -1113,7 +1114,7 @@ fn _to_string_list[
     fn len_fn(v: Span[Byte, O]) -> Int:
         return len(v)
 
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
 
 
 # ===----------------------------------------------------------------------===#
@@ -1356,7 +1357,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 conversion_flag not in Self.supported_conversion_flags
             ):
                 var f = String(_build_slice(field_ptr, new_idx, field_len))
-                _ = field^
+                _ = field
                 raise Error('Conversion flag "' + f + '" not recognised.')
             self.conversion_flag = conversion_flag
             field = _build_slice(field_ptr, 0, exclamation_index)
