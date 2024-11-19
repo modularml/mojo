@@ -20,13 +20,13 @@ from testing import assert_equal
 def test_out_of_bounds_message():
     l = List[Int](1, 2)
     # CHECK: index out of bounds: 2
-    _ = normalize_index["List"](2, l)
+    _ = normalize_index["List", assert_mode="safe"](2, l)
     # CHECK: index out of bounds: -3
-    _ = normalize_index["List"](-3, l)
+    _ = normalize_index["List", assert_mode="safe"](-3, l)
 
     l2 = List[Int]()
     # CHECK: indexing into a List that has 0 elements
-    _ = normalize_index["List"](2, l2)
+    _ = normalize_index["List", assert_mode="safe"](2, l2)
 
 
 def test_normalize_index():

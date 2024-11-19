@@ -21,6 +21,7 @@ fn normalize_index[
     *,
     ignore_zero_length: Bool = False,
     cap_to_container_length: Bool = True,
+    assert_mode: StringLiteral = "warn",
 ](idx: Int, container: ContainerType) -> Int:
     """Normalize the given index value to a valid index value for the given
     container length. If the provided value is negative, the `index +
@@ -31,6 +32,7 @@ fn normalize_index[
         container_name: The name of the container. Used for the error message.
         ignore_zero_length: Whether to ignore if the container is of length 0.
         cap_to_container_length: Whether to cap the value to container length.
+        assert_mode: The mode in which to do the bounds check asserts.
 
     Args:
         idx: The index value to normalize.
@@ -49,13 +51,13 @@ fn normalize_index[
 
     @parameter
     if not ignore_zero_length:
-        debug_assert[assert_mode="none", cpu_only=True](
+        debug_assert[assert_mode=assert_mode, cpu_only=True](
             c_len > 0,
             "indexing into a ",
             container_name,
             " that has 0 elements",
         )
-        debug_assert[assert_mode="none", cpu_only=True](
+        debug_assert[assert_mode=assert_mode, cpu_only=True](
             -c_len <= idx < c_len,
             container_name,
             " has length: ",
