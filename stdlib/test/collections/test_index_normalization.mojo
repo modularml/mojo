@@ -16,18 +16,6 @@ from collections._index_normalization import normalize_index
 
 from testing import assert_equal
 
-# FIXME: doesn't work for some reason
-# def test_out_of_bounds_message():
-#     l = List[Int](1, 2)
-#     # CHECK: index out of bounds: 2
-#     _ = normalize_index["List", assert_mode="safe"](2, l)
-#     # CHECK: index out of bounds: -3
-#     _ = normalize_index["List", assert_mode="safe"](-3, l)
-
-#     l2 = List[Int]()
-#     # CHECK: indexing into a List that has 0 elements
-#     _ = normalize_index["List", assert_mode="safe"](2, l2)
-
 
 def test_normalize_index():
     alias t = "TestContainer"
@@ -52,16 +40,26 @@ def test_normalize_index():
     assert_equal(normalize_index[t](2, container), 2)
     assert_equal(normalize_index[t](3, container), 3)
     # test cap to container length overflow
+    # CHECK: index out of bounds: -8
     assert_equal(normalize_index[t](-8, container), 0)
+    # CHECK: index out of bounds: -7
     assert_equal(normalize_index[t](-7, container), 0)
+    # CHECK: index out of bounds: -6
     assert_equal(normalize_index[t](-6, container), 0)
+    # CHECK: index out of bounds: -5
     assert_equal(normalize_index[t](-5, container), 0)
+    # CHECK: index out of bounds: 4
     assert_equal(normalize_index[t](4, container), 3)
+    # CHECK: index out of bounds: 5
     assert_equal(normalize_index[t](5, container), 3)
+    # CHECK: index out of bounds: 6
     assert_equal(normalize_index[t](6, container), 3)
+    # CHECK: index out of bounds: 7
     assert_equal(normalize_index[t](7, container), 3)
     # test container with zero length
     container = List[Int]()
+    # CHECK: indexing into a TestContainer that has 0 elements
+    _ = normalize_index[t](-8, container)
     assert_equal(normalize_index[t, ignore_zero_length=True](-8, container), 0)
     assert_equal(normalize_index[t, ignore_zero_length=True](-7, container), 0)
     assert_equal(normalize_index[t, ignore_zero_length=True](-6, container), 0)
@@ -93,5 +91,4 @@ def test_normalize_index():
 
 
 def main():
-    # test_out_of_bounds_message()
     test_normalize_index()
