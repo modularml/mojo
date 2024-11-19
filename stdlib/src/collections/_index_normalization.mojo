@@ -70,14 +70,18 @@ fn normalize_index[
             c_len - 1,
         )
 
+    var normalize_len = c_len * int(idx < 0)
+
     @parameter
     if cap_to_container_length:
-        var v = idx + c_len * int(idx < 0)
-        return v * int(v < c_len and v > 0) + (c_len - 1) * int(v >= c_len)
+        var v = idx + normalize_len
+        var v_or_zero = v * int(0 < v < c_len)
+        var c_end_on_overflow = (c_len - int(c_len != 0)) * int(v >= c_len)
+        return v_or_zero + c_end_on_overflow
     else:
 
         @parameter
         if ignore_zero_length:
-            return idx * int(c_len != 0) + c_len * int(idx < 0)
+            return idx * int(c_len != 0) + normalize_len
         else:
-            return idx + c_len * int(idx < 0)
+            return idx + normalize_len
