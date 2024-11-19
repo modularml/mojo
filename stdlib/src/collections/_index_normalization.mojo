@@ -53,7 +53,7 @@ fn normalize_index[
     if not ignore_zero_length:
         debug_assert[assert_mode=assert_mode, cpu_only=True](
             c_len > 0,
-            "indexing into a ",
+            "Indexing into a ",
             container_name,
             " that has 0 elements",
         )
@@ -62,7 +62,7 @@ fn normalize_index[
             container_name,
             " has length: ",
             c_len,
-            " index out of bounds: ",
+            ". Index out of bounds: ",
             idx,
             " should be between ",
             -c_len,

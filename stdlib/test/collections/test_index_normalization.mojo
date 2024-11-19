@@ -40,25 +40,25 @@ def test_normalize_index():
     assert_equal(normalize_index[t](2, container), 2)
     assert_equal(normalize_index[t](3, container), 3)
     # test cap to container length overflow
-    # CHECK: index out of bounds: -8
+    # CHECK: TestContainer has length: 4. Index out of bounds: -8 should be between -4 and 3
     assert_equal(normalize_index[t](-8, container), 0)
-    # CHECK: index out of bounds: -7
+    # CHECK: TestContainer has length: 4. Index out of bounds: -7 should be between -4 and 3
     assert_equal(normalize_index[t](-7, container), 0)
-    # CHECK: index out of bounds: -6
+    # CHECK: TestContainer has length: 4. Index out of bounds: -6 should be between -4 and 3
     assert_equal(normalize_index[t](-6, container), 0)
-    # CHECK: index out of bounds: -5
+    # CHECK: TestContainer has length: 4. Index out of bounds: -5 should be between -4 and 3
     assert_equal(normalize_index[t](-5, container), 0)
-    # CHECK: index out of bounds: 4
+    # CHECK: TestContainer has length: 4. Index out of bounds: 4 should be between -4 and 3
     assert_equal(normalize_index[t](4, container), 3)
-    # CHECK: index out of bounds: 5
+    # CHECK: TestContainer has length: 4. Index out of bounds: 5 should be between -4 and 3
     assert_equal(normalize_index[t](5, container), 3)
-    # CHECK: index out of bounds: 6
+    # CHECK: TestContainer has length: 4. Index out of bounds: 6 should be between -4 and 3
     assert_equal(normalize_index[t](6, container), 3)
-    # CHECK: index out of bounds: 7
+    # CHECK: TestContainer has length: 4. Index out of bounds: 7 should be between -4 and 3
     assert_equal(normalize_index[t](7, container), 3)
     # test container with zero length
     container = List[Int]()
-    # CHECK: indexing into a TestContainer that has 0 elements
+    # CHECK: Indexing into a TestContainer that has 0 elements
     _ = normalize_index[t](-8, container)
     assert_equal(normalize_index[t, ignore_zero_length=True](-8, container), 0)
     assert_equal(normalize_index[t, ignore_zero_length=True](-7, container), 0)
