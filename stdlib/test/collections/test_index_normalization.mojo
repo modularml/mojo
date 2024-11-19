@@ -30,15 +30,66 @@ def test_out_of_bounds_message():
 
 
 def test_normalize_index():
+    alias t = "TestContainer"
     container = List[Int](1, 1, 1, 1)
-    assert_equal(normalize_index[""](-4, container), 0)
-    assert_equal(normalize_index[""](-3, container), 1)
-    assert_equal(normalize_index[""](-2, container), 2)
-    assert_equal(normalize_index[""](-1, container), 3)
-    assert_equal(normalize_index[""](0, container), 0)
-    assert_equal(normalize_index[""](1, container), 1)
-    assert_equal(normalize_index[""](2, container), 2)
-    assert_equal(normalize_index[""](3, container), 3)
+    # test no cap
+    alias no_cap = normalize_index[t, cap_to_container_length=False]
+    assert_equal(no_cap(-4, container), 0)
+    assert_equal(no_cap(-3, container), 1)
+    assert_equal(no_cap(-2, container), 2)
+    assert_equal(no_cap(-1, container), 3)
+    assert_equal(no_cap(0, container), 0)
+    assert_equal(no_cap(1, container), 1)
+    assert_equal(no_cap(2, container), 2)
+    assert_equal(no_cap(3, container), 3)
+    # test cap to container length
+    assert_equal(normalize_index[t](-4, container), 0)
+    assert_equal(normalize_index[t](-3, container), 1)
+    assert_equal(normalize_index[t](-2, container), 2)
+    assert_equal(normalize_index[t](-1, container), 3)
+    assert_equal(normalize_index[t](0, container), 0)
+    assert_equal(normalize_index[t](1, container), 1)
+    assert_equal(normalize_index[t](2, container), 2)
+    assert_equal(normalize_index[t](3, container), 3)
+    # test cap to container length overflow
+    assert_equal(normalize_index[t](-8, container), 0)
+    assert_equal(normalize_index[t](-7, container), 0)
+    assert_equal(normalize_index[t](-6, container), 0)
+    assert_equal(normalize_index[t](-5, container), 0)
+    assert_equal(normalize_index[t](4, container), 3)
+    assert_equal(normalize_index[t](5, container), 3)
+    assert_equal(normalize_index[t](6, container), 3)
+    assert_equal(normalize_index[t](7, container), 3)
+    # test container with zero length
+    container = List[Int]()
+    assert_equal(normalize_index[t, ignore_zero_length=True](-8, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](-7, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](-6, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](-5, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](4, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](5, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](6, container), 0)
+    assert_equal(normalize_index[t, ignore_zero_length=True](7, container), 0)
+    # test container with zero length no cap
+    alias ign_zero_no_cap = normalize_index[
+        t, ignore_zero_length=True, cap_to_container_length=False
+    ]
+    assert_equal(ign_zero_no_cap(-8, container), 0)
+    assert_equal(ign_zero_no_cap(-7, container), 0)
+    assert_equal(ign_zero_no_cap(-6, container), 0)
+    assert_equal(ign_zero_no_cap(-5, container), 0)
+    assert_equal(ign_zero_no_cap(-4, container), 0)
+    assert_equal(ign_zero_no_cap(-3, container), 0)
+    assert_equal(ign_zero_no_cap(-2, container), 0)
+    assert_equal(ign_zero_no_cap(-1, container), 0)
+    assert_equal(ign_zero_no_cap(0, container), 0)
+    assert_equal(ign_zero_no_cap(1, container), 0)
+    assert_equal(ign_zero_no_cap(2, container), 0)
+    assert_equal(ign_zero_no_cap(3, container), 0)
+    assert_equal(ign_zero_no_cap(4, container), 0)
+    assert_equal(ign_zero_no_cap(5, container), 0)
+    assert_equal(ign_zero_no_cap(6, container), 0)
+    assert_equal(ign_zero_no_cap(7, container), 0)
 
 
 def main():
