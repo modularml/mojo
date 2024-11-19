@@ -21,7 +21,7 @@ fn normalize_index[
     *,
     ignore_zero_length: Bool = False,
     cap_to_container_length: Bool = True,
-    assert_mode: StringLiteral = "warn",
+    assert_mode: StringLiteral = "none",
 ](idx: Int, container: ContainerType) -> Int:
     """Normalize the given index value to a valid index value for the given
     container length. If the provided value is negative, the `index +
