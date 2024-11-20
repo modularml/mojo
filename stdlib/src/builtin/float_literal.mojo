@@ -447,6 +447,18 @@ struct FloatLiteral(
         """
         return rhs // self
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return -(self // -denominator)
+
     # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
