@@ -28,6 +28,7 @@ from sys import (
     has_avx512f,
     simdwidthof,
     is_nvidia_gpu,
+    is_amd_gpu,
     sizeof,
 )
 
@@ -1412,6 +1413,8 @@ fn cos[
         return _call_ptx_intrinsic[
             instruction="cos.approx.ftz.f32", constraints="=f,f"
         ](x)
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.cos", __type_of(x)](x)
     else:
         return _call_libm["cos"](x)
 
@@ -1445,6 +1448,8 @@ fn sin[
         return _call_ptx_intrinsic[
             instruction="sin.approx.ftz.f32", constraints="=f,f"
         ](x)
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.sin", __type_of(x)](x)
     else:
         return _call_libm["sin"](x)
 
@@ -1622,6 +1627,8 @@ fn log10(x: SIMD) -> __type_of(x):
                 ](x)
                 * log10_2
             )
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.log10", __type_of(x)](x)
 
     return _call_libm["log10"](x)
 
