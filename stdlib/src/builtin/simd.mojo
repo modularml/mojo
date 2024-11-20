@@ -1573,6 +1573,23 @@ struct SIMD[type: DType, size: Int](
         """
         hasher._update_with_simd(self)
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+
+        @parameter
+        if type.is_signed():
+            return -(self // -denominator)
+        return (self + denominator - 1) // denominator
+
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
