@@ -48,6 +48,7 @@ from .info import (
     simdwidthof,
     sizeof,
     is_nvidia_gpu,
+    is_amd_gpu,
     is_gpu,
 )
 from .intrinsics import (
