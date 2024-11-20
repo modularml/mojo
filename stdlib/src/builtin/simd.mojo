@@ -39,7 +39,7 @@ from math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.dtype import _uint_type_of_width
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from builtin.format_int import _try_write_int
+from builtin.format_int import _write_int
 from builtin._format_float import _write_float
 from builtin.io import _snprintf
 from collections import InlineArray
@@ -3367,12 +3367,7 @@ fn _write_scalar[
 
         @parameter
         if is_nvidia_gpu():
-            var err = _try_write_int(writer, value)
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
+            _write_int(writer, value)
         else:
             # Stack allocate enough bytes to store any formatted Scalar value.
             alias size: Int = _calc_format_buffer_size[dtype]()

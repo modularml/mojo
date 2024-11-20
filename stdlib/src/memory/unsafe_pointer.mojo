@@ -422,9 +422,7 @@ struct UnsafePointer[
         Args:
             writer: The object to write to.
         """
-
-        # TODO: Avoid intermediate String allocation.
-        writer.write(str(self))
+        hex(int(self), writer=writer)
 
     # ===-------------------------------------------------------------------===#
     # Methods
