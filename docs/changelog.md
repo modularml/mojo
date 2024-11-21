@@ -250,7 +250,7 @@ what we publish.
 - Introduced a new `Deque` (double-ended queue) collection type, based on a
   dynamically resizing circular buffer for efficient O(1) additions and removals
   at both ends as well as O(1) direct access to all elements.
-  
+
   The `Deque` supports the full Python `collections.deque` API, ensuring that all
   expected deque operations perform as in Python.
 
@@ -513,6 +513,8 @@ what we publish.
           self.value = value
   ```
 
+- `Arc` has been renamed to `ArcPointer`, for consistency with `OwnedPointer`.
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -557,7 +559,7 @@ what we publish.
 - Error messages that include type names no longer include inferred or defaulted
   parameters when they aren't needed.  For example, previously Mojo complained
   about things like:
-  
+
   ```plaintext
   ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
   ```
