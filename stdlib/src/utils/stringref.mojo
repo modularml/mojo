@@ -15,13 +15,14 @@
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from collections.string import _atol, _isspace
+from collections.string import _atol, _is_ascii_space
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import c_char
 from sys import simdwidthof
+from builtin.builtin_list import _lit_mut_cast
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -215,11 +216,15 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
+    @always_inline
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous Span of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
         return Span[Byte, __origin_of(self)](ptr=self.data, length=self.length)
 
@@ -607,9 +612,9 @@ struct StringRef(
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
+        while start < end and _is_ascii_space(ptr[start]):
             start += 1
-        while end > start and _isspace(ptr[end - 1]):
+        while end > start and _is_ascii_space(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
 

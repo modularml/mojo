@@ -26,16 +26,14 @@ from builtin.builtin_list import _lit_mut_cast
 
 
 trait AsBytes:
-    """
-    The `AsBytes` trait denotes a type that can be returned as a immutable byte
-    span.
+    """The `AsBytes` trait denotes a type that can be returned as a byte span.
     """
 
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
@@ -345,8 +343,7 @@ struct Span[
         return not self == rhs
 
     fn fill[origin: MutableOrigin, //](self: Span[T, origin], value: T):
-        """
-        Fill the memory that a span references with a given value.
+        """Fill the memory that a span references with a given value.
 
         Parameters:
             origin: The inferred mutable origin of the data within the Span.
@@ -358,8 +355,7 @@ struct Span[
             element[] = value
 
     fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
-        """
-        Return an immutable version of this span.
+        """Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.

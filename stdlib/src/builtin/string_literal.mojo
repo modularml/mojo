@@ -19,17 +19,21 @@ from sys.ffi import c_char
 
 from memory import memcpy, UnsafePointer
 from collections import List
+from collections.string import _repr, _ascii
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from utils import StringRef, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.span import Span
 from utils.string_slice import (
+    StringSlice,
+    StaticString,
+    Stringlike,
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
     _to_string_list,
 )
+from builtin.builtin_list import _lit_mut_cast
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -41,7 +45,6 @@ from utils.string_slice import (
 struct StringLiteral(
     Boolable,
     Comparable,
-    CollectionElementNew,
     Writable,
     IntableRaising,
     KeyElement,
@@ -49,8 +52,8 @@ struct StringLiteral(
     Sized,
     Stringable,
     FloatableRaising,
-    BytesCollectionElement,
     _HashableWithHasher,
+    Stringlike,
 ):
     """This type represents a string literal.
 
@@ -328,7 +331,8 @@ struct StringLiteral(
 
     @no_inline
     fn __str__(self) -> String:
-        """Convert the string literal to a string.
+        """Gets this `StringLiteral` as a standard `String`. You don't need to
+        call this method directly, use `str("...")` instead.
 
         Returns:
             A new string.
@@ -349,16 +353,25 @@ struct StringLiteral(
         string._buffer = buffer^
         return string
 
-    @no_inline
+    @always_inline
     fn __repr__(self) -> String:
-        """Return a representation of the `StringLiteral` instance.
-
-        You don't need to call this method directly, use `repr("...")` instead.
+        """Return a representation of the string instance. You don't need to
+        call this method directly, use `repr("...")` instead.
 
         Returns:
             A new representation of the string.
         """
-        return self.__str__().__repr__()
+        return _repr(self)
+
+    @always_inline
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
+
+        Returns:
+            A string containing the ASCII representation of the object.
+        """
+        return _ascii(self)
 
     fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
@@ -473,36 +486,32 @@ struct StringLiteral(
         Returns:
             A string slice pointing to this static string literal.
         """
-
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in StringLiteral so this is actually
-        #   guaranteed to be valid.
-        return StaticString(ptr=self.unsafe_ptr(), length=self.byte_length())
+        return StaticString(self)
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
-        """
-        Returns a contiguous Span of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
-        """
+            A contiguous slice pointing to bytes.
 
+        Notes:
+            This does not include the trailing null terminator.
+        """
         return Span[Byte, StaticConstantOrigin](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-        # Does NOT include the NUL terminator.
         return Span[Byte, __origin_of(self)](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )

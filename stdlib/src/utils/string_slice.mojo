@@ -23,14 +23,15 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils import Span
-from collections.string import _isspace, _atol, _atof
+from utils.span import Span, AsBytes
+from collections.string import _is_ascii_space, _atol, _atof, _repr, _ascii
 from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
 from sys.intrinsics import unlikely
 from memory.memory import _memcmp_impl_unconstrained
 from ._utf8_validation import _is_valid_utf8
+from builtin.builtin_list import _lit_mut_cast
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -101,14 +102,11 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         - (a >> 18) | 0b11110000, (b >> 12) | 0b10000000, (c >> 6) | 0b10000000,
         d | 0b10000000
     """
-    if num_bytes == 1:
-        ptr[0] = UInt8(c)
-        return
 
     var shift = 6 * (num_bytes - 1)
-    var mask = UInt8(0xFF) >> (num_bytes + 1)
+    var mask = UInt8(0xFF) >> (num_bytes + int(num_bytes > 1))
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    ptr[0] = ((c >> shift) & mask) | num_bytes_marker
+    ptr[0] = ((c >> shift) & mask) | num_bytes_marker * int(num_bytes > 1)
     for i in range(1, num_bytes):
         shift -= 6
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
@@ -246,9 +244,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     Stringable,
     Sized,
     Writable,
-    CollectionElement,
-    CollectionElementNew,
     Hashable,
+    Stringlike,
 ):
     """A non-owning view to encoded string data.
 
@@ -362,24 +359,44 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Args:
             value: The string value.
         """
-
-        debug_assert(
-            _is_valid_utf8(value.as_bytes()), "value is not valid utf8"
-        )
+        # FIXME: problems at comp time
+        # debug_assert(
+        #     _is_valid_utf8(value.as_bytes()), "value is not valid utf8"
+        # )
         self = StringSlice[O](unsafe_from_utf8=value.as_bytes())
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
     # ===------------------------------------------------------------------===#
 
-    @no_inline
     fn __str__(self) -> String:
-        """Gets this slice as a standard `String`.
+        """Gets this slice as a standard `String`. You don't need to
+        call this method directly, use `str("...")` instead.
 
         Returns:
             The string representation of the slice.
         """
         return String(str_slice=self)
+
+    @always_inline
+    fn __repr__(self) -> String:
+        """Return a representation of the string instance. You don't need to
+        call this method directly, use `repr("...")` instead.
+
+        Returns:
+            A new representation of the string.
+        """
+        return _repr(self)
+
+    @always_inline
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
+
+        Returns:
+            A new string containing the ASCII representation of the object.
+        """
+        return _ascii(self)
 
     fn __len__(self) -> Int:
         """Nominally returns the _length in Unicode codepoints_ (not bytes!).
@@ -642,18 +659,21 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
+        while start < end and _is_ascii_space(ptr[start]):
             start += 1
-        while end > start and _isspace(ptr[end - 1]):
+        while end > start and _is_ascii_space(ptr[end - 1]):
             end -= 1
         return StringSlice[origin](ptr=ptr + start, length=end - start)
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, origin]:
-        """Get the sequence of encoded bytes of the underlying string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A slice containing the underlying sequence of encoded bytes.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
         return self._slice
 
@@ -878,7 +898,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         for s in self:
             var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
-            if no_null_len == 1 and _isspace(ptr[0]):
+            if no_null_len == 1 and _is_ascii_space(ptr[0]):
                 continue
             elif (
                 no_null_len == 2 and memcmp(ptr, next_line.unsafe_ptr(), 2) == 0
@@ -1022,7 +1042,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike:
+trait Stringlike(CollectionElement, CollectionElementNew):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 
@@ -1042,6 +1062,15 @@ trait Stringlike:
 
         Returns:
             The raw pointer to the data.
+        """
+        ...
+
+    fn __ascii__(self) -> String:
+        """Get the ASCII representation of the object. You don't need to call
+        this method directly, use `ascii("...")` instead.
+
+        Returns:
+            A string containing the ASCII representation of the object.
         """
         ...
 

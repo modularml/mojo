@@ -15,7 +15,7 @@
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
-    _isspace,
+    _is_ascii_space,
 )
 from memory import UnsafePointer
 from python import Python
@@ -45,28 +45,40 @@ def test_stringable():
 
 def test_repr():
     # Standard single-byte characters
-    assert_equal(String.__repr__("hello"), "'hello'")
-    assert_equal(String.__repr__(str(0)), "'0'")
-    assert_equal(String.__repr__("A"), "'A'")
-    assert_equal(String.__repr__(" "), "' '")
-    assert_equal(String.__repr__("~"), "'~'")
+    assert_equal(repr("hello"), "'hello'")
+    assert_equal(repr(str(0)), "'0'")
+    assert_equal(repr("A"), "'A'")
+    assert_equal(repr(" "), "' '")
+    assert_equal(repr("~"), "'~'")
 
     # Special single-byte characters
-    assert_equal(String.__repr__("\0"), r"'\x00'")
-    assert_equal(String.__repr__("\x06"), r"'\x06'")
-    assert_equal(String.__repr__("\x09"), r"'\t'")
-    assert_equal(String.__repr__("\n"), r"'\n'")
-    assert_equal(String.__repr__("\x0d"), r"'\r'")
-    assert_equal(String.__repr__("\x0e"), r"'\x0e'")
-    assert_equal(String.__repr__("\x1f"), r"'\x1f'")
-    assert_equal(String.__repr__("'"), '"\'"')
-    assert_equal(String.__repr__("\\"), r"'\\'")
-    assert_equal(String.__repr__("\x7f"), r"'\x7f'")
+    assert_equal(repr("\0"), r"'\x00'")
+    assert_equal(repr("\x06"), r"'\x06'")
+    assert_equal(repr("\t"), "'\\t'")
+    assert_equal(repr("\t"), r"'\t'")
+    assert_equal(repr("\n"), "'\\n'")
+    assert_equal(repr("\n"), r"'\n'")
+    assert_equal(repr("\r"), "'\\r'")
+    assert_equal(repr("\r"), r"'\r'")
+    assert_equal(repr("\x0e"), r"'\x0e'")
+    assert_equal(repr("\x1f"), r"'\x1f'")
+    assert_equal(repr("'"), '"\'"')
+    assert_equal(repr("\\"), r"'\\'")
+    assert_equal(repr("\x7f"), r"'\x7f'")
+
+    assert_equal(repr("0'123'4"), r'''"0'123'4"''')
+    assert_equal(ascii("0'123'4"), r'''"0'123'4"''')
 
     # Multi-byte characters
-    assert_equal(String.__repr__("Örnsköldsvik"), "'Örnsköldsvik'")  # 2-byte
-    assert_equal(String.__repr__("你好!"), "'你好!'")  # 3-byte
-    assert_equal(String.__repr__("hello 🔥!"), "'hello 🔥!'")  # 4-byte
+    # 2-byte
+    assert_equal(ascii("Örnsköldsvik"), r"'\xd6rnsk\xf6ldsvik'")
+    assert_equal(repr("Örnsköldsvik"), r"'Örnsköldsvik'")
+    # 3-byte
+    assert_equal(ascii("你好!"), r"'\u4f60\u597d!'")
+    assert_equal(repr("你好!"), r"'你好!'")
+    # 4-byte
+    assert_equal(ascii("hello 🔥!"), r"'hello \U0001f525!'")
+    assert_equal(repr("hello 🔥!"), r"'hello 🔥!'")
 
 
 def test_constructors():
@@ -966,24 +978,15 @@ def test_upper():
 
 def test_isspace():
     # checking true cases
-    assert_true(_isspace(ord(" ")))
-    assert_true(_isspace(ord("\n")))
-    assert_true(_isspace("\n"))
-    assert_true(_isspace(ord("\t")))
-    assert_true(_isspace(ord("\r")))
-    assert_true(_isspace(ord("\v")))
-    assert_true(_isspace(ord("\f")))
+    for item in List(" ", "\n", "\t", "\r", "\v", "\f", "\x1c", "\x1d", "\x1e"):
+        assert_true(_is_ascii_space(ord(item[])))
 
     # Checking false cases
-    assert_false(_isspace(ord("a")))
-    assert_false(_isspace("a"))
-    assert_false(_isspace(ord("u")))
-    assert_false(_isspace(ord("s")))
-    assert_false(_isspace(ord("t")))
-    assert_false(_isspace(ord("i")))
-    assert_false(_isspace(ord("n")))
-    assert_false(_isspace(ord("z")))
-    assert_false(_isspace(ord(".")))
+    symbols = List("!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "-", "_")
+    letters = List("a", "e", "i", "o", "u", "c", "d", "f", "g", "h", "j", "k")
+    numbers = List("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+    for item in symbols + letters + numbers:
+        assert_false(_is_ascii_space(ord(item[])))
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
