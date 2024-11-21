@@ -1225,6 +1225,34 @@ struct Int(
             value = byte_swap(value)
         return int(value)
 
+    fn as_bytes[type: DType, big_endian: Bool = False](self) -> List[Byte]:
+        """Convert the integer to a byte array.
+
+        Parameters:
+            type: The type of the integer.
+            big_endian: Whether the byte array should be big-endian.
+
+        Returns:
+            The byte array.
+        """
+        alias type_len = type.sizeof()
+        var value = Scalar[type](self)
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+
+        var ptr: UnsafePointer[Scalar[type]] = UnsafePointer.address_of(value)
+        var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
+        var list = List[Byte](capacity=type_len)
+
+        @parameter
+        for i in range(type_len):
+            list.append(byte_ptr[i])
+        return list^
+
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
         """Convert to index.
