@@ -285,6 +285,17 @@ def test_from_bytes():
         Int.from_bytes[DType.int32, big_endian=True](Bytes(255, 0, 0, 0)),
         -16777216,
     )
+    for x_ref in List[Int](10, 100, -12, 0, 1, -1, 1000, -1000):
+        x = x_ref[]
+
+        @parameter
+        for b in range(2):
+            assert_equal(
+                Int.from_bytes[DType.int16, big_endian=b](
+                    Int(x).as_bytes[DType.int16, big_endian=b]()
+                ),
+                x,
+            )
 
 
 def main():
