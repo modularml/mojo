@@ -392,6 +392,41 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
 
 #     return join(path.__fspath__(), *paths_str)
 
+# ===----------------------------------------------------------------------=== #
+# splitroot
+# ===----------------------------------------------------------------------=== #
+
+
+fn splitroot[
+    PathLike: os.PathLike, //
+](path: PathLike) -> Tuple[String, String, String]:
+    """Splits `path` into drive, root and tail. The tail contains anything after the root.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to be split.
+
+    Returns:
+        A tuple containing three strings: (drive, root, tail).
+    """
+    var p = path.__fspath__()
+    alias empty = String("")
+
+    # Relative path, e.g.: 'foo'
+    if p[:1] != sep:
+        return empty, empty, p
+
+    # Absolute path, e.g.: '/foo', '///foo', '////foo', etc.
+    elif p[1:2] != sep or p[2:3] == sep:
+        return empty, String(sep), p[1:]
+
+    # Precisely two leading slashes, e.g.: '//foo'. Implementation defined per POSIX, see
+    # https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
+    else:
+        return empty, p[:2], p[2:]
+
 
 # ===----------------------------------------------------------------------=== #
 # expandvars
