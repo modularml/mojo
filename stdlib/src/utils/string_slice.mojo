@@ -37,16 +37,30 @@ alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
 
 
-@always_inline
-fn _is_continuation_byte[
-    w: Int
-](vec: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
-    return (vec & 0b1100_0000) == 0b1000_0000
-
-
-@always_inline
 fn _count_utf8_continuation_bytes(span: Span[Byte]) -> Int:
-    return span.count[func=_is_continuation_byte]()
+    alias sizes = (256, 128, 64, 32, 16, 8)
+    var ptr = span.unsafe_ptr()
+    var num_bytes = len(span)
+    var amnt: Int = 0
+    var processed = 0
+
+    @parameter
+    for i in range(len(sizes)):
+        alias s = sizes.get[i, Int]()
+
+        @parameter
+        if simdwidthof[DType.uint8]() >= s:
+            var rest = num_bytes - processed
+            for _ in range(rest // s):
+                var vec = (ptr + processed).load[width=s]()
+                var comp = (vec & 0b1100_0000) == 0b1000_0000
+                amnt += int(comp.cast[DType.uint8]().reduce_add())
+                processed += s
+
+    for i in range(num_bytes - processed):
+        amnt += int((ptr[processed + i] & 0b1100_0000) == 0b1000_0000)
+
+    return amnt
 
 
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
@@ -58,15 +72,19 @@ fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
 
 
 @always_inline
-fn _utf8_first_byte_sequence_length(b: SIMD[DType.uint8, 1]) -> Int:
+fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
     """Get the length of the sequence starting with given byte. Do note that
     this does not work correctly if given a continuation byte."""
 
     debug_assert(
-        not _is_continuation_byte(b),
-        "Function does not work correctly if given a continuation byte.",
+        (b & 0b1100_0000) != 0b1000_0000,
+        (
+            "Function `_utf8_first_byte_sequence_length()` does not work"
+            " correctly if given a continuation byte."
+        ),
     )
-    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
+    var flipped = ~b
+    return int(count_leading_zeros(flipped) + (flipped >> 7))
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
