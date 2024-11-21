@@ -20,6 +20,8 @@ from sys import (
     external_call,
     stdout,
     is_nvidia_gpu,
+    is_amd_gpu,
+    is_gpu,
     _libc as libc,
 )
 from sys._libc import dup, fclose, fdopen, fflush
@@ -170,6 +172,9 @@ fn _printf[
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
+    elif is_amd_gpu():
+        # constrained[False, "_printf on AMDGPU is not implemented"]()
+        pass
     else:
         with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
@@ -258,7 +263,7 @@ fn print[
     write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
 
     @parameter
-    if not is_nvidia_gpu():
+    if not is_gpu():
         if flush:
             _flush(file=file)
 
