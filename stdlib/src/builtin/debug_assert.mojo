@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_nvidia_gpu, llvm_intrinsic
+from sys import is_nvidia_gpu, is_gpu, llvm_intrinsic
 from sys._build import is_debug_build
 from sys.param_env import env_get_string
 from sys.ffi import external_call, c_uint, c_size_t, c_char
@@ -44,7 +44,7 @@ fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
     ]()
 
     @parameter
-    if defined_mode == "none" or (is_nvidia_gpu() and cpu_only):
+    if defined_mode == "none" or (is_gpu() and cpu_only):
         return False
     elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
         return True
@@ -236,7 +236,7 @@ fn _debug_assert_msg(
     var stdout = sys.stdout
 
     @parameter
-    if is_nvidia_gpu():
+    if is_gpu():
         var buffer = _WriteBufferHeap[4096](stdout)
         buffer.write("At ", loc, ": ")
         _write_gpu_thread_context(buffer)
