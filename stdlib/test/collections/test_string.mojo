@@ -1244,20 +1244,20 @@ def test_indexing():
     assert_equal(a[2], "c")
 
 
-def test_string_iter():
+def test_iter():
     var vs = String("123")
 
     # Borrow immutably
     fn conc(vs: String) -> String:
         var c = String("")
-        for v in vs:
+        for v in iter(vs):
             c += v
         return c
 
     assert_equal(123, atol(conc(vs)))
 
     concat = String("")
-    for v in vs.__reversed__():
+    for v in reversed(vs):
         concat += v
     assert_equal(321, atol(concat))
 
@@ -1327,7 +1327,7 @@ def test_string_iter():
 
         assert_equal(amnt_characters, items_amount_characters[item_idx])
         var concat = String("")
-        for v in item.__reversed__():
+        for v in reversed(item):
             concat += v
         assert_equal(rev[item_idx], concat)
         item_idx += 1
@@ -1634,7 +1634,7 @@ def main():
     test_intable()
     test_string_mul()
     test_indexing()
-    test_string_iter()
+    test_iter()
     test_format_args()
     test_format_conversion_flags()
     test_isdigit()

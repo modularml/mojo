@@ -1281,7 +1281,7 @@ struct String(
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringSliceIter[__origin_of(self), False]:
+    fn __reversed__(ref self) -> _StringSliceIter[__origin_of(self), False]:
         """Iterate backwards over the string unicode characters.
 
         Returns:
