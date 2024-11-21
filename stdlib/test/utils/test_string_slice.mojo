@@ -488,10 +488,10 @@ def test_splitlines():
 
 
 def test_iter():
-    vs = "123"
+    vs = StringSlice("123")
 
     # Borrow immutably
-    fn conc(vs: StringLiteral) -> String:
+    fn conc(vs: StringSlice) -> String:
         var c = String("")
         for v in iter(vs):
             c += v
@@ -505,8 +505,7 @@ def test_iter():
     assert_equal(321, atol(concat))
 
     idx = -1
-    vs = "mojo🔥"
-    for item in vs:
+    for item in StringSlice("mojo🔥"):
         idx += 1
         if idx == 0:
             assert_equal("m", item)
