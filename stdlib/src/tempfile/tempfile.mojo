@@ -350,7 +350,7 @@ struct NamedTemporaryFile:
         if self._delete:
             os.remove(self.name)
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Moves constructor for the file handle.
 
         Args:

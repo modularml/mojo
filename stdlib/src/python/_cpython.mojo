@@ -160,7 +160,7 @@ struct PyObjectPtr:
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize a null PyObjectPtr."""
         self.unsized_obj_ptr = UnsafePointer[PyObject]()
 
@@ -259,7 +259,8 @@ struct PythonVersion:
     var patch: Int
     """The patch version number."""
 
-    fn __init__(inout self, version: StringRef):
+    @implicit
+    fn __init__(out self, version: StringRef):
         """Initialize a PythonVersion object from a version string.
 
         Args:
@@ -333,7 +334,7 @@ struct PyMethodDef:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a zero initialized PyModuleDef.
 
         This is suitable for use terminating an array of PyMethodDef values.
@@ -343,7 +344,7 @@ struct PyMethodDef:
         self.method_flags = 0
         self.method_docstring = UnsafePointer[c_char]()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly construct a deep copy of the provided value.
 
         Args:
@@ -465,7 +466,7 @@ struct PyObject(Stringable, Representable, Writable):
     var object_ref_count: Int
     var object_type: UnsafePointer[PyTypeObject]
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.object_ref_count = 0
         self.object_type = UnsafePointer[PyTypeObject]()
 
@@ -541,13 +542,13 @@ struct PyModuleDef_Base(Stringable, Representable, Writable):
     # Life cycle methods
     # ===------------------------------------------------------------------=== #
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.object_base = PyObject()
         self.init_fn = _null_fn_ptr[Self._init_fn_type]()
         self.index = 0
         self.dict_copy = UnsafePointer[PyObject]()
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.object_base = existing.object_base
         self.init_fn = existing.init_fn
         self.index = existing.index
@@ -647,7 +648,8 @@ struct PyModuleDef(Stringable, Representable, Writable):
     alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
     var free_fn: Self._free_fn_type
 
-    fn __init__(inout self, name: String):
+    @implicit
+    fn __init__(out self, name: String):
         self.base = PyModuleDef_Base()
         self.name = name.unsafe_cstr_ptr()
         self.docstring = UnsafePointer[c_char]()
@@ -661,7 +663,7 @@ struct PyModuleDef(Stringable, Representable, Writable):
         self.clear_fn = _null_fn_ptr[Self._clear_fn_type]()
         self.free_fn = _null_fn_ptr[Self._free_fn_type]()
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.base = existing.base^
         self.name = existing.name
         self.docstring = existing.docstring
@@ -748,7 +750,7 @@ struct CPython:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
@@ -1176,6 +1178,13 @@ struct CPython:
         https://docs.python.org/3/c-api/type.html#c.PyType_FromSpec).
         """
         return self.lib.call["PyType_FromSpec", PyObjectPtr](spec)
+
+    fn PyType_GenericAlloc(
+        inout self,
+        type: UnsafePointer[PyTypeObject],
+        nitems: Py_ssize_t,
+    ) -> PyObjectPtr:
+        return self.lib.call["PyType_GenericAlloc", PyObjectPtr](type, nitems)
 
     # ===-------------------------------------------------------------------===#
     # Python Evaluation

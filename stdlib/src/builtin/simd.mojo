@@ -25,7 +25,7 @@ from sys import (
     llvm_intrinsic,
     prefetch,
     simdwidthof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     bitwidthof,
 )
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
@@ -40,6 +40,8 @@ from builtin.dtype import _uint_type_of_width
 from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from builtin.format_int import _try_write_int
+from builtin._format_float import _write_float
+from builtin.io import _snprintf
 from collections import InlineArray
 from memory import bitcast, UnsafePointer
 
@@ -60,7 +62,6 @@ from .dtype import (
     _unsigned_integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _printf, _snprintf_scalar
 from collections.string import (
     _calc_format_buffer_size,
     _calc_initial_buffer_size,
@@ -90,6 +91,10 @@ alias Int64 = Scalar[DType.int64]
 alias UInt64 = Scalar[DType.uint64]
 """Represents a 64-bit unsigned scalar integer."""
 
+alias Float8e5m2 = Scalar[DType.float8e5m2]
+"""Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+alias Float8e4m3 = Scalar[DType.float8e4m3]
+"""Represents a FP8E4M3 floating point format whose bitwidth is 8."""
 alias BFloat16 = Scalar[DType.bfloat16]
 """Represents a 16-bit brain floating point value."""
 alias Float16 = Scalar[DType.float16]
@@ -151,12 +156,12 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
-    return triple_is_nvidia_cuda()
+    return is_nvidia_gpu()
 
 
 @always_inline("nodebug")
 fn _has_native_f8_support() -> Bool:
-    return _is_sm_9x() or triple_is_nvidia_cuda["sm_89"]()
+    return _is_sm_9x() or is_nvidia_gpu["sm_89"]()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -217,16 +222,14 @@ struct SIMD[type: DType, size: Int](
     alias MIN_FINITE = Self(_min_finite[type]())
     """Returns the minimum (lowest) finite value of SIMD value."""
 
-    alias _default_alignment = alignof[
-        Scalar[type]
-    ]() if triple_is_nvidia_cuda() else 1
+    alias _default_alignment = alignof[Scalar[type]]() if is_nvidia_gpu() else 1
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default initializer of the SIMD vector.
 
         By default the SIMD vectors are initialized to all zeros.
@@ -236,7 +239,7 @@ struct SIMD[type: DType, size: Int](
 
     # FIXME(MOCO-1291): Can't implement this due to ambiguity.
     # @always_inline("nodebug")
-    # fn __init__(inout self, *, other: SIMD[type, size]):
+    # fn __init__(out self, *, other: SIMD[type, size]):
     #    """Explicitly copy the provided value.
 
     #    Args:
@@ -245,7 +248,8 @@ struct SIMD[type: DType, size: Int](
     #    self.__copyinit__(other)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: UInt):
+    @implicit
+    fn __init__(out self, value: UInt):
         """Initializes the SIMD vector with an unsigned integer.
 
         The unsigned integer value is splatted across all the elements of the SIMD
@@ -257,7 +261,8 @@ struct SIMD[type: DType, size: Int](
         self = Self(value.value)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         """Initializes the SIMD vector with a signed integer.
 
         The signed integer value is splatted across all the elements of the SIMD
@@ -270,7 +275,8 @@ struct SIMD[type: DType, size: Int](
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.index):
+    @implicit
+    fn __init__(out self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
 
         var t0 = __mlir_op.`pop.cast_from_builtin`[
@@ -284,7 +290,8 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    @implicit
+    fn __init__(out self, value: IntLiteral):
         """Initializes the SIMD vector with an integer.
 
         The integer value is splatted across all the elements of the SIMD
@@ -309,7 +316,8 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
-    fn __init__(inout self: SIMD[DType.bool, size], value: Bool, /):
+    @implicit
+    fn __init__(out self: SIMD[DType.bool, size], value: Bool, /):
         """Initializes the SIMD vector with a bool value.
 
         The bool value is splatted across all elements of the SIMD vector.
@@ -327,6 +335,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(
         inout self,
         value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
@@ -340,7 +349,8 @@ struct SIMD[type: DType, size: Int](
         self.value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Scalar[type], /):
+    @implicit
+    fn __init__(out self, value: Scalar[type], /):
         """Constructs a SIMD vector by splatting a scalar value.
 
         The input value is splatted across all elements of the SIMD vector.
@@ -356,7 +366,8 @@ struct SIMD[type: DType, size: Int](
         ](value.value)
 
     @always_inline("nodebug")
-    fn __init__(inout self, *elems: Scalar[type]):
+    @implicit
+    fn __init__(out self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
         The input values are assigned to the corresponding elements of the SIMD
@@ -395,7 +406,8 @@ struct SIMD[type: DType, size: Int](
             self[i] = elems[i]
 
     @always_inline
-    fn __init__(inout self, value: FloatLiteral):
+    @implicit
+    fn __init__(out self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
         The value is splatted across all the elements of the SIMD
@@ -1439,20 +1451,17 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The representation of the SIMD value.
         """
-
         var output = String()
-        self.write_to[use_scientific_notation=True](output)
-
-        var values = output.as_string_slice()
-
-        @parameter
-        if size > 1:
-            # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(unsafe_from_utf8=output.as_bytes()[1:-1])
-
-        return (
-            "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
-        )
+        output.write("SIMD[" + type.__repr__() + ", ", size, "](")
+        # Write each element.
+        for i in range(size):
+            var element = self[i]
+            # Write separators between each element.
+            if i != 0:
+                output.write(", ")
+            _write_scalar(output, element)
+        output.write(")")
+        return output
 
     @always_inline("nodebug")
     fn __floor__(self) -> Self:
@@ -1496,7 +1505,7 @@ struct SIMD[type: DType, size: Int](
         elif type.is_floating_point():
 
             @parameter
-            if triple_is_nvidia_cuda():
+            if is_nvidia_gpu():
 
                 @parameter
                 if type.is_half_float():
@@ -1564,6 +1573,23 @@ struct SIMD[type: DType, size: Int](
         """
         hasher._update_with_simd(self)
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+
+        @parameter
+        if type.is_signed():
+            return -(self // -denominator)
+        return (self + denominator - 1) // denominator
+
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
@@ -1585,7 +1611,7 @@ struct SIMD[type: DType, size: Int](
             return rebind[SIMD[target, size]](self)
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
 
             @parameter
             if size > 1 and type is DType.float32 and target.is_half_float():
@@ -1617,7 +1643,30 @@ struct SIMD[type: DType, size: Int](
                 return self.cast[DType.float32]().cast[target]()
 
         @parameter
-        if has_neon() and (type is DType.bfloat16 or target == DType.bfloat16):
+        if type in (DType.float8e4m3, DType.float8e5m2):
+            constrained[
+                target in (DType.float32, DType.float16, DType.bfloat16),
+                (
+                    "Only FP8->F32, FP8->F16, and FP8->BF16 castings are"
+                    " implemented."
+                ),
+            ]()
+
+            @parameter
+            if target is DType.float32:
+                return _convert_float8_to_f32(
+                    rebind[SIMD[type, size]](self)
+                ).cast[target]()
+            elif target is DType.float16:
+                return _convert_float8_to_f16(
+                    rebind[SIMD[type, size]](self)
+                ).cast[target]()
+            return rebind[SIMD[target, size]](
+                self.cast[DType.float32]().cast[DType.bfloat16]()
+            )
+
+        @parameter
+        if has_neon() and (type is DType.bfloat16 or target is DType.bfloat16):
             # TODO(KERN-228): support BF16 on neon systems.
             return _unchecked_zero[target, size]()
 
@@ -1626,17 +1675,17 @@ struct SIMD[type: DType, size: Int](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
 
         @parameter
-        if target == DType.bool:
+        if target is DType.bool:
             return rebind[SIMD[target, size]](self != 0)
 
         @parameter
-        if type is DType.bfloat16 and target is DType.float32:
-            return rebind[SIMD[target, size]](
-                _bfloat16_to_f32(rebind[SIMD[DType.bfloat16, size]](self))
-            )
+        if type is DType.bfloat16 and not _has_native_bf16_support():
+            return _bfloat16_to_f32(
+                rebind[SIMD[DType.bfloat16, size]](self)
+            ).cast[target]()
 
         @parameter
-        if type is DType.float32 and target == DType.bfloat16:
+        if target is DType.bfloat16 and not _has_native_bf16_support():
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
@@ -1662,82 +1711,21 @@ struct SIMD[type: DType, size: Int](
         Args:
             writer: The object to write to.
         """
-        self.write_to[use_scientific_notation=False](writer)
 
-    # This overload is required to keep SIMD compliant with the Writable
-    # trait, and the call to `String.write(self)` in SIMD.__str__ will
-    # fail to compile.
-    @no_inline
-    fn write_to[
-        W: Writer, use_scientific_notation: Bool
-    ](self, inout writer: W):
-        """
-        Formats this SIMD value to the provided Writer.
-
-        Parameters:
-            W: A type conforming to the Writable trait.
-            use_scientific_notation: Whether floats should use scientific
-                notation. This parameter does not apply to integer types.
-
-        Args:
-            writer: The object to write to.
-        """
-
-        # Print an opening `[`.
+        # Write an opening `[`.
         @parameter
         if size > 1:
             writer.write("[")
 
-        # Print each element.
+        # Write each element.
         for i in range(size):
             var element = self[i]
-            # Print separators between each element.
+            # Write separators between each element.
             if i != 0:
                 writer.write(", ")
+            _write_scalar(writer, element)
 
-            @parameter
-            if triple_is_nvidia_cuda():
-                # FIXME(MSTDL-406):
-                #   The uses of `printf` below prints "out of band" with the
-                #   `Writer` passed in, meaning this will only work if
-                #   `Writer` is an unbuffered wrapper around printf (which
-                #   Writer.stdout currently is by default).
-                #
-                #   This is a workaround to permit debug formatting of
-                #   floating-point values on GPU, where printing to stdout
-                #   is the only way the Writer framework is currently
-                #   used.
-
-                @parameter
-                if type is DType.float64:
-                    # get_dtype_printf_format hardcodes 17 digits of precision.
-                    _printf["%g"](element)
-                elif type.is_floating_point():
-                    # We need to cast the value to float64 to print it, to avoid
-                    # an ABI mismatch.
-                    _printf["%g"](element.cast[DType.float64]())
-                elif type.is_integral():
-                    var err = _try_write_int(writer, element)
-                    if err:
-                        abort(
-                            "unreachable: unexpected write int failure"
-                            " condition: "
-                            + str(err.value())
-                        )
-                else:
-                    _printf[_get_dtype_printf_format[type]()](element)
-            else:
-
-                @parameter
-                if use_scientific_notation and type.is_floating_point():
-                    alias float_format = "%." + _scientific_notation_digits[
-                        type
-                    ]() + "e"
-                    _format_scalar[float_format](writer, element)
-                else:
-                    _format_scalar(writer, element)
-
-        # Print a closing `]`.
+        # Write a closing `]`.
         @parameter
         if size > 1:
             writer.write("]")
@@ -2984,6 +2972,136 @@ fn _powi[type: DType](base: Scalar[type], exp: Int32) -> __type_of(base):
 
 
 # ===----------------------------------------------------------------------=== #
+# float8
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _convert_float8_to_f32_scaler[
+    type: DType,
+](x: Scalar[type]) -> Scalar[DType.float32]:
+    var kF32_NaN: UInt32 = 0x7FFFFFFF
+    var FP8_NUM_BITS = 8
+    var IS_E4M3 = type is DType.float8e4m3
+    var FP8_NUM_MANTISSA_BITS = FPUtils[type].mantissa_width()
+    var FP8_NUM_EXPONENT_BITS = FPUtils[type].exponent_width()
+    var FP32_NUM_BITS = 32
+    var FP8_EXPONENT_MASK: UInt8 = (1 << FP8_NUM_EXPONENT_BITS) - 1
+    var FP8_MANTISSA_MASK: UInt8 = (1 << FP8_NUM_MANTISSA_BITS) - 1
+    var FP8_MAX_EXPONENT = 7 if IS_E4M3 else 15
+    var FP8_EXPONENT_BIAS = 7 if IS_E4M3 else 15
+    var FP32_EXPONENT_BIAS = 127
+    var FP32_NUM_MANTISSA_BITS = 23
+
+    var f8: UInt8 = bitcast[DType.uint8](x)
+
+    var sign: UInt32 = (f8.cast[DType.uint32]() >> (FP8_NUM_BITS - 1)) & 1
+    var exp: UInt32 = ((f8 >> FP8_NUM_MANTISSA_BITS) & FP8_EXPONENT_MASK).cast[
+        DType.uint32
+    ]()
+    var mantissa: UInt32 = (f8 & FP8_MANTISSA_MASK).cast[DType.uint32]()
+
+    var f: UInt32 = (sign << (FP32_NUM_BITS - 1))
+
+    if IS_E4M3 and exp == 15 and mantissa == 0x7:
+        f = kF32_NaN
+    elif exp > 0 and (
+        IS_E4M3 or exp < (FP8_MAX_EXPONENT + FP8_EXPONENT_BIAS + 1)
+    ):
+        # normal
+        exp += FP32_EXPONENT_BIAS - FP8_EXPONENT_BIAS
+        f |= exp << FP32_NUM_MANTISSA_BITS
+        f |= mantissa << (FP32_NUM_MANTISSA_BITS - FP8_NUM_MANTISSA_BITS)
+    elif exp == 0:
+        if mantissa:
+            # subnormal
+            exp += (FP32_EXPONENT_BIAS - FP8_EXPONENT_BIAS) + 1
+            while (mantissa & (1 << FP8_NUM_MANTISSA_BITS)) == 0:
+                mantissa <<= 1
+                exp -= 1
+            mantissa = mantissa & FP8_MANTISSA_MASK.cast[DType.uint32]()
+            f |= exp << FP32_NUM_MANTISSA_BITS
+            f |= mantissa << (FP32_NUM_MANTISSA_BITS - FP8_NUM_MANTISSA_BITS)
+        else:
+            # sign-preserving zero
+            pass
+    else:
+        if mantissa == 0:
+            # Sign-preserving infinity
+            f |= 0x7F800000
+        else:
+            # Canonical NaN
+            f = kF32_NaN
+
+    return bitcast[DType.float32](f)
+
+
+@always_inline
+fn _convert_float8_to_f32[
+    type: DType,
+    size: Int,
+](val: SIMD[type, size]) -> SIMD[DType.float32, size]:
+    @parameter
+    if is_nvidia_gpu() and _is_sm_9x():
+        return _convert_float8_to_f16(rebind[SIMD[type, size]](val)).cast[
+            DType.float32
+        ]()
+    else:
+
+        @always_inline
+        @parameter
+        fn wrapper_fn[
+            input_type: DType, result_type: DType
+        ](val: Scalar[input_type]) capturing -> Scalar[result_type]:
+            return rebind[Scalar[result_type]](
+                _convert_float8_to_f32_scaler(rebind[Scalar[type]](val))
+            )
+
+        return _simd_apply[wrapper_fn, DType.float32, size](val)
+
+
+@always_inline
+fn _convert_float8_to_f16[
+    type: DType,
+    size: Int,
+](val: SIMD[type, size],) -> SIMD[DType.float16, size]:
+    @parameter
+    if is_nvidia_gpu() and _is_sm_9x():
+        alias asm_prefix = "cvt.rn.f16x2.e4m3x2" if type is DType.float8e4m3 else "cvt.rn.f16x2.e5m2x2"
+        var val_uint8 = bitcast[DType.uint8](val)
+
+        @parameter
+        if size > 1:
+            var res = SIMD[DType.uint16, size]()
+
+            @parameter
+            for i in range(0, size, 2):
+                var f8x2 = val_uint8.slice[2, offset=i]()
+                var f16x2_f8x2 = inlined_assembly[
+                    asm_prefix + " $0, $1;",
+                    Scalar[DType.uint32],
+                    constraints="=r,h",
+                    has_side_effect=False,
+                ](bitcast[DType.uint16, 1](f8x2))
+                var ui16x2 = bitcast[DType.uint16, 2](f16x2_f8x2)
+                res = res.insert[offset=i](ui16x2)
+            return bitcast[DType.float16](res)
+        else:
+            var f16x2_f8x2 = inlined_assembly[
+                asm_prefix + " $0, $1;",
+                Scalar[DType.uint32],
+                constraints="=r,h",
+                has_side_effect=False,
+            ](val_uint8.cast[DType.uint16]())
+            var ui16x2 = bitcast[DType.uint16, 2](f16x2_f8x2)
+            return bitcast[DType.float16](ui16x2[0])
+    else:
+        return _convert_float8_to_f32(rebind[SIMD[type, size]](val)).cast[
+            DType.float16
+        ]()
+
+
+# ===----------------------------------------------------------------------=== #
 # bfloat16
 # ===----------------------------------------------------------------------=== #
 
@@ -3003,7 +3121,7 @@ fn _bfloat16_to_f32_scalar(
 
     # For bfloat16, we can just do a memcpy to perform the cast to float32.
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         return inlined_assembly[
             "cvt.f32.bf16 $0, $1;" if _is_sm_9x() else "mov.b32 $0, {0, $1};",
             Scalar[DType.float32],
@@ -3154,34 +3272,6 @@ fn _simd_apply[
 
 
 # ===----------------------------------------------------------------------=== #
-# Scalar Formatting
-# ===----------------------------------------------------------------------=== #
-
-
-fn _format_scalar[
-    dtype: DType,
-    W: Writer, //,
-    float_format: StringLiteral = "%.17g",
-](inout writer: W, value: Scalar[dtype]):
-    # Stack allocate enough bytes to store any formatted Scalar value of any
-    # type.
-    alias size: Int = _calc_format_buffer_size[dtype]()
-
-    var buf = InlineArray[UInt8, size](fill=0)
-
-    var wrote = _snprintf_scalar[dtype, float_format](
-        buf.unsafe_ptr(),
-        size,
-        value,
-    )
-
-    # SAFETY:
-    #   Create a slice to only those bytes in `buf` that have been initialized.
-    var span = Span[Byte](buf)[:wrote]
-    writer.write_bytes(span)
-
-
-# ===----------------------------------------------------------------------=== #
 # modf
 # ===----------------------------------------------------------------------=== #
 
@@ -3256,3 +3346,40 @@ fn _floor(x: SIMD) -> __type_of(x):
         bits,
     )
     return __type_of(x)(from_bits=bits)
+
+
+fn _write_scalar[
+    dtype: DType,
+    W: Writer, //,
+](inout writer: W, value: Scalar[dtype]):
+    @parameter
+    if dtype == DType.bool:
+        if value:
+            writer.write("True")
+        else:
+            writer.write("False")
+
+    elif dtype.is_floating_point():
+        _write_float(writer, value)
+
+    # TODO: bring in modern int formatter and remove GPU specific code
+    elif dtype.is_integral():
+
+        @parameter
+        if is_nvidia_gpu():
+            var err = _try_write_int(writer, value)
+            if err:
+                abort(
+                    "unreachable: unexpected write int failure condition: "
+                    + str(err.value())
+                )
+        else:
+            # Stack allocate enough bytes to store any formatted Scalar value.
+            alias size: Int = _calc_format_buffer_size[dtype]()
+            var buf = InlineArray[UInt8, size](fill=0)
+            var wrote = _snprintf[_get_dtype_printf_format[dtype]()](
+                buf.unsafe_ptr(), size, value
+            )
+            # SAFETY:
+            #   Create a slice to only those bytes in `buf` that have been initialized.
+            writer.write_bytes(Span[Byte](buf)[:wrote])

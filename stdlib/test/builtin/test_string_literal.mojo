@@ -45,9 +45,18 @@ def test_iadd():
 
 
 def test_mul():
-    alias original = "mojo"
-    alias concat = original * 3
-    assert_equal("mojomojomojo", concat)
+    alias `3`: Int = 3
+    alias `u3`: UInt = 3
+    alias static_concat_0 = "mojo" * 3
+    alias static_concat_1 = "mojo" * `3`
+    alias static_concat_2 = "mojo" * `u3`
+    assert_equal(static_concat_0, static_concat_1)
+    assert_equal(static_concat_1, static_concat_2)
+    assert_equal("mojomojomojo", static_concat_0)
+    assert_equal(static_concat_0, String("mojo") * 3)
+    var dynamic_concat = "mojo" * 3
+    assert_equal("mojomojomojo", dynamic_concat)
+    assert_equal(static_concat_0, dynamic_concat)
 
 
 def test_equality():
@@ -56,6 +65,15 @@ def test_equality():
 
     assert_true(StringLiteral.__ne__("five", "six"))
     assert_false(StringLiteral.__ne__("six", "six"))
+
+    var hello = str("hello")
+    var hello_ref = hello.as_string_slice()
+
+    assert_false(StringLiteral.__eq__("goodbye", hello))
+    assert_true(StringLiteral.__eq__("hello", hello))
+
+    assert_false(StringLiteral.__eq__("goodbye", hello_ref))
+    assert_true(StringLiteral.__eq__("hello", hello_ref))
 
 
 def test_len():

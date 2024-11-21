@@ -11,10 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer
+from memory import UnsafePointer, stack_allocation
 
 from sys import sizeof, alignof
-from sys.ffi import OpaquePointer
 
 import python._cpython as cp
 from python import TypedPythonObject, Python, PythonObject
@@ -29,7 +28,6 @@ from python._cpython import (
 from python._bindings import (
     Pythonable,
     ConvertibleFromPython,
-    PythonableAndConvertibleFromPython,
     PyMojoObject,
     python_type_object,
     py_c_function_wrapper,
@@ -117,7 +115,7 @@ fn add_wrapper_to_module[
 
 
 fn check_and_get_arg[
-    T: Pythonable
+    T: AnyType
 ](
     func_name: StringLiteral,
     type_name_id: StringLiteral,
@@ -127,15 +125,23 @@ fn check_and_get_arg[
     return check_argument_type[T](func_name, type_name_id, py_args[index])
 
 
+# NOTE:
+#   @always_inline is needed so that the stack_allocation() that appears in
+#   the definition below is valid in the _callers_ stack frame, effectively
+#   allowing us to "return" a pointer to stack-allocated data from this
+#   function.
+@always_inline
 fn check_and_get_or_convert_arg[
-    T: PythonableAndConvertibleFromPython
+    T: ConvertibleFromPython
 ](
     func_name: StringLiteral,
     type_name_id: StringLiteral,
     py_args: TypedPythonObject["Tuple"],
     index: Int,
-    converted_arg_ptr: UnsafePointer[T],
 ) raises -> UnsafePointer[T]:
+    # Stack space to hold a converted value for this argument, if needed.
+    var converted_arg_ptr: UnsafePointer[T] = stack_allocation[1, T]()
+
     try:
         return check_and_get_arg[T](func_name, type_name_id, py_args, index)
     except e:
@@ -147,6 +153,8 @@ fn check_and_get_or_convert_arg[
                 index,
             )
         )
+        # Return a pointer to stack data. Only valid because this function is
+        # @always_inline.
         return converted_arg_ptr
 
 

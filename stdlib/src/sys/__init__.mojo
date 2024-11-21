@@ -46,9 +46,10 @@ from .info import (
     simdbitwidth,
     simdbytewidth,
     simdwidthof,
-    warpsize,
     sizeof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
+    is_amd_gpu,
+    is_gpu,
 )
 from .intrinsics import (
     PrefetchCache,

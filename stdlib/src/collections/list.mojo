@@ -109,13 +109,13 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs an empty list."""
         self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Creates a deep copy of the given list.
 
         Args:
@@ -125,7 +125,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         for e in other:
             self.append(e[])
 
-    fn __init__(inout self, *, capacity: Int):
+    fn __init__(out self, *, capacity: Int):
         """Constructs a list with the given capacity.
 
         Args:
@@ -135,7 +135,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.size = 0
         self.capacity = capacity
 
-    fn __init__(inout self, owned *values: T):
+    @implicit
+    fn __init__(out self, owned *values: T):
         """Constructs a list from the given values.
 
         Args:
@@ -143,7 +144,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self = Self(variadic_list=values^)
 
-    fn __init__(inout self, *, owned variadic_list: VariadicListMem[T, _]):
+    fn __init__(out self, *, owned variadic_list: VariadicListMem[T, _]):
         """Constructs a list from the given values.
 
         Args:
@@ -164,7 +165,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         self.size = length
 
-    fn __init__(inout self, span: Span[T]):
+    @implicit
+    fn __init__(out self, span: Span[T]):
         """Constructs a list from the a Span of values.
 
         Args:
@@ -175,24 +177,20 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.append(value[])
 
     fn __init__(
-        inout self,
-        *,
-        unsafe_pointer: UnsafePointer[T],
-        size: Int,
-        capacity: Int,
+        inout self, *, ptr: UnsafePointer[T], length: Int, capacity: Int
     ):
-        """Constructs a list from a pointer, its size, and its capacity.
+        """Constructs a list from a pointer, its length, and its capacity.
 
         Args:
-            unsafe_pointer: The pointer to the data.
-            size: The number of elements in the list.
+            ptr: The pointer to the data.
+            length: The number of elements in the list.
             capacity: The capacity of the list.
         """
-        self.data = unsafe_pointer
-        self.size = size
+        self.data = ptr
+        self.size = length
         self.capacity = capacity
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move data of an existing list into a new one.
 
         Args:
@@ -202,7 +200,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.size = existing.size
         self.capacity = existing.capacity
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Creates a deepcopy of the given list.
 
         Args:
@@ -349,9 +347,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self.extend(other^)
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
+    fn __iter__(ref self) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -360,7 +356,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
-        ref [_]self: Self,
+        ref self,
     ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
@@ -693,7 +689,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn index[
         C: EqualityComparableCollectionElement, //
     ](
-        ref [_]self: List[C, *_],
+        ref self: List[C, *_],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -789,7 +785,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [self] T:
+    fn __getitem__(ref self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -814,7 +810,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.T:
+    fn unsafe_get(ref self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it

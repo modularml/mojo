@@ -85,7 +85,7 @@ struct OwnedPointer[T: AnyType]:
         """
         self.__init__(copy_value=other[])
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move this OwnedPointer[].
 
         Args:
