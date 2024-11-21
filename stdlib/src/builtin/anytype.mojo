@@ -46,6 +46,7 @@ trait AnyType:
         var p: UnsafePointer[Int]
         var size: Int
 
+        @implicit
         fn __init__(out self, size: Int):
             self.p = UnsafePointer[Int].alloc(size)
             self.size = size

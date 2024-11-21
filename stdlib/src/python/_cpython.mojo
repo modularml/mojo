@@ -259,6 +259,7 @@ struct PythonVersion:
     var patch: Int
     """The patch version number."""
 
+    @implicit
     fn __init__[O: ImmutableOrigin](out self, version: StringSlice[O]):
         """Initialize a PythonVersion object from a version string.
 
@@ -655,6 +656,7 @@ struct PyModuleDef(Stringable, Representable, Writable):
     alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
     var free_fn: Self._free_fn_type
 
+    @implicit
     fn __init__(out self, name: String):
         self.base = PyModuleDef_Base()
         self.name = name.unsafe_cstr_ptr()

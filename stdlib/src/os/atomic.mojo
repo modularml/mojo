@@ -41,6 +41,7 @@ struct Atomic[type: DType]:
     """
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Scalar[type]):
         """Constructs a new atomic value.
 
@@ -348,11 +349,12 @@ fn _max_impl[
         alias unsigned_integral_type = _unsigned_integral_type_of[type]()
         if rhs >= 0:
             _max_impl_base(
-                ptr.bitcast[integral_type](), bitcast[integral_type](rhs)
+                ptr.bitcast[Scalar[integral_type]](),
+                bitcast[integral_type](rhs),
             )
             return
         _min_impl_base(
-            ptr.bitcast[unsigned_integral_type](),
+            ptr.bitcast[Scalar[unsigned_integral_type]](),
             bitcast[unsigned_integral_type](rhs),
         )
         return
@@ -370,11 +372,12 @@ fn _min_impl[
         alias unsigned_integral_type = _unsigned_integral_type_of[type]()
         if rhs >= 0:
             _min_impl_base(
-                ptr.bitcast[integral_type](), bitcast[integral_type](rhs)
+                ptr.bitcast[Scalar[integral_type]](),
+                bitcast[integral_type](rhs),
             )
             return
         _max_impl_base(
-            ptr.bitcast[unsigned_integral_type](),
+            ptr.bitcast[Scalar[unsigned_integral_type]](),
             bitcast[unsigned_integral_type](rhs),
         )
         return

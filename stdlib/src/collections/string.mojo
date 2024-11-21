@@ -19,7 +19,7 @@ from builtin.builtin_list import _lit_mut_cast
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char, OpaquePointer
+from sys.ffi import c_char
 from utils import StaticString, write_args
 
 from bit import count_leading_zeros
@@ -46,6 +46,13 @@ from utils.string_slice import (
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
     _to_string_list,
+)
+
+from utils._unicode import (
+    is_lowercase,
+    is_uppercase,
+    to_lowercase,
+    to_uppercase,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -87,7 +94,7 @@ fn ord(s: StringSlice) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s.unsafe_ptr().bitcast[UInt8]()
+    var p = s.unsafe_ptr()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(s.byte_length() == 1, "input string length must be 1")
@@ -735,6 +742,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
+    @implicit
     fn __init__(out self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
@@ -757,6 +765,10 @@ struct String(
         )
         # We make a backup because steal_data() will clear size and capacity.
         var size = impl.size
+        debug_assert(
+            impl[size - 1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
         var capacity = impl.capacity
         self._buffer = Self._buffer_type(
             ptr=impl.steal_data(), length=size, capacity=capacity
@@ -784,6 +796,7 @@ struct String(
         """
         self.__copyinit__(other)
 
+    @implicit
     fn __init__(out self, str: StringRef):
         """Construct a string from a StringRef object.
 
@@ -797,6 +810,7 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
+    @implicit
     fn __init__(out self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
@@ -820,6 +834,7 @@ struct String(
         self = Self(buffer^)
 
     @always_inline
+    @implicit
     fn __init__(out self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
@@ -848,14 +863,13 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     fn write_bytes(inout self, bytes: Span[Byte, _]):
-        """
-        Write a byte span to this String.
+        """Write a byte span to this String.
 
         Args:
             bytes: The byte span to write to this String. Must NOT be
-              null terminated.
+                null terminated.
         """
-        self._iadd[True](bytes)
+        self._iadd[False](bytes)
 
     fn write[*Ts: Writable](inout self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
@@ -1527,7 +1541,7 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1544,7 +1558,7 @@ struct String(
 
     @always_inline
     fn as_string_slice(
-        ref [_]self,
+        ref self,
     ) -> StringSlice[_lit_mut_cast[__origin_of(self), False].result]:
         """Returns a string slice of the data owned by this string.
 
@@ -1987,46 +2001,29 @@ struct String(
         return String(res^)
 
     fn lower(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters
+        """Returns a copy of the string with all cased characters
         converted to lowercase.
 
         Returns:
             A new string where cased letters have been converted to lowercase.
         """
 
-        # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ascii_uppercase]()
+        # TODO: the _unicode module does not support locale sensitive conversions yet.
+        return to_lowercase(self)
 
     fn upper(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters
+        """Returns a copy of the string with all cased characters
         converted to uppercase.
 
         Returns:
             A new string where cased letters have been converted to uppercase.
         """
 
-        # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ascii_lowercase]()
-
-    fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
-        var copy: String = self
-
-        var char_ptr = copy.unsafe_ptr()
-
-        for i in range(self.byte_length()):
-            var char: UInt8 = char_ptr[i]
-            if check_case(char):
-                var lower = _toggle_ascii_case(char)
-                char_ptr[i] = lower
-
-        return copy
+        # TODO: the _unicode module does not support locale sensitive conversions yet.
+        return to_uppercase(self)
 
     fn startswith(
-        ref [_]self, prefix: String, start: Int = 0, end: Int = -1
+        ref self, prefix: String, start: Int = 0, end: Int = -1
     ) -> Bool:
         """Checks if the string starts with the specified prefix between start
         and end positions. Returns True if found and False otherwise.
@@ -2190,44 +2187,25 @@ struct String(
                 return False
         return True
 
-    fn _isupper_islower[*, upper: Bool](self) -> Bool:
-        fn is_ascii_cased(c: UInt8) -> Bool:
-            return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
-
-        for c in self:
-            debug_assert(c.byte_length() == 1, "only implemented for ASCII")
-            if is_ascii_cased(ord(c)):
-
-                @parameter
-                if upper:
-                    return self == self.upper()
-                else:
-                    return self == self.lower()
-        return False
-
     fn isupper(self) -> Bool:
         """Returns True if all cased characters in the string are uppercase and
         there is at least one cased character.
-
-        Note that this currently only works with ASCII strings.
 
         Returns:
             True if all cased characters in the string are uppercase and there
             is at least one cased character, False otherwise.
         """
-        return self._isupper_islower[upper=True]()
+        return len(self) > 0 and is_uppercase(self)
 
     fn islower(self) -> Bool:
         """Returns True if all cased characters in the string are lowercase and
         there is at least one cased character.
 
-        Note that this currently only works with ASCII strings.
-
         Returns:
             True if all cased characters in the string are lowercase and there
             is at least one cased character, False otherwise.
         """
-        return self._isupper_islower[upper=False]()
+        return len(self) > 0 and is_lowercase(self)
 
     fn isprintable(self) -> Bool:
         """Returns True if all characters in the string are ASCII printable.

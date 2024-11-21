@@ -57,6 +57,7 @@ struct Matrix[rows: Int, cols: Int]:
         memset_zero(self.data, rows * cols)
 
     # Initialize taking a pointer, don't set any elements
+    @implicit
     fn __init__(out self, data: UnsafePointer[Scalar[type]]):
         self.data = data
 

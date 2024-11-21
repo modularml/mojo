@@ -54,9 +54,10 @@ struct _ArcInner[T: Movable]:
     var refcount: Atomic[DType.uint64]
     var payload: T
 
+    @implicit
     fn __init__(out self, owned value: T):
         """Create an initialized instance of this with a refcount of 1."""
-        self.refcount = 1
+        self.refcount = Scalar[DType.uint64](1)
         self.payload = value^
 
     fn add_ref(inout self):
@@ -88,6 +89,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     alias _inner_type = _ArcInner[T]
     var _inner: UnsafePointer[Self._inner_type]
 
+    @implicit
     fn __init__(out self, owned value: T):
         """Construct a new thread-safe, reference-counted smart pointer,
         and move the value into heap memory managed by the new pointer.
@@ -140,7 +142,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
     fn __getitem__[
         self_life: ImmutableOrigin
     ](
-        ref [self_life]self: Self,
+        ref [self_life]self,
     ) -> ref [
         _lit_mut_cast[self_life, result_mutable=True].result
     ] T:
