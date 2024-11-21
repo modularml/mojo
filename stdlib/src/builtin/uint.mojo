@@ -383,6 +383,19 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.or`(self.value, rhs.value)
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return __mlir_op.`index.ceildivu`(self.value, denominator.value)
+
     # ===----------------------------------------------------------------------===#
     # In place operations.
     # ===----------------------------------------------------------------------===#
