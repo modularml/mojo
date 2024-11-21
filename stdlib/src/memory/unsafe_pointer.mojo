@@ -104,6 +104,7 @@ struct UnsafePointer[
 
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
@@ -113,6 +114,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
+    @implicit
     fn __init__(out self, other: UnsafePointer[type, address_space, *_, **_]):
         """Exclusivity parameter cast a pointer.
 
@@ -976,30 +978,6 @@ struct UnsafePointer[
                 T, address_space, alignment=alignment
             ]._mlir_type,
         ](self.address)
-
-    @always_inline("nodebug")
-    fn bitcast[
-        T: DType,
-        /,
-        address_space: AddressSpace = Self.address_space,
-        alignment: Int = Self.alignment,
-        origin: Origin[True].type = Self.origin,
-    ](self) -> UnsafePointer[Scalar[T], address_space, alignment, origin]:
-        """Bitcasts a UnsafePointer to a different type.
-
-        Parameters:
-            T: The target type.
-            address_space: The address space of the result.
-            alignment: Alignment of the destination pointer.
-            origin: Origin of the destination pointer.
-
-        Returns:
-            A new UnsafePointer object with the specified type and the same address,
-            as the original UnsafePointer.
-        """
-        return self.bitcast[
-            Scalar[T], address_space=address_space, alignment=alignment
-        ]()
 
     @always_inline
     fn destroy_pointee(

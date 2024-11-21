@@ -59,6 +59,7 @@ struct IntLiteral(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
 
@@ -702,6 +703,19 @@ struct IntLiteral(
             The value as a string.
         """
         return str(Int(self))
+
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return -(self // -denominator)
 
     # ===----------------------------------------------------------------------===#
     # Methods

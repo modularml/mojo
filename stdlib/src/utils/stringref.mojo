@@ -86,6 +86,7 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
+    @implicit
     fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
@@ -128,6 +129,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
+    @implicit
     fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
@@ -215,7 +217,7 @@ struct StringRef(
         return Self(self.data, self.length - num_bytes)
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of bytes.
 
         Returns:

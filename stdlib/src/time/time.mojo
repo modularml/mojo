@@ -24,6 +24,7 @@ from sys import (
     external_call,
     os_is_linux,
     os_is_windows,
+    is_amd_gpu,
     is_nvidia_gpu,
     llvm_intrinsic,
 )
@@ -353,6 +354,12 @@ fn sleep(sec: Float64):
             nsec.cast[DType.int32]()
         )
         return
+    elif is_amd_gpu():
+        var nsec = sec * 1.0e9
+        llvm_intrinsic["llvm.amdgcn.s.sleep", NoneType](
+            nsec.cast[DType.int32]()
+        )
+        return
 
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
     var total_secs = floor(sec)
@@ -376,7 +383,7 @@ fn sleep(sec: Int):
     """
 
     @parameter
-    if is_nvidia_gpu():
+    if is_nvidia_gpu() or is_amd_gpu():
         return sleep(Float64(sec))
 
     @parameter

@@ -40,6 +40,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
+    @implicit
     fn __init__(out self, owned *args: *Ts):
         """Construct the list literal from the given values.
 
@@ -164,6 +165,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
     alias IterType = _VariadicListIter[type]
 
     @always_inline
+    @implicit
     fn __init__(out self, *value: type):
         """Constructs a VariadicList from a variadic list of arguments.
 
@@ -175,6 +177,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
 
@@ -327,6 +330,7 @@ struct VariadicListMem[
     # Provide support for borrowed variadic arguments.
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
 
@@ -344,6 +348,7 @@ struct VariadicListMem[
     ]
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._inout_variadic_type):
         """Constructs a VariadicList from a variadic argument type.
 
@@ -364,6 +369,7 @@ struct VariadicListMem[
     ]
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._owned_variadic_type):
         """Constructs a VariadicList from a variadic argument type.
 

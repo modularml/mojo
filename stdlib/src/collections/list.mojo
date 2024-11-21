@@ -135,6 +135,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.size = 0
         self.capacity = capacity
 
+    @implicit
     fn __init__(out self, owned *values: T):
         """Constructs a list from the given values.
 
@@ -164,6 +165,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         self.size = length
 
+    @implicit
     fn __init__(out self, span: Span[T]):
         """Constructs a list from the a Span of values.
 
@@ -345,9 +347,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self.extend(other^)
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
+    fn __iter__(ref self) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -356,7 +356,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
-        ref [_]self: Self,
+        ref self,
     ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
@@ -689,7 +689,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn index[
         C: EqualityComparableCollectionElement, //
     ](
-        ref [_]self: List[C, *_],
+        ref self: List[C, *_],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -785,7 +785,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [self] T:
+    fn __getitem__(ref self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -810,7 +810,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.T:
+    fn unsafe_get(ref self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it

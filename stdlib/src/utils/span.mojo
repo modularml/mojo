@@ -30,7 +30,7 @@ trait AsBytes:
     """The `AsBytes` trait denotes a type that can be returned as a byte span.
     """
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of bytes.
 
         Returns:
@@ -91,6 +91,7 @@ struct _SpanIter[
 
 
 @value
+@register_passable("trivial")
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
@@ -134,6 +135,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
+    @implicit
     fn __init__(out self, ref [origin]list: List[T, *_]):
         """Construct a Span from a List.
 
@@ -192,6 +194,10 @@ struct Span[
 
         Returns:
             A new span that points to the same data as the current span.
+
+        Allocation:
+            This function allocates when the step is negative, to avoid a memory
+            leak, take ownership of the value.
         """
         var start: Int
         var end: Int

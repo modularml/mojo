@@ -56,6 +56,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self._data = Dict[V, Int]()
 
     # TODO: Change List to Iterable when it is supported in Mojo
+    @implicit
     fn __init__(out self, items: List[V, *_]):
         """Create a from an input iterable.
 
@@ -121,7 +122,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data[value] = count
 
-    fn __iter__(self: Self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
+    fn __iter__(self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -481,9 +482,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.pop(value, default)
 
-    fn keys(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
+    fn keys(ref self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
         """Iterate over the Counter's keys as immutable references.
 
         Returns:
@@ -491,9 +490,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.keys()
 
-    fn values(
-        ref [_]self: Self,
-    ) -> _DictValueIter[V, Int, __origin_of(self._data)]:
+    fn values(ref self) -> _DictValueIter[V, Int, __origin_of(self._data)]:
         """Iterate over the Counter's values as references.
 
         Returns:
@@ -501,7 +498,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.values()
 
-    fn items(self: Self) -> _DictEntryIter[V, Int, __origin_of(self._data)]:
+    fn items(self) -> _DictEntryIter[V, Int, __origin_of(self._data)]:
         """Iterate over the dict's entries as immutable references.
 
         Returns:
