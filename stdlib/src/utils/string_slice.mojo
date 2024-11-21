@@ -65,8 +65,7 @@ fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
         not _is_continuation_byte(b),
         "Function does not work correctly if given a continuation byte.",
     )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
+    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
