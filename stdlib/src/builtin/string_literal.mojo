@@ -856,3 +856,11 @@ struct StringLiteral(
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
+
+
+fn _to_string_literal(i: Int) -> StringLiteral:
+    return __mlir_op.`pop.string.create`(i)
+
+
+fn _to_string_literal(i: SIMD) -> StringLiteral:
+    return __mlir_op.`pop.string.create`(i)
