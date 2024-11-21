@@ -390,7 +390,7 @@ struct Span[
             return self.count[func=equal_fn]()
 
         # FIXME(#3548): this is a hack until we have Span.find(). All count
-        # implementations should delegate to Span.count() anyway.
+        # implementations should delegate to Span.count() eventually.
         return String(
             StringSlice[origin](
                 ptr=self.unsafe_ptr().bitcast[Byte](),
@@ -483,7 +483,6 @@ struct Span[
                     processed += w
 
         for i in range(num_bytes - processed):
-            print(i, func(ptr[processed + i]))
             amnt += int(func(ptr[processed + i]))
 
         return amnt
