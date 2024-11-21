@@ -248,6 +248,7 @@ struct SIMD[type: DType, size: Int](
     #    self.__copyinit__(other)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: UInt):
         """Initializes the SIMD vector with an unsigned integer.
 
@@ -260,6 +261,7 @@ struct SIMD[type: DType, size: Int](
         self = Self(value.value)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Initializes the SIMD vector with a signed integer.
 
@@ -273,6 +275,7 @@ struct SIMD[type: DType, size: Int](
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
 
@@ -287,6 +290,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Initializes the SIMD vector with an integer.
 
@@ -312,6 +316,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self: SIMD[DType.bool, size], value: Bool, /):
         """Initializes the SIMD vector with a bool value.
 
@@ -330,6 +335,7 @@ struct SIMD[type: DType, size: Int](
         ](casted)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(
         inout self,
         value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
@@ -343,6 +349,7 @@ struct SIMD[type: DType, size: Int](
         self.value = value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Scalar[type], /):
         """Constructs a SIMD vector by splatting a scalar value.
 
@@ -359,6 +366,7 @@ struct SIMD[type: DType, size: Int](
         ](value.value)
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
@@ -398,6 +406,7 @@ struct SIMD[type: DType, size: Int](
             self[i] = elems[i]
 
     @always_inline
+    @implicit
     fn __init__(out self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
@@ -1564,6 +1573,23 @@ struct SIMD[type: DType, size: Int](
         """
         hasher._update_with_simd(self)
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+
+        @parameter
+        if type.is_signed():
+            return -(self // -denominator)
+        return (self + denominator - 1) // denominator
+
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
@@ -1615,6 +1641,29 @@ struct SIMD[type: DType, size: Int](
                 # Convert to F64 via a Float32 pathway. This would allow us to
                 # use the optimizations defined above.
                 return self.cast[DType.float32]().cast[target]()
+
+        @parameter
+        if type in (DType.float8e4m3, DType.float8e5m2):
+            constrained[
+                target in (DType.float32, DType.float16, DType.bfloat16),
+                (
+                    "Only FP8->F32, FP8->F16, and FP8->BF16 castings are"
+                    " implemented."
+                ),
+            ]()
+
+            @parameter
+            if target is DType.float32:
+                return _convert_float8_to_f32(
+                    rebind[SIMD[type, size]](self)
+                ).cast[target]()
+            elif target is DType.float16:
+                return _convert_float8_to_f16(
+                    rebind[SIMD[type, size]](self)
+                ).cast[target]()
+            return rebind[SIMD[target, size]](
+                self.cast[DType.float32]().cast[DType.bfloat16]()
+            )
 
         @parameter
         if has_neon() and (type is DType.bfloat16 or target is DType.bfloat16):
@@ -2920,6 +2969,136 @@ fn _powi[type: DType](base: Scalar[type], exp: Int32) -> __type_of(base):
         if exp < 0:
             return 1 / res
     return res
+
+
+# ===----------------------------------------------------------------------=== #
+# float8
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _convert_float8_to_f32_scaler[
+    type: DType,
+](x: Scalar[type]) -> Scalar[DType.float32]:
+    var kF32_NaN: UInt32 = 0x7FFFFFFF
+    var FP8_NUM_BITS = 8
+    var IS_E4M3 = type is DType.float8e4m3
+    var FP8_NUM_MANTISSA_BITS = FPUtils[type].mantissa_width()
+    var FP8_NUM_EXPONENT_BITS = FPUtils[type].exponent_width()
+    var FP32_NUM_BITS = 32
+    var FP8_EXPONENT_MASK: UInt8 = (1 << FP8_NUM_EXPONENT_BITS) - 1
+    var FP8_MANTISSA_MASK: UInt8 = (1 << FP8_NUM_MANTISSA_BITS) - 1
+    var FP8_MAX_EXPONENT = 7 if IS_E4M3 else 15
+    var FP8_EXPONENT_BIAS = 7 if IS_E4M3 else 15
+    var FP32_EXPONENT_BIAS = 127
+    var FP32_NUM_MANTISSA_BITS = 23
+
+    var f8: UInt8 = bitcast[DType.uint8](x)
+
+    var sign: UInt32 = (f8.cast[DType.uint32]() >> (FP8_NUM_BITS - 1)) & 1
+    var exp: UInt32 = ((f8 >> FP8_NUM_MANTISSA_BITS) & FP8_EXPONENT_MASK).cast[
+        DType.uint32
+    ]()
+    var mantissa: UInt32 = (f8 & FP8_MANTISSA_MASK).cast[DType.uint32]()
+
+    var f: UInt32 = (sign << (FP32_NUM_BITS - 1))
+
+    if IS_E4M3 and exp == 15 and mantissa == 0x7:
+        f = kF32_NaN
+    elif exp > 0 and (
+        IS_E4M3 or exp < (FP8_MAX_EXPONENT + FP8_EXPONENT_BIAS + 1)
+    ):
+        # normal
+        exp += FP32_EXPONENT_BIAS - FP8_EXPONENT_BIAS
+        f |= exp << FP32_NUM_MANTISSA_BITS
+        f |= mantissa << (FP32_NUM_MANTISSA_BITS - FP8_NUM_MANTISSA_BITS)
+    elif exp == 0:
+        if mantissa:
+            # subnormal
+            exp += (FP32_EXPONENT_BIAS - FP8_EXPONENT_BIAS) + 1
+            while (mantissa & (1 << FP8_NUM_MANTISSA_BITS)) == 0:
+                mantissa <<= 1
+                exp -= 1
+            mantissa = mantissa & FP8_MANTISSA_MASK.cast[DType.uint32]()
+            f |= exp << FP32_NUM_MANTISSA_BITS
+            f |= mantissa << (FP32_NUM_MANTISSA_BITS - FP8_NUM_MANTISSA_BITS)
+        else:
+            # sign-preserving zero
+            pass
+    else:
+        if mantissa == 0:
+            # Sign-preserving infinity
+            f |= 0x7F800000
+        else:
+            # Canonical NaN
+            f = kF32_NaN
+
+    return bitcast[DType.float32](f)
+
+
+@always_inline
+fn _convert_float8_to_f32[
+    type: DType,
+    size: Int,
+](val: SIMD[type, size]) -> SIMD[DType.float32, size]:
+    @parameter
+    if is_nvidia_gpu() and _is_sm_9x():
+        return _convert_float8_to_f16(rebind[SIMD[type, size]](val)).cast[
+            DType.float32
+        ]()
+    else:
+
+        @always_inline
+        @parameter
+        fn wrapper_fn[
+            input_type: DType, result_type: DType
+        ](val: Scalar[input_type]) capturing -> Scalar[result_type]:
+            return rebind[Scalar[result_type]](
+                _convert_float8_to_f32_scaler(rebind[Scalar[type]](val))
+            )
+
+        return _simd_apply[wrapper_fn, DType.float32, size](val)
+
+
+@always_inline
+fn _convert_float8_to_f16[
+    type: DType,
+    size: Int,
+](val: SIMD[type, size],) -> SIMD[DType.float16, size]:
+    @parameter
+    if is_nvidia_gpu() and _is_sm_9x():
+        alias asm_prefix = "cvt.rn.f16x2.e4m3x2" if type is DType.float8e4m3 else "cvt.rn.f16x2.e5m2x2"
+        var val_uint8 = bitcast[DType.uint8](val)
+
+        @parameter
+        if size > 1:
+            var res = SIMD[DType.uint16, size]()
+
+            @parameter
+            for i in range(0, size, 2):
+                var f8x2 = val_uint8.slice[2, offset=i]()
+                var f16x2_f8x2 = inlined_assembly[
+                    asm_prefix + " $0, $1;",
+                    Scalar[DType.uint32],
+                    constraints="=r,h",
+                    has_side_effect=False,
+                ](bitcast[DType.uint16, 1](f8x2))
+                var ui16x2 = bitcast[DType.uint16, 2](f16x2_f8x2)
+                res = res.insert[offset=i](ui16x2)
+            return bitcast[DType.float16](res)
+        else:
+            var f16x2_f8x2 = inlined_assembly[
+                asm_prefix + " $0, $1;",
+                Scalar[DType.uint32],
+                constraints="=r,h",
+                has_side_effect=False,
+            ](val_uint8.cast[DType.uint16]())
+            var ui16x2 = bitcast[DType.uint16, 2](f16x2_f8x2)
+            return bitcast[DType.float16](ui16x2[0])
+    else:
+        return _convert_float8_to_f32(rebind[SIMD[type, size]](val)).cast[
+            DType.float16
+        ]()
 
 
 # ===----------------------------------------------------------------------=== #

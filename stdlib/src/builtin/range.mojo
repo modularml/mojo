@@ -57,6 +57,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var end: Int
 
     @always_inline
+    @implicit
     fn __init__(out self, end: Int):
         self.curr = max(0, end)
         self.end = self.curr
@@ -333,6 +334,7 @@ struct _UIntZeroStartingRange(UIntSized):
     var end: UInt
 
     @always_inline
+    @implicit
     fn __init__(out self, end: UInt):
         self.curr = max(0, end)
         self.end = self.curr
@@ -473,6 +475,7 @@ struct _ZeroStartingScalarRange[type: DType]:
     var end: Scalar[type]
 
     @always_inline
+    @implicit
     fn __init__(out self, end: Scalar[type]):
         self.curr = max(0, end)
         self.end = self.curr

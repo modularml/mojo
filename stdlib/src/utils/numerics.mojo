@@ -812,7 +812,7 @@ fn max_finite[type: DType]() -> Scalar[type]:
     elif type is DType.float64:
         return 1.79769313486231570815e308
     elif type is DType.bool:
-        return True
+        return rebind[Scalar[type]](Scalar(True))
     else:
         constrained[False, "max_finite() called on unsupported type"]()
         return 0
@@ -853,7 +853,7 @@ fn min_finite[type: DType]() -> Scalar[type]:
     elif type.is_floating_point():
         return -max_finite[type]()
     elif type is DType.bool:
-        return False
+        return rebind[Scalar[type]](Scalar(False))
     else:
         constrained[False, "min_finite() called on unsupported type"]()
         return 0
