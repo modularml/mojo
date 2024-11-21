@@ -221,10 +221,10 @@ struct _StringSliceIter[
         @parameter
         if forward:
             remaining = self.length - self.index
-            cont = _count(S(unsafe_ptr=self.ptr + self.index, len=remaining))
+            cont = _count(S(ptr=self.ptr + self.index, length=remaining))
             return remaining - cont
         else:
-            return self.index - _count(S(unsafe_ptr=self.ptr, len=self.index))
+            return self.index - _count(S(ptr=self.ptr, length=self.index))
 
 
 @value
