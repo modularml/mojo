@@ -253,7 +253,7 @@ fn _atol(str_slice: StringSlice, base: Int = 10) raises -> Int:
     var is_negative: Bool = False
     var has_prefix: Bool = False
     var start: Int = 0
-    var str_len = len(str_slice)
+    var str_len = str_slice.byte_length()
 
     start, is_negative = _trim_and_handle_sign(str_slice, str_len)
 
@@ -333,6 +333,7 @@ fn _atol(str_slice: StringSlice, base: Int = 10) raises -> Int:
         result = -result
     return result
 
+
 @always_inline
 fn _trim_and_handle_sign(str_slice: StringSlice, str_len: Int) -> (Int, Bool):
     """Trims leading whitespace, handles the sign of the number in the string.
@@ -399,7 +400,7 @@ fn _str_to_base_error(base: Int, str_slice: StringSlice) -> String:
 
 
 fn _identify_base(str_slice: StringSlice[_], start: Int) -> Tuple[Int, Int]:
-    var length = len(str_slice)
+    var length = str_slice.byte_length()
     # just 1 digit, assume base 10
     if start == (length - 1):
         return 10, start
