@@ -193,6 +193,13 @@ what we publish.
   ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
    [@bgreni](https://github.com/bgreni))
 
+- `Span` now implements a generic `.count()` method which can be passed a
+  function that returns a boolean SIMD vector. The function counts how many
+  times it returns `True` evaluating it in a vectorized manner. This works for
+  any `Span[Scalar[D]]` e.g. `Span[Byte]`. It also implements the Python-like
+  `.count(sub)` which works for any scalar value sequence.
+  PR [#3792](https://github.com/modularml/mojo/pull/3792) by [@martinvuyk](https://github.com/martinvuyk).
+
 - `StringRef` now implements `split()` which can be used to split a
   `StringRef` into a `List[StringRef]` by a delimiter.
   ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
