@@ -302,7 +302,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 conversion_flag not in Self.supported_conversion_flags
             ):
                 var f = String(_build_slice(field_ptr, new_idx, field_len))
-                _ = field^
+                _ = field
                 raise Error('Conversion flag "' + f + '" not recognised.')
             self.conversion_flag = conversion_flag
             field = _build_slice(field_ptr, 0, exclamation_index)
