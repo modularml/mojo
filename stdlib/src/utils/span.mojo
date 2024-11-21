@@ -23,7 +23,6 @@ from utils import Span
 from collections import InlineArray
 from memory import Pointer, UnsafePointer
 from builtin.builtin_list import _lit_mut_cast
-from sys import simdwidthof
 
 
 trait AsBytes:
