@@ -805,7 +805,9 @@ struct CPython:
         self.logging_enabled = logging_enabled
         if not self.init_error:
             if not self.lib.check_symbol("Py_Initialize"):
-                self.init_error = "compatible Python library not found"
+                self.init_error = __type_of(self.init_error)(
+                    "compatible Python library not found"
+                )
             self.lib.call["Py_Initialize"]()
             self.version = PythonVersion(_py_get_version(self.lib))
         else:
