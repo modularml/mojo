@@ -33,17 +33,18 @@ from sys.ffi import c_char
 @value
 @register_passable("trivial")
 struct StringRef(
-    Sized,
-    IntableRaising,
+    AsBytes,
+    Boolable,
     CollectionElement,
     CollectionElementNew,
+    Comparable,
+    Hashable,
+    IntableRaising,
+    Representable,
+    Sized,
     Stringable,
     Writable,
-    Hashable,
     _HashableWithHasher,
-    Boolable,
-    Comparable,
-    AsBytes,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -76,6 +77,7 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
+    @implicit
     fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
@@ -118,6 +120,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
+    @implicit
     fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
@@ -204,7 +207,7 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
@@ -389,6 +392,15 @@ struct StringRef(
             A new string.
         """
         return String.write(self)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Convert the string reference to a string.
+
+        Returns:
+            The String representation of the StringRef.
+        """
+        return String.write("StringRef(", repr(str(self)), ")")
 
     @no_inline
     fn write_to[W: Writer](self, inout writer: W):

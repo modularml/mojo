@@ -141,12 +141,15 @@ def test_span_slice():
     res = s[1::-1]
     assert_equal(res[0], 2)
     assert_equal(res[1], 1)
+    res.unsafe_ptr().free()
     res = s[2:1:-1]
     assert_equal(res[0], 3)
     assert_equal(len(res), 1)
+    res.unsafe_ptr().free()
     res = s[5:1:-2]
     assert_equal(res[0], 5)
     assert_equal(res[1], 3)
+    res.unsafe_ptr().free()
 
 
 def test_copy_from():

@@ -60,6 +60,7 @@ struct _PyIter(Sized):
         self.preparedNextItem = existing.preparedNextItem
         self.isDone = existing.isDone
 
+    @implicit
     fn __init__(out self, iter: PythonObject):
         """Initialize an iterator.
 
@@ -261,6 +262,7 @@ struct PythonObject(
         """
         self = other
 
+    @implicit
     fn __init__(out self, ptr: PyObjectPtr):
         """Initialize this object from an owned reference-counted Python object
         pointer.
@@ -308,6 +310,7 @@ struct PythonObject(
 
         return PythonObject(borrowed_ptr)
 
+    @implicit
     fn __init__(out self, owned typed_obj: TypedPythonObject[_]):
         """Construct a PythonObject from a typed object, dropping the type hint
         information.
@@ -330,6 +333,7 @@ struct PythonObject(
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
+    @implicit
     fn __init__(out self, none: NoneType._mlir_type):
         """Initialize a none value object from a `None` literal.
 
@@ -338,6 +342,7 @@ struct PythonObject(
         """
         self = Self(none=NoneType())
 
+    @implicit
     fn __init__(out self, none: NoneType):
         """Initialize a none value object from a `None` literal.
 
@@ -348,6 +353,7 @@ struct PythonObject(
         self.py_object = cpython.Py_None()
         cpython.Py_IncRef(self.py_object)
 
+    @implicit
     fn __init__(out self, value: Bool):
         """Initialize the object from a bool.
 
@@ -357,6 +363,7 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyBool_FromLong(int(value))
 
+    @implicit
     fn __init__(out self, integer: Int):
         """Initialize the object with an integer value.
 
@@ -366,6 +373,7 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyLong_FromSsize_t(integer)
 
+    @implicit
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         """Initialize the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
@@ -389,6 +397,7 @@ struct PythonObject(
             fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val)
 
+    @implicit
     fn __init__(out self, value: StringLiteral):
         """Initialize the object from a string literal.
 
@@ -397,6 +406,7 @@ struct PythonObject(
         """
         self = PythonObject(str(value))
 
+    @implicit
     fn __init__(out self, strref: StringRef):
         """Initialize the object from a string reference.
 
@@ -406,6 +416,7 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyUnicode_DecodeUTF8(strref)
 
+    @implicit
     fn __init__(out self, string: String):
         """Initialize the object from a string.
 
@@ -415,6 +426,7 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyUnicode_DecodeUTF8(string.as_string_slice())
 
+    @implicit
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
 
@@ -457,6 +469,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
+    @implicit
     fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
 
@@ -500,6 +513,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
+    @implicit
     fn __init__(out self, slice: Slice):
         """Initialize the object from a Mojo Slice.
 
@@ -508,6 +522,7 @@ struct PythonObject(
         """
         self.py_object = _slice_to_py_object_ptr(slice)
 
+    @implicit
     fn __init__(out self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
 

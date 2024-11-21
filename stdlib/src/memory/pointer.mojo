@@ -37,16 +37,17 @@ struct _GPUAddressSpace(EqualityComparable):
     """Generic address space."""
     alias GLOBAL = AddressSpace(1)
     """Global address space."""
-    alias CONSTANT = AddressSpace(2) if is_nvidia_gpu() else AddressSpace(4)
+    alias CONSTANT = AddressSpace(2)
     """Constant address space."""
     alias SHARED = AddressSpace(3)
     """Shared address space."""
     alias PARAM = AddressSpace(4)
     """Param address space."""
-    alias LOCAL = AddressSpace(5) if is_nvidia_gpu() else AddressSpace(3)
+    alias LOCAL = AddressSpace(5)
     """Local address space."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         self._value = value
 
@@ -170,6 +171,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Generic address space."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Initializes the address space from the underlying integral value.
 
@@ -179,6 +181,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         self._value = value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integral value.
 

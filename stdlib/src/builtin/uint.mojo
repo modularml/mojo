@@ -60,6 +60,7 @@ struct UInt(IntLike, _HashableWithHasher):
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         """Construct UInt from the given index value.
 
@@ -70,6 +71,7 @@ struct UInt(IntLike, _HashableWithHasher):
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct UInt from the given Index value.
 
@@ -81,6 +83,7 @@ struct UInt(IntLike, _HashableWithHasher):
         )
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Construct UInt from the given index value.
 
@@ -90,6 +93,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self.value = value.value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Construct UInt from the given IntLiteral value.
 
@@ -149,7 +153,7 @@ struct UInt(IntLike, _HashableWithHasher):
         Returns:
             The string representation of this UInt.
         """
-        return "UInt(" + str(self) + ")"
+        return String.write("UInt(", str(self), ")")
 
     fn __hash__(self) -> UInt:
         """Hash the UInt using builtin hash.
@@ -378,6 +382,19 @@ struct UInt(IntLike, _HashableWithHasher):
             `self | rhs`.
         """
         return __mlir_op.`index.or`(self.value, rhs.value)
+
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return __mlir_op.`index.ceildivu`(self.value, denominator.value)
 
     # ===----------------------------------------------------------------------===#
     # In place operations.
