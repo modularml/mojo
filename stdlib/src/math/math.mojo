@@ -1401,7 +1401,9 @@ fn cos[
             instruction="cos.approx.ftz.f32", constraints="=f,f"
         ](x)
     elif is_amd_gpu():
-        return llvm_intrinsic["llvm.cos", __type_of(x)](x)
+        return llvm_intrinsic["llvm.cos", __type_of(x), has_side_effect=False](
+            x
+        )
     else:
         return _call_libm["cos"](x)
 
@@ -1436,7 +1438,9 @@ fn sin[
             instruction="sin.approx.ftz.f32", constraints="=f,f"
         ](x)
     elif is_amd_gpu():
-        return llvm_intrinsic["llvm.sin", __type_of(x)](x)
+        return llvm_intrinsic["llvm.sin", __type_of(x), has_side_effect=False](
+            x
+        )
     else:
         return _call_libm["sin"](x)
 
@@ -1615,7 +1619,9 @@ fn log10(x: SIMD) -> __type_of(x):
                 * log10_2
             )
     elif is_amd_gpu():
-        return llvm_intrinsic["llvm.log10", __type_of(x)](x)
+        return llvm_intrinsic[
+            "llvm.log10", __type_of(x), has_side_effect=False
+        ](x)
 
     return _call_libm["log10"](x)
 
