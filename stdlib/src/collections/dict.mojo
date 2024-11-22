@@ -846,7 +846,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var entry_value = entry[].unsafe_take()
             entry[] = None
             self.size -= 1
-            return entry_value^.reap_value()
+            var tmp = entry_value^.reap_value()
+            self._maybe_resize()
+            return tmp^
         raise "KeyError"
 
     fn popitem(inout self) raises -> DictEntry[K, V]:
@@ -1010,9 +1012,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
             elif index == Self.REMOVED:
                 pass
             else:
-                var entry = self._entries[index]
-                debug_assert(entry.__bool__(), "entry in index must be full")
-                if hash == entry.value().hash and key == entry.value().key:
+                var entry = Pointer.address_of(self._entries[index])
+                debug_assert(entry[].__bool__(), "entry in index must be full")
+                if hash == entry[].value().hash and key == entry[].value().key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
 
@@ -1039,22 +1041,23 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """Not for resizing, used internally to manage the capacity.
 
         The `Dict` load balancer uses that method for balancing memory usage.
-        
+
         """
-        debug_assert(_new_reserved%2==0, "_new_reserved is not a power of two")
+        debug_assert(
+            _new_reserved % 2 == 0, "_new_reserved is not a power of two"
+        )
         var old_entries = self._entries^
         self._entries = self._new_entries(_new_reserved)
         self._index = _DictIndex(_new_reserved)
-        self.size  = 0
+        self.size = 0
         for i in range(self._n_entries):
-            var entry = Reference(old_entries[i])
+            var entry = Pointer.address_of(old_entries[i])
             if entry[]:
                 self._set_index(
-                    self._find_empty_index(entry[].value().hash),
-                    self.size
+                    self._find_empty_index(entry[].value().hash), self.size
                 )
                 self._entries[self.size] = entry[].unsafe_take()
-                self.size +=1
+                self.size += 1
         self._n_entries = self.size
 
     fn _compact(inout self):
