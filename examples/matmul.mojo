@@ -23,7 +23,7 @@ from sys import simdwidthof
 import benchmark
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from algorithm import parallelize, vectorize
-from memory import memset_zero, stack_allocation
+from memory import memset_zero, stack_allocation, UnsafePointer
 from python import Python, PythonObject
 
 alias M = 512  # rows of A and C
@@ -52,12 +52,13 @@ struct Matrix[rows: Int, cols: Int]:
     var data: UnsafePointer[Scalar[type]]
 
     # Initialize zeroing all values
-    fn __init__(inout self):
+    fn __init__(out self):
         self.data = UnsafePointer[Scalar[type]].alloc(rows * cols)
         memset_zero(self.data, rows * cols)
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(inout self, data: UnsafePointer[Scalar[type]]):
+    @implicit
+    fn __init__(out self, data: UnsafePointer[Scalar[type]]):
         self.data = data
 
     ## Initialize with random values
@@ -77,7 +78,7 @@ struct Matrix[rows: Int, cols: Int]:
         return self.data.load[width=nelts](y * self.cols + x)
 
     fn store[nelts: Int = 1](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        self.data.store[width=nelts](y * self.cols + x, val)
+        self.data.store(y * self.cols + x, val)
 
 
 def run_matmul_python() -> Float64:

@@ -15,7 +15,7 @@ repos:
         stages: [commit]
       - id: check-license
         name: check-license
-        entry: mojo stdlib/scripts/check-licenses.mojo
+        entry: mojo stdlib/scripts/check_licenses.mojo
         language: system
         files: '\.(mojo|🔥|py)$'
         stages: [commit]

@@ -15,11 +15,11 @@
 You can import these APIs from the `collections` package. For example:
 
 ```mojo
-from collections.vector import InlinedFixedVector
+from collections import InlinedFixedVector
 ```
 """
 
-from memory import Reference, UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy
 from sys import sizeof
 
 from utils import StaticTuple
@@ -44,6 +44,10 @@ struct _VecIter[
     fn __next__(inout self) -> type:
         self.i += 1
         return deref(self.vec, self.i - 1)
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         return self.size - self.i
@@ -110,7 +114,8 @@ struct InlinedFixedVector[
     """The maximum number of elements that can fit in the vector."""
 
     @always_inline
-    fn __init__(inout self, capacity: Int):
+    @implicit
+    fn __init__(out self, capacity: Int):
         """Constructs `InlinedFixedVector` with the given capacity.
 
         The dynamically allocated portion is `capacity - size`.
@@ -126,7 +131,8 @@ struct InlinedFixedVector[
         self.capacity = capacity
 
     @always_inline
-    fn __init__(inout self, existing: Self):
+    @implicit
+    fn __init__(out self, existing: Self):
         """
         Copy constructor.
 
@@ -144,7 +150,7 @@ struct InlinedFixedVector[
         self.capacity = existing.capacity
 
     @always_inline
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """
         Move constructor.
 

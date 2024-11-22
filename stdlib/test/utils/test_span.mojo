@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import InlineArray, List
+from memory import UnsafePointer
 from testing import assert_equal, assert_true
 
 from utils import Span
@@ -136,10 +137,19 @@ def test_span_slice():
     assert_equal(res[0], 2)
     assert_equal(res[1], 3)
     assert_equal(res[2], 4)
-    # TODO: Fix Span slicing
-    # res = s[1::-1]
-    # assert_equal(res[0], 2)
-    # assert_equal(res[1], 1)
+    # Test slicing with negative step
+    res = s[1::-1]
+    assert_equal(res[0], 2)
+    assert_equal(res[1], 1)
+    res.unsafe_ptr().free()
+    res = s[2:1:-1]
+    assert_equal(res[0], 3)
+    assert_equal(len(res), 1)
+    res.unsafe_ptr().free()
+    res = s[5:1:-2]
+    assert_equal(res[0], 5)
+    assert_equal(res[1], 3)
+    res.unsafe_ptr().free()
 
 
 def test_copy_from():
@@ -166,6 +176,8 @@ def test_equality():
     var sp = Span[String](l)
     var sp2 = Span[String](l)
     var sp3 = Span(l2)
+    # same pointer
+    assert_true(sp == sp2)
     # different pointer
     assert_true(sp == sp3)
     # different length
@@ -188,11 +200,7 @@ def test_fill():
 def test_ref():
     var l = InlineArray[Int, 3](1, 2, 3)
     var s = Span[Int](array=l)
-    # Would be nice to just use `assert_equal` with `Reference`, but doesn't quite work yet
-    # even after `Reference` is `Stringable`.  So, just compare for pointer equality right now.
-    var p1 = UnsafePointer(__mlir_op.`lit.ref.to_pointer`(s.as_ref().value))
-    var p2 = l.unsafe_ptr()
-    assert_equal(p1, p2)
+    assert_true(s.as_ref() == Pointer.address_of(l.unsafe_ptr()[]))
 
 
 def main():

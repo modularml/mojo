@@ -11,6 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from ._ahash import AHasher
+from memory import UnsafePointer
+
 
 trait _HashableWithHasher:
     fn __hash__[H: _Hasher](self, inout hasher: H):
@@ -18,7 +21,7 @@ trait _HashableWithHasher:
 
 
 trait _Hasher:
-    fn __init__(inout self):
+    fn __init__(out self):
         ...
 
     fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
@@ -34,10 +37,22 @@ trait _Hasher:
         ...
 
 
+alias default_hasher = AHasher[SIMD[DType.uint64, 4](0, 0, 0, 0)]
+
+
 fn _hash_with_hasher[
-    HasherType: _Hasher, HashableType: _HashableWithHasher
+    HashableType: _HashableWithHasher, HasherType: _Hasher = default_hasher
 ](hashable: HashableType) -> UInt64:
     var hasher = HasherType()
     hasher.update(hashable)
+    var value = hasher^.finish()
+    return value
+
+
+fn _hash_with_hasher[
+    HasherType: _Hasher = default_hasher
+](data: UnsafePointer[UInt8], len: Int) -> UInt64:
+    var hasher = HasherType()
+    hasher._update_with_bytes(data, len)
     var value = hasher^.finish()
     return value

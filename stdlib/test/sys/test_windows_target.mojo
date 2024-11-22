@@ -14,7 +14,7 @@
 # This file is only run on windows targets.
 #
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: windows
+# REQUIRES: system-windows
 # RUN: mojo.exe %s
 
 

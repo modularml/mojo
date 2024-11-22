@@ -10,17 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-#
-# This file only tests the debug_assert function
-#
-# ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not --crash %bare-mojo -D BUILD_TYPE=debug %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: not %mojo -D my_false=blah %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+
+from sys import env_get_bool
 
 
-# CHECK-FAIL-LABEL: test_fail
+# CHECK-FAIL: constraint failed: the boolean environment value is neither `True` nor `False`
 fn main():
-    print("== test_fail")
-    debug_assert(False, "fail")
-    # CHECK-FAIL-NOT: is never reached
-    print("is never reached")
+    _ = env_get_bool["my_false"]()

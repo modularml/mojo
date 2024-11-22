@@ -48,7 +48,7 @@ struct _c_stat(Stringable):
     var st_birthtimespec: _CTimeSpec  # time of file creation(birth)
     var unused: InlineArray[Int64, 2]  # RESERVED: DO NOT USE!
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.st_dev = 0
         self.st_mode = 0
         self.st_nlink = 0
@@ -110,7 +110,7 @@ struct _c_stat(Stringable):
 fn _stat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__xstat", Int32](
-        Int32(0), path.unsafe_ptr(), Reference(stat)
+        Int32(0), path.unsafe_ptr(), Pointer.address_of(stat)
     )
     if err == -1:
         raise "unable to stat '" + path + "'"
@@ -121,7 +121,7 @@ fn _stat(path: String) raises -> _c_stat:
 fn _lstat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__lxstat", Int32](
-        Int32(0), path.unsafe_ptr(), Reference(stat)
+        Int32(0), path.unsafe_ptr(), Pointer.address_of(stat)
     )
     if err == -1:
         raise "unable to lstat '" + path + "'"

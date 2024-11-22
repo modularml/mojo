@@ -10,10 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: linux || darwin
+# REQUIRES: system-linux || system-darwin
 # RUN: TEST_MYVAR=MyValue %mojo %s
 
-from os import getenv, setenv
+from os import getenv, setenv, unsetenv
 
 from testing import assert_equal
 
@@ -40,6 +40,14 @@ def test_setenv():
     assert_equal(setenv("=", "INVALID", True), False)
 
 
+def test_unsetenv():
+    assert_equal(setenv("NEW_VAR", "FOO", True), True)
+    assert_equal(getenv("NEW_VAR"), "FOO")
+    assert_equal(unsetenv("NEW_VAR"), True)
+    assert_equal(getenv("NEW_VAR"), "")
+
+
 def main():
     test_getenv()
     test_setenv()
+    test_unsetenv()

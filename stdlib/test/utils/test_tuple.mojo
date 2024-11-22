@@ -14,7 +14,8 @@
 
 from testing import assert_equal, assert_false, assert_true
 
-from utils import StaticIntTuple, StaticTuple
+from memory import UnsafePointer
+from utils import IndexList, StaticTuple
 from test_utils import ValueDestructorRecorder
 
 
@@ -36,39 +37,33 @@ def test_static_tuple():
 
 
 def test_static_int_tuple():
-    assert_equal(str(StaticIntTuple[1](1)), "(1,)")
+    assert_equal(str(IndexList[1](1)), "(1,)")
 
-    assert_equal(str(StaticIntTuple[3](2)), "(2, 2, 2)")
+    assert_equal(str(IndexList[3](2)), "(2, 2, 2)")
 
     assert_equal(
-        str(StaticIntTuple[3](1, 2, 3) * StaticIntTuple[3](4, 5, 6)),
+        str(IndexList[3](1, 2, 3) * IndexList[3](4, 5, 6)),
         "(4, 10, 18)",
     )
 
     assert_equal(
-        str(StaticIntTuple[4](1, 2, 3, 4) - StaticIntTuple[4](4, 5, 6, 7)),
+        str(IndexList[4](1, 2, 3, 4) - IndexList[4](4, 5, 6, 7)),
         "(-3, -3, -3, -3)",
     )
 
-    assert_equal(
-        str(StaticIntTuple[2](10, 11) // StaticIntTuple[2](3, 4)), "(3, 2)"
-    )
+    assert_equal(str(IndexList[2](10, 11) // IndexList[2](3, 4)), "(3, 2)")
 
     # Note: index comparison is intended for access bound checking, which is
     #  usually all-element semantic, i.e. true if true for all positions.
-    assert_true(
-        StaticIntTuple[5](1, 2, 3, 4, 5) < StaticIntTuple[5](4, 5, 6, 7, 8)
-    )
+    assert_true(IndexList[5](1, 2, 3, 4, 5) < IndexList[5](4, 5, 6, 7, 8))
 
-    assert_false(
-        StaticIntTuple[4](3, 5, -1, -2) > StaticIntTuple[4](0, 0, 0, 0)
-    )
+    assert_false(IndexList[4](3, 5, -1, -2) > IndexList[4](0, 0, 0, 0))
 
-    assert_equal(len(StaticIntTuple[4](3, 5, -1, -2)), 4)
+    assert_equal(len(IndexList[4](3, 5, -1, -2)), 4)
 
-    assert_equal(str(StaticIntTuple[2]((1, 2))), "(1, 2)")
+    assert_equal(str(IndexList[2]((1, 2))), "(1, 2)")
 
-    assert_equal(str(StaticIntTuple[4]((1, 2, 3, 4))), "(1, 2, 3, 4)")
+    assert_equal(str(IndexList[4]((1, 2, 3, 4))), "(1, 2, 3, 4)")
 
 
 def test_tuple_literal():

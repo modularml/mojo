@@ -27,20 +27,20 @@ from sys import (
     bitwidthof,
     has_avx512f,
     simdwidthof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
+    is_amd_gpu,
     sizeof,
 )
 
 from memory import UnsafePointer
 
 from bit import count_trailing_zeros
-from builtin._math import *
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply, _modf
 from sys.info import _current_arch
 
 from utils import Span
-from utils.index import StaticIntTuple
+from utils.index import IndexList
 from utils.numerics import FPUtils, isnan, nan
 from utils.static_tuple import StaticTuple
 
@@ -95,7 +95,7 @@ fn ceil[T: Ceilable, //](value: T) -> T:
 
 @always_inline
 fn ceildiv[T: CeilDivable, //](numerator: T, denominator: T) -> T:
-    """Return the rounded-up result of dividing x by y.
+    """Return the rounded-up result of dividing numerator by denominator.
 
     Parameters:
         T: A type that support floor division.
@@ -105,14 +105,15 @@ fn ceildiv[T: CeilDivable, //](numerator: T, denominator: T) -> T:
         denominator: The denominator.
 
     Returns:
-        The ceiling of dividing x by y.
+        The ceiling of dividing numerator by denominator.
     """
-    return -(numerator // -denominator)
+    # return -(numerator // -denominator)
+    return numerator.__ceildiv__(denominator)
 
 
 @always_inline
 fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
-    """Return the rounded-up result of dividing x by y, potentially raising.
+    """Return the rounded-up result of dividing numerator by denominator, potentially raising.
 
     Parameters:
         T: A type that support floor division.
@@ -122,39 +123,25 @@ fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
         denominator: The denominator.
 
     Returns:
-        The ceiling of dividing x by y.
+        The ceiling of dividing numerator by denominator.
     """
-    return -(numerator // -denominator)
+    return numerator.__ceildiv__(denominator)
 
 
 # NOTE: this overload is needed because of overload precedence; without it the
 # Int overload would be preferred, and ceildiv wouldn't work on IntLiteral.
 @always_inline
 fn ceildiv(numerator: IntLiteral, denominator: IntLiteral) -> IntLiteral:
-    """Return the rounded-up result of dividing x by y.
+    """Return the rounded-up result of dividing numerator by denominator.
 
     Args:
         numerator: The numerator.
         denominator: The denominator.
 
     Returns:
-        The ceiling of dividing x by y.
+        The ceiling of dividing numerator by denominator.
     """
-    return -(numerator // -denominator)
-
-
-@always_inline("nodebug")
-fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
-    """Return the rounded-up result of dividing x by y.
-
-    Args:
-        numerator: The numerator.
-        denominator: The denominator.
-
-    Returns:
-        The ceiling of dividing x by y.
-    """
-    return __mlir_op.`index.ceildivu`(numerator.value, denominator.value)
+    return numerator.__ceildiv__(denominator)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -259,7 +246,7 @@ fn sqrt[
         for i in range(simd_width):
             res[i] = sqrt(int(x[i]))
         return res
-    elif triple_is_nvidia_cuda():
+    elif is_nvidia_gpu():
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
@@ -304,7 +291,7 @@ fn isqrt(x: SIMD) -> __type_of(x):
     constrained[x.type.is_floating_point(), "type must be floating point"]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
@@ -350,7 +337,7 @@ fn recip(x: SIMD) -> __type_of(x):
     constrained[x.type.is_floating_point(), "type must be floating point"]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if x.type in (DType.float16, DType.bfloat16):
@@ -386,7 +373,7 @@ fn exp2[
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if type is DType.float16:
@@ -419,11 +406,9 @@ fn exp2[
     if type not in (DType.float32, DType.float64):
         return exp2(x.cast[DType.float32]()).cast[type]()
 
-    alias integral_type = FPUtils[type].integral_type
-
     var xc = x.clamp(-126, 126)
 
-    var m = xc.cast[integral_type]()
+    var m = xc.cast[__type_of(x.to_bits()).type]()
 
     xc -= m.cast[type]()
 
@@ -437,11 +422,9 @@ fn exp2[
             1.33336498402e-3,
         ),
     ](xc)
-
-    return (
-        r._float_to_bits[integral_type]()
-        + (m << FPUtils[type].mantissa_width())
-    )._bits_to_float[type]()
+    return __type_of(r)(
+        from_bits=(r.to_bits() + (m << FPUtils[type].mantissa_width()))
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -505,11 +488,9 @@ fn _ldexp_impl[
         return res
 
     alias integral_type = FPUtils[type].integral_type
-    var m: SIMD[integral_type, simd_width] = (
-        exp.cast[integral_type]() + FPUtils[type].exponent_bias()
-    )
+    var m = exp.cast[integral_type]() + FPUtils[type].exponent_bias()
 
-    return x * (m << FPUtils[type].mantissa_width())._bits_to_float[type]()
+    return x * __type_of(x)(from_bits=m << FPUtils[type].mantissa_width())
 
 
 @always_inline
@@ -596,7 +577,7 @@ fn exp[
     alias inv_lg2 = 1.442695040888963407359924681001892137426646
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if type in (DType.float16, DType.float32):
@@ -630,8 +611,8 @@ fn exp[
 
 @always_inline
 fn _frexp_mask1[
-    simd_width: Int, type: DType, integral_type: DType
-]() -> SIMD[integral_type, simd_width]:
+    simd_width: Int, type: DType
+]() -> SIMD[_integral_type_of[type](), simd_width]:
     @parameter
     if type is DType.float16:
         return 0x7C00
@@ -646,8 +627,8 @@ fn _frexp_mask1[
 
 @always_inline
 fn _frexp_mask2[
-    simd_width: Int, type: DType, integral_type: DType
-]() -> SIMD[integral_type, simd_width]:
+    simd_width: Int, type: DType
+]() -> SIMD[_integral_type_of[type](), simd_width]:
     @parameter
     if type is DType.float16:
         return 0x3800
@@ -682,22 +663,20 @@ fn frexp[
     """
     # Based on the implementation in boost/simd/arch/common/simd/function/ifrexp.hpp
     constrained[type.is_floating_point(), "must be a floating point value"]()
-    alias integral_type = _integral_type_of[type]()
-    alias zero = SIMD[type, simd_width](0)
-    alias max_exponent = FPUtils[type].max_exponent() - 2
+    alias T = SIMD[type, simd_width]
+    alias zero = T(0)
+    alias max_exponent = FPUtils[type].max_exponent() - 1
     alias mantissa_width = FPUtils[type].mantissa_width()
-    var mask1 = _frexp_mask1[simd_width, type, integral_type]()
-    var mask2 = _frexp_mask2[simd_width, type, integral_type]()
-    var x_int = x._float_to_bits[integral_type]()
+    var mask1 = _frexp_mask1[simd_width, type]()
+    var mask2 = _frexp_mask2[simd_width, type]()
+    var x_int = x.to_bits()
     var selector = x != zero
     var exp = selector.select(
         (((mask1 & x_int) >> mantissa_width) - max_exponent).cast[type](),
         zero,
     )
-    var frac = selector.select(
-        ((x_int & ~mask1) | mask2)._bits_to_float[type](), zero
-    )
-    return StaticTuple[SIMD[type, simd_width], 2](frac, exp)
+    var frac = selector.select(T(from_bits=x_int & ~mask1 | mask2), zero)
+    return StaticTuple[size=2](frac, exp)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -777,7 +756,7 @@ fn log(x: SIMD) -> __type_of(x):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias ln2 = 0.69314718055966295651160180568695068359375
 
         @parameter
@@ -811,7 +790,7 @@ fn log2(x: SIMD) -> __type_of(x):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
 
         @parameter
         if sizeof[x.type]() < sizeof[DType.float32]():
@@ -945,7 +924,7 @@ fn tanh[
     ]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias instruction = "tanh.approx.f32"
 
         @parameter
@@ -1055,6 +1034,18 @@ fn isclose[
 # ===----------------------------------------------------------------------=== #
 # iota
 # ===----------------------------------------------------------------------=== #
+
+
+# TODO: Remove this when `iota` works at compile-time
+fn _compile_time_iota[type: DType, simd_width: Int]() -> SIMD[type, simd_width]:
+    constrained[
+        type.is_integral(),
+        "_compile_time_iota can only be used with integer types.",
+    ]()
+    var a = SIMD[type, simd_width](0)
+    for i in range(simd_width):
+        a[i] = i
+    return a
 
 
 @always_inline
@@ -1405,10 +1396,12 @@ fn cos[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and sizeof[type]() <= sizeof[DType.float32]():
+    if is_nvidia_gpu() and sizeof[type]() <= sizeof[DType.float32]():
         return _call_ptx_intrinsic[
             instruction="cos.approx.ftz.f32", constraints="=f,f"
         ](x)
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.cos", __type_of(x)](x)
     else:
         return _call_libm["cos"](x)
 
@@ -1438,10 +1431,12 @@ fn sin[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and sizeof[type]() <= sizeof[DType.float32]():
+    if is_nvidia_gpu() and sizeof[type]() <= sizeof[DType.float32]():
         return _call_ptx_intrinsic[
             instruction="sin.approx.ftz.f32", constraints="=f,f"
         ](x)
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.sin", __type_of(x)](x)
     else:
         return _call_libm["sin"](x)
 
@@ -1606,7 +1601,7 @@ fn log10(x: SIMD) -> __type_of(x):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         alias log10_2 = 0.301029995663981195213738894724493027
 
         @parameter
@@ -1619,6 +1614,8 @@ fn log10(x: SIMD) -> __type_of(x):
                 ](x)
                 * log10_2
             )
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.log10", __type_of(x)](x)
 
     return _call_libm["log10"](x)
 
@@ -2217,7 +2214,7 @@ fn factorial(n: Int) -> Int:
     Returns:
         The factorial of the input. Results are undefined for negative inputs.
     """
-    alias table = StaticIntTuple[21](
+    alias table = StaticTuple[Int, 21](
         1,
         1,
         2,
@@ -2325,7 +2322,7 @@ fn _call_libm[
         arg_type == result_type, "the argument type must match the result type"
     ]()
     constrained[
-        not triple_is_nvidia_cuda(),
+        not is_nvidia_gpu(),
         "the libm operation is not available on the CUDA target",
     ]()
 
@@ -2368,7 +2365,21 @@ fn _call_ptx_intrinsic_scalar[
         Scalar[type],
         constraints=constraints,
         has_side_effect=False,
-    ](arg).cast[type]()
+    ](arg)
+
+
+fn _call_ptx_intrinsic_scalar[
+    type: DType, //,
+    *,
+    instruction: StringLiteral,
+    constraints: StringLiteral,
+](arg0: Scalar[type], arg1: Scalar[type]) -> Scalar[type]:
+    return inlined_assembly[
+        instruction + " $0, $1, $2;",
+        Scalar[type],
+        constraints=constraints,
+        has_side_effect=False,
+    ](arg0, arg1)
 
 
 fn _call_ptx_intrinsic[
@@ -2419,7 +2430,223 @@ fn _call_ptx_intrinsic[
                 SIMD[type, 2],
                 constraints=vector_constraints,
                 has_side_effect=False,
-            ](arg).cast[type]()
+            ](arg.slice[2, offset=i]())
         )
 
     return res
+
+
+fn _call_ptx_intrinsic[
+    type: DType,
+    simd_width: Int, //,
+    *,
+    scalar_instruction: StringLiteral,
+    vector2_instruction: StringLiteral,
+    scalar_constraints: StringLiteral,
+    vector_constraints: StringLiteral,
+](arg0: SIMD[type, simd_width], arg1: SIMD[type, simd_width]) -> SIMD[
+    type, simd_width
+]:
+    @parameter
+    if simd_width == 1:
+        return _call_ptx_intrinsic_scalar[
+            instruction=scalar_instruction, constraints=scalar_constraints
+        ](arg0[0], arg1[0])
+
+    var res = SIMD[type, simd_width]()
+
+    @parameter
+    for i in range(0, simd_width, 2):
+        res = res.insert[offset=i](
+            inlined_assembly[
+                vector2_instruction + " $0, $1; $2;",
+                SIMD[type, 2],
+                constraints=vector_constraints,
+                has_side_effect=False,
+            ](arg0.slice[2, offset=i](), arg1.slice[2, offset=i]())
+        )
+
+    return res
+
+
+# ===----------------------------------------------------------------------=== #
+# Ceilable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Ceilable:
+    """
+    The `Ceilable` trait describes a type that defines a ceiling operation.
+
+    Types that conform to `Ceilable` will work with the builtin `ceil`
+    function. The ceiling operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Ceilable, ceil
+
+    @value
+    struct Complex(Ceilable):
+        var re: Float64
+        var im: Float64
+
+        fn __ceil__(self) -> Self:
+            return Self(ceil(self.re), ceil(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Floorable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Floorable:
+    """
+    The `Floorable` trait describes a type that defines a floor operation.
+
+    Types that conform to `Floorable` will work with the builtin `floor`
+    function. The floor operation always returns the same type as the input.
+
+    For example:
+    ```mojo
+    from math import Floorable, floor
+
+    @value
+    struct Complex(Floorable):
+        var re: Float64
+        var im: Float64
+
+        fn __floor__(self) -> Self:
+            return Self(floor(self.re), floor(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# CeilDivable
+# ===----------------------------------------------------------------------=== #
+
+
+trait CeilDivable:
+    """
+    The `CeilDivable` trait describes a type that defines a ceil division
+    operation.
+
+    Types that conform to `CeilDivable` will work with the `math.ceildiv`
+    function.
+
+    For example:
+    ```mojo
+    from math import CeilDivable
+
+    @value
+    struct Foo(CeilDivable):
+        var x: Float64
+
+        fn __ceildiv__(self, denominator: Self) -> Self:
+            return -(self.x // -denominator.x)
+    ```
+    """
+
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        ...
+
+
+trait CeilDivableRaising:
+    """
+    The `CeilDivable` trait describes a type that define a floor division and
+    negation operation that can raise.
+
+    Types that conform to `CeilDivableRaising` will work with the `//` operator
+    as well as the `math.ceildiv` function.
+
+    For example:
+    ```mojo
+    from math import CeilDivableRaising
+
+    @value
+    struct Foo(CeilDivableRaising):
+        var x: object
+
+        fn __ceildiv__(self, denominator: Self) raises -> Self:
+            return -(self.x // -denominator.x)
+    ```
+    """
+
+    fn __ceildiv__(self, denominator: Self) raises -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Truncable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Truncable:
+    """
+    The `Truncable` trait describes a type that defines a truncation operation.
+
+    Types that conform to `Truncable` will work with the builtin `trunc`
+    function. The truncation operation always returns the same type as the
+    input.
+
+    For example:
+    ```mojo
+    from math import Truncable, trunc
+
+    @value
+    struct Complex(Truncable):
+        var re: Float64
+        var im: Float64
+
+        fn __trunc__(self) -> Self:
+            return Self(trunc(self.re), trunc(self.im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        ...

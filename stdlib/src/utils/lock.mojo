@@ -15,6 +15,7 @@ from memory import UnsafePointer
 from os import Atomic
 from time import sleep
 from sys import external_call
+from sys.ffi import OpaquePointer
 
 
 # ===----------------------------------------------------------------------===#
@@ -25,23 +26,23 @@ from sys import external_call
 struct SpinWaiter:
     """A proxy for the C++ runtime's SpinWaiter type."""
 
-    var storage: UnsafePointer[NoneType]
+    var storage: OpaquePointer
     """Pointer to the underlying SpinWaiter instance."""
 
-    fn __init__(inout self: Self):
+    fn __init__(out self):
         """Initializes a SpinWaiter instance."""
         self.storage = external_call[
             "KGEN_CompilerRT_AsyncRT_InitializeSpinWaiter",
-            UnsafePointer[NoneType],
+            OpaquePointer,
         ]()
 
-    fn __del__(owned self: Self):
+    fn __del__(owned self):
         """Destroys the SpinWaiter instance."""
         external_call["KGEN_CompilerRT_AsyncRT_DestroySpinWaiter", NoneType](
             self.storage
         )
 
-    fn wait(self: Self):
+    fn wait(self):
         """Blocks the current task for a duration determined by the underlying
         policy."""
         external_call["KGEN_CompilerRT_AsyncRT_SpinWaiter_Wait", NoneType](
@@ -59,12 +60,12 @@ struct BlockingSpinLock:
     var counter: Atomic[DType.int64]
     """The atomic counter implementing the spin lock."""
 
-    fn __init__(inout self: Self):
+    fn __init__(out self):
         """Default constructor."""
 
         self.counter = Atomic[DType.int64](Self.UNLOCKED)
 
-    fn lock(inout self: Self, owner: Int):
+    fn lock(inout self, owner: Int):
         """Acquires the lock.
 
         Args:
@@ -78,7 +79,7 @@ struct BlockingSpinLock:
             waiter.wait()
             expected = Self.UNLOCKED
 
-    fn unlock(inout self: Self, owner: Int) -> Bool:
+    fn unlock(inout self, owner: Int) -> Bool:
         """Releases the lock.
 
         Args:

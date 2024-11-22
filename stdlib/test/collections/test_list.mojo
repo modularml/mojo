@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import List
+from memory import UnsafePointer
 from sys.info import sizeof
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
@@ -293,9 +294,6 @@ def test_list_reverse_move_count():
     assert_equal(vec.data[3].move_count, 3)
     assert_equal(vec.data[4].move_count, 3)
 
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
-
 
 def test_list_insert():
     #
@@ -485,7 +483,7 @@ def test_list_extend_non_trivial():
     v2.append(MoveCounter[String]("Bar"))
     v2.append(MoveCounter[String]("Baz"))
 
-    v1.extend(v2)
+    v1.extend(v2^)
 
     assert_equal(len(v1), 5)
     assert_equal(v1[0].value, "Hello")
@@ -499,9 +497,6 @@ def test_list_extend_non_trivial():
     assert_equal(v1.data[2].move_count, 2)
     assert_equal(v1.data[3].move_count, 2)
     assert_equal(v1.data[4].move_count, 2)
-
-    # Keep v1 alive until after we've done the last `vec.data + N` read.
-    _ = v1^
 
 
 def test_2d_dynamic_list():
@@ -556,11 +551,12 @@ struct CopyCountedStruct(CollectionElement):
     var counter: CopyCounter
     var value: String
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.counter = CopyCounter(other=other.counter)
         self.value = String(other=other.value)
 
-    fn __init__(inout self, value: String):
+    @implicit
+    fn __init__(out self, value: String):
         self.counter = CopyCounter()
         self.value = value
 
@@ -721,7 +717,7 @@ def test_constructor_from_pointer():
     new_pointer[2] = 2
     # rest is not initialized
 
-    var some_list = List[Int8](unsafe_pointer=new_pointer, size=3, capacity=5)
+    var some_list = List[Int8](ptr=new_pointer, length=3, capacity=5)
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
     assert_equal(some_list[2], 2)
@@ -736,7 +732,7 @@ def test_constructor_from_other_list_through_pointer():
     var size = len(initial_list)
     var capacity = initial_list.capacity
     var some_list = List[Int8](
-        unsafe_pointer=initial_list.steal_data(), size=size, capacity=capacity
+        ptr=initial_list.steal_data(), length=size, capacity=capacity
     )
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
@@ -881,16 +877,16 @@ struct DtorCounter(CollectionElement):
     # NOTE: payload is required because List does not support zero sized structs.
     var payload: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.payload = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.payload = other.payload
 
-    fn __copyinit__(inout self, existing: Self, /):
+    fn __copyinit__(out self, existing: Self, /):
         self.payload = existing.payload
 
-    fn __moveinit__(inout self, owned existing: Self, /):
+    fn __moveinit__(out self, owned existing: Self, /):
         self.payload = existing.payload
         existing.payload = 0
 
@@ -908,7 +904,7 @@ def inner_test_list_dtor():
     l.append(DtorCounter())
     assert_equal(g_dtor_count, 0)
 
-    l.__del__()
+    l^.__del__()
     assert_equal(g_dtor_count, 1)
 
 

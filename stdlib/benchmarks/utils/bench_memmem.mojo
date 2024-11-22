@@ -10,14 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-
 # RUN: %mojo-no-debug %s -t
+# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
+# the -t flag. Remember to replace it again before pushing any code.
 
 from sys import simdwidthof
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from memory import memcmp, bitcast
+from memory import memcmp, bitcast, UnsafePointer, pack_bits
 
 from utils.stringref import _align_down, _memchr, _memmem
 
@@ -167,7 +168,7 @@ fn _memmem_baseline[
     )
     for i in range(0, vectorized_end, bool_mask_width):
         var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
         while mask:
             var offset = int(i + count_trailing_zeros(mask))
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
@@ -220,7 +221,7 @@ fn bench_find_optimized(inout b: Bencher) raises:
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=10000))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_find_baseline](BenchId("find_baseline"))
     m.bench_function[bench_find_optimized](BenchId("find_optimized"))
     m.dump_report()

@@ -21,7 +21,7 @@ These are Mojo built-ins, so you don't need to import them.
 struct NoneType(
     CollectionElement,
     CollectionElementNew,
-    Formattable,
+    Writable,
     Representable,
     Stringable,
 ):
@@ -33,12 +33,22 @@ struct NoneType(
     var _value: Self._mlir_type
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct an instance of the `None` type."""
         self._value = None
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    @implicit
+    fn __init__(out self, value: Self._mlir_type):
+        """Construct an instance of the `None` type.
+
+        Args:
+            value: The MLIR none type to construct from.
+        """
+        self._value = value
+
+    @always_inline
+    fn __init__(out self, *, other: Self):
         """Explicit copy constructor.
 
         Args:
@@ -65,10 +75,13 @@ struct NoneType(
         return "None"
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Write `None` to a formatter stream.
+    fn write_to[W: Writer](self, inout writer: W):
+        """Write `None` to a writer stream.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("None")

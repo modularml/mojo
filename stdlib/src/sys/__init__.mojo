@@ -47,7 +47,9 @@ from .info import (
     simdbytewidth,
     simdwidthof,
     sizeof,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
+    is_amd_gpu,
+    is_gpu,
 )
 from .intrinsics import (
     PrefetchCache,
@@ -65,5 +67,5 @@ from .intrinsics import (
     strided_load,
     strided_store,
 )
-from .param_env import env_get_int, env_get_string, is_defined
+from .param_env import env_get_int, env_get_string, env_get_bool, is_defined
 from .terminate import exit

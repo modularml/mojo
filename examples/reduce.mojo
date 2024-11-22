@@ -22,6 +22,7 @@ from time import now
 from algorithm import sum
 from benchmark import Unit, benchmark, keep
 from buffer import Buffer
+from memory import UnsafePointer
 from python import Python
 
 # Change these numbers to reduce on different sizes
@@ -35,7 +36,7 @@ alias scalar = Scalar[type]
 
 # Use the https://en.wikipedia.org/wiki/Kahan_summation_algorithm
 # Simple summation of the array elements
-fn naive_reduce_sum[size: Int](buffer: Buffer[type, size]) -> scalar:
+fn naive_reduce_sum[size: Int](buffer: Buffer[type, size]) raises -> scalar:
     var my_sum: scalar = 0
     var c: scalar = 0
     for i in range(buffer.size):
@@ -46,7 +47,7 @@ fn naive_reduce_sum[size: Int](buffer: Buffer[type, size]) -> scalar:
     return my_sum
 
 
-fn stdlib_reduce_sum[size: Int](array: Buffer[type, size]) -> scalar:
+fn stdlib_reduce_sum[size: Int](array: Buffer[type, size]) raises -> scalar:
     var my_sum = sum(array)
     return my_sum
 
@@ -61,12 +62,12 @@ def pretty_print(name: String, elements: Int, time: Float64):
 
 
 fn bench[
-    func: fn[size: Int] (buffer: Buffer[type, size]) -> scalar,
+    func: fn[size: Int] (buffer: Buffer[type, size]) raises -> scalar,
     size: Int,
     name: String,
 ](buffer: Buffer[type, size]) raises:
     @parameter
-    fn runner():
+    fn runner() raises:
         var result = func[size](buffer)
         keep(result)
 

@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 from .pwd import Passwd
 from memory import UnsafePointer
-from sys.ffi import C_char, external_call
+from sys.ffi import c_char, external_call
 
 alias uid_t = Int32
 alias gid_t = Int32
-alias char = UnsafePointer[C_char]
+alias char = UnsafePointer[c_char]
 
 
 @register_passable("trivial")

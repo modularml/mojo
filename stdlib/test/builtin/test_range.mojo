@@ -187,6 +187,24 @@ def test_range_bounds():
     assert_equal(r[ln - 1], last_seen)
 
 
+def test_scalar_range():
+    r = range(UInt8(2), 16, 4)
+    assert_equal(r.start, 2)
+    assert_equal(r.end, 16)
+    assert_equal(r.step, 4)
+
+    fn append_many(inout list: List, *values: list.T):
+        for value in values:
+            list.append(value[])
+
+    expected_elements = List[UInt8]()
+    append_many(expected_elements, 2, 6, 10, 14)
+    actual_elements = List[UInt8]()
+    for e in r:
+        actual_elements.append(e)
+    assert_equal(actual_elements, expected_elements)
+
+
 def main():
     test_range_len()
     test_range_len_uint()

@@ -261,7 +261,7 @@ fn pop_count[
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_not[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
@@ -283,7 +283,7 @@ fn bit_not[
     """
     constrained[type.is_integral(), "must be integral"]()
     var neg_one = SIMD[type, width](-1)
-    return __mlir_op.`pop.xor`(val.value, neg_one.value)
+    return __mlir_op.`pop.simd.xor`(val.value, neg_one.value)
 
 
 # ===----------------------------------------------------------------------===#
@@ -359,7 +359,7 @@ fn is_power_of_two(val: Int) -> Bool:
     Returns:
         True if the input value is a power of 2, False otherwise.
     """
-    return (val != 0) & (val & (val - 1) == 0)
+    return (val > 0) & (val & (val - 1) == 0)
 
 
 @always_inline
@@ -384,7 +384,11 @@ fn is_power_of_two[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    return (val != 0) & (val & (val - 1) == 0)
+    @parameter
+    if type.is_unsigned():
+        return pop_count(val) == 1
+    else:
+        return (val > 0) & (val & (val - 1) == 0)
 
 
 # ===----------------------------------------------------------------------===#
@@ -413,7 +417,7 @@ fn bit_ceil(val: Int) -> Int:
     return 1 << bit_width(val - 1)
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_ceil[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
@@ -449,7 +453,7 @@ fn bit_ceil[
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_floor
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_floor(val: Int) -> Int:
     """Computes the largest power of 2 that is less than or equal to the input
     value. Any integral value less than or equal to 0 will be floored to 0.
@@ -466,7 +470,7 @@ fn bit_floor(val: Int) -> Int:
     return 1 << (bit_width(val) - 1)
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_floor[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
@@ -520,8 +524,8 @@ fn rotate_bits_left[shift: Int](x: Int) -> Int:
         The input rotated to the left by `shift` elements (with wrap-around).
     """
     constrained[
-        shift >= -sizeof[Int]() and shift < sizeof[Int](),
-        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+        shift >= -bitwidthof[Int]() and shift < bitwidthof[Int](),
+        "Constraints: -bitwidthof[Int]() <= shift < bitwidthof[Int]()",
     ]()
 
     @parameter
@@ -598,8 +602,8 @@ fn rotate_bits_right[shift: Int](x: Int) -> Int:
         The input rotated to the right by `shift` elements (with wrap-around).
     """
     constrained[
-        shift >= -sizeof[Int]() and shift < sizeof[Int](),
-        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+        shift >= -bitwidthof[Int]() and shift < bitwidthof[Int](),
+        "Constraints: -bitwidthof[Int]() <= shift < bitwidthof[Int]()",
     ]()
 
     @parameter

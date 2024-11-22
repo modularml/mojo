@@ -14,15 +14,15 @@ frequency.
 ## Fields
 
 - ​<b>out_file</b> (`Optional[Path]`): Output file to write results to.
-- ​<b>min_runtime_secs</b> (`SIMD[float64, 1]`): Upper bound on benchmarking time
+- ​<b>min_runtime_secs</b> (`SIMD[float64, 1]`): Lower bound on benchmarking time
   in secs.
-- ​<b>max_runtime_secs</b> (`SIMD[float64, 1]`): Lower bound on benchmarking time
+- ​<b>max_runtime_secs</b> (`SIMD[float64, 1]`): Upper bound on benchmarking time
+  in secs.
+- ​<b>min_warmuptime_secs</b> (`SIMD[float64, 1]`): Lower bound on the warmup time
   in secs.
 - ​<b>max_batch_size</b> (`Int`): The maximum number of iterations to perform per
   time measurement.
 - ​<b>max_iters</b> (`Int`): Max number of iterations to run.
-- ​<b>warmup_iters</b> (`Int`): Number of warmup iterations to run before
-  starting benchmarking.
 - ​<b>num_repetitions</b> (`Int`): Number of times the benchmark has to be
   repeated.
 - ​<b>flush_denormals</b> (`Bool`): Whether or not the denormal values are
@@ -48,7 +48,7 @@ frequency.
 <div class="mojo-function-sig">
 
 ```mojo
-__init__(inout self: Self, out_file: Optional[Path] = #kgen.none, min_runtime_secs: SIMD[float64, 1] = #kgen.float_literal<1|10>, max_runtime_secs: SIMD[float64, 1] = 1, warmup_iters: Int = 2, max_batch_size: Int = 0, max_iters: Int = 1000000000, num_repetitions: Int = 1, flush_denormals: Bool = 1)
+__init__(inout self: out_file: Optional[Path] = None, min_runtime_secs: SIMD[float64, 1] = 1.0, max_runtime_secs: SIMD[float64, 1] = 2.0, min_warmuptime_secs: SIMD[float64, 1] = 1.0, max_batch_size: Int = 0, max_iters: Int = 1000000000, num_repetitions: Int = 1, flush_denormals: Bool = True)
 ```
 
 </div>
@@ -59,11 +59,11 @@ Constructs and initializes Benchmark config object with default and inputted val
 
 - ​<b>out_file</b> (`Optional[Path]`): Output file to write results to.
 - ​<b>min_runtime_secs</b> (`SIMD[float64, 1]`): Upper bound on benchmarking time
-  in secs (default `0.1`).
+  in secs (default `1.0`).
 - ​<b>max_runtime_secs</b> (`SIMD[float64, 1]`): Lower bound on benchmarking time
-  in secs (default `1`).
-- ​<b>warmup_iters</b> (`Int`): Number of warmup iterations to run before
-  starting benchmarking (default 2).
+  in secs (default `2.0`).
+- ​<b>min_warmuptime_secs</b> (`SIMD[float64, 1]`): Lower bound on the warmup time
+  in secs (default `1.0`).
 - ​<b>max_batch_size</b> (`Int`): The maximum number of iterations to perform per
   time measurement.
 - ​<b>max_iters</b> (`Int`): Max number of iterations to run (default

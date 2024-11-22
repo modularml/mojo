@@ -167,7 +167,7 @@ fn test_sort3_dupe_elements() raises:
     alias length = 3
 
     fn test[
-        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
+        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing [_] -> Bool,
     ]() raises:
         var list = List[Int](capacity=3)
         list.append(5)
@@ -453,8 +453,10 @@ fn test_sort_stress() raises:
     @__copy_capture(random_seed)
     @parameter
     fn test[
-        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
-        check_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
+        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing [_] -> Bool,
+        check_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing [
+            _
+        ] -> Bool,
     ](length: Int) raises:
         var list = List[Int](capacity=length)
         for _ in range(length):
@@ -495,7 +497,7 @@ fn test_sort_stress() raises:
 struct MyStruct(CollectionElement):
     var val: Int
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.val = other.val
 
 
@@ -548,7 +550,7 @@ struct Person(ComparableCollectionElement):
     var name: String
     var age: Int
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.name = String(other=other.name)
         self.age = other.age
 
@@ -619,8 +621,8 @@ def test_stable_sort_stress():
 
     @parameter
     fn test[
-        cmp_fn: fn (IntPair, IntPair) capturing -> Bool,
-        check_fn: fn (IntPair, IntPair) capturing -> Bool,
+        cmp_fn: fn (IntPair, IntPair) capturing [_] -> Bool,
+        check_fn: fn (IntPair, IntPair) capturing [_] -> Bool,
     ](length: Int) raises:
         var list = List[IntPair](capacity=length)
         for i in range(length):

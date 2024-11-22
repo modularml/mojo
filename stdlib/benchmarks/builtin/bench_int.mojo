@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo-no-debug %s -t
+# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
+# the -t flag. Remember to replace it again before pushing any code.
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 
@@ -34,7 +36,7 @@ fn bench_stringify_small_integers(inout b: Bencher) raises:
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 def main():
-    var m = Bench(BenchConfig(num_repetitions=1, warmup_iters=100))
+    var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_stringify_small_integers](
         BenchId("bench_stringify_small_integers")
     )

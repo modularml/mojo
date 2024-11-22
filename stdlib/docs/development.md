@@ -89,7 +89,7 @@ run all the tests automatically.
 ./stdlib/scripts/run-tests.sh
 ```
 
-Note that tests are run with `-D MOJO_ENABLE_ASSERTIONS`.
+Note that tests are run with `-D ASSERT=all`.
 
 If you wish to run the unit tests that are in a specific test file, you can do
 so with
@@ -376,6 +376,5 @@ did have a worthwhile change you wanted to raise, follow the steps to
 Congratulations! You've now got an idea on how to contribute to the standard
 library, test your changes, and raise a PR.
 
-If you're still having troubles make sure to reach out on
-[GitHub](https://github.com/modularml/mojo/discussions/new?category=general) or
-[Discord](https://modul.ar/discord)!
+If you're still having issues, reach out on
+[Discord](https://modul.ar/discord).

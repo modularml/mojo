@@ -17,80 +17,213 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_defined, triple_is_nvidia_cuda
+from sys import is_nvidia_gpu, llvm_intrinsic
 from sys._build import is_debug_build
+from sys.param_env import env_get_string
+from sys.ffi import external_call, c_uint, c_size_t, c_char
+from memory import UnsafePointer
+from utils.write import _WriteBufferHeap, _WriteBufferStack, write_args
+
 
 from builtin._location import __call_location, _SourceLocation
 
-# Print an error and fail.
-alias _ERROR_ON_ASSERT = is_debug_build() or is_defined[
-    "MOJO_ENABLE_ASSERTIONS"
-]()
+alias defined_mode = env_get_string["ASSERT", "safe"]()
 
-# Print a warning, but do not fail (useful for testing assert behavior).
-alias _WARN_ON_ASSERT = is_defined["ASSERT_WARNING"]()
+
+@no_inline
+fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
+    constrained[
+        defined_mode in ["none", "warn", "safe", "all"],
+        "-D ASSERT="
+        + defined_mode
+        + " but must be one of: none, warn, safe, all",
+    ]()
+    constrained[
+        assert_mode in ["none", "safe"],
+        "assert_mode=" + assert_mode + " but must be one of: none, safe",
+    ]()
+
+    @parameter
+    if defined_mode == "none" or (is_nvidia_gpu() and cpu_only):
+        return False
+    elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
+        return True
+    else:
+        return defined_mode == assert_mode
 
 
 @always_inline
 fn debug_assert[
-    func: fn () capturing -> Bool, message_type: Stringable
-](message: message_type):
+    cond: fn () capturing [_] -> Bool,
+    assert_mode: StringLiteral = "none",
+    cpu_only: Bool = False,
+    *Ts: Writable,
+](*messages: *Ts):
     """Asserts that the condition is true.
 
-    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
-    builds unless MOJO_ENABLE_ASSERTIONS is defined.
-
-    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
-    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
-    for enabling assertions in the library.
-
     Parameters:
-        func: The function to invoke to check if the assertion holds. Can be used
-            if the function is side-effecting, in which case a debug_assert taking
-            a Bool will evaluate the expression producing the Bool even in release mode.
-        message_type: A type conforming to `Stringable` for the message.
+        cond: The function to invoke to check if the assertion holds.
+        assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
+        Ts: The element types conforming to `Writable` for the message.
 
     Args:
-        message: The message before displaying it on failure.
+        messages: Arguments to convert to a `String` message.
+
+
+    You can pass in multiple args that are `Writable` to generate a formatted
+    message, by default this will be a no-op:
+
+    ```mojo
+    x = 0
+    debug_assert(x > 0, "expected x to be more than 0 but got: ", x)
+    ```
+
+    You can change the assertion level for example:
+
+    ```sh
+    mojo -D ASSERT=all main.mojo
+    ```
+
+    Assertion modes:
+
+    - none: turn off all assertions for performance at the cost of safety.
+    - warn: print any errors instead of aborting.
+    - safe: standard safety checks that are on even in release builds.
+    - all: turn on all assertions.
+
+    You can set the `assert_mode` to `safe` so the assertion runs even in
+    release builds:
+
+    ```mojo
+    debug_assert[assert_mode="safe"](
+        x > 0, "expected x to be more than 0 but got: ", x
+    )
+    ```
+
+    To ensure that you have no runtime penality from your assertion in release
+    builds, make sure there are no side effects in your message and condition.
+    Take this example:
+
+    ```mojo
+    person = "name: john, age: 50"
+    name = "john"
+    debug_assert(str("name: ") + name == person, "unexpected name")
+    ```
+
+    This will have a runtime penality due to allocating a `String` in the
+    condition even in release builds, you must put the condition inside a
+    closure so it only runs when the assertion is turned on:
+
+    ```mojo
+    fn check_name() capturing -> Bool:
+        return str("name: ") + name == person
+
+    debug_assert[check_name]("unexpected name")
+    ```
+
+    If you need to allocate, and so don't want the assert to ever run on GPU,
+    you can set it to CPU only:
+
+    ```mojo
+    debug_assert[check_name, cpu_only=True]("unexpected name")
+    ```
     """
 
     @parameter
-    if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
-        debug_assert(func(), message)
+    if _assert_enabled[assert_mode, cpu_only]():
+        if cond():
+            return
+        _debug_assert_msg(messages, __call_location())
 
 
 @always_inline
-fn debug_assert[message_type: Stringable](cond: Bool, message: message_type):
+fn debug_assert[
+    assert_mode: StringLiteral = "none",
+    cpu_only: Bool = False,
+    *Ts: Writable,
+](cond: Bool, *messages: *Ts):
     """Asserts that the condition is true.
 
-    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
-    builds unless MOJO_ENABLE_ASSERTIONS is defined.
-
-    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
-    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
-    for enabling assertions in the library.
-
     Parameters:
-        message_type: A type conforming to `Stringable` for the message.
+        assert_mode: Determines when the assert is turned on.
+        cpu_only: If true, only run the assert on CPU.
+        Ts: The element types conforming to `Writable` for the message.
 
     Args:
         cond: The bool value to assert.
-        message: The message before displaying it on failure.
+        messages: Arguments to convert to a `String` message.
+
+    You can pass in multiple args that are `Writable` to generate a formatted
+    message, by default this will be a no-op:
+
+    ```mojo
+    x = 0
+    debug_assert(x > 0, "expected x to be more than 0 but got: ", x)
+    ```
+
+    You can change the assertion level for example:
+
+    ```sh
+    mojo -D ASSERT=all main.mojo
+    ```
+
+    Assertion modes:
+
+    - none: turn off all assertions for performance at the cost of safety.
+    - warn: print any errors instead of aborting.
+    - safe: standard safety checks that are on even in release builds.
+    - all: turn on all assertions.
+
+    You can set the `assert_mode` to `safe` so the assertion runs even in
+    release builds:
+
+    ```mojo
+    debug_assert[assert_mode="safe"](
+        x > 0, "expected x to be more than 0 but got: ", x
+    )
+    ```
+
+    To ensure that you have no runtime penality from your assertion in release
+    builds, make sure there are no side effects in your message and condition.
+    Take this example:
+
+    ```mojo
+    person = "name: john, age: 50"
+    name = "john"
+    debug_assert(str("name: ") + name == person, "unexpected name")
+    ```
+
+    This will have a runtime penality due to allocating a `String` in the
+    condition even in release builds, you must put the condition inside a
+    closure so it only runs when the assertion is turned on:
+
+    ```mojo
+    fn check_name() capturing -> Bool:
+        return str("name: ") + name == person
+
+    debug_assert[check_name]("unexpected name")
+    ```
+
+    If you need to allocate, and so don't want the assert to ever run on GPU,
+    you can set it to CPU only:
+
+    ```mojo
+    debug_assert[check_name, cpu_only=True]("unexpected name")
+    ```
     """
 
     @parameter
-    if _ERROR_ON_ASSERT or _WARN_ON_ASSERT:
+    if _assert_enabled[assert_mode, cpu_only]():
         if cond:
             return
-        _debug_assert_msg[is_warning=_WARN_ON_ASSERT](
-            message, __call_location()
-        )
+        _debug_assert_msg(messages, __call_location())
 
 
 @no_inline
-fn _debug_assert_msg[
-    message_type: Stringable, //, *, is_warning: Bool = False
-](msg: message_type, loc: _SourceLocation):
+fn _debug_assert_msg(
+    messages: VariadicPack[_, Writable, *_], loc: _SourceLocation
+):
     """Aborts with (or prints) the given message and location.
 
     This function is intentionally marked as no_inline to reduce binary size.
@@ -100,19 +233,84 @@ fn _debug_assert_msg[
     abort's implementation could use debug_assert)
     """
 
+    var stdout = sys.stdout
+
     @parameter
-    if triple_is_nvidia_cuda():
-        # On GPUs, assert shouldn't allocate.
+    if is_nvidia_gpu():
+        var buffer = _WriteBufferHeap[4096](stdout)
+        buffer.write("At ", loc, ": ")
+        _write_gpu_thread_context(buffer)
 
         @parameter
-        if is_warning:
-            print("Assert Warning")
+        if defined_mode == "warn":
+            buffer.write(" Assert Warning: ")
         else:
+            buffer.write(" Assert Error: ")
+
+        write_args(buffer, messages, end="\n")
+        buffer.flush()
+
+        @parameter
+        if defined_mode != "warn":
             abort()
+
+    else:
+        var buffer = _WriteBufferStack[4096](stdout)
+        buffer.write("At ", loc, ": ")
+
+        @parameter
+        if defined_mode == "warn":
+            buffer.write(" Assert Warning: ")
+        else:
+            buffer.write(" Assert Error: ")
+
+        write_args(buffer, messages, end="\n")
+        buffer.flush()
+
+        @parameter
+        if defined_mode != "warn":
+            abort()
+
+
+# Can't import gpu module at this stage in compilation for thread/block idx
+fn _write_gpu_thread_context[W: Writer](inout writer: W):
+    writer.write("block: [")
+    _write_id["block", "x"](writer)
+    writer.write(",")
+    _write_id["block", "y"](writer)
+    writer.write(",")
+    _write_id["block", "z"](writer)
+    writer.write("] thread: [")
+    _write_id["thread", "x"](writer)
+    writer.write(",")
+    _write_id["thread", "y"](writer)
+    writer.write(",")
+    _write_id["thread", "z"](writer)
+    writer.write("]")
+
+
+fn _write_id[
+    W: Writer, //, type: StringLiteral, dim: StringLiteral
+](inout writer: W):
+    alias intrinsic_name = _get_intrinsic_name[type, dim]()
+    writer.write(llvm_intrinsic[intrinsic_name, Int32, has_side_effect=False]())
+
+
+fn _get_intrinsic_name[
+    type: StringLiteral, dim: StringLiteral
+]() -> StringLiteral:
+    @parameter
+    if is_nvidia_gpu():
+
+        @parameter
+        if type == "thread":
+            return "llvm.nvvm.read.ptx.sreg.tid." + dim
+        else:
+            return "llvm.nvvm.read.ptx.sreg.ctaid." + dim
     else:
 
         @parameter
-        if is_warning:
-            print(loc.prefix("Assert Warning:"), str(msg))
+        if type == "thread":
+            return "llvm.amdgcn.workitem.id." + dim
         else:
-            abort(loc.prefix("Assert Error: " + str(msg)))
+            return "llvm.amdgcn.workgroup.id." + dim
