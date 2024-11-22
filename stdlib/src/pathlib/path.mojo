@@ -84,6 +84,7 @@ struct Path(
         """Initializes a path with the current directory."""
         self = cwd()
 
+    @implicit
     fn __init__(out self, path: String):
         """Initializes a path with the provided path.
 

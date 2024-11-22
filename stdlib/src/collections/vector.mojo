@@ -114,6 +114,7 @@ struct InlinedFixedVector[
     """The maximum number of elements that can fit in the vector."""
 
     @always_inline
+    @implicit
     fn __init__(out self, capacity: Int):
         """Constructs `InlinedFixedVector` with the given capacity.
 
@@ -130,6 +131,7 @@ struct InlinedFixedVector[
         self.capacity = capacity
 
     @always_inline
+    @implicit
     fn __init__(out self, existing: Self):
         """
         Copy constructor.

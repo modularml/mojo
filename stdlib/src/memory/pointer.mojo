@@ -19,6 +19,8 @@ from memory import Pointer
 ```
 """
 
+from sys import is_nvidia_gpu
+
 # ===----------------------------------------------------------------------===#
 # AddressSpace
 # ===----------------------------------------------------------------------===#
@@ -30,6 +32,7 @@ struct _GPUAddressSpace(EqualityComparable):
     var _value: Int
 
     # See https://docs.nvidia.com/cuda/nvvm-ir-spec/#address-space
+    # And https://llvm.org/docs/AMDGPUUsage.html#address-spaces
     alias GENERIC = AddressSpace(0)
     """Generic address space."""
     alias GLOBAL = AddressSpace(1)
@@ -44,6 +47,7 @@ struct _GPUAddressSpace(EqualityComparable):
     """Local address space."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         self._value = value
 
@@ -167,6 +171,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Generic address space."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Initializes the address space from the underlying integral value.
 
@@ -176,6 +181,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         self._value = value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integral value.
 

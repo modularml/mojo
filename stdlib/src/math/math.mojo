@@ -28,6 +28,7 @@ from sys import (
     has_avx512f,
     simdwidthof,
     is_nvidia_gpu,
+    is_amd_gpu,
     sizeof,
 )
 
@@ -94,7 +95,7 @@ fn ceil[T: Ceilable, //](value: T) -> T:
 
 @always_inline
 fn ceildiv[T: CeilDivable, //](numerator: T, denominator: T) -> T:
-    """Return the rounded-up result of dividing x by y.
+    """Return the rounded-up result of dividing numerator by denominator.
 
     Parameters:
         T: A type that support floor division.
@@ -104,14 +105,15 @@ fn ceildiv[T: CeilDivable, //](numerator: T, denominator: T) -> T:
         denominator: The denominator.
 
     Returns:
-        The ceiling of dividing x by y.
+        The ceiling of dividing numerator by denominator.
     """
-    return -(numerator // -denominator)
+    # return -(numerator // -denominator)
+    return numerator.__ceildiv__(denominator)
 
 
 @always_inline
 fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
-    """Return the rounded-up result of dividing x by y, potentially raising.
+    """Return the rounded-up result of dividing numerator by denominator, potentially raising.
 
     Parameters:
         T: A type that support floor division.
@@ -121,39 +123,25 @@ fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
         denominator: The denominator.
 
     Returns:
-        The ceiling of dividing x by y.
+        The ceiling of dividing numerator by denominator.
     """
-    return -(numerator // -denominator)
+    return numerator.__ceildiv__(denominator)
 
 
 # NOTE: this overload is needed because of overload precedence; without it the
 # Int overload would be preferred, and ceildiv wouldn't work on IntLiteral.
 @always_inline
 fn ceildiv(numerator: IntLiteral, denominator: IntLiteral) -> IntLiteral:
-    """Return the rounded-up result of dividing x by y.
+    """Return the rounded-up result of dividing numerator by denominator.
 
     Args:
         numerator: The numerator.
         denominator: The denominator.
 
     Returns:
-        The ceiling of dividing x by y.
+        The ceiling of dividing numerator by denominator.
     """
-    return -(numerator // -denominator)
-
-
-@always_inline("nodebug")
-fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
-    """Return the rounded-up result of dividing x by y.
-
-    Args:
-        numerator: The numerator.
-        denominator: The denominator.
-
-    Returns:
-        The ceiling of dividing x by y.
-    """
-    return __mlir_op.`index.ceildivu`(numerator.value, denominator.value)
+    return numerator.__ceildiv__(denominator)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1412,6 +1400,8 @@ fn cos[
         return _call_ptx_intrinsic[
             instruction="cos.approx.ftz.f32", constraints="=f,f"
         ](x)
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.cos", __type_of(x)](x)
     else:
         return _call_libm["cos"](x)
 
@@ -1445,6 +1435,8 @@ fn sin[
         return _call_ptx_intrinsic[
             instruction="sin.approx.ftz.f32", constraints="=f,f"
         ](x)
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.sin", __type_of(x)](x)
     else:
         return _call_libm["sin"](x)
 
@@ -1622,6 +1614,8 @@ fn log10(x: SIMD) -> __type_of(x):
                 ](x)
                 * log10_2
             )
+    elif is_amd_gpu():
+        return llvm_intrinsic["llvm.log10", __type_of(x)](x)
 
     return _call_libm["log10"](x)
 
@@ -2570,29 +2564,20 @@ trait CeilDivable:
     struct Foo(CeilDivable):
         var x: Float64
 
-        fn __floordiv__(self, other: Self) -> Self:
-            return self.x // other.x
-
-        fn __rfloordiv__(self, other: Self) -> Self:
-            return other // self
-
-        fn __neg__(self) -> Self:
-            return -self.x
+        fn __ceildiv__(self, denominator: Self) -> Self:
+            return -(self.x // -denominator.x)
     ```
     """
 
-    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
-    # or associated types.
-    @doc_private
-    fn __floordiv__(self, other: Self) -> Self:
-        ...
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
 
-    @doc_private
-    fn __rfloordiv__(self, other: Self) -> Self:
-        ...
+        Args:
+            denominator: The denominator.
 
-    @doc_private
-    fn __neg__(self) -> Self:
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
         ...
 
 
@@ -2612,29 +2597,20 @@ trait CeilDivableRaising:
     struct Foo(CeilDivableRaising):
         var x: object
 
-        fn __floordiv__(self, other: Self) raises -> Self:
-            return self.x // other.x
-
-        fn __rfloordiv__(self, other: Self) raises -> Self:
-            return other // self
-
-        fn __neg__(self) raises -> Self:
-            return -self.x
+        fn __ceildiv__(self, denominator: Self) raises -> Self:
+            return -(self.x // -denominator.x)
     ```
     """
 
-    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
-    # or associated types.
-    @doc_private
-    fn __floordiv__(self, other: Self) raises -> Self:
-        ...
+    fn __ceildiv__(self, denominator: Self) raises -> Self:
+        """Return the rounded-up result of dividing self by denominator.
 
-    @doc_private
-    fn __rfloordiv__(self, other: Self) raises -> Self:
-        ...
+        Args:
+            denominator: The denominator.
 
-    @doc_private
-    fn __neg__(self) raises -> Self:
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
         ...
 
 
@@ -2661,7 +2637,7 @@ trait Truncable:
         var im: Float64
 
         fn __trunc__(self) -> Self:
-            return Self(trunc(re), trunc(im))
+            return Self(trunc(self.re), trunc(self.im))
     ```
     """
 

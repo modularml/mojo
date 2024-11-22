@@ -13,7 +13,7 @@
 
 from memory import UnsafePointer
 
-from sys.ffi import c_int, OpaquePointer
+from sys.ffi import c_int
 from sys.info import sizeof
 
 from os import abort
@@ -52,10 +52,6 @@ trait ConvertibleFromPython(CollectionElement):
             If conversion was not successful.
         """
         ...
-
-
-trait PythonableAndConvertibleFromPython(Pythonable, ConvertibleFromPython):
-    pass
 
 
 # ===-----------------------------------------------------------------------===#
@@ -348,7 +344,7 @@ fn check_arguments_arity(
 
 
 fn check_argument_type[
-    T: Pythonable,
+    T: AnyType
 ](
     func_name: StringLiteral,
     type_name_id: StringLiteral,

@@ -139,6 +139,7 @@ struct InlineArray[
             )
 
     @always_inline
+    @implicit
     fn __init__(out self, fill: Self.ElementType):
         """Constructs an empty array where each element is the supplied `fill`.
 
@@ -157,6 +158,7 @@ struct InlineArray[
             ptr.init_pointee_copy(fill)
 
     @always_inline
+    @implicit
     fn __init__(out self, owned *elems: Self.ElementType):
         """Constructs an array given a set of arguments.
 
@@ -232,7 +234,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
+    fn __getitem__(ref self, idx: Int) -> ref [self] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
         Args:
@@ -245,9 +247,7 @@ struct InlineArray[
         return self.unsafe_get(normalized_index)
 
     @always_inline
-    fn __getitem__[
-        idx: Int,
-    ](ref [_]self: Self) -> ref [self] Self.ElementType:
+    fn __getitem__[idx: Int](ref self) -> ref [self] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
         Parameters:
@@ -284,7 +284,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
+    fn unsafe_get(ref self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is

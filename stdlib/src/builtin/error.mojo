@@ -65,6 +65,7 @@ struct Error(
         self.loaded_length = 0
 
     @always_inline
+    @implicit
     fn __init__(out self, value: StringLiteral):
         """Construct an Error object with a given string literal.
 
@@ -74,6 +75,7 @@ struct Error(
         self.data = value.unsafe_ptr()
         self.loaded_length = len(value)
 
+    @implicit
     fn __init__(out self, src: String):
         """Construct an Error object with a given string.
 
@@ -91,6 +93,7 @@ struct Error(
         self.data = dest
         self.loaded_length = -length
 
+    @implicit
     fn __init__(out self, src: StringRef):
         """Construct an Error object with a given string ref.
 
@@ -180,7 +183,7 @@ struct Error(
         Returns:
             A printable representation of the error message.
         """
-        return "Error(" + repr(self._message()) + ")"
+        return String.write("Error(", repr(self._message()), ")")
 
     # ===-------------------------------------------------------------------===#
     # Methods

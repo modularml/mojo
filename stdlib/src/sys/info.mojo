@@ -28,13 +28,20 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
     return __mlir_attr.`#kgen.param.expr<current_target> : !kgen.target`
 
 
+@always_inline("nodebug")
+fn _accelerator_arch() -> StringLiteral:
+    return __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
+
+
 fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
-    return __mlir_attr[
-        `#kgen.param.expr<target_get_field,`,
-        target,
-        `, "arch" : !kgen.string`,
-        `> : !kgen.string`,
-    ]
+    return String(
+        __mlir_attr[
+            `#kgen.param.expr<target_get_field,`,
+            target,
+            `, "arch" : !kgen.string`,
+            `> : !kgen.string`,
+        ]
+    )
 
 
 @always_inline("nodebug")
@@ -380,31 +387,36 @@ fn os_is_windows() -> Bool:
 
 
 @always_inline("nodebug")
-fn _triple_attr() -> __mlir_type.`!kgen.string`:
+fn _triple_attr[
+    triple: __mlir_type.`!kgen.target` = _current_target()
+]() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
-        _current_target(),
+        triple,
         `, "triple" : !kgen.string`,
         `> : !kgen.string`,
     ]
 
 
 @always_inline("nodebug")
-fn is_triple[triple: StringLiteral]() -> Bool:
+fn is_triple[
+    name: StringLiteral, target: __mlir_type.`!kgen.target` = _current_target()
+]() -> Bool:
     """Returns True if the target triple of the compiler matches the input and
     False otherwise.
 
     Parameters:
-      triple: The triple value to be checked against.
+      name: The name of the triple value.
+      target: The triple value to be checked against.
 
     Returns:
         True if the triple matches and False otherwise.
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _triple_attr(),
+        _triple_attr[target](),
         `, `,
-        triple.value,
+        name.value,
         `> : i1`,
     ]
 
@@ -446,6 +458,27 @@ fn is_nvidia_gpu[subarch: StringLiteral]() -> Bool:
         True if the triple target is cuda and False otherwise.
     """
     return is_nvidia_gpu() and StringLiteral(_current_arch()) == subarch
+
+
+@always_inline("nodebug")
+fn is_amd_gpu() -> Bool:
+    """Returns True if the target triple of the compiler is `amdgcn-amd-amdhsa`
+    False otherwise.
+
+    Returns:
+        True if the triple target is amdgpu and False otherwise.
+    """
+    return is_triple["amdgcn-amd-amdhsa"]()
+
+
+@always_inline("nodebug")
+fn is_gpu() -> Bool:
+    """Returns True if the target triple is GPU and  False otherwise.
+
+    Returns:
+        True if the triple target is GPU and False otherwise.
+    """
+    return is_nvidia_gpu() or is_amd_gpu()
 
 
 @always_inline("nodebug")
@@ -560,21 +593,6 @@ fn simdbytewidth[
     """
     alias CHAR_BIT = 8
     return simdbitwidth[target]() // CHAR_BIT
-
-
-@always_inline("nodebug")
-fn warpsize[
-    target: __mlir_type.`!kgen.target` = _current_target()
-]() -> IntLiteral:
-    """Returns the warp size of the specified target.
-
-    Parameters:
-        target: The target architecture.
-
-    Returns:
-        The warp size of the specified target.
-    """
-    return 32
 
 
 @always_inline("nodebug")
