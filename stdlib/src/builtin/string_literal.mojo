@@ -15,16 +15,18 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import c_char
-
+from builtin.builtin_list import _lit_mut_cast
 from memory import memcpy, UnsafePointer
 from collections import List
+from collections.string import _atol
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from sys.ffi import c_char
+from utils import StringRef, Span, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-
 from utils.string_slice import (
+    StringSlice,
+    StaticString,
+    Stringlike,
     _StringSliceIter,
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
@@ -39,18 +41,7 @@ from utils.string_slice import (
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct StringLiteral(
-    Boolable,
-    Comparable,
-    CollectionElementNew,
-    Writable,
-    IntableRaising,
-    KeyElement,
-    Representable,
-    Sized,
-    Stringable,
-    FloatableRaising,
-    BytesCollectionElement,
-    _HashableWithHasher,
+    Comparable, KeyElement, Representable, Stringlike, _HashableWithHasher
 ):
     """This type represents a string literal.
 
@@ -493,17 +484,28 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
+    fn as_bytes[
+        is_mutable: Bool, //,
+        mutate: Bool = False,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
+        .result,
+    ](ref self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
+            origin: The origin of the data.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-        # Does NOT include the NUL terminator.
-        return Span[Byte, __origin_of(self)](
+        constrained[not mutate, "StringLiteral can't be mutated"]()
+        return Span[Byte, _lit_mut_cast[origin, mutate].result](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -585,7 +587,9 @@ struct StringLiteral(
         """
         return __mlir_op.`pop.string.replace`(self.value, old.value, new.value)
 
-    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
@@ -597,7 +601,7 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
-        return str(self).join(elems)
+        return self.as_string_slice().join(elems)
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.

@@ -224,8 +224,8 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait BytesCollectionElement(CollectionElement, AsBytes):
-    """The BytesCollectionElement trait denotes a trait composition
+trait AsBytesCollectionElement(CollectionElement, AsBytes):
+    """The AsBytesCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `AsBytes`.
 
     This is useful to have as a named entity since Mojo does not

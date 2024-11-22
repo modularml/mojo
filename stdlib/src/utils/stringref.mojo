@@ -15,6 +15,7 @@
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
+from builtin.builtin_list import _lit_mut_cast
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import UnsafePointer, memcmp, pack_bits
@@ -215,13 +216,39 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes[
+        mutate: Bool = False
+    ](ref self) -> Span[Byte, _lit_mut_cast[__origin_of(self), mutate].result]:
         """Returns a contiguous Span of the bytes owned by this string.
+
+        Parameters:
+            mutate: Whether the result will be mutable.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
-        return Span[Byte, __origin_of(self)](ptr=self.data, length=self.length)
+        return self.as_bytes[mutate, __origin_of(self)]()
+
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, //, mutate: Bool, origin: Origin[is_mutable].type
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
+            origin: The origin of the data.
+
+        Returns:
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return Span[Byte, _lit_mut_cast[origin, mutate].result](
+            ptr=self.data, length=self.length
+        )
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders

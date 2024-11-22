@@ -23,13 +23,15 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils import Span
+from builtin.builtin_list import _lit_mut_cast
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from memory import memcmp, UnsafePointer, memcpy
-from sys import simdwidthof, bitwidthof
-from sys.intrinsics import unlikely
 from memory.memory import _memcmp_impl_unconstrained
+from sys import simdwidthof, bitwidthof
+from sys.intrinsics import unlikely, _type_is_eq
+from utils.span import Span, AsBytes
 from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -242,13 +244,8 @@ struct _StringSliceIter[
 
 @value
 @register_passable("trivial")
-struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
-    Stringable,
-    Sized,
-    Writable,
-    CollectionElement,
-    CollectionElementNew,
-    Hashable,
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
+    Stringlike
 ):
     """A non-owning view to encoded string data.
 
@@ -649,13 +646,46 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return StringSlice[origin](ptr=ptr + start, length=end - start)
 
     @always_inline
-    fn as_bytes(self) -> Span[Byte, origin]:
-        """Get the sequence of encoded bytes of the underlying string.
+    fn as_bytes[
+        mutate: Bool = is_mutable
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            mutate: Whether the result will be mutable.
 
         Returns:
-            A slice containing the underlying sequence of encoded bytes.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
-        return self._slice
+        return self.as_bytes[mutate=mutate, origin=origin]()
+
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, //,
+        mutate: Bool = Self.is_mutable,
+        origin: Origin[is_mutable]
+        .type = _lit_mut_cast[Self.origin, is_mutable]
+        .result,
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
+            origin: The origin of the data.
+
+        Returns:
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return rebind[Span[Byte, _lit_mut_cast[origin, mutate].result]](
+            self._slice
+        )
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -851,6 +881,96 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
         return int(loc) - int(self.unsafe_ptr())
 
+    fn join[
+        T: StringableCollectionElement, //
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        # TODO(#3403): Simplify this when the linked conditional conformance
+        # feature is added.  Runs a faster algorithm if the concrete types are
+        # able to be converted to a span of bytes.
+
+        @parameter
+        if _type_is_eq[T, String]():
+            return self._join_bytes(rebind[List[String]](elems))
+        elif _type_is_eq[T, StringLiteral]():
+            return self._join_bytes(rebind[List[StringLiteral]](elems))
+        elif _type_is_eq[T, StringSlice[__origin_of(elems)]]():
+            return self._join_bytes(
+                rebind[List[StringSlice[__origin_of(elems)]]](elems)
+            )
+        else:
+            var e_len = len(elems)
+            var buf = List[String](capacity=e_len)
+            buf.size = e_len
+            var b_ptr = buf.unsafe_ptr()
+
+            for i in range(e_len):
+                (b_ptr + i).init_pointee_move(str(elems.unsafe_get(i)))
+
+            return self._join_bytes(buf^)
+
+    fn _join_bytes[
+        T: AsBytesCollectionElement, //,
+    ](self, elems: List[T, *_]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+
+        Notes:
+            This is a temporary method until we can build a generic
+            `Span[Scalar[D]].join[T: AsSpan[D]](elems: Span[T])`. Where AsSpan
+            is a parametrized trait for types which have `.as_span(self) ->
+            Span[T]`.
+        """
+
+        var n_elems = len(elems)
+        var s_len = self.byte_length()
+        var len_elems = 0
+        # Calculate the total size of the elements to join beforehand
+        # to prevent alloc syscalls as we know the buffer size.
+        # This can hugely improve the performance on large lists
+        for e in elems:
+            len_elems += len(
+                e[].as_bytes[mutate=False, origin = __origin_of(e)]()
+            )
+        var capacity = s_len * (n_elems - int(n_elems > 0)) + len_elems + 1
+        var buf = String._buffer_type(capacity=capacity)
+        buf.size = capacity
+        s_ptr, b_ptr = self.unsafe_ptr(), buf.unsafe_ptr()
+        offset, i = 0, 0
+        var not_first = False
+        while i < n_elems:
+            memcpy(dest=b_ptr + offset, src=s_ptr, count=s_len * int(not_first))
+            offset += s_len * int(not_first)
+            not_first = True
+            var e_span = elems.unsafe_get(i).as_bytes[
+                mutate=False, origin = __origin_of(elems[i])
+            ]()
+            e_len = len(e_span)
+            memcpy(dest=b_ptr + offset, src=e_span.unsafe_ptr(), count=e_len)
+            offset += e_len
+            i += 1
+        b_ptr[capacity - 1] = 0
+        return String(buf^)
+
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
         python whitespace String. This corresponds to Python's
@@ -1022,7 +1142,18 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 # ===----------------------------------------------------------------------===#
 
 
-trait Stringlike:
+trait Stringlike(
+    Sized,
+    Boolable,
+    AsBytes,
+    CollectionElement,
+    CollectionElementNew,
+    Writable,
+    Stringable,
+    IntableRaising,
+    FloatableRaising,
+    Hashable,
+):
     """Trait intended to be used only with `String`, `StringLiteral` and
     `StringSlice`."""
 

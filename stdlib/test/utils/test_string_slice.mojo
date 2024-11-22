@@ -33,7 +33,7 @@ fn test_string_literal_byte_span() raises:
 
 fn test_string_byte_span() raises:
     var string = String("Hello")
-    var str_slice = string.as_bytes()
+    var str_slice = string.as_bytes[mutate=True]()
 
     assert_equal(len(str_slice), 5)
     assert_equal(str_slice[0], ord("H"))
@@ -487,6 +487,17 @@ def test_splitlines():
         _assert_equal(s.splitlines(keepends=True), items)
 
 
+def test_join():
+    alias S = StringSlice[StaticConstantOrigin]
+    l1 = List[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9)
+    assert_equal(S(",").join(l1), "1,2,3,4,5,6,7,8,9")
+    assert_equal(S(",").join(List[Byte](1, 2, 3)), "1,2,3")
+    assert_equal(S(",").join(List[Byte]()), "")
+    assert_equal(S(",").join(List[Byte](1)), "1")
+    l2 = List[S]("1", "2", "3")
+    assert_equal(S(",").join(l2), "1,2,3")
+
+
 fn main() raises:
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -505,3 +516,4 @@ fn main() raises:
     test_combination_10_good_10_bad_utf8_sequences()
     test_count_utf8_continuation_bytes()
     test_splitlines()
+    test_join()

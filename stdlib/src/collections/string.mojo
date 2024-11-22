@@ -15,29 +15,26 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import KeyElement, List, Optional
+from bit import count_leading_zeros
+from builtin.builtin_list import _lit_mut_cast
+from collections import KeyElement, List
 from collections._index_normalization import normalize_index
-from sys import bitwidthof, llvm_intrinsic
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from memory import UnsafePointer, memcpy
+from sys import bitwidthof
 from sys.ffi import c_char
 from utils import StaticString, write_args
-
-from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
-from python import PythonObject
-
-from sys.intrinsics import _type_is_eq
-from hashlib._hasher import _HashableWithHasher, _Hasher
-
 from utils import (
     Span,
     IndexList,
     StringRef,
-    StringSlice,
     Variant,
     Writable,
     Writer,
 )
 from utils.string_slice import (
+    StringSlice,
+    Stringlike,
     _utf8_byte_type,
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
@@ -700,18 +697,11 @@ fn isprintable(c: UInt8) -> Bool:
 
 @value
 struct String(
-    Sized,
-    Stringable,
-    AsBytes,
     Representable,
-    IntableRaising,
     KeyElement,
     Comparable,
-    Boolable,
-    Writable,
     Writer,
-    CollectionElementNew,
-    FloatableRaising,
+    Stringlike,
     _HashableWithHasher,
 ):
     """Represents a mutable string."""
@@ -1438,45 +1428,8 @@ struct String(
         _ = is_first
         return result
 
-    fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
-        """Joins string elements using the current string as a delimiter.
-
-        Parameters:
-            T: The types of the elements.
-
-        Args:
-            elems: The input values.
-
-        Returns:
-            The joined string.
-        """
-
-        # TODO(#3403): Simplify this when the linked conditional conformance
-        # feature is added.  Runs a faster algorithm if the concrete types are
-        # able to be converted to a span of bytes.
-        @parameter
-        if _type_is_eq[T, String]():
-            return self.fast_join(rebind[List[String]](elems))
-        elif _type_is_eq[T, StringLiteral]():
-            return self.fast_join(rebind[List[StringLiteral]](elems))
-        # FIXME(#3597): once StringSlice conforms to CollectionElement trait:
-        # if _type_is_eq[T, StringSlice]():
-        # return self.fast_join(rebind[List[StringSlice]](elems))
-        else:
-            var result: String = ""
-            var is_first = True
-
-            for e in elems:
-                if is_first:
-                    is_first = False
-                else:
-                    result += self
-                result += str(e[])
-
-            return result
-
-    fn fast_join[
-        T: BytesCollectionElement, //,
+    fn join[
+        T: StringableCollectionElement, //
     ](self, elems: List[T, *_]) -> String:
         """Joins string elements using the current string as a delimiter.
 
@@ -1489,37 +1442,7 @@ struct String(
         Returns:
             The joined string.
         """
-        var n_elems = len(elems)
-        if n_elems == 0:
-            return String("")
-        var len_self = self.byte_length()
-        var len_elems = 0
-        # Calculate the total size of the elements to join beforehand
-        # to prevent alloc syscalls as we know the buffer size.
-        # This can hugely improve the performance on large lists
-        for e_ref in elems:
-            len_elems += len(e_ref[].as_bytes())
-        var capacity = len_self * (n_elems - 1) + len_elems
-        var buf = Self._buffer_type(capacity=capacity)
-        var self_ptr = self.unsafe_ptr()
-        var ptr = buf.unsafe_ptr()
-        var offset = 0
-        var i = 0
-        var is_first = True
-        while i < n_elems:
-            if is_first:
-                is_first = False
-            else:
-                memcpy(dest=ptr + offset, src=self_ptr, count=len_self)
-                offset += len_self
-            var e = elems[i].as_bytes()
-            var e_len = len(e)
-            memcpy(dest=ptr + offset, src=e.unsafe_ptr(), count=e_len)
-            offset += e_len
-            i += 1
-        buf.size = capacity
-        buf.append(0)
-        return String(buf^)
+        return self.as_string_slice().join(elems)
 
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
@@ -1540,8 +1463,13 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes[
+        mutate: Bool = False
+    ](ref self) -> Span[Byte, _lit_mut_cast[__origin_of(self), mutate].result]:
         """Returns a contiguous slice of the bytes owned by this string.
+
+        Parameters:
+            mutate: Whether the result will be mutable.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
@@ -1549,22 +1477,38 @@ struct String(
         Notes:
             This does not include the trailing null terminator.
         """
+        return self.as_bytes[mutate, __origin_of(self)]()
 
-        # Does NOT include the NUL terminator.
-        return Span[Byte, __origin_of(self)](
-            ptr=self._buffer.unsafe_ptr(), length=self.byte_length()
+    @always_inline
+    fn as_bytes[
+        is_mutable: Bool, //, mutate: Bool, origin: Origin[is_mutable].type
+    ](ref [_]self) -> Span[Byte, _lit_mut_cast[origin, mutate].result]:
+        """Returns a contiguous slice of bytes.
+
+        Parameters:
+            is_mutable: Whether the origin is mutable.
+            mutate: Whether the result will be mutable.
+            origin: The origin of the data.
+
+        Returns:
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        return Span[Byte, _lit_mut_cast[origin, mutate].result](
+            ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline
-    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(
+        ref self,
+    ) -> StringSlice[_lit_mut_cast[__origin_of(self), False].result]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        # FIXME(MSTDL-160):
-        #   Enforce UTF-8 encoding in String so this is actually
-        #   guaranteed to be valid.
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline

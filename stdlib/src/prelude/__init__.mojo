@@ -91,7 +91,7 @@ from builtin.value import (
     Defaultable,
     CollectionElement,
     CollectionElementNew,
-    BytesCollectionElement,
+    AsBytesCollectionElement,
     StringableCollectionElement,
     EqualityComparableCollectionElement,
     ComparableCollectionElement,
