@@ -178,6 +178,7 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     """The reference to the dictionary."""
 
     @always_inline
+    @implicit
     fn __init__(out self, values: VariadicListMem[Attr, _]):
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
@@ -305,6 +306,7 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Self.type):
         self.value = value
 
@@ -313,6 +315,7 @@ struct _ObjectImpl(
         self.value = Self.type(_NoneMarker {})
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Bool):
         self.value = Self.type(value)
 
@@ -325,18 +328,22 @@ struct _ObjectImpl(
             self.value = Self.type(value)
 
     @always_inline
+    @implicit
     fn __init__(out self, value: _ImmutableString):
         self.value = Self.type(value)
 
     @always_inline
+    @implicit
     fn __init__(out self, value: _RefCountedListRef):
         self.value = Self.type(value)
 
     @always_inline
+    @implicit
     fn __init__(out self, value: _Function):
         self.value = Self.type(value)
 
     @always_inline
+    @implicit
     fn __init__(out self, value: _RefCountedAttrsDictRef):
         self.value = Self.type(value)
 
@@ -725,6 +732,7 @@ struct object(
         self._value = _ObjectImpl()
 
     @always_inline
+    @implicit
     fn __init__(out self, impl: _ObjectImpl):
         """Initializes the object with an implementation value. This is meant for
         internal use only.
@@ -735,6 +743,7 @@ struct object(
         self._value = impl
 
     @always_inline
+    @implicit
     fn __init__(out self, none: NoneType):
         """Initializes a none value object from a `None` literal.
 
@@ -743,7 +752,20 @@ struct object(
         """
         self._value = _ObjectImpl()
 
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @doc_private
     @always_inline
+    @implicit
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        """Initializes a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = NoneType()
+
+    @always_inline
+    @implicit
     fn __init__(out self, value: Int):
         """Initializes the object with an integer value.
 
@@ -753,6 +775,7 @@ struct object(
         self._value = Int64(value)
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Float64):
         """Initializes the object with an floating-point value.
 
@@ -781,6 +804,7 @@ struct object(
             self._value = value
 
     @always_inline
+    @implicit
     fn __init__(out self, value: Bool):
         """Initializes the object from a bool.
 
@@ -790,6 +814,7 @@ struct object(
         self._value = value
 
     @always_inline
+    @implicit
     fn __init__(out self, value: StringLiteral):
         """Initializes the object from a string literal.
 
@@ -799,6 +824,7 @@ struct object(
         self = object(StringRef(value))
 
     @always_inline
+    @implicit
     fn __init__(out self, value: StringRef):
         """Initializes the object from a string reference.
 
@@ -850,6 +876,7 @@ struct object(
                 ]()
 
     @always_inline
+    @implicit
     fn __init__(out self, func: Self.nullary_function):
         """Initializes an object from a function that takes no arguments.
 
@@ -859,6 +886,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
+    @implicit
     fn __init__(out self, func: Self.unary_function):
         """Initializes an object from a function that takes one argument.
 
@@ -868,6 +896,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
+    @implicit
     fn __init__(out self, func: Self.binary_function):
         """Initializes an object from a function that takes two arguments.
 
@@ -877,6 +906,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
+    @implicit
     fn __init__(out self, func: Self.ternary_function):
         """Initializes an object from a function that takes three arguments.
 
@@ -886,6 +916,7 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
+    @implicit
     fn __init__(out self, *attrs: Attr):
         """Initializes the object with a sequence of zero or more attributes.
 

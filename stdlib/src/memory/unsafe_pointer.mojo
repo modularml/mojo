@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof, is_nvidia_gpu
+from sys import alignof, sizeof, is_nvidia_gpu, is_gpu
 from sys.intrinsics import (
     _mlirtype_is_eq,
     _type_is_eq,
@@ -40,7 +40,7 @@ from memory.memory import _free, _malloc
 
 @always_inline
 fn _default_alignment[type: AnyType]() -> Int:
-    return alignof[type]() if is_nvidia_gpu() else 1
+    return alignof[type]() if is_gpu() else 1
 
 
 @always_inline
@@ -104,6 +104,7 @@ struct UnsafePointer[
 
     @doc_private
     @always_inline
+    @implicit
     fn __init__(out self, value: Self._mlir_type):
         """Create a pointer with the input value.
 
@@ -113,6 +114,7 @@ struct UnsafePointer[
         self.address = value
 
     @always_inline
+    @implicit
     fn __init__(out self, other: UnsafePointer[type, address_space, *_, **_]):
         """Exclusivity parameter cast a pointer.
 
@@ -842,7 +844,7 @@ struct UnsafePointer[
         type: DType, //,
         *,
         width: Int = 1,
-        alignment: Int = alignof[SIMD[type, width]]() if is_nvidia_gpu() else 1,
+        alignment: Int = _default_alignment[type, width](),
     ](
         self: UnsafePointer[Scalar[type], *_, **_],
         offset: SIMD[_, width],
@@ -976,30 +978,6 @@ struct UnsafePointer[
                 T, address_space, alignment=alignment
             ]._mlir_type,
         ](self.address)
-
-    @always_inline("nodebug")
-    fn bitcast[
-        T: DType,
-        /,
-        address_space: AddressSpace = Self.address_space,
-        alignment: Int = Self.alignment,
-        origin: Origin[True].type = Self.origin,
-    ](self) -> UnsafePointer[Scalar[T], address_space, alignment, origin]:
-        """Bitcasts a UnsafePointer to a different type.
-
-        Parameters:
-            T: The target type.
-            address_space: The address space of the result.
-            alignment: Alignment of the destination pointer.
-            origin: Origin of the destination pointer.
-
-        Returns:
-            A new UnsafePointer object with the specified type and the same address,
-            as the original UnsafePointer.
-        """
-        return self.bitcast[
-            Scalar[T], address_space=address_space, alignment=alignment
-        ]()
 
     @always_inline
     fn destroy_pointee(

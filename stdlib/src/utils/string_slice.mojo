@@ -243,6 +243,7 @@ struct _StringSliceIter[
 
 
 @value
+@register_passable("trivial")
 struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
     Stringlike
 ):
@@ -264,6 +265,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
     # ===------------------------------------------------------------------===#
 
     @always_inline
+    @implicit
     fn __init__(out self: StaticString, lit: StringLiteral):
         """Construct a new `StringSlice` from a `StringLiteral`.
 
@@ -295,7 +297,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
             `unsafe_from_utf8` MUST be valid UTF-8 encoded data.
         """
 
-        self._slice = unsafe_from_utf8^
+        self._slice = unsafe_from_utf8
 
     fn __init__(out self, *, unsafe_from_utf8_strref: StringRef):
         """Construct a new StringSlice from a `StringRef` pointing to UTF-8
@@ -345,6 +347,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         """
         self._slice = other._slice
 
+    @implicit
     fn __init__[
         O: ImmutableOrigin, //
     ](inout self: StringSlice[O], ref [O]value: String):
@@ -561,7 +564,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         buf.append(0)
         return String(buf^)
 
-    fn __contains__(ref [_]self, substr: StringSlice[_]) -> Bool:
+    fn __contains__(ref self, substr: StringSlice[_]) -> Bool:
         """Returns True if the substring is contained within the current string.
 
         Args:
@@ -720,7 +723,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         """
         if end == -1:
             return self.find(prefix, start) == start
-        return StringSlice[__origin_of(self)](
+        return StringSlice[origin](
             ptr=self.unsafe_ptr() + start, length=end - start
         ).startswith(prefix)
 
@@ -742,7 +745,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
             return False
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
-        return StringSlice[__origin_of(self)](
+        return StringSlice[origin](
             ptr=self.unsafe_ptr() + start, length=end - start
         ).endswith(suffix)
 
@@ -812,7 +815,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(ref [_]self, substr: StringSlice, start: Int = 0) -> Int:
+    fn find(ref self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
 
@@ -1128,7 +1131,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
 
             str_len = eol_start - offset + int(keepends) * eol_length
             s = StringSlice[O](ptr=ptr + offset, length=str_len)
-            output.append(s^)
+            output.append(s)
             offset = eol_start + eol_length
 
         return output^
@@ -1175,7 +1178,7 @@ trait Stringlike(
 
 
 fn _to_string_list[
-    T: CollectionElement, //,
+    T: CollectionElement,  # TODO(MOCO-1446): Make `T` parameter inferred
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
@@ -1217,7 +1220,7 @@ fn _to_string_list[
     fn len_fn(v: StringSlice[O]) -> Int:
         return v.byte_length()
 
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
 
 
 @always_inline
@@ -1242,7 +1245,7 @@ fn _to_string_list[
     fn len_fn(v: Span[Byte, O]) -> Int:
         return len(v)
 
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
 
 
 # ===----------------------------------------------------------------------===#
@@ -1315,19 +1318,19 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         self.format_spec = format_spec
 
     @always_inline
-    fn is_escaped_brace(ref [_]self) -> Bool:
+    fn is_escaped_brace(ref self) -> Bool:
         return self.field.isa[Bool]()
 
     @always_inline
-    fn is_kwargs_field(ref [_]self) -> Bool:
+    fn is_kwargs_field(ref self) -> Bool:
         return self.field.isa[String]()
 
     @always_inline
-    fn is_automatic_indexing(ref [_]self) -> Bool:
+    fn is_automatic_indexing(ref self) -> Bool:
         return self.field.isa[NoneType]()
 
     @always_inline
-    fn is_manual_indexing(ref [_]self) -> Bool:
+    fn is_manual_indexing(ref self) -> Bool:
         return self.field.isa[Int]()
 
     @staticmethod
@@ -1485,7 +1488,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 conversion_flag not in Self.supported_conversion_flags
             ):
                 var f = String(_build_slice(field_ptr, new_idx, field_len))
-                _ = field^
+                _ = field
                 raise Error('Conversion flag "' + f + '" not recognised.')
             self.conversion_flag = conversion_flag
             field = _build_slice(field_ptr, 0, exclamation_index)

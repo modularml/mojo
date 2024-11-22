@@ -279,6 +279,7 @@ struct PrefetchLocality:
     """Extremely local locality (keep in cache)."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Constructs a prefetch locality option.
 
@@ -301,6 +302,7 @@ struct PrefetchRW:
     """Write prefetch."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Constructs a prefetch read-write option.
 
@@ -324,6 +326,7 @@ struct PrefetchCache:
     """The data prefetching option."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Constructs a prefetch option.
 

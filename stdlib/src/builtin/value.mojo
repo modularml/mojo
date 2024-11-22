@@ -66,6 +66,7 @@ trait Copyable:
     struct Foo(Copyable):
         var s: String
 
+        @implicit
         fn __init__(out self, s: String):
             self.s = s
 
@@ -117,9 +118,11 @@ trait ExplicitlyCopyable:
     struct Foo(ExplicitlyCopyable):
         var s: String
 
+        @implicit
         fn __init__(out self, s: String):
             self.s = s
 
+        @implicit
         fn __init__(out self, copy: Self):
             print("explicitly copying value")
             self.s = copy.s

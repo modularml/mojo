@@ -42,17 +42,18 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @value
 @register_passable("trivial")
 struct StringRef(
-    Sized,
-    IntableRaising,
+    AsBytes,
+    Boolable,
     CollectionElement,
     CollectionElementNew,
+    Comparable,
+    Hashable,
+    IntableRaising,
+    Representable,
+    Sized,
     Stringable,
     Writable,
-    Hashable,
     _HashableWithHasher,
-    Boolable,
-    Comparable,
-    AsBytes,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -85,6 +86,7 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
+    @implicit
     fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
@@ -127,6 +129,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
+    @implicit
     fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
@@ -215,9 +218,7 @@ struct StringRef(
 
     fn as_bytes[
         mutate: Bool = False
-    ](ref [_]self) -> Span[
-        Byte, _lit_mut_cast[__origin_of(self), mutate].result
-    ]:
+    ](ref self) -> Span[Byte, _lit_mut_cast[__origin_of(self), mutate].result]:
         """Returns a contiguous Span of the bytes owned by this string.
 
         Parameters:
@@ -424,6 +425,15 @@ struct StringRef(
             A new string.
         """
         return String.write(self)
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Convert the string reference to a string.
+
+        Returns:
+            The String representation of the StringRef.
+        """
+        return String.write("StringRef(", repr(str(self)), ")")
 
     @no_inline
     fn write_to[W: Writer](self, inout writer: W):
