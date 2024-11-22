@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
-from sys.ffi import c_char, OpaquePointer
+from sys.ffi import c_char
 from utils import StaticString, write_args
 
 from bit import count_leading_zeros
@@ -45,6 +45,13 @@ from utils.string_slice import (
     _FormatCurlyEntry,
     _CurlyEntryFormattable,
     _to_string_list,
+)
+
+from utils._unicode import (
+    is_lowercase,
+    is_uppercase,
+    to_lowercase,
+    to_uppercase,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -86,7 +93,7 @@ fn ord(s: StringSlice) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s.unsafe_ptr().bitcast[UInt8]()
+    var p = s.unsafe_ptr()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(s.byte_length() == 1, "input string length must be 1")
@@ -146,7 +153,7 @@ fn chr(c: Int) -> String:
     #     p.free()
     #     return chr(0xFFFD)
     p[num_bytes] = 0
-    return String(ptr=p, len=num_bytes + 1)
+    return String(ptr=p, length=num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -734,7 +741,8 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, owned impl: List[UInt8, *_]):
+    @implicit
+    fn __init__(out self, owned impl: List[UInt8, *_]):
         """Construct a string from a buffer of bytes.
 
         The buffer must be terminated with a null byte:
@@ -756,17 +764,30 @@ struct String(
         )
         # We make a backup because steal_data() will clear size and capacity.
         var size = impl.size
+        debug_assert(
+            impl[size - 1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
         var capacity = impl.capacity
         self._buffer = Self._buffer_type(
-            unsafe_pointer=impl.steal_data(), size=size, capacity=capacity
+            ptr=impl.steal_data(), length=size, capacity=capacity
         )
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
 
-    fn __init__(inout self, *, other: Self):
+    @always_inline
+    fn __init__(out self, *, capacity: Int):
+        """Construct an uninitialized string with the given capacity.
+
+        Args:
+            capacity: The capacity of the string.
+        """
+        self._buffer = Self._buffer_type(capacity=capacity)
+
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -774,7 +795,8 @@ struct String(
         """
         self.__copyinit__(other)
 
-    fn __init__(inout self, str: StringRef):
+    @implicit
+    fn __init__(out self, str: StringRef):
         """Construct a string from a StringRef object.
 
         Args:
@@ -787,7 +809,8 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
-    fn __init__(inout self, str_slice: StringSlice):
+    @implicit
+    fn __init__(out self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
         This will allocate a new string that copies the string contents from
@@ -810,7 +833,8 @@ struct String(
         self = Self(buffer^)
 
     @always_inline
-    fn __init__(inout self, literal: StringLiteral):
+    @implicit
+    fn __init__(out self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
@@ -819,7 +843,7 @@ struct String(
         self = literal.__str__()
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
+    fn __init__(out self, *, ptr: UnsafePointer[Byte], length: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -827,29 +851,24 @@ struct String(
 
         Args:
             ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
+            length: The length of the buffer, including the null terminator.
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(
-            Self._buffer_type(
-                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
-            )
-        )
+        self = Self(Self._buffer_type(ptr=ptr, length=length, capacity=length))
 
     # ===------------------------------------------------------------------=== #
     # Factory dunders
     # ===------------------------------------------------------------------=== #
 
     fn write_bytes(inout self, bytes: Span[Byte, _]):
-        """
-        Write a byte span to this String.
+        """Write a byte span to this String.
 
         Args:
             bytes: The byte span to write to this String. Must NOT be
-              null terminated.
+                null terminated.
         """
-        self._iadd[True](bytes)
+        self._iadd[False](bytes)
 
     fn write[*Ts: Writable](inout self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
@@ -957,7 +976,7 @@ struct String(
             buff: The buffer. This should have an existing terminator.
         """
 
-        return String(buff, len(StringRef(ptr=buff)) + 1)
+        return String(ptr=buff, length=len(StringRef(ptr=buff)) + 1)
 
     @staticmethod
     fn _from_bytes(owned buff: Self._buffer_type) -> String:
@@ -1118,9 +1137,9 @@ struct String(
         var rhs_ptr = rhs.unsafe_ptr()
         alias S = StringSlice[ImmutableAnyOrigin]
         if lhs_len == 0:
-            return String(S(unsafe_from_utf8_ptr=rhs_ptr, len=rhs_len))
+            return String(S(ptr=rhs_ptr, length=rhs_len))
         elif rhs_len == 0:
-            return String(S(unsafe_from_utf8_ptr=lhs_ptr, len=lhs_len))
+            return String(S(ptr=lhs_ptr, length=lhs_len))
         var sum_len = lhs_len + rhs_len
         var buffer = Self._buffer_type(capacity=sum_len + 1)
         var ptr = buffer.unsafe_ptr()
@@ -1211,7 +1230,7 @@ struct String(
         var o_ptr = other.unsafe_ptr()
         if s_len == 0:
             alias S = StringSlice[ImmutableAnyOrigin]
-            self = String(S(unsafe_from_utf8_ptr=o_ptr, len=o_len))
+            self = String(S(ptr=o_ptr, length=o_len))
             return
         elif o_len == 0:
             return
@@ -1521,7 +1540,7 @@ struct String(
         return self.unsafe_ptr().bitcast[c_char]()
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
@@ -1533,11 +1552,11 @@ struct String(
 
         # Does NOT include the NUL terminator.
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
+            ptr=self._buffer.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1977,46 +1996,29 @@ struct String(
         return String(res^)
 
     fn lower(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters
+        """Returns a copy of the string with all cased characters
         converted to lowercase.
 
         Returns:
             A new string where cased letters have been converted to lowercase.
         """
 
-        # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ascii_uppercase]()
+        # TODO: the _unicode module does not support locale sensitive conversions yet.
+        return to_lowercase(self)
 
     fn upper(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters
+        """Returns a copy of the string with all cased characters
         converted to uppercase.
 
         Returns:
             A new string where cased letters have been converted to uppercase.
         """
 
-        # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ascii_lowercase]()
-
-    fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
-        var copy: String = self
-
-        var char_ptr = copy.unsafe_ptr()
-
-        for i in range(self.byte_length()):
-            var char: UInt8 = char_ptr[i]
-            if check_case(char):
-                var lower = _toggle_ascii_case(char)
-                char_ptr[i] = lower
-
-        return copy
+        # TODO: the _unicode module does not support locale sensitive conversions yet.
+        return to_uppercase(self)
 
     fn startswith(
-        ref [_]self, prefix: String, start: Int = 0, end: Int = -1
+        ref self, prefix: String, start: Int = 0, end: Int = -1
     ) -> Bool:
         """Checks if the string starts with the specified prefix between start
         and end positions. Returns True if found and False otherwise.
@@ -2031,12 +2033,12 @@ struct String(
         """
         if end == -1:
             return StringSlice[__origin_of(self)](
-                unsafe_from_utf8_ptr=self.unsafe_ptr() + start,
-                len=self.byte_length() - start,
+                ptr=self.unsafe_ptr() + start,
+                length=self.byte_length() - start,
             ).startswith(prefix.as_string_slice())
 
         return StringSlice[__origin_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+            ptr=self.unsafe_ptr() + start, length=end - start
         ).startswith(prefix.as_string_slice())
 
     fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
@@ -2053,12 +2055,12 @@ struct String(
         """
         if end == -1:
             return StringSlice[__origin_of(self)](
-                unsafe_from_utf8_ptr=self.unsafe_ptr() + start,
-                len=self.byte_length() - start,
+                ptr=self.unsafe_ptr() + start,
+                length=self.byte_length() - start,
             ).endswith(suffix.as_string_slice())
 
         return StringSlice[__origin_of(self)](
-            unsafe_from_utf8_ptr=self.unsafe_ptr() + start, len=end - start
+            ptr=self.unsafe_ptr() + start, length=end - start
         ).endswith(suffix.as_string_slice())
 
     fn removeprefix(self, prefix: String, /) -> String:
@@ -2136,19 +2138,7 @@ struct String(
         Returns:
             The string concatenated `n` times.
         """
-        if n <= 0:
-            return ""
-        var len_self = self.byte_length()
-        var count = len_self * n + 1
-        var buf = Self._buffer_type(capacity=count)
-        buf.resize(count, 0)
-        for i in range(n):
-            memcpy(
-                dest=buf.data + len_self * i,
-                src=self.unsafe_ptr(),
-                count=len_self,
-            )
-        return String(buf^)
+        return self.as_string_slice() * n
 
     @always_inline
     fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
@@ -2192,44 +2182,25 @@ struct String(
                 return False
         return True
 
-    fn _isupper_islower[*, upper: Bool](self) -> Bool:
-        fn is_ascii_cased(c: UInt8) -> Bool:
-            return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
-
-        for c in self:
-            debug_assert(c.byte_length() == 1, "only implemented for ASCII")
-            if is_ascii_cased(ord(c)):
-
-                @parameter
-                if upper:
-                    return self == self.upper()
-                else:
-                    return self == self.lower()
-        return False
-
     fn isupper(self) -> Bool:
         """Returns True if all cased characters in the string are uppercase and
         there is at least one cased character.
-
-        Note that this currently only works with ASCII strings.
 
         Returns:
             True if all cased characters in the string are uppercase and there
             is at least one cased character, False otherwise.
         """
-        return self._isupper_islower[upper=True]()
+        return len(self) > 0 and is_uppercase(self)
 
     fn islower(self) -> Bool:
         """Returns True if all cased characters in the string are lowercase and
         there is at least one cased character.
 
-        Note that this currently only works with ASCII strings.
-
         Returns:
             True if all cased characters in the string are lowercase and there
             is at least one cased character, False otherwise.
         """
-        return self._isupper_islower[upper=False]()
+        return len(self) > 0 and is_lowercase(self)
 
     fn isprintable(self) -> Bool:
         """Returns True if all characters in the string are ASCII printable.
@@ -2295,6 +2266,18 @@ struct String(
         memcpy(buffer.unsafe_ptr().offset(start), self.unsafe_ptr(), len(self))
         var result = String(buffer)
         return result^
+
+    fn reserve(inout self, new_capacity: Int):
+        """Reserves the requested capacity.
+
+        Args:
+            new_capacity: The new capacity.
+
+        Notes:
+            If the current capacity is greater or equal, this is a no-op.
+            Otherwise, the storage is reallocated and the data is moved.
+        """
+        self._buffer.reserve(new_capacity)
 
 
 # ===----------------------------------------------------------------------=== #

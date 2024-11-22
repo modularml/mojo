@@ -32,7 +32,7 @@ from utils import StringRef, Variant
 struct _NoneMarker(CollectionElementNew):
     """This is a trivial class to indicate that an object is `None`."""
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         pass
 
 
@@ -50,12 +50,12 @@ struct _ImmutableString(CollectionElement, CollectionElementNew):
     """The length of the string."""
 
     @always_inline
-    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn __init__(out self, data: UnsafePointer[UInt8], length: Int):
         self.data = data
         self.length = length
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
     @always_inline
@@ -78,7 +78,7 @@ struct _RefCountedList:
     var impl: Arc[List[_ObjectImpl]]
     """The list value."""
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
 
 
@@ -89,13 +89,13 @@ struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     """The reference to the list."""
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         self.lst = ptr.bitcast[NoneType]()
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.lst = other.lst
 
     @always_inline
@@ -118,7 +118,7 @@ struct _RefCountedAttrsDict:
     var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
     """The implementation of the map."""
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
             Dict[StringLiteral, _ObjectImpl]()
         )
@@ -159,7 +159,7 @@ struct Attr:
     """The value of the attribute."""
 
     @always_inline
-    fn __init__(inout self, key: StringLiteral, owned value: object):
+    fn __init__(out self, key: StringLiteral, owned value: object):
         """Initializes the attribute with a key and value.
 
         Args:
@@ -178,7 +178,8 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _]):
+    @implicit
+    fn __init__(out self, values: VariadicListMem[Attr, _]):
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
@@ -188,7 +189,7 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
         self.attrs = ptr.bitcast[Int8]()
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
     @always_inline
@@ -216,7 +217,7 @@ struct _Function(CollectionElement, CollectionElementNew):
         self.value = f
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.value = other.value
 
     alias fn0 = fn () raises -> object
@@ -305,15 +306,17 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, value: Self.type):
+    @implicit
+    fn __init__(out self, value: Self.type):
         self.value = value
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         self.value = Self.type(_NoneMarker {})
 
     @always_inline
-    fn __init__(inout self, value: Bool):
+    @implicit
+    fn __init__(out self, value: Bool):
         self.value = Self.type(value)
 
     @always_inline
@@ -325,23 +328,27 @@ struct _ObjectImpl(
             self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _ImmutableString):
+    @implicit
+    fn __init__(out self, value: _ImmutableString):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _RefCountedListRef):
+    @implicit
+    fn __init__(out self, value: _RefCountedListRef):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _Function):
+    @implicit
+    fn __init__(out self, value: _Function):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _RefCountedAttrsDictRef):
+    @implicit
+    fn __init__(out self, value: _RefCountedAttrsDictRef):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -350,11 +357,11 @@ struct _ObjectImpl(
         self = other.value
 
     @always_inline
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self = existing.value
 
     @always_inline
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         self = other.value^
 
     @always_inline
@@ -720,12 +727,13 @@ struct object(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initializes the object with a `None` value."""
         self._value = _ObjectImpl()
 
     @always_inline
-    fn __init__(inout self, impl: _ObjectImpl):
+    @implicit
+    fn __init__(out self, impl: _ObjectImpl):
         """Initializes the object with an implementation value. This is meant for
         internal use only.
 
@@ -735,7 +743,8 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__(inout self, none: NoneType):
+    @implicit
+    fn __init__(out self, none: NoneType):
         """Initializes a none value object from a `None` literal.
 
         Args:
@@ -743,8 +752,21 @@ struct object(
         """
         self._value = _ObjectImpl()
 
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @doc_private
     @always_inline
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        """Initializes a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = NoneType()
+
+    @always_inline
+    @implicit
+    fn __init__(out self, value: Int):
         """Initializes the object with an integer value.
 
         Args:
@@ -753,7 +775,8 @@ struct object(
         self._value = Int64(value)
 
     @always_inline
-    fn __init__(inout self, value: Float64):
+    @implicit
+    fn __init__(out self, value: Float64):
         """Initializes the object with an floating-point value.
 
         Args:
@@ -781,7 +804,8 @@ struct object(
             self._value = value
 
     @always_inline
-    fn __init__(inout self, value: Bool):
+    @implicit
+    fn __init__(out self, value: Bool):
         """Initializes the object from a bool.
 
         Args:
@@ -790,7 +814,8 @@ struct object(
         self._value = value
 
     @always_inline
-    fn __init__(inout self, value: StringLiteral):
+    @implicit
+    fn __init__(out self, value: StringLiteral):
         """Initializes the object from a string literal.
 
         Args:
@@ -799,7 +824,8 @@ struct object(
         self = object(StringRef(value))
 
     @always_inline
-    fn __init__(inout self, value: StringRef):
+    @implicit
+    fn __init__(out self, value: StringRef):
         """Initializes the object from a string reference.
 
         Args:
@@ -850,7 +876,8 @@ struct object(
                 ]()
 
     @always_inline
-    fn __init__(inout self, func: Self.nullary_function):
+    @implicit
+    fn __init__(out self, func: Self.nullary_function):
         """Initializes an object from a function that takes no arguments.
 
         Args:
@@ -859,7 +886,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.unary_function):
+    @implicit
+    fn __init__(out self, func: Self.unary_function):
         """Initializes an object from a function that takes one argument.
 
         Args:
@@ -868,7 +896,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.binary_function):
+    @implicit
+    fn __init__(out self, func: Self.binary_function):
         """Initializes an object from a function that takes two arguments.
 
         Args:
@@ -877,7 +906,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.ternary_function):
+    @implicit
+    fn __init__(out self, func: Self.ternary_function):
         """Initializes an object from a function that takes three arguments.
 
         Args:
@@ -886,7 +916,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, *attrs: Attr):
+    @implicit
+    fn __init__(out self, *attrs: Attr):
         """Initializes the object with a sequence of zero or more attributes.
 
         Args:
@@ -895,7 +926,7 @@ struct object(
         self._value = _RefCountedAttrsDictRef(attrs)
 
     @always_inline
-    fn __moveinit__(inout self, owned existing: object):
+    fn __moveinit__(out self, owned existing: object):
         """Move the value of an object.
 
         Args:
@@ -905,7 +936,7 @@ struct object(
         existing._value = _ObjectImpl()
 
     @always_inline
-    fn __copyinit__(inout self, existing: object):
+    fn __copyinit__(out self, existing: object):
         """Copies the object. This clones the underlying string value and
         increases the refcount of lists or dictionaries.
 

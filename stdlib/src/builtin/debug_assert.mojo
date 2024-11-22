@@ -17,12 +17,12 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_defined, triple_is_nvidia_cuda
+from sys import is_nvidia_gpu, llvm_intrinsic
 from sys._build import is_debug_build
 from sys.param_env import env_get_string
 from sys.ffi import external_call, c_uint, c_size_t, c_char
-from sys.info import sizeof
 from memory import UnsafePointer
+from utils.write import _WriteBufferHeap, _WriteBufferStack, write_args
 
 
 from builtin._location import __call_location, _SourceLocation
@@ -44,71 +44,12 @@ fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
     ]()
 
     @parameter
-    if defined_mode == "none" or (triple_is_nvidia_cuda() and cpu_only):
+    if defined_mode == "none" or (is_nvidia_gpu() and cpu_only):
         return False
     elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
         return True
     else:
         return defined_mode == assert_mode
-
-
-@always_inline
-fn debug_assert[
-    assert_mode: StringLiteral = "none", cpu_only: Bool = False
-](cond: Bool, message: StringLiteral):
-    """Asserts that the condition is true.
-
-    Parameters:
-        assert_mode: Determines when the assert is turned on.
-        cpu_only: If true, only run the assert on CPU.
-
-    Args:
-        cond: The function to invoke to check if the assertion holds.
-        message: A StringLiteral to print on failure.
-
-
-    Pass in a condition and single StringLiteral to stop execution and
-    show an error on failure:
-
-    ```mojo
-    x = 0
-    debug_assert(x > 0, "x is not more than 0")
-    ```
-
-    By default it's a no-op, you can change the assertion level for example:
-
-    ```sh
-    mojo -D ASSERT=all main.mojo
-    ```
-
-    Assertion modes:
-
-    - none: turn off all assertions for performance at the cost of safety.
-    - warn: print any errors instead of aborting.
-    - safe: standard safety checks that are on even in release builds.
-    - all: turn on all assertions.
-
-    You can set the `assert_mode` to `safe` so the assertion runs even in
-    release builds:
-
-    ```mojo
-    debug_assert[assert_mode="safe"](
-        x > 0, "expected x to be more than 0 but got: ", x
-    )
-    ```
-
-    To ensure that you have no runtime penality from your assertion in release
-    builds, make sure there are no side effects in your message and condition.
-
-    On GPU this will also show the the block and thread idx's on failure.
-    .
-    """
-
-    @parameter
-    if _assert_enabled[assert_mode, cpu_only]():
-        if cond:
-            return
-        _debug_assert_msg_literal(message, __call_location())
 
 
 @always_inline
@@ -187,7 +128,6 @@ fn debug_assert[
     ```mojo
     debug_assert[check_name, cpu_only=True]("unexpected name")
     ```
-    .
     """
 
     @parameter
@@ -271,7 +211,6 @@ fn debug_assert[
     ```mojo
     debug_assert[check_name, cpu_only=True]("unexpected name")
     ```
-    .
     """
 
     @parameter
@@ -294,53 +233,84 @@ fn _debug_assert_msg(
     abort's implementation could use debug_assert)
     """
 
-    @parameter
-    if triple_is_nvidia_cuda():
-        external_call["__assertfail", NoneType](
-            "debug_assert message must be a single StringLiteral on GPU"
-            .unsafe_cstr_ptr(),
-            loc.file_name.unsafe_cstr_ptr(),
-            c_uint(loc.line),
-            # TODO(MSTDL-962) pass through the funciton name here
-            "kernel".unsafe_cstr_ptr(),
-            c_size_t(sizeof[Int8]()),
-        )
+    var stdout = sys.stdout
 
-    else:
-        message = String.write(messages)
+    @parameter
+    if is_nvidia_gpu():
+        var buffer = _WriteBufferHeap[4096](stdout)
+        buffer.write("At ", loc, ": ")
+        _write_gpu_thread_context(buffer)
 
         @parameter
         if defined_mode == "warn":
-            print(loc.prefix("Assert Warning: " + message))
+            buffer.write(" Assert Warning: ")
         else:
-            abort(loc.prefix("Assert Error: " + message))
+            buffer.write(" Assert Error: ")
 
+        write_args(buffer, messages, end="\n")
+        buffer.flush()
 
-@no_inline
-fn _debug_assert_msg_literal(message: StringLiteral, loc: _SourceLocation):
-    """Aborts with (or prints) the given message and location.
+        @parameter
+        if defined_mode != "warn":
+            abort()
 
-    This function is intentionally marked as no_inline to reduce binary size.
-
-    Note that it's important that this function doesn't get inlined; otherwise,
-    an indirect recursion of @always_inline functions is possible (e.g. because
-    abort's implementation could use debug_assert)
-    """
-
-    @parameter
-    if triple_is_nvidia_cuda():
-        external_call["__assertfail", NoneType](
-            message.unsafe_cstr_ptr(),
-            loc.file_name.unsafe_cstr_ptr(),
-            c_uint(loc.line),
-            # TODO(MSTDL-962) pass through the funciton name here
-            "kernel".unsafe_cstr_ptr(),
-            c_size_t(sizeof[Int8]()),
-        )
     else:
+        var buffer = _WriteBufferStack[4096](stdout)
+        buffer.write("At ", loc, ": ")
 
         @parameter
         if defined_mode == "warn":
-            print(loc.prefix(str("Assert Warning: ") + message))
+            buffer.write(" Assert Warning: ")
         else:
-            abort(loc.prefix(str("Assert Error: ") + message))
+            buffer.write(" Assert Error: ")
+
+        write_args(buffer, messages, end="\n")
+        buffer.flush()
+
+        @parameter
+        if defined_mode != "warn":
+            abort()
+
+
+# Can't import gpu module at this stage in compilation for thread/block idx
+fn _write_gpu_thread_context[W: Writer](inout writer: W):
+    writer.write("block: [")
+    _write_id["block", "x"](writer)
+    writer.write(",")
+    _write_id["block", "y"](writer)
+    writer.write(",")
+    _write_id["block", "z"](writer)
+    writer.write("] thread: [")
+    _write_id["thread", "x"](writer)
+    writer.write(",")
+    _write_id["thread", "y"](writer)
+    writer.write(",")
+    _write_id["thread", "z"](writer)
+    writer.write("]")
+
+
+fn _write_id[
+    W: Writer, //, type: StringLiteral, dim: StringLiteral
+](inout writer: W):
+    alias intrinsic_name = _get_intrinsic_name[type, dim]()
+    writer.write(llvm_intrinsic[intrinsic_name, Int32, has_side_effect=False]())
+
+
+fn _get_intrinsic_name[
+    type: StringLiteral, dim: StringLiteral
+]() -> StringLiteral:
+    @parameter
+    if is_nvidia_gpu():
+
+        @parameter
+        if type == "thread":
+            return "llvm.nvvm.read.ptx.sreg.tid." + dim
+        else:
+            return "llvm.nvvm.read.ptx.sreg.ctaid." + dim
+    else:
+
+        @parameter
+        if type == "thread":
+            return "llvm.amdgcn.workitem.id." + dim
+        else:
+            return "llvm.amdgcn.workgroup.id." + dim

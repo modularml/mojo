@@ -100,7 +100,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """This constructor creates an empty InlineList."""
         self._array = InlineArray[
             UnsafeMaybeUninitialized[ElementType], capacity
@@ -109,7 +109,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
-    fn __init__(inout self, *values: ElementType):
+    @implicit
+    fn __init__(out self, *values: ElementType):
         """Constructs a list from the given values.
 
         Args:
@@ -132,7 +133,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     @always_inline
     fn __getitem__(
-        ref [_]self: Self, owned idx: Int
+        ref self, owned idx: Int
     ) -> ref [self._array] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
@@ -174,7 +175,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         return len(self) > 0
 
     fn __iter__(
-        ref [_]self: Self,
+        ref self,
     ) -> _InlineListIter[ElementType, capacity, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
@@ -185,7 +186,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     fn __contains__[
         C: EqualityComparableCollectionElement, //
-    ](self: Self, value: C) -> Bool:
+    ](self, value: C) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -215,9 +216,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn count[
-        C: EqualityComparableCollectionElement, //
-    ](self: Self, value: C) -> Int:
+    fn count[C: EqualityComparableCollectionElement, //](self, value: C) -> Int:
         """Counts the number of occurrences of a value in the list.
 
         ```mojo

@@ -80,11 +80,12 @@ struct Path(
     var path: String
     """The underlying path string representation."""
 
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         """Initializes a path with the current directory."""
         self = cwd()
 
-    fn __init__(inout self, path: String):
+    @implicit
+    fn __init__(out self, path: String):
         """Initializes a path with the provided path.
 
         Args:
@@ -92,7 +93,7 @@ struct Path(
         """
         self.path = path
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:

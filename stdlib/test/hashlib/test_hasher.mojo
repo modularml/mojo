@@ -25,7 +25,7 @@ from utils import StringRef
 struct DummyHasher(_Hasher):
     var _dummy_value: UInt64
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self._dummy_value = 0
 
     fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):

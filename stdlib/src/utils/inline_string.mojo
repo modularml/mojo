@@ -19,7 +19,6 @@ from collections import InlineArray
 from os import abort
 from collections import Optional
 from sys import sizeof
-from sys.ffi import OpaquePointer
 
 from memory import UnsafePointer, memcpy
 
@@ -53,12 +52,13 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a new empty string."""
         var fixed = _FixedString[Self.SMALL_CAP]()
         self._storage = Self.Layout(fixed^)
 
-    fn __init__(inout self, literal: StringLiteral):
+    @implicit
+    fn __init__(out self, literal: StringLiteral):
         """Constructs a InlineString value given a string literal.
 
         Args:
@@ -82,7 +82,8 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             var heap = String(literal)
             self._storage = Self.Layout(heap^)
 
-    fn __init__(inout self, owned heap_string: String):
+    @implicit
+    fn __init__(out self, owned heap_string: String):
         """Construct a new small string by taking ownership of an existing
         heap-allocated String.
 
@@ -91,7 +92,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self._storage = Self.Layout(heap_string^)
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -268,7 +269,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -281,7 +282,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -292,9 +293,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
 
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=len(self),
+            ptr=self.unsafe_ptr(), length=len(self)
         )
 
 
@@ -330,12 +329,12 @@ struct _FixedString[CAP: Int](
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a new empty string."""
         self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -343,7 +342,7 @@ struct _FixedString[CAP: Int](
         """
         self = other
 
-    fn __init__(inout self, literal: StringLiteral) raises:
+    fn __init__(out self, literal: StringLiteral) raises:
         """Constructs a FixedString value given a string literal.
 
         Args:
@@ -508,7 +507,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -521,7 +520,7 @@ struct _FixedString[CAP: Int](
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -532,7 +531,5 @@ struct _FixedString[CAP: Int](
         """
 
         return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=self.size,
+            ptr=self.unsafe_ptr(), length=self.size
         )

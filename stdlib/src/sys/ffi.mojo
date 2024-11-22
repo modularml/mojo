@@ -22,6 +22,10 @@ from .intrinsics import _mlirtype_is_eq
 
 from sys._libc import dlerror, dlopen, dlclose, dlsym
 
+# ===-----------------------------------------------------------------------===#
+# Primitive C type aliases
+# ===-----------------------------------------------------------------------===#
+
 alias c_char = Int8
 """C `char` type."""
 
@@ -85,6 +89,11 @@ fn _c_long_long_dtype() -> DType:
         return abort[DType]()
 
 
+# ===-----------------------------------------------------------------------===#
+# Dynamic Library Loading
+# ===-----------------------------------------------------------------------===#
+
+
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
 
@@ -117,7 +126,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn __init__(inout self, path: String, flags: Int = DEFAULT_RTLD):
+    fn __init__(out self, path: String, flags: Int = DEFAULT_RTLD):
         """Initialize a DLHandle object by loading the dynamic library at the
         given path.
 
@@ -136,7 +145,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         else:
             self.handle = OpaquePointer()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -358,29 +367,6 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         return self.get_function[fn (__type_of(v)) -> return_type](name)(v)
 
 
-# ===----------------------------------------------------------------------===#
-# Library Load
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _get_global[
-    name: StringLiteral,
-    init_fn: fn (OpaquePointer) -> OpaquePointer,
-    destroy_fn: fn (OpaquePointer) -> None,
-](payload: OpaquePointer = OpaquePointer()) -> OpaquePointer:
-    return external_call["KGEN_CompilerRT_GetGlobalOrCreate", OpaquePointer](
-        StringRef(name), payload, init_fn, destroy_fn
-    )
-
-
-@always_inline
-fn _get_global_or_null[name: StringLiteral]() -> OpaquePointer:
-    return external_call["KGEN_CompilerRT_GetGlobalOrNull", OpaquePointer](
-        name.unsafe_ptr(), name.byte_length()
-    )
-
-
 @always_inline
 fn _get_dylib[
     name: StringLiteral,
@@ -416,6 +402,64 @@ fn _get_dylib_function[
     )
 
     return new_func
+
+
+# ===----------------------------------------------------------------------===#
+# Globals
+# ===----------------------------------------------------------------------===#
+
+
+struct _Global[
+    name: StringLiteral,
+    storage_type: Movable,
+    init_fn: fn () -> storage_type,
+]:
+    @staticmethod
+    fn _init_wrapper(payload: OpaquePointer) -> OpaquePointer:
+        # Struct-based globals don't get to take arguments to their initializer.
+        debug_assert(not payload)
+
+        # Heap allocate space to store this "global"
+        var ptr = UnsafePointer[storage_type].alloc(1)
+
+        # TODO:
+        #   Any way to avoid the move, e.g. by calling this function
+        #   with the ABI destination result pointer already set to `ptr`?
+        ptr.init_pointee_move(init_fn())
+
+        return ptr.bitcast[NoneType]()
+
+    @staticmethod
+    fn _deinit_wrapper(self_: OpaquePointer):
+        var ptr: UnsafePointer[storage_type] = self_.bitcast[storage_type]()
+
+        # Deinitialize and deallocate the global
+        ptr.destroy_pointee()
+        ptr.free()
+
+    @staticmethod
+    fn get_or_create_ptr() -> UnsafePointer[storage_type]:
+        return _get_global[
+            name, Self._init_wrapper, Self._deinit_wrapper
+        ]().bitcast[storage_type]()
+
+
+@always_inline
+fn _get_global[
+    name: StringLiteral,
+    init_fn: fn (OpaquePointer) -> OpaquePointer,
+    destroy_fn: fn (OpaquePointer) -> None,
+](payload: OpaquePointer = OpaquePointer()) -> OpaquePointer:
+    return external_call["KGEN_CompilerRT_GetGlobalOrCreate", OpaquePointer](
+        StringRef(name), payload, init_fn, destroy_fn
+    )
+
+
+@always_inline
+fn _get_global_or_null[name: StringLiteral]() -> OpaquePointer:
+    return external_call["KGEN_CompilerRT_GetGlobalOrNull", OpaquePointer](
+        name.unsafe_ptr(), name.byte_length()
+    )
 
 
 # ===----------------------------------------------------------------------===#

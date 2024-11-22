@@ -25,8 +25,8 @@ f.close()
 """
 from utils import Span
 from builtin.io import _printf
-from sys.ffi import external_call, OpaquePointer
-from sys.info import triple_is_nvidia_cuda
+from sys.ffi import external_call
+from sys.info import is_nvidia_gpu
 from memory import UnsafePointer
 
 
@@ -38,7 +38,8 @@ struct FileDescriptor(Writer):
     var value: Int
     """The underlying value of the file descriptor."""
 
-    fn __init__(inout self, value: Int = 1):
+    @implicit
+    fn __init__(out self, value: Int = 1):
         """Constructs the file descriptor from an integer.
 
         Args:
@@ -46,7 +47,8 @@ struct FileDescriptor(Writer):
         """
         self.value = value
 
-    fn __init__(inout self, f: FileHandle):
+    @implicit
+    fn __init__(out self, f: FileHandle):
         """Constructs the file descriptor from a file handle.
 
         Args:
@@ -65,7 +67,7 @@ struct FileDescriptor(Writer):
         var len_bytes = len(bytes)
 
         @parameter
-        if triple_is_nvidia_cuda():
+        if is_nvidia_gpu():
             _printf["%*s"](len_bytes, bytes.unsafe_ptr())
         else:
             written = external_call["write", Int32](
