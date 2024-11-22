@@ -17,6 +17,7 @@ from python import Python, PythonObject
 from testing import assert_equal, assert_false, assert_raises, assert_true
 from collections import Dict
 
+
 def test_contains_dunder(inout python: Python):
     with assert_raises(contains="'int' object is not iterable"):
         var z = PythonObject(0)
@@ -41,7 +42,7 @@ def test_contains_dunder(inout python: Python):
     assert_false("C" in x)
     assert_true("B" in x)
 
-    #tests with python modules:
+    # tests with python modules:
     module = python.import_module(
         "module_for_test_python_object_dunder_contains"
     )
@@ -51,10 +52,10 @@ def test_contains_dunder(inout python: Python):
 
     x = module.Class_no_iterable_no_contains()
     with assert_raises(
-        contains = "'Class_no_iterable_no_contains' object is not iterable"
+        contains="'Class_no_iterable_no_contains' object is not iterable"
     ):
         _ = 123 in x
-    
+
     x = module.Class_iterable_no_contains()
     assert_true(123 in x)
     assert_true(456 in x)

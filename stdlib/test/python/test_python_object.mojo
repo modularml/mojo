@@ -574,6 +574,7 @@ fn test_py_slice() raises:
     with assert_raises(contains="list index out of range"):
         _ = with_2d[0:1][4]
 
+
 def test_contains_dunder():
     with assert_raises(contains="'int' object is not iterable"):
         var z = PythonObject(0)
