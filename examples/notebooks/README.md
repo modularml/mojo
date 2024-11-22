@@ -6,7 +6,7 @@ like Python.
 This page explains how to get started with Mojo notebooks, and this repo
 directory contains notebooks that demonstrate some of Mojo's features
 (most of which we originally published on the [Mojo
-Playground](https://playground.modular.com/)).
+Playground](https://docs.modular.com/mojo/playground)).
 
 If you're not familiar with Jupyter notebooks, they're files that allow you to
 create documents with live code, equations, visualizations, and explanatory
