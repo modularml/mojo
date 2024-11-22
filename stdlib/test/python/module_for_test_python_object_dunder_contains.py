@@ -8,7 +8,7 @@ class Class_no_iterable_but_contains:
 
 class Class_iterable_no_contains:
     def __init__(self):
-        self.data = [123]
+        self.data = [123, 456]
     
     def __iter__(self):
         self.i = 0

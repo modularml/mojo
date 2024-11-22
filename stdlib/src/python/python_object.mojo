@@ -1346,10 +1346,6 @@ struct PythonObject(
                 return True
         return False
 
-
-    fn _get_ptr_as_int(self) -> Int:
-        return self.py_object._get_ptr_as_int()
-
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules
     fn __call__(

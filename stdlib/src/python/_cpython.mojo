@@ -1350,6 +1350,7 @@ struct CPython:
             ", parent obj:",
             obj._get_ptr_as_int(),
         )
+        return r
 
     fn PyObject_HasAttrString(
         inout self,
