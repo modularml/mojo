@@ -32,8 +32,7 @@ from memory import UnsafePointer
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
-from sys import triple_is_nvidia_cuda, bitwidthof
-from sys.ffi import OpaquePointer
+from sys import is_nvidia_gpu, bitwidthof
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -308,11 +307,11 @@ struct Int(
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -322,7 +321,8 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.index):
+    @implicit
+    fn __init__(out self, value: __mlir_type.index):
         """Construct Int from the given index value.
 
         Args:
@@ -332,7 +332,8 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si16>`):
+    @implicit
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
 
         Args:
@@ -346,7 +347,8 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si32>`):
+    @implicit
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
 
         Args:
@@ -360,7 +362,8 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si64>`):
+    @implicit
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
 
         Args:
@@ -374,7 +377,8 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+    @implicit
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
 
         Args:
@@ -385,7 +389,8 @@ struct Int(
         )
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    @implicit
+    fn __init__(out self, value: IntLiteral):
         """Construct Int from the given IntLiteral value.
 
         Args:
@@ -394,6 +399,7 @@ struct Int(
         self = value.__int__()
 
     @always_inline("nodebug")
+    @implicit
     fn __init__[IndexerTy: Indexer](inout self, value: IndexerTy):
         """Construct Int from the given Indexer value.
 
@@ -406,7 +412,8 @@ struct Int(
         self = value.__index__()
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: UInt):
+    @implicit
+    fn __init__(out self, value: UInt):
         """Construct Int from the given UInt value.
 
         Args:
@@ -1137,6 +1144,19 @@ struct Int(
         """
 
         result = Python.py_long_as_ssize_t(obj)
+
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return -(self // -denominator)
 
     # ===-------------------------------------------------------------------===#
     # Methods

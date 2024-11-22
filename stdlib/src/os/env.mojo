@@ -19,7 +19,8 @@ from os import setenv
 ```
 """
 
-from sys import external_call, os_is_linux, os_is_macos
+from sys import external_call, os_is_linux, os_is_macos, os_is_windows
+from sys.ffi import c_int
 
 from memory import UnsafePointer
 from utils import StringRef
@@ -49,6 +50,22 @@ fn setenv(name: String, value: String, overwrite: Bool = True) -> Bool:
         name.unsafe_ptr(), value.unsafe_ptr(), Int32(1 if overwrite else 0)
     )
     return status == 0
+
+
+fn unsetenv(name: String) -> Bool:
+    """Unsets an environment variable.
+
+    Args:
+        name: The name of the environment variable.
+
+    Returns:
+        True if unsetting the variable succeeded. Otherwise, False is returned.
+    """
+    constrained[
+        not os_is_windows(), "operating system must be Linux or macOS"
+    ]()
+
+    return external_call["unsetenv", c_int](name.unsafe_ptr()) == 0
 
 
 fn getenv(name: String, default: String = "") -> String:

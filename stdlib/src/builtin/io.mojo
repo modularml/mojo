@@ -19,7 +19,7 @@ from sys import (
     bitwidthof,
     external_call,
     stdout,
-    triple_is_nvidia_cuda,
+    is_nvidia_gpu,
     _libc as libc,
 )
 from sys._libc import dup, fclose, fdopen, fflush
@@ -43,7 +43,8 @@ from utils import StringRef, StaticString, StringSlice
 struct _fdopen[mode: StringLiteral = "a"]:
     var handle: OpaquePointer
 
-    fn __init__(inout self, stream_id: FileDescriptor):
+    @implicit
+    fn __init__(out self, stream_id: FileDescriptor):
         """Creates a file handle to the stdout/stderr stream.
 
         Args:
@@ -163,7 +164,7 @@ fn _printf[
     var f = fmt.unsafe_ptr().bitcast[c_char]()
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         _ = external_call["vprintf", Int32](f, Pointer.address_of(loaded_pack))
     else:
         with _fdopen(file) as fd:
@@ -220,114 +221,6 @@ fn _snprintf[
     return int(num)
 
 
-@no_inline
-fn _snprintf_scalar[
-    type: DType,
-    float_format: StringLiteral = "%.17g",
-](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
-    @parameter
-    if type is DType.bool:
-        if x:
-            return _snprintf["True"](buffer, size)
-        else:
-            return _snprintf["False"](buffer, size)
-    elif type.is_integral():
-        return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
-    elif (
-        type is DType.float16 or type is DType.bfloat16 or type is DType.float32
-    ):
-        # We need to cast the value to float64 to print it.
-        return _float_repr[float_format](buffer, size, x.cast[DType.float64]())
-    elif type is DType.float64:
-        return _float_repr[float_format](buffer, size, rebind[Float64](x))
-    return 0
-
-
-# ===----------------------------------------------------------------------=== #
-#  Helper functions to print a single pop scalar without spacing or new line.
-# ===----------------------------------------------------------------------=== #
-
-
-@no_inline
-fn _float_repr[
-    fmt: StringLiteral = "%.17g"
-](buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
-    # Using `%.17g` with decimal check is equivalent to CPython's fallback path
-    # when its more complex dtoa library (forked from
-    # https://github.com/dtolnay/dtoa) is not available.
-    var n = _snprintf[fmt](buffer, size, x.value)
-    # If the buffer isn't big enough to add anything, then just return.
-    if n + 2 >= size:
-        return n
-    # Don't do anything fancy. Just insert ".0" if there is no decimal and this
-    # is not in exponent form.
-    var p = buffer
-    alias minus = ord("-")
-    alias dot = ord(".")
-    if p[] == minus:
-        p += 1
-    while p[] != 0 and isdigit(p[]):
-        p += 1
-    if p[]:
-        return n
-    p[] = dot
-    p += 1
-    p[] = ord("0")
-    p += 1
-    p[] = 0
-    return n + 2
-
-
-# ===----------------------------------------------------------------------=== #
-#  _put
-# ===----------------------------------------------------------------------=== #
-
-
-fn _put(strref: StringRef, file: FileDescriptor = stdout):
-    var str_slice = StringSlice[ImmutableAnyOrigin](
-        unsafe_from_utf8_strref=strref
-    )
-
-    _put(str_slice, file=file)
-
-
-@no_inline
-fn _put[
-    lif: ImmutableOrigin, //
-](x: StringSlice[lif], file: FileDescriptor = stdout):
-    # Avoid printing "(null)" for an empty/default constructed `String`
-    var str_len = x.byte_length()
-
-    if not str_len:
-        return
-
-    @parameter
-    if triple_is_nvidia_cuda():
-        # Note:
-        #   This assumes that the `StringSlice` that was passed in is NUL
-        #   terminated.
-        var tmp = 0
-        var arg_ptr = UnsafePointer.address_of(tmp)
-        _ = external_call["vprintf", Int32](
-            x.unsafe_ptr(), arg_ptr.bitcast[OpaquePointer]()
-        )
-    else:
-        alias MAX_STR_LEN = 0x1000_0000
-
-        # The string can be printed, so that's fine.
-        if str_len < MAX_STR_LEN:
-            _printf["%.*s"](x.byte_length(), x.unsafe_ptr(), file=file)
-            return
-
-        # The string is large, then we need to chunk it.
-        var p = x.unsafe_ptr()
-        while str_len:
-            var ll = min(str_len, MAX_STR_LEN)
-            _printf["%.*s"](ll, p, file=file)
-            str_len -= ll
-            p += ll
-
-
 # ===----------------------------------------------------------------------=== #
 #  print
 # ===----------------------------------------------------------------------=== #
@@ -356,14 +249,10 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
+    write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
 
-    # TODO: Implement a float formatter for GPU to enable buffering to global
-    # memory. PTX isn't able to call snprintf to format floats.
     @parameter
-    if triple_is_nvidia_cuda():
-        write_args(file, values, sep=sep, end=end)
-    else:
-        write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
+    if not is_nvidia_gpu():
         if flush:
             _flush(file=file)
 

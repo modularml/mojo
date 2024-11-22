@@ -41,17 +41,18 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @value
 @register_passable("trivial")
 struct StringRef(
-    Sized,
-    IntableRaising,
+    AsBytes,
+    Boolable,
     CollectionElement,
     CollectionElementNew,
+    Comparable,
+    Hashable,
+    IntableRaising,
+    Representable,
+    Sized,
     Stringable,
     Writable,
-    Hashable,
     _HashableWithHasher,
-    Boolable,
-    Comparable,
-    AsBytes,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -69,12 +70,12 @@ struct StringRef(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct a StringRef value with length zero."""
         self = StringRef(UnsafePointer[UInt8](), 0)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -84,7 +85,8 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
-    fn __init__(inout self, str: StringLiteral):
+    @implicit
+    fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
         Args:
@@ -93,7 +95,7 @@ struct StringRef(
         self = StringRef(str.unsafe_ptr(), len(str))
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[c_char], len: Int):
+    fn __init__(out self, ptr: UnsafePointer[c_char], len: Int):
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -112,7 +114,7 @@ struct StringRef(
         self.length = len
 
     @always_inline
-    fn __init__(inout self, *, ptr: UnsafePointer[UInt8]):
+    fn __init__(out self, *, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
@@ -126,7 +128,8 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[c_char]):
+    @implicit
+    fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `UnsafePointer[UInt8]` instead
@@ -212,15 +215,13 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
         """
-        return Span[Byte, __origin_of(self)](
-            unsafe_ptr=self.data, len=self.length
-        )
+        return Span[Byte, __origin_of(self)](ptr=self.data, length=self.length)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -399,6 +400,15 @@ struct StringRef(
         return String.write(self)
 
     @no_inline
+    fn __repr__(self) -> String:
+        """Convert the string reference to a string.
+
+        Returns:
+            The String representation of the StringRef.
+        """
+        return String.write("StringRef(", repr(str(self)), ")")
+
+    @no_inline
     fn write_to[W: Writer](self, inout writer: W):
         """
         Formats this StringRef to the provided Writer.
@@ -413,7 +423,7 @@ struct StringRef(
         #   Safe because our use of this Span does not outlive `self`.
         writer.write_bytes(
             Span[Byte, ImmutableAnyOrigin](
-                unsafe_ptr=self.unsafe_ptr(), len=len(self)
+                ptr=self.unsafe_ptr(), length=len(self)
             )
         )
 

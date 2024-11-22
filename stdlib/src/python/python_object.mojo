@@ -50,7 +50,7 @@ struct _PyIter(Sized):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy another iterator.
 
         Args:
@@ -60,7 +60,8 @@ struct _PyIter(Sized):
         self.preparedNextItem = existing.preparedNextItem
         self.isDone = existing.isDone
 
-    fn __init__(inout self, iter: PythonObject):
+    @implicit
+    fn __init__(out self, iter: PythonObject):
         """Initialize an iterator.
 
         Args:
@@ -76,7 +77,7 @@ struct _PyIter(Sized):
             self.preparedNextItem = PythonObject(maybeNextItem)
             self.isDone = False
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize an empty iterator."""
         self.iterator = PythonObject(PyObjectPtr())
         self.isDone = True
@@ -145,7 +146,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self, *, owned unsafe_unchecked_from: PythonObject):
+    fn __init__(out self, *, owned unsafe_unchecked_from: PythonObject):
         """Construct a TypedPythonObject without any validation that the given
         object is of the specified hinted type.
 
@@ -155,7 +156,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
         """
         self._obj = unsafe_unchecked_from^
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Copy an instance of this type.
 
         Args:
@@ -249,11 +250,11 @@ struct PythonObject(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize the object with a `None` value."""
         self.__init__(None)
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -261,7 +262,8 @@ struct PythonObject(
         """
         self = other
 
-    fn __init__(inout self, ptr: PyObjectPtr):
+    @implicit
+    fn __init__(out self, ptr: PyObjectPtr):
         """Initialize this object from an owned reference-counted Python object
         pointer.
 
@@ -308,7 +310,8 @@ struct PythonObject(
 
         return PythonObject(borrowed_ptr)
 
-    fn __init__(inout self, owned typed_obj: TypedPythonObject[_]):
+    @implicit
+    fn __init__(out self, owned typed_obj: TypedPythonObject[_]):
         """Construct a PythonObject from a typed object, dropping the type hint
         information.
 
@@ -330,7 +333,8 @@ struct PythonObject(
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
-    fn __init__(inout self, none: NoneType._mlir_type):
+    @implicit
+    fn __init__(out self, none: NoneType._mlir_type):
         """Initialize a none value object from a `None` literal.
 
         Args:
@@ -338,7 +342,8 @@ struct PythonObject(
         """
         self = Self(none=NoneType())
 
-    fn __init__(inout self, none: NoneType):
+    @implicit
+    fn __init__(out self, none: NoneType):
         """Initialize a none value object from a `None` literal.
 
         Args:
@@ -348,7 +353,8 @@ struct PythonObject(
         self.py_object = cpython.Py_None()
         cpython.Py_IncRef(self.py_object)
 
-    fn __init__(inout self, value: Bool):
+    @implicit
+    fn __init__(out self, value: Bool):
         """Initialize the object from a bool.
 
         Args:
@@ -357,7 +363,8 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyBool_FromLong(int(value))
 
-    fn __init__(inout self, integer: Int):
+    @implicit
+    fn __init__(out self, integer: Int):
         """Initialize the object with an integer value.
 
         Args:
@@ -366,6 +373,7 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyLong_FromSsize_t(integer)
 
+    @implicit
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         """Initialize the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
@@ -389,7 +397,8 @@ struct PythonObject(
             fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val)
 
-    fn __init__(inout self, value: StringLiteral):
+    @implicit
+    fn __init__(out self, value: StringLiteral):
         """Initialize the object from a string literal.
 
         Args:
@@ -397,7 +406,8 @@ struct PythonObject(
         """
         self = PythonObject(str(value))
 
-    fn __init__(inout self, strref: StringRef):
+    @implicit
+    fn __init__(out self, strref: StringRef):
         """Initialize the object from a string reference.
 
         Args:
@@ -406,7 +416,8 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyUnicode_DecodeUTF8(strref)
 
-    fn __init__(inout self, string: String):
+    @implicit
+    fn __init__(out self, string: String):
         """Initialize the object from a string.
 
         Args:
@@ -415,6 +426,7 @@ struct PythonObject(
         cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.PyUnicode_DecodeUTF8(string.as_string_slice())
 
+    @implicit
     fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
 
@@ -457,6 +469,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
+    @implicit
     fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
 
@@ -500,7 +513,8 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-    fn __init__(inout self, slice: Slice):
+    @implicit
+    fn __init__(out self, slice: Slice):
         """Initialize the object from a Mojo Slice.
 
         Args:
@@ -508,7 +522,8 @@ struct PythonObject(
         """
         self.py_object = _slice_to_py_object_ptr(slice)
 
-    fn __init__(inout self, value: Dict[Self, Self]):
+    @implicit
+    fn __init__(out self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
 
         Args:
@@ -521,7 +536,7 @@ struct PythonObject(
                 self.py_object, entry[].key.py_object, entry[].value.py_object
             )
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy the object.
 
         This increments the underlying refcount of the existing object.

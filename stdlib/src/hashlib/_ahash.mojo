@@ -61,14 +61,18 @@ fn _read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
     if length >= 2:
         if length >= 4:
             # len 4-8
-            var a = data.bitcast[DType.uint32]().load().cast[DType.uint64]()
-            var b = data.offset(length - 4).bitcast[DType.uint32]().load().cast[
+            var a = data.bitcast[Scalar[DType.uint32]]().load().cast[
                 DType.uint64
             ]()
+            var b = data.offset(length - 4).bitcast[
+                Scalar[DType.uint32]
+            ]().load().cast[DType.uint64]()
             return U128(a, b)
         else:
             # len 2-3
-            var a = data.bitcast[DType.uint16]().load().cast[DType.uint64]()
+            var a = data.bitcast[Scalar[DType.uint16]]().load().cast[
+                DType.uint64
+            ]()
             var b = data.offset(length - 1).load().cast[DType.uint64]()
             return U128(a, b)
     else:
@@ -93,7 +97,7 @@ struct AHasher[key: U256](_Hasher):
     var pad: UInt64
     var extra_keys: U128
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize the hasher."""
         alias pi_key = key ^ U256(
             0x243F_6A88_85A3_08D3,
@@ -136,19 +140,21 @@ struct AHasher[key: U256](_Hasher):
         if length > 8:
             if length > 16:
                 var tail = data.offset(length - 16).bitcast[
-                    DType.uint64
+                    Scalar[DType.uint64]
                 ]().load[width=2]()
                 self._large_update(tail)
                 var offset = 0
                 while length - offset > 16:
                     var block = data.offset(offset).bitcast[
-                        DType.uint64
+                        Scalar[DType.uint64]
                     ]().load[width=2]()
                     self._large_update(block)
                     offset += 16
             else:
-                var a = data.bitcast[DType.uint64]().load()
-                var b = data.offset(length - 8).bitcast[DType.uint64]().load()
+                var a = data.bitcast[Scalar[DType.uint64]]().load()
+                var b = data.offset(length - 8).bitcast[
+                    Scalar[DType.uint64]
+                ]().load()
                 self._large_update(U128(a, b))
         else:
             var value = _read_small(data, length)
