@@ -18,7 +18,7 @@ from testing import assert_equal, assert_false, assert_true
 
 
 fn test_atomic() raises:
-    var atom: Atomic[DType.index] = 3
+    var atom = Atomic[DType.index](3)
 
     assert_equal(atom.load(), 3)
 
@@ -68,7 +68,7 @@ fn test_atomic_floating_point() raises:
 
 
 def test_compare_exchange_weak():
-    var atom: Atomic[DType.int64] = 3
+    var atom = Atomic[DType.int64](3)
     var expected = Int64(3)
     var desired = Int64(3)
     var ok = atom.compare_exchange_weak(expected, desired)

@@ -228,6 +228,7 @@ struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
     var pos: Int
     var writer: W
 
+    @implicit
     fn __init__(out self, owned writer: W):
         self.data = UnsafePointer[
             UInt8,
@@ -275,6 +276,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
     var pos: Int
     var writer: W
 
+    @implicit
     fn __init__(out self, owned writer: W):
         self.data = InlineArray[UInt8, capacity](unsafe_uninitialized=True)
         self.pos = 0
@@ -361,6 +363,8 @@ fn write_buffered[
     ```
     .
     """
+
+    @parameter
     if is_nvidia_gpu():
         # Stack space is very small on GPU due to many threads, so use heap
         var buffer = _WriteBufferHeap[buffer_size](writer^)

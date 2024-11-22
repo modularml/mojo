@@ -70,6 +70,7 @@ struct StringLiteral(
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Self.type):
         """Create a string literal from a builtin string type.
 
@@ -196,6 +197,30 @@ struct StringLiteral(
             True if they are not equal.
         """
         return StringRef(self) != StringRef(rhs)
+
+    @always_inline("nodebug")
+    fn __eq__(self, rhs: StringSlice) -> Bool:
+        """Compare two string literals for equality.
+
+        Args:
+            rhs: The string to compare.
+
+        Returns:
+            True if they are equal.
+        """
+        return not (self != rhs)
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: StringSlice) -> Bool:
+        """Compare two string literals for inequality.
+
+        Args:
+            rhs: The string to compare.
+
+        Returns:
+            True if they are not equal.
+        """
+        return self.as_string_slice() != rhs
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: StringLiteral) -> Bool:
@@ -364,7 +389,7 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantOrigin]:
+    fn __iter__(ref self) -> _StringSliceIter[StaticConstantOrigin]:
         """Return an iterator over the string literal.
 
         Returns:
@@ -469,7 +494,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:

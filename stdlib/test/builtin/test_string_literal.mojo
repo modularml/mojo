@@ -66,6 +66,15 @@ def test_equality():
     assert_true(StringLiteral.__ne__("five", "six"))
     assert_false(StringLiteral.__ne__("six", "six"))
 
+    var hello = str("hello")
+    var hello_ref = hello.as_string_slice()
+
+    assert_false(StringLiteral.__eq__("goodbye", hello))
+    assert_true(StringLiteral.__eq__("hello", hello))
+
+    assert_false(StringLiteral.__eq__("goodbye", hello_ref))
+    assert_true(StringLiteral.__eq__("hello", hello_ref))
+
 
 def test_len():
     assert_equal(0, StringLiteral.__len__(""))

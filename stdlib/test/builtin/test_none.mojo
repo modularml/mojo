@@ -37,9 +37,17 @@ def test_format_to():
 struct FromNone:
     var value: Int
 
+    @implicit
     fn __init__(out self, none: NoneType):
         self.value = -1
 
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @always_inline
+    @implicit
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        self = NoneType()
+
+    @implicit
     fn __init__(out self, value: Int):
         self.value = value
 

@@ -260,6 +260,7 @@ struct PythonVersion:
     var patch: Int
     """The patch version number."""
 
+    @implicit
     fn __init__(out self, version: StringRef):
         """Initialize a PythonVersion object from a version string.
 
@@ -645,6 +646,7 @@ struct PyModuleDef(Stringable, Representable, Writable):
     alias _free_fn_type = fn (OpaquePointer) -> OpaquePointer
     var free_fn: Self._free_fn_type
 
+    @implicit
     fn __init__(out self, name: String):
         self.base = PyModuleDef_Base()
         self.name = c_char_ptr(name)
@@ -1174,6 +1176,13 @@ struct CPython:
         https://docs.python.org/3/c-api/type.html#c.PyType_FromSpec).
         """
         return self.lib.call["PyType_FromSpec", PyObjectPtr](spec)
+
+    fn PyType_GenericAlloc(
+        inout self,
+        type: UnsafePointer[PyTypeObject],
+        nitems: Py_ssize_t,
+    ) -> PyObjectPtr:
+        return self.lib.call["PyType_GenericAlloc", PyObjectPtr](type, nitems)
 
     # ===-------------------------------------------------------------------===#
     # Python Evaluation
