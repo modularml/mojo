@@ -28,7 +28,7 @@ from collections.string import (
 )
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
-from memory import UnsafePointer
+from memory import memcpy, UnsafePointer
 
 from utils import Span, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -1247,9 +1247,10 @@ struct Int(
         var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
         var list = List[Byte](capacity=type_len)
 
-        @parameter
-        for i in range(type_len):
-            list.append(byte_ptr[i])
+        # TODO: Maybe this can be a List.extend(ptr, count) method
+        memcpy(list.unsafe_ptr(), byte_ptr, type_len)
+        list.size = type_len
+
         return list^
 
     @always_inline("nodebug")
