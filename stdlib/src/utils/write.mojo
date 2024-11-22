@@ -18,7 +18,6 @@ from utils import Span, StaticString
 from sys.info import is_gpu
 from builtin.io import _printf
 
-
 # ===----------------------------------------------------------------------===#
 
 
@@ -223,25 +222,18 @@ trait MovableWriter(Movable, Writer):
     ...
 
 
-struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
+struct _WriteBufferHeap(Writer):
     var data: UnsafePointer[UInt8]
     var pos: Int
-    var writer: W
 
-    @implicit
-    fn __init__(out self, owned writer: W):
+    fn __init__(out self, size: Int):
         self.data = UnsafePointer[
-            UInt8,
-            address_space = AddressSpace.GENERIC,
-        ].alloc(capacity)
+            UInt8, address_space = AddressSpace.GENERIC
+        ].alloc(size)
         self.pos = 0
-        self.writer = writer^
 
-    fn flush(inout self):
-        self.writer.write_bytes(
-            Span[Byte, ImmutableAnyOrigin](ptr=self.data, length=self.pos)
-        )
-        self.pos = 0
+    fn __del__(owned self):
+        self.data.free()
 
     @always_inline
     fn write_bytes(inout self, bytes: Span[UInt8, _]):
@@ -249,19 +241,27 @@ struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
         # If empty then return
         if len_bytes == 0:
             return
-        # If span is too large to fit in buffer, write directly and return
-        if len_bytes > capacity:
-            self.flush()
-            self.writer.write_bytes(bytes)
-            return
-        # If buffer would overflow, flush writer and reset pos to 0.
-        if self.pos + len_bytes > capacity:
-            self.flush()
-        ptr = bytes.unsafe_ptr()
-        # Continue writing to buffer
+        var ptr = bytes.unsafe_ptr()
         for i in range(len_bytes):
             self.data[i + self.pos] = ptr[i]
         self.pos += len_bytes
+
+    fn write[*Ts: Writable](inout self, *args: *Ts):
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+
+struct _ArgBytes(Writer):
+    var size: Int
+
+    fn __init__(out self):
+        self.size = 0
+
+    fn write_bytes(inout self, bytes: Span[UInt8, _]):
+        self.size += len(bytes)
 
     fn write[*Ts: Writable](inout self, *args: *Ts):
         @parameter
@@ -367,9 +367,16 @@ fn write_buffered[
     @parameter
     if is_gpu():
         # Stack space is very small on GPU due to many threads, so use heap
-        var buffer = _WriteBufferHeap[buffer_size](writer^)
+        # Count the total length of bytes to allocate only once
+        var arg_bytes = _ArgBytes()
+        write_args(arg_bytes, args, sep=sep, end=end)
+
+        var buffer = _WriteBufferHeap(arg_bytes.size + 1)
         write_args(buffer, args, sep=sep, end=end)
-        buffer.flush()
+        buffer.data[buffer.pos] = 0
+        writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](ptr=buffer.data, length=buffer.pos)
+        )
     else:
         var buffer = _WriteBufferStack[buffer_size](writer^)
         write_args(buffer, args, sep=sep, end=end)
