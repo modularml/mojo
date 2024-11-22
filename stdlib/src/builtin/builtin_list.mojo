@@ -634,29 +634,30 @@ struct VariadicPack[
     # C Pack Utilities
     # ===-------------------------------------------------------------------===#
 
-    # This is the element_types list lowered to `variadic<type>` type for kgen.
     alias _kgen_element_types = rebind[
         __mlir_type.`!kgen.variadic<!kgen.type>`
     ](Self.element_types)
-
-    # Use variadic_ptr_map to construct the type list of the !kgen.pack that the
-    # !lit.ref.pack will lower to.  It exposes the pointers introduced by the
-    # references.
+    """This is the element_types list lowered to `variadic<type>` type for kgen.
+    """
     alias _variadic_pointer_types = __mlir_attr[
         `#kgen.param.expr<variadic_ptr_map, `,
         Self._kgen_element_types,
         `, 0: index>: !kgen.variadic<!kgen.type>`,
     ]
-
-    # This is the !kgen.pack type with pointer elements.
+    """Use variadic_ptr_map to construct the type list of the !kgen.pack that
+    the !lit.ref.pack will lower to.  It exposes the pointers introduced by the
+    references.
+    """
     alias _kgen_pack_with_pointer_type = __mlir_type[
         `!kgen.pack<:variadic<type> `, Self._variadic_pointer_types, `>`
     ]
+    """This is the !kgen.pack type with pointer elements."""
 
-    # This rebinds `in_pack` to the equivalent `!kgen.pack` with kgen pointers.
     @doc_private
     @always_inline("nodebug")
     fn get_as_kgen_pack(self) -> Self._kgen_pack_with_pointer_type:
+        """This rebinds `in_pack` to the equivalent `!kgen.pack` with kgen
+        pointers."""
         return rebind[Self._kgen_pack_with_pointer_type](self._value)
 
     alias _variadic_with_pointers_removed = __mlir_attr[
@@ -664,15 +665,16 @@ struct VariadicPack[
         Self._variadic_pointer_types,
         `>: !kgen.variadic<!kgen.type>`,
     ]
-
-    # This is the `!kgen.pack` type that happens if one loads all the elements
-    # of the pack.
     alias _loaded_kgen_pack_type = __mlir_type[
         `!kgen.pack<:variadic<type> `, Self._variadic_with_pointers_removed, `>`
     ]
+    """This is the `!kgen.pack` type that happens if one loads all the elements
+    of the pack.
+    """
 
-    # This returns the stored KGEN pack after loading all of the elements.
     @doc_private
     @always_inline("nodebug")
     fn get_loaded_kgen_pack(self) -> Self._loaded_kgen_pack_type:
+        """This returns the stored KGEN pack after loading all of the elements.
+        """
         return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
