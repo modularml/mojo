@@ -39,7 +39,7 @@ from python._bindings import Typed_initproc, PyMojoObject, Pythonable
 
 from memory import UnsafePointer
 
-from utils import StringSlice
+from utils import StringSlice, StringRef
 
 
 # ===-----------------------------------------------------------------------===#
@@ -291,13 +291,8 @@ struct PythonVersion:
 
 fn _py_get_version(lib: DLHandle) -> StringSlice[ImmutableAnyOrigin]:
     var ptr = lib.call["Py_GetVersion", UnsafePointer[c_char]]()
-    var length = 0
-    for i in range(50):
-        if ptr[i] == 0:
-            length = i
-            break
     return StringSlice[ImmutableAnyOrigin](
-        ptr=ptr.bitcast[Byte](), length=length
+        unsafe_from_utf8_strref=StringRef(ptr=ptr)
     )
 
 
@@ -784,13 +779,8 @@ struct CPython:
         var ptr = external_call[
             "KGEN_CompilerRT_Python_SetPythonPath", UnsafePointer[c_char]
         ]()
-        var length = 0
-        for i in range(1_000):
-            if ptr[i] == 0:
-                length = i
-                break
         self.init_error = StringSlice[ImmutableAnyOrigin](
-            ptr=ptr.bitcast[Byte](), length=length
+            unsafe_from_utf8_strref=StringRef(ptr=ptr)
         )
 
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
