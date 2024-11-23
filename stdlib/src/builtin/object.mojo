@@ -19,7 +19,7 @@ from collections import Dict, List
 from sys.intrinsics import _type_is_eq
 from sys.ffi import OpaquePointer
 
-from memory import Arc, memcmp, memcpy, UnsafePointer
+from memory import ArcPointer, memcmp, memcpy, UnsafePointer
 
 from utils import StringRef, Variant
 
@@ -75,11 +75,11 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    var impl: Arc[List[_ObjectImpl]]
+    var impl: ArcPointer[List[_ObjectImpl]]
     """The list value."""
 
     fn __init__(out self):
-        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
+        self.impl = ArcPointer[List[_ObjectImpl]](List[_ObjectImpl]())
 
 
 @register_passable("trivial")
@@ -115,11 +115,11 @@ struct _RefCountedAttrsDict:
     directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
-    var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
+    var impl: ArcPointer[Dict[StringLiteral, _ObjectImpl]]
     """The implementation of the map."""
 
     fn __init__(out self):
-        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
+        self.impl = ArcPointer[Dict[StringLiteral, _ObjectImpl]](
             Dict[StringLiteral, _ObjectImpl]()
         )
 
@@ -653,7 +653,7 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
+    fn get_list_ptr(self) -> ArcPointer[List[_ObjectImpl]]:
         return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
 
     @always_inline

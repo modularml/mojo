@@ -23,11 +23,9 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
-
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
     _StringSliceIter,
-    _FormatCurlyEntry,
-    _CurlyEntryFormattable,
     _to_string_list,
 )
 
@@ -599,6 +597,50 @@ struct StringLiteral(
         """
         return str(self).join(elems)
 
+    fn join(self, *elems: Int) -> String:
+        """Joins the elements from the tuple using the current string literal as a
+        delimiter.
+
+        Args:
+            elems: The input tuple.
+
+        Returns:
+            The joined string.
+        """
+        if len(elems) == 0:
+            return ""
+        var curr = str(elems[0])
+        for i in range(1, len(elems)):
+            curr += self + str(elems[i])
+        return curr
+
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            Types: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        var result: String = ""
+        var is_first = True
+
+        @parameter
+        fn add_elt[T: Stringable](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(a)
+
+        elems.each[add_elt]()
+        return result
+
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.
 
@@ -858,3 +900,11 @@ struct StringLiteral(
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
+
+
+fn _to_string_literal(i: Int) -> StringLiteral:
+    return __mlir_op.`pop.string.create`(i)
+
+
+fn _to_string_literal(i: SIMD) -> StringLiteral:
+    return __mlir_op.`pop.string.create`(i)
