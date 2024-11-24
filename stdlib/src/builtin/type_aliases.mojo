@@ -44,6 +44,7 @@ alias OriginSet = __mlir_type.`!lit.origin.set`
 
 # Helper to build a value of !lit.origin type.
 # TODO: Should be a parametric alias.
+@value
 struct Origin[is_mutable: Bool]:
     """This represents a origin reference of potentially parametric type.
     TODO: This should be replaced with a parametric type alias.
@@ -57,3 +58,26 @@ struct Origin[is_mutable: Bool]:
         is_mutable.value,
         `>`,
     ]
+
+    # ===-------------------------------------------------------------------===#
+    # Fields
+    # ===-------------------------------------------------------------------===#
+
+    var _mlir_origin: Self.type
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    # NOTE:
+    #   Needs to be @implicit convertible for the time being so that
+    #   `__origin_of(..)` can implicilty convert to `Origin` in use cases like:
+    #       Span[Byte, __origin_of(self)]
+    @implicit
+    @always_inline("nodebug")
+    fn __init__(out self, mlir_origin: Self.type):
+        """Initialize an Origin from a raw MLIR `!lit.origin` value.
+
+        Args:
+            mlir_origin: The raw MLIR origin value."""
+        self._mlir_origin = mlir_origin
