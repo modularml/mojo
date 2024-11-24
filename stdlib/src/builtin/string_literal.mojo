@@ -925,9 +925,12 @@ struct StringLiteral(
         return str(self).lstrip()
 
 
-fn _to_string_literal(i: Int) -> StringLiteral:
-    return __mlir_op.`pop.string.create`(i)
+fn _to_string_literal[val: Int]() -> StringLiteral:
+    alias s = StringLiteral.from_string[str(val)]()
+    return s
 
 
-fn _to_string_literal(i: SIMD) -> StringLiteral:
-    return __mlir_op.`pop.string.create`(i)
+fn _to_string_literal[val: SIMD]() -> StringLiteral:
+    constrained[val.type.is_integral(), "input type must be integral"]()
+    alias s = StringLiteral.from_string[str(val)]()
+    return s
