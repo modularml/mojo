@@ -640,7 +640,9 @@ struct StringLiteral(
                 not _type_is_eq[T, String]()
                 and not _type_is_eq[T, StringLiteral]()
             ):
+                # TODO: This is not working as unpacked arguments are not supported by compiler.
                 return self.slow_join(*elems)
+        # TODO: This is not working as unpacked arguments are not supported by compiler.
         return self.fast_join(*elems)
 
     fn slow_join[*Types: Stringable](self, *elems: *Types) -> String:
