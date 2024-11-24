@@ -274,6 +274,10 @@ what we publish.
   memory allocation and performance. These options allow for optimized memory usage
   and reduced buffer reallocations, providing flexibility based on application requirements.
 
+- A new `StringLiteral.from_string[someString]()` method is available.  It
+  allows forming a runtime-constant StringLiteral from a compile-time-dynamic
+  `String` value.
+
 ### 🦋 Changed
 
 - The argument convention for `__init__` methods has been changed from `inout`

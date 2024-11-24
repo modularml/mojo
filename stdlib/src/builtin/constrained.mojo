@@ -88,8 +88,4 @@ fn constrained[cond: Bool, msg: String]():
             "at least two cores are required"
         ]()
     """
-    __mlir_op.`kgen.param.assert.ex`[
-        cond = cond.__mlir_i1__(),
-        messageStart = msg.unsafe_ptr().address,
-        messageLength = msg.byte_length().value,
-    ]()
+    constrained[cond, StringLiteral.from_string[msg]()]()
