@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the memory package."""
 
-from .arc import Arc
+from .arc import ArcPointer
 from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
 from .owned_pointer import OwnedPointer
 from .pointer import AddressSpace, Pointer

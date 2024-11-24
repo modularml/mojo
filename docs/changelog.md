@@ -114,6 +114,18 @@ what we publish.
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
 
+- Introduce `random.shuffle` for `List`.
+  ([PR #3327](https://github.com/modularml/mojo/pull/3327) by [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  from random import shuffle
+
+  var l = List[Int](1, 2, 3, 4, 5)
+  shuffle(l)
+  ```
+  
 - The `Dict.__getitem__` method now returns a reference instead of a copy of
   the value (or raises).  This improves the performance of common code that
   uses `Dict` by allowing borrows from the `Dict` elements.
@@ -244,8 +256,10 @@ what we publish.
   of variables that are handled as synthetic types, e.g. `List` from Mojo or
   `std::vector` from C++.
 
-- Added `os.path.expandvars` to expand environment variables in a string.
-  ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
+- Expanded `os.path` with new functions (by [@thatstoasty](https://github.com/thatstoasty)):
+  - `os.path.expandvars`: Expands environment variables in a path ([PR #3735](https://github.com/modularml/mojo/pull/3735)).
+  - `os.path.splitroot`: Split a path into drive, root and tail.
+  ([PR #3780](https://github.com/modularml/mojo/pull/3780)).
 
 - Added a `reserve` method and new constructor to the `String` struct to
   allocate additional capacity.
@@ -254,7 +268,7 @@ what we publish.
 - Introduced a new `Deque` (double-ended queue) collection type, based on a
   dynamically resizing circular buffer for efficient O(1) additions and removals
   at both ends as well as O(1) direct access to all elements.
-  
+
   The `Deque` supports the full Python `collections.deque` API, ensuring that all
   expected deque operations perform as in Python.
 
@@ -517,6 +531,8 @@ what we publish.
           self.value = value
   ```
 
+- `Arc` has been renamed to `ArcPointer`, for consistency with `OwnedPointer`.
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -561,7 +577,7 @@ what we publish.
 - Error messages that include type names no longer include inferred or defaulted
   parameters when they aren't needed.  For example, previously Mojo complained
   about things like:
-  
+
   ```plaintext
   ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
   ```

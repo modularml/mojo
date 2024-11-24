@@ -33,7 +33,7 @@ from memory import memcpy, UnsafePointer
 from utils import Span, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
-from sys import is_big_endian, is_nvidia_gpu, bitwidthof
+from sys import is_big_endian, bitwidthof
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -242,21 +242,39 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 
 
 fn int(value: String, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
-
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+    If base is set to 0, the string is parsed as an Integer literal, with the
+    following considerations:
+    - '0b' or '0B' prefix indicates binary (base 2)
+    - '0o' or '0O' prefix indicates octal (base 8)
+    - '0x' or '0X' prefix indicates hexadecimal (base 16)
+    - Without a prefix, it's treated as decimal (base 10)
 
     Args:
         value: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
-        An integer value that represents the string, or otherwise raises.
+        An integer value that represents the string.
+
+    Raises:
+        If the given string cannot be parsed as an integer value or if an
+        incorrect base is provided.
+
+    Examples:
+        >>> int("32")
+        32
+        >>> int("FF", 16)
+        255
+        >>> int("0xFF", 0)
+        255
+        >>> int("0b1010", 0)
+        10
+
+    Notes:
+        This follows [Python's integer literals](
+        https://docs.python.org/3/reference/lexical_analysis.html#integers).
     """
     return atol(value, base)
 

@@ -1001,7 +1001,9 @@ fn get_accum_type[type: DType]() -> DType:
         DType.float32 if type is a half-precision float, type otherwise.
     """
 
-    return DType.float32 if type.is_half_float() else type
+    return DType.float32 if (
+        type.is_half_float() or type in (DType.float8e4m3, DType.float8e5m2)
+    ) else type
 
 
 # ===----------------------------------------------------------------------=== #
