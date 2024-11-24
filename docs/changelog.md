@@ -586,3 +586,6 @@ what we publish.
 
 - Tooling now prints the origins of `ref` arguments and results correctly, and
   prints `self` instead of `self: Self` in methods.
+
+- The LSP and generated documentation now print parametric result types
+  correctly, e.g. showing `SIMD[type, simd_width]` instead of `SIMD[$0, $1]`.
