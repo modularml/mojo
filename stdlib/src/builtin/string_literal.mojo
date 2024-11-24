@@ -20,6 +20,7 @@ from sys.ffi import c_char
 from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from sys.intrinsics import _type_is_eq
 from utils import StringRef, Span, StringSlice, StaticString
 from utils import Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -627,6 +628,36 @@ struct StringLiteral(
             The joined string.
         """
 
+        # TODO(#3403): Simplify this when the linked conditional conformance
+        # feature is added.  Runs a faster algorithm if the concrete types are
+        # able to be converted to a span of bytes.
+        @parameter
+        for i in range(len(VariadicList(Types))):
+            alias T = Types[i]
+
+            @parameter
+            if (
+                not _type_is_eq[T, String]()
+                and not _type_is_eq[T, StringLiteral]()
+            ):
+                return self.slow_join(*elems)
+        return self.fast_join(*elems)
+
+    fn slow_join[*Types: Stringable](self, *elems: *Types) -> String:
+        """Joins string elements using the current string as a delimiter.
+        This is a slower version of join as we don't know the total capacity of the
+        resulting string so we have to grow it on-the-fly and many reallocations
+        might happen.
+
+        Parameters:
+            Types: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
         var result: String = ""
         var is_first = True
 
@@ -637,6 +668,45 @@ struct StringLiteral(
             else:
                 result += self
             result += str(a)
+
+        elems.each[add_elt]()
+        return result
+
+    fn fast_join[
+        *Types: BytesCollectionElement
+    ](self, *elems: *Types) -> String:
+        """Joins string elements using the current string as a delimiter.
+        This is a faster version of join that works with types that can be converted
+        to a span of bytes so we can calculate the capacity of the resulting string.
+
+        Parameters:
+            Types: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        var is_first: Bool = True
+        var capacity: Int = 0
+
+        @parameter
+        fn add_capacity[T: BytesCollectionElement](a: T):
+            capacity += len(a.as_bytes())
+
+        elems.each[add_capacity]()
+
+        var result = String(capacity=capacity)
+
+        @parameter
+        fn add_elt[T: BytesCollectionElement](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += String(a.as_bytes())
 
         elems.each[add_elt]()
         return result
