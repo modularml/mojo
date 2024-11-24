@@ -42,15 +42,13 @@ alias OriginSet = __mlir_type.`!lit.origin.set`
 """A set of origin parameters."""
 
 
-# Helper to build a value of !lit.origin type.
-# TODO: Should be a parametric alias.
 @value
+@register_passable("trivial")
 struct Origin[is_mutable: Bool]:
-    """This represents a origin reference of potentially parametric type.
-    TODO: This should be replaced with a parametric type alias.
+    """This represents a origin reference for a memory value.
 
     Parameters:
-        is_mutable: Whether the origin reference is mutable.
+        is_mutable: Whether the origin is mutable.
     """
 
     alias type = __mlir_type[
