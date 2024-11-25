@@ -626,9 +626,11 @@ struct DType(
     @staticmethod
     fn get_dtype[T: AnyType, size: Int = 1]() -> DType:
         """Get the `DType` if the given Type is a `SIMD[_, size]` of a `DType`.
+
         Parameters:
             T: AnyType.
             size: The SIMD size to compare against.
+
         Returns:
             The `DType` if matched, otherwise `DType.invalid`.
         """
@@ -673,8 +675,10 @@ struct DType(
     @staticmethod
     fn is_scalar[T: AnyType]() -> Bool:
         """Whether the given Type is a Scalar of a DType.
+
         Parameters:
             T: AnyType.
+
         Returns:
             The result.
         """
