@@ -936,7 +936,7 @@ def test_list_repr():
     assert_equal(empty.__repr__(), "[]")
 
 
-def test_copyinit_trivial_types[dt: DType, hint_trivial_type:Bool]():
+def test_copyinit_trivial_types[dt: DType, hint_trivial_type: Bool]():
     alias sizes = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
     assert_equal(len(sizes), 10)
     var test_current_size = 1
