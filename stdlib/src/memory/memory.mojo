@@ -257,45 +257,57 @@ fn memcpy[
 
 @always_inline("nodebug")
 fn _memset_impl[
-    type: DType, address_space: AddressSpace
+    D: DType, address_space: AddressSpace
 ](
-    ptr: UnsafePointer[Scalar[type], address_space],
-    value: Scalar[type],
+    ptr: UnsafePointer[Scalar[D], address_space],
+    value: Scalar[D],
     count: Int,
 ):
-    alias simd_width = simdwidthof[Scalar[type]]()
+    alias simd_width = simdwidthof[Scalar[D]]()
     var vector_end = _align_down(count, simd_width)
 
     for i in range(0, vector_end, simd_width):
-        ptr.store(i, SIMD[type, simd_width](value))
+        ptr.store(i, SIMD[D, simd_width](value))
 
     for i in range(vector_end, count):
         ptr.store(i, value)
 
 
 @always_inline
-fn memset[type: Copyable](ptr: UnsafePointer[type], value: type, count: Int):
+fn memset[D: DType](ptr: UnsafePointer[T], value: Scalar[D], count: Int):
     """Fills memory with the given value.
 
     Parameters:
-        type: The element dtype.
+        T: The element type.
 
     Args:
         ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    alias dt = DType.get_dtype[type]()
+    _memset_impl[dt](p, value, count)
 
-    @parameter
-    if dt is not DType.invalid:
-        var p = ptr.bitcast[Scalar[dt]]()
-        _memset_impl[dt](p, rebind[Scalar[dt]](value), count)
-    # FIXME(#3581): `elif is_trivial(type) and bitwidth[type]() in (64, 32, 16, 8): ...` bitcast to a DType and do op
-    else:
-        for i in range(count):
-            (ptr + i).init_pointee_copy(value)
+# FIXME: this should only be for trivial types
+@always_inline
+fn memset[
+    T: AnyType, D: DType
+](ptr: UnsafePointer[T], value: Scalar[D], count: Int):
+    """Fills memory with the given value.
 
+    Parameters:
+        T: The element type.
+
+    Args:
+        ptr: UnsafePointer to the beginning of the memory block to fill.
+        value: The value to fill with.
+        count: Number of elements to fill (in elements, not bytes).
+    """
+    constrained[
+        bitwidthof[T]() == bitwidthof[Scalar[D]](),
+        "value to fill must be the same bitwidth as the type",
+    ]()
+    alias size = bitwidthof[Scalar[D]]() // 8
+    _memset_impl(ptr.bitcast[Scalar[D]](), value, count * size)
 
 # ===----------------------------------------------------------------------===#
 # memset_zero
