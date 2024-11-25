@@ -640,13 +640,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             self.resize(new_size)
         else:
             self.reserve(new_size)
-            
-            @parameter
-            if hint_trivial_type:
-                memset(self.data + self.size, value, new_size - self.size)
-            else:
-                for i in range(self.size, new_size):
-                    (self.data + i).init_pointee_copy(value)
+            for i in range(self.size, new_size):
+                (self.data + i).init_pointee_copy(value)
             self.size = new_size
 
     fn resize(inout self, new_size: Int):

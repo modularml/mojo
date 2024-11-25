@@ -29,6 +29,7 @@ from sys import (
     simdwidthof,
     simdbitwidth,
     _libc as libc,
+    bitwidthof,
 )
 from collections import Optional
 from memory.pointer import AddressSpace, _GPUAddressSpace
@@ -258,11 +259,7 @@ fn memcpy[
 @always_inline("nodebug")
 fn _memset_impl[
     D: DType, address_space: AddressSpace
-](
-    ptr: UnsafePointer[Scalar[D], address_space],
-    value: Scalar[D],
-    count: Int,
-):
+](ptr: UnsafePointer[Scalar[D], address_space], value: Scalar[D], count: Int,):
     alias simd_width = simdwidthof[Scalar[D]]()
     var vector_end = _align_down(count, simd_width)
 
@@ -274,20 +271,39 @@ fn _memset_impl[
 
 
 @always_inline
-fn memset[D: DType](ptr: UnsafePointer[T], value: Scalar[D], count: Int):
+fn memset[
+    D: DType
+](ptr: UnsafePointer[Scalar[D]], value: Scalar[D], count: Int):
     """Fills memory with the given value.
 
     Parameters:
-        T: The element type.
+        D: The element dtype.
 
     Args:
         ptr: UnsafePointer to the beginning of the memory block to fill.
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_impl[dt](p, value, count)
+    _memset_impl(ptr, value, count)
 
-# FIXME: this should only be for trivial types
+
+@always_inline
+fn memset[D: DType](ptr: UnsafePointer[Scalar[D]], value: Int, count: Int):
+    """Fills memory with the given value.
+
+    Parameters:
+        D: The element dtype.
+
+    Args:
+        ptr: UnsafePointer to the beginning of the memory block to fill.
+        value: The value to fill with.
+        count: Number of elements to fill (in elements, not bytes).
+    """
+    _memset_impl(ptr, Scalar[D](value), count)
+
+
+# FIXME: this should only be for trivial types, but constraining it would make
+# building generics on top of this harder
 @always_inline
 fn memset[
     T: AnyType, D: DType
@@ -296,6 +312,7 @@ fn memset[
 
     Parameters:
         T: The element type.
+        D: The value's dtype.
 
     Args:
         ptr: UnsafePointer to the beginning of the memory block to fill.
@@ -303,11 +320,12 @@ fn memset[
         count: Number of elements to fill (in elements, not bytes).
     """
     constrained[
-        bitwidthof[T]() == bitwidthof[Scalar[D]](),
+        sizeof[T]() == sizeof[Scalar[D]](),
         "value to fill must be the same bitwidth as the type",
     ]()
     alias size = bitwidthof[Scalar[D]]() // 8
     _memset_impl(ptr.bitcast[Scalar[D]](), value, count * size)
+
 
 # ===----------------------------------------------------------------------===#
 # memset_zero

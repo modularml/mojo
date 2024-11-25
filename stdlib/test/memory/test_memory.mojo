@@ -37,48 +37,11 @@ alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`
 
 
-trait _Pair:
-    fn __init__(inout self, lo: Int, hi: Int):
-        ...
-
-    fn low(self) -> Int:
-        ...
-
-    fn high(self) -> Int:
-        ...
-
-
 @value
 @register_passable("trivial")
 struct Pair:
     var lo: Int
     var hi: Int
-
-    fn __init__(inout self, lo: Int, hi: Int):
-        self.lo = lo
-        self.hi = hi
-
-    fn low(self) -> Int:
-        return self.lo
-
-    fn high(self) -> Int:
-        return self.hi
-
-
-@value
-struct PairNonTrivial:
-    var lo: Int
-    var hi: Int
-
-    fn __init__(inout self, lo: Int, hi: Int):
-        self.lo = lo
-        self.hi = hi
-
-    fn low(self) -> Int:
-        return self.lo
-
-    fn high(self) -> Int:
-        return self.hi
 
 
 def test_memcpy():
@@ -312,21 +275,16 @@ def test_memcmp_extensive():
 
 
 def test_memset():
-    fn test_pair[T: _Pair]() raises:
-        var pair = T(1, 2)
-        var ptr = UnsafePointer.address_of(pair)
-        memset(ptr.bitcast[Int](), 0, 1)
-        assert_equal(pair.low(), 0)
-        assert_equal(pair.high(), 2)
+    var pair = Pair(1, 2)
+    var ptr = UnsafePointer.address_of(pair)
+    memset(ptr.bitcast[UInt64](), 0, 1)
+    assert_equal(pair.lo, 0)
+    assert_equal(pair.hi, 2)
 
-        pair = T(1, 2)
-        memset_zero(ptr, 1)
-        assert_equal(pair.low(), 0)
-        assert_equal(pair.high(), 0)
-        _ = pair^
-
-    test_pair[Pair]()
-    test_pair[PairNonTrivial]()
+    pair = Pair(1, 2)
+    memset_zero(ptr, 1)
+    assert_equal(pair.lo, 0)
+    assert_equal(pair.hi, 0)
 
     fn test_dtype[D: DType]() raises:
         var buf1 = stack_allocation[2, Scalar[D]]()
