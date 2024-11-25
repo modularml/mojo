@@ -29,7 +29,6 @@ from sys import (
     simdwidthof,
     simdbitwidth,
     _libc as libc,
-    bitwidthof,
 )
 from collections import Optional
 from memory.pointer import AddressSpace, _GPUAddressSpace
@@ -319,11 +318,12 @@ fn memset[
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
+
+    alias size = sizeof[Scalar[D]]()
     constrained[
-        sizeof[T]() == sizeof[Scalar[D]](),
+        sizeof[T]() == size,
         "value to fill must be the same bitwidth as the type",
     ]()
-    alias size = bitwidthof[Scalar[D]]() // 8
     _memset_impl(ptr.bitcast[Scalar[D]](), value, count * size)
 
 
