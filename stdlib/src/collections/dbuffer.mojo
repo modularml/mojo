@@ -112,6 +112,7 @@ struct DBuffer[
         print(parse(DBuffer[origin=MutableAnyOrigin].own(l1^))) # hi
         # the compiler won't let you use l1 beyond this point
     ```
+    .
     """
 
     alias _intwidth = bitwidthof[Int]()
@@ -201,6 +202,7 @@ struct DBuffer[
         l1 = List[Int](1, 2, 3, 4, 5, 6, 7)
         s1 = DBuffer[origin=MutableAnyOrigin].own(l1^)
         ```
+        .
         """
         var l_len = len(list)  # to avoid steal_data() which sets it to 0
         return Self(ptr=list.steal_data(), length=l_len, self_is_owner=True)
