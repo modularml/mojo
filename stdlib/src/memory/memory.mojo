@@ -301,8 +301,8 @@ fn memset[D: DType](ptr: UnsafePointer[Scalar[D]], value: Int, count: Int):
     _memset_impl(ptr, Scalar[D](value), count)
 
 
-# FIXME: this should only be for trivial types, but constraining it would make
-# building generics on top of this harder
+# FIXME(#3581): this should only be for trivial types, but constraining it with
+# AnyTrivialRegType would make building generics on top of this harder
 @always_inline
 fn memset[
     T: AnyType, D: DType
