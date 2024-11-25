@@ -191,6 +191,9 @@ struct DBuffer[
         Args:
             list: The list to which the DBuffer refers.
 
+        Returns:
+            The owned DBuffer with the data.
+
         Examples:
 
         ```mojo
