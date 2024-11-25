@@ -15,31 +15,31 @@
 Example usage:
 
 ```mojo
-from memory import Arc
-var p = Arc(4)
+from memory import ArcPointer
+var p = ArcPointer(4)
 var p2 = p
 p2[]=3
 print(3 == p[])
 ```
 
 Subscripting(`[]`) is done by `Pointer`,
-in order to ensure that the underlying `Arc` outlive the operation.
+in order to ensure that the underlying `ArcPointer` outlive the operation.
 
-It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
+It is highly DISCOURAGED to manipulate an `ArcPointer` through `UnsafePointer`.
 Mojo's ASAP deletion policy ensure values are destroyed at last use.
-Do not unsafely dereference the `Arc` inner `UnsafePointer` field.
+Do not unsafely dereference the `ArcPointer` inner `UnsafePointer` field.
 See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
 
 ```mojo
 # Illustration of what NOT to do, in order to understand:
-print(Arc(String("ok"))._inner[].payload)
+print(ArcPointer(String("ok"))._inner[].payload)
 #........................^ASAP ^already freed
 ```
 
 Always use `Pointer` subscripting (`[]`):
 
 ```mojo
-print(Arc(String("ok"))[])
+print(ArcPointer(String("ok"))[])
 ```
 
 """
@@ -50,7 +50,7 @@ from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, stack_allocation
 
 
-struct _ArcInner[T: Movable]:
+struct _ArcPointerInner[T: Movable]:
     var refcount: Atomic[DType.uint64]
     var payload: T
 
@@ -71,7 +71,9 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
+struct ArcPointer[T: Movable](
+    CollectionElement, CollectionElementNew, Identifiable
+):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -86,7 +88,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
         T: The type of the stored value.
     """
 
-    alias _inner_type = _ArcInner[T]
+    alias _inner_type = _ArcPointerInner[T]
     var _inner: UnsafePointer[Self._inner_type]
 
     @implicit
@@ -98,7 +100,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
             value: The value to manage.
         """
         self._inner = UnsafePointer[Self._inner_type].alloc(1)
-        # Cannot use init_pointee_move as _ArcInner isn't movable.
+        # Cannot use init_pointee_move as _ArcPointerInner isn't movable.
         __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
             value^
         )
@@ -135,7 +137,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
             self._inner.free()
 
     # FIXME: The origin returned for this is currently self origin, which
-    # keeps the Arc object alive as long as there are references into it.  That
+    # keeps the ArcPointer object alive as long as there are references into it.  That
     # said, this isn't really the right modeling, we need hierarchical origins
     # to model the mutability and invalidation of the returned reference
     # correctly.
@@ -174,23 +176,23 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew, Identifiable):
         return self._inner[].refcount.load()
 
     fn __is__(self, rhs: Self) -> Bool:
-        """Returns True if the two Arcs point at the same object.
+        """Returns True if the two ArcPointers point at the same object.
 
         Args:
-            rhs: The other Arc.
+            rhs: The other ArcPointer.
 
         Returns:
-            True if the two Arcs point at the same object and False otherwise.
+            True if the two ArcPointers point at the same object and False otherwise.
         """
         return self._inner == rhs._inner
 
     fn __isnot__(self, rhs: Self) -> Bool:
-        """Returns True if the two Arcs point at different objects.
+        """Returns True if the two ArcPointers point at different objects.
 
         Args:
-            rhs: The other Arc.
+            rhs: The other ArcPointer.
 
         Returns:
-            True if the two Arcs point at different objects and False otherwise.
+            True if the two ArcPointers point at different objects and False otherwise.
         """
         return self._inner != rhs._inner

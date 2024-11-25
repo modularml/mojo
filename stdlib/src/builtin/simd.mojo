@@ -26,6 +26,8 @@ from sys import (
     prefetch,
     simdwidthof,
     is_nvidia_gpu,
+    is_gpu,
+    is_amd_gpu,
     bitwidthof,
 )
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
@@ -156,12 +158,12 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 
 @always_inline("nodebug")
 fn _has_native_bf16_support() -> Bool:
-    return is_nvidia_gpu()
+    return is_gpu()
 
 
 @always_inline("nodebug")
 fn _has_native_f8_support() -> Bool:
-    return _is_sm_9x() or is_nvidia_gpu["sm_89"]()
+    return _is_sm_9x() or is_nvidia_gpu["sm_89"]() or is_amd_gpu()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -222,7 +224,7 @@ struct SIMD[type: DType, size: Int](
     alias MIN_FINITE = Self(_min_finite[type]())
     """Returns the minimum (lowest) finite value of SIMD value."""
 
-    alias _default_alignment = alignof[Scalar[type]]() if is_nvidia_gpu() else 1
+    alias _default_alignment = alignof[Scalar[type]]() if is_gpu() else 1
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -3366,7 +3368,7 @@ fn _write_scalar[
     elif dtype.is_integral():
 
         @parameter
-        if is_nvidia_gpu():
+        if is_gpu() or dtype.is_integral():
             var err = _try_write_int(writer, value)
             if err:
                 abort(
