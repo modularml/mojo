@@ -23,12 +23,12 @@ struct MoveOnlyType(Movable):
     var actions: UnsafePointer[List[String]]
     var value: Int
 
-    fn __init__(inout self, value: Int, actions: UnsafePointer[List[String]]):
+    fn __init__(out self, value: Int, actions: UnsafePointer[List[String]]):
         self.actions = actions
         self.value = value
         self.actions[0].append("__init__")
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.actions = existing.actions
         self.value = existing.value
         self.actions[0].append("__moveinit__")
@@ -227,6 +227,29 @@ def test_indexing():
     assert_equal(ptr[3], 3)
 
 
+def test_indexing_simd():
+    var ptr = UnsafePointer[Int].alloc(4)
+    for i in range(4):
+        ptr[UInt8(i)] = i
+
+    assert_equal(ptr[UInt8(1)], 1)
+    assert_equal(ptr[UInt8(3)], 3)
+    assert_equal(ptr[UInt16(1)], 1)
+    assert_equal(ptr[UInt16(3)], 3)
+    assert_equal(ptr[UInt32(1)], 1)
+    assert_equal(ptr[UInt32(3)], 3)
+    assert_equal(ptr[UInt64(1)], 1)
+    assert_equal(ptr[UInt64(3)], 3)
+    assert_equal(ptr[Int8(1)], 1)
+    assert_equal(ptr[Int8(3)], 3)
+    assert_equal(ptr[Int16(1)], 1)
+    assert_equal(ptr[Int16(3)], 3)
+    assert_equal(ptr[Int32(1)], 1)
+    assert_equal(ptr[Int32(3)], 3)
+    assert_equal(ptr[Int64(1)], 1)
+    assert_equal(ptr[Int64(3)], 3)
+
+
 def test_bool():
     var nullptr = UnsafePointer[Int]()
     var ptr = UnsafePointer[Int].alloc(1)
@@ -286,6 +309,21 @@ def test_load_and_store_simd():
         assert_equal(ptr2[i], i // 4 * 4)
 
 
+def test_volatile_load_and_store_simd():
+    var ptr = UnsafePointer[Int8].alloc(16)
+    for i in range(16):
+        ptr[i] = i
+    for i in range(0, 16, 4):
+        var vec = ptr.load[width=4, volatile=True](i)
+        assert_equal(vec, SIMD[DType.int8, 4](i, i + 1, i + 2, i + 3))
+
+    var ptr2 = UnsafePointer[Int8].alloc(16)
+    for i in range(0, 16, 4):
+        ptr2.store[volatile=True](i, SIMD[DType.int8, 4](i))
+    for i in range(16):
+        assert_equal(ptr2[i], i // 4 * 4)
+
+
 def main():
     test_address_of()
 
@@ -304,7 +342,9 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
+    test_indexing_simd()
     test_bool()
     test_alignment()
     test_offset()
     test_load_and_store_simd()
+    test_volatile_load_and_store_simd()

@@ -10,7 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !system-windows
 # RUN: %mojo  -D TEMP_FILE=%t %s
 
 import os
@@ -92,7 +91,7 @@ fn get_user_path() -> Path:
     @parameter
     if os_is_windows():
         return Path("C:") / "Users" / "user"
-    return "/home/user"
+    return Path("/home/user")
 
 
 fn get_current_home() -> String:
@@ -149,6 +148,34 @@ def test_home():
     set_home(original_home)
 
 
+def test_stat():
+    var path = Path(__source_location().file_name)
+    var stat = path.stat()
+    assert_equal(
+        str(stat),
+        "os.stat_result(st_mode={}, st_ino={}, st_dev={}, st_nlink={},"
+        " st_uid={}, st_gid={}, st_size={}, st_atime={}, st_mtime={},"
+        " st_ctime={}, st_birthtime={}, st_blocks={}, st_blksize={},"
+        " st_rdev={}, st_flags={})".format(
+            stat.st_mode,
+            stat.st_ino,
+            stat.st_dev,
+            stat.st_nlink,
+            stat.st_uid,
+            stat.st_gid,
+            stat.st_size,
+            str(stat.st_atimespec),
+            str(stat.st_mtimespec),
+            str(stat.st_ctimespec),
+            str(stat.st_birthtimespec),
+            stat.st_blocks,
+            stat.st_blksize,
+            stat.st_rdev,
+            stat.st_flags,
+        ),
+    )
+
+
 def main():
     test_cwd()
     test_path()
@@ -160,3 +187,4 @@ def main():
     test_read_write()
     test_expand_user()
     test_home()
+    test_stat()

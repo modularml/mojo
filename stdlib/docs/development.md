@@ -376,6 +376,5 @@ did have a worthwhile change you wanted to raise, follow the steps to
 Congratulations! You've now got an idea on how to contribute to the standard
 library, test your changes, and raise a PR.
 
-If you're still having troubles make sure to reach out on
-[GitHub](https://github.com/modularml/mojo/discussions/new?category=general) or
-[Discord](https://modul.ar/discord)!
+If you're still having issues, reach out on
+[Discord](https://modul.ar/discord).

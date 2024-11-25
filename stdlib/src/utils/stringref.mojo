@@ -16,7 +16,8 @@
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
-from memory import UnsafePointer, memcmp, bitcast
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
 from utils import StringSlice
 from sys.ffi import c_char
@@ -40,15 +41,18 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @value
 @register_passable("trivial")
 struct StringRef(
-    Sized,
-    IntableRaising,
+    AsBytes,
+    Boolable,
     CollectionElement,
     CollectionElementNew,
-    Stringable,
-    Formattable,
-    Hashable,
-    Boolable,
     Comparable,
+    Hashable,
+    IntableRaising,
+    Representable,
+    Sized,
+    Stringable,
+    Writable,
+    _HashableWithHasher,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -66,12 +70,12 @@ struct StringRef(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Construct a StringRef value with length zero."""
         self = StringRef(UnsafePointer[UInt8](), 0)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -81,7 +85,8 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
-    fn __init__(inout self, str: StringLiteral):
+    @implicit
+    fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
         Args:
@@ -90,7 +95,7 @@ struct StringRef(
         self = StringRef(str.unsafe_ptr(), len(str))
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[c_char], len: Int):
+    fn __init__(out self, ptr: UnsafePointer[c_char], len: Int):
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -109,7 +114,7 @@ struct StringRef(
         self.length = len
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8]):
+    fn __init__(out self, *, ptr: UnsafePointer[UInt8]):
         """Construct a StringRef value given a null-terminated string.
 
         Args:
@@ -123,7 +128,8 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[c_char]):
+    @implicit
+    fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `UnsafePointer[UInt8]` instead
@@ -208,6 +214,14 @@ struct StringRef(
         if num_bytes >= self.length:
             return StringRef()
         return Self(self.data, self.length - num_bytes)
+
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous Span of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+        return Span[Byte, __origin_of(self)](ptr=self.data, length=self.length)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -341,6 +355,17 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.data, self.length)
+
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
@@ -351,7 +376,10 @@ struct StringRef(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        var str_slice = StringSlice[ImmutableAnyOrigin](
+            unsafe_from_utf8_strref=self
+        )
+        return _atol(str_slice)
 
     @always_inline
     fn __len__(self) -> Int:
@@ -369,24 +397,35 @@ struct StringRef(
         Returns:
             A new string.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn __repr__(self) -> String:
+        """Convert the string reference to a string.
+
+        Returns:
+            The String representation of the StringRef.
         """
-        Formats this StringRef to the provided formatter.
+        return String.write("StringRef(", repr(str(self)), ")")
+
+    @no_inline
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Formats this StringRef to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
-
         # SAFETY:
-        #   Safe because our use of this StringSlice does not outlive `self`.
-        var str_slice = StringSlice[ImmutableAnyLifetime](
-            unsafe_from_utf8_strref=self
+        #   Safe because our use of this Span does not outlive `self`.
+        writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](
+                ptr=self.unsafe_ptr(), length=len(self)
+            )
         )
-
-        writer.write_str(str_slice)
 
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.
@@ -558,7 +597,7 @@ struct StringRef(
 
     fn strip(self) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
+        This only takes C spaces into account: " \\t\\n\\v\\f\\r".
 
         For example, `"  mojo  "` returns `"mojo"`.
 
@@ -669,7 +708,7 @@ fn _memchr[
 
     for i in range(0, vectorized_end, bool_mask_width):
         var bool_mask = source.load[width=bool_mask_width](i) == first_needle
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
         if mask:
             return source + int(i + count_trailing_zeros(mask))
 
@@ -713,7 +752,7 @@ fn _memmem[
         var eq_last = last_needle == last_block
 
         var bool_mask = eq_first & eq_last
-        var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+        var mask = pack_bits(bool_mask)
 
         while mask:
             var offset = int(i + count_trailing_zeros(mask))

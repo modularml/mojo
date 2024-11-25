@@ -13,13 +13,16 @@
 
 from .path import (
     dirname,
+    basename,
     exists,
     expanduser,
+    expandvars,
     getsize,
     isdir,
     isfile,
     islink,
     join,
     split,
+    splitroot,
     lexists,
 )

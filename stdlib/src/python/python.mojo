@@ -22,41 +22,55 @@ from python import Python
 from collections import Dict
 from os import abort, getenv
 from sys import external_call, sizeof
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi import _Global
 
 from memory import UnsafePointer
 
 from utils import StringRef
 
 from .python_object import PythonObject, TypedPythonObject
-from ._cpython import CPython, Py_eval_input, Py_file_input, PyMethodDef
+from ._cpython import (
+    CPython,
+    Py_eval_input,
+    Py_file_input,
+    PyMethodDef,
+    Py_ssize_t,
+)
+
+alias _PYTHON_GLOBAL = _Global["Python", _PythonGlobal, _init_python_global]
 
 
-fn _init_global(ignored: OpaquePointer) -> OpaquePointer:
-    var ptr = UnsafePointer[CPython].alloc(1)
-    ptr[] = CPython()
-    return ptr.bitcast[NoneType]()
+fn _init_python_global() -> _PythonGlobal:
+    return _PythonGlobal()
 
 
-fn _destroy_global(python: OpaquePointer):
-    var p = python.bitcast[CPython]()
-    CPython.destroy(p[])
-    python.free()
+struct _PythonGlobal:
+    var cpython: CPython
+
+    fn __moveinit__(inout self, owned other: Self):
+        self.cpython = other.cpython^
+
+    fn __init__(inout self):
+        self.cpython = CPython()
+
+    fn __del__(owned self):
+        CPython.destroy(self.cpython)
 
 
 @always_inline
 fn _get_global_python_itf() -> _PythonInterfaceImpl:
-    var ptr = _get_global["Python", _init_global, _destroy_global]()
-    return ptr.bitcast[CPython]()
+    var ptr = _PYTHON_GLOBAL.get_or_create_ptr()
+    return _PythonInterfaceImpl(ptr.bitcast[CPython]())
 
 
 struct _PythonInterfaceImpl:
     var _cpython: UnsafePointer[CPython]
 
-    fn __init__(inout self, cpython: UnsafePointer[CPython]):
+    @implicit
+    fn __init__(out self, cpython: UnsafePointer[CPython]):
         self._cpython = cpython
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self._cpython = existing._cpython
 
     fn cpython(self) -> CPython:
@@ -73,11 +87,11 @@ struct Python:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor."""
         self.impl = _get_global_python_itf()
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy constructor.
 
         Args:
@@ -436,3 +450,34 @@ struct Python:
             `PythonObject` representing `None`.
         """
         return PythonObject(None)
+
+    # ===-------------------------------------------------------------------===#
+    # Checked Conversions
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    fn py_long_as_ssize_t(obj: PythonObject) raises -> Py_ssize_t:
+        """Get the value of a Python `long` object.
+
+        Args:
+            obj: The Python `long` object.
+
+        Raises:
+            If `obj` is not a Python `long` object, or if the `long` object
+            value overflows `Py_ssize_t`.
+
+        Returns:
+            The value of the `long` object as a `Py_ssize_t`.
+        """
+        var cpython = Python().impl.cpython()
+
+        var long: Py_ssize_t = cpython.PyLong_AsSsize_t(
+            obj.unsafe_as_py_object_ptr()
+        )
+
+        # Disambiguate if this is an error return setinel, or a legitimate
+        # value.
+        if long == -1:
+            Python.throw_python_exception_if_error_state(cpython)
+
+        return long

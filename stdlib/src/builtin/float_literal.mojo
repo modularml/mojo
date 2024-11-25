@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
+from math import Ceilable, CeilDivable, Floorable, Truncable
 
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
@@ -49,7 +49,8 @@ struct FloatLiteral(
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self.fp_type):
+    @implicit
+    fn __init__(out self, value: Self.fp_type):
         """Create a FloatLiteral value from a kgen.float_literal value.
 
         Args:
@@ -58,7 +59,8 @@ struct FloatLiteral(
         self.value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    @implicit
+    fn __init__(out self, value: IntLiteral):
         """Convert an IntLiteral to a FloatLiteral value.
 
         Args:
@@ -444,6 +446,18 @@ struct FloatLiteral(
             `floor(rhs / self)` value.
         """
         return rhs // self
+
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return -(self // -denominator)
 
     # TODO - maybe __pow__?
 

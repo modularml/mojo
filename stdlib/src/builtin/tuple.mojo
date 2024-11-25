@@ -47,7 +47,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, owned *args: *element_types):
+    @implicit
+    fn __init__(out self, owned *args: *element_types):
         """Construct the tuple.
 
         Args:
@@ -92,7 +93,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             UnsafePointer.address_of(self[i]).destroy_pointee()
 
     @always_inline("nodebug")
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy construct the tuple.
 
         Args:
@@ -108,7 +109,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             UnsafePointer.address_of(self[i]).init_pointee_copy(existing[i])
 
     @always_inline("nodebug")
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move construct the tuple.
 
         Args:
@@ -153,9 +154,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         return Self.__len__()
 
     @always_inline("nodebug")
-    fn __getitem__[
-        idx: Int
-    ](ref [_]self: Self) -> ref [self] element_types[idx.value]:
+    fn __getitem__[idx: Int](ref self) -> ref [self] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -172,13 +171,13 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
             storage_kgen_ptr
         )
-        # Use an immortal mut reference, which converts to self's lifetime.
+        # Use an immortal mut reference, which converts to self's origin.
         return UnsafePointer(elt_kgen_ptr)[]
 
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](ref [_]self) -> ref [self] T:
+    fn get[i: Int, T: CollectionElement](ref self) -> ref [self] T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:

@@ -24,7 +24,8 @@ from sys import (
     external_call,
     os_is_linux,
     os_is_windows,
-    triple_is_nvidia_cuda,
+    is_amd_gpu,
+    is_nvidia_gpu,
     llvm_intrinsic,
 )
 from sys._assembly import inlined_assembly
@@ -63,7 +64,7 @@ struct _CTimeSpec(Stringable):
     var tv_sec: Int  # Seconds
     var tv_subsec: Int  # subsecond (nanoseconds on linux and usec on mac)
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.tv_sec = 0
         self.tv_subsec = 0
 
@@ -85,7 +86,7 @@ struct _FILETIME:
     var dw_low_date_time: UInt32
     var dw_high_date_time: UInt32
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.dw_low_date_time = 0
         self.dw_high_date_time = 0
 
@@ -206,7 +207,7 @@ fn perf_counter_ns() -> Int:
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         return int(
             inlined_assembly[
                 "mov.u64 $0, %globaltimer;", UInt64, constraints="=l"
@@ -349,9 +350,15 @@ fn sleep(sec: Float64):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         var nsec = sec * 1.0e9
         llvm_intrinsic["llvm.nvvm.nanosleep", NoneType](
+            nsec.cast[DType.int32]()
+        )
+        return
+    elif is_amd_gpu():
+        var nsec = sec * 1.0e9
+        llvm_intrinsic["llvm.amdgcn.s.sleep", NoneType](
             nsec.cast[DType.int32]()
         )
         return
@@ -378,7 +385,7 @@ fn sleep(sec: Int):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu() or is_amd_gpu():
         return sleep(Float64(sec))
 
     @parameter

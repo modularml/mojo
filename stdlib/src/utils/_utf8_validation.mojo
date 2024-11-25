@@ -14,7 +14,7 @@
 """Implement fast utf-8 validation using SIMD instructions.
 
 References for this algorithm:
-J. Keiser, D. Lemire, Validating UTF-8 In Less Than One Instruction Per Byte, 
+J. Keiser, D. Lemire, Validating UTF-8 In Less Than One Instruction Per Byte,
 Software: Practice and Experience 51 (5), 2021
 https://arxiv.org/abs/2010.03090
 
@@ -26,6 +26,8 @@ https://github.com/simdutf/SimdUnicode/blob/main/src/UTF8.cs
 """
 
 from memory import UnsafePointer
+from sys.intrinsics import llvm_intrinsic
+from builtin.simd import _sub_with_saturation
 
 alias TOO_SHORT: UInt8 = 1 << 0
 alias TOO_LONG: UInt8 = 1 << 1
@@ -81,25 +83,13 @@ alias shuf3 = SIMD[DType.uint8, 16](
 
 
 @always_inline
-fn extract_vector[
-    simd_size: Int, //, offset: Int
-](a: SIMD[DType.uint8, simd_size], b: SIMD[DType.uint8, simd_size]) -> SIMD[
-    DType.uint8, simd_size
+fn _extract_vector[
+    width: Int, //, offset: Int
+](a: SIMD[DType.uint8, width], b: SIMD[DType.uint8, width]) -> SIMD[
+    DType.uint8, width
 ]:
-    """This can be a single instruction on some architectures."""
-    concatenated = a.join(b)
-    return concatenated.slice[simd_size, offset=offset]()
-
-
-@always_inline
-fn _subtract_with_saturation[
-    simd_size: Int, //, b: Int
-](a: SIMD[DType.uint8, simd_size]) -> SIMD[DType.uint8, simd_size]:
-    """The equivalent of https://doc.rust-lang.org/core/arch/x86_64/fn._mm_subs_epu8.html .
-    This can be a single instruction on some architectures.
-    """
-    alias b_as_vector = SIMD[DType.uint8, simd_size](b)
-    return max(a, b_as_vector) - b_as_vector
+    # generates a single `vpalignr` on x86 with AVX
+    return a.join(b).slice[width, offset=offset]()
 
 
 fn validate_chunk[
@@ -112,7 +102,7 @@ fn validate_chunk[
     alias v80 = SIMD[DType.uint8, simd_size](0x80)
     alias third_byte = 0b11100000 - 0x80
     alias fourth_byte = 0b11110000 - 0x80
-    var prev1 = extract_vector[simd_size - 1](
+    var prev1 = _extract_vector[simd_size - 1](
         previous_input_block, current_block
     )
     var byte_1_high = shuf1._dynamic_shuffle(prev1 >> 4)
@@ -120,25 +110,24 @@ fn validate_chunk[
     var byte_2_high = shuf3._dynamic_shuffle(current_block >> 4)
     var sc = byte_1_high & byte_1_low & byte_2_high
 
-    var prev2 = extract_vector[simd_size - 2](
+    var prev2 = _extract_vector[simd_size - 2](
         previous_input_block, current_block
     )
-    var prev3 = extract_vector[simd_size - 3](
+    var prev3 = _extract_vector[simd_size - 3](
         previous_input_block, current_block
     )
-    var is_third_byte = _subtract_with_saturation[third_byte](prev2)
-    var is_fourth_byte = _subtract_with_saturation[fourth_byte](prev3)
+    var is_third_byte = _sub_with_saturation(prev2, third_byte)
+    var is_fourth_byte = _sub_with_saturation(prev3, fourth_byte)
     var must23 = is_third_byte | is_fourth_byte
     var must23_as_80 = must23 & v80
     return must23_as_80 ^ sc
 
 
-fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
+fn _is_valid_utf8(span: Span[Byte]) -> Bool:
     """Verify that the bytes are valid UTF-8.
 
     Args:
-        ptr: The pointer to the data.
-        length: The length of the items pointed to.
+        span: The Span of bytes.
 
     Returns:
         Whether the data is valid UTF-8.
@@ -159,6 +148,9 @@ fn _is_valid_utf8(ptr: UnsafePointer[UInt8], length: Int) -> Bool:
     U+40000..U+FFFFF   | F1..F3     | 80..BF      | 80..BF     | 80..BF      |
     U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
     """
+
+    ptr = span.unsafe_ptr()
+    length = len(span)
     alias simd_size = sys.simdbytewidth()
     var i: Int = 0
     var previous = SIMD[DType.uint8, simd_size]()

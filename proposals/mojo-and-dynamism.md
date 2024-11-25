@@ -2,7 +2,7 @@
 
 Mojo has the lofty goal of being a simple, powerful, and easy-to-use language
 like Python but with features that allow programmers to reach the performance of
-C. One of Mojo's approaches is to start from being a superset of Python and
+C. One of Mojo's approaches is to start by adopting the syntax of Python and
 provide an incremental typing-for-performance story where the performance of
 Python code can be incrementally improved by adding type annotations, explicit
 variable declarations and error handling, switching `def` to `fn`, and so on.
@@ -47,10 +47,10 @@ would be member functions have their first argument bound to the new class
 instance through the Python [descriptor
 mechanism](https://docs.python.org/3/howto/descriptor.html#invocation-from-a-class).
 
-Mojo as a superset of Python has to support the full "hash-table" dynamism in
-classes for compatibility with Python, but reference semantic classes are also
-important for systems programming and application programming, where this level
-of dynamism isn't needed and is actively harmful.  We need to decide how to
+Mojo adopting the syntax of Python means we have to support the full "hash-table"
+dynamism in classes for compatibility with Python, but reference semantic classes
+are also important for systems programming and application programming, where this
+level of dynamism isn't needed and is actively harmful.  We need to decide how to
 handle this.
 
 One approach is to provide a decorator on class definitions (which can be opt-in

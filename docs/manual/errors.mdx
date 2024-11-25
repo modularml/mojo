@@ -103,7 +103,7 @@ recovery that's appropriate for your application.
 
 If you provide the name of a variable after the `except` keyword, then the
 `Error` instance is bound to the variable if an error occurs. The `Error` type
-implements the [`Formattable`](/mojo/stdlib/utils/format/Formattable) trait, so
+implements the [`Writable`](/mojo/stdlib/utils/write/Writable) trait, so
 you can pass it as an argument to the [`print()`](/mojo/stdlib/builtin/io/print)
 function if you'd like to print its error message to the console. It also
 implements the [`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait, so you

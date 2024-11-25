@@ -79,7 +79,7 @@ fn _int_tuple_binary_apply[
     for i in range(a.size):
         var a_elem = a.__getitem__[i]()
         var b_elem = b.__getitem__[i]()
-        c.__setitem__[i](binary_fn[a._int_dtype](a_elem, b_elem))
+        c.__setitem__[i](binary_fn[a.element_type](a_elem, b_elem))
 
     return c
 
@@ -110,7 +110,7 @@ fn _int_tuple_compare[
     for i in range(a.size):
         var a_elem = a.__getitem__[i]()
         var b_elem = b.__getitem__[i]()
-        c.__setitem__[i](comp_fn[a._int_dtype](a_elem, b_elem))
+        c.__setitem__[i](comp_fn[a.element_type](a_elem, b_elem))
 
     return c
 
@@ -173,7 +173,7 @@ struct IndexList[
 ](
     Sized,
     Stringable,
-    Formattable,
+    Writable,
     Comparable,
 ):
     """A base struct that implements size agnostic index functions.
@@ -184,22 +184,34 @@ struct IndexList[
         unsigned: Whether the integer is signed or unsigned.
     """
 
-    alias _int_dtype = _type_of_width[element_bitwidth, unsigned]()
+    alias element_type = _type_of_width[element_bitwidth, unsigned]()
     """The underlying dtype of the integer element value."""
 
-    alias _int_type = Scalar[Self._int_dtype]
+    alias _int_type = Scalar[Self.element_type]
     """The underlying storage of the integer element value."""
 
     var data: StaticTuple[Self._int_type, size]
     """The underlying storage of the tuple value."""
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a static int tuple of the given size."""
         self = 0
 
     @always_inline
-    fn __init__(inout self, value: __mlir_type.index):
+    @implicit
+    fn __init__(out self, data: StaticTuple[Self._int_type, size]):
+        """Constructs a static int tuple of the given size.
+
+        Args:
+            data: The StaticTuple to construct the IndexList from.
+        """
+        self.data = data
+
+    @doc_private
+    @always_inline
+    @implicit
+    fn __init__(out self, value: __mlir_type.index):
         """Constructs a sized 1 static int tuple of given the element value.
 
         Args:
@@ -209,7 +221,8 @@ struct IndexList[
         self = Int(value)
 
     @always_inline
-    fn __init__(inout self, elems: (Int, Int)):
+    @implicit
+    fn __init__(out self, elems: (Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -234,7 +247,8 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, elems: (Int, Int, Int)):
+    @implicit
+    fn __init__(out self, elems: (Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -259,7 +273,8 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, elems: (Int, Int, Int, Int)):
+    @implicit
+    fn __init__(out self, elems: (Int, Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -284,7 +299,8 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, *elems: Int):
+    @implicit
+    fn __init__(out self, *elems: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
@@ -307,7 +323,8 @@ struct IndexList[
         self = tup
 
     @always_inline
-    fn __init__(inout self, elem: Int):
+    @implicit
+    fn __init__(out self, elem: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
@@ -320,7 +337,7 @@ struct IndexList[
             ]
         ](Self._int_type(elem))
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy constructor.
 
         Args:
@@ -329,7 +346,8 @@ struct IndexList[
         self.data = other.data
 
     @always_inline
-    fn __init__(inout self, values: VariadicList[Int]):
+    @implicit
+    fn __init__(out self, values: VariadicList[Int]):
         """Creates a tuple constant using the specified values.
 
         Args:
@@ -736,12 +754,15 @@ struct IndexList[
         return buf^
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this int tuple to the provided formatter.
+        Formats this int tuple to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         # TODO: Optimize this to avoid the intermediate String allocation.
@@ -770,9 +791,9 @@ struct IndexList[
         @parameter
         for i in range(size):
             res.data[i] = rebind[__type_of(result.data).element_type](
-                rebind[Scalar[Self._int_dtype]](
+                rebind[Scalar[Self.element_type]](
                     self.data.__getitem__[i]()
-                ).cast[result._int_dtype]()
+                ).cast[result.element_type]()
             )
         return res
 
@@ -810,11 +831,20 @@ struct IndexList[
 # Factory functions for creating index.
 # ===----------------------------------------------------------------------===#
 @always_inline
-fn Index[T0: Intable](x: T0) -> IndexList[1]:
+fn Index[
+    T0: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0) -> IndexList[
+    1, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 1-D Index from the given value.
 
     Parameters:
         T0: The type of the 1st argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The initial value.
@@ -822,29 +852,47 @@ fn Index[T0: Intable](x: T0) -> IndexList[1]:
     Returns:
         The constructed IndexList.
     """
-    return IndexList[1](int(x))
+    return __type_of(result)(int(x))
 
 
 @always_inline
-fn Index(x: UInt) -> IndexList[1]:
+fn Index[
+    *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
+](x: UInt) -> IndexList[
+    1, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 1-D Index from the given value.
 
+    Parameters:
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
+
     Args:
         x: The initial value.
 
     Returns:
         The constructed IndexList.
     """
-    return IndexList[1](x.value)
+    return __type_of(result)(int(x))
 
 
 @always_inline
-fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
+fn Index[
+    T0: Intable,
+    T1: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1) -> IndexList[
+    2, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 2-D Index from the given values.
 
     Parameters:
         T0: The type of the 1st argument.
         T1: The type of the 2nd argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -853,33 +901,50 @@ fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> IndexList[2]:
     Returns:
         The constructed IndexList.
     """
-    return IndexList[2](int(x), int(y))
-
-
-@always_inline
-fn Index(x: UInt, y: UInt) -> IndexList[2]:
-    """Constructs a 2-D Index from the given values.
-
-    Args:
-        x: The 1st initial value.
-        y: The 2nd initial value.
-
-    Returns:
-        The constructed IndexList.
-    """
-    return IndexList[2](x.value, y.value)
+    return __type_of(result)(int(x), int(y))
 
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable
-](x: T0, y: T1, z: T2) -> IndexList[3]:
+    *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
+](x: UInt, y: UInt) -> IndexList[
+    2, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
+    """Constructs a 2-D Index from the given values.
+
+    Parameters:
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
+
+    Args:
+        x: The 1st initial value.
+        y: The 2nd initial value.
+
+    Returns:
+        The constructed IndexList.
+    """
+    return __type_of(result)(int(x), int(y))
+
+
+@always_inline
+fn Index[
+    T0: Intable,
+    T1: Intable,
+    T2: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1, z: T2) -> IndexList[
+    3, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 3-D Index from the given values.
 
     Parameters:
         T0: The type of the 1st argument.
         T1: The type of the 2nd argument.
         T2: The type of the 3rd argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -889,13 +954,21 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return IndexList[3](int(x), int(y), int(z))
+    return __type_of(result)(int(x), int(y), int(z))
 
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable, T3: Intable
-](x: T0, y: T1, z: T2, w: T3) -> IndexList[4]:
+    T0: Intable,
+    T1: Intable,
+    T2: Intable,
+    T3: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1, z: T2, w: T3) -> IndexList[
+    4, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 4-D Index from the given values.
 
     Parameters:
@@ -903,6 +976,8 @@ fn Index[
         T1: The type of the 2nd argument.
         T2: The type of the 3rd argument.
         T3: The type of the 4th argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -913,13 +988,22 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return IndexList[4](int(x), int(y), int(z), int(w))
+    return __type_of(result)(int(x), int(y), int(z), int(w))
 
 
 @always_inline
 fn Index[
-    T0: Intable, T1: Intable, T2: Intable, T3: Intable, T4: Intable
-](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[5]:
+    T0: Intable,
+    T1: Intable,
+    T2: Intable,
+    T3: Intable,
+    T4: Intable, //,
+    *,
+    element_bitwidth: Int = bitwidthof[Int](),
+    unsigned: Bool = False,
+](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[
+    5, element_bitwidth=element_bitwidth, unsigned=unsigned
+] as result:
     """Constructs a 5-D Index from the given values.
 
     Parameters:
@@ -928,6 +1012,8 @@ fn Index[
         T2: The type of the 3rd argument.
         T3: The type of the 4th argument.
         T4: The type of the 5th argument.
+        element_bitwidth: The bitwidth of the underlying integer element type.
+        unsigned: Whether the integer is signed or unsigned.
 
     Args:
         x: The 1st initial value.
@@ -939,7 +1025,7 @@ fn Index[
     Returns:
         The constructed IndexList.
     """
-    return IndexList[5](int(x), int(y), int(z), int(w), int(v))
+    return __type_of(result)(int(x), int(y), int(z), int(w), int(v))
 
 
 # ===----------------------------------------------------------------------===#
@@ -948,7 +1034,7 @@ fn Index[
 
 
 @always_inline
-fn product[size: Int](tuple: IndexList[size], end_idx: Int) -> Int:
+fn product[size: Int](tuple: IndexList[size, **_], end_idx: Int) -> Int:
     """Computes a product of values in the tuple up to the given index.
 
     Parameters:
@@ -967,7 +1053,7 @@ fn product[size: Int](tuple: IndexList[size], end_idx: Int) -> Int:
 @always_inline
 fn product[
     size: Int
-](tuple: IndexList[size], start_idx: Int, end_idx: Int) -> Int:
+](tuple: IndexList[size, **_], start_idx: Int, end_idx: Int) -> Int:
     """Computes a product of values in the tuple in the given index range.
 
     Parameters:

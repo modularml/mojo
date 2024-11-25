@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import sizeof, bitwidthof, os_is_windows
 
 alias _mIsSigned = UInt8(1)
@@ -27,7 +28,12 @@ alias _mIsFloat = UInt8(1 << 6)
 @value
 @register_passable("trivial")
 struct DType(
-    Stringable, Formattable, Representable, KeyElement, CollectionElementNew
+    Stringable,
+    Writable,
+    Representable,
+    KeyElement,
+    CollectionElementNew,
+    _HashableWithHasher,
 ):
     """Represents DType and provides methods for working with it."""
 
@@ -87,7 +93,7 @@ struct DType(
     on the system."""
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy this DType.
 
         Args:
@@ -151,55 +157,58 @@ struct DType(
             The name of the dtype.
         """
 
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this dtype to the provided formatter.
+        Formats this dtype to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         if self == DType.bool:
-            return writer.write_str("bool")
+            return writer.write("bool")
         if self == DType.int8:
-            return writer.write_str("int8")
+            return writer.write("int8")
         if self == DType.uint8:
-            return writer.write_str("uint8")
+            return writer.write("uint8")
         if self == DType.int16:
-            return writer.write_str("int16")
+            return writer.write("int16")
         if self == DType.uint16:
-            return writer.write_str("uint16")
+            return writer.write("uint16")
         if self == DType.int32:
-            return writer.write_str("int32")
+            return writer.write("int32")
         if self == DType.uint32:
-            return writer.write_str("uint32")
+            return writer.write("uint32")
         if self == DType.int64:
-            return writer.write_str("int64")
+            return writer.write("int64")
         if self == DType.uint64:
-            return writer.write_str("uint64")
+            return writer.write("uint64")
         if self == DType.index:
-            return writer.write_str("index")
+            return writer.write("index")
         if self == DType.float8e5m2:
-            return writer.write_str("float8e5m2")
+            return writer.write("float8e5m2")
         if self == DType.float8e4m3:
-            return writer.write_str("float8e4m3")
+            return writer.write("float8e4m3")
         if self == DType.bfloat16:
-            return writer.write_str("bfloat16")
+            return writer.write("bfloat16")
         if self == DType.float16:
-            return writer.write_str("float16")
+            return writer.write("float16")
         if self == DType.float32:
-            return writer.write_str("float32")
+            return writer.write("float32")
         if self == DType.tensor_float32:
-            return writer.write_str("tensor_float32")
+            return writer.write("tensor_float32")
         if self == DType.float64:
-            return writer.write_str("float64")
+            return writer.write("float64")
         if self == DType.invalid:
-            return writer.write_str("invalid")
+            return writer.write("invalid")
 
-        return writer.write_str("<<unknown>>")
+        return writer.write("<<unknown>>")
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
@@ -208,7 +217,7 @@ struct DType(
         Returns:
             The representation of the dtype.
         """
-        return "DType." + str(self)
+        return String.write("DType.", self)
 
     @always_inline("nodebug")
     fn get_value(self) -> __mlir_type.`!kgen.dtype`:
@@ -297,6 +306,17 @@ struct DType(
             A 64-bit integer hash of this `DType` value.
         """
         return hash(UInt8(self._as_i8()))
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with this `DType` value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
     fn is_unsigned(self) -> Bool:
@@ -626,6 +646,38 @@ fn _integral_type_of[type: DType]() -> DType:
     @parameter
     if type is DType.float64:
         return DType.int64
+
+    return type.invalid
+
+
+@always_inline("nodebug")
+fn _uint_type_of[type: DType]() -> DType:
+    """Gets the unsigned integral type which has the same bitwidth as the input
+    type."""
+
+    @parameter
+    if type.is_integral() and type.is_unsigned():
+        return type
+
+    @parameter
+    if type.is_float8() or type is DType.int8:
+        return DType.uint8
+
+    @parameter
+    if type.is_half_float() or type is DType.int16:
+        return DType.uint16
+
+    @parameter
+    if (
+        type is DType.float32
+        or type is DType.tensor_float32
+        or type is DType.int32
+    ):
+        return DType.uint32
+
+    @parameter
+    if type is DType.float64 or type is DType.int64:
+        return DType.uint64
 
     return type.invalid
 

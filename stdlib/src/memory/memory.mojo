@@ -24,13 +24,13 @@ from sys import (
     alignof,
     llvm_intrinsic,
     sizeof,
-    triple_is_nvidia_cuda,
+    is_gpu,
     external_call,
     simdwidthof,
+    simdbitwidth,
     _libc as libc,
 )
 from collections import Optional
-from builtin.dtype import _integral_type_of
 from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #
@@ -134,7 +134,7 @@ fn memcmp[
             byte_count // sizeof[DType.int32](),
         )
 
-    return _memcmp_impl(s1.bitcast[Int8](), s2.bitcast[Int8](), byte_count)
+    return _memcmp_impl(s1.bitcast[Byte](), s2.bitcast[Byte](), byte_count)
 
 
 # ===----------------------------------------------------------------------===#
@@ -144,7 +144,7 @@ fn memcmp[
 
 @always_inline
 fn _memcpy_impl(
-    dest_data: UnsafePointer[Int8, *_], src_data: __type_of(dest_data), n: Int
+    dest_data: UnsafePointer[Byte, *_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
 
@@ -153,6 +153,17 @@ fn _memcpy_impl(
         src_data: The source pointer.
         n: The number of bytes to copy.
     """
+
+    @parameter
+    if is_gpu():
+        alias chunk_size = simdbitwidth()
+        var vector_end = _align_down(n, chunk_size)
+        for i in range(0, vector_end, chunk_size):
+            dest_data.store(i, src_data.load[width=chunk_size](i))
+        for i in range(vector_end, n):
+            dest_data.store(i, src_data.load(i))
+        return
+
     if n < 5:
         if n == 0:
             return
@@ -166,17 +177,30 @@ fn _memcpy_impl(
 
     if n <= 16:
         if n >= 8:
-            var ui64_size = sizeof[Int64]()
-            dest_data.bitcast[Int64]()[] = src_data.bitcast[Int64]()[0]
-            dest_data.offset(n - ui64_size).bitcast[
-                Int64
-            ]()[] = src_data.offset(n - ui64_size).bitcast[Int64]()[0]
+            var ui64_size = sizeof[UInt64]()
+            dest_data.bitcast[UInt64]().store[alignment=1](
+                0, src_data.bitcast[UInt64]().load[alignment=1](0)
+            )
+            dest_data.offset(n - ui64_size).bitcast[UInt64]().store[
+                alignment=1
+            ](
+                0,
+                src_data.offset(n - ui64_size)
+                .bitcast[UInt64]()
+                .load[alignment=1](0),
+            )
             return
-        var ui32_size = sizeof[Int32]()
-        dest_data.bitcast[Int32]()[] = src_data.bitcast[Int32]()[0]
-        dest_data.offset(n - ui32_size).bitcast[Int32]()[] = src_data.offset(
-            n - ui32_size
-        ).bitcast[Int32]()[0]
+
+        var ui32_size = sizeof[UInt32]()
+        dest_data.bitcast[UInt32]().store[alignment=1](
+            0, src_data.bitcast[UInt32]().load[alignment=1](0)
+        )
+        dest_data.offset(n - ui32_size).bitcast[UInt32]().store[alignment=1](
+            0,
+            src_data.offset(n - ui32_size)
+            .bitcast[UInt32]()
+            .load[alignment=1](0),
+        )
         return
 
     # TODO (#10566): This branch appears to cause a 12% regression in BERT by
@@ -191,16 +215,13 @@ fn _memcpy_impl(
     #    )
     #    return
 
-    var dest_ptr = dest_data.bitcast[Int8]()
-    var src_ptr = src_data.bitcast[Int8]()
-
     # Copy in 32-byte chunks.
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_ptr.store(i, src_ptr.load[width=chunk_size](i))
+        dest_data.store(i, src_data.load[width=chunk_size](i))
     for i in range(vector_end, n):
-        dest_ptr.store(i, src_ptr.load(i))
+        dest_data.store(i, src_data.load(i))
 
 
 @always_inline
@@ -223,8 +244,8 @@ fn memcpy[
     """
     var n = count * sizeof[dest.type]()
     _memcpy_impl(
-        dest.bitcast[Int8, lifetime=MutableAnyLifetime](),
-        src.bitcast[Int8, lifetime=MutableAnyLifetime](),
+        dest.bitcast[Byte, origin=MutableAnyOrigin](),
+        src.bitcast[Byte, origin=MutableAnyOrigin](),
         n,
     )
 
@@ -237,8 +258,8 @@ fn memcpy[
 @always_inline("nodebug")
 fn _memset_impl[
     address_space: AddressSpace
-](ptr: UnsafePointer[UInt8, address_space], value: UInt8, count: Int):
-    alias simd_width = simdwidthof[UInt8]()
+](ptr: UnsafePointer[Byte, address_space], value: Byte, count: Int):
+    alias simd_width = simdwidthof[Byte]()
     var vector_end = _align_down(count, simd_width)
 
     for i in range(0, vector_end, simd_width):
@@ -251,7 +272,7 @@ fn _memset_impl[
 @always_inline
 fn memset[
     type: AnyType, address_space: AddressSpace
-](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
+](ptr: UnsafePointer[type, address_space], value: Byte, count: Int):
     """Fills memory with the given value.
 
     Parameters:
@@ -263,7 +284,7 @@ fn memset[
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    _memset_impl(ptr.bitcast[UInt8](), value, count * sizeof[type]())
+    _memset_impl(ptr.bitcast[Byte](), value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#
@@ -328,7 +349,7 @@ fn stack_allocation[
     count: Int,
     type: DType,
     /,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if is_gpu() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> UnsafePointer[Scalar[type], address_space]:
     """Allocates data buffer space on the stack given a data type and number of
@@ -355,7 +376,7 @@ fn stack_allocation[
     type: AnyType,
     /,
     name: Optional[StringLiteral] = None,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if is_gpu() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> UnsafePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
@@ -373,7 +394,7 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_gpu():
         # On NVGPU, SHARED and PARAM address spaces lower to global memory.
         @parameter
         if address_space in (_GPUAddressSpace.SHARED, _GPUAddressSpace.PARAM):
@@ -415,12 +436,12 @@ fn _malloc[
     type: AnyType,
     /,
     *,
-    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
+    alignment: Int = alignof[type]() if is_gpu() else 1,
 ](size: Int, /) -> UnsafePointer[
     type, AddressSpace.GENERIC, alignment=alignment
 ]:
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_gpu():
         return external_call[
             "malloc", UnsafePointer[NoneType, AddressSpace.GENERIC]
         ](size).bitcast[type]()
@@ -438,7 +459,7 @@ fn _malloc[
 @always_inline
 fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_gpu():
         libc.free(ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)
