@@ -121,7 +121,7 @@ what we publish.
   var l = List[Int](1, 2, 3, 4, 5)
   shuffle(l)
   ```
-  
+
 - The `Dict.__getitem__` method now returns a reference instead of a copy of
   the value (or raises).  This improves the performance of common code that
   uses `Dict` by allowing borrows from the `Dict` elements.
@@ -532,6 +532,8 @@ what we publish.
   ```
 
 - `Arc` has been renamed to `ArcPointer`, for consistency with `OwnedPointer`.
+
+- `UnsafePointer` parameters (other than the type) are now keyword-only.
 
 ### ❌ Removed
 
