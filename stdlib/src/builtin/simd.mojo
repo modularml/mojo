@@ -95,8 +95,16 @@ alias UInt64 = Scalar[DType.uint64]
 
 alias Float8e5m2 = Scalar[DType.float8e5m2]
 """Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+alias Float8e5m2fnuz = Scalar[DType.float8e5m2fnuz]
+"""Represents a FP8E5M2FNUZ floating point format for AMD GPU whose bitwdith is 8.
+   This dtype only supports finite and NaN values. NaN is when sign bit is set and
+   all other exponent and mantissa bits are 0."""
 alias Float8e4m3 = Scalar[DType.float8e4m3]
 """Represents a FP8E4M3 floating point format whose bitwidth is 8."""
+alias Float8e4m3fnuz = Scalar[DType.float8e4m3fnuz]
+"""Represents a FP8E4M3FNUZ floating point format for AMD GPU whose bitwdith is 8.
+   This dtype only supports finite and NaN values. NaN is when sign bit is set and
+   all other exponent and mantissa bits are 0."""
 alias BFloat16 = Scalar[DType.bfloat16]
 """Represents a 16-bit brain floating point value."""
 alias Float16 = Scalar[DType.float16]
@@ -136,6 +144,13 @@ fn _simd_construction_checks[type: DType, size: Int]():
     constrained[
         not (type.is_float8() and not _has_native_f8_support()),
         "f8 is not supported on non sm_89 and sm_90 architectures",
+    ]()
+    constrained[
+        not (
+            type in (DType.float8e4m3fnuz, DType.float8e5m2fnuz)
+            and not is_amd_gpu()
+        ),
+        "f8 fnuz variants is only supported for AMD GPU.",
     ]()
 
 
