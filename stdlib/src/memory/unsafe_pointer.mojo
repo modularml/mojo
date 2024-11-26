@@ -51,6 +51,7 @@ fn _default_alignment[type: DType, width: Int = 1]() -> Int:
 @register_passable("trivial")
 struct UnsafePointer[
     type: AnyType,
+    *,
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
     origin: Origin[True].type = MutableAnyOrigin,
@@ -115,7 +116,9 @@ struct UnsafePointer[
 
     @always_inline
     @implicit
-    fn __init__(out self, other: UnsafePointer[type, address_space, *_, **_]):
+    fn __init__(
+        out self, other: UnsafePointer[type, address_space=address_space, **_]
+    ):
         """Exclusivity parameter cast a pointer.
 
         Args:
@@ -144,8 +147,9 @@ struct UnsafePointer[
         ref [_, address_space._value.value]arg: type
     ) -> UnsafePointer[
         type,
-        address_space,
-        1,
+        address_space=address_space,
+        alignment=1,
+        origin=MutableAnyOrigin
         # TODO: Propagate origin of the argument.
     ] as result:
         """Gets the address of the argument.
@@ -164,7 +168,9 @@ struct UnsafePointer[
     @always_inline
     fn alloc(
         count: Int,
-    ) -> UnsafePointer[type, AddressSpace.GENERIC, alignment]:
+    ) -> UnsafePointer[
+        type, address_space = AddressSpace.GENERIC, alignment=alignment
+    ]:
         """Allocate an array with specified or default alignment.
 
         Args:
@@ -195,9 +201,12 @@ struct UnsafePointer[
         alias _ref_type = Pointer[type, origin, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                UnsafePointer[type, address_space, alignment, origin](
-                    self
-                ).address
+                UnsafePointer[
+                    type,
+                    address_space=address_space,
+                    alignment=alignment,
+                    origin=origin,
+                ](self).address
             )
         )
 
@@ -433,7 +442,9 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn as_noalias_ptr(
         self,
-    ) -> UnsafePointer[type, address_space, alignment, origin]:
+    ) -> UnsafePointer[
+        type, address_space=address_space, alignment=alignment, origin=origin
+    ]:
         """Cast the pointer to a new pointer that is known not to locally alias
         any other pointer. In other words, the pointer transitively does not
         alias any other memory value declared in the local function context.
@@ -454,7 +465,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
         invariant: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_]) -> SIMD[type, width]:
+    ](self: UnsafePointer[Scalar[type], **_]) -> SIMD[type, width]:
         """Loads the value the pointer points to.
 
         Constraints:
@@ -530,7 +541,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
         invariant: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], offset: Scalar) -> SIMD[
+    ](self: UnsafePointer[Scalar[type], **_], offset: Scalar) -> SIMD[
         type, width
     ]:
         """Loads the value the pointer points to with the given offset.
@@ -569,9 +580,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
         invariant: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], offset: T) -> SIMD[
-        type, width
-    ]:
+    ](self: UnsafePointer[Scalar[type], **_], offset: T) -> SIMD[type, width]:
         """Loads the value the pointer points to with the given offset.
 
         Constraints:
@@ -605,11 +614,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type](),
         volatile: Bool = False,
-    ](
-        self: UnsafePointer[Scalar[type], *_, **_],
-        offset: T,
-        val: Scalar[type],
-    ):
+    ](self: UnsafePointer[Scalar[type], **_], offset: T, val: Scalar[type],):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -637,7 +642,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
     ](
-        self: UnsafePointer[Scalar[type], *_, **_],
+        self: UnsafePointer[Scalar[type], **_],
         offset: T,
         val: SIMD[type, width],
     ):
@@ -668,7 +673,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type](),
         volatile: Bool = False,
     ](
-        self: UnsafePointer[Scalar[type], *_, **_],
+        self: UnsafePointer[Scalar[type], **_],
         offset: Scalar[offset_type],
         val: Scalar[type],
     ):
@@ -701,7 +706,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
     ](
-        self: UnsafePointer[Scalar[type], *_, **_],
+        self: UnsafePointer[Scalar[type], **_],
         offset: Scalar[offset_type],
         val: SIMD[type, width],
     ):
@@ -732,7 +737,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type](),
         volatile: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], val: Scalar[type]):
+    ](self: UnsafePointer[Scalar[type], **_], val: Scalar[type]):
         """Stores a single element value.
 
         Constraints:
@@ -755,7 +760,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], val: SIMD[type, width]):
+    ](self: UnsafePointer[Scalar[type], **_], val: SIMD[type, width]):
         """Stores a single element value.
 
         Constraints:
@@ -779,7 +784,7 @@ struct UnsafePointer[
         *,
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
-    ](self: UnsafePointer[Scalar[type], *_, **_], val: SIMD[type, width]):
+    ](self: UnsafePointer[Scalar[type], **_], val: SIMD[type, width]):
         constrained[width > 0, "width must be a positive integer value"]()
         constrained[
             alignment > 0, "alignment must be a positive integer value"
@@ -798,9 +803,7 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn strided_load[
         type: DType, T: Intable, //, width: Int
-    ](self: UnsafePointer[Scalar[type], *_, **_], stride: T) -> SIMD[
-        type, width
-    ]:
+    ](self: UnsafePointer[Scalar[type], **_], stride: T) -> SIMD[type, width]:
         """Performs a strided load of the SIMD vector.
 
         Parameters:
@@ -822,7 +825,7 @@ struct UnsafePointer[
         T: Intable, //,
         width: Int,
     ](
-        self: UnsafePointer[Scalar[type], *_, **_],
+        self: UnsafePointer[Scalar[type], **_],
         val: SIMD[type, width],
         stride: T,
     ):
@@ -846,7 +849,7 @@ struct UnsafePointer[
         width: Int = 1,
         alignment: Int = _default_alignment[type, width](),
     ](
-        self: UnsafePointer[Scalar[type], *_, **_],
+        self: UnsafePointer[Scalar[type], **_],
         offset: SIMD[_, width],
         mask: SIMD[DType.bool, width] = True,
         default: SIMD[type, width] = 0,
@@ -901,7 +904,7 @@ struct UnsafePointer[
         width: Int = 1,
         alignment: Int = _default_alignment[type, width](),
     ](
-        self: UnsafePointer[Scalar[type], *_, **_],
+        self: UnsafePointer[Scalar[type], **_],
         offset: SIMD[_, width],
         val: SIMD[type, width],
         mask: SIMD[DType.bool, width] = True,
@@ -949,7 +952,7 @@ struct UnsafePointer[
         scatter(val, base, mask, alignment)
 
     @always_inline
-    fn free(self: UnsafePointer[_, AddressSpace.GENERIC, *_, **_]):
+    fn free(self: UnsafePointer[_, address_space = AddressSpace.GENERIC, **_]):
         """Free the memory referenced by the pointer."""
         _free(self)
 
@@ -960,7 +963,9 @@ struct UnsafePointer[
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
         origin: Origin[True].type = Self.origin,
-    ](self) -> UnsafePointer[T, address_space, alignment, origin]:
+    ](self) -> UnsafePointer[
+        T, address_space=address_space, alignment=alignment, origin=origin
+    ]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
@@ -975,13 +980,13 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer.bitcast`[
             _type = UnsafePointer[
-                T, address_space, alignment=alignment
+                T, address_space=address_space, alignment=alignment
             ]._mlir_type,
         ](self.address)
 
     @always_inline
     fn destroy_pointee(
-        self: UnsafePointer[type, AddressSpace.GENERIC, *_, **_]
+        self: UnsafePointer[type, address_space = AddressSpace.GENERIC, **_]
     ):
         """Destroy the pointed-to value.
 
@@ -996,7 +1001,7 @@ struct UnsafePointer[
     @always_inline
     fn take_pointee[
         T: Movable, //,
-    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_]) -> T:
+    ](self: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_]) -> T:
         """Move the value at the pointer out, leaving it uninitialized.
 
         The pointer must not be null, and the pointer memory location is assumed
@@ -1019,7 +1024,10 @@ struct UnsafePointer[
     @always_inline
     fn init_pointee_move[
         T: Movable, //,
-    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_], owned value: T):
+    ](
+        self: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
+        owned value: T,
+    ):
         """Emplace a new value into the pointer location, moving from `value`.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -1041,7 +1049,10 @@ struct UnsafePointer[
     @always_inline
     fn init_pointee_copy[
         T: Copyable, //,
-    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_], value: T):
+    ](
+        self: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
+        value: T,
+    ):
         """Emplace a copy of `value` into the pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -1063,7 +1074,10 @@ struct UnsafePointer[
     @always_inline
     fn init_pointee_explicit_copy[
         T: ExplicitlyCopyable, //
-    ](self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_], value: T):
+    ](
+        self: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
+        value: T,
+    ):
         """Emplace a copy of `value` into this pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -1087,8 +1101,8 @@ struct UnsafePointer[
     fn move_pointee_into[
         T: Movable, //,
     ](
-        self: UnsafePointer[T, AddressSpace.GENERIC, *_, **_],
-        dst: UnsafePointer[T, AddressSpace.GENERIC, *_, **_],
+        self: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
+        dst: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
     ):
         """Moves the value `self` points to into the memory location pointed to by
         `dst`.
