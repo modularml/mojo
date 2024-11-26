@@ -3368,7 +3368,7 @@ fn _write_scalar[
     elif dtype.is_integral():
 
         @parameter
-        if is_gpu():
+        if is_gpu() or dtype.is_integral():
             var err = _try_write_int(writer, value)
             if err:
                 abort(

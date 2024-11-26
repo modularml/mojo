@@ -278,6 +278,10 @@ what we publish.
   memory allocation and performance. These options allow for optimized memory usage
   and reduced buffer reallocations, providing flexibility based on application requirements.
 
+- A new `StringLiteral.from_string[someString]()` method is available.  It
+  allows forming a runtime-constant StringLiteral from a compile-time-dynamic
+  `String` value.
+
 ### 🦋 Changed
 
 - The argument convention for `__init__` methods has been changed from `inout`
@@ -590,3 +594,6 @@ what we publish.
 
 - Tooling now prints the origins of `ref` arguments and results correctly, and
   prints `self` instead of `self: Self` in methods.
+
+- The LSP and generated documentation now print parametric result types
+  correctly, e.g. showing `SIMD[type, simd_width]` instead of `SIMD[$0, $1]`.
