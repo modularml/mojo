@@ -126,20 +126,22 @@ fn test_parameter_context() raises:
 
 
 @always_inline
-fn capture_call_loc(cond: Bool = False) -> _SourceLocation:
+fn capture_call_loc[depth: Int = 1](cond: Bool = False) -> _SourceLocation:
     if (
         not cond
     ):  # NOTE: we test that __call_location works even in a nested scope.
-        return __call_location()
+        return __call_location[depth]()
     return _SourceLocation(-1, -1, "")
 
 
 @always_inline("nodebug")
-fn capture_call_loc_nodebug(cond: Bool = False) -> _SourceLocation:
+fn capture_call_loc_nodebug[
+    depth: Int = 1
+](cond: Bool = False) -> _SourceLocation:
     if (
         not cond
     ):  # NOTE: we test that __call_location works even in a nested scope.
-        return __call_location()
+        return __call_location[depth]()
     return _SourceLocation(-1, -1, "")
 
 
@@ -151,11 +153,20 @@ fn get_call_locs() -> (_SourceLocation, _SourceLocation):
 
 
 @always_inline("nodebug")
-fn get_call_locs_inlined() -> (_SourceLocation, _SourceLocation):
+fn get_call_locs_inlined[
+    depth: Int = 1
+]() -> (_SourceLocation, _SourceLocation):
     return (
-        capture_call_loc(),
-        capture_call_loc_nodebug(),
+        capture_call_loc[depth](),
+        capture_call_loc_nodebug[depth](),
     )
+
+
+@always_inline
+fn get_call_locs_inlined_twice[
+    depth: Int = 1
+]() -> (_SourceLocation, _SourceLocation):
+    return get_call_locs_inlined[depth]()
 
 
 fn get_four_call_locs() -> (
@@ -182,8 +193,8 @@ fn get_four_call_locs_inlined() -> (
 
 
 fn test_builtin_call_loc() raises:
-    var l = (148, 149, 156, 157)
-    var c = (25, 33, 25, 33)
+    var l = (150, 151, 160, 161)
+    var c = (25, 33, 32, 40)
     var loc_pair = get_call_locs()
     check_source_loc(l[0], c[0], loc_pair[0])
     check_source_loc(l[1], c[1], loc_pair[1])
@@ -191,6 +202,10 @@ fn test_builtin_call_loc() raises:
     loc_pair = get_call_locs_inlined()
     check_source_loc(l[2], c[2], loc_pair[0])
     check_source_loc(l[3], c[3], loc_pair[1])
+
+    loc_pair = get_call_locs_inlined_twice[2]()
+    check_source_loc(169, 40, loc_pair[0])
+    check_source_loc(169, 40, loc_pair[1])
 
     var loc_quad = get_four_call_locs()
     check_source_loc(l[0], c[0], loc_quad[0])
@@ -211,7 +226,7 @@ fn source_loc_with_debug() -> _SourceLocation:
     var col: __mlir_type.index
     var file_name: __mlir_type.`!kgen.string`
     line, col, file_name = __mlir_op.`kgen.source_loc`[
-        _properties = __mlir_attr.`{inlineCount = 0 : i64}`,
+        inlineCount = Int(0).value,
         _type = (
             __mlir_type.index,
             __mlir_type.index,
