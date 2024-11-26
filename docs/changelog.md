@@ -535,6 +535,17 @@ what we publish.
 
 - `UnsafePointer` parameters (other than the type) are now keyword-only.
 
+- Inferred-only parameters may now be explicitly bound with keywords, enabling
+  some important patterns in the standard library:
+
+  ```mojo
+  struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]]: ...
+  alias ImmStringSlice = StringSlice[is_mutable=False]
+  # This auto-parameterizes on the origin, but constrains it to being an
+  # immutable slice instead of a potentially mutable one.
+  fn take_imm_slice(a: ImmStringSlice): ...
+  ```
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
