@@ -143,7 +143,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if name == "size" or name == "length":
             self._len = value
         else:
-            debug_assert[assert_mode="safe"](False, "that attr does not exist")
+            constrained[False, "that attr does not exist"]()
+            abort()
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
