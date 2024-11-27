@@ -3369,24 +3369,10 @@ fn _write_scalar[
     elif dtype.is_floating_point():
         _write_float(writer, value)
 
-    # TODO: bring in modern int formatter and remove GPU specific code
+    # TODO(MSTDL-1039): bring in performant integer to string formatter
     elif dtype.is_integral():
-
-        @parameter
-        if is_gpu() or dtype.is_integral():
-            var err = _try_write_int(writer, value)
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
-        else:
-            # Stack allocate enough bytes to store any formatted Scalar value.
-            alias size: Int = _calc_format_buffer_size[dtype]()
-            var buf = InlineArray[UInt8, size](fill=0)
-            var wrote = _snprintf[_get_dtype_printf_format[dtype]()](
-                buf.unsafe_ptr(), size, value
-            )
-            # SAFETY:
-            #   Create a slice to only those bytes in `buf` that have been initialized.
-            writer.write_bytes(Span[Byte](buf)[:wrote])
+        _ = _try_write_int(writer, value)
+    else:
+        constrained[
+            False, "unable to write dtype, only integral/float/bool supported"
+        ]()
