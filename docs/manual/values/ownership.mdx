@@ -29,7 +29,7 @@ The fundamental rules that make Mojo's ownership model work are the following:
 
 * Every value has only one owner at a time.
 * When the lifetime of the owner ends, Mojo destroys the value.
-* If there are outstanding references to a value, Mojo extends the lifetime of
+* If there are existing references to a value, Mojo extends the lifetime of
   the owner.
 
 ### Variables and references
@@ -293,13 +293,11 @@ gets unique ownership of a value. This happens in one of
 three ways:
 
 * The caller passes the argument with the `^` transfer sigil, which ends the
-  lifetime of that variable (the variable becomes uninitialized) and ownership is
-  transferred into the function without making a copy of any heap-allocated data.
+  lifetime of that variable (the variable becomes uninitialized) and ownership
+  is transferred into the function.
 
-* The caller **does not** use the `^` transfer sigil, in which case, the
-  value is copied into the function argument and the original variable remains
-  valid. (If the original value is not used again, the compiler may optimize away
-  the copy and transfer the value).
+* The caller **does not** use the `^` transfer sigil, in which case, Mojo copies
+  the value. If the type isn't copyable, this is a compile-time error.
 
 * The caller passes in a newly-created "owned" value, such as a value returned
   from a function. In this case, no variable owns the value and it can be
@@ -312,9 +310,8 @@ three ways:
   take(String("A brand-new String!"))
   ```
 
-For example, the following code works by making a copy of the string,
-because—although `take_text()` uses the `owned` convention—the caller does not
-include the transfer sigil:
+The following code works by making a copy of the string, because `take_text()`
+uses the `owned` convention, and the caller does not include the transfer sigil:
 
 ```mojo
 fn take_text(owned text: String):
@@ -394,19 +391,6 @@ used inside a function.
 
 :::
 
-### Borrowed versus owned in `def` functions
-
-The difference between `borrowed` and `owned` in a `def` function may be a
-little subtle. In both cases, you can end up with a uniquely-owned value that's
-a copy of the original value.
-
-* The `borrowed` argument always gets an immutable reference or a local copy.
-  You can't transfer a value into a `borrowed` argument.
-
-* The `owned` argument always gets a uniquely owned value, which may have been
-  copied or transferred from the callee. Using `owned` arguments without the
-  transfer sigil (`^`) usually results in values being copied.
-
 ### Transfer implementation details
 
 In Mojo, you shouldn't conflate "ownership transfer" with a "move
@@ -463,3 +447,16 @@ This shadow copy typically adds no overhead, because small types
 like `object` are cheap to copy. However, copying large types that allocate heap
 storage can be expensive. (For example, copying `List` or `Dict` types, or
 copying large numbers of strings.)
+
+### Borrowed versus owned in `def` functions
+
+The difference between `borrowed` and `owned` in a `def` function may be a
+little subtle. In both cases, you can end up with a uniquely-owned value that's
+a copy of the original value.
+
+* The `borrowed` argument always gets an immutable reference or a local copy.
+  You can't transfer a value into a `borrowed` argument.
+
+* The `owned` argument always gets a uniquely owned value, which may have been
+  copied or transferred from the callee. Using `owned` arguments without the
+  transfer sigil (`^`) usually results in values being copied.
