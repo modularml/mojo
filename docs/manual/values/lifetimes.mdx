@@ -43,7 +43,7 @@ However, in some cases you'll need to interact with origins directly:
   values.
 
 * When working with types like
-  [`Pointer`](/mojo/stdlib/memory/reference/Pointer) or
+  [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) or
   [`Span`](/mojo/stdlib/utils/span/Span) which are parameterized on the
   origin of the data they refer to.
 
@@ -73,7 +73,7 @@ struct ImmutableRef[origin: ImmutableOrigin]:
     pass
 ```
 
-Or you can use the [`Origin`](mojo/stdlib/builtin/type_aliases/Origin)
+Or you can use the [`Origin`](/mojo/stdlib/builtin/type_aliases/Origin)
 struct to specify an origin with parametric mutability:
 
 ```mojo
@@ -117,7 +117,7 @@ few ways to specify origin values:
 * Static origin. The `StaticConstantOrigin`
   alias is an origin value representing immutable values that that last for the
   duration of the program. String literal values have a `StaticConstantOrigin`.
-* The `__origin_of()` magic function, which returns the origin associated
+* Derived origin. The `__origin_of()` magic function returns the origin associated
   with the value (or values) passed in.
 * Inferred origin. You can use inferred parameters to capture the origin
   of a value passed in to a function.
@@ -161,13 +161,13 @@ the stored string, using the same origin as the original `OwnedPointer`.
 from memory import OwnedPointer, Pointer
 
 struct BoxedString:
-    var box: OwnedPointer[String]
+    var o_ptr: OwnedPointer[String]
 
     fn __init__(out self, value: String):
-        self.box = OwnedPointer(value)
+        self.o_ptr = OwnedPointer(value)
 
-    fn as_ptr(self) -> Pointer[String, __origin_of(self.box)]:
-        return Pointer.address_of(self.box[])
+    fn as_ptr(self) -> Pointer[String, __origin_of(self.o_ptr)]:
+        return Pointer.address_of(self.o_ptr[])
 ```
 
 #### Inferred origins
@@ -362,7 +362,7 @@ will be added in a future release.
 
 If you're working with an API that returns a reference, and you want to avoid
 copying the referenced value, you can use a
-[`Pointer`](/mojo/stdlib/memory/reference/Pointer) to hold an indirect reference.
+[`Pointer`](/mojo/stdlib/memory/pointer/Pointer) to hold an indirect reference.
 You can assign a `Pointer` to a variable, but you need to use the dereference
 operator (`[]`) to access the underlying value.
 

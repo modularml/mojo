@@ -247,10 +247,11 @@ a constructor should support implicit conversion.
 
 ## Copy constructor
 
-When Mojo encounters an assignment operator (`=`), it tries to make a copy of
-the right-side value by calling upon that type's copy constructor: the
-`__copyinit__()` method. Thus, it's the responsibility of the type author to
-implement `__copyinit__()` so it returns a copy of the value.
+When Mojo encounters an assignment statement that doesn't use the [transfer
+sigil (`^`)](/mojo/manual/values/ownership#transfer-arguments-owned-and-), it
+tries to make a copy of the right-side value by calling upon that type's copy
+constructor: the `__copyinit__()` method. Thus, it's the responsibility of the
+type author to implement `__copyinit__()` so it returns a copy of the value.
 
 For example, the `MyPet` type above does not have a copy constructor,
 so this code fails to compile:
@@ -285,9 +286,9 @@ mistakes when referring to the current struct name.
 
 Also, notice that the `existing` argument in `__copyinit__()` is immutable
 because the default [argument
-convention](/mojo/manual/values/ownership#argument-conventions) in an `fn`
-function is `borrowed`—this is a good thing because this function should not
-modify the contents of the value being copied.
+convention](/mojo/manual/values/ownership#argument-conventions) is
+`borrowed`—this is a good thing because this function should not modify the
+contents of the value being copied.
 
 :::
 
