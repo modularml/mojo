@@ -109,17 +109,18 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     @always_inline
     fn __getattr__[name: StringLiteral](self) -> Int:
-        """Get the number of elements in the list.
+        """Get the length of the list.
 
         Parameters:
-            name: The name of the attribute (`"size"`).
+            name: The name of the attribute (`"length"` or `"size"` (soft
+                deprecated)).
 
         Returns:
             The attribute value.
         """
 
         @parameter
-        if name == "size":
+        if name == "size" or name == "length":
             return len(self)
         else:
             constrained[False, "that attr does not exist"]()
@@ -128,14 +129,18 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # FIXME: default is only because otherwise += assignments won't work
     @always_inline
     fn __setattr__[name: StringLiteral = "size"](inout self, value: Int):
-        """Set the number of elements in the list.
+        """Set the length of the list.
 
         Parameters:
-            name: The name of the attribute (`"size"`).
+            name: The name of the attribute (`"length"` or `"size"` (soft
+                deprecated)).
+
+        Args:
+            value: The value to set the length to.
         """
 
         @parameter
-        if name == "size":
+        if name == "size" or name == "length":
             self._len = value
         else:
             debug_assert[assert_mode="safe"](False, "that attr does not exist")
