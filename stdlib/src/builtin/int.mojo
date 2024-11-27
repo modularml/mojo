@@ -1215,24 +1215,24 @@ struct Int(
 
     @staticmethod
     fn from_bytes[
-        type: DType, big_endian: Bool = False
-    ](bytes: Span[Byte]) raises -> Self:
+        D: DType, big_endian: Bool = False
+    ](bytes: Span[Scalar[D]]) raises -> Self:
         """Converts a byte array to an integer.
 
         Args:
             bytes: The byte array to convert.
 
         Parameters:
-            type: The type of the integer.
+            D: The type of the integer.
             big_endian: Whether the byte array is big-endian.
 
         Returns:
             The integer value.
         """
-        if type.sizeof() != len(bytes):
+        if D.sizeof() != len(bytes):
             raise Error("Byte array size does not match the integer size.")
-        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(bytes[0])
-        var type_ptr: UnsafePointer[Scalar[type]] = ptr.bitcast[Scalar[type]]()
+        var ptr: UnsafePointer[Scalar[D]] = UnsafePointer.address_of(bytes[0])
+        var type_ptr: UnsafePointer[Scalar[D]] = ptr.bitcast[Scalar[D]]()
         var value = type_ptr[]
 
         @parameter
@@ -1242,18 +1242,18 @@ struct Int(
             value = byte_swap(value)
         return int(value)
 
-    fn as_bytes[type: DType, big_endian: Bool = False](self) -> List[Byte]:
+    fn as_bytes[D: DType, big_endian: Bool = False](self) -> List[Scalar[D]]:
         """Convert the integer to a byte array.
 
         Parameters:
-            type: The type of the integer.
+            D: The type of the integer.
             big_endian: Whether the byte array should be big-endian.
 
         Returns:
             The byte array.
         """
-        alias type_len = type.sizeof()
-        var value = Scalar[type](self)
+        alias type_len = D.sizeof()
+        var value = Scalar[D](self)
 
         @parameter
         if is_big_endian() and not big_endian:
@@ -1261,12 +1261,12 @@ struct Int(
         elif not is_big_endian() and big_endian:
             value = byte_swap(value)
 
-        var ptr: UnsafePointer[Scalar[type]] = UnsafePointer.address_of(value)
-        var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
-        var list = List[Byte](capacity=type_len)
+        var ptr: UnsafePointer[Scalar[D]] = UnsafePointer.address_of(value)
+        var scalar_ptr: UnsafePointer[Scalar[D]] = ptr.bitcast[Scalar[D]]()
+        var list = List[Scalar[D]](capacity=type_len)
 
         # TODO: Maybe this can be a List.extend(ptr, count) method
-        memcpy(list.unsafe_ptr(), byte_ptr, type_len)
+        memcpy(list.unsafe_ptr(), scalar_ptr, type_len)
         list.size = type_len
 
         return list^
