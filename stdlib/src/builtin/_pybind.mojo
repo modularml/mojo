@@ -14,6 +14,7 @@
 from memory import UnsafePointer, stack_allocation
 
 from sys import sizeof, alignof
+from sys.ffi import c_char_ptr
 
 import python._cpython as cp
 from python import TypedPythonObject, Python, PythonObject
@@ -54,10 +55,7 @@ fn fail_initialization(owned err: Error) -> PythonObject:
     cpython = get_cpython()
     error_type = cpython.get_error_global("PyExc_Exception")
 
-    cpython.PyErr_SetString(
-        error_type,
-        err.unsafe_cstr_ptr(),
-    )
+    cpython.PyErr_SetString(error_type, c_char_ptr(err))
     _ = err^
     return PythonObject(PyObjectPtr())
 

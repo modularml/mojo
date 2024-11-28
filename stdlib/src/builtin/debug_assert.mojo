@@ -20,7 +20,7 @@ from os import abort
 from sys import is_nvidia_gpu, is_gpu, llvm_intrinsic
 from sys._build import is_debug_build
 from sys.param_env import env_get_string
-from sys.ffi import external_call, c_uint, c_size_t, c_char
+from sys.ffi import external_call, c_uint, c_size_t, c_char, c_char_ptr
 from memory import UnsafePointer
 from utils.write import (
     _WriteBufferHeap,

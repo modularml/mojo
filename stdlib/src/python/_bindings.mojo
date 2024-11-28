@@ -13,7 +13,7 @@
 
 from memory import UnsafePointer
 
-from sys.ffi import c_int
+from sys.ffi import c_int, c_char_ptr
 from sys.info import sizeof
 
 from os import abort
@@ -112,7 +112,7 @@ fn python_type_object[
 
     var type_spec = PyType_Spec {
         # FIXME(MOCO-1306): This should be `T.__name__`.
-        name: type_name.unsafe_cstr_ptr(),
+        name: c_char_ptr(type_name),
         basicsize: sizeof[PyMojoObject[T]](),
         itemsize: 0,
         flags: Py_TPFLAGS_DEFAULT,
@@ -183,12 +183,7 @@ fn empty_tp_init_wrapper[
     except e:
         # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
         var error_type = cpython.get_error_global("PyExc_ValueError")
-
-        cpython.PyErr_SetString(
-            error_type,
-            e.unsafe_cstr_ptr(),
-        )
-
+        cpython.PyErr_SetString(error_type, c_char_ptr(e))
         return -1
 
 
@@ -285,10 +280,7 @@ fn py_c_function_wrapper[
             # TODO(MSTDL-933): Add custom 'MojoError' type, and raise it here.
             var error_type = cpython.get_error_global("PyExc_Exception")
 
-            cpython.PyErr_SetString(
-                error_type,
-                e.unsafe_cstr_ptr(),
-            )
+            cpython.PyErr_SetString(error_type, c_char_ptr(e))
 
             # Return a NULL `PyObject*`.
             return PythonObject(PyObjectPtr())

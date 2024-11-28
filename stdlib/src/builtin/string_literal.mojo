@@ -475,6 +475,7 @@ struct StringLiteral(
         #   return type.
         return ptr.bitcast[UInt8]()
 
+    @deprecated("Use `sys.ffi.c_char_ptr()` instead.")
     @always_inline
     # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:

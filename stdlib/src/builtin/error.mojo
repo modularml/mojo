@@ -189,6 +189,8 @@ struct Error(
     # Methods
     # ===-------------------------------------------------------------------===#
 
+    @deprecated("Use `sys.ffi.c_char_ptr()` instead.")
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
@@ -198,6 +200,15 @@ struct Error(
             The pointer to the underlying memory.
         """
         return self.data.bitcast[c_char]()
+
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        return self.data
 
     fn _message(self) -> String:
         """Converts the Error to string representation.

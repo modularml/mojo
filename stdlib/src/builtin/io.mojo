@@ -25,7 +25,7 @@ from sys import (
     _libc as libc,
 )
 from sys._libc import dup, fclose, fdopen, fflush
-from sys.ffi import OpaquePointer
+from sys.ffi import OpaquePointer, c_char_ptr
 
 from utils import Span, write_buffered, write_args
 from collections import InlineArray
@@ -53,7 +53,7 @@ struct _fdopen[mode: StringLiteral = "a"]:
             stream_id: The stream id
         """
 
-        self.handle = fdopen(dup(stream_id.value), mode.unsafe_cstr_ptr())
+        self.handle = fdopen(dup(stream_id.value), c_char_ptr(mode))
 
     fn __enter__(self) -> Self:
         """Open the file handle for use within a context manager"""
@@ -170,7 +170,7 @@ fn _printf[
     @parameter
     if is_nvidia_gpu():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
+            c_char_ptr(fmt), Pointer.address_of(loaded_pack)
         )
     elif is_amd_gpu():
         # constrained[False, "_printf on AMDGPU is not implemented"]()
@@ -186,7 +186,7 @@ fn _printf[
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type=Int32,
-            ](fd, fmt.unsafe_cstr_ptr(), loaded_pack)
+            ](fd, c_char_ptr(fmt), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -228,7 +228,7 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.unsafe_cstr_ptr(), loaded_pack)
+        ](str, size, c_char_ptr(fmt), loaded_pack)
     )
 
 
