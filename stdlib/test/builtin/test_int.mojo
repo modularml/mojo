@@ -19,8 +19,6 @@ from testing import assert_equal, assert_true, assert_false, assert_raises
 from python import PythonObject
 from memory import UnsafePointer
 
-alias Bytes = List[Byte]
-
 
 def test_properties():
     assert_equal(Int.MAX, (1 << bitwidthof[DType.index]() - 1) - 1)
@@ -249,6 +247,8 @@ def test_conversion_from_python():
 
 
 def test_from_bytes():
+    alias Bytes = List[Byte]
+
     assert_equal(Int.from_bytes[DType.int16, big_endian=True](Bytes(0, 16)), 16)
     assert_equal(
         Int.from_bytes[DType.int16, big_endian=False](Bytes(0, 16)), 4096
