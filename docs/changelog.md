@@ -121,7 +121,7 @@ what we publish.
   var l = List[Int](1, 2, 3, 4, 5)
   shuffle(l)
   ```
-  
+
 - The `Dict.__getitem__` method now returns a reference instead of a copy of
   the value (or raises).  This improves the performance of common code that
   uses `Dict` by allowing borrows from the `Dict` elements.
@@ -532,6 +532,19 @@ what we publish.
   ```
 
 - `Arc` has been renamed to `ArcPointer`, for consistency with `OwnedPointer`.
+
+- `UnsafePointer` parameters (other than the type) are now keyword-only.
+
+- Inferred-only parameters may now be explicitly bound with keywords, enabling
+  some important patterns in the standard library:
+
+  ```mojo
+  struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]]: ...
+  alias ImmStringSlice = StringSlice[is_mutable=False]
+  # This auto-parameterizes on the origin, but constrains it to being an
+  # immutable slice instead of a potentially mutable one.
+  fn take_imm_slice(a: ImmStringSlice): ...
+  ```
 
 ### ❌ Removed
 

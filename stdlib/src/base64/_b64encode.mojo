@@ -24,11 +24,11 @@ Instructions, ACM Transactions on the Web 12 (3), 2018.
 https://arxiv.org/abs/1704.00605
 """
 
-from builtin.simd import _sub_with_saturation
 from collections import InlineArray
 from math.math import _compile_time_iota
 from memory import memcpy, bitcast, UnsafePointer
 from utils import IndexList
+from sys import llvm_intrinsic
 
 alias Bytes = SIMD[DType.uint8, _]
 
@@ -291,3 +291,13 @@ fn _rshift_bits_in_u16[shift: Int](input: Bytes) -> __type_of(input):
     var u16 = bitcast[DType.uint16, input.size // 2](input)
     var res = bit.rotate_bits_right[shift](u16)
     return bitcast[DType.uint8, input.size](res)
+
+
+@always_inline
+fn _sub_with_saturation[
+    width: Int, //
+](a: SIMD[DType.uint8, width], b: SIMD[DType.uint8, width]) -> SIMD[
+    DType.uint8, width
+]:
+    # generates a single `vpsubusb` on x86 with AVX
+    return llvm_intrinsic["llvm.usub.sat", __type_of(a)](a, b)
