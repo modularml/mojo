@@ -95,8 +95,16 @@ alias UInt64 = Scalar[DType.uint64]
 
 alias Float8e5m2 = Scalar[DType.float8e5m2]
 """Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+alias Float8e5m2fnuz = Scalar[DType.float8e5m2fnuz]
+"""Represents a FP8E5M2FNUZ floating point format for AMD GPU whose bitwdith is 8.
+   This dtype only supports finite and NaN values. NaN is when sign bit is set and
+   all other exponent and mantissa bits are 0."""
 alias Float8e4m3 = Scalar[DType.float8e4m3]
 """Represents a FP8E4M3 floating point format whose bitwidth is 8."""
+alias Float8e4m3fnuz = Scalar[DType.float8e4m3fnuz]
+"""Represents a FP8E4M3FNUZ floating point format for AMD GPU whose bitwdith is 8.
+   This dtype only supports finite and NaN values. NaN is when sign bit is set and
+   all other exponent and mantissa bits are 0."""
 alias BFloat16 = Scalar[DType.bfloat16]
 """Represents a 16-bit brain floating point value."""
 alias Float16 = Scalar[DType.float16]
@@ -136,6 +144,13 @@ fn _simd_construction_checks[type: DType, size: Int]():
     constrained[
         not (type.is_float8() and not _has_native_f8_support()),
         "f8 is not supported on non sm_89 and sm_90 architectures",
+    ]()
+    constrained[
+        not (
+            type in (DType.float8e4m3fnuz, DType.float8e5m2fnuz)
+            and not is_amd_gpu()
+        ),
+        "f8 fnuz variants is only supported for AMD GPU.",
     ]()
 
 
@@ -3311,16 +3326,6 @@ fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
     return (result_int, result_frac)
 
 
-@always_inline("nodebug")
-fn _sub_with_saturation[
-    width: Int, //
-](a: SIMD[DType.uint8, width], b: SIMD[DType.uint8, width]) -> SIMD[
-    DType.uint8, width
-]:
-    # generates a single `vpsubusb` on x86 with AVX
-    return llvm_intrinsic["llvm.usub.sat", __type_of(a)](a, b)
-
-
 # ===----------------------------------------------------------------------=== #
 # floor
 # ===----------------------------------------------------------------------=== #
@@ -3364,24 +3369,10 @@ fn _write_scalar[
     elif dtype.is_floating_point():
         _write_float(writer, value)
 
-    # TODO: bring in modern int formatter and remove GPU specific code
+    # TODO(MSTDL-1039): bring in performant integer to string formatter
     elif dtype.is_integral():
-
-        @parameter
-        if is_gpu() or dtype.is_integral():
-            var err = _try_write_int(writer, value)
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
-        else:
-            # Stack allocate enough bytes to store any formatted Scalar value.
-            alias size: Int = _calc_format_buffer_size[dtype]()
-            var buf = InlineArray[UInt8, size](fill=0)
-            var wrote = _snprintf[_get_dtype_printf_format[dtype]()](
-                buf.unsafe_ptr(), size, value
-            )
-            # SAFETY:
-            #   Create a slice to only those bytes in `buf` that have been initialized.
-            writer.write_bytes(Span[Byte](buf)[:wrote])
+        _ = _try_write_int(writer, value)
+    else:
+        constrained[
+            False, "unable to write dtype, only integral/float/bool supported"
+        ]()

@@ -51,7 +51,11 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 @always_inline
 fn _memcmp_impl_unconstrained[
     type: DType
-](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
+](
+    s1: UnsafePointer[Scalar[type], **_],
+    s2: UnsafePointer[Scalar[type], **_],
+    count: Int,
+) -> Int:
     alias simd_width = simdwidthof[type]()
     if count < simd_width:
         for i in range(count):
@@ -95,7 +99,11 @@ fn _memcmp_impl_unconstrained[
 @always_inline
 fn _memcmp_impl[
     type: DType
-](s1: UnsafePointer[Scalar[type], _], s2: __type_of(s1), count: Int) -> Int:
+](
+    s1: UnsafePointer[Scalar[type], **_],
+    s2: UnsafePointer[Scalar[type], **_],
+    count: Int,
+) -> Int:
     constrained[type.is_integral(), "the input dtype must be integral"]()
     return _memcmp_impl_unconstrained(s1, s2, count)
 
@@ -104,8 +112,8 @@ fn _memcmp_impl[
 fn memcmp[
     type: AnyType, address_space: AddressSpace
 ](
-    s1: UnsafePointer[type, address_space],
-    s2: UnsafePointer[type, address_space],
+    s1: UnsafePointer[type, address_space=address_space],
+    s2: UnsafePointer[type, address_space=address_space],
     count: Int,
 ) -> Int:
     """Compares two buffers. Both strings are assumed to be of the same length.
@@ -144,7 +152,7 @@ fn memcmp[
 
 @always_inline
 fn _memcpy_impl(
-    dest_data: UnsafePointer[Byte, *_], src_data: __type_of(dest_data), n: Int
+    dest_data: UnsafePointer[Byte, **_], src_data: __type_of(dest_data), n: Int
 ):
     """Copies a memory area.
 
@@ -228,8 +236,8 @@ fn _memcpy_impl(
 fn memcpy[
     T: AnyType
 ](
-    dest: UnsafePointer[T, AddressSpace.GENERIC, *_],
-    src: UnsafePointer[T, AddressSpace.GENERIC, *_],
+    dest: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
+    src: UnsafePointer[T, address_space = AddressSpace.GENERIC, **_],
     count: Int,
 ):
     """Copies a memory area.
@@ -258,7 +266,11 @@ fn memcpy[
 @always_inline("nodebug")
 fn _memset_impl[
     address_space: AddressSpace
-](ptr: UnsafePointer[Byte, address_space], value: Byte, count: Int):
+](
+    ptr: UnsafePointer[Byte, address_space=address_space],
+    value: Byte,
+    count: Int,
+):
     alias simd_width = simdwidthof[Byte]()
     var vector_end = _align_down(count, simd_width)
 
@@ -272,7 +284,11 @@ fn _memset_impl[
 @always_inline
 fn memset[
     type: AnyType, address_space: AddressSpace
-](ptr: UnsafePointer[type, address_space], value: Byte, count: Int):
+](
+    ptr: UnsafePointer[type, address_space=address_space],
+    value: Byte,
+    count: Int,
+):
     """Fills memory with the given value.
 
     Parameters:
@@ -295,7 +311,7 @@ fn memset[
 @always_inline
 fn memset_zero[
     type: AnyType, address_space: AddressSpace, //
-](ptr: UnsafePointer[type, address_space], count: Int):
+](ptr: UnsafePointer[type, address_space=address_space], count: Int):
     """Fills memory with zeros.
 
     Parameters:
@@ -312,7 +328,7 @@ fn memset_zero[
 @always_inline
 fn memset_zero[
     type: DType, address_space: AddressSpace, //, *, count: Int
-](ptr: UnsafePointer[Scalar[type], address_space]):
+](ptr: UnsafePointer[Scalar[type], address_space=address_space]):
     """Fills memory with zeros.
 
     Parameters:
@@ -351,7 +367,7 @@ fn stack_allocation[
     /,
     alignment: Int = alignof[type]() if is_gpu() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[Scalar[type], address_space]:
+]() -> UnsafePointer[Scalar[type], address_space=address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -378,7 +394,7 @@ fn stack_allocation[
     name: Optional[StringLiteral] = None,
     alignment: Int = alignof[type]() if is_gpu() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]() -> UnsafePointer[type, address_space]:
+]() -> UnsafePointer[type, address_space=address_space]:
     """Allocates data buffer space on the stack given a data type and number of
     elements.
 
@@ -402,7 +418,9 @@ fn stack_allocation[
             return __mlir_op.`pop.global_alloc`[
                 name = global_name.value,
                 count = count.value,
-                _type = UnsafePointer[type, address_space]._mlir_type,
+                _type = UnsafePointer[
+                    type, address_space=address_space
+                ]._mlir_type,
                 alignment = alignment.value,
             ]()
         # MSTDL-797: The NVPTX backend requires that `alloca` instructions may
@@ -415,13 +433,15 @@ fn stack_allocation[
                 alignment = alignment.value,
             ]()
             return __mlir_op.`pop.pointer.bitcast`[
-                _type = UnsafePointer[type, address_space]._mlir_type
+                _type = UnsafePointer[
+                    type, address_space=address_space
+                ]._mlir_type
             ](generic_ptr)
 
     # Perofrm a stack allocation of the requested size, alignment, and type.
     return __mlir_op.`pop.stack_allocation`[
         count = count.value,
-        _type = UnsafePointer[type, address_space]._mlir_type,
+        _type = UnsafePointer[type, address_space=address_space]._mlir_type,
         alignment = alignment.value,
     ]()
 
@@ -438,16 +458,19 @@ fn _malloc[
     *,
     alignment: Int = alignof[type]() if is_gpu() else 1,
 ](size: Int, /) -> UnsafePointer[
-    type, AddressSpace.GENERIC, alignment=alignment
+    type, address_space = AddressSpace.GENERIC, alignment=alignment
 ]:
     @parameter
     if is_gpu():
         return external_call[
-            "malloc", UnsafePointer[NoneType, AddressSpace.GENERIC]
+            "malloc",
+            UnsafePointer[NoneType, address_space = AddressSpace.GENERIC],
         ](size).bitcast[type]()
     else:
         return __mlir_op.`pop.aligned_alloc`[
-            _type = UnsafePointer[type, AddressSpace.GENERIC]._mlir_type
+            _type = UnsafePointer[
+                type, address_space = AddressSpace.GENERIC
+            ]._mlir_type
         ](alignment.value, size.value)
 
 
@@ -457,7 +480,7 @@ fn _malloc[
 
 
 @always_inline
-fn _free(ptr: UnsafePointer[_, AddressSpace.GENERIC, *_]):
+fn _free(ptr: UnsafePointer[_, address_space = AddressSpace.GENERIC, *_, **_]):
     @parameter
     if is_gpu():
         libc.free(ptr.bitcast[NoneType]())
