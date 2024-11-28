@@ -44,14 +44,7 @@ alias OriginSet = __mlir_type.`!lit.origin.set`
 """A set of origin parameters."""
 
 
-struct _origin_inner[is_mutable: Bool, //]:
-    alias type = __mlir_type[
-        `!lit.origin<`,
-        is_mutable.value,
-        `>`,
-    ]
-
-
+@value
 @register_passable("trivial")
 struct Origin[is_mutable: Bool]:
     """This represents a origin reference for a memory value.

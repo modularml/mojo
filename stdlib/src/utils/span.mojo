@@ -382,13 +382,3 @@ struct Span[
         """
         for element in self:
             element[] = value
-
-    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
-        """
-        Return an immutable version of this span.
-        Returns:
-            A span covering the same elements, but without mutability.
-        """
-        return Span[T, _lit_mut_cast[origin, False].result](
-            ptr=self._data, length=self._len
-        )
