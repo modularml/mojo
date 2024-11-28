@@ -16,38 +16,43 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 import math
+from collections import InlineArray
+from collections.string import (
+    _calc_format_buffer_size,
+    _calc_initial_buffer_size,
+)
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from math import Ceilable, CeilDivable, Floorable, Truncable
 from math.math import _call_ptx_intrinsic
+from os import abort
 from sys import (
     PrefetchOptions,
     _RegisterPackType,
+    alignof,
+    bitwidthof,
     has_neon,
+    is_amd_gpu,
+    is_gpu,
+    is_nvidia_gpu,
     is_x86,
     llvm_intrinsic,
     prefetch,
     simdwidthof,
-    is_nvidia_gpu,
-    is_gpu,
-    is_amd_gpu,
-    bitwidthof,
+    sizeof,
 )
+from sys._assembly import inlined_assembly
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
 
-from sys._assembly import inlined_assembly
-from os import abort
-
 from bit import pop_count
-from documentation import doc_private
-from math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.dtype import _uint_type_of_width
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from builtin.format_int import _try_write_int
 from builtin._format_float import _write_float
+from builtin.dtype import _uint_type_of_width
+from builtin.format_int import _try_write_int
 from builtin.io import _snprintf
-from collections import InlineArray
-from memory import bitcast, UnsafePointer
+from documentation import doc_private
+from memory import UnsafePointer, bitcast
 
-from utils import StringSlice, StaticTuple, IndexList, Span
+from utils import IndexList, Span, StaticTuple, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -56,17 +61,12 @@ from utils.numerics import max_or_inf as _max_or_inf
 from utils.numerics import min_finite as _min_finite
 from utils.numerics import min_or_neg_inf as _min_or_neg_inf
 from utils.numerics import nan as _nan
-from sys import sizeof, alignof
 
 from .dtype import (
     _get_dtype_printf_format,
     _integral_type_of,
-    _unsigned_integral_type_of,
     _scientific_notation_digits,
-)
-from collections.string import (
-    _calc_format_buffer_size,
-    _calc_initial_buffer_size,
+    _unsigned_integral_type_of,
 )
 
 # ===----------------------------------------------------------------------=== #

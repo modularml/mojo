@@ -13,10 +13,12 @@
 """Establishes the contract between `Writer` and `Writable` types."""
 
 from collections import InlineArray
-from memory import memcpy, UnsafePointer
-from utils import Span, StaticString
 from sys.info import is_gpu
+
 from builtin.io import _printf
+from memory import UnsafePointer, memcpy
+
+from utils import Span, StaticString
 
 # ===----------------------------------------------------------------------===#
 

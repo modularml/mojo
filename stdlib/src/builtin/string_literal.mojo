@@ -15,19 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import c_char
-
-from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from sys.ffi import c_char
+
+from memory import UnsafePointer, memcpy
+
+from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
-    _StringSliceIter,
-    _to_string_list,
-)
+from utils.string_slice import _StringSliceIter, _to_string_list
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral

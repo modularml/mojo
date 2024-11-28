@@ -18,7 +18,8 @@ You can import these APIs from the `collections` package. For example:
 from collections import Counter
 ```
 """
-from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
+from collections.dict import Dict, _DictEntryIter, _DictKeyIter, _DictValueIter
+
 from utils import Variant
 
 

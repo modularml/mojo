@@ -22,11 +22,11 @@ from .os import (
     abort,
     getuid,
     listdir,
-    mkdir,
     makedirs,
+    mkdir,
     remove,
-    rmdir,
     removedirs,
+    rmdir,
     sep,
     unlink,
 )

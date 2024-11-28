@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof, is_nvidia_gpu, is_gpu
+from sys import alignof, is_gpu, is_nvidia_gpu, sizeof
 from sys.intrinsics import (
     _mlirtype_is_eq,
     _type_is_eq,
@@ -31,7 +31,6 @@ from sys.intrinsics import (
 
 from bit import is_power_of_two
 from memory.memory import _free, _malloc
-
 
 # ===----------------------------------------------------------------------=== #
 # UnsafePointer

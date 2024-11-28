@@ -12,14 +12,14 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_false, assert_true, assert_not_equal
+from memory import OwnedPointer, UnsafePointer
 from test_utils import (
-    MoveOnly,
     ExplicitCopyOnly,
     ImplicitCopyOnly,
+    MoveOnly,
     ObservableDel,
 )
-from memory import OwnedPointer, UnsafePointer
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
 
 
 def test_basic_ref():

@@ -26,13 +26,12 @@ There are a few main tools in this module:
 """
 
 import random
-
-from sys.ffi import _Global
-from sys import simdwidthof, bitwidthof
 from collections import InlineArray
+from sys import bitwidthof, simdwidthof
+from sys.ffi import _Global
 
 from builtin.dtype import _uint_type_of_width
-from memory import memcpy, memset_zero, stack_allocation, bitcast, UnsafePointer
+from memory import UnsafePointer, bitcast, memcpy, memset_zero, stack_allocation
 
 # ===----------------------------------------------------------------------=== #
 # Implementation

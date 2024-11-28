@@ -23,11 +23,13 @@ f.close()
 ```
 
 """
-from utils import Span
-from builtin.io import _printf
 from sys.ffi import external_call
 from sys.info import is_gpu
+
+from builtin.io import _printf
 from memory import UnsafePointer
+
+from utils import Span
 
 
 @value

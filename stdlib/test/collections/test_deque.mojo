@@ -12,9 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_false, assert_true, assert_raises
-
 from collections import Deque
+
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 # ===----------------------------------------------------------------------===#
 # Implementation tests

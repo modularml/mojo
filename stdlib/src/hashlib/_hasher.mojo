@@ -11,8 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from ._ahash import AHasher
 from memory import UnsafePointer
+
+from ._ahash import AHasher
 
 
 trait _HashableWithHasher:

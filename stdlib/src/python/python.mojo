@@ -28,14 +28,14 @@ from memory import UnsafePointer
 
 from utils import StringRef
 
-from .python_object import PythonObject, TypedPythonObject
 from ._cpython import (
     CPython,
     Py_eval_input,
     Py_file_input,
-    PyMethodDef,
     Py_ssize_t,
+    PyMethodDef,
 )
+from .python_object import PythonObject, TypedPythonObject
 
 alias _PYTHON_GLOBAL = _Global["Python", _PythonGlobal, _init_python_global]
 

@@ -15,11 +15,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import bitwidthof
-from utils._visualizers import lldb_formatter_wrapping_type
-from documentation import doc_private
-from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from sys import bitwidthof
+
+from documentation import doc_private
+
+from utils._visualizers import lldb_formatter_wrapping_type
 
 
 @lldb_formatter_wrapping_type

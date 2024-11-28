@@ -18,7 +18,7 @@ Documentation for these functions can be found online at:
 """
 
 from collections import InlineArray, Optional
-from os import getenv, setenv, abort
+from os import abort, getenv, setenv
 from os.path import dirname
 from pathlib import Path
 from sys import external_call
@@ -34,13 +34,11 @@ from sys.ffi import (
     c_uint,
 )
 
-from python.python import _get_global_python_itf
-from python._bindings import Typed_initproc, PyMojoObject, Pythonable
-
 from memory import UnsafePointer
+from python._bindings import PyMojoObject, Pythonable, Typed_initproc
+from python.python import _get_global_python_itf
 
 from utils import StringRef, StringSlice
-
 
 # ===-----------------------------------------------------------------------===#
 # Raw Bindings

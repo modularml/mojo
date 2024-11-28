@@ -20,17 +20,18 @@ from memory import memcmp
 """
 
 
+from collections import Optional
+from sys import _libc as libc
 from sys import (
     alignof,
-    llvm_intrinsic,
-    sizeof,
-    is_gpu,
     external_call,
-    simdwidthof,
+    is_gpu,
+    llvm_intrinsic,
     simdbitwidth,
-    _libc as libc,
+    simdwidthof,
+    sizeof,
 )
-from collections import Optional
+
 from memory.pointer import AddressSpace, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------=== #

@@ -19,8 +19,9 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
+
+from .ffi import OpaquePointer, _external_call_const, external_call
 
 
 @always_inline("nodebug")
