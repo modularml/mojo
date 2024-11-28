@@ -22,6 +22,86 @@ from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
 
 
+# ===----------------------------------------------------------------------=== #
+#  UIntable
+# ===----------------------------------------------------------------------=== #
+
+
+trait UIntable:
+    """The `UIntable` trait describes a type that can be converted to a `UInt`.
+    """
+
+    fn __uint__(self) -> UInt:
+        """Get the unsigned integral representation of the value.
+
+        Returns:
+            The unsigned integral representation of the value.
+        """
+        ...
+
+
+trait UIntableRaising:
+    """The `UIntableRaising` trait describes a type can be converted to a UInt,
+    but the conversion might raise an error.
+    """
+
+    fn __uint__(self) raises -> UInt:
+        """Get the unsigned integral representation of the value.
+
+        Returns:
+            The unsigned integral representation of the type.
+
+        Raises:
+            If the type does not have an unsigned integral representation.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+#  uint
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn uint[T: UIntable](value: T) -> UInt:
+    """Get the `UInt` representation of the value.
+
+    Parameters:
+        T: The UIntable type.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The unsigned integral representation of the value.
+    """
+    return value.__uint__()
+
+
+@always_inline
+fn uint[T: UIntableRaising](value: T) raises -> UInt:
+    """Get the `UInt` representation of the value.
+
+    Parameters:
+        T: The UIntable type.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The unsigned integral representation of the value.
+
+    Raises:
+        If the type does not have an integral representation.
+    """
+    return value.__uint__()
+
+
+# ===----------------------------------------------------------------------=== #
+#  UInt
+# ===----------------------------------------------------------------------=== #
+
+
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
@@ -85,21 +165,31 @@ struct UInt(IntLike, _HashableWithHasher):
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: Int):
-        """Construct UInt from the given index value.
+        """Construct `UInt` from the given `Int` value.
 
         Args:
             value: The init value.
         """
+        debug_assert(
+            value >= 0,
+            "Constructing `UInt` from negative `Int` is discouraged, use the",
+            " `uint` builtin function (e.g. `uint(-1)`) if you are sure.",
+        )
         self.value = value.value
 
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: IntLiteral):
-        """Construct UInt from the given IntLiteral value.
+        """Construct `UInt` from the given `IntLiteral` value.
 
         Args:
             value: The init value.
         """
+        debug_assert(
+            value >= 0,
+            "Constructing `UInt` from negative `Int` is discouraged, use the",
+            " `uint` builtin function (e.g. `uint(-1)`) if you are sure.",
+        )
         self = value.__uint__()
 
     @always_inline("nodebug")
@@ -110,6 +200,24 @@ struct UInt(IntLike, _HashableWithHasher):
             The corresponding __mlir_type.index value.
         """
         return self.value
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Gets the integral value.
+
+        Returns:
+            The value as an integer.
+        """
+        return self.value
+
+    @always_inline("nodebug")
+    fn __uint__(self) -> UInt:
+        """Gets the unsigned integral value.
+
+        Returns:
+            The value as an unsigned integer.
+        """
+        return self
 
     @no_inline
     fn __str__(self) -> String:

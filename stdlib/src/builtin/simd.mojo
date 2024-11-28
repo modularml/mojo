@@ -1425,6 +1425,19 @@ struct SIMD[type: DType, size: Int](
             ](rebind[Scalar[type]](self).value)
 
     @always_inline("nodebug")
+    fn __uint__(self) -> UInt:
+        """Casts to the value to a UInt. If there is a fractional component,
+        then the fractional part is truncated.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            The value as an integer.
+        """
+        return uint(int(self))
+
+    @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
         """Convert to index.
 

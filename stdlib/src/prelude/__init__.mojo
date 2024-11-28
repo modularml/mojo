@@ -83,7 +83,7 @@ from builtin.type_aliases import (
     OriginSet,
     Origin,
 )
-from builtin.uint import UInt
+from builtin.uint import UInt, uint
 from builtin.value import (
     Movable,
     Copyable,
