@@ -1216,7 +1216,7 @@ struct Int(
     @staticmethod
     fn from_bytes[
         D: DType, big_endian: Bool = False
-    ](bytes: Span[Scalar[D]]) raises -> Self:
+    ](bytes: Span[Byte]) raises -> Self:
         """Converts a byte array to an integer.
 
         Args:
@@ -1231,7 +1231,7 @@ struct Int(
         """
         if D.sizeof() != len(bytes):
             raise Error("Byte array size does not match the integer size.")
-        var ptr: UnsafePointer[Scalar[D]] = UnsafePointer.address_of(bytes[0])
+        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(bytes[0])
         var type_ptr: UnsafePointer[Scalar[D]] = ptr.bitcast[Scalar[D]]()
         var value = type_ptr[]
 
@@ -1242,7 +1242,7 @@ struct Int(
             value = byte_swap(value)
         return int(value)
 
-    fn as_bytes[D: DType, big_endian: Bool = False](self) -> List[Scalar[D]]:
+    fn as_bytes[D: DType, big_endian: Bool = False](self) -> List[Byte]:
         """Convert the integer to a byte array.
 
         Parameters:
@@ -1262,11 +1262,11 @@ struct Int(
             value = byte_swap(value)
 
         var ptr: UnsafePointer[Scalar[D]] = UnsafePointer.address_of(value)
-        var scalar_ptr: UnsafePointer[Scalar[D]] = ptr.bitcast[Scalar[D]]()
-        var list = List[Scalar[D]](capacity=type_len)
+        var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
+        var list = List[Byte](capacity=type_len)
 
         # TODO: Maybe this can be a List.extend(ptr, count) method
-        memcpy(list.unsafe_ptr(), scalar_ptr, type_len)
+        memcpy(list.unsafe_ptr(), byte_ptr, type_len)
         list.size = type_len
 
         return list^
