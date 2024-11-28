@@ -664,6 +664,7 @@ struct DType(
             The `DType` if matched, otherwise `DType.invalid`.
         """
 
+        @parameter
         if _type_is_eq[T, SIMD[DType.bool, size]]():
             return DType.bool
         elif _type_is_eq[T, SIMD[DType.int8, size]]():
@@ -686,8 +687,12 @@ struct DType(
             return DType.index
         elif _type_is_eq[T, SIMD[DType.float8e5m2, size]]():
             return DType.float8e5m2
+        elif _type_is_eq[T, SIMD[DType.float8e5m2fnuz, size]]():
+            return DType.float8e5m2fnuz
         elif _type_is_eq[T, SIMD[DType.float8e4m3, size]]():
             return DType.float8e4m3
+        elif _type_is_eq[T, SIMD[DType.float8e4m3fnuz, size]]():
+            return DType.float8e4m3fnuz
         elif _type_is_eq[T, SIMD[DType.bfloat16, size]]():
             return DType.bfloat16
         elif _type_is_eq[T, SIMD[DType.float16, size]]():
