@@ -13,6 +13,7 @@
 
 from .path import (
     dirname,
+    basename,
     exists,
     expanduser,
     expandvars,
@@ -22,5 +23,6 @@ from .path import (
     islink,
     join,
     split,
+    splitroot,
     lexists,
 )

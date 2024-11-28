@@ -38,13 +38,12 @@ from utils import (
     Writable,
     Writer,
 )
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
     _utf8_byte_type,
     _StringSliceIter,
     _unicode_codepoint_utf8_byte_length,
     _shift_unicode_to_utf8,
-    _FormatCurlyEntry,
-    _CurlyEntryFormattable,
     _to_string_list,
 )
 
@@ -236,15 +235,15 @@ fn ascii(value: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
-    """Implementation of `atol` for StringRef inputs.
+fn _atol(str_slice: StringSlice, base: Int = 10) raises -> Int:
+    """Implementation of `atol` for StringSlice inputs.
 
     Please see its docstring for details.
     """
     if (base != 0) and (base < 2 or base > 36):
         raise Error("Base must be >= 2 and <= 36, or 0.")
-    if not str_ref:
-        raise Error(_atol_error(base, str_ref))
+    if not str_slice:
+        raise Error(_str_to_base_error(base, str_slice))
 
     var real_base: Int
     var ord_num_max: Int
@@ -254,53 +253,23 @@ fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
     var is_negative: Bool = False
     var has_prefix: Bool = False
     var start: Int = 0
-    var str_len = len(str_ref)
-    var buff = str_ref.unsafe_ptr()
+    var str_len = str_slice.byte_length()
 
-    for pos in range(start, str_len):
-        if _isspace(buff[pos]):
-            continue
-
-        if str_ref[pos] == "-":
-            is_negative = True
-            start = pos + 1
-        elif str_ref[pos] == "+":
-            start = pos + 1
-        else:
-            start = pos
-        break
-
-    if str_ref[start] == "0" and start + 1 < str_len:
-        if base == 2 and (
-            str_ref[start + 1] == "b" or str_ref[start + 1] == "B"
-        ):
-            start += 2
-            has_prefix = True
-        elif base == 8 and (
-            str_ref[start + 1] == "o" or str_ref[start + 1] == "O"
-        ):
-            start += 2
-            has_prefix = True
-        elif base == 16 and (
-            str_ref[start + 1] == "x" or str_ref[start + 1] == "X"
-        ):
-            start += 2
-            has_prefix = True
+    start, is_negative = _trim_and_handle_sign(str_slice, str_len)
 
     alias ord_0 = ord("0")
-    # FIXME:
-    #   Change this to `alias` after fixing support for __getitem__ of alias.
-    var ord_letter_min = (ord("a"), ord("A"))
+    alias ord_letter_min = (ord("a"), ord("A"))
     alias ord_underscore = ord("_")
 
     if base == 0:
-        var real_base_new_start = _identify_base(str_ref, start)
+        var real_base_new_start = _identify_base(str_slice, start)
         real_base = real_base_new_start[0]
         start = real_base_new_start[1]
         has_prefix = real_base != 10
         if real_base == -1:
-            raise Error(_atol_error(base, str_ref))
+            raise Error(_str_to_base_error(base, str_slice))
     else:
+        start, has_prefix = _handle_base_prefix(start, str_slice, str_len, base)
         real_base = base
 
     if real_base <= 10:
@@ -312,21 +281,23 @@ fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
             ord("A") + (real_base - 11),
         )
 
+    var buff = str_slice.unsafe_ptr()
     var found_valid_chars_after_start = False
     var has_space_after_number = False
+
     # Prefixed integer literals with real_base 2, 8, 16 may begin with leading
     # underscores under the conditions they have a prefix
-    var was_last_digit_undescore = not (real_base in (2, 8, 16) and has_prefix)
+    var was_last_digit_underscore = not (real_base in (2, 8, 16) and has_prefix)
     for pos in range(start, str_len):
         var ord_current = int(buff[pos])
         if ord_current == ord_underscore:
-            if was_last_digit_undescore:
-                raise Error(_atol_error(base, str_ref))
+            if was_last_digit_underscore:
+                raise Error(_str_to_base_error(base, str_slice))
             else:
-                was_last_digit_undescore = True
+                was_last_digit_underscore = True
                 continue
         else:
-            was_last_digit_undescore = False
+            was_last_digit_underscore = False
         if ord_0 <= ord_current <= ord_num_max:
             result += ord_current - ord_0
             found_valid_chars_after_start = True
@@ -341,45 +312,100 @@ fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
             start = pos + 1
             break
         else:
-            raise Error(_atol_error(base, str_ref))
+            raise Error(_str_to_base_error(base, str_slice))
         if pos + 1 < str_len and not _isspace(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
-                    _atol_error(base, str_ref)
+                    _str_to_base_error(base, str_slice)
                     + " String expresses an integer too large to store in Int."
                 )
             result = nextresult
 
-    if was_last_digit_undescore or (not found_valid_chars_after_start):
-        raise Error(_atol_error(base, str_ref))
+    if was_last_digit_underscore or (not found_valid_chars_after_start):
+        raise Error(_str_to_base_error(base, str_slice))
 
     if has_space_after_number:
         for pos in range(start, str_len):
             if not _isspace(buff[pos]):
-                raise Error(_atol_error(base, str_ref))
+                raise Error(_str_to_base_error(base, str_slice))
     if is_negative:
         result = -result
     return result
 
 
-fn _atol_error(base: Int, str_ref: StringSlice[_]) -> String:
+@always_inline
+fn _trim_and_handle_sign(str_slice: StringSlice, str_len: Int) -> (Int, Bool):
+    """Trims leading whitespace, handles the sign of the number in the string.
+
+    Args:
+        str_slice: A StringSlice containing the number to parse.
+        str_len: The length of the string.
+
+    Returns:
+        A tuple containing:
+        - The starting index of the number after whitespace and sign.
+        - A boolean indicating whether the number is negative.
+    """
+    var buff = str_slice.unsafe_ptr()
+    var start: Int = 0
+    while start < str_len and _isspace(buff[start]):
+        start += 1
+    var p: Bool = buff[start] == ord("+")
+    var n: Bool = buff[start] == ord("-")
+    return start + (p or n), n
+
+
+@always_inline
+fn _handle_base_prefix(
+    pos: Int, str_slice: StringSlice, str_len: Int, base: Int
+) -> (Int, Bool):
+    """Adjusts the starting position if a valid base prefix is present.
+
+    Handles "0b"/"0B" for base 2, "0o"/"0O" for base 8, and "0x"/"0X" for base
+    16. Only adjusts if the base matches the prefix.
+
+    Args:
+        pos: Current position in the string.
+        str_slice: The input StringSlice.
+        str_len: Length of the input string.
+        base: The specified base.
+
+    Returns:
+        A tuple containing:
+            - Updated position after the prefix, if applicable.
+            - A boolean indicating if the prefix was valid for the given base.
+    """
+    var start = pos
+    var buff = str_slice.unsafe_ptr()
+    if start + 1 < str_len:
+        var prefix_char = chr(int(buff[start + 1]))
+        if buff[start] == ord("0") and (
+            (base == 2 and (prefix_char == "b" or prefix_char == "B"))
+            or (base == 8 and (prefix_char == "o" or prefix_char == "O"))
+            or (base == 16 and (prefix_char == "x" or prefix_char == "X"))
+        ):
+            start += 2
+    return start, start != pos
+
+
+fn _str_to_base_error(base: Int, str_slice: StringSlice) -> String:
     return (
         "String is not convertible to integer with base "
         + str(base)
         + ": '"
-        + str(str_ref)
+        + str(str_slice)
         + "'"
     )
 
 
-fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
-    var length = len(str_ref)
+fn _identify_base(str_slice: StringSlice[_], start: Int) -> Tuple[Int, Int]:
+    var length = str_slice.byte_length()
     # just 1 digit, assume base 10
     if start == (length - 1):
         return 10, start
-    if str_ref[start] == "0":
-        var second_digit = str_ref[start + 1]
+    if str_slice[start] == "0":
+        var second_digit = str_slice[start + 1]
         if second_digit == "b" or second_digit == "B":
             return 2, start + 2
         if second_digit == "o" or second_digit == "O":
@@ -389,7 +415,7 @@ fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
         # checking for special case of all "0", "_" are also allowed
         var was_last_character_underscore = False
         for i in range(start + 1, length):
-            if str_ref[i] == "_":
+            if str_slice[i] == "_":
                 if was_last_character_underscore:
                     return -1, -1
                 else:
@@ -397,9 +423,9 @@ fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
                     continue
             else:
                 was_last_character_underscore = False
-            if str_ref[i] != "0":
+            if str_slice[i] != "0":
                 return -1, -1
-    elif ord("1") <= ord(str_ref[start]) <= ord("9"):
+    elif ord("1") <= ord(str_slice[start]) <= ord("9"):
         return 10, start
     else:
         return -1, -1
@@ -410,19 +436,37 @@ fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
 fn atol(str: String, base: Int = 10) raises -> Int:
     """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If base is 0 the the string is
-    parsed as an Integer literal, see: https://docs.python.org/3/reference/lexical_analysis.html#integers.
-
-    Raises:
-        If the given string cannot be parsed as an integer value. For example in
-        `atol("hi")`.
+    If base is set to 0, the string is parsed as an Integer literal, with the
+    following considerations:
+    - '0b' or '0B' prefix indicates binary (base 2)
+    - '0o' or '0O' prefix indicates octal (base 8)
+    - '0x' or '0X' prefix indicates hexadecimal (base 16)
+    - Without a prefix, it's treated as decimal (base 10)
 
     Args:
         str: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
-        An integer value that represents the string, or otherwise raises.
+        An integer value that represents the string.
+
+    Raises:
+        If the given string cannot be parsed as an integer value or if an
+        incorrect base is provided.
+
+    Examples:
+        >>> atol("32")
+        32
+        >>> atol("FF", 16)
+        255
+        >>> atol("0xFF", 0)
+        255
+        >>> atol("0b1010", 0)
+        10
+
+    Notes:
+        This follows [Python's integer literals](
+        https://docs.python.org/3/reference/lexical_analysis.html#integers).
     """
     return _atol(str.as_string_slice(), base)
 
@@ -1436,7 +1480,6 @@ struct String(
             result.write(a)
 
         elems.each[add_elt]()
-        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:

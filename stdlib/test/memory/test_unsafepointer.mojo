@@ -178,10 +178,10 @@ def test_comparisons():
 
 
 def test_unsafepointer_address_space():
-    var p1 = UnsafePointer[Int, AddressSpace(0)].alloc(1)
+    var p1 = UnsafePointer[Int, address_space = AddressSpace(0)].alloc(1)
     p1.free()
 
-    var p2 = UnsafePointer[Int, AddressSpace.GENERIC].alloc(1)
+    var p2 = UnsafePointer[Int, address_space = AddressSpace.GENERIC].alloc(1)
     p2.free()
 
 
