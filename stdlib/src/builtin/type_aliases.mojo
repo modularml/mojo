@@ -15,6 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from builtin.builtin_list import _lit_mut_cast
+
 alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
 
@@ -56,26 +58,37 @@ struct Origin[is_mutable: Bool]:
         is_mutable.value,
         `>`,
     ]
+    """The underlying MLIR type."""
 
     # ===-------------------------------------------------------------------===#
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    var _mlir_origin: Self.type
+    var value: Self.type
+    """The underlying MLIR value."""
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    # NOTE:
-    #   Needs to be @implicit convertible for the time being so that
-    #   `__origin_of(..)` can implicilty convert to `Origin` in use cases like:
-    #       Span[Byte, __origin_of(self)]
+    @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self, mlir_origin: Self.type):
-        """Initialize an Origin from a raw MLIR `!lit.origin` value.
+    fn __init__(out self: Origin[False], origin: Origin[True]):
+        """Initialize an Origin from an mutable origin value.
 
         Args:
-            mlir_origin: The raw MLIR origin value."""
-        self._mlir_origin = mlir_origin
+            origin: The origin value.
+        """
+        self.value = rebind[ImmutableOrigin](origin.value)
+
+    @doc_private
+    @implicit
+    @always_inline("nodebug")
+    fn __init__(out self: Origin[True], origin: Origin[False]):
+        """Initialize an Origin from an mutable origin value.
+
+        Args:
+            origin: The origin value.
+        """
+        self.value = rebind[MutableOrigin](origin.value)

@@ -22,6 +22,7 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
+from builtin.builtin_list import _lit_mut_cast
 from utils import Span
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
@@ -242,7 +243,7 @@ struct _StringSliceIter[
 
 @value
 @register_passable("trivial")
-struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
     Stringable,
     Sized,
     Writable,
@@ -261,11 +262,35 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         UTF-8.
     """
 
+    alias _mut = StringSlice[Origin[True].value]
+    alias _immut = StringSlice[Origin[False].value]
     var _slice: Span[Byte, origin]
 
     # ===------------------------------------------------------------------===#
     # Initializers
     # ===------------------------------------------------------------------===#
+
+    @doc_private
+    @implicit
+    @always_inline("nodebug")
+    fn __init__(out self: Self._mut, other: Self._immut):
+        """Implicitly cast the immutable origin of self to a mutable one.
+
+        Args:
+            other: The StringSlice to cast.
+        """
+        self = rebind[__type_of(self)](other)
+
+    @doc_private
+    @implicit
+    @always_inline("nodebug")
+    fn __init__(out self: Self._immut, other: Self._mut):
+        """Implicitly cast the mutable origin of self to an immutable one.
+
+        Args:
+            other: The StringSlice to cast.
+        """
+        self = rebind[__type_of(self)](other)
 
     @always_inline
     @implicit
