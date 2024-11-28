@@ -23,7 +23,8 @@ from utils import StringSlice
 
 from bit import count_leading_zeros
 from utils import Span
-from collections.string import _isspace, _atol, _atof
+from collections.string import _isspace, _atol, atof
+
 from collections import List, Optional
 from memory import memcmp, UnsafePointer, memcpy
 from sys import simdwidthof, bitwidthof
@@ -596,7 +597,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         Returns:
             A float value that represents the string, or otherwise raises.
         """
-        return _atof(self)
+        return atof(self)
 
     fn __mul__(self, n: Int) -> String:
         """Concatenates the string `n` times.
