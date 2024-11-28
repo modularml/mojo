@@ -19,8 +19,8 @@ from python import PythonObject
 ```
 """
 
+from builtin.builtin_list import _lit_mut_cast
 from sys.intrinsics import _type_is_eq
-
 from memory import UnsafePointer
 from collections import Dict
 from utils import StringSlice, StringRef
@@ -1358,7 +1358,11 @@ struct PythonObject(
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
             var key = cpython.PyUnicode_DecodeUTF8(
-                entry[].key.as_string_slice()
+                rebind[
+                    StringSlice[
+                        _lit_mut_cast[__origin_of(entry[].key), False].result
+                    ]
+                ](entry[].key.as_string_slice())
             )
             var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object

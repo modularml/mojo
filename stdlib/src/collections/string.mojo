@@ -15,7 +15,6 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin.builtin_list import _lit_mut_cast
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
@@ -1600,9 +1599,7 @@ struct String(
         )
 
     @always_inline
-    fn as_string_slice(
-        ref self,
-    ) -> StringSlice[_lit_mut_cast[__origin_of(self), False].result]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1611,7 +1608,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[_lit_mut_cast[__origin_of(self), False].result](
+        return StringSlice[__origin_of(self)](
             ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
