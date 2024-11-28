@@ -20,6 +20,20 @@ These are Mojo built-ins, so you don't need to import them.
 # ===----------------------------------------------------------------------=== #
 
 
+# TODO(MOCO-1468): Add @explicit_destroy here so we get an error message,
+#     preferably one that mentions a link the user can go to to learn about
+#     linear types.
+trait UnknownDestructibility:
+    """The UnknownDestructibility trait is the most basic trait, that all other
+    types extend.
+
+    This has no __del__ method. For types that should have the __del__ method,
+    use ImplicitlyDestructible instead.
+    """
+
+    pass
+
+
 trait AnyType:
     """The AnyType trait describes a type that has a destructor.
 
@@ -32,10 +46,9 @@ trait AnyType:
     lifetime, and the resultant type receives a destructor regardless of whether
     the user explicitly defines one.
 
-    All types pessimistically require a destructor when used in generic
-    functions. Hence, all Mojo traits are considered to inherit from
-    AnyType, providing a default no-op destructor implementation for types
-    that may need them.
+    Unless they specify @explicit_destroy, all Mojo structs and traits are
+    considered to inherit from AnyType, providing a default no-op destructor
+    implementation for types that may need them.
 
     Example implementing the `AnyType` trait on `Foo` that frees the
     allocated memory:
@@ -66,3 +79,8 @@ trait AnyType:
         end of this function.
         """
         ...
+
+
+# A temporary alias to help with the linear types transition, see
+# https://www.notion.so/modularai/Linear-Types-14a1044d37bb809ab074c990fe1a84e3.
+alias ImplicitlyDestructible = AnyType

@@ -19,7 +19,6 @@ from memory import Pointer
 ```
 """
 
-from sys import is_nvidia_gpu
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace

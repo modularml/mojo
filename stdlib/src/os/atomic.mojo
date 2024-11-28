@@ -62,7 +62,7 @@ struct Atomic[type: DType]:
     @staticmethod
     @always_inline
     fn _fetch_add(
-        ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]
+        ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]
     ) -> Scalar[type]:
         """Performs atomic in-place add.
 
@@ -200,7 +200,7 @@ struct Atomic[type: DType]:
 
     @staticmethod
     @always_inline
-    fn max(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    fn max(ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
         """Performs atomic in-place max on the pointer.
 
         Atomically replaces the current value pointer to by `ptr` by the result
@@ -240,7 +240,7 @@ struct Atomic[type: DType]:
 
     @staticmethod
     @always_inline
-    fn min(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    fn min(ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
         """Performs atomic in-place min on the pointer.
 
         Atomically replaces the current value pointer to by `ptr` by the result
@@ -289,7 +289,7 @@ struct Atomic[type: DType]:
 fn _compare_exchange_weak_integral_impl[
     type: DType, //
 ](
-    value_addr: UnsafePointer[Scalar[type], *_],
+    value_addr: UnsafePointer[Scalar[type], **_],
     inout expected: Scalar[type],
     desired: Scalar[type],
 ) -> Bool:
@@ -318,7 +318,7 @@ fn _compare_exchange_weak_integral_impl[
 @always_inline
 fn _max_impl_base[
     type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     var value_addr = ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]()
     _ = __mlir_op.`pop.atomic.rmw`[
         bin_op = __mlir_attr.`#pop<bin_op max>`,
@@ -330,7 +330,7 @@ fn _max_impl_base[
 @always_inline
 fn _min_impl_base[
     type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     var value_addr = ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]()
     _ = __mlir_op.`pop.atomic.rmw`[
         bin_op = __mlir_attr.`#pop<bin_op min>`,
@@ -342,7 +342,7 @@ fn _min_impl_base[
 @always_inline
 fn _max_impl[
     type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     @parameter
     if is_nvidia_gpu() and type.is_floating_point():
         alias integral_type = _integral_type_of[type]()
@@ -365,7 +365,7 @@ fn _max_impl[
 @always_inline
 fn _min_impl[
     type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     @parameter
     if is_nvidia_gpu() and type.is_floating_point():
         alias integral_type = _integral_type_of[type]()

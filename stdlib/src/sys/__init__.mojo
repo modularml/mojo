@@ -50,6 +50,8 @@ from .info import (
     is_nvidia_gpu,
     is_amd_gpu,
     is_gpu,
+    has_amd_gpu,
+    has_nvidia_gpu,
 )
 from .intrinsics import (
     PrefetchCache,

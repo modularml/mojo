@@ -25,7 +25,7 @@ struct OwnedPointer[T: AnyType]:
         T: The type to be stored in the OwnedPointer[].
     """
 
-    var _inner: UnsafePointer[T, AddressSpace.GENERIC]
+    var _inner: UnsafePointer[T, address_space = AddressSpace.GENERIC]
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods

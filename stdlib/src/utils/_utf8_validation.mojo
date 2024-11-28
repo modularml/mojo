@@ -27,7 +27,7 @@ https://github.com/simdutf/SimdUnicode/blob/main/src/UTF8.cs
 
 from memory import UnsafePointer
 from sys.intrinsics import llvm_intrinsic
-from builtin.simd import _sub_with_saturation
+from base64._b64encode import _sub_with_saturation
 
 alias TOO_SHORT: UInt8 = 1 << 0
 alias TOO_LONG: UInt8 = 1 << 1
