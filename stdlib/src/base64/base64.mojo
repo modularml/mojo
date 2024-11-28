@@ -21,7 +21,9 @@ from base64 import b64encode
 
 from collections import List
 from sys import simdwidthof
+
 import bit
+
 from ._b64encode import b64encode_with_buffers as _b64encode_with_buffers
 
 # ===----------------------------------------------------------------------===#

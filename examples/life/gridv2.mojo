@@ -11,9 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from collections import Optional
-from memory import memcpy, memset_zero, UnsafePointer
 import random
+from collections import Optional
+
+from memory import UnsafePointer, memcpy, memset_zero
 
 
 struct Grid[rows: Int, cols: Int](StringableRaising):

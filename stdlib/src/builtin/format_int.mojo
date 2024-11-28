@@ -16,9 +16,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections import InlineArray, List, Optional
 from os import abort
-from collections import List, Optional, InlineArray
-from utils import StringSlice, StaticString
+
+from utils import StaticString, StringSlice
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 

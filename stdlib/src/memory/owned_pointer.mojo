@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from memory import UnsafePointer, stack_allocation, memcpy
+from memory import UnsafePointer, memcpy, stack_allocation
 
 
 struct OwnedPointer[T: AnyType]:

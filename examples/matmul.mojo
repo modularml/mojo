@@ -17,13 +17,12 @@
 
 from os.env import getenv
 from random import rand
-from sys import info
-from sys import simdwidthof
+from sys import info, simdwidthof
 
 import benchmark
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from algorithm import parallelize, vectorize
-from memory import memset_zero, stack_allocation, UnsafePointer
+from memory import UnsafePointer, memset_zero, stack_allocation
 from python import Python, PythonObject
 
 alias M = 512  # rows of A and C

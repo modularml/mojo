@@ -17,10 +17,10 @@ C standard library counterparts. These are used to implement higher level
 functionality in the rest of the Mojo standard library.
 """
 
-from memory import UnsafePointer
 from sys import os_is_windows
-from sys.ffi import c_char, c_int, OpaquePointer
+from sys.ffi import OpaquePointer, c_char, c_int
 
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # stdlib.h — core C standard library operations

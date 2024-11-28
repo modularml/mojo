@@ -15,9 +15,9 @@
 from .dict import (
     Dict,
     KeyElement,
+    RepresentableKeyElement,
     _DictEntryIter,
     _DictKeyIter,
-    RepresentableKeyElement,
 )
 
 

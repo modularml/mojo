@@ -13,10 +13,10 @@
 """Implements the time package."""
 
 from .time import (
+    monotonic,
     now,
     perf_counter,
     perf_counter_ns,
     sleep,
     time_function,
-    monotonic,
 )

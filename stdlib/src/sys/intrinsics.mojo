@@ -19,11 +19,12 @@ from sys import PrefetchLocality
 ```
 """
 
-from .info import sizeof, is_nvidia_gpu
-from ._assembly import inlined_assembly
 import math
 
 from memory import AddressSpace, UnsafePointer
+
+from ._assembly import inlined_assembly
+from .info import is_nvidia_gpu, sizeof
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic

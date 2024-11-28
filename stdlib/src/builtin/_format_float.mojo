@@ -25,10 +25,12 @@
 # ===----------------------------------------------------------------------=== #
 from collections import InlineArray
 from math import log2
-from memory import bitcast
 from sys.info import sizeof
-from utils import StaticTuple, Span
+
 from builtin.io import _printf
+from memory import bitcast
+
+from utils import Span, StaticTuple
 from utils.numerics import FPUtils, isinf, isnan
 
 

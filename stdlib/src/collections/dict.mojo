@@ -31,12 +31,13 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
+from sys.ffi import OpaquePointer
+
+from bit import is_power_of_two
 from builtin.value import StringableCollectionElement
+from memory import UnsafePointer, bitcast, memcpy
 
 from .optional import Optional
-from bit import is_power_of_two
-from sys.ffi import OpaquePointer
-from memory import memcpy, bitcast, UnsafePointer
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
