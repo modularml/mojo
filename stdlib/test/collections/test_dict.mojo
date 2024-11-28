@@ -15,8 +15,9 @@
 from collections import Dict, KeyElement, Optional
 from collections.dict import OwnedKwargsDict
 
-from test_utils import CopyCounter
+from test_utils import CopyCounter, ValueDestructorRecorder
 from testing import assert_equal, assert_false, assert_raises, assert_true
+from memory import UnsafePointer
 
 
 def test_dict_construction():
@@ -602,6 +603,44 @@ fn test_dict_setdefault() raises:
     assert_equal(0, other_dict["b"].copy_count)
 
 
+def test_dict_entries_del_count():
+    alias dict_type = Dict[Int, ValueDestructorRecorder]
+    var iter = 0
+    for entries_to_insert in range(16):
+        var x = List[Int]()
+        var y = dict_type()
+        var result = 0
+        var expected_result = 0
+        for i in range(entries_to_insert):
+            expected_result += i
+
+        for i in range(entries_to_insert):
+            y[i] = ValueDestructorRecorder(i, UnsafePointer.address_of(x))
+        assert_equal(len(x), 0)
+
+        for i in range(entries_to_insert):
+            result += y[i].value
+        assert_equal(len(x), 0)
+        __type_of(y).__del__(y^)
+        assert_equal(len(x), entries_to_insert)
+        assert_equal(result, expected_result)
+
+        y = dict_type()
+        x.clear()
+        result = 0
+        for i in range(entries_to_insert):
+            y[i] = ValueDestructorRecorder(i, UnsafePointer.address_of(x))
+        assert_equal(len(x), 0)
+        for i in range(entries_to_insert):
+            result += y.pop(i).value
+        assert_equal(len(x), entries_to_insert)
+        __type_of(y).__del__(y^)
+        assert_equal(len(x), entries_to_insert)
+        assert_equal(result, expected_result)
+        iter += 1
+    assert_equal(iter, 16)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
@@ -615,3 +654,4 @@ def main():
     test_clear()
     test_init_initial_capacity()
     test_dict_setdefault()
+    test_dict_entries_del_count()
