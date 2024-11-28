@@ -1231,9 +1231,11 @@ struct Int(
         """
         if D.sizeof() != len(bytes):
             raise Error("Byte array size does not match the integer size.")
-        var ptr: UnsafePointer[Byte] = UnsafePointer.address_of(bytes[0])
-        var type_ptr: UnsafePointer[Scalar[D]] = ptr.bitcast[Scalar[D]]()
-        var value = type_ptr[]
+
+        var ptr: UnsafePointer[Scalar[D]] = bytes.unsafe_ptr().bitcast[
+            Scalar[D]
+        ]()
+        var value = ptr[]
 
         @parameter
         if is_big_endian() and not big_endian:
@@ -1261,12 +1263,11 @@ struct Int(
         elif not is_big_endian() and big_endian:
             value = byte_swap(value)
 
-        var ptr: UnsafePointer[Scalar[D]] = UnsafePointer.address_of(value)
-        var byte_ptr: UnsafePointer[Byte] = ptr.bitcast[Byte]()
+        var ptr = UnsafePointer.address_of(value)
         var list = List[Byte](capacity=type_len)
 
         # TODO: Maybe this can be a List.extend(ptr, count) method
-        memcpy(list.unsafe_ptr(), byte_ptr, type_len)
+        memcpy(list.unsafe_ptr(), ptr.bitcast[Byte](), type_len)
         list.size = type_len
 
         return list^
