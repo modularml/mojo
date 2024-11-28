@@ -260,7 +260,7 @@ struct PythonVersion:
     """The patch version number."""
 
     @implicit
-    fn __init__[O: ImmutableOrigin](out self, version: StringSlice[O]):
+    fn __init__(out self, version: StringSlice[is_mutable=False]):
         """Initialize a PythonVersion object from a version string.
 
         Args:
@@ -795,8 +795,8 @@ struct CPython:
         self.logging_enabled = logging_enabled
         if not self.init_error:
             if not self.lib.check_symbol("Py_Initialize"):
-                self.init_error = __type_of(self.init_error)(
-                    "compatible Python library not found"
+                self.init_error = rebind[__type_of(self.init_error)](
+                    StringSlice("compatible Python library not found")
                 )
             self.lib.call["Py_Initialize"]()
             self.version = PythonVersion(_py_get_version(self.lib))
@@ -1070,9 +1070,9 @@ struct CPython:
     # Python Module operations
     # ===-------------------------------------------------------------------===#
 
-    fn PyImport_ImportModule[
-        O: ImmutableOrigin
-    ](inout self, name: StringSlice[O]) -> PyObjectPtr:
+    fn PyImport_ImportModule(
+        inout self, name: StringSlice[is_mutable=False]
+    ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/import.html#c.PyImport_ImportModule).
         """
@@ -1092,9 +1092,9 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyImport_AddModule[
-        O: ImmutableOrigin
-    ](inout self, name: StringSlice[O]) -> PyObjectPtr:
+    fn PyImport_AddModule(
+        inout self, name: StringSlice[is_mutable=False]
+    ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/import.html#c.PyImport_AddModule).
         """
@@ -1201,9 +1201,9 @@ struct CPython:
     # Python Evaluation
     # ===-------------------------------------------------------------------===#
 
-    fn PyRun_SimpleString[
-        O: ImmutableOrigin
-    ](inout self, strref: StringSlice[O]) -> Bool:
+    fn PyRun_SimpleString(
+        inout self, strref: StringSlice[is_mutable=False]
+    ) -> Bool:
         """Executes the given Python code.
 
         Args:
@@ -1224,11 +1224,9 @@ struct CPython:
             == 0
         )
 
-    fn PyRun_String[
-        O: ImmutableOrigin
-    ](
+    fn PyRun_String(
         inout self,
-        strref: StringSlice[O],
+        strref: StringSlice[is_mutable=False],
         globals: PyObjectPtr,
         locals: PyObjectPtr,
         run_mode: Int,
@@ -1277,12 +1275,10 @@ struct CPython:
         """
         return self.lib.call["PyEval_GetBuiltins", PyObjectPtr]()
 
-    fn Py_CompileString[
-        O1: ImmutableOrigin, O2: ImmutableOrigin
-    ](
+    fn Py_CompileString(
         inout self,
-        strref: StringSlice[O1],
-        filename: StringSlice[O2],
+        strref: StringSlice[is_mutable=False],
+        filename: StringSlice[is_mutable=False],
         compile_mode: Int,
     ) -> PyObjectPtr:
         """[Reference](
@@ -1378,9 +1374,9 @@ struct CPython:
 
         return r
 
-    fn PyObject_GetAttrString[
-        O: ImmutableOrigin
-    ](inout self, obj: PyObjectPtr, name: StringSlice[O],) -> PyObjectPtr:
+    fn PyObject_GetAttrString(
+        inout self, obj: PyObjectPtr, name: StringSlice[is_mutable=False]
+    ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetAttrString).
         """
@@ -1402,12 +1398,10 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyObject_SetAttrString[
-        O: ImmutableOrigin
-    ](
+    fn PyObject_SetAttrString(
         inout self,
         obj: PyObjectPtr,
-        name: StringSlice[O],
+        name: StringSlice[is_mutable=False],
         new_value: PyObjectPtr,
     ) -> c_int:
         """[Reference](
@@ -1731,9 +1725,9 @@ struct CPython:
     # Unicode Objects
     # ===-------------------------------------------------------------------===#
 
-    fn PyUnicode_DecodeUTF8[
-        O: ImmutableOrigin
-    ](inout self, strref: StringSlice[O]) -> PyObjectPtr:
+    fn PyUnicode_DecodeUTF8(
+        inout self, strref: StringSlice[is_mutable=False]
+    ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).
         """

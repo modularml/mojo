@@ -407,11 +407,8 @@ struct PythonObject(
         self = PythonObject(str(value))
 
     @implicit
-    fn __init__[O: ImmutableOrigin](out self, strref: StringSlice[O]):
+    fn __init__(out self, strref: StringSlice[is_mutable=False]):
         """Initialize the object from a string reference.
-
-        Parameters:
-            O: The origin of the reference.
 
         Args:
             strref: The string reference.
@@ -750,9 +747,9 @@ struct PythonObject(
         cpython.Py_DecRef(key_obj)
         cpython.Py_DecRef(value.py_object)
 
-    fn _call_zero_arg_method[
-        O: ImmutableOrigin
-    ](self, method_name: StringSlice[O]) raises -> PythonObject:
+    fn _call_zero_arg_method(
+        self, method_name: StringSlice[is_mutable=False]
+    ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(0)
         var callable_obj = cpython.PyObject_GetAttrString(
@@ -765,10 +762,8 @@ struct PythonObject(
         cpython.Py_DecRef(callable_obj)
         return PythonObject(result)
 
-    fn _call_single_arg_method[
-        O: ImmutableOrigin
-    ](
-        self, method_name: StringSlice[O], rhs: PythonObject
+    fn _call_single_arg_method(
+        self, method_name: StringSlice[is_mutable=False], rhs: PythonObject
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
@@ -786,9 +781,11 @@ struct PythonObject(
         cpython.Py_DecRef(callable_obj)
         return PythonObject(result_obj)
 
-    fn _call_single_arg_inplace_method[
-        O: ImmutableOrigin
-    ](inout self, method_name: StringSlice[O], rhs: PythonObject) raises:
+    fn _call_single_arg_inplace_method(
+        inout self,
+        method_name: StringSlice[is_mutable=False],
+        rhs: PythonObject,
+    ) raises:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
         var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)

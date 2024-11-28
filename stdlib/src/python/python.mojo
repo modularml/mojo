@@ -99,11 +99,8 @@ struct Python:
         """
         self.impl = existing.impl
 
-    fn eval[O: ImmutableOrigin](inout self, code: StringSlice[O]) -> Bool:
+    fn eval(inout self, code: StringSlice[is_mutable=False]) -> Bool:
         """Executes the given Python code.
-
-        Parameters:
-            O: The origin of the code.
 
         Args:
             code: The python code to execute.
@@ -116,17 +113,12 @@ struct Python:
         return cpython.PyRun_SimpleString(code)
 
     @staticmethod
-    fn evaluate[
-        O: ImmutableOrigin = StaticConstantOrigin
-    ](
-        expr: StringSlice[O],
+    fn evaluate(
+        expr: StringSlice[is_mutable=False],
         file: Bool = False,
         name: StaticString = "__main__",
     ) raises -> PythonObject:
         """Executes the given Python code.
-
-        Parameters:
-            O: The origin of the expression.
 
         Args:
             expr: The Python expression to evaluate.
@@ -212,13 +204,10 @@ struct Python:
 
     # TODO(MSTDL-880): Change this to return `TypedPythonObject["Module"]`
     @staticmethod
-    fn import_module[
-        O: ImmutableOrigin
-    ](module: StringSlice[O]) raises -> PythonObject:
+    fn import_module(
+        module: StringSlice[is_mutable=False],
+    ) raises -> PythonObject:
         """Imports a Python module.
-
-        Parameters:
-            O: The origin of the module name.
 
         This provides you with a module object you can use just like you would
         in Python. For example:
