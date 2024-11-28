@@ -262,8 +262,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
         UTF-8.
     """
 
-    alias _mut = StringSlice[Origin[True].value]
-    alias _immut = StringSlice[Origin[False].value]
+    alias mut = StringSlice[_lit_mut_cast[origin, True].result]
+    """The mutable type of the StringSlice."""
+    alias immut = StringSlice[_lit_mut_cast[origin, False].result]
+    """The immutable type of the StringSlice."""
     var _slice: Span[Byte, origin]
 
     # ===------------------------------------------------------------------===#
@@ -273,7 +275,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Self._mut, other: Self._immut):
+    fn __init__(out self: Self.mut, other: Self.immut):
         """Implicitly cast the immutable origin of self to a mutable one.
 
         Args:
@@ -284,7 +286,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Self._immut, other: Self._mut):
+    fn __init__(out self: Self.immut, other: Self.mut):
         """Implicitly cast the mutable origin of self to an immutable one.
 
         Args:

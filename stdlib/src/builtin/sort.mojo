@@ -218,8 +218,8 @@ fn _quicksort[
 
     # Work with an immutable span so we don't run into exclusivity problems with
     # the List[Span].
-    var imm_span = Span[type, Origin[False](origin).value](span)
-    alias ImmSpan = __type_of(imm_span)
+    var imm_span = span.immut(span)
+    alias ImmSpan = span.immut
 
     var stack = List[ImmSpan](capacity=_estimate_initial_height(size))
     stack.append(imm_span)

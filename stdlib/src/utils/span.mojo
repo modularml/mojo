@@ -20,6 +20,7 @@ from utils import Span
 ```
 """
 
+from builtin.builtin_list import _lit_mut_cast
 from collections import InlineArray
 from memory import Pointer, UnsafePointer
 
@@ -105,8 +106,10 @@ struct Span[
         origin: The origin of the Span.
     """
 
-    alias _mut = Span[T, Origin[True](origin).value]
-    alias _immut = Span[T, Origin[False](origin).value]
+    alias mut = Span[T, _lit_mut_cast[origin, True].result]
+    """The mutable type of the Span."""
+    alias immut = Span[T, _lit_mut_cast[origin, False].result]
+    """The immutable type of the Span."""
     # Field
     var _data: UnsafePointer[T]
     var _len: Int
@@ -118,7 +121,7 @@ struct Span[
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Self._mut, other: Self._immut):
+    fn __init__(out self: Self.mut, other: Self.immut):
         """Implicitly cast the immmutable origin of self to a mutable one.
 
         Args:
@@ -129,7 +132,7 @@ struct Span[
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Self._immut, other: Self._mut):
+    fn __init__(out self: Self.immut, other: Self.mut):
         """Implicitly cast the mutable origin of self to an immutable one.
 
         Args:
@@ -379,3 +382,13 @@ struct Span[
         """
         for element in self:
             element[] = value
+
+    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
+        """
+        Return an immutable version of this span.
+        Returns:
+            A span covering the same elements, but without mutability.
+        """
+        return Span[T, _lit_mut_cast[origin, False].result](
+            ptr=self._data, length=self._len
+        )

@@ -44,7 +44,14 @@ alias OriginSet = __mlir_type.`!lit.origin.set`
 """A set of origin parameters."""
 
 
-@value
+struct _origin_inner[is_mutable: Bool, //]:
+    alias type = __mlir_type[
+        `!lit.origin<`,
+        is_mutable.value,
+        `>`,
+    ]
+
+
 @register_passable("trivial")
 struct Origin[is_mutable: Bool]:
     """This represents a origin reference for a memory value.
@@ -74,21 +81,31 @@ struct Origin[is_mutable: Bool]:
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Origin[False], origin: Origin[True]):
-        """Initialize an Origin from an mutable origin value.
+    fn __init__(out self, mlir_origin: Self.type):
+        """Initialize an Origin from an MLIR origin value.
 
         Args:
-            origin: The origin value.
+            mlir_origin: The MLIR origin value.
         """
-        self.value = rebind[ImmutableOrigin](origin.value)
+        self.value = mlir_origin
 
-    @doc_private
-    @implicit
-    @always_inline("nodebug")
-    fn __init__(out self: Origin[True], origin: Origin[False]):
-        """Initialize an Origin from an mutable origin value.
+    # FIXME: This will be useful to do `Origin[False].coerce[mlir_origin]()`
+    # and to replace _lit_mut_cast_origin. But:
+    # error: invalid call to 'coerce': callee parameter #1 has 'Bool'
+    # type, but value has type 'Origin[is_mutable.value]'
+    # @always_inline("nodebug")
+    # @staticmethod
+    # fn coerce[mutable: Bool, //, origin: Origin[mutable].type]() -> Self.type:
+    #     """Return a coerced version of the Origin.
 
-        Args:
-            origin: The origin value.
-        """
-        self.value = rebind[MutableOrigin](origin.value)
+    #     Returns:
+    #         A mutable version of the Origin.
+    #     """
+    #     alias result = __mlir_attr[
+    #     `#lit.origin.mutcast<`,
+    #     origin,
+    #     `> : !lit.origin<`,
+    #     +Self.is_mutable.value,
+    #     `>`,
+    #     ]
+    #     return result
