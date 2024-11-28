@@ -119,8 +119,7 @@ fn _write_float[
             float8e4m3fnuz_to_str[int(bitcast[DType.uint8](value))]
         )
     else:
-        # Currently only specialized for float32 and float64, upcast anything
-        # else to float32
+        # Upcast the float16 types to float32
         casted = value.cast[
             DType.float64 if type == DType.float64 else DType.float32
         ]()
@@ -135,20 +134,17 @@ fn _write_float[
 
         if isinf(value):
             if sign:
-                writer.write("-")
-            writer.write("inf")
-            return
+                return writer.write("-inf")
+            return writer.write("inf")
 
         if isnan(value):
-            writer.write("nan")
-            return
+            return writer.write("nan")
 
         if sign:
             writer.write("-")
 
         if not sig and not exp:
-            writer.write("0.0")
-            return
+            return writer.write("0.0")
 
         # Convert the binary components to a decimal representation:
         #   - The raw binary sig into a decimal sig
@@ -383,7 +379,7 @@ fn _compute_endpoint[
     CarrierDType: DType, sig_bits: Int, total_bits: Int, cache_bits: Int
 ](cache_index: Int, beta: Int, left_endpoint: Bool) -> Scalar[CarrierDType]:
     @parameter
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var cache = cache_f64[cache_index]
         if left_endpoint:
             return (
@@ -420,9 +416,9 @@ fn _print_bits[type: DType](x: Scalar[type]) -> String:
             if i % 8 == 0:
                 output.write(" ")
     else:
-        alias sig_bits = 23 if type == DType.float32 else 52
-        alias exp_bits = 8 if type == DType.float32 else 11
-        alias cast_type = DType.uint32 if type == DType.float32 else DType.uint64
+        alias sig_bits = 23 if type is DType.float32 else 52
+        alias exp_bits = 8 if type is DType.float32 else 11
+        alias cast_type = DType.uint32 if type is DType.float32 else DType.uint64
         var casted = bitcast[cast_type](x)
         for i in reversed(range(total_bits)):
             output.write((casted >> i) & 1)
@@ -448,7 +444,7 @@ fn _rotr[
     CarrierDType: DType
 ](n: Scalar[CarrierDType], r: Scalar[CarrierDType]) -> Scalar[CarrierDType]:
     @parameter
-    if CarrierDType == DType.uint32:
+    if CarrierDType is DType.uint32:
         var r_masked = r & 31
         return (n >> r_masked) | (n << ((32 - r_masked) & 31))
     else:
@@ -508,7 +504,7 @@ fn _remove_trailing_zeros[
     """
 
     @parameter
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var r = _rotr(sig * 28999941890838049, 8)
         var b = r < 184467440738
         var s = int(b)
@@ -560,7 +556,7 @@ fn _divide_by_pow10[
     CarrierDType: DType, //, N: Int, n_max: Scalar[CarrierDType]
 ](n: Scalar[CarrierDType]) -> Scalar[CarrierDType]:
     @parameter
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
 
         @parameter
         if N == 1 and bool(n_max <= 4611686018427387908):
@@ -596,7 +592,7 @@ fn _umul192_lower128(x: UInt64, y: _UInt128) -> _UInt128:
 fn _compute_mul_parity[
     CarrierDType: DType
 ](two_f: Scalar[CarrierDType], cache_index: Int, beta: Int) -> _MulParity:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         debug_assert(1 <= beta < 64, "beta must be between 1 and 64")
         var r = _umul192_lower128(
             two_f.cast[DType.uint64](), cache_f64[cache_index]
@@ -668,7 +664,7 @@ fn _umul96_upper64[
 fn _compute_mul[
     CarrierDType: DType
 ](u: Scalar[CarrierDType], cache_index: Int) -> _MulResult[CarrierDType]:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var r = _umul192_upper128(u, cache_f64[cache_index])
         return _MulResult[CarrierDType](r.high.cast[CarrierDType](), r.low == 0)
     else:
@@ -682,7 +678,7 @@ fn _compute_mul[
 fn _compute_delta[
     CarrierDType: DType, total_bits: Int, cache_bits: Int
 ](cache_index: Int, beta: Int) -> Scalar[CarrierDType]:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var cache = cache_f64[cache_index]
         return (cache.high >> (total_bits - 1 - beta)).cast[CarrierDType]()
     else:
@@ -737,7 +733,7 @@ fn _count_factors[
 fn _compute_round_up_for_shorter_interval_case[
     CarrierDType: DType, total_bits: Int, sig_bits: Int, cache_bits: Int
 ](cache_index: Int, beta: Int) -> Scalar[CarrierDType]:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var cache = cache_f64[cache_index]
         return (
             (
