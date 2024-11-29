@@ -246,7 +246,7 @@ def test_conversion_from_python():
     assert_equal(Int.try_from_python(PythonObject(-1)), -1)
 
 
-def test_from_bytes():
+def test_from_bytes_as_bytes():
     alias Bytes = List[Byte]
 
     assert_equal(Int.from_bytes[DType.int16, big_endian=True](Bytes(0, 16)), 16)
@@ -321,4 +321,4 @@ def main():
     test_int_uint()
     test_float_conversion()
     test_conversion_from_python()
-    test_from_bytes()
+    test_from_bytes_as_bytes()
