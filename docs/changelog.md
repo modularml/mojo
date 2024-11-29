@@ -50,6 +50,20 @@ what we publish.
   The consequence of this is that the old hack is no longer needed for these
   cases!
 
+- Various improvements to origin handling and syntax have landed, including
+  support for the ternary operator and allowing multiple arguments in a `ref`
+  specifier (which are implicitly unions).  This enables expression of simple
+  algorithms cleanly:
+
+  ```mojo
+  fn my_min[T: Comparable](ref a: T, ref b: T) -> ref [a, b] T:
+    return a if a < b else b
+  ```
+
+  It is also nice that `my_min` automatically and implicitly propagates the
+  mutability of its arguments, so things like `my_min(str1, str2) += "foo"` is
+  valid.
+
 - The `UnsafePointer` type now has an `origin` parameter that can be used when
   the `UnsafePointer` is known to point to a value with a known origin. This
   origin is propagated through the `ptr[]` indirection operation.
