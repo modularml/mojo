@@ -143,7 +143,7 @@ struct UnsafePointer[
     @staticmethod
     @always_inline("nodebug")
     fn address_of(
-        ref [_, address_space._value.value]arg: type
+        ref [address_space]arg: type,
     ) -> UnsafePointer[
         type,
         address_space=address_space,
@@ -189,7 +189,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__(
         self,
-    ) -> ref [origin, address_space._value.value] type:
+    ) -> ref [origin, address_space] type:
         """Return a reference to the underlying data.
 
         Returns:
@@ -227,7 +227,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__[
         IntLike: IntLike, //
-    ](self, offset: IntLike) -> ref [origin, address_space._value.value] type:
+    ](self, offset: IntLike) -> ref [origin, address_space] type:
         """Return a reference to the underlying data, offset by the given index.
 
         Parameters:
