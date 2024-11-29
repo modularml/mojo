@@ -441,7 +441,87 @@ struct SIMD[type: DType, size: Int](
         # TODO (#36686): This introduces unneeded casts here to work around
         # parameter if issues.
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e4m3>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E4M3
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float8e4m3fnuz:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e4m3fnuz>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E4M3FNUZ
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float8e5m2:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e5m2>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E5M2
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float8e5m2fnuz:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e5m2fnuz>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E5M2FNUZ
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float16:
             self = SIMD[type, size](
                 __mlir_op.`pop.simd.splat`[
                     _type = __mlir_type[
