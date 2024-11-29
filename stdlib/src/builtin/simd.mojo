@@ -448,9 +448,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f8e4m3>`]
                         ](
@@ -468,9 +466,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f8e4m3fnuz>`]
                         ](
@@ -488,9 +484,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f8e5m2>`]
                         ](
@@ -508,9 +502,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f8e5m2fnuz>`]
                         ](
@@ -528,9 +520,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f16>`]
                         ](
@@ -548,9 +538,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<bf16>`]
                         ](
@@ -568,9 +556,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f32>`]
                         ](
@@ -588,9 +574,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f64>`]
                         ](
