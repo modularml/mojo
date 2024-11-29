@@ -591,6 +591,9 @@ what we publish.
 - [Issue #3710](https://github.com/modularml/mojo/issues/3710) - Mojo frees
   memory while reference to it is still in use.
 
+- [Issue #3805](https://github.com/modularml/mojo/issues/3805) - Crash When
+  Initializing !llvm.ptr.
+
 - [Issue #3816](https://github.com/modularml/mojo/issues/3816) - Ternary
   if-operator doesn't propagate origin information.
 
