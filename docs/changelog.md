@@ -580,6 +580,9 @@ what we publish.
 - [Issue #3816](https://github.com/modularml/mojo/issues/3816) - Ternary
   if-operator doesn't propagate origin information.
 
+- [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
+  [BUG] Mutability not preserved when taking the union of two origins.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
