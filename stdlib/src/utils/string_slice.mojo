@@ -1090,7 +1090,7 @@ fn _to_string_list[
 fn _is_newline_char[
     include_r_n: Bool = False
 ](p: UnsafePointer[Byte], eol_start: Int, b0: Byte, char_len: Int) -> Bool:
-    """Returns the eol character length or 0.
+    """Returns whether the char is a newline char.
 
     Safety:
         This assumes valid utf-8 is passed.
