@@ -235,7 +235,7 @@ fn ascii(value: String) -> String:
 
 @always_inline
 fn _stol(str_slice: StringSlice, base: Int = 10) raises -> (Int, String):
-    """Implementation if `stol` for StringSlice inputs.
+    """Implementation of `stol` for StringSlice inputs.
 
     Please see its docstring for details.
     """
@@ -424,7 +424,6 @@ fn _atol(str_slice: StringSlice, base: Int = 10) raises -> Int:
     """
     if (base != 0) and (base < 2 or base > 36):
         raise Error("Base must be >= 2 and <= 36, or 0.")
-
     if not str_slice:
         raise Error(_str_to_base_error(base, str_slice))
 
@@ -512,10 +511,8 @@ fn _atol(str_slice: StringSlice, base: Int = 10) raises -> Int:
         for pos in range(start, str_len):
             if not _isspace(buff[pos]):
                 raise Error(_str_to_base_error(base, str_slice))
-
     if is_negative:
         result = -result
-
     return result
 
 
