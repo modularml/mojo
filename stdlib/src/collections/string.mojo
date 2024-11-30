@@ -235,7 +235,7 @@ fn ascii(value: String) -> String:
 
 @always_inline
 fn _stol(str_slice: StringSlice, base: Int = 10) raises -> (Int, String):
-    """Implementation if `stol` for StringRef inputs.
+    """Implementation if `stol` for StringSlice inputs.
 
     Please see its docstring for details.
     """
@@ -259,37 +259,20 @@ fn _stol(str_slice: StringSlice, base: Int = 10) raises -> (Int, String):
         return 0, String(str_slice)
 
     if base == 0:
-        if start == (str_len - 1):
-            real_base = 10
-        elif buff[start] == ord("0") and start + 1 < str_len:
-            var second_digit = chr(int(buff[start + 1]))
-            if second_digit == "b" or second_digit == "B":
-                real_base = 2
-                start += 1  # Move past the '0', but not the 'b'
-            elif second_digit == "o" or second_digit == "O":
-                real_base = 8
-                start += 1
-            elif second_digit == "x" or second_digit == "X":
-                real_base = 16
-                start += 1
-            else:
-                real_base = 10
+        var real_base_new_start = _identify_base(str_slice, start)
+        real_base = real_base_new_start[0]
 
-            # Check if the character after the prefix is valid
-            if real_base != 10:
-                if start + 1 < str_len and _is_valid_digit(
-                    int(buff[start + 1]), real_base
-                ):
-                    start += 1  # Move past the prefix character
-                else:
-                    # Invalid prefix or digit after prefix
-                    return 0, String(
-                        StringSlice(
-                            unsafe_from_utf8=str_slice.as_bytes()[start:]
-                        )
-                    )
-        else:
+        # If identify_base returns error but starts with 0, treat as base 10
+        if real_base == -1 and buff[start] == ord("0"):
             real_base = 10
+            # Keep original start position for base 10
+        else:
+            # For valid prefixes, use the new start position
+            if real_base != -1:
+                start = real_base_new_start[1]
+            else:
+                return 0, String(str_slice)
+
         has_prefix = real_base != 10
     else:
         start, has_prefix = _handle_base_prefix(start, str_slice, str_len, base)
