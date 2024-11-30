@@ -20,9 +20,12 @@ from collections import List
 """
 
 
-from sys.intrinsics import _type_is_eq
 from os import abort
-from memory import Reference, UnsafePointer
+from sys import sizeof
+from sys.intrinsics import _type_is_eq
+
+from memory import Pointer, UnsafePointer, memcpy
+
 from utils import Span
 
 from .optional import Optional
@@ -36,7 +39,8 @@ from .optional import Optional
 struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
-    list_lifetime: AnyLifetime[list_mutability].type,
+    hint_trivial_type: Bool,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -44,28 +48,34 @@ struct _ListIter[
     Parameters:
         list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
-        list_lifetime: The lifetime of the List
+        hint_trivial_type: Set to `True` if the type `T` is trivial, this is not mandatory,
+            but it helps performance. Will go away in the future.
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias list_type = List[T]
+    alias list_type = List[T, hint_trivial_type]
 
     var index: Int
-    var src: Reference[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_lifetime]:
+    ) -> Pointer[T, list_origin]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[][self.index - 1]
+            return Pointer.address_of(self.src[][self.index - 1])
         else:
             self.index -= 1
-            return self.src[][self.index]
+            return Pointer.address_of(self.src[][self.index])
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        return self.__len__() > 0
 
     fn __len__(self) -> Int:
         @parameter
@@ -75,7 +85,7 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](
+struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     CollectionElement, CollectionElementNew, Sized, Boolable
 ):
     """The `List` type is a dynamically-allocated list.
@@ -85,6 +95,8 @@ struct List[T: CollectionElement](
 
     Parameters:
         T: The type of the elements.
+        hint_trivial_type: A hint to the compiler that the type T is trivial.
+            It's not mandatory, but if set, it allows some optimizations.
     """
 
     # Fields
@@ -99,13 +111,13 @@ struct List[T: CollectionElement](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs an empty list."""
         self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Creates a deep copy of the given list.
 
         Args:
@@ -115,7 +127,7 @@ struct List[T: CollectionElement](
         for e in other:
             self.append(e[])
 
-    fn __init__(inout self, *, capacity: Int):
+    fn __init__(out self, *, capacity: Int):
         """Constructs a list with the given capacity.
 
         Args:
@@ -125,19 +137,38 @@ struct List[T: CollectionElement](
         self.size = 0
         self.capacity = capacity
 
-    # TODO: Avoid copying elements in once owned varargs
-    # allow transfers.
-    fn __init__(inout self, *values: T):
+    @implicit
+    fn __init__(out self, owned *values: T):
         """Constructs a list from the given values.
 
         Args:
             values: The values to populate the list with.
         """
-        self = Self(capacity=len(values))
-        for value in values:
-            self.append(value[])
+        self = Self(variadic_list=values^)
 
-    fn __init__(inout self, span: Span[T]):
+    fn __init__(out self, *, owned variadic_list: VariadicListMem[T, _]):
+        """Constructs a list from the given values.
+
+        Args:
+            variadic_list: The values to populate the list with.
+        """
+        var length = len(variadic_list)
+
+        self = Self(capacity=length)
+
+        for i in range(length):
+            var src = UnsafePointer.address_of(variadic_list[i])
+            var dest = self.data + i
+
+            src.move_pointee_into(dest)
+
+        # Mark the elements as unowned to avoid del'ing uninitialized objects.
+        variadic_list._is_owned = False
+
+        self.size = length
+
+    @implicit
+    fn __init__(out self, span: Span[T]):
         """Constructs a list from the a Span of values.
 
         Args:
@@ -148,24 +179,20 @@ struct List[T: CollectionElement](
             self.append(value[])
 
     fn __init__(
-        inout self: Self,
-        *,
-        unsafe_pointer: UnsafePointer[T],
-        size: Int,
-        capacity: Int,
+        inout self, *, ptr: UnsafePointer[T], length: Int, capacity: Int
     ):
-        """Constructs a list from a pointer, its size, and its capacity.
+        """Constructs a list from a pointer, its length, and its capacity.
 
         Args:
-            unsafe_pointer: The pointer to the data.
-            size: The number of elements in the list.
+            ptr: The pointer to the data.
+            length: The number of elements in the list.
             capacity: The capacity of the list.
         """
-        self.data = unsafe_pointer
-        self.size = size
+        self.data = ptr
+        self.size = length
         self.capacity = capacity
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move data of an existing list into a new one.
 
         Args:
@@ -175,7 +202,7 @@ struct List[T: CollectionElement](
         self.size = existing.size
         self.capacity = existing.capacity
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Creates a deepcopy of the given list.
 
         Args:
@@ -198,7 +225,7 @@ struct List[T: CollectionElement](
     @always_inline
     fn __eq__[
         U: EqualityComparableCollectionElement, //
-    ](self: List[U], other: List[U]) -> Bool:
+    ](self: List[U, *_], other: List[U, *_]) -> Bool:
         """Checks if two lists are equal.
 
         Examples:
@@ -230,7 +257,7 @@ struct List[T: CollectionElement](
     @always_inline
     fn __ne__[
         U: EqualityComparableCollectionElement, //
-    ](self: List[U], other: List[U]) -> Bool:
+    ](self: List[U, *_], other: List[U, *_]) -> Bool:
         """Checks if two lists are not equal.
 
         Examples:
@@ -255,7 +282,7 @@ struct List[T: CollectionElement](
 
     fn __contains__[
         U: EqualityComparableCollectionElement, //
-    ](self: List[U], value: U) -> Bool:
+    ](self: List[U, *_], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -322,23 +349,23 @@ struct List[T: CollectionElement](
         """
         self.extend(other^)
 
-    fn __iter__(ref [_]self: Self) -> _ListIter[T, __lifetime_of(self)]:
+    fn __iter__(ref self) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _ListIter(0, self)
+        return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
-        ref [_]self: Self,
-    ) -> _ListIter[T, __lifetime_of(self), False]:
+        ref self,
+    ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self), self)
+        return _ListIter[forward=False](len(self), Pointer.address_of(self))
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -361,7 +388,9 @@ struct List[T: CollectionElement](
         return len(self) > 0
 
     @no_inline
-    fn __str__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
+    fn __str__[
+        U: RepresentableCollectionElement, //
+    ](self: List[U, *_]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -385,21 +414,21 @@ struct List[T: CollectionElement](
             A string representation of the list.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output^
 
     @no_inline
-    fn format_to[
-        U: RepresentableCollectionElement, //
-    ](self: List[U], inout writer: Formatter):
-        """Write `my_list.__str__()` to a `Formatter`.
+    fn write_to[
+        W: Writer, U: RepresentableCollectionElement, //
+    ](self: List[U, *_], inout writer: W):
+        """Write `my_list.__str__()` to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("[")
         for i in range(len(self)):
@@ -409,7 +438,9 @@ struct List[T: CollectionElement](
         writer.write("]")
 
     @no_inline
-    fn __repr__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
+    fn __repr__[
+        U: RepresentableCollectionElement, //
+    ](self: List[U, *_]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -438,11 +469,22 @@ struct List[T: CollectionElement](
     # Methods
     # ===-------------------------------------------------------------------===#
 
+    fn bytecount(self) -> Int:
+        """Gets the bytecount of the List.
+
+        Returns:
+            The bytecount of the List.
+        """
+        return len(self) * sizeof[T]()
+
     fn _realloc(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
-        for i in range(self.size):
-            (self.data + i).move_pointee_into(new_data + i)
+        _move_pointee_into_many_elements[hint_trivial_type](
+            dest=new_data,
+            src=self.data,
+            size=self.size,
+        )
 
         if self.data:
             self.data.free()
@@ -508,7 +550,7 @@ struct List[T: CollectionElement](
         for i in range(x - 1):
             self.extend(orig)
 
-    fn extend(inout self, owned other: List[T]):
+    fn extend(inout self, owned other: List[T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -649,7 +691,7 @@ struct List[T: CollectionElement](
     fn index[
         C: EqualityComparableCollectionElement, //
     ](
-        ref [_]self: List[C],
+        ref self: List[C, *_],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -745,7 +787,7 @@ struct List[T: CollectionElement](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+    fn __getitem__(ref self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -754,10 +796,15 @@ struct List[T: CollectionElement](
         Returns:
             A reference to the element at the given index.
         """
+
         var normalized_idx = idx
+
         debug_assert(
             -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
+            "index: ",
+            normalized_idx,
+            " is out of bounds for `List` of size: ",
+            self.size,
         )
         if normalized_idx < 0:
             normalized_idx += len(self)
@@ -765,9 +812,7 @@ struct List[T: CollectionElement](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(
-        ref [_]self: Self, idx: Int
-    ) -> ref [__lifetime_of(self)] Self.T:
+    fn unsafe_get(ref self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it
@@ -823,7 +868,7 @@ struct List[T: CollectionElement](
 
     fn count[
         T: EqualityComparableCollectionElement, //
-    ](self: List[T], value: T) -> Int:
+    ](self: List[T, *_], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.
@@ -852,6 +897,32 @@ struct List[T: CollectionElement](
                 count += 1
         return count
 
+    fn swap_elements(inout self, elt_idx_1: Int, elt_idx_2: Int):
+        """Swaps elements at the specified indexes if they are different.
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        my_list.swap_elements(0, 2)
+        print(my_list) # 3, 2, 1
+        ```
+
+        This is useful because `swap(my_list[i], my_list[j])` cannot be
+        supported by Mojo, because a mutable alias may be formed.
+
+        Args:
+            elt_idx_1: The index of one element.
+            elt_idx_2: The index of the other element.
+        """
+        debug_assert(
+            0 <= elt_idx_1 < len(self) and 0 <= elt_idx_2 < len(self),
+            (
+                "The indices provided to swap_elements must be within the range"
+                " [0, len(List)-1]"
+            ),
+        )
+        if elt_idx_1 != elt_idx_2:
+            swap((self.data + elt_idx_1)[], (self.data + elt_idx_2)[])
+
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
@@ -864,3 +935,18 @@ struct List[T: CollectionElement](
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
+
+
+fn _move_pointee_into_many_elements[
+    T: CollectionElement, //, hint_trivial_type: Bool
+](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
+    @parameter
+    if hint_trivial_type:
+        memcpy(
+            dest=dest.bitcast[Int8](),
+            src=src.bitcast[Int8](),
+            count=size * sizeof[T](),
+        )
+    else:
+        for i in range(size):
+            (src + i).move_pointee_into(dest + i)

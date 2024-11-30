@@ -18,7 +18,13 @@ These are Mojo built-ins, so you don't need to import them.
 
 @value
 @register_passable("trivial")
-struct NoneType(CollectionElement):
+struct NoneType(
+    CollectionElement,
+    CollectionElementNew,
+    Writable,
+    Representable,
+    Stringable,
+):
     """Represents the absence of a value."""
 
     alias _mlir_type = __mlir_type.`!kgen.none`
@@ -26,14 +32,56 @@ struct NoneType(CollectionElement):
 
     var _value: Self._mlir_type
 
-    fn __init__(inout self):
+    @always_inline
+    fn __init__(out self):
         """Construct an instance of the `None` type."""
         self._value = None
 
-    fn __init__(inout self, *, other: Self):
+    @always_inline
+    @implicit
+    fn __init__(out self, value: Self._mlir_type):
+        """Construct an instance of the `None` type.
+
+        Args:
+            value: The MLIR none type to construct from.
+        """
+        self._value = value
+
+    @always_inline
+    fn __init__(out self, *, other: Self):
         """Explicit copy constructor.
 
         Args:
             other: Another `NoneType` instance to copy.
         """
         self._value = None
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Returns the string representation of `None`.
+
+        Returns:
+            `"None"`.
+        """
+        return "None"
+
+    @no_inline
+    fn __repr__(self) -> String:
+        """Returns the string representation of `None`.
+
+        Returns:
+            `"None"`.
+        """
+        return "None"
+
+    @no_inline
+    fn write_to[W: Writer](self, inout writer: W):
+        """Write `None` to a writer stream.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        writer.write("None")

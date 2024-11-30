@@ -13,7 +13,9 @@
 # RUN: %mojo %s
 
 from collections import List
+from sys.info import sizeof
 
+from memory import UnsafePointer
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
@@ -39,6 +41,7 @@ def test_list():
         list.append(i)
 
     assert_equal(5, len(list))
+    assert_equal(5 * sizeof[Int](), list.bytecount())
     assert_equal(0, list[0])
     assert_equal(1, list[1])
     assert_equal(2, list[2])
@@ -160,6 +163,17 @@ def test_list_variadic_constructor():
     assert_equal(4, len(l))
     assert_equal(8, l[3])
 
+    #
+    # Test variadic construct copying behavior
+    #
+
+    var l2 = List[CopyCounter](CopyCounter(), CopyCounter(), CopyCounter())
+
+    assert_equal(len(l2), 3)
+    assert_equal(l2[0].copy_count, 0)
+    assert_equal(l2[1].copy_count, 0)
+    assert_equal(l2[2].copy_count, 0)
+
 
 def test_list_resize():
     var l = List[Int](1)
@@ -280,9 +294,6 @@ def test_list_reverse_move_count():
     assert_equal(vec.data[2].move_count, 1)
     assert_equal(vec.data[3].move_count, 3)
     assert_equal(vec.data[4].move_count, 3)
-
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
 
 
 def test_list_insert():
@@ -473,7 +484,7 @@ def test_list_extend_non_trivial():
     v2.append(MoveCounter[String]("Bar"))
     v2.append(MoveCounter[String]("Baz"))
 
-    v1.extend(v2)
+    v1.extend(v2^)
 
     assert_equal(len(v1), 5)
     assert_equal(v1[0].value, "Hello")
@@ -487,9 +498,6 @@ def test_list_extend_non_trivial():
     assert_equal(v1.data[2].move_count, 2)
     assert_equal(v1.data[3].move_count, 2)
     assert_equal(v1.data[4].move_count, 2)
-
-    # Keep v1 alive until after we've done the last `vec.data + N` read.
-    _ = v1^
 
 
 def test_2d_dynamic_list():
@@ -544,11 +552,12 @@ struct CopyCountedStruct(CollectionElement):
     var counter: CopyCounter
     var value: String
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.counter = CopyCounter(other=other.counter)
         self.value = String(other=other.value)
 
-    fn __init__(inout self, value: String):
+    @implicit
+    fn __init__(out self, value: String):
         self.counter = CopyCounter()
         self.value = value
 
@@ -679,6 +688,24 @@ def test_list_span():
     assert_equal(es[0], 1)
 
 
+def test_list_realloc_trivial_types():
+    a = List[Int, hint_trivial_type=True]()
+    for i in range(100):
+        a.append(i)
+
+    assert_equal(len(a), 100)
+    for i in range(100):
+        assert_equal(a[i], i)
+
+    b = List[Int8, hint_trivial_type=True]()
+    for i in range(100):
+        b.append(Int8(i))
+
+    assert_equal(len(b), 100)
+    for i in range(100):
+        assert_equal(b[i], Int8(i))
+
+
 def test_list_boolable():
     assert_true(List[Int](1))
     assert_false(List[Int]())
@@ -691,7 +718,7 @@ def test_constructor_from_pointer():
     new_pointer[2] = 2
     # rest is not initialized
 
-    var some_list = List[Int8](unsafe_pointer=new_pointer, size=3, capacity=5)
+    var some_list = List[Int8](ptr=new_pointer, length=3, capacity=5)
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
     assert_equal(some_list[2], 2)
@@ -706,7 +733,7 @@ def test_constructor_from_other_list_through_pointer():
     var size = len(initial_list)
     var capacity = initial_list.capacity
     var some_list = List[Int8](
-        unsafe_pointer=initial_list.steal_data(), size=size, capacity=capacity
+        ptr=initial_list.steal_data(), length=size, capacity=capacity
     )
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
@@ -851,16 +878,16 @@ struct DtorCounter(CollectionElement):
     # NOTE: payload is required because List does not support zero sized structs.
     var payload: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.payload = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.payload = other.payload
 
-    fn __copyinit__(inout self, existing: Self, /):
+    fn __copyinit__(out self, existing: Self, /):
         self.payload = existing.payload
 
-    fn __moveinit__(inout self, owned existing: Self, /):
+    fn __moveinit__(out self, owned existing: Self, /):
         self.payload = existing.payload
         existing.payload = 0
 
@@ -878,7 +905,7 @@ def inner_test_list_dtor():
     l.append(DtorCounter())
     assert_equal(g_dtor_count, 0)
 
-    l.__del__()
+    l^.__del__()
     assert_equal(g_dtor_count, 1)
 
 
@@ -888,6 +915,13 @@ def test_list_dtor():
 
     # verify we still only ran the destructor once
     assert_equal(g_dtor_count, 1)
+
+
+def test_list_repr():
+    var l = List(1, 2, 3)
+    assert_equal(l.__repr__(), "[1, 2, 3]")
+    var empty = List[Int]()
+    assert_equal(empty.__repr__(), "[]")
 
 
 # ===-------------------------------------------------------------------===#
@@ -916,6 +950,7 @@ def main():
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
+    test_list_realloc_trivial_types()
     test_list_boolable()
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
@@ -926,3 +961,4 @@ def main():
     test_list_contains()
     test_indexing()
     test_list_dtor()
+    test_list_repr()

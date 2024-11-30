@@ -5,8 +5,8 @@ description: Answers to questions we expect about Mojo.
 ---
 
 We tried to anticipate your questions about Mojo on this page. If this page
-doesn't answer all your questions, also check out our [Mojo community
-channels](/mojo/community).
+doesn't answer all your questions, also check out our [community
+channels](https://www.modular.com/community).
 
 ## Motivation
 
@@ -405,4 +405,4 @@ provides important information about our current priorities and links to
 our GitHub channels where you can report issues and discuss new features.
 
 To get in touch with the Mojo team and developer community, use the resources
-on our [Mojo community page](/mojo/community).
+on our [community page](https://www.modular.com/community).

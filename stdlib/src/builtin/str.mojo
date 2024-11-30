@@ -23,7 +23,7 @@ These are Mojo built-ins, so you don't need to import them.
 trait Stringable:
     """
     The `Stringable` trait describes a type that can be converted to a
-    [`String`](/mojo/stdlib/builtin/string/String).
+    [`String`](/mojo/stdlib/collections/string/String).
 
     Any type that conforms to `Stringable` or
     [`StringableRaising`](/mojo/stdlib/builtin/str/StringableRaising) works
@@ -77,7 +77,7 @@ trait Stringable:
 
 trait StringableRaising:
     """The StringableRaising trait describes a type that can be converted to a
-    [`String`](/mojo/stdlib/builtin/string/String).
+    [`String`](/mojo/stdlib/collections/string/String).
 
     Any type that conforms to
     [`Stringable`](/mojo/stdlib/builtin/str/Stringable) or

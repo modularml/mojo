@@ -14,7 +14,9 @@
 
 from sys.info import bitwidthof
 
-from testing import assert_equal, assert_true, assert_false
+from memory import UnsafePointer
+from python import PythonObject
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_properties():
@@ -227,6 +229,22 @@ def test_comparison():
     assert_false(Int(5).__ge__(Int(10)))
 
 
+def test_float_conversion():
+    assert_equal(float(Int(45)), Float64(45))
+
+
+def test_conversion_from_python():
+    # Test conversion from Python '5'
+    assert_equal(Int.try_from_python(PythonObject(5)), 5)
+
+    # Test error trying conversion from Python '"str"'
+    with assert_raises(contains="an integer is required"):
+        _ = Int.try_from_python(PythonObject("str"))
+
+    # Test conversion from Python '-1'
+    assert_equal(Int.try_from_python(PythonObject(-1)), -1)
+
+
 def main():
     test_properties()
     test_add()
@@ -248,3 +266,5 @@ def main():
     test_decimal_digit_count()
     test_comparison()
     test_int_uint()
+    test_float_conversion()
+    test_conversion_from_python()

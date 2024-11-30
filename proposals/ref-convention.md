@@ -83,7 +83,7 @@ You would now use an argument convention:
 ```mojo
 fn __refitem__(ref [_] self, index: Int) -> Reference[
         # This is a bit yuck, but is simplified further below.
-        Self.ElementType, __lifetime_of(self).is_mutable, __lifetime_of(self)
+        Self.ElementType, __origin_of(self).is_mutable, __origin_of(self)
     ]:
 
 # Alternatively, name the Lifetime:
@@ -134,7 +134,7 @@ example:
 
 ```mojo
 fn __refitem__(ref [_] self, index: Int)
-    -> ref [__lifetime_of(self)] Self.ElementType:
+    -> ref [self] Self.ElementType:
 
 # Hopefully someday we'll have a Lifetime type:
 fn __refitem__(ref [_] self, index: Int)
@@ -174,7 +174,7 @@ becomes:
 
 ```mojo
 fn __getitem__(ref [_] self, index: Int)
-    -> ref [__lifetime_of(self)] Self.ElementType:
+    -> ref [self] Self.ElementType:
 ```
 
 Note: Neither `inout` nor `borrowed` are allowed in a result position. The
@@ -327,7 +327,7 @@ commence! 👏
 We have proposed two new conventions: an argument convention and a result
 convention. For both of these conventions, we have used the keyword `ref`. This
 terminology has precedent in C++, C#, and many other languages. However, Mojo
-aims to be a superset of Python, and in Python, a "reference" is understood to
+aims to adopt the syntax of Python, and in Python, a "reference" is understood to
 be a pointer to a heap-allocated, garbage-collected instance of a class. The
 argument conventions that we've proposed are entirely unrelated to that feature.
 Therefore, it seems wise to consider other syntaxes for the conventions. We

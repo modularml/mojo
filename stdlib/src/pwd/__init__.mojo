@@ -12,4 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the pwd package."""
 
-from .pwd import getpwuid, getpwnam
+from .pwd import getpwnam, getpwuid

@@ -15,9 +15,9 @@
 from .dict import (
     Dict,
     KeyElement,
+    RepresentableKeyElement,
     _DictEntryIter,
     _DictKeyIter,
-    RepresentableKeyElement,
 )
 
 
@@ -54,7 +54,8 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self, *ts: T):
+    @implicit
+    fn __init__(out self, *ts: T):
         """Construct a set from initial elements.
 
         Args:
@@ -64,7 +65,8 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for t in ts:
             self.add(t[])
 
-    fn __init__(inout self, elements: Self):
+    @implicit
+    fn __init__(out self, elements: Self):
         """Explicitly copy another Set instance.
 
         Args:
@@ -74,7 +76,8 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
-    fn __init__(inout self, elements: List[T]):
+    @implicit
+    fn __init__(out self, elements: List[T, *_]):
         """Construct a set from a List of elements.
 
         Args:
@@ -84,7 +87,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         """Move constructor.
 
         Args:
@@ -313,8 +316,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             The string representation of the set.
         """
         var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to(writer)
+        self.write_to(output)
         return output
 
     @no_inline
@@ -329,16 +331,18 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return self.__str__()
 
-    fn format_to[
+    fn write_to[
+        W: Writer,
         U: RepresentableKeyElement,
-    ](self: Set[U], inout writer: Formatter):
-        """Write Set string representation to a `Formatter`.
+    ](self: Set[U], inout writer: W):
+        """Write Set string representation to a `Writer`.
 
         Parameters:
+            W: A type conforming to the Writable trait.
             U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
         writer.write("{")
         var written = 0
@@ -353,9 +357,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
+    fn __iter__(ref self) -> _DictKeyIter[T, NoneType, __origin_of(self._data)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
@@ -583,14 +585,18 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         except:
             pass
 
-    fn clear(inout self) raises:
+    fn clear(inout self):
         """Removes all elements from the set.
 
         This method modifies the set in-place, removing all of its elements.
         After calling this method, the set will be empty.
         """
         for _ in range(len(self)):
-            var a = self.pop()
+            # Can't fail from an empty set
+            try:
+                _ = self.pop()
+            except:
+                pass
 
         #! This code below (without using range function) won't pass tests
         #! It leaves set with one remaining item. Is this a bug?

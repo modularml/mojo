@@ -152,10 +152,18 @@ struct MyStruct(Sized, Stringable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    # Basically anything that "backs" special syntax: [..], *, +, /, //, etc...
+    # Anything that "backs" special syntax: [..], *, +, /, //, etc...
 
     fn __getitem__
-    fn __getitem__
+    fn __setitem__
+
+    fn __getattr__
+    fn __setattr__
+
+    fn __iter__     # `for x in self`
+    fn __next__
+    fn __contains__ # `x in self`
+    fn __is__       # `x is self`
 
     fn __add__
     fn __iadd__
@@ -340,6 +348,33 @@ fn add_param_arg[foo: Int](bar: Int) -> Int:
 
 For more detailed style guidelines, see the
 [Mojo docstring style guide](docstring-style-guide.md).
+
+### Assertions
+
+You should use assertions liberally when there is a condition you expect for the
+following code to behave correctly. Assertions may be present even in
+"unsafe" methods and types. You should format the message to be descriptive with
+the expected and actual values:
+
+```mojo
+actual = 41
+expected = 42
+debug_assert(actual == expected, "expected: ", expected, " but got: ", actual)
+```
+
+Make sure that you don't allocate anything in the call to `debug_assert` to
+ensure there is no runtime penalty when assertions are disabled. If you must
+have a side-effect in the condition such as allocating a `String`, you can pass
+a closure as a parameter that only runs when assertions are enabled:
+
+```mojo
+tensor = Tensor[DType.uint8, 1](TensorShape(1), cpu_device())
+
+fn _test_cpu() capturing -> Bool:
+    return "cpu" in str(tensor._device)
+
+debug_assert[_test_cpu]("This code is only runnable on CPU")
+```
 
 ### Testing
 

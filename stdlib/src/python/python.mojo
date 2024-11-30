@@ -20,43 +20,57 @@ from python import Python
 """
 
 from collections import Dict
-from os.env import getenv
+from os import abort, getenv
 from sys import external_call, sizeof
-from sys.ffi import _get_global
+from sys.ffi import _Global
 
 from memory import UnsafePointer
 
 from utils import StringRef
 
-from ._cpython import CPython, Py_eval_input, Py_file_input
-from .object import PythonObject
+from ._cpython import (
+    CPython,
+    Py_eval_input,
+    Py_file_input,
+    Py_ssize_t,
+    PyMethodDef,
+)
+from .python_object import PythonObject, TypedPythonObject
+
+alias _PYTHON_GLOBAL = _Global["Python", _PythonGlobal, _init_python_global]
 
 
-fn _init_global(ignored: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
-    var ptr = UnsafePointer[CPython].alloc(1)
-    ptr[] = CPython()
-    return ptr.bitcast[NoneType]()
+fn _init_python_global() -> _PythonGlobal:
+    return _PythonGlobal()
 
 
-fn _destroy_global(python: UnsafePointer[NoneType]):
-    var p = python.bitcast[CPython]()
-    CPython.destroy(p[])
-    python.free()
+struct _PythonGlobal:
+    var cpython: CPython
+
+    fn __moveinit__(inout self, owned other: Self):
+        self.cpython = other.cpython^
+
+    fn __init__(inout self):
+        self.cpython = CPython()
+
+    fn __del__(owned self):
+        CPython.destroy(self.cpython)
 
 
 @always_inline
 fn _get_global_python_itf() -> _PythonInterfaceImpl:
-    var ptr = _get_global["Python", _init_global, _destroy_global]()
-    return ptr.bitcast[CPython]()
+    var ptr = _PYTHON_GLOBAL.get_or_create_ptr()
+    return _PythonInterfaceImpl(ptr.bitcast[CPython]())
 
 
 struct _PythonInterfaceImpl:
     var _cpython: UnsafePointer[CPython]
 
-    fn __init__(inout self, cpython: UnsafePointer[CPython]):
+    @implicit
+    fn __init__(out self, cpython: UnsafePointer[CPython]):
         self._cpython = cpython
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self._cpython = existing._cpython
 
     fn cpython(self) -> CPython:
@@ -69,11 +83,15 @@ struct Python:
     var impl: _PythonInterfaceImpl
     """The underlying implementation of Mojo's Python interface."""
 
-    fn __init__(inout self):
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
+    fn __init__(out self):
         """Default constructor."""
         self.impl = _get_global_python_itf()
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy constructor.
 
         Args:
@@ -109,12 +127,13 @@ struct Python:
             `PythonObject` containing the result of the evaluation.
         """
         var cpython = _get_global_python_itf().cpython()
-        var module = PythonObject(cpython.PyImport_AddModule(name))
-        # PyImport_AddModule returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(module.py_object)
-        var dict_obj = PythonObject(cpython.PyModule_GetDict(module.py_object))
-        # PyModule_GetDict returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(dict_obj.py_object)
+        # PyImport_AddModule returns a borrowed reference.
+        var module = PythonObject.from_borrowed_ptr(
+            cpython.PyImport_AddModule(name)
+        )
+        var dict_obj = PythonObject.from_borrowed_ptr(
+            cpython.PyModule_GetDict(module.py_object)
+        )
         if file:
             # We compile the code as provided and execute in the module
             # context. Note that this may be an existing module if the provided
@@ -177,6 +196,11 @@ struct Python:
         var directory: PythonObject = dir_path
         _ = sys.path.append(directory)
 
+    # ===-------------------------------------------------------------------===#
+    # PythonObject "Module" Operations
+    # ===-------------------------------------------------------------------===#
+
+    # TODO(MSTDL-880): Change this to return `TypedPythonObject["Module"]`
     @staticmethod
     fn import_module(module: StringRef) raises -> PythonObject:
         """Imports a Python module.
@@ -206,6 +230,122 @@ struct Python:
         var module_maybe = cpython.PyImport_ImportModule(module)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)
+
+    @staticmethod
+    fn create_module(name: String) raises -> TypedPythonObject["Module"]:
+        """Creates a Python module using the provided name.
+
+        Inspired by https://github.com/pybind/pybind11/blob/a1d00916b26b187e583f3bce39cd59c3b0652c32/include/pybind11/pybind11.h#L1227
+
+        TODO: allow specifying a doc-string to attach to the module upon creation or lazily added?
+
+        Args:
+            name: The Python module name.
+
+        Returns:
+            The Python module.
+        """
+        # Initialize the global instance to the Python interpreter
+        # in case this is our first time.
+
+        var cpython = _get_global_python_itf().cpython()
+
+        # This will throw an error if there are any errors during initialization.
+        cpython.check_init_error()
+
+        var module = cpython.PyModule_Create(name)
+
+        # TODO: investigate when `PyModule_Create` can actually produce an error
+        # This is cargo copy-pasted from other methods in this file essentially.
+        Python.throw_python_exception_if_error_state(cpython)
+
+        return TypedPythonObject["Module"](
+            unsafe_unchecked_from=PythonObject(module)
+        )
+
+    @staticmethod
+    fn add_functions(
+        inout module: TypedPythonObject["Module"],
+        owned functions: List[PyMethodDef],
+    ) raises:
+        """Adds functions to a PyModule object.
+
+        Args:
+            module: The PyModule object.
+            functions: List of function data.
+        """
+
+        # Write a zeroed entry at the end as a terminator.
+        functions.append(PyMethodDef())
+
+        # FIXME(MSTDL-910):
+        #   This is an intentional memory leak, because we don't store this
+        #   in a global variable (yet).
+        var ptr: UnsafePointer[PyMethodDef] = functions.steal_data()
+
+        return Self.unsafe_add_methods(module, ptr)
+
+    @staticmethod
+    fn unsafe_add_methods(
+        inout module: TypedPythonObject["Module"],
+        functions: UnsafePointer[PyMethodDef],
+    ) raises:
+        """Adds methods to a PyModule object.
+
+        Safety:
+            The provided `functions` pointer must point to data that lives
+            for the duration of the associated Python interpreter session.
+
+        Args:
+            module: The PyModule object.
+            functions: A null terminated pointer to function data.
+        """
+        var cpython = _get_global_python_itf().cpython()
+
+        var result = cpython.PyModule_AddFunctions(
+            # Safety: `module` pointer lives long enough because its reference
+            #   argument.
+            module.unsafe_as_py_object_ptr(),
+            functions,
+        )
+
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
+
+    @staticmethod
+    fn add_object(
+        inout module: TypedPythonObject["Module"],
+        name: StringLiteral,
+        value: PythonObject,
+    ) raises:
+        """Add a new object to `module` with the given name and value.
+
+        The provided object can be any type of Python object: an instance,
+        a type object, a function, etc.
+
+        The added value will be inserted into the `__dict__` of the provided
+        module.
+
+        Args:
+            module: The Python module to modify.
+            name: The name of the new object.
+            value: The python object value.
+        """
+
+        var cpython = _get_global_python_itf().cpython()
+
+        var result = cpython.PyModule_AddObjectRef(
+            module.unsafe_as_py_object_ptr(),
+            name.unsafe_cstr_ptr(),
+            value.unsafe_as_py_object_ptr(),
+        )
+
+        if result != 0:
+            Python.throw_python_exception_if_error_state(cpython)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @staticmethod
     fn dict() -> PythonObject:
@@ -246,9 +386,33 @@ struct Python:
             cpython: The cpython instance we wish to error check.
         """
         if cpython.PyErr_Occurred():
-            var error: Error = str(PythonObject(cpython.PyErr_Fetch()))
-            cpython.PyErr_Clear()
-            raise error
+            raise Python.unsafe_get_python_exception(cpython)
+
+    @staticmethod
+    fn unsafe_get_python_exception(inout cpython: CPython) -> Error:
+        """Get the `Error` object corresponding to the current CPython
+        interpreter error state.
+
+        Safety:
+            The caller MUST be sure that the CPython interpreter is in an error
+            state before calling this function.
+
+        This function will clear the CPython error.
+
+        Args:
+            cpython: The cpython instance we wish to error check.
+
+        Returns:
+            `Error` object describing the CPython error.
+        """
+        debug_assert(
+            cpython.PyErr_Occurred(),
+            "invalid unchecked conversion of Python error to Mojo error",
+        )
+
+        var error: Error = str(PythonObject(cpython.PyErr_Fetch()))
+        cpython.PyErr_Clear()
+        return error
 
     @staticmethod
     fn is_type(x: PythonObject, y: PythonObject) -> Bool:
@@ -286,3 +450,34 @@ struct Python:
             `PythonObject` representing `None`.
         """
         return PythonObject(None)
+
+    # ===-------------------------------------------------------------------===#
+    # Checked Conversions
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    fn py_long_as_ssize_t(obj: PythonObject) raises -> Py_ssize_t:
+        """Get the value of a Python `long` object.
+
+        Args:
+            obj: The Python `long` object.
+
+        Raises:
+            If `obj` is not a Python `long` object, or if the `long` object
+            value overflows `Py_ssize_t`.
+
+        Returns:
+            The value of the `long` object as a `Py_ssize_t`.
+        """
+        var cpython = Python().impl.cpython()
+
+        var long: Py_ssize_t = cpython.PyLong_AsSsize_t(
+            obj.unsafe_as_py_object_ptr()
+        )
+
+        # Disambiguate if this is an error return setinel, or a legitimate
+        # value.
+        if long == -1:
+            Python.throw_python_exception_if_error_state(cpython)
+
+        return long

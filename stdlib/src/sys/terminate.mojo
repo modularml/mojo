@@ -13,7 +13,8 @@
 """This module includes the exit functions."""
 
 
-from .ffi import external_call
+from sys import _libc as libc
+from sys.ffi import c_int
 
 
 fn exit():
@@ -33,4 +34,4 @@ fn exit[intable: Intable](code: intable):
     Args:
         code: The exit code.
     """
-    external_call["exit", NoneType](Int32(int(code)))
+    libc.exit(c_int(int(code)))

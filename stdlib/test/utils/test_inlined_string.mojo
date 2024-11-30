@@ -13,6 +13,8 @@
 # REQUIRES: disabled
 # RUN: %mojo --debug-level full %s
 
+from os import abort
+
 from testing import assert_equal, assert_true
 
 from utils import InlineString

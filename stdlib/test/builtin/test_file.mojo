@@ -16,8 +16,8 @@
 from pathlib import Path, _dir_of_current_file
 from sys import os_is_windows
 from tempfile import gettempdir
-from memory import UnsafePointer
 
+from memory import UnsafePointer
 from testing import assert_equal, assert_true
 
 
@@ -186,7 +186,7 @@ def test_file_write_span():
     var content: String = "The quick brown fox jumps over the lazy dog"
     var TEMP_FILE = Path(gettempdir().value()) / "test_file_write_span"
     with open(TEMP_FILE, "w") as f:
-        f.write(content.as_bytes_slice())
+        f.write_bytes(content.as_bytes())
 
     with open(TEMP_FILE, "r") as read_file:
         assert_equal(read_file.read(), content)

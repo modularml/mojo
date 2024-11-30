@@ -19,9 +19,17 @@ from time import now
 ```
 """
 
-from sys import external_call, os_is_linux, os_is_windows, triple_is_nvidia_cuda
-from sys._assembly import inlined_assembly
 from math import floor
+from os import abort
+from sys import (
+    external_call,
+    is_amd_gpu,
+    is_nvidia_gpu,
+    llvm_intrinsic,
+    os_is_linux,
+    os_is_windows,
+)
+from sys._assembly import inlined_assembly
 
 from memory import UnsafePointer
 
@@ -56,7 +64,7 @@ struct _CTimeSpec(Stringable):
     var tv_sec: Int  # Seconds
     var tv_subsec: Int  # subsecond (nanoseconds on linux and usec on mac)
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.tv_sec = 0
         self.tv_subsec = 0
 
@@ -78,7 +86,7 @@ struct _FILETIME:
     var dwLowDateTime: UInt32
     var dwHighDateTime: UInt32
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.dwLowDateTime = 0
         self.dwHighDateTime = 0
 
@@ -99,7 +107,9 @@ fn _clock_gettime(clockid: Int) -> _CTimeSpec:
     var ts = _CTimeSpec()
 
     # Call libc's clock_gettime.
-    _ = external_call["clock_gettime", Int32](Int32(clockid), Reference(ts))
+    _ = external_call["clock_gettime", Int32](
+        Int32(clockid), Pointer.address_of(ts)
+    )
 
     return ts
 
@@ -128,7 +138,9 @@ fn _monotonic_nanoseconds() -> Int:
     @parameter
     if os_is_windows():
         var ft = _FILETIME()
-        external_call["GetSystemTimePreciseAsFileTime", NoneType](Reference(ft))
+        external_call["GetSystemTimePreciseAsFileTime", NoneType](
+            Pointer.address_of(ft)
+        )
 
         return ft.as_nanoseconds()
     else:
@@ -191,6 +203,14 @@ fn perf_counter_ns() -> Int:
     Returns:
         The current time in ns.
     """
+
+    @parameter
+    if is_nvidia_gpu():
+        return int(
+            inlined_assembly[
+                "mov.u64 $0, %globaltimer;", UInt64, constraints="=l"
+            ]()
+        )
     return _monotonic_nanoseconds()
 
 
@@ -215,13 +235,34 @@ fn now() -> Int:
 
 
 # ===----------------------------------------------------------------------===#
+# monotonic
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn monotonic() -> Int:
+    """
+    Returns the current monotonic time time in nanoseconds. This function
+    queries the current platform's monotonic clock, making it useful for
+    measuring time differences, but the significance of the returned value
+    varies depending on the underlying implementation.
+
+    Returns:
+        The current time in ns.
+    """
+    return perf_counter_ns()
+
+
+# ===----------------------------------------------------------------------===#
 # time_function
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline
 @parameter
-fn _time_function_windows[func: fn () capturing -> None]() -> Int:
+fn _time_function_windows[
+    func: fn () raises capturing [_] -> None
+]() raises -> Int:
     """Calculates elapsed time in Windows"""
 
     var ticks_per_sec: _WINDOWS_LARGE_INTEGER = 0
@@ -252,7 +293,7 @@ fn _time_function_windows[func: fn () capturing -> None]() -> Int:
 
 @always_inline
 @parameter
-fn time_function[func: fn () capturing -> None]() -> Int:
+fn time_function[func: fn () raises capturing [_] -> None]() raises -> Int:
     """Measures the time spent in the function.
 
     Parameters:
@@ -272,6 +313,28 @@ fn time_function[func: fn () capturing -> None]() -> Int:
     return toc - tic
 
 
+@always_inline
+@parameter
+fn time_function[func: fn () capturing [_] -> None]() -> Int:
+    """Measures the time spent in the function.
+
+    Parameters:
+        func: The function to time.
+
+    Returns:
+        The time elapsed in the function in ns.
+    """
+
+    @parameter
+    fn raising_func() raises:
+        func()
+
+    try:
+        return time_function[raising_func]()
+    except err:
+        return abort[Int](err)
+
+
 # ===----------------------------------------------------------------------===#
 # sleep
 # ===----------------------------------------------------------------------===#
@@ -285,10 +348,16 @@ fn sleep(sec: Float64):
     """
 
     @parameter
-    if triple_is_nvidia_cuda():
+    if is_nvidia_gpu():
         var nsec = sec * 1.0e9
-        inlined_assembly["nanosleep.u32 $0;", NoneType, constraints="r"](
-            nsec.cast[DType.uint32]()
+        llvm_intrinsic["llvm.nvvm.nanosleep", NoneType](
+            nsec.cast[DType.int32]()
+        )
+        return
+    elif is_amd_gpu():
+        var nsec = sec * 1.0e9
+        llvm_intrinsic["llvm.amdgcn.s.sleep", NoneType](
+            nsec.cast[DType.int32]()
         )
         return
 
@@ -312,6 +381,10 @@ fn sleep(sec: Int):
     Args:
         sec: The number of seconds to sleep for.
     """
+
+    @parameter
+    if is_nvidia_gpu() or is_amd_gpu():
+        return sleep(Float64(sec))
 
     @parameter
     if os_is_windows():

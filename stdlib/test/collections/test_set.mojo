@@ -14,8 +14,8 @@
 
 from collections import Set
 
-from testing import assert_false, assert_raises, assert_true
 from testing import assert_equal as AE
+from testing import assert_false, assert_raises, assert_true
 
 
 fn assert_equal[T: EqualityComparable](lhs: T, rhs: T) raises:
@@ -460,6 +460,11 @@ def test_discard():
 
 
 def test_clear():
+    # Shouldn't fail when clearing a 0 length set
+    set0 = Set[Int]()
+    set0.clear()
+    assert_equal(0, len(set0))
+
     set1 = Set[Int](1, 2, 3)
     set1.clear()
     assert_true(set1 == Set[Int]())

@@ -10,14 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from .pwd import Passwd
+from sys.ffi import c_char, external_call
+
 from memory import UnsafePointer
-from sys.ffi import C_char
+
+from .pwd import Passwd
 
 alias uid_t = Int32
 alias gid_t = Int32
 alias time_t = Int
-alias char = UnsafePointer[C_char]
+alias char = UnsafePointer[c_char]
 
 
 @register_passable("trivial")

@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the memory package."""
 
-from .arc import Arc
+from .arc import ArcPointer
 from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
-from .reference import AddressSpace, Reference
-from .unsafe import bitcast
+from .owned_pointer import OwnedPointer
+from .pointer import AddressSpace, Pointer
+from .unsafe import bitcast, pack_bits
 from .unsafe_pointer import UnsafePointer

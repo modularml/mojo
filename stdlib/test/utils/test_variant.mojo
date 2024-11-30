@@ -12,8 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.ffi import _get_global
+from sys.ffi import _Global
 
+from memory import UnsafePointer
+from test_utils import ObservableDel
 from testing import assert_equal, assert_false, assert_true
 
 from utils import Variant
@@ -23,56 +25,50 @@ struct TestCounter(CollectionElement):
     var copied: Int
     var moved: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.copied = 0
         self.moved = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         self.copied = other.copied + 1
         self.moved = other.moved
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         self.copied = other.copied
         self.moved = other.moved + 1
 
 
+alias TEST_VARIANT_POISON = _Global[
+    "TEST_VARIANT_POISON", Bool, _initialize_poison
+]
+
+
+fn _initialize_poison() -> Bool:
+    return False
+
+
 fn _poison_ptr() -> UnsafePointer[Bool]:
-    var ptr = _get_global[
-        "TEST_VARIANT_POISON", _initialize_poison, _destroy_poison
-    ]()
-    return ptr.bitcast[Bool]()
+    return TEST_VARIANT_POISON.get_or_create_ptr()
 
 
 fn assert_no_poison() raises:
     assert_false(_poison_ptr().take_pointee())
 
 
-fn _initialize_poison(
-    payload: UnsafePointer[NoneType],
-) -> UnsafePointer[NoneType]:
-    var poison = UnsafePointer[Bool].alloc(1)
-    poison.init_pointee_move(False)
-    return poison.bitcast[NoneType]()
-
-
-fn _destroy_poison(p: UnsafePointer[NoneType]):
-    p.free()
-
-
 struct Poison(CollectionElement):
-    fn __init__(inout self):
+    fn __init__(out self):
         pass
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         _poison_ptr().init_pointee_move(True)
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         _poison_ptr().init_pointee_move(True)
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         _poison_ptr().init_pointee_move(True)
 
     fn __del__(owned self):
@@ -138,17 +134,6 @@ def test_move():
     assert_equal(v2[TestCounter].moved, 2)
     # test that we didn't call the other moveinit too!
     assert_no_poison()
-
-
-@value
-struct ObservableDel(CollectionElement):
-    var target: UnsafePointer[Bool]
-
-    fn __init__(inout self, *, other: Self):
-        self = other
-
-    fn __del__(owned self):
-        self.target.init_pointee_move(True)
 
 
 def test_del():

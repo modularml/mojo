@@ -16,8 +16,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List, Optional
-from utils import InlineArray, StringSlice, StaticString
+from collections import InlineArray, List, Optional
+from os import abort
+
+from utils import StaticString, StringSlice
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -236,18 +238,18 @@ fn _format_int[
     digit_chars: StaticString = _DEFAULT_DIGIT_CHARS,
     prefix: StaticString = "",
 ) raises -> String:
-    var string = String()
-    var fmt = string._unsafe_to_formatter()
+    var output = String()
 
-    _write_int(fmt, value, radix, digit_chars=digit_chars, prefix=prefix)
+    _write_int(output, value, radix, digit_chars=digit_chars, prefix=prefix)
 
-    return string^
+    return output^
 
 
 fn _write_int[
-    type: DType, //,
+    type: DType,
+    W: Writer,
 ](
-    inout fmt: Formatter,
+    inout writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,
@@ -256,16 +258,17 @@ fn _write_int[
     prefix: StaticString = "",
 ) raises:
     var err = _try_write_int(
-        fmt, value, radix, digit_chars=digit_chars, prefix=prefix
+        writer, value, radix, digit_chars=digit_chars, prefix=prefix
     )
     if err:
         raise err.value()
 
 
 fn _try_write_int[
-    type: DType, //,
+    type: DType,
+    W: Writer,
 ](
-    inout fmt: Formatter,
+    inout writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,
@@ -304,33 +307,30 @@ fn _try_write_int[
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.write_str["-"]()
+        writer.write("-")
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.
-    fmt.write_str(prefix)
+    writer.write(prefix)
 
     if value == 0:
         # TODO: Replace with safe digit_chars[:1] syntax.
         # SAFETY:
-        #   This static lifetime is valid as long as we're using a
+        #   This static origin is valid as long as we're using a
         #   `StringLiteral` for `digit_chars`.
         var zero_char = digit_chars_array[0]
 
         # Construct a null-terminated buffer of single-byte char.
         var zero_buf = InlineArray[UInt8, 2](zero_char, 0)
 
-        var zero = StringSlice[ImmutableStaticLifetime](
-            # TODO(MSTDL-720):
-            #   Support printing non-null-terminated strings on GPU and switch
-            #   back to this code without a workaround.
-            # unsafe_from_utf8_ptr=digit_chars_array,
-            unsafe_from_utf8_ptr=zero_buf.unsafe_ptr(),
-            len=1,
+        # TODO(MSTDL-720):
+        #   Support printing non-null-terminated strings on GPU and switch
+        #   back to this code without a workaround.
+        # ptr=digit_chars_array,
+        var zero = StringSlice[ImmutableAnyOrigin](
+            ptr=zero_buf.unsafe_ptr(), length=1
         )
-        fmt.write_str(zero)
-
-        _ = zero_buf
+        writer.write(zero)
 
         return None
 
@@ -347,7 +347,9 @@ fn _try_write_int[
     # earlier in the buffer as we write the more-significant digits.
     var offset = CAPACITY - 1
 
-    buf[offset] = 0  # Write NUL terminator at the end
+    buf.unsafe_ptr().offset(offset).init_pointee_copy(
+        0
+    )  # Write NUL terminator at the end
 
     # Position the offset to write the least-significant digit just before the
     # NUL terminator.
@@ -357,13 +359,15 @@ fn _try_write_int[
     var remaining_int = value
 
     @parameter
-    fn process_digits[get_digit_value: fn () capturing -> Scalar[type]]():
+    fn process_digits[get_digit_value: fn () capturing [_] -> Scalar[type]]():
         while remaining_int:
             var digit_value = get_digit_value()
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset] = digit_chars_array[int(digit_value)]
+            buf.unsafe_ptr().offset(offset).init_pointee_copy(
+                digit_chars_array[int(digit_value)]
+            )
 
             # Position the offset to write the next digit.
             offset -= 1
@@ -400,12 +404,8 @@ fn _try_write_int[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf_ptr,
-        len=len,
-    )
+    var str_slice = StringSlice[__origin_of(buf)](ptr=buf_ptr, length=len)
 
-    fmt.write_str(str_slice)
-    _ = buf^
+    writer.write(str_slice)
 
     return None

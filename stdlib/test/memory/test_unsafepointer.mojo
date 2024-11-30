@@ -12,9 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from memory import UnsafePointer, AddressSpace
+from memory import AddressSpace, UnsafePointer
 from test_utils import ExplicitCopyOnly, MoveCounter
-from testing import assert_equal, assert_not_equal, assert_true, assert_false
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
 
 
 struct MoveOnlyType(Movable):
@@ -23,12 +23,12 @@ struct MoveOnlyType(Movable):
     var actions: UnsafePointer[List[String]]
     var value: Int
 
-    fn __init__(inout self, value: Int, actions: UnsafePointer[List[String]]):
+    fn __init__(out self, value: Int, actions: UnsafePointer[List[String]]):
         self.actions = actions
         self.value = value
         self.actions[0].append("__init__")
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.actions = existing.actions
         self.value = existing.value
         self.actions[0].append("__moveinit__")
@@ -48,10 +48,11 @@ def test_unsafepointer_of_move_only_type():
     assert_equal(actions_ptr[0][1], "__moveinit__", msg="emplace_value")
     assert_equal(ptr[0].value, 42)
 
-    var value = ptr.take_pointee()
-    assert_equal(len(actions_ptr[0]), 3)
-    assert_equal(actions_ptr[0][2], "__moveinit__")
-    assert_equal(value.value, 42)
+    if True:  # scope value
+        var value = ptr.take_pointee()
+        assert_equal(len(actions_ptr[0]), 3)
+        assert_equal(actions_ptr[0][2], "__moveinit__")
+        assert_equal(value.value, 42)
 
     ptr.free()
     assert_equal(len(actions_ptr[0]), 4)
@@ -131,6 +132,9 @@ def test_bitcast():
     assert_equal(int(ptr), int(ptr.bitcast[Int]()))
 
     assert_equal(int(ptr), int(aliased_ptr))
+
+    assert_equal(ptr.bitcast[ptr.type, alignment=33]().alignment, 33)
+
     _ = local
 
 
@@ -174,28 +178,28 @@ def test_comparisons():
 
 
 def test_unsafepointer_address_space():
-    var p1 = UnsafePointer[Int, AddressSpace(0)].alloc(1)
+    var p1 = UnsafePointer[Int, address_space = AddressSpace(0)].alloc(1)
     p1.free()
 
-    var p2 = UnsafePointer[Int, AddressSpace.GENERIC].alloc(1)
+    var p2 = UnsafePointer[Int, address_space = AddressSpace.GENERIC].alloc(1)
     p2.free()
 
 
 def test_unsafepointer_aligned_alloc():
     alias alignment_1 = 32
-    var ptr = UnsafePointer[UInt8].alloc[alignment=alignment_1](1)
+    var ptr = UnsafePointer[UInt8, alignment=alignment_1].alloc(1)
     var ptr_uint64 = UInt64(int(ptr))
     ptr.free()
     assert_equal(ptr_uint64 % alignment_1, 0)
 
     alias alignment_2 = 64
-    var ptr_2 = UnsafePointer[UInt8].alloc[alignment=alignment_2](1)
+    var ptr_2 = UnsafePointer[UInt8, alignment=alignment_2].alloc(1)
     var ptr_uint64_2 = UInt64(int(ptr_2))
     ptr_2.free()
     assert_equal(ptr_uint64_2 % alignment_2, 0)
 
     alias alignment_3 = 128
-    var ptr_3 = UnsafePointer[UInt8].alloc[alignment=alignment_3](1)
+    var ptr_3 = UnsafePointer[UInt8, alignment=alignment_3].alloc(1)
     var ptr_uint64_3 = UInt64(int(ptr_3))
     ptr_3.free()
     assert_equal(ptr_uint64_3 % alignment_3, 0)
@@ -219,9 +223,31 @@ def test_indexing():
     for i in range(4):
         ptr[i] = i
 
-    assert_equal(ptr[False], 0)
     assert_equal(ptr[int(1)], 1)
     assert_equal(ptr[3], 3)
+
+
+def test_indexing_simd():
+    var ptr = UnsafePointer[Int].alloc(4)
+    for i in range(4):
+        ptr[UInt8(i)] = i
+
+    assert_equal(ptr[UInt8(1)], 1)
+    assert_equal(ptr[UInt8(3)], 3)
+    assert_equal(ptr[UInt16(1)], 1)
+    assert_equal(ptr[UInt16(3)], 3)
+    assert_equal(ptr[UInt32(1)], 1)
+    assert_equal(ptr[UInt32(3)], 3)
+    assert_equal(ptr[UInt64(1)], 1)
+    assert_equal(ptr[UInt64(3)], 3)
+    assert_equal(ptr[Int8(1)], 1)
+    assert_equal(ptr[Int8(3)], 3)
+    assert_equal(ptr[Int16(1)], 1)
+    assert_equal(ptr[Int16(3)], 3)
+    assert_equal(ptr[Int32(1)], 1)
+    assert_equal(ptr[Int32(3)], 3)
+    assert_equal(ptr[Int64(1)], 1)
+    assert_equal(ptr[Int64(3)], 3)
 
 
 def test_bool():
@@ -237,11 +263,11 @@ def test_bool():
 
 
 def test_alignment():
-    var ptr = UnsafePointer[Int64].alloc[alignment=64](8)
+    var ptr = UnsafePointer[Int64, alignment=64].alloc(8)
     assert_equal(int(ptr) % 64, 0)
     ptr.free()
 
-    var ptr_2 = UnsafePointer[UInt8].alloc[alignment=32](32)
+    var ptr_2 = UnsafePointer[UInt8, alignment=32].alloc(32)
     assert_equal(int(ptr_2) % 32, 0)
     ptr_2.free()
 
@@ -252,9 +278,20 @@ def test_offset():
         ptr[i] = i
     var x = UInt(3)
     var y = Int(4)
-    assert_equal(ptr[x], 3)
-    assert_equal(ptr[y], 4)
+    assert_equal(ptr.offset(x)[], 3)
+    assert_equal(ptr.offset(y)[], 4)
+
+    var ptr2 = UnsafePointer[Int].alloc(5)
+    var ptr3 = ptr2
+    ptr2 += UInt(3)
+    assert_equal(ptr2, ptr3.offset(3))
+    ptr2 -= UInt(5)
+    assert_equal(ptr2, ptr3.offset(-2))
+    assert_equal(ptr2 + UInt(1), ptr3.offset(-1))
+    assert_equal(ptr2 - UInt(4), ptr3.offset(-6))
+
     ptr.free()
+    ptr2.free()
 
 
 def test_load_and_store_simd():
@@ -267,7 +304,22 @@ def test_load_and_store_simd():
 
     var ptr2 = UnsafePointer[Int8].alloc(16)
     for i in range(0, 16, 4):
-        ptr2.store[width=4](i, i)
+        ptr2.store(i, SIMD[DType.int8, 4](i))
+    for i in range(16):
+        assert_equal(ptr2[i], i // 4 * 4)
+
+
+def test_volatile_load_and_store_simd():
+    var ptr = UnsafePointer[Int8].alloc(16)
+    for i in range(16):
+        ptr[i] = i
+    for i in range(0, 16, 4):
+        var vec = ptr.load[width=4, volatile=True](i)
+        assert_equal(vec, SIMD[DType.int8, 4](i, i + 1, i + 2, i + 3))
+
+    var ptr2 = UnsafePointer[Int8].alloc(16)
+    for i in range(0, 16, 4):
+        ptr2.store[volatile=True](i, SIMD[DType.int8, 4](i))
     for i in range(16):
         assert_equal(ptr2[i], i // 4 * 4)
 
@@ -290,7 +342,9 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
+    test_indexing_simd()
     test_bool()
     test_alignment()
     test_offset()
     test_load_and_store_simd()
+    test_volatile_load_and_store_simd()

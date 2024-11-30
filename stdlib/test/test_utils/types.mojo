@@ -10,6 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+from memory import UnsafePointer
+
+# ===----------------------------------------------------------------------=== #
+# MoveOnly
+# ===----------------------------------------------------------------------=== #
 
 
 struct MoveOnly[T: Movable](Movable):
@@ -22,7 +27,8 @@ struct MoveOnly[T: Movable](Movable):
     var data: T
     """Test data payload."""
 
-    fn __init__(inout self, owned i: T):
+    @implicit
+    fn __init__(out self, owned i: T):
         """Construct a MoveOnly providing the payload data.
 
         Args:
@@ -30,7 +36,7 @@ struct MoveOnly[T: Movable](Movable):
         """
         self.data = i^
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         """Move construct a MoveOnly from an existing variable.
 
         Args:
@@ -39,17 +45,47 @@ struct MoveOnly[T: Movable](Movable):
         self.data = other.data^
 
 
+# ===----------------------------------------------------------------------=== #
+# ExplicitCopyOnly
+# ===----------------------------------------------------------------------=== #
+
+
 struct ExplicitCopyOnly(ExplicitlyCopyable):
     var value: Int
     var copy_count: Int
 
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         self.value = value
         self.copy_count = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.value = other.value
         self.copy_count = other.copy_count + 1
+
+
+# ===----------------------------------------------------------------------=== #
+# ImplicitCopyOnly
+# ===----------------------------------------------------------------------=== #
+
+
+struct ImplicitCopyOnly(Copyable):
+    var value: Int
+    var copy_count: Int
+
+    @implicit
+    fn __init__(out self, value: Int):
+        self.value = value
+        self.copy_count = 0
+
+    fn __copyinit__(out self, *, other: Self):
+        self.value = other.value
+        self.copy_count = other.copy_count + 1
+
+
+# ===----------------------------------------------------------------------=== #
+# CopyCounter
+# ===----------------------------------------------------------------------=== #
 
 
 struct CopyCounter(CollectionElement, ExplicitlyCopyable):
@@ -57,17 +93,22 @@ struct CopyCounter(CollectionElement, ExplicitlyCopyable):
 
     var copy_count: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.copy_count = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.copy_count = other.copy_count + 1
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.copy_count = existing.copy_count
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self.copy_count = existing.copy_count + 1
+
+
+# ===----------------------------------------------------------------------=== #
+# MoveCounter
+# ===----------------------------------------------------------------------=== #
 
 
 struct MoveCounter[T: CollectionElementNew](
@@ -79,7 +120,8 @@ struct MoveCounter[T: CollectionElementNew](
     var value: T
     var move_count: Int
 
-    fn __init__(inout self, owned value: T):
+    @implicit
+    fn __init__(out self, owned value: T):
         """Construct a new instance of this type. This initial move is not counted.
         """
         self.value = value^
@@ -87,7 +129,7 @@ struct MoveCounter[T: CollectionElementNew](
 
     # TODO: This type should not be ExplicitlyCopyable, but has to be to satisfy
     #       CollectionElementNew at the moment.
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -96,16 +138,21 @@ struct MoveCounter[T: CollectionElementNew](
         self.value = T(other=other.value)
         self.move_count = other.move_count
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.value = existing.value^
         self.move_count = existing.move_count + 1
 
     # TODO: This type should not be Copyable, but has to be to satisfy
     #       CollectionElement at the moment.
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         # print("ERROR: _MoveCounter copy constructor called unexpectedly!")
         self.value = T(other=existing.value)
         self.move_count = existing.move_count
+
+
+# ===----------------------------------------------------------------------=== #
+# ValueDestructorRecorder
+# ===----------------------------------------------------------------------=== #
 
 
 @value
@@ -113,9 +160,25 @@ struct ValueDestructorRecorder(ExplicitlyCopyable):
     var value: Int
     var destructor_counter: UnsafePointer[List[Int]]
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.value = other.value
         self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
+
+
+# ===----------------------------------------------------------------------=== #
+# ObservableDel
+# ===----------------------------------------------------------------------=== #
+
+
+@value
+struct ObservableDel(CollectionElement):
+    var target: UnsafePointer[Bool]
+
+    fn __init__(out self, *, other: Self):
+        self = other
+
+    fn __del__(owned self):
+        self.target.init_pointee_move(True)

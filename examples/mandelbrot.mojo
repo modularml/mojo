@@ -14,11 +14,12 @@
 # RUN: %mojo %s | FileCheck %s
 
 from math import iota
-from sys import num_physical_cores
+from sys import num_physical_cores, simdwidthof
 
 import benchmark
 from algorithm import parallelize, vectorize
 from complex import ComplexFloat64, ComplexSIMD
+from memory import UnsafePointer
 
 alias float_type = DType.float32
 alias int_type = DType.int32
@@ -38,11 +39,11 @@ alias max_y = 1.5
 struct Matrix[type: DType, rows: Int, cols: Int]:
     var data: UnsafePointer[Scalar[type]]
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.data = UnsafePointer[Scalar[type]].alloc(rows * cols)
 
     fn store[nelts: Int](self, row: Int, col: Int, val: SIMD[type, nelts]):
-        self.data.store[width=nelts](row * cols + col, val)
+        self.data.store(row * cols + col, val)
 
 
 fn mandelbrot_kernel_SIMD[

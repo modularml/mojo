@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_true, assert_false
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_add():
@@ -97,15 +97,23 @@ def test_indexer():
 
 
 def test_divmod():
-    t = IntLiteral.__divmod__(2, 2)
-    assert_equal(t[0], 1)
-    assert_equal(t[1], 0)
-    t = IntLiteral.__divmod__(2, 3)
-    assert_equal(t[0], 0)
-    assert_equal(t[1], 2)
-    t = IntLiteral.__divmod__(99, -2)
-    assert_equal(t[0], -50)
-    assert_equal(t[1], -1)
+    alias t0 = IntLiteral.__divmod__(2, 2)
+    alias q0 = t0[0]
+    alias r0 = t0[1]
+    assert_equal(q0, 1)
+    assert_equal(r0, 0)
+
+    alias t1 = IntLiteral.__divmod__(2, 3)
+    alias q1 = t1[0]
+    alias r1 = t1[1]
+    assert_equal(q1, 0)
+    assert_equal(r1, 2)
+
+    alias t2 = IntLiteral.__divmod__(99, -2)
+    alias q2 = t2[0]
+    alias r2 = t2[1]
+    assert_equal(q2, -50)
+    assert_equal(r2, -1)
 
 
 def test_bool():

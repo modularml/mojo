@@ -119,6 +119,8 @@ accepted. For example:
 
 - Changes that do not align with the published roadmap or the core principles of
   the standard library.
+- Changes to the math module until more thorough performance
+  benchmarking is available.
 - Code without tests—especially for core primitives.
 - Changes that break existing API or implicit behavior semantics.
 - Changes where the contributors’ favorite feature or system isn’t being used
@@ -259,29 +261,29 @@ git rebase upstream/nightly
 #### Getting the nightly Mojo compiler
 
 Now that you're on the nightly branch, you need to install the latest nightly
-Mojo compiler:
+build.
+
+If you're using [`magic`](https://docs.modular.com/magic), create a new
+project environment with the `max-nightly` channel like this:
 
 ```bash
-curl https://get.modular.com | sh -
-
-modular auth
-
-modular install nightly/mojo
+magic init mojo-nightly --format mojoproject \
+  -c conda-forge -c https://conda.modular.com/max-nightly
 ```
 
-If you already have an older `nightly/mojo` compiler, replace
-`modular install nightly/mojo` with `modular update nightly/mojo`.
+If you're [using conda](https://docs.modular.com/magic/conda), add the
+`https://conda.modular.com/max-nightly/` channel to your `environment.yaml`
+file. For example:
 
-Then, follow the instructions from the `modular` tool in adding the `mojo`
-compiler to your `PATH` such as:
+```yaml
+[project]
+name = "Mojo nightly example"
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 
-```bash
-echo export MODULAR_HOME="$HOME/.modular" >> ~/.zshrc
-echo 'export PATH="$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+[dependencies]
+max = "*"
 ```
-
-If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
 
 #### Mojo nightly vscode extension
 
@@ -302,7 +304,7 @@ request into the `nightly` branch.
 First push your changes:
 
 ```bash
-git push -u [your-username] my-fix-pr
+git push -u origin my-fix-pr
 ```
 
 You'll see a link to create a PR:
@@ -384,7 +386,64 @@ By making a contribution to this project, I certify that:
     this project or the open source license(s) involved.
 ```
 
-### Review time SLA
+### Guidelines for Review Time
 
-The team commits to reviewing submitted pull requests within a week of
-submission.
+1. Pull Request (PR) Review Timeline
+
+- Initial Review:
+  - Maintainers will provide an initial review or feedback within 3 weeks of
+    the PR submission.  At times, it may be significantly quicker, but it
+    depends on a variety of factors.
+- Subsequent Reviews:
+  - Once a contributor addresses feedback, maintainers will review updates as
+    soon as they can, typically within 5 business days.
+
+1. Issue Triage Timeline
+
+- New Issues:
+  - Maintainers will label and acknowledge new issues within 10 days of the
+    issue submission.
+
+1. Proposals
+
+- Proposals take more time for the team to review, discuss, and make sure this
+  is in line with the overall strategy and vision for the standard library.
+  These will get discussed in the team's weekly design meetings internally and
+  feedback will be communicated back on the relevant proposal.  As a team, we'll
+  ensure these get reviewed and discussed within 6 weeks of submission.
+
+#### Exceptions
+
+While we strive our best to adhere to these timelines, there may be occasional
+delays due any of the following:
+
+- High volume of contributions.
+- Maintainers' availability (e.g. holidays, team events).
+- Complex issues or PRs requiring extended discussion (these may get deferred to
+  the team's weekly design discussion meetings).
+
+Note that just because a pull request has been reviewed does not necessarily
+mean it will be able to merged internally immediately.  This could be due to a
+variety of reasons, such as:
+
+- Mojo compiler bugs.  These take time to find a minimal reproducer, file an
+  issue with the compiler team, and then get prioritized and fixed.
+- Internal bugs that get exposed due to a changeset.
+- Massive refactorings due to an external changeset.  These also take time to
+  fix - remember, we have the largest Mojo codebase in the world internally.
+
+If delays occur, we'll provide status updates in the relevant thread (pull
+request or GitHub issue).  Please bare with us as Mojo is an early language.
+We look forward to working together with you in making Mojo better for everyone!
+
+#### How You Can Help
+
+To ensure quicker reviews:
+
+- **Ensure your PR is small and focused.** See the [pull request size section](#about-pull-request-sizes)
+  for more info.
+- Write a good commit message/PR summary outlining the motivation and describing
+  the changes.  In the near future, we'll provide a pull request template to
+  clarify this further.
+- Use descriptive titles and comments for clarity.
+- Code-review other contributor pull requests and help each other.

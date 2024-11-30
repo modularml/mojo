@@ -14,6 +14,7 @@
 # We pass an_argument here to avoid the compiler from optimizing the code
 # away.
 
+from os import abort
 from sys import argv
 
 

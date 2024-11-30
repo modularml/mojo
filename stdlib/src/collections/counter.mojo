@@ -10,8 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Defines the `Counter` type.
 
-from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
+You can import these APIs from the `collections` package. For example:
+
+```mojo
+from collections import Counter
+```
+"""
+from collections.dict import Dict, _DictEntryIter, _DictKeyIter, _DictValueIter
+
 from utils import Variant
 
 
@@ -44,12 +52,13 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # Life cycle methods
     # ===------------------------------------------------------------------=== #
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Create a new, empty Counter object."""
         self._data = Dict[V, Int]()
 
     # TODO: Change List to Iterable when it is supported in Mojo
-    fn __init__(inout self, items: List[V]):
+    @implicit
+    fn __init__(out self, items: List[V, *_]):
         """Create a from an input iterable.
 
         Args:
@@ -61,7 +70,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             self._data[item] = self._data.get(item, 0) + 1
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Create a new Counter by copying another Counter.
 
         Args:
@@ -70,7 +79,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self._data = Dict[V, Int](other=other._data)
 
     @staticmethod
-    fn fromkeys(keys: List[V], value: Int) -> Self:
+    fn fromkeys(keys: List[V, *_], value: Int) -> Self:
         """Create a new Counter from a list of keys and a default value.
 
         Args:
@@ -114,7 +123,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data[value] = count
 
-    fn __iter__(self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
+    fn __iter__(self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -267,7 +276,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return +result^  # Remove zero and negative counts
 
-    fn __iadd__(inout self, other: Self) raises:
+    fn __iadd__(inout self, other: Self):
         """Add counts from another Counter to this Counter.
 
         Args:
@@ -292,7 +301,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return +result^  # Remove zero and negative counts
 
-    fn __isub__(inout self, other: Self) raises:
+    fn __isub__(inout self, other: Self):
         """Subtract counts from another Counter from this Counter.
 
         Args:
@@ -301,7 +310,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self.subtract(other)
         self._keep_positive()
 
-    fn __and__(self, other: Self) raises -> Self:
+    fn __and__(self, other: Self) -> Self:
         """Intersection: keep common elements with the minimum count.
 
         Args:
@@ -316,11 +325,11 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         for key_ref in self.keys():
             var key = key_ref[]
             if key in other:
-                result[key] = min(self[key], other[key])
+                result[key] = min(self.get(key, 0), other.get(key, 0))
 
         return result^
 
-    fn __iand__(inout self, other: Self) raises:
+    fn __iand__(inout self, other: Self):
         """Intersection: keep common elements with the minimum count.
 
         Args:
@@ -329,16 +338,59 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         for key_ref in self.keys():
             var key = key_ref[]
             if key not in other:
-                _ = self.pop(key)
+                try:
+                    _ = self.pop(key)
+                except:
+                    pass  # this should not happen
             else:
-                self[key] = min(self[key], other[key])
+                self[key] = min(self.get(key, 0), other.get(key, 0))
 
-    fn _keep_positive(inout self) raises:
+    fn __or__(self, other: Self) -> Self:
+        """Union: keep all elements with the maximum count.
+
+        Args:
+            other: The other Counter to union with.
+
+        Returns:
+            A new Counter with all elements and the maximum count of the two
+            Counters.
+        """
+        var result = Counter[V]()
+
+        for key_ref in self.keys():
+            var key = key_ref[]
+            var newcount = max(self.get(key, 0), other.get(key, 0))
+            if newcount > 0:
+                result[key] = newcount
+
+        for key_ref in other.keys():
+            var key = key_ref[]
+            if key not in self and other.get(key, 0) > 0:
+                result[key] = other.get(key, 0)
+
+        return result^
+
+    fn __ior__(inout self, other: Self):
+        """Union: keep all elements with the maximum count.
+
+        Args:
+            other: The other Counter to union with.
+        """
+        for key_ref in other.keys():
+            var key = key_ref[]
+            var newcount = max(self.get(key, 0), other.get(key, 0))
+            if newcount > 0:
+                self[key] = newcount
+
+    fn _keep_positive(inout self):
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
             var key = key_ref[]
-            if self[key] <= 0:
-                _ = self.pop(key)
+            if self.get(key, 0) <= 0:
+                try:
+                    _ = self.pop(key)
+                except:
+                    pass  # this should not happen
 
     # ===------------------------------------------------------------------=== #
     # Unary operators
@@ -356,6 +408,20 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             if item.value > 0:
                 result[item.key] = item.value
         return result^
+
+    fn __neg__(self) -> Self:
+        """Substract from an empty Counter. Strips positive and zero counts,
+        and flips the sign on negative counts.
+
+        Returns:
+            A new Counter with stripped counts and negative counts.
+        """
+        var result = Counter[V]()
+        for item_ref in self.items():
+            var item = item_ref[]
+            if item.value < 0:
+                result[item.key] = -item.value
+        return result
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -417,7 +483,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.pop(value, default)
 
-    fn keys(ref [_]self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
+    fn keys(ref self) -> _DictKeyIter[V, Int, __origin_of(self._data)]:
         """Iterate over the Counter's keys as immutable references.
 
         Returns:
@@ -425,7 +491,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.keys()
 
-    fn values(ref [_]self: Self) -> _DictValueIter[V, Int, __lifetime_of(self)]:
+    fn values(ref self) -> _DictValueIter[V, Int, __origin_of(self._data)]:
         """Iterate over the Counter's values as references.
 
         Returns:
@@ -433,7 +499,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.values()
 
-    fn items(self: Self) -> _DictEntryIter[V, Int, __lifetime_of(self)]:
+    fn items(self) -> _DictEntryIter[V, Int, __origin_of(self._data)]:
         """Iterate over the dict's entries as immutable references.
 
         Returns:
@@ -548,7 +614,7 @@ struct CountTuple[V: KeyElement](
     # Life cycle methods
     # ===------------------------------------------------------------------=== #
 
-    fn __init__(inout self, value: V, count: Int):
+    fn __init__(out self, value: V, count: Int):
         """Create a new CountTuple.
 
         Args:
@@ -558,7 +624,7 @@ struct CountTuple[V: KeyElement](
         self._value = value
         self._count = count
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Create a new CountTuple by copying another CountTuple.
 
         Args:
@@ -567,7 +633,7 @@ struct CountTuple[V: KeyElement](
         self._value = other._value
         self._count = other._count
 
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         """Create a new CountTuple by moving another CountTuple.
 
         Args:

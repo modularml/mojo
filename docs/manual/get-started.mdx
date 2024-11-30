@@ -6,47 +6,106 @@ description: Install Mojo now and start developing
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import MaxInstall from '@site/src/components/MaxInstall';
 
-On this page, we'll show you how to create the classic "Hello
-world" starter program with Mojo, in three different ways. If you'd rather read
-how to write Mojo code beyond just printing text, see the [introduction to
-Mojo](/mojo/manual/basics).
+On this page, we'll show you how to create the classic "Hello world" starter
+program with Mojo. If you'd rather read how to write Mojo code, see the
+[introduction to Mojo](/mojo/manual/basics).
 
-## 1. Install Mojo
+By installing Mojo, you understand and agree to our [software
+license](https://www.modular.com/legal/max).
 
-Mojo is now bundled with MAX, which provides everything you need to compile,
-run, debug, and package Mojo code. (Read [why we bundled Mojo with
-MAX](/max/faq#why-bundle-mojo-with-max).)
+## 1. Create a new project
 
-Follow the guide to [install MAX & Mojo](/max/install), and then return here.
+To create a new Mojo project, we'll use [Magic](/magic)—a virtual environment
+manager and package manager based on conda.
+
+1. Install Magic on macOS or Ubuntu Linux with this command:
+
+    <MaxInstall type="magic" />
+
+    Then run the `source` command printed in your terminal.
+
+2. Create a Mojo project called "hello-world":
+
+    ```sh
+    magic init hello-world --format mojoproject
+    ```
+
+    This creates a directory named `hello-world` and installs the Mojo project
+    dependencies—the only dependency for a Mojo project is the `max` package
+    (Mojo is [bundled with MAX](/max/faq#why-bundle-mojo-with-max)).
+
+3. Start a shell in the project virtual environment:
+
+    ```sh
+    cd hello-world && magic shell
+    ```
+
+That's it! The `magic shell` command activates the virtual environment so you
+can now start using Mojo. For example, you can check your Mojo version like
+this:
+
+```sh
+mojo --version
+```
+
+
+<details>
+  <summary>Click here to install the Mojo nightly build.</summary>
+  <div>
+
+To install the latest nightly build, specify the `max-nightly` channel when you
+initialize your project:
+
+```sh
+magic init hello-world-nightly --format mojoproject \
+  -c conda-forge -c https://conda.modular.com/max-nightly
+```
+
+When you include the `-c` (`--channel`) option, you must specify all channels.
+Be sure to specify the `conda-forge` channel (or another conda channel) where
+Magic should look for all packages other than MAX/Mojo.
+
+Then start a shell in the new environment:
+
+```sh
+cd hello-world-nightly && magic shell
+```
+
+The nightly version of Mojo installed in this project is fully independent, so
+it will not interfere with other projects that use the latest stable build.
+
+  </div>
+</details>
+
 
 ## 2. Run code in the REPL
-
-Now that you've installed Mojo, let's write some code!
 
 First, let's use the Mojo
 [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop),
 which allows you to write and run Mojo code in a command prompt:
 
-1. To start a REPL session, type `mojo` in your terminal and press
-   <kbd>Enter</kbd>.
+1. To start a REPL session, type `mojo` and press <kbd>Enter</kbd>.
 
-2. Then type `print("Hello, world!")` and press <kbd>Enter</kbd> twice
+2. Type `print("Hello, world!")` and press <kbd>Enter</kbd> twice
 (a blank line is required to indicate the end of an expression).
 
-That's it! For example:
+    The result looks like this:
 
-```text
-$ mojo
-Welcome to Mojo! 🔥
+    ```text
+    $ mojo
+    Welcome to Mojo! 🔥
 
-Expressions are delimited by a blank line.
-Type `:quit` to exit the REPL and `:mojo help repl` for further assistance.
+    Expressions are delimited by a blank line.
+    Type `:quit` to exit the REPL and `:mojo help repl` for further assistance.
 
-1> print("Hello, world!")
-2.
-Hello, world!
-```
+      1> print("Hello world")
+    Hello world
+    ```
+
+3. To exit REPL, type `:quit` and press <kbd>Enter</kbd>, or press
+<kbd>Ctrl</kbd> + <kbd>D</kbd>.
 
 You can write as much code as you want in the REPL. You can press
 <kbd>Enter</kbd> to start a new line and continue writing code, and when you
@@ -77,15 +136,9 @@ Now let's write the code in a Mojo source file and run it with the
     mojo hello.mojo
     ```
 
-    It should immediately print the message:
-
-    ```text
+    ```output
     Hello, world!
     ```
-
-If this didn't work for you, double-check that your code looks exactly like the
-code in step 1, and make sure you correctly installed either [MAX](/max/install)
-(which includes Mojo) or [Mojo](#1-install-mojo).
 
 ## 4. Build an executable binary
 
@@ -106,10 +159,60 @@ Finally, let's build and run that same code as an executable:
     ./hello
     ```
 
-This creates a statically compiled binary file, so it contains all the code and
-libraries it needs to run.
+    ```output
+    Hello, world!
+    ```
 
-## 5. Install our VS Code extension (optional)
+The [`build`](/mojo/cli/build) command creates a statically compiled binary
+file, so it contains all the code and libraries it needs to run.
+
+You can now deactivate the virtual environment by just typing `exit`:
+
+```sh
+exit
+```
+
+Now let's try running an existing code example.
+
+## 5. Run an example from GitHub
+
+Our Mojo code examples in GitHub include a Magic configuration file so you can
+simply clone the repo and run the code with `magic`. For example:
+
+1. Clone the Mojo repo:
+
+    ```sh
+    git clone https://github.com/modularml/mojo.git
+    ```
+
+    Only if you installed the nightly build, also checkout the nightly branch:
+
+    ```sh
+    git checkout nightly
+    ```
+
+2. Navigate to the examples:
+
+    ```sh
+    cd mojo/examples
+    ```
+
+3. Run some code:
+
+    ```sh
+    magic run mojo hello_interop.mojo
+    ```
+
+    ```output
+    Hello Mojo 🔥!
+    9
+    6
+    3
+    Hello from Python!
+    I can even print a numpy array:  [1 2 3]
+    ```
+
+## 6. Install our VS Code extension (optional)
 
 To provide a first-class developer experience with features like code
 completion, quick fixes, and hover help, we've created a [Mojo extension for
@@ -118,27 +221,64 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
 
 ![](./images/mojo-vscode.png)
 
+
+## Update Mojo
+
+To update the Mojo version in your project, use `magic add`
+and specify the `max` package version.
+
+For example, if you want to always use the latest version of Mojo, you can use
+the `*` wildcard as the version and then simply run `magic update` (you must
+run `magic add` within the project path):
+
+```sh
+cd hello-world
+```
+
+```sh
+magic add max
+```
+
+```sh
+magic update
+```
+
+:::note
+
+Although the wildcard option allows `magic update` to always install the latest
+version, it also updates the `magic.lock` file in your project with the
+explicit version you've installed. This ensures that anybody else who
+initializes the project also gets the same package version (until you run
+`magic update` again).
+
+:::
+
+To be more specific with your package version, you can use any of the [Python
+package version
+specifiers](https://packaging.python.org/en/latest/specifications/version-specifiers/#id5).
+For example:
+
+```sh
+magic add "max~=24.4"
+```
+
+```sh
+magic add "max>=24.4,<24.5"
+```
+
+
 ## Next steps
 
 - If you're new to Mojo, we suggest you learn the language basics in the
   [introduction to Mojo](/mojo/manual/basics).
 
-- If you want to experiment with some code, clone [the Mojo
-repo](https://github.com/modularml/mojo/) to try our code examples:
+- To learn more about the `magic` tool, read [Get started with Magic](/magic/).
 
-  ```sh
-  git clone https://github.com/modularml/mojo.git
-  ```
-
-  If you installed the nightly build, also checkout the nightly branch:
-
-  ```sh
-  git checkout nightly
-  ```
-
-  In addition to several `.mojo` examples, the repo includes [Jupyter
-  notebooks](https://github.com/modularml/mojo/tree/main/examples/notebooks#readme)
-  that teach advanced Mojo features.
+- Explore more code examples in the [the Mojo
+repo](https://github.com/modularml/mojo/). In addition to several `.mojo`
+examples, the repo includes [Jupyter
+notebooks](https://github.com/modularml/mojo/tree/main/examples/notebooks#readme)
+that teach advanced Mojo features.
 
 - To see all the available Mojo APIs, check out the [Mojo standard library
   reference](/mojo/lib).
@@ -153,22 +293,3 @@ crash reports. [Learn
 more](/mojo/faq#does-the-mojo-sdk-collect-telemetry).
 
 :::
-
-## Update Mojo
-
-Because Mojo is now a part of MAX, you soon won't be able to update the
-standalone `mojo` package, and you must instead install/update the `max`
-package. (Read [why we bundled Mojo with
-MAX](/max/faq#why-bundle-mojo-with-max).)
-
-If you already installed Mojo on its own, you'll need to install MAX to get all
-future Mojo updates.
-
-Before you install `max`, you should uninstall Mojo to avoid conflicting
-toolchain versions between the `mojo` and `max` packages:
-
-```sh
-modular uninstall mojo
-```
-
-Then follow the guide to [install MAX & Mojo](/max/install).

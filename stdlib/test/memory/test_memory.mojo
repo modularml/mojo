@@ -10,11 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %mojo --debug-level full %s
 
-from sys import sizeof
+from sys import simdwidthof, sizeof
 
 from memory import (
+    AddressSpace,
     UnsafePointer,
     memcmp,
     memcpy,
@@ -125,16 +126,16 @@ def test_memcmp():
 
 
 def test_memcmp_overflow():
-    var p1 = UnsafePointer[Int8].alloc(1)
-    var p2 = UnsafePointer[Int8].alloc(1)
+    p1 = UnsafePointer[Byte].alloc(1)
+    p2 = UnsafePointer[Byte].alloc(1)
     p1.store(-120)
     p2.store(120)
 
-    var c = memcmp(p1, p2, 1)
-    assert_equal(c, -1, "-120 is smaller than 120")
+    c = memcmp(p1, p2, 1)
+    assert_equal(c, 1)
 
     c = memcmp(p2, p1, 1)
-    assert_equal(c, 1, "120 is bigger than -120")
+    assert_equal(c, -1)
 
 
 def test_memcmp_simd():
@@ -293,10 +294,20 @@ def test_memset():
     assert_equal(buf0.load(0), 16843009)
     memset(buf0, -1, 2)
     assert_equal(buf0.load(0), -1)
+    buf0.free()
 
     var buf1 = UnsafePointer[Int8].alloc(2)
     memset(buf1, 5, 2)
     assert_equal(buf1.load(0), 5)
+    buf1.free()
+
+    var buf3 = UnsafePointer[Int32].alloc(2)
+    memset(buf3, 1, 2)
+    memset_zero[count=2](buf3)
+    assert_equal(buf3.load(0), 0)
+    assert_equal(buf3.load(1), 0)
+    buf3.free()
+
     _ = pair
 
 
@@ -353,6 +364,11 @@ def test_pointer_refitem_pair():
     assert_equal(ptr[].lo, 42)
     assert_equal(ptr[].hi, 24)
     ptr.free()
+
+
+def test_address_space_str():
+    assert_equal(str(AddressSpace.GENERIC), "AddressSpace.GENERIC")
+    assert_equal(str(AddressSpace(17)), "AddressSpace(17)")
 
 
 def test_dtypepointer_gather():
@@ -474,7 +490,6 @@ def test_indexing():
     for i in range(4):
         ptr[i] = i
 
-    assert_equal(ptr[True], 1)
     assert_equal(ptr[int(2)], 2)
     assert_equal(ptr[1], 1)
 
@@ -494,6 +509,8 @@ def main():
     test_pointer_refitem_string()
     test_pointer_refitem_pair()
     test_pointer_string()
+
+    test_address_space_str()
 
     test_dtypepointer_gather()
     test_dtypepointer_scatter()

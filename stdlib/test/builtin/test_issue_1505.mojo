@@ -15,12 +15,13 @@
 
 from random import random_ui64
 
-from utils import StaticIntTuple
 from testing import assert_equal
 
+from utils import IndexList
 
-fn gen_perm() -> StaticIntTuple[64]:
-    var result = StaticIntTuple[64]()
+
+fn gen_perm() -> IndexList[64]:
+    var result = IndexList[64]()
 
     for i in range(64):
         result[i] = 64 - i - 1

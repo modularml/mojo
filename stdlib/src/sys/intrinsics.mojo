@@ -19,24 +19,25 @@ from sys import PrefetchLocality
 ```
 """
 
-from sys import sizeof
+import math
 
 from memory import AddressSpace, UnsafePointer
+
+from ._assembly import inlined_assembly
+from .info import is_nvidia_gpu, sizeof
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic
 # ===----------------------------------------------------------------------===#
-
-# FIXME: Need tuple unpacking to write a single function definition.
 
 
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
     type: AnyTrivialRegType,
-    *,
+    *types: AnyType,
     has_side_effect: Bool = True,
-]() -> type:
+](*arguments: *types) -> type:
     """Calls an LLVM intrinsic with no arguments.
 
     Calls an LLVM intrinsic with the name intrin and return type type.
@@ -44,11 +45,17 @@ fn llvm_intrinsic[
     Parameters:
       intrin: The name of the llvm intrinsic.
       type: The return type of the intrinsic.
+      types: The argument types for the function.
       has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
+
+    Args:
+      arguments: The arguments to the function.
 
     Returns:
       The result of calling the llvm intrinsic with no arguments.
     """
+
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
@@ -58,15 +65,15 @@ fn llvm_intrinsic[
             __mlir_op.`pop.call_llvm_intrinsic`[
                 intrin = intrin.value,
                 _type=None,
-            ]()
+            ](loaded_pack)
             return rebind[type](None)
-
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ]()
-        return rebind[type](None)
+        else:
+            __mlir_op.`pop.call_llvm_intrinsic`[
+                intrin = intrin.value,
+                _type=None,
+                hasSideEffects = __mlir_attr.false,
+            ](loaded_pack)
+            return rebind[type](None)
     else:
 
         @parameter
@@ -74,744 +81,13 @@ fn llvm_intrinsic[
             return __mlir_op.`pop.call_llvm_intrinsic`[
                 intrin = intrin.value,
                 _type=type,
-            ]()
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ]()
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0) -> type:
-    """Calls an LLVM intrinsic with one argument.
-
-    Calls the intrinsic with the name intrin and return type type on argument
-    arg0.
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-    Args:
-      arg0: The argument to call the LLVM intrinsic with. The type of arg0
-        must be T0.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0 as an argument.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0, arg1: T1) -> type:
-    """Calls an LLVM intrinsic with two arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-    arguments arg0 and arg1.
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of
-        arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of
-        arg1 must be T1.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0 and arg1 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1)
-        return rebind[type](None)
-    else:
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1)
-
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0, arg1: T1, arg2: T2) -> type:
-    """Calls an LLVM intrinsic with three arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-    arguments arg0, arg1 and arg2.
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of
-        arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of
-        arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of
-        arg2 must be T2.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0, arg1 and arg2 as
-      arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
-    """Calls an LLVM intrinsic with four arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-    arguments arg0, arg1, arg2 and arg3.
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of
-        arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of
-        arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of
-        arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of
-        arg3 must be T3.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0, arg1, arg2 and arg3
-      as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
-    """Calls an LLVM intrinsic with five arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-      arguments arg0, arg1, arg2, arg3 and arg4.
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      T4: The type of the fifth argument to the intrinsic (arg4).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of arg3 must be T3.
-      arg4: The fifth argument to call the LLVM intrinsic with. The type of arg4 must be T4.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0...arg4 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType,
-    T5: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
-    """Calls an LLVM intrinsic with six arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-      arguments arg0, arg1, ..., arg5
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      T4: The type of the fifth argument to the intrinsic (arg4).
-      T5: The type of the sixth argument to the intrinsic (arg5).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of arg3 must be T3.
-      arg4: The fifth argument to call the LLVM intrinsic with. The type of arg4 must be T4.
-      arg5: The sixth argument to call the LLVM intrinsic with. The type of arg5 must be T5.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0...arg5 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
+            ](loaded_pack)
+        else:
             return __mlir_op.`pop.call_llvm_intrinsic`[
                 intrin = intrin.value,
                 _type=type,
-            ](arg0, arg1, arg2, arg3, arg4, arg5)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType,
-    T5: AnyTrivialRegType,
-    T6: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
-    """Calls an LLVM intrinsic with seven arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-      arguments arg0, arg1, ..., arg6
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      T4: The type of the fifth argument to the intrinsic (arg4).
-      T5: The type of the sixth argument to the intrinsic (arg5).
-      T6: The type of the seventh argument to the intrinsic (arg6).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of arg3 must be T3.
-      arg4: The fifth argument to call the LLVM intrinsic with. The type of arg4 must be T4.
-      arg5: The sixth argument to call the LLVM intrinsic with. The type of arg5 must be T5.
-      arg6: The seventh argument to call the LLVM intrinsic with. The type of arg6 must be T6.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0...arg6 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType,
-    T5: AnyTrivialRegType,
-    T6: AnyTrivialRegType,
-    T7: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-) -> type:
-    """Calls an LLVM intrinsic with eight arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-      arguments arg0, arg1, ..., arg7
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      T4: The type of the fifth argument to the intrinsic (arg4).
-      T5: The type of the sixth argument to the intrinsic (arg5).
-      T6: The type of the seventh argument to the intrinsic (arg6).
-      T7: The type of the eighth argument to the intrinsic (arg7).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of arg3 must be T3.
-      arg4: The fifth argument to call the LLVM intrinsic with. The type of arg4 must be T4.
-      arg5: The sixth argument to call the LLVM intrinsic with. The type of arg5 must be T5.
-      arg6: The seventh argument to call the LLVM intrinsic with. The type of arg6 must be T6.
-      arg7: The eighth argument to call the LLVM intrinsic with. The type of arg7 must be T7.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0...arg7 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType,
-    T5: AnyTrivialRegType,
-    T6: AnyTrivialRegType,
-    T7: AnyTrivialRegType,
-    T8: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-) -> type:
-    """Calls an LLVM intrinsic with nine arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-      arguments arg0, arg1, ..., arg8
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      T4: The type of the fifth argument to the intrinsic (arg4).
-      T5: The type of the sixth argument to the intrinsic (arg5).
-      T6: The type of the seventh argument to the intrinsic (arg6).
-      T7: The type of the eighth argument to the intrinsic (arg7).
-      T8: The type of the ninth argument to the intrinsic (arg8).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of arg3 must be T3.
-      arg4: The fifth argument to call the LLVM intrinsic with. The type of arg4 must be T4.
-      arg5: The sixth argument to call the LLVM intrinsic with. The type of arg5 must be T5.
-      arg6: The seventh argument to call the LLVM intrinsic with. The type of arg6 must be T6.
-      arg7: The eighth argument to call the LLVM intrinsic with. The type of arg7 must be T7.
-      arg8: The ninth argument to call the LLVM intrinsic with. The type of arg8 must be T8.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0...arg8 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value,
-                _type=type,
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
-
-
-@always_inline("nodebug")
-fn llvm_intrinsic[
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType,
-    T5: AnyTrivialRegType,
-    T6: AnyTrivialRegType,
-    T7: AnyTrivialRegType,
-    T8: AnyTrivialRegType,
-    T9: AnyTrivialRegType, //,
-    intrin: StringLiteral,
-    type: AnyTrivialRegType,
-    *,
-    has_side_effect: Bool = True,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-    arg7: T7,
-    arg8: T8,
-    arg9: T9,
-) -> type:
-    """Calls an LLVM intrinsic with ten arguments.
-
-    Calls the LLVM intrinsic with the name intrin and return type type on
-      arguments arg0, arg1, ..., arg10
-
-    Parameters:
-      T0: The type of the first argument to the intrinsic (arg0).
-      T1: The type of the second argument to the intrinsic (arg1).
-      T2: The type of the third argument to the intrinsic (arg2).
-      T3: The type of the fourth argument to the intrinsic (arg3).
-      T4: The type of the fifth argument to the intrinsic (arg4).
-      T5: The type of the sixth argument to the intrinsic (arg5).
-      T6: The type of the seventh argument to the intrinsic (arg6).
-      T7: The type of the eighth argument to the intrinsic (arg7).
-      T8: The type of the ninth argument to the intrinsic (arg8).
-      T9: The type of the tenth argument to the intrinsic (arg9).
-      intrin: The name of the llvm intrinsic.
-      type: The return type of the intrinsic.
-      has_side_effect: If `True` the intrinsic will have side effects, otherwise its pure.
-
-
-    Args:
-      arg0: The first argument to call the LLVM intrinsic with. The type of arg0 must be T0.
-      arg1: The second argument to call the LLVM intrinsic with. The type of arg1 must be T1.
-      arg2: The third argument to call the LLVM intrinsic with. The type of arg2 must be T2.
-      arg3: The fourth argument to call the LLVM intrinsic with. The type of arg3 must be T3.
-      arg4: The fifth argument to call the LLVM intrinsic with. The type of arg4 must be T4.
-      arg5: The sixth argument to call the LLVM intrinsic with. The type of arg5 must be T5.
-      arg6: The seventh argument to call the LLVM intrinsic with. The type of arg6 must be T6.
-      arg7: The eighth argument to call the LLVM intrinsic with. The type of arg7 must be T7.
-      arg8: The ninth argument to call the LLVM intrinsic with. The type of arg8 must be T8.
-      arg9: The tenth argument to call the LLVM intrinsic with. The type of arg9 must be T9.
-
-    Returns:
-      The result of calling the llvm intrinsic with arg0...arg9 as arguments.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-
-        @parameter
-        if has_side_effect:
-            __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=None
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
-            return rebind[type](None)
-        __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=None,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
-        return rebind[type](None)
-    else:
-
-        @parameter
-        if has_side_effect:
-            return __mlir_op.`pop.call_llvm_intrinsic`[
-                intrin = intrin.value, _type=type
-            ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = intrin.value,
-            _type=type,
-            hasSideEffects = __mlir_attr.false,
-        ](arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)
+                hasSideEffects = __mlir_attr.false,
+            ](loaded_pack)
 
 
 # ===----------------------------------------------------------------------===#
@@ -832,7 +108,7 @@ fn _unsafe_aliasing_address_to_pointer[
 
 @always_inline("nodebug")
 fn gather[
-    type: DType, size: Int
+    type: DType, size: Int, //
 ](
     owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
@@ -885,7 +161,7 @@ fn gather[
         return _unsafe_aliasing_address_to_pointer[type](
             base[0]
         ).load() if mask else passthrough[0]
-    return llvm_intrinsic[
+    var result = llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ](
@@ -896,6 +172,8 @@ fn gather[
         mask,
         passthrough,
     )
+    _ = base
+    return result
 
 
 # ===----------------------------------------------------------------------===#
@@ -905,7 +183,7 @@ fn gather[
 
 @always_inline("nodebug")
 fn scatter[
-    type: DType, size: Int
+    type: DType, size: Int, //
 ](
     value: SIMD[type, size],
     owned base: SIMD[DType.index, size],
@@ -973,6 +251,7 @@ fn scatter[
         Int32(alignment),
         mask,
     )
+    _ = base
 
 
 # ===----------------------------------------------------------------------===#
@@ -1001,7 +280,8 @@ struct PrefetchLocality:
     """Extremely local locality (keep in cache)."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         """Constructs a prefetch locality option.
 
         Args:
@@ -1023,7 +303,8 @@ struct PrefetchRW:
     """Write prefetch."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         """Constructs a prefetch read-write option.
 
         Args:
@@ -1046,7 +327,8 @@ struct PrefetchCache:
     """The data prefetching option."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         """Constructs a prefetch option.
 
         Args:
@@ -1081,7 +363,7 @@ struct PrefetchOptions:
     """Indicates i-cache or d-cache prefetching."""
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs an instance of PrefetchOptions with default params."""
         self.rw = PrefetchRW.READ
         self.locality = PrefetchLocality.HIGH
@@ -1186,26 +468,36 @@ struct PrefetchOptions:
 
 @always_inline("nodebug")
 fn prefetch[
-    params: PrefetchOptions, type: DType
-](addr: UnsafePointer[Scalar[type], *_]):
+    type: DType, //, params: PrefetchOptions = PrefetchOptions()
+](addr: UnsafePointer[Scalar[type], **_]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
     to prefetch instruction or data into cache before they are used.
 
     Parameters:
-      params: Configuration options for the prefect intrinsic.
       type: The DType of value stored in addr.
+      params: Configuration options for the prefect intrinsic.
 
     Args:
       addr: The data pointer to prefetch.
     """
-    llvm_intrinsic["llvm.prefetch", NoneType](
-        addr.bitcast[NoneType](),
-        params.rw,
-        params.locality,
-        params.cache,
-    )
+
+    @parameter
+    if is_nvidia_gpu():
+        inlined_assembly[
+            "prefetch.global.L2 [$0];",
+            NoneType,
+            constraints="l,~{memory}",
+            has_side_effect=True,
+        ](addr.bitcast[NoneType]())
+    else:
+        llvm_intrinsic["llvm.prefetch", NoneType](
+            addr.bitcast[NoneType](),
+            params.rw,
+            params.locality,
+            params.cache,
+        )
 
 
 # ===----------------------------------------------------------------------===#
@@ -1217,7 +509,7 @@ fn prefetch[
 fn masked_load[
     type: DType, //, size: Int
 ](
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     mask: SIMD[DType.bool, size],
     passthrough: SIMD[type, size],
     alignment: Int = 1,
@@ -1264,7 +556,7 @@ fn masked_store[
     size: Int
 ](
     value: SIMD,
-    addr: UnsafePointer[Scalar[value.type], *_],
+    addr: UnsafePointer[Scalar[value.type], **_],
     mask: SIMD[DType.bool, size],
     alignment: Int = 1,
 ):
@@ -1306,7 +598,7 @@ fn compressed_store[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     mask: SIMD[DType.bool, size],
 ):
     """Compresses the lanes of `value`, skipping `mask` lanes, and stores
@@ -1343,9 +635,9 @@ fn compressed_store[
 
 @always_inline("nodebug")
 fn strided_load[
-    type: DType, simd_width: Int
+    type: DType, //, simd_width: Int
 ](
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ) -> SIMD[type, simd_width]:
@@ -1369,15 +661,11 @@ fn strided_load[
     if simd_width == 1:
         return addr.load() if mask else Scalar[type]()
 
-    alias IndexTy = SIMD[DType.index, simd_width]
-    var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector", IndexTy, has_side_effect=False
+    var offset = int(addr) + stride * sizeof[type]() * math.iota[
+        DType.index, simd_width
     ]()
-    var offset = IndexTy(int(addr)) + IndexTy(stride) * iota * IndexTy(
-        sizeof[type]()
-    )
     var passthrough = SIMD[type, simd_width]()
-    return gather[type, simd_width](offset, mask, passthrough)
+    return gather(offset, mask, passthrough)
 
 
 # ===----------------------------------------------------------------------===#
@@ -1387,10 +675,10 @@ fn strided_load[
 
 @always_inline("nodebug")
 fn strided_store[
-    type: DType, simd_width: Int
+    type: DType, //, simd_width: Int
 ](
     value: SIMD[type, simd_width],
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ):
@@ -1414,15 +702,10 @@ fn strided_store[
             addr.store(value[0])
         return
 
-    alias IndexTy = SIMD[DType.index, simd_width]
-    var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector", IndexTy, has_side_effect=False
+    var offset = int(addr) + stride * sizeof[type]() * math.iota[
+        DType.index, simd_width
     ]()
-    var offset = IndexTy(int(addr)) + IndexTy(stride) * iota * IndexTy(
-        sizeof[type]()
-    )
-
-    scatter[type, simd_width](value, offset, mask)
+    scatter(value, offset, mask)
 
 
 # ===-------------------------------------------------------------------===#
@@ -1496,3 +779,85 @@ struct _RegisterPackType[*a: AnyTrivialRegType]:
             The tuple element at the requested index.
         """
         return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
+
+
+# ===----------------------------------------------------------------------=== #
+# expect
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn expect[T: AnyTrivialRegType, //, expected_val: T](val: T) -> T:
+    """Provides information about expected (the most probable) value of `val`,
+    which can be used by optimizers.
+
+    Constraints:
+        Only work with integer types.
+
+    Parameters:
+        T: The type of the input value.
+        expected_val: The expected value of `val`.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The input value.
+    """
+    return llvm_intrinsic["llvm.expect", T, has_side_effect=False](
+        val, expected_val
+    )
+
+
+# ===----------------------------------------------------------------------=== #
+# likely
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn likely(val: Bool) -> Bool:
+    """Provides information that the most probable value of `val` is going to be
+    `True`. This information can be used by optimizers.
+
+    Args:
+        val: The input value which is likely to be `True` most of the time.
+
+    Returns:
+        The input value.
+    """
+    return expect[True](val)
+
+
+# ===----------------------------------------------------------------------=== #
+# unlikely
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn unlikely(val: Bool) -> Bool:
+    """Provides information that the most probable value of `val` is going to be
+    `False`. This information can be used by optimizers.
+
+    Args:
+        val: The input value which is likely to be `False` most of the time.
+
+    Returns:
+        The input value.
+    """
+    return expect[False](val)
+
+
+# ===----------------------------------------------------------------------=== #
+# assume
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn assume(val: Bool):
+    """Signals to the optimizer that the condition is always true. This allows
+    the optimizer to optimize the code.
+
+    Args:
+      val: The input value which is assumed to be `True`.
+    """
+    llvm_intrinsic["llvm.assume", NoneType](val)

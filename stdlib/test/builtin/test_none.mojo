@@ -12,18 +12,43 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from testing import assert_equal
+
 
 def main():
+    test_str()
+    test_repr()
+    test_format_to()
     test_type_from_none()
+
+
+def test_str():
+    assert_equal(NoneType().__str__(), "None")
+
+
+def test_repr():
+    assert_equal(NoneType().__repr__(), "None")
+
+
+def test_format_to():
+    assert_equal(String.write(NoneType()), "None")
 
 
 struct FromNone:
     var value: Int
 
-    fn __init__(inout self, none: NoneType):
+    @implicit
+    fn __init__(out self, none: NoneType):
         self.value = -1
 
-    fn __init__(inout self, value: Int):
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @always_inline
+    @implicit
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        self = NoneType()
+
+    @implicit
+    fn __init__(out self, value: Int):
         self.value = value
 
 
