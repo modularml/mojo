@@ -65,7 +65,7 @@ fn make_string[
 # Benchmark string init
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_string_init(inout b: Bencher) raises:
+fn bench_string_init(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -84,7 +84,7 @@ fn bench_string_count[
     length: UInt = 0,
     filename: StringLiteral = "UN_charter_EN",
     sequence: StringLiteral = "a",
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -105,7 +105,7 @@ fn bench_string_split[
     length: UInt = 0,
     filename: StringLiteral = "UN_charter_EN",
     sequence: Optional[StringLiteral] = None,
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -130,7 +130,7 @@ fn bench_string_split[
 @parameter
 fn bench_string_splitlines[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -149,7 +149,7 @@ fn bench_string_splitlines[
 @parameter
 fn bench_string_lower[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -168,7 +168,7 @@ fn bench_string_lower[
 @parameter
 fn bench_string_upper[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -190,7 +190,7 @@ fn bench_string_replace[
     filename: StringLiteral = "UN_charter_EN",
     old: StringLiteral = "a",
     new: StringLiteral = "A",
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -209,7 +209,7 @@ fn bench_string_replace[
 @parameter
 fn bench_string_is_valid_utf8[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".html")
 
     @always_inline

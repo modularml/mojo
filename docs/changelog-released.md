@@ -6088,7 +6088,7 @@ busy this week.
 - 📢 The `__clone__` method for copying a value is now named `__copy__` to
   better follow Python term of art.
 
-- 📢 The `__copy__` method now takes its self argument as a "borrowed" value,
+- 📢 The `__copy__` method now takes its self argument as a "read" value,
   instead of taking it by reference.  This makes it easier to write, works for
   `@register_passable` types, and exposes more optimization opportunities to
   the early optimizer and dataflow analysis passes.
@@ -6153,7 +6153,7 @@ busy this week.
   Note that `@register_passable` types must use the later style.
 
 - 📢 The default argument convention is now the `borrowed` convention.  A
-  "borrowed" argument is passed like a C++ `const&` so it doesn't need to
+  "read" argument is passed like a C++ `const&` so it doesn't need to
   invoke the copy constructor (aka the `__clone__` method) when passing a value
   to the function.  There are two differences from C++ `const&`:
 

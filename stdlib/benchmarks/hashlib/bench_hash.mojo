@@ -599,7 +599,7 @@ fn gen_word_pairs[words: String = words_en]() -> List[String]:
 # Benchmarks
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_small_keys[s: String](inout b: Bencher) raises:
+fn bench_small_keys[s: String](mut b: Bencher) raises:
     var words = gen_word_pairs[s]()
 
     @always_inline
@@ -613,7 +613,7 @@ fn bench_small_keys[s: String](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
+fn bench_small_keys_new_hash_function[s: String](mut b: Bencher) raises:
     var words = gen_word_pairs[s]()
 
     @always_inline
@@ -627,7 +627,7 @@ fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_long_key[s: String](inout b: Bencher) raises:
+fn bench_long_key[s: String](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -638,7 +638,7 @@ fn bench_long_key[s: String](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_long_key_new_hash_function[s: String](inout b: Bencher) raises:
+fn bench_long_key_new_hash_function[s: String](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():

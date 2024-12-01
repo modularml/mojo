@@ -190,9 +190,7 @@ struct _StringSliceIter[
     var ptr: UnsafePointer[UInt8]
     var length: Int
 
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
+    fn __init__(mut self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
@@ -203,7 +201,7 @@ struct _StringSliceIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringSlice[origin]:
+    fn __next__(mut self) -> StringSlice[origin]:
         @parameter
         if forward:
             var byte_len = 1
@@ -356,7 +354,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     @implicit
     fn __init__[
         O: ImmutableOrigin, //
-    ](inout self: StringSlice[O], ref [O]value: String):
+    ](mut self: StringSlice[O], ref [O]value: String):
         """Construct an immutable StringSlice.
 
         Parameters:
@@ -395,7 +393,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var s = S(ptr=self.unsafe_ptr(), length=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Formats this string slice to the provided `Writer`.
 
         Parameters:

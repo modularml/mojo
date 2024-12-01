@@ -123,7 +123,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: StringLiteral):
+    fn __iadd__(mut self, rhs: StringLiteral):
         """Concatenate a string literal to an existing one. Can only be
         evaluated at compile time using the `alias` keyword, which will write
         the result into the binary.
@@ -388,7 +388,7 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -551,7 +551,7 @@ struct StringLiteral(
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string literal to the provided Writer.
 

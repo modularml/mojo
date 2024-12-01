@@ -29,12 +29,12 @@ struct __MLIRType[T: AnyTrivialRegType](Movable, Copyable):
 
 
 trait _IntNext(Copyable):
-    fn __next__(inout self) -> Int:
+    fn __next__(mut self) -> Int:
         ...
 
 
 trait _UIntNext(Copyable):
-    fn __next__(inout self) -> UInt:
+    fn __next__(mut self) -> UInt:
         ...
 
 

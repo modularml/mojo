@@ -31,7 +31,7 @@ from utils.stringref import _align_down, _memchr, _memmem
 # Benchmarks
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_writer_int[n: Int](inout b: Bencher) raises:
+fn bench_writer_int[n: Int](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -43,7 +43,7 @@ fn bench_writer_int[n: Int](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_writer_simd[n: Int](inout b: Bencher) raises:
+fn bench_writer_simd[n: Int](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():

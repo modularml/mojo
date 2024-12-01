@@ -31,7 +31,7 @@ struct OwnedPointer[T: AnyType]:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__[T: Movable](inout self: OwnedPointer[T], owned value: T):
+    fn __init__[T: Movable](mut self: OwnedPointer[T], owned value: T):
         """Construct a new OwnedPointer[] by moving the passed value into a new backing allocation.
 
         Parameters:
@@ -45,7 +45,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: OwnedPointer[T], *, copy_value: T):
+    ](mut self: OwnedPointer[T], *, copy_value: T):
         """Construct a new OwnedPointer[] by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
@@ -59,7 +59,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: Copyable, U: NoneType = None
-    ](inout self: OwnedPointer[T], value: T):
+    ](mut self: OwnedPointer[T], value: T):
         """Construct a new OwnedPointer[] by copying the passed value into a new backing allocation.
 
         Parameters:
@@ -74,7 +74,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: OwnedPointer[T], *, other: OwnedPointer[T],):
+    ](mut self: OwnedPointer[T], *, other: OwnedPointer[T],):
         """Construct a new OwnedPointer[] by explicitly copying the value from another OwnedPointer[].
 
         Parameters:

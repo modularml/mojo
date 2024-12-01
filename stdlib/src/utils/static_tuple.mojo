@@ -231,7 +231,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     @always_inline("nodebug")
     fn __setitem__[
         IntLike: IntLike, //
-    ](inout self, idx: IntLike, val: Self.element_type):
+    ](mut self, idx: IntLike, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
         Parameters:
@@ -252,7 +252,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self.element_type):
+    fn __setitem__[index: Int](mut self, val: Self.element_type):
         """Stores a single value into the tuple at the specified index.
 
         Parameters:

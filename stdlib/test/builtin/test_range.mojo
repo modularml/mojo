@@ -193,7 +193,7 @@ def test_scalar_range():
     assert_equal(r.end, 16)
     assert_equal(r.step, 4)
 
-    fn append_many(inout list: List, *values: list.T):
+    fn append_many(mut list: List, *values: list.T):
         for value in values:
             list.append(value[])
 

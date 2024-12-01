@@ -40,7 +40,7 @@ struct _UInt128:
     var high: UInt64
     var low: UInt64
 
-    fn __iadd__(inout self, n: UInt64):
+    fn __iadd__(mut self, n: UInt64):
         var sum = (self.low + n) & UInt64.MAX
         self.high += 1 if sum < self.low else 0
         self.low = sum
@@ -89,9 +89,7 @@ struct FP[type: DType, CarrierDType: DType = FPUtils[type].uint_type]:
     alias small_divisor = pow(10, Self.kappa)
 
 
-fn _write_float[
-    W: Writer, type: DType, //
-](inout writer: W, value: Scalar[type]):
+fn _write_float[W: Writer, type: DType, //](mut writer: W, value: Scalar[type]):
     """Write a SIMD float type into a Writer, using the dragonbox algorithm for
     perfect roundtrip, shortest representable format, and high performance.
     Paper: https://github.com/jk-jeon/dragonbox/blob/master/other_files/Dragonbox.pdf
@@ -228,7 +226,7 @@ fn _write_float[
 
 fn _to_decimal[
     CarrierDType: DType, //, type: DType
-](inout sig: Scalar[CarrierDType], inout exp: Int):
+](mut sig: Scalar[CarrierDType], mut exp: Int):
     """Transform the raw binary significand to decimal significand,
     and biased binary exponent into a decimal power of 10 exponent.
     """
@@ -500,7 +498,7 @@ fn _umul128[
 
 fn _remove_trailing_zeros[
     CarrierDType: DType
-](inout sig: Scalar[CarrierDType], inout exp: Int):
+](mut sig: Scalar[CarrierDType], mut exp: Int):
     """Fastest alg for removing trailing zeroes:
     https://github.com/jk-jeon/rtz_benchmark.
     """
@@ -629,7 +627,7 @@ fn _check_divisibility_and_divide_by_pow10[
     CarrierDType: DType, //,
     carrier_bits: Int,
     divide_magic_number: StaticTuple[UInt32, 2],
-](inout n: Scalar[CarrierDType], N: Int) -> Bool:
+](mut n: Scalar[CarrierDType], N: Int) -> Bool:
     # Make sure the computation for max_n does not overflow.
     debug_assert(N + 1 <= _floor_log10_pow2(carrier_bits))
 
