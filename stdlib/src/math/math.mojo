@@ -1154,6 +1154,23 @@ fn fma(a: Int, b: Int, c: Int) -> Int:
     return a * b + c
 
 
+@always_inline
+fn fma(a: UInt, b: UInt, c: UInt) -> UInt:
+    """Performs `fma` (fused multiply-add) on the inputs.
+
+    The result is `(a * b) + c`.
+
+    Args:
+        a: The first input.
+        b: The second input.
+        c: The third input.
+
+    Returns:
+        `(a * b) + c`.
+    """
+    return a * b + c
+
+
 @always_inline("nodebug")
 fn fma[
     type: DType, simd_width: Int
