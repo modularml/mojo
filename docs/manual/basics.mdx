@@ -95,7 +95,7 @@ passed by reference, the short answer is: `def` functions receive arguments
 
 The longer short answer is that Mojo allows you to specify for each argument
 whether it should be passed by value (as `owned`), or whether it should be
-passed by reference (as `borrowed` for an immutable reference, or as `inout`
+passed by reference (as `read` for an immutable reference, or as `mut`
 for a mutable reference).
 
 This feature is entwined with Mojo's value ownership model, which protects you

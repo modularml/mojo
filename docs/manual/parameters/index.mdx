@@ -402,7 +402,7 @@ struct MyStruct:
     fn __init__(out self):
         pass
 
-    fn foo(inout self):
+    fn foo(mut self):
         print("calling instance method")
 
     @staticmethod
@@ -411,7 +411,7 @@ struct MyStruct:
 
 fn test_static_overload():
     var a = MyStruct()
-    # `foo(inout self)` takes precedence over a static method.
+    # `foo(mut self)` takes precedence over a static method.
     a.foo()
 ```
 

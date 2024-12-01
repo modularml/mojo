@@ -120,9 +120,9 @@ and only make a copy when it's explicitly requested.
 The arguments above are mutable because a [`def`
 function](/mojo/manual/functions#def-functions) has special treatment for
 the default
-[`borrowed` argument convention](/mojo/manual/values/ownership#argument-conventions).
+[`read` argument convention](/mojo/manual/values/ownership#argument-conventions).
 
-Whereas, `fn` functions always receive `borrowed` arguments as immutable
+Whereas, `fn` functions always receive `read` arguments as immutable
 references. This is a memory optimization to avoid making
 unnecessary copies.
 
