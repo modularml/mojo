@@ -268,10 +268,7 @@ fn _stol(str_slice: StringSlice, base: Int = 10) raises -> (Int, String):
             # Keep original start position for base 10
         else:
             # For valid prefixes, use the new start position
-            if real_base != -1:
-                start = real_base_new_start[1]
-            else:
-                return 0, String(str_slice)
+            start = real_base_new_start[1]
 
         has_prefix = real_base != 10
     else:
