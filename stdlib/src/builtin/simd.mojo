@@ -802,7 +802,7 @@ struct SIMD[type: DType, size: Int](
             specified exponent value.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return _pow[type, size, DType.index](self, exp)
+        return _pow(self, SIMD[DType.index, size](exp))
 
     # TODO(#22771): remove this overload.
     @always_inline("nodebug")
@@ -2952,17 +2952,13 @@ fn _tbl1(
 
 @always_inline
 fn _pow[
-    BaseTy: DType, simd_width: Int, ExpTy: DType
-](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> __type_of(
-    base
-):
+    simd_width: Int
+](base: SIMD[_, simd_width], exp: SIMD[_, simd_width]) -> __type_of(base):
     """Computes the power of the elements of a SIMD vector raised to the
     corresponding elements of another SIMD vector.
 
     Parameters:
-        BaseTy: The `dtype` of the `base` SIMD vector.
         simd_width: The width of the input and output SIMD vectors.
-        ExpTy: The `dtype` of the `exp` SIMD vector.
 
     Args:
         base: Base of the power operation.
@@ -2973,9 +2969,9 @@ fn _pow[
     """
 
     @parameter
-    if ExpTy.is_floating_point() and BaseTy == ExpTy:
+    if exp.type.is_floating_point() and base.type is exp.type:
         return _powf(base, exp)
-    elif ExpTy.is_integral():
+    elif exp.type.is_integral():
         # Common cases
         if all(exp == 2):
             return base * base
@@ -3030,12 +3026,15 @@ fn _powf[
 
 
 @always_inline
-fn _powi[type: DType](base: Scalar[type], exp: Int32) -> __type_of(base):
+fn _powi(base: Scalar, exp: Int32) -> __type_of(base):
+    alias type = base.type
+
     if type.is_integral() and exp < 0:
         # Not defined for Integers, this should raise an
         # exception.
         debug_assert(False, "exponent < 0 is undefined for integers")
         return 0
+
     var a = base
     var b = abs(exp) if type.is_floating_point() else exp
     var res: Scalar[type] = 1
