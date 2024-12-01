@@ -249,7 +249,7 @@ fn _write_int[
     type: DType,
     W: Writer,
 ](
-    inout writer: W,
+    mut writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,
@@ -268,7 +268,7 @@ fn _try_write_int[
     type: DType,
     W: Writer,
 ](
-    inout writer: W,
+    mut writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,

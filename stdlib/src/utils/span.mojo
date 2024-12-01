@@ -69,7 +69,7 @@ struct _SpanIter[
 
     @always_inline
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[T, origin]:
         @parameter
         if forward:
@@ -150,7 +150,7 @@ struct Span[
     @always_inline
     fn __init__[
         size: Int, //
-    ](inout self, ref [origin]array: InlineArray[T, size]):
+    ](mut self, ref [origin]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:

@@ -176,7 +176,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn close(inout self):
+    fn close(mut self):
         """Delete the DLHandle object unloading the associated dynamic library.
         """
 

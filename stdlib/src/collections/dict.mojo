@@ -79,7 +79,7 @@ struct _DictEntryIter[
     var src: Pointer[Dict[K, V], dict_origin]
 
     fn __init__(
-        inout self, index: Int, seen: Int, ref [dict_origin]dict: Dict[K, V]
+        mut self, index: Int, seen: Int, ref [dict_origin]dict: Dict[K, V]
     ):
         self.index = index
         self.seen = seen
@@ -90,7 +90,7 @@ struct _DictEntryIter[
 
     @always_inline
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[DictEntry[K, V], __origin_of(self.src[]._entries[0].value())]:
         while True:
             var opt_entry_ref = Pointer.address_of(
@@ -141,7 +141,7 @@ struct _DictKeyIter[
         return self
 
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[K, __origin_of(self.iter.__next__()[].key)]:
         return Pointer.address_of(self.iter.__next__()[].key)
 
@@ -187,7 +187,7 @@ struct _DictValueIter[
             )
         )
 
-    fn __next__(inout self) -> Self.ref_type:
+    fn __next__(mut self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
         # Cast through a pointer to grant additional mutability because
         # _DictEntryIter.next erases it.
@@ -331,7 +331,7 @@ struct _DictIndex:
             var data = self.data.bitcast[Int64]()
             return int(data.load(slot & (reserved - 1)))
 
-    fn set_index(inout self, reserved: Int, slot: Int, value: Int):
+    fn set_index(mut self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[Int8]()
             return data.store(slot & (reserved - 1), value)
@@ -599,7 +599,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self._find_ref(key)
 
-    fn __setitem__(inout self, owned key: K, owned value: V):
+    fn __setitem__(mut self, owned key: K, owned value: V):
         """Set a value in the dictionary by key.
 
         Args:
@@ -650,7 +650,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         result.update(other)
         return result^
 
-    fn __ior__(inout self, other: Self):
+    fn __ior__(mut self, other: Self):
         """Merge self with other in place.
 
         Args:
@@ -805,7 +805,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self.find(key).or_else(default)
 
-    fn pop(inout self, key: K, owned default: V) -> V:
+    fn pop(mut self, key: K, owned default: V) -> V:
         """Remove a value from the dictionary by key.
 
         Args:
@@ -822,7 +822,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         except:
             return default
 
-    fn pop(inout self, key: K) raises -> V:
+    fn pop(mut self, key: K) raises -> V:
         """Remove a value from the dictionary by key.
 
         Args:
@@ -850,7 +850,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return entry_value^.reap_value()
         raise "KeyError"
 
-    fn popitem(inout self) raises -> DictEntry[K, V]:
+    fn popitem(mut self) raises -> DictEntry[K, V]:
         """Remove and return a (key, value) pair from the dictionary. Pairs are returned in LIFO order.
         popitem() is useful to destructively iterate over a dictionary, as often used in set algorithms.
         If the dictionary is empty, calling popitem() raises a KeyError.
@@ -916,7 +916,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return _DictEntryIter(0, 0, self)
 
-    fn update(inout self, other: Self, /):
+    fn update(mut self, other: Self, /):
         """Update the dictionary with the key/value pairs from other, overwriting existing keys.
         The argument must be positional only.
 
@@ -926,7 +926,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for entry in other.items():
             self[entry[].key] = entry[].value
 
-    fn clear(inout self):
+    fn clear(mut self):
         """Remove all elements from the dictionary."""
         self.size = 0
         self._n_entries = 0
@@ -934,7 +934,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(self._reserved())
 
     fn setdefault(
-        inout self, key: K, owned default: V
+        mut self, key: K, owned default: V
     ) raises -> ref [self._find_ref(key)] V:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
@@ -960,12 +960,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
             entries.append(None)
         return entries
 
-    fn _insert(inout self, owned key: K, owned value: V):
+    fn _insert(mut self, owned key: K, owned value: V):
         self._insert(DictEntry[K, V](key^, value^))
 
     fn _insert[
         safe_context: Bool = False
-    ](inout self, owned entry: DictEntry[K, V]):
+    ](mut self, owned entry: DictEntry[K, V]):
         @parameter
         if not safe_context:
             self._maybe_resize()
@@ -983,10 +983,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _get_index(self, slot: Int) -> Int:
         return self._index.get_index(self._reserved(), slot)
 
-    fn _set_index(inout self, slot: Int, index: Int):
+    fn _set_index(mut self, slot: Int, index: Int):
         return self._index.set_index(self._reserved(), slot, index)
 
-    fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
+    fn _next_index_slot(self, mut slot: Int, mut perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
         slot = ((5 * slot) + int(perturb + 1)) & (self._reserved() - 1)
@@ -1023,7 +1023,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _over_compact_factor(self) -> Bool:
         return 4 * self._n_entries > 3 * self._reserved()
 
-    fn _maybe_resize(inout self):
+    fn _maybe_resize(mut self):
         if not self._over_load_factor():
             if self._over_compact_factor():
                 self._compact()
@@ -1040,7 +1040,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             if entry:
                 self._insert[safe_context=True](entry.unsafe_take())
 
-    fn _compact(inout self):
+    fn _compact(mut self):
         self._index = _DictIndex(self._reserved())
         var right = 0
         for left in range(self.size):
@@ -1129,7 +1129,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict[key]
 
     @always_inline
-    fn __setitem__(inout self, key: Self.key_type, value: V):
+    fn __setitem__(mut self, key: Self.key_type, value: V):
         """Set a value in the keyword dictionary by key.
 
         Args:
@@ -1182,7 +1182,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.find(key)
 
     @always_inline
-    fn pop(inout self, key: self.key_type, owned default: V) -> V:
+    fn pop(mut self, key: self.key_type, owned default: V) -> V:
         """Remove a value from the dictionary by key.
 
         Args:
@@ -1197,7 +1197,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.pop(key, default^)
 
     @always_inline
-    fn pop(inout self, key: self.key_type) raises -> V:
+    fn pop(mut self, key: self.key_type) raises -> V:
         """Remove a value from the dictionary by key.
 
         Args:
@@ -1270,9 +1270,9 @@ struct OwnedKwargsDict[V: CollectionElement](
         return _DictEntryIter(0, 0, self._dict)
 
     @always_inline
-    fn _insert(inout self, owned key: Self.key_type, owned value: V):
+    fn _insert(mut self, owned key: Self.key_type, owned value: V):
         self._dict._insert(key^, value^)
 
     @always_inline
-    fn _insert(inout self, key: StringLiteral, owned value: V):
+    fn _insert(mut self, key: StringLiteral, owned value: V):
         self._insert(String(key), value^)

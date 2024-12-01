@@ -135,7 +135,7 @@ struct _VariadicListIter[type: AnyTrivialRegType]:
     var index: Int
     var src: VariadicList[type]
 
-    fn __next__(inout self) -> type:
+    fn __next__(mut self) -> type:
         self.index += 1
         return self.src[self.index - 1]
 
@@ -239,12 +239,12 @@ struct _VariadicListMemIter[
     var src: Pointer[Self.variadic_list_type, list_origin]
 
     fn __init__(
-        inout self, index: Int, ref [list_origin]list: Self.variadic_list_type
+        mut self, index: Int, ref [list_origin]list: Self.variadic_list_type
     ):
         self.index = index
         self.src = Pointer.address_of(list)
 
-    fn __next__(inout self) -> Self.variadic_list_type.reference_type:
+    fn __next__(mut self) -> Self.variadic_list_type.reference_type:
         self.index += 1
         # TODO: Need to make this return a dereferenced reference, not a
         # reference that must be deref'd by the user.
@@ -303,7 +303,7 @@ struct VariadicListMem[
 
     Parameters:
         elt_is_mutable: True if the elements of the list are mutable for an
-                        inout or owned argument.
+                        mut or owned argument.
         element_type: The type of the elements in the list.
         origin: The reference origin of the underlying elements.
     """
@@ -326,7 +326,7 @@ struct VariadicListMem[
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    # Provide support for borrowed variadic arguments.
+    # Provide support for read-only variadic arguments.
     @doc_private
     @always_inline
     @implicit
@@ -339,9 +339,9 @@ struct VariadicListMem[
         self.value = value
         self._is_owned = False
 
-    # Provide support for variadics of *inout* arguments.  The reference will
+    # Provide support for variadics of *mut* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
-    # convention=inout.
+    # convention=mut.
     alias _inout_variadic_type = __mlir_type[
         `!kgen.variadic<`, Self._mlir_ref_type, `, inout>`
     ]
@@ -489,7 +489,7 @@ struct VariadicPack[
 
     Parameters:
         elt_is_mutable: True if the elements of the list are mutable for an
-                        inout or owned argument pack.
+                        mut or owned argument pack.
         origin: The reference origin of the underlying elements.
         element_trait: The trait that each element of the pack conforms to.
         element_types: The list of types held by the argument pack.
@@ -519,7 +519,7 @@ struct VariadicPack[
 
         Args:
             value: The argument to construct the pack with.
-            is_owned: Whether this is an 'owned' pack or 'inout'/'borrowed'.
+            is_owned: Whether this is an 'owned' pack or 'mut'/'read-only'.
         """
         self._value = value
         self._is_owned = is_owned
@@ -602,7 +602,7 @@ struct VariadicPack[
         """Apply a function to each element of the pack in order.  This applies
         the specified function (which must be parametric on the element type) to
         each element of the pack, from the first element to the last, passing
-        in each element as a borrowed argument.
+        in each element as a read-only argument.
 
         Parameters:
             func: The function to apply to each element.
@@ -619,7 +619,7 @@ struct VariadicPack[
         """Apply a function to each element of the pack in order.  This applies
         the specified function (which must be parametric on the element type) to
         each element of the pack, from the first element to the last, passing
-        in each element as a borrowed argument.
+        in each element as a read-only argument.
 
         Parameters:
             func: The function to apply to each element.

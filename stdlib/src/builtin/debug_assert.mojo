@@ -308,7 +308,7 @@ struct _ThreadContext(Writable):
         self.thread_y = _get_id["thread", "y"]()
         self.thread_z = _get_id["thread", "z"]()
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write(
             "block: [",
             self.block_x,

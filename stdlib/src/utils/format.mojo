@@ -80,7 +80,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         self.format_spec = other.format_spec
 
     fn __init__(
-        inout self,
+        mut self,
         first_curly: Int,
         last_curly: Int,
         field: Self._FieldVariantType,
@@ -267,17 +267,17 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     fn _handle_field_and_break[
         T: Stringlike
     ](
-        inout self,
+        mut self,
         fmt_src: T,
         len_pos_args: Int,
         i: Int,
         start_value: Int,
-        inout automatic_indexing_count: Int,
-        inout raised_automatic_index: Optional[Int],
-        inout manual_indexing_count: Int,
-        inout raised_manual_index: Optional[Int],
-        inout raised_kwarg_field: Optional[String],
-        inout total_estimated_entry_byte_width: Int,
+        mut automatic_indexing_count: Int,
+        mut raised_automatic_index: Optional[Int],
+        mut manual_indexing_count: Int,
+        mut raised_manual_index: Optional[Int],
+        mut raised_kwarg_field: Optional[String],
+        mut total_estimated_entry_byte_width: Int,
     ) raises -> Bool:
         alias S = StringSlice[StaticConstantOrigin]
 
@@ -350,7 +350,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     fn _format_entry[
         len_pos_args: Int
-    ](self, inout res: String, args: Self._args_t, inout auto_idx: Int) raises:
+    ](self, mut res: String, args: Self._args_t, mut auto_idx: Int) raises:
         # TODO(#3403 and/or #3252): this function should be able to use
         # Writer syntax when the type implements it, since it will give great
         # performance benefits. This also needs to be able to check if the given
@@ -603,7 +603,7 @@ struct _FormatSpec:
     """
 
     fn __init__(
-        inout self,
+        mut self,
         fill: UInt8 = ord(" "),
         align: UInt8 = 0,
         sign: UInt8 = ord("-"),
@@ -680,7 +680,7 @@ struct _FormatSpec:
         return None
 
     # TODO: this should be in StringSlice.__format__(self, spec: FormatSpec, *, writer: Writer):
-    fn format(self, inout res: String, item: StringSlice) raises:
+    fn format(self, mut res: String, item: StringSlice) raises:
         """Transform a String according to its format specification.
 
         Args:
@@ -691,9 +691,7 @@ struct _FormatSpec:
         # TODO: align, fill, etc.
         res += item
 
-    fn format[
-        T: _CurlyEntryFormattable
-    ](self, inout res: String, item: T) raises:
+    fn format[T: _CurlyEntryFormattable](self, mut res: String, item: T) raises:
         """Stringify a type according to its format specification.
 
         Args:

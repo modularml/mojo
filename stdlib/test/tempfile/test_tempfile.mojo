@@ -55,7 +55,7 @@ struct TempEnvWithCleanup:
     """Function called after the context manager exits if an error occurs."""
 
     fn __init__(
-        inout self,
+        mut self,
         vars_to_set: Dict[String, String],
         clean_up_function: fn () raises -> None,
     ):
@@ -63,20 +63,20 @@ struct TempEnvWithCleanup:
         self._vars_back = Dict[String, String]()
         self.clean_up_function = clean_up_function
 
-    def __enter__(inout self):
+    def __enter__(mut self):
         for key_value in self.vars_to_set.items():
             var key = key_value[].key
             var value = key_value[].value
             self._vars_back[key] = os.getenv(key)
             _ = os.setenv(key, value, overwrite=True)
 
-    fn __exit__(inout self):
+    fn __exit__(mut self):
         for key_value in self.vars_to_set.items():
             var key = key_value[].key
             var value = key_value[].value
             _ = os.setenv(key, value, overwrite=True)
 
-    def __exit__(inout self, error: Error) -> Bool:
+    def __exit__(mut self, error: Error) -> Bool:
         self.__exit__()
         self.clean_up_function()
         return False

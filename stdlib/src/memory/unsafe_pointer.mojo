@@ -272,7 +272,7 @@ struct UnsafePointer[
         return self + (-1 * Int(offset.__mlir_index__()))
 
     @always_inline
-    fn __iadd__[T: IntLike, //](inout self, offset: T):
+    fn __iadd__[T: IntLike, //](mut self, offset: T):
         """Add an offset to this pointer.
 
         Parameters:
@@ -284,7 +284,7 @@ struct UnsafePointer[
         self = self + offset
 
     @always_inline
-    fn __isub__[T: IntLike, //](inout self, offset: T):
+    fn __isub__[T: IntLike, //](mut self, offset: T):
         """Subtract an offset from this pointer.
 
         Parameters:
@@ -420,7 +420,7 @@ struct UnsafePointer[
         return hex(int(self))
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this pointer address to the provided Writer.
 

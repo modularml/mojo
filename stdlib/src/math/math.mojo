@@ -1108,7 +1108,7 @@ fn iota[
         buff.store(i, i + offset)
 
 
-fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
+fn iota[type: DType, //](mut v: List[Scalar[type], *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
@@ -1121,7 +1121,7 @@ fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
     iota(v.data, len(v), offset)
 
 
-fn iota(inout v: List[Int, *_], offset: Int = 0):
+fn iota(mut v: List[Int, *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:

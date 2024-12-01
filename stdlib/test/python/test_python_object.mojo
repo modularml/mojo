@@ -21,7 +21,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from utils import StringRef
 
 
-def test_dunder_methods(inout python: Python):
+def test_dunder_methods(mut python: Python):
     var a = PythonObject(34)
     var b = PythonObject(10)
 
