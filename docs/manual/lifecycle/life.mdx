@@ -71,7 +71,7 @@ var mine = MyPet("Loki", 4)
 ```
 
 An instance of `MyPet` can also be
-[borrowed](/mojo/manual/values/ownership#borrowed-arguments-borrowed)
+[read](/mojo/manual/values/ownership#read-arguments-read)
 and destroyed, but it currently can't be copied or moved.
 
 We believe this is a good default starting point, because there are no built-in
@@ -99,8 +99,8 @@ example, you might want a default constructor that sets some default values and
 takes no arguments, and then additional constructors that accept more arguments.
 
 Just be aware that, in order to modify any fields, each constructor must
-declare the `self` argument with the [`inout`
-convention](/mojo/manual/values/ownership#mutable-arguments-inout). If you
+declare the `self` argument with the [`out`
+convention](/mojo/manual/values/ownership#mutable-arguments-mut). If you
 want to call one constructor from another, you simply call upon that
 constructor as you would externally (you don't need to pass `self`).
 
@@ -287,7 +287,7 @@ mistakes when referring to the current struct name.
 Also, notice that the `existing` argument in `__copyinit__()` is immutable
 because the default [argument
 convention](/mojo/manual/values/ownership#argument-conventions) is
-`borrowed`—this is a good thing because this function should not modify the
+`read`—this is a good thing because this function should not modify the
 contents of the value being copied.
 
 :::
@@ -337,7 +337,7 @@ struct HeapArray:
             (self.data + i).destroy_pointee()
         self.data.free()
 
-    fn append(inout self, val: Int):
+    fn append(mut self, val: Int):
         # Update the array for demo purposes
         if self.size < self.cap:
             (self.data + self.size).init_pointee_copy(val)
@@ -478,7 +478,7 @@ struct HeapArray:
             (self.data + i).destroy_pointee()
         self.data.free()
 
-    fn append(inout self, val: Int):
+    fn append(mut self, val: Int):
         # Update the array for demo purposes
         if self.size < self.cap:
             (self.data + self.size).init_pointee_copy(val)
@@ -529,7 +529,7 @@ values that are expensive to copy.
 To go further and ensure your type can never be copied, you can make it
 "move-only" by implementing `__moveinit__()` and *excluding* `__copyinit__()`.
 A move-only type can be passed to other variables and passed into functions
-with any argument convention (`borrowed`, `inout`, and `owned`)—the only catch
+with any argument convention (`read`, `mut`, and `owned`)—the only catch
 is that you must use the `^` transfer sigil to end the lifetime of a
 move-only type when assigning it to a new variable or when passing it as an
 `owned` argument.

@@ -849,10 +849,10 @@ struct MyInt:
     def __radd__(self, lhs: Int) -> Self:
         return MyInt(self.value + lhs)
 
-    def __iadd__(inout self, rhs: MyInt) -> None:
+    def __iadd__(mut self, rhs: MyInt) -> None:
         self.value += rhs.value
 
-    def __iadd__(inout self, rhs: Int) -> None:
+    def __iadd__(mut self, rhs: Int) -> None:
         self.value += rhs
 ```
 
@@ -953,7 +953,7 @@ struct MySeq[type: CollectionElement]:
     fn __getitem__(self, idx: Int) -> type:
         # Return element at the given index
         ...
-    fn __setitem__(inout self, idx: Int, value: type):
+    fn __setitem__(mut self, idx: Int, value: type):
         # Assign the element at the given index the provided value
 ```
 
@@ -1116,7 +1116,7 @@ struct Complex(
     fn __str__(self) -> String:
         return String.write(self)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write("(", self.re)
         if self.im < 0:
             writer.write(" - ", -self.im)
@@ -1169,7 +1169,7 @@ this example.
         else:
             raise "index out of bounds"
 
-    def __setitem__(inout self, idx: Int, value: Float64) -> None:
+    def __setitem__(mut self, idx: Int, value: Float64) -> None:
         if idx == 0:
             self.re = value
         elif idx == 1:
@@ -1372,44 +1372,44 @@ f1 / c1 = (-0.068665598535133904 - 0.37193865873197529i)
 
 Now let's implement support for the in-place assignment operators: `+=`, `-=`,
 `*=`, and `/=`. These modify the original value, so we need to mark `self` as
-being an `inout` argument and update the `re` and `im` fields instead of
+being an `mut` argument and update the `re` and `im` fields instead of
 returning a new `Complex` instance. And once again, we'll overload the
 definitions to support both a `Complex` and a `Float64` operand.
 
 ```mojo
     # ...
-    def __iadd__(inout self, rhs: Self) -> None:
+    def __iadd__(mut self, rhs: Self) -> None:
         self.re += rhs.re
         self.im += rhs.im
 
-    def __iadd__(inout self, rhs: Float64) -> None:
+    def __iadd__(mut self, rhs: Float64) -> None:
         self.re += rhs
 
-    def __isub__(inout self, rhs: Self) -> None:
+    def __isub__(mut self, rhs: Self) -> None:
         self.re -= rhs.re
         self.im -= rhs.im
 
-    def __isub__(inout self, rhs: Float64) -> None:
+    def __isub__(mut self, rhs: Float64) -> None:
         self.re -= rhs
 
-    def __imul__(inout self, rhs: Self) -> None:
+    def __imul__(mut self, rhs: Self) -> None:
         new_re = self.re * rhs.re - self.im * rhs.im
         new_im = self.re * rhs.im + self.im * rhs.re
         self.re = new_re
         self.im = new_im
 
-    def __imul__(inout self, rhs: Float64) -> None:
+    def __imul__(mut self, rhs: Float64) -> None:
         self.re *= rhs
         self.im *= rhs
 
-    def __itruediv__(inout self, rhs: Self) -> None:
+    def __itruediv__(mut self, rhs: Self) -> None:
         denom = rhs.squared_norm()
         new_re = (self.re * rhs.re + self.im * rhs.im) / denom
         new_im = (self.im * rhs.re - self.re * rhs.im) / denom
         self.re = new_re
         self.im = new_im
 
-    def __itruediv__(inout self, rhs: Float64) -> None:
+    def __itruediv__(mut self, rhs: Float64) -> None:
         self.re /= rhs
         self.im /= rhs
 ```

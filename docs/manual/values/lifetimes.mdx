@@ -205,8 +205,8 @@ You can use the `ref` keyword with arguments and return values to specify a
 reference with parametric mutability. That is, they can be either mutable or
 immutable.
 
-From inside the called function, a `ref` argument looks like a `borrowed` or
-`inout` argument.
+From inside the called function, a `ref` argument looks like a `read` or
+`mut` argument.
 
 A `ref` return value looks like any other return value to the calling function,
 but it is a *reference* to an existing value, not a copy.
@@ -282,7 +282,7 @@ Mutable: Goodbye
 ### `ref` return values
 
 Like `ref` arguments, `ref` return values allow a function to return a mutable
-or immutable reference to a value. Like a `borrowed` or `inout` argument, these
+or immutable reference to a value. Like a `read` or `mut` argument, these
 references don't need to be dereferenced.
 
 `ref` return values can be an efficient way to handle updating items in a
