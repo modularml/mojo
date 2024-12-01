@@ -62,16 +62,16 @@ of the `Hashable` trait.
 ```mojo
 trait Hasher:
     """Trait which every hash function implementer needs to implement."""
-    fn __init__(inout self):
+    fn __init__(out self):
         """Expects a no argument instantiation."""
         ...
-    fn _update_with_bytes(inout self, bytes: DTypePointer[DType.uint8], n: Int):
+    fn _update_with_bytes(mut self, bytes: DTypePointer[DType.uint8], n: Int):
         """Conribute to the hash value based on a sequence of bytes. Use only for complex types which are not just a composition of Hashable types."""
         ...
-    fn _update_with_simd[dt: DType, size: Int](inout self, value: SIMD[dt, size]):
+    fn _update_with_simd[dt: DType, size: Int](mut self, value: SIMD[dt, size]):
         """Contribute to the hash value with a compile time know fix size value. Used inside of std lib to avoid runtime branching."""
         ...
-    fn update[T: Hashable](inout self, value: T):
+    fn update[T: Hashable](mut self, value: T):
         """Contribute to the hash value with a Hashable value. Should be used by implementors of Hashable types which are a composition of Hashable types."""
         ...
     fn _finish[dt: DType = DType.uint64](owned self) -> Scalar[dt]:
@@ -93,13 +93,13 @@ Below you can see a dummy implementation of a `DefaultHasher`
 struct DefaultHasher(Hasher):
     var hash: UInt64
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.hash = 42
-    fn _update_with_bytes(inout self, bytes: DTypePointer[DType.uint8], n: Int):
+    fn _update_with_bytes(mut self, bytes: DTypePointer[DType.uint8], n: Int):
         ...
-    fn _update_with_simd[dt: DType, size: Int](inout self, value: SIMD[dt, size]):
+    fn _update_with_simd[dt: DType, size: Int](mut self, value: SIMD[dt, size]):
         ...
-    fn update[T: Hashable](inout self, value: T):
+    fn update[T: Hashable](mut self, value: T):
         ...
     fn _finish[dt: DType = DType.uint64](owned self) -> Scalar[dt]:
         return self.hash.cast[dt]()
@@ -112,7 +112,7 @@ data flow paradigm instead of call return.
 
 ```mojo
 trait Hashable:
-    fn hash_with[H: Hasher](self, inout hasher: H):
+    fn hash_with[H: Hasher](self, mut hasher: H):
         ...
 ```
 
@@ -128,7 +128,7 @@ struct Person(Hashable):
     var name: String
     var age: Int
 
-    fn __hash__[H: Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(self.name)
         hasher.update(self.age)
 ```
@@ -155,21 +155,21 @@ from random import random_si64
 
 trait Hashable:
     """Trait which every hashable type needs to implement."""
-    fn __hash__[H: Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         ...
 
 trait Hasher:
     """Trait which every hash function implementer needs to implement."""
-    fn __init__(inout self):
+    fn __init__(out self):
         """Expects a no argument instantiation."""
         ...
-    fn _update_with_bytes(inout self, bytes: DTypePointer[DType.uint8], n: Int):
+    fn _update_with_bytes(mut self, bytes: DTypePointer[DType.uint8], n: Int):
         """Conribute to the hash value based on a sequence of bytes. Use only for complex types which are not just a composition of Hashable types."""
         ...
-    fn _update_with_simd[dt: DType, size: Int](inout self, value: SIMD[dt, size]):
+    fn _update_with_simd[dt: DType, size: Int](mut self, value: SIMD[dt, size]):
         """Contribute to the hash value with a compile time know fix size value. Used inside of std lib to avoid runtime branching."""
         ...
-    fn update[T: Hashable](inout self, value: T):
+    fn update[T: Hashable](mut self, value: T):
         """Contribute to the hash value with a Hashable value. Should be used by implementors of Hashable types which are a composition of Hashable types."""
         ...
     fn _finish[dt: DType = DType.uint64](owned self) -> Scalar[dt]:
@@ -184,7 +184,7 @@ struct MyInt(Hashable):
     var value: Int
 
     @always_inline
-    fn __hash__[H: Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         hasher._update_with_simd(Int64(self.value))
 
 @value
@@ -193,7 +193,7 @@ struct MyString(Hashable):
     var value: StringLiteral
 
     @always_inline
-    fn __hash__[H: Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(MyInt(len(self.value)))
         hasher._update_with_bytes(self.value.data().bitcast[DType.uint8](), len(self.value))
 
@@ -203,7 +203,7 @@ struct Person(Hashable):
     var name: MyString
     var age: MyInt
 
-    fn __hash__[H: Hasher](self, inout hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         hasher.update(self.name)
         hasher.update(self.age)
 
@@ -235,7 +235,7 @@ struct DJBX33A_Hasher[custom_secret: UInt64 = 0](Hasher):
     var secret: UInt64
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         self.hash_data = 5361
         @parameter
         if custom_secret != 0:
@@ -244,13 +244,13 @@ struct DJBX33A_Hasher[custom_secret: UInt64 = 0](Hasher):
             self.secret = _DJBX33A_SECRET()
 
     @always_inline
-    fn _update_with_bytes(inout self, bytes: DTypePointer[DType.uint8], n: Int):
+    fn _update_with_bytes(mut self, bytes: DTypePointer[DType.uint8], n: Int):
         """The algorithm is not optimal."""
         for i in range(n):
             self.hash_data = self.hash_data * 33 + bytes.load(i).cast[DType.uint64]()
 
     @always_inline
-    fn _update_with_simd[dt: DType, size: Int](inout self, value: SIMD[dt, size]):
+    fn _update_with_simd[dt: DType, size: Int](mut self, value: SIMD[dt, size]):
         """The algorithm is not optimal."""
         alias size_in_bytes = size * dt.sizeof()
         var bytes = bitcast[DType.uint8, size_in_bytes](value)
@@ -259,7 +259,7 @@ struct DJBX33A_Hasher[custom_secret: UInt64 = 0](Hasher):
             self.hash_data = self.hash_data * 33 + bytes[i].cast[DType.uint64]()
 
     @always_inline
-    fn update[T: Hashable](inout self, value: T):
+    fn update[T: Hashable](mut self, value: T):
         value.__hash__(self)
 
     @always_inline
