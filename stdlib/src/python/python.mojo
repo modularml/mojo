@@ -132,7 +132,7 @@ struct Python:
             cpython.PyImport_AddModule(name)
         )
         var dict_obj = PythonObject.from_borrowed_ptr(
-            cpython.PyModule_GetDict(module.py_object)
+            cpython.PyModule_GetDict(module.py_object_ptr)
         )
         if file:
             # We compile the code as provided and execute in the module
@@ -153,7 +153,9 @@ struct Python:
             # the module scope for this eval, they should be the same object.
             var result = PythonObject(
                 cpython.PyEval_EvalCode(
-                    code.py_object, dict_obj.py_object, dict_obj.py_object
+                    code.py_object_ptr,
+                    dict_obj.py_object_ptr,
+                    dict_obj.py_object_ptr,
                 )
             )
             Python.throw_python_exception_if_error_state(cpython)
@@ -165,7 +167,10 @@ struct Python:
             # all the globals/locals to be discarded. See above re: why the same
             # dictionary is being used here for both globals and locals.
             var result = cpython.PyRun_String(
-                expr, dict_obj.py_object, dict_obj.py_object, Py_eval_input
+                expr,
+                dict_obj.py_object_ptr,
+                dict_obj.py_object_ptr,
+                Py_eval_input,
             )
             # We no longer need module and dictionary, release them.
             Python.throw_python_exception_if_error_state(cpython)
@@ -305,7 +310,7 @@ struct Python:
         var result = cpython.PyModule_AddFunctions(
             # Safety: `module` pointer lives long enough because its reference
             #   argument.
-            module.unsafe_as_py_object_ptr(),
+            module.unsafe_py_object_ptr(),
             functions,
         )
 
@@ -335,9 +340,9 @@ struct Python:
         var cpython = _get_global_python_itf().cpython()
 
         var result = cpython.PyModule_AddObjectRef(
-            module.unsafe_as_py_object_ptr(),
+            module.unsafe_py_object_ptr(),
             name.unsafe_cstr_ptr(),
-            value.unsafe_as_py_object_ptr(),
+            value.unsafe_py_object_ptr(),
         )
 
         if result != 0:
@@ -376,7 +381,7 @@ struct Python:
             Mojo string representing the given Python object.
         """
         var cpython = self.impl.cpython()
-        return cpython.PyUnicode_AsUTF8AndSize(str_obj.py_object)
+        return cpython.PyUnicode_AsUTF8AndSize(str_obj.py_object_ptr)
 
     @staticmethod
     fn throw_python_exception_if_error_state(inout cpython: CPython) raises:
@@ -427,7 +432,7 @@ struct Python:
             True if `x` and `y` are the same object and False otherwise.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.Py_Is(x.py_object, y.py_object)
+        return cpython.Py_Is(x.py_object_ptr, y.py_object_ptr)
 
     @staticmethod
     fn type(obj: PythonObject) -> PythonObject:
@@ -440,7 +445,7 @@ struct Python:
             A PythonObject that holds the type object.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.PyObject_Type(obj.py_object)
+        return cpython.PyObject_Type(obj.py_object_ptr)
 
     @staticmethod
     fn none() -> PythonObject:
@@ -472,7 +477,7 @@ struct Python:
         var cpython = Python().impl.cpython()
 
         var long: Py_ssize_t = cpython.PyLong_AsSsize_t(
-            obj.unsafe_as_py_object_ptr()
+            obj.unsafe_py_object_ptr()
         )
 
         # Disambiguate if this is an error return setinel, or a legitimate

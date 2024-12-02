@@ -1665,11 +1665,11 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyLong_AsSsize_t(inout self, py_object: PyObjectPtr) -> c_ssize_t:
+    fn PyLong_AsSsize_t(inout self, py_object_ptr: PyObjectPtr) -> c_ssize_t:
         """[Reference](
         https://docs.python.org/3/c-api/long.html#c.PyLong_AsSsize_t).
         """
-        return self.lib.call["PyLong_AsSsize_t", c_ssize_t](py_object)
+        return self.lib.call["PyLong_AsSsize_t", c_ssize_t](py_object_ptr)
 
     # ===-------------------------------------------------------------------===#
     # Floating-Point Objects
@@ -1693,11 +1693,11 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyFloat_AsDouble(inout self, py_object: PyObjectPtr) -> Float64:
+    fn PyFloat_AsDouble(inout self, py_object_ptr: PyObjectPtr) -> Float64:
         """[Reference](
         https://docs.python.org/3/c-api/float.html#c.PyFloat_AsDouble).
         """
-        return self.lib.call["PyFloat_AsDouble", Float64](py_object)
+        return self.lib.call["PyFloat_AsDouble", Float64](py_object_ptr)
 
     # ===-------------------------------------------------------------------===#
     # Unicode Objects
@@ -1773,7 +1773,9 @@ struct CPython:
 
         return py_slice
 
-    fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
+    fn PyUnicode_AsUTF8AndSize(
+        inout self, py_object_ptr: PyObjectPtr
+    ) -> StringRef:
         """[Reference](
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsUTF8AndSize).
         """
@@ -1781,7 +1783,7 @@ struct CPython:
         var s = StringRef()
         s.data = self.lib.call[
             "PyUnicode_AsUTF8AndSize", UnsafePointer[c_char]
-        ](py_object, UnsafePointer.address_of(s.length)).bitcast[UInt8]()
+        ](py_object_ptr, UnsafePointer.address_of(s.length)).bitcast[UInt8]()
         return s
 
     # ===-------------------------------------------------------------------===#
