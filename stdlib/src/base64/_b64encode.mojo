@@ -26,9 +26,11 @@ https://arxiv.org/abs/1704.00605
 
 from collections import InlineArray
 from math.math import _compile_time_iota
-from memory import memcpy, bitcast, UnsafePointer
-from utils import IndexList
 from sys import llvm_intrinsic
+
+from memory import UnsafePointer, bitcast, memcpy
+
+from utils import IndexList
 
 alias Bytes = SIMD[DType.uint8, _]
 

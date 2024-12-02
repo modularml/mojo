@@ -13,7 +13,9 @@
 """Implements Formatting utilities."""
 
 from collections import Optional
+
 from memory import UnsafePointer
+
 from utils.string_slice import Stringlike
 
 # TODO: _FormatCurlyEntry and _FormatSpec should be public in the future for

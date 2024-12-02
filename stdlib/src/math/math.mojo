@@ -20,24 +20,23 @@ from math import floor
 """
 
 from collections import List
-from sys._assembly import inlined_assembly
-from sys.ffi import _external_call_const
 from sys import (
-    llvm_intrinsic,
     bitwidthof,
     has_avx512f,
-    simdwidthof,
-    is_nvidia_gpu,
     is_amd_gpu,
+    is_nvidia_gpu,
+    llvm_intrinsic,
+    simdwidthof,
     sizeof,
 )
-
-from memory import UnsafePointer
+from sys._assembly import inlined_assembly
+from sys.ffi import _external_call_const
+from sys.info import _current_arch
 
 from bit import count_trailing_zeros
 from builtin.dtype import _integral_type_of
-from builtin.simd import _simd_apply, _modf
-from sys.info import _current_arch
+from builtin.simd import _modf, _simd_apply
+from memory import UnsafePointer
 
 from utils import Span
 from utils.index import IndexList

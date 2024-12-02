@@ -11,4 +11,4 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 """Implements the hashlib package that provides various hash algorithms."""
-from .hash import hash, Hashable
+from .hash import Hashable, hash

@@ -11,9 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from time import perf_counter_ns
+
 import gridv1
 import gridv2
-from time import perf_counter_ns
 
 
 def main():

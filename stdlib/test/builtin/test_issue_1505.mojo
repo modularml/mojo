@@ -15,8 +15,9 @@
 
 from random import random_ui64
 
-from utils import IndexList
 from testing import assert_equal
+
+from utils import IndexList
 
 
 fn gen_perm() -> IndexList[64]:

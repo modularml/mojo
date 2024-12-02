@@ -15,14 +15,13 @@
 
 import os
 from collections import List
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from os import PathLike, listdir, stat_result
-from sys import os_is_windows, external_call
+from sys import external_call, os_is_windows
 from sys.ffi import c_char
 
 from builtin._location import __call_location, _SourceLocation
-from memory import stack_allocation, UnsafePointer
-
-from hashlib._hasher import _HashableWithHasher, _Hasher
+from memory import UnsafePointer, stack_allocation
 
 from utils import StringRef
 

@@ -11,28 +11,25 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer
-
+from collections import Optional
+from os import abort
 from sys.ffi import c_int
 from sys.info import sizeof
 
-from os import abort
-
-from collections import Optional
-
+from memory import UnsafePointer
 from python import PythonObject, TypedPythonObject
-from python.python import _get_global_python_itf
 from python._cpython import (
+    Py_TPFLAGS_DEFAULT,
+    PyCFunction,
+    PyMethodDef,
     PyObject,
     PyObjectPtr,
-    PyCFunction,
-    PyType_Spec,
     PyType_Slot,
-    PyMethodDef,
-    Py_TPFLAGS_DEFAULT,
-    newfunc,
+    PyType_Spec,
     destructor,
+    newfunc,
 )
+from python.python import _get_global_python_itf
 
 
 trait ConvertibleFromPython(CollectionElement):

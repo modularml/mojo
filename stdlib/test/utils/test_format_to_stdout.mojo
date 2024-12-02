@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils import Writable, Writer
 import sys
+
+from utils import Writable, Writer
 
 
 fn main() raises:

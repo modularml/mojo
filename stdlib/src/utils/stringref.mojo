@@ -13,15 +13,17 @@
 """Implements the StringRef class.
 """
 
-from bit import count_trailing_zeros
-from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from sys import simdwidthof
+from sys.ffi import c_char
+
+from bit import count_trailing_zeros
+from builtin.dtype import _uint_type_of_width
 from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
+
 from utils import StringSlice
-from sys.ffi import c_char
-from sys import simdwidthof
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

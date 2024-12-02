@@ -16,11 +16,12 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import List
-from sys import bitwidthof
 from math import ceil
+from sys import bitwidthof
 
 from bit import count_leading_zeros
 from memory import UnsafePointer
+
 from utils import Span
 
 # ===----------------------------------------------------------------------===#

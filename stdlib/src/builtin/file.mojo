@@ -34,9 +34,10 @@ with open("my_file.txt", "r") as f:
 from os import PathLike, abort
 from sys import external_call, sizeof
 from sys.ffi import OpaquePointer
-from utils import Span, StringRef, StringSlice, write_buffered
 
 from memory import AddressSpace, UnsafePointer
+
+from utils import Span, StringRef, StringSlice, write_buffered
 
 
 @register_passable

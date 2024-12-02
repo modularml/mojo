@@ -17,40 +17,39 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char
-from utils import StaticString, write_args
+from sys.intrinsics import _type_is_eq
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
-from sys.intrinsics import _type_is_eq
-from hashlib._hasher import _HashableWithHasher, _Hasher
-
 from utils import (
-    Span,
     IndexList,
+    Span,
+    StaticString,
     StringRef,
     StringSlice,
     Variant,
     Writable,
     Writer,
+    write_args,
 )
-from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
-    _utf8_byte_type,
-    _StringSliceIter,
-    _unicode_codepoint_utf8_byte_length,
-    _shift_unicode_to_utf8,
-    _to_string_list,
-)
-
 from utils._unicode import (
     is_lowercase,
     is_uppercase,
     to_lowercase,
     to_uppercase,
+)
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from utils.string_slice import (
+    _shift_unicode_to_utf8,
+    _StringSliceIter,
+    _to_string_list,
+    _unicode_codepoint_utf8_byte_length,
+    _utf8_byte_type,
 )
 
 # ===----------------------------------------------------------------------=== #

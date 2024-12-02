@@ -16,38 +16,43 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 import math
+from collections import InlineArray
+from collections.string import (
+    _calc_format_buffer_size,
+    _calc_initial_buffer_size,
+)
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from math import Ceilable, CeilDivable, Floorable, Truncable
 from math.math import _call_ptx_intrinsic
+from os import abort
 from sys import (
     PrefetchOptions,
     _RegisterPackType,
+    alignof,
+    bitwidthof,
     has_neon,
+    is_amd_gpu,
+    is_gpu,
+    is_nvidia_gpu,
     is_x86,
     llvm_intrinsic,
     prefetch,
     simdwidthof,
-    is_nvidia_gpu,
-    is_gpu,
-    is_amd_gpu,
-    bitwidthof,
+    sizeof,
 )
+from sys._assembly import inlined_assembly
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
 
-from sys._assembly import inlined_assembly
-from os import abort
-
 from bit import pop_count
-from documentation import doc_private
-from math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.dtype import _uint_type_of_width
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from builtin.format_int import _try_write_int
 from builtin._format_float import _write_float
+from builtin.dtype import _uint_type_of_width
+from builtin.format_int import _try_write_int
 from builtin.io import _snprintf
-from collections import InlineArray
-from memory import bitcast, UnsafePointer
+from documentation import doc_private
+from memory import UnsafePointer, bitcast
 
-from utils import StringSlice, StaticTuple, IndexList, Span
+from utils import IndexList, Span, StaticTuple, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -56,17 +61,12 @@ from utils.numerics import max_or_inf as _max_or_inf
 from utils.numerics import min_finite as _min_finite
 from utils.numerics import min_or_neg_inf as _min_or_neg_inf
 from utils.numerics import nan as _nan
-from sys import sizeof, alignof
 
 from .dtype import (
     _get_dtype_printf_format,
     _integral_type_of,
-    _unsigned_integral_type_of,
     _scientific_notation_digits,
-)
-from collections.string import (
-    _calc_format_buffer_size,
-    _calc_initial_buffer_size,
+    _unsigned_integral_type_of,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -441,16 +441,86 @@ struct SIMD[type: DType, size: Int](
         # TODO (#36686): This introduces unneeded casts here to work around
         # parameter if issues.
         @parameter
-        if type is DType.float16:
+        if type is DType.float8e4m3:
             self = SIMD[type, size](
                 __mlir_op.`pop.simd.splat`[
                     _type = __mlir_type[
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e4m3>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E4M3
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float8e4m3fnuz:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e4m3fnuz>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E4M3FNUZ
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float8e5m2:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e5m2>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E5M2
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float8e5m2fnuz:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f8e5m2fnuz>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f8E5M2FNUZ
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type is DType.float16:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f16>`]
                         ](
@@ -468,9 +538,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<bf16>`]
                         ](
@@ -488,9 +556,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f32>`]
                         ](
@@ -508,9 +574,7 @@ struct SIMD[type: DType, size: Int](
                         `!pop.simd<`, size.value, `,`, type.value, `>`
                     ]
                 ](
-                    __mlir_op.`pop.cast`[
-                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-                    ](
+                    rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
                         __mlir_op.`pop.cast_from_builtin`[
                             _type = __mlir_type[`!pop.scalar<f64>`]
                         ](

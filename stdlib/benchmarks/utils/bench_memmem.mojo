@@ -15,10 +15,11 @@
 # the -t flag. Remember to replace it again before pushing any code.
 
 from sys import simdwidthof
+
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from memory import memcmp, bitcast, UnsafePointer, pack_bits
+from memory import UnsafePointer, bitcast, memcmp, pack_bits
 
 from utils.stringref import _align_down, _memchr, _memmem
 
