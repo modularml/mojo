@@ -382,6 +382,21 @@ struct Optional[T: CollectionElement](
             return self._value[T]
         return default
 
+    fn __getitem__(owned self) raises -> T:
+        """Move the value out of the Optional consuming it. If the optional is
+        empty, raise ValueError.
+
+        Returns:
+            The value inside the Optional.
+
+        Raises:
+            ValueError on empty Optional.
+        """
+
+        if not self:
+            raise Error("ValueError: take() on empty Optional")
+        return self.unsafe_take()
+
 
 # ===----------------------------------------------------------------------===#
 # OptionalReg

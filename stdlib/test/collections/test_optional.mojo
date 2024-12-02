@@ -157,6 +157,15 @@ def test_optional_equality():
     assert_true(n == None)
 
 
+def test_optional_unwrap():
+    var a = Optional(123)
+    assert_true(a)
+    assert_equal(123, a[])
+    a = Optional[Int](None)
+    with assert_raises(contains="ValueError: take() on empty Optional"):
+        _ = a[]
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -168,3 +177,4 @@ def main():
     test_optional_explicit_copy()
     test_optional_str_repr()
     test_optional_equality()
+    test_optional_unwrap()
