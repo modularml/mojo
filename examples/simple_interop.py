@@ -18,7 +18,7 @@
 import check_mod
 
 check_mod.install_if_missing("numpy")
-import numpy as np
+import numpy as np  # noqa
 
 
 def test_interop_func():
