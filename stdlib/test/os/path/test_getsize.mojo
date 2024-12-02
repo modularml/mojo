@@ -14,6 +14,7 @@
 
 from os.path import getsize
 from tempfile import NamedTemporaryFile
+
 from testing import assert_equal
 
 

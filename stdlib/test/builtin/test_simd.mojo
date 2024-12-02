@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys import has_neon
-from memory import UnsafePointer
-
 from collections import InlineArray
+from sys import has_neon
+
 from builtin.simd import _modf
+from memory import UnsafePointer
 from testing import (
     assert_almost_equal,
     assert_equal,
@@ -24,7 +24,8 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticTuple, IndexList
+
+from utils import IndexList, StaticTuple, unroll
 from utils.numerics import isfinite, isinf, isnan, nan
 
 

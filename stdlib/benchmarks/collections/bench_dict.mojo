@@ -14,14 +14,14 @@
 # NOTE: to test changes on the current branch using run-benchmarks.sh, remove
 # the -t flag. Remember to replace it again before pushing any code.
 
-from random import *
-
-from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from sys import sizeof
-from bit import bit_ceil
-from math import ceil
 from collections import Dict, Optional
 from collections.dict import DictEntry
+from math import ceil
+from random import *
+from sys import sizeof
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from bit import bit_ceil
 
 
 # ===----------------------------------------------------------------------===#

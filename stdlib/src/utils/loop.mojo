@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from builtin.range import _ZeroStartingRange, _SequentialRange, _StridedRange
+from builtin.range import _SequentialRange, _StridedRange, _ZeroStartingRange
 
 """Implements higher-order functions.
 

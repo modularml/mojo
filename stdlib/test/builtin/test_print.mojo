@@ -14,11 +14,11 @@
 
 
 import sys
-
 from tempfile import NamedTemporaryFile
-from testing import assert_equal
 
 from builtin._location import __call_location, _SourceLocation
+from testing import assert_equal
+
 from utils import IndexList, StringRef
 
 

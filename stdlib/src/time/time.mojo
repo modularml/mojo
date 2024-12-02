@@ -19,17 +19,17 @@ from time import now
 ```
 """
 
+from math import floor
 from os import abort
 from sys import (
     external_call,
-    os_is_linux,
-    os_is_windows,
     is_amd_gpu,
     is_nvidia_gpu,
     llvm_intrinsic,
+    os_is_linux,
+    os_is_windows,
 )
 from sys._assembly import inlined_assembly
-from math import floor
 
 from memory import UnsafePointer
 

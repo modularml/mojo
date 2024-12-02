@@ -15,20 +15,17 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import c_char
-
-from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from sys.ffi import c_char
 from sys.intrinsics import _type_is_eq
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+
+from memory import UnsafePointer, memcpy
+
+from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
-    _StringSliceIter,
-    _to_string_list,
-)
+from utils.string_slice import _StringSliceIter, _to_string_list
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -86,6 +83,29 @@ struct StringLiteral(
             other: The string literal to copy.
         """
         self = other
+
+    # TODO(MOCO-1460): This should be: fn __init__[*, value: String](out self):
+    # but Mojo tries to bind the parameter in `StringLiteral["foo"]()` to the
+    # type instead of the initializer.  Use a static method to work around this
+    # for now.
+    @always_inline("nodebug")
+    @staticmethod
+    fn from_string[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The string value to use.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return __mlir_attr[
+            `#kgen.param.expr<data_to_str,`,
+            value.byte_length().value,
+            `,`,
+            value.unsafe_ptr().address,
+            `> : !kgen.string`,
+        ]
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -974,9 +994,12 @@ struct StringLiteral(
         return str(self).lstrip()
 
 
-fn _to_string_literal(i: Int) -> StringLiteral:
-    return __mlir_op.`pop.string.create`(i)
+fn _to_string_literal[val: Int]() -> StringLiteral:
+    alias s = StringLiteral.from_string[str(val)]()
+    return s
 
 
-fn _to_string_literal(i: SIMD) -> StringLiteral:
-    return __mlir_op.`pop.string.create`(i)
+fn _to_string_literal[val: SIMD]() -> StringLiteral:
+    constrained[val.type.is_integral(), "input type must be integral"]()
+    alias s = StringLiteral.from_string[str(val)]()
+    return s

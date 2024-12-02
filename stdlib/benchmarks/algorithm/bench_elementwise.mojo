@@ -15,6 +15,7 @@
 # the -t flag. Remember to replace it again before pushing any code.
 
 from sys import simdwidthof
+
 from algorithm import elementwise
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from buffer import Buffer

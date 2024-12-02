@@ -13,12 +13,14 @@
 # RUN: %mojo %s
 
 
-from hashlib._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
 from hashlib._ahash import AHasher
-from memory import UnsafePointer
+from hashlib._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
 from pathlib import Path
+
+from memory import UnsafePointer
 from python import Python, PythonObject
 from testing import assert_equal, assert_true
+
 from utils import StringRef
 
 

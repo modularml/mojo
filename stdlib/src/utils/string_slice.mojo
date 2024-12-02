@@ -21,15 +21,18 @@ from utils import StringSlice
 ```
 """
 
-from bit import count_leading_zeros
-from utils import Span
-from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer, memcpy
-from sys import simdwidthof, bitwidthof
+from collections.string import _atof, _atol, _isspace
+from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
+
+from bit import count_leading_zeros
+from memory import UnsafePointer, memcmp, memcpy
 from memory.memory import _memcmp_impl_unconstrained
+
+from utils import Span
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+
 from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]

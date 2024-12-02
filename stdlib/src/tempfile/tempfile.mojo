@@ -21,8 +21,9 @@ from tempfile import gettempdir
 
 import os
 import sys
-from collections import Optional, List
+from collections import List, Optional
 from pathlib import Path
+
 from utils import Span, write_buffered
 
 alias TMP_MAX = 10_000

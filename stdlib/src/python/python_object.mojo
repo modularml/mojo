@@ -19,17 +19,17 @@ from python import PythonObject
 ```
 """
 
+from collections import Dict
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from sys.ffi import c_ssize_t
 from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
-from collections import Dict
-from utils import StringRef
 
-from hashlib._hasher import _HashableWithHasher, _Hasher
+from utils import StringRef
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
-from sys.ffi import c_ssize_t
 
 
 struct _PyIter(Sized):
