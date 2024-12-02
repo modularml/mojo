@@ -15,8 +15,9 @@
 from collections import Dict, KeyElement, Optional
 from collections.dict import OwnedKwargsDict
 
-from test_utils import CopyCounter
+from test_utils import CopyCounter, ValueDestructorRecorder
 from testing import assert_equal, assert_false, assert_raises, assert_true
+from memory import UnsafePointer
 
 
 def test_dict_construction():
@@ -602,6 +603,94 @@ fn test_dict_setdefault() raises:
     assert_equal(0, other_dict["b"].copy_count)
 
 
+def test_dict_adaptive_capacity():
+    var result: Int = 0
+    var dict_size = 256
+
+    x = Dict[Int, Int]()
+    adaptive_capacity = List[Int]()
+    for y in range(2):
+        # grow the dictionary up to its full size
+        for i in range(dict_size):
+            var current_size = len(x)
+            var current_reserved = x._reserved()
+            var over_load = ((3 * current_size) + 1) > (2 * current_reserved)
+            x[i] = i
+            if over_load:
+                assert_equal(len(x), current_size + 1)
+                assert_true(x._reserved() != current_reserved)
+                assert_equal(x._reserved(), current_reserved * 2)
+                adaptive_capacity.append(x._reserved())
+        assert_equal(len(x), dict_size)
+        # always have more reserved:
+        assert_equal(x._reserved(), dict_size * 2)
+
+        # ungrow the dictionary
+        for i in range(dict_size):
+            var current_reserved = x._reserved()
+            var under_load = (
+                current_reserved > __type_of(x)._initial_reservation
+                and ((len(x) - 1) * 3 < current_reserved)
+            )
+            result += x.pop(i)
+            if under_load:
+                assert_true(x._reserved() != current_reserved)
+                assert_equal(x._reserved(), current_reserved / 2)
+                adaptive_capacity.append(x._reserved())
+        assert_equal(len(x), 0)
+        assert_equal(x._reserved(), __type_of(x)._initial_reservation)
+
+    assert_equal(
+        adaptive_capacity,
+        List[Int](
+            16,
+            32,
+            64,
+            128,
+            256,
+            512,
+            256,
+            128,
+            64,
+            32,
+            16,
+            8,
+            16,
+            32,
+            64,
+            128,
+            256,
+            512,
+            256,
+            128,
+            64,
+            32,
+            16,
+            8,
+        ),
+    )
+
+    value_to_compare = 0
+    for y in range(2):
+        for i in range(256):
+            value_to_compare += i
+    assert_equal(result, value_to_compare)
+
+
+def test_dict_adaptive_capacity2():
+    x = Dict[Int, ValueDestructorRecorder]()
+    y = List[Int]()
+    y_ptr = UnsafePointer.address_of(y)
+    alias size = 64
+    for i in range(size):
+        x[i] = ValueDestructorRecorder(i, y_ptr)^
+    for i in range(size):
+        _ = x.pop(i)
+    assert_equal(len(y), 64)
+    for i in range(size):
+        assert_equal(y[i], i)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
@@ -615,3 +704,5 @@ def main():
     test_clear()
     test_init_initial_capacity()
     test_dict_setdefault()
+    test_dict_adaptive_capacity()
+    test_dict_adaptive_capacity2()
