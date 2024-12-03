@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from memory import UnsafePointer, stack_allocation, memcpy
+from memory import UnsafePointer, memcpy, stack_allocation
 
 
 struct OwnedPointer[T: AnyType]:
@@ -104,8 +104,8 @@ struct OwnedPointer[T: AnyType]:
     # ===-------------------------------------------------------------------===#
 
     fn __getitem__(
-        ref [_, AddressSpace.GENERIC._value.value]self
-    ) -> ref [self, AddressSpace.GENERIC._value.value] T:
+        ref [AddressSpace.GENERIC]self,
+    ) -> ref [self, AddressSpace.GENERIC] T:
         """Returns a reference to the pointers's underlying data with parametric mutability.
 
         Returns:
@@ -116,7 +116,6 @@ struct OwnedPointer[T: AnyType]:
         # returned from UnsafePointer to be guarded behind the
         # aliasing guarantees of the origin system here.
         # All of the magic happens above in the function signature
-
         return self._inner[]
 
     # ===-------------------------------------------------------------------===#

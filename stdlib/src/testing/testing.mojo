@@ -35,7 +35,6 @@ from math import isclose
 
 from builtin._location import __call_location, _SourceLocation
 
-
 # ===----------------------------------------------------------------------=== #
 # Assertions
 # ===----------------------------------------------------------------------=== #

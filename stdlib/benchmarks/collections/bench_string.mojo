@@ -14,12 +14,14 @@
 # NOTE: to test changes on the current branch using run-benchmarks.sh, remove
 # the -t flag. Remember to replace it again before pushing any code.
 
-from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from random import random_si64, seed
-from pathlib import _dir_of_current_file
-from collections import Optional, Dict
-from os import abort
+from collections import Dict, Optional
 from collections.string import String
+from os import abort
+from pathlib import _dir_of_current_file
+from random import random_si64, seed
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+
 from utils._utf8_validation import _is_valid_utf8
 
 

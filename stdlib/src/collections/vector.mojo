@@ -19,8 +19,9 @@ from collections import InlinedFixedVector
 ```
 """
 
-from memory import Pointer, UnsafePointer, memcpy
 from sys import sizeof
+
+from memory import Pointer, UnsafePointer, memcpy
 
 from utils import StaticTuple
 

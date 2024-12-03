@@ -15,8 +15,8 @@
 from collections import List
 
 from memory import ArcPointer, UnsafePointer
-from testing import assert_equal, assert_false, assert_true
 from test_utils import ObservableDel
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_basic():

@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from memory import UnsafePointer
+from test_utils import ValueDestructorRecorder
 from testing import assert_equal, assert_false, assert_true
 
-from memory import UnsafePointer
 from utils import IndexList, StaticTuple
-from test_utils import ValueDestructorRecorder
 
 
 def test_static_tuple():

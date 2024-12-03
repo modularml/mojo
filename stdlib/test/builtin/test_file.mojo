@@ -16,8 +16,8 @@
 from pathlib import Path, _dir_of_current_file
 from sys import os_is_windows
 from tempfile import gettempdir
-from memory import UnsafePointer
 
+from memory import UnsafePointer
 from testing import assert_equal, assert_true
 
 

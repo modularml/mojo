@@ -14,6 +14,7 @@
 
 import os
 from os.path import expandvars
+
 from testing import assert_equal
 
 

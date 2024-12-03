@@ -16,12 +16,14 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
+from math import ceildiv
+
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
 from builtin._stubs import _IntIterable, _StridedIterable, _UIntStridedIterable
 from python import (
     PythonObject,
 )  # TODO: remove this and fixup downstream imports
-from math import ceildiv
+
 from utils._select import _select_register_value as select
 
 # ===----------------------------------------------------------------------=== #

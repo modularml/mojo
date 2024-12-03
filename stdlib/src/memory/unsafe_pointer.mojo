@@ -19,7 +19,7 @@ from memory import UnsafePointer
 ```
 """
 
-from sys import alignof, sizeof, is_nvidia_gpu, is_gpu
+from sys import alignof, is_gpu, is_nvidia_gpu, sizeof
 from sys.intrinsics import (
     _mlirtype_is_eq,
     _type_is_eq,
@@ -31,7 +31,6 @@ from sys.intrinsics import (
 
 from bit import is_power_of_two
 from memory.memory import _free, _malloc
-
 
 # ===----------------------------------------------------------------------=== #
 # UnsafePointer
@@ -144,7 +143,7 @@ struct UnsafePointer[
     @staticmethod
     @always_inline("nodebug")
     fn address_of(
-        ref [_, address_space._value.value]arg: type
+        ref [address_space]arg: type,
     ) -> UnsafePointer[
         type,
         address_space=address_space,
@@ -190,7 +189,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__(
         self,
-    ) -> ref [origin, address_space._value.value] type:
+    ) -> ref [origin, address_space] type:
         """Return a reference to the underlying data.
 
         Returns:
@@ -228,7 +227,7 @@ struct UnsafePointer[
     @always_inline
     fn __getitem__[
         IntLike: IntLike, //
-    ](self, offset: IntLike) -> ref [origin, address_space._value.value] type:
+    ](self, offset: IntLike) -> ref [origin, address_space] type:
         """Return a reference to the underlying data, offset by the given index.
 
         Parameters:

@@ -13,14 +13,14 @@
 """Implements a foreign functions interface (FFI)."""
 
 from os import abort
+from sys._libc import dlclose, dlerror, dlopen, dlsym
+
 from memory import UnsafePointer
 
 from utils import StringRef
 
-from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
+from .info import is_64bit, os_is_linux, os_is_macos, os_is_windows
 from .intrinsics import _mlirtype_is_eq
-
-from sys._libc import dlerror, dlopen, dlclose, dlsym
 
 # ===-----------------------------------------------------------------------===#
 # Primitive C type aliases
