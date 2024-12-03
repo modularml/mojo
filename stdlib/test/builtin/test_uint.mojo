@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_false, assert_not_equal, assert_true
 from sys import bitwidthof
+
 from bit import count_trailing_zeros
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
 
 
 def test_simple_uint():

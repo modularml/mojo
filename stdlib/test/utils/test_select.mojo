@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils._select import _select_register_value
 from testing import assert_equal
+
+from utils._select import _select_register_value
 
 
 def test_select_register_value():
