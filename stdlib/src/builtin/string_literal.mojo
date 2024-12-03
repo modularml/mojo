@@ -89,7 +89,7 @@ struct StringLiteral(
     # for now.
     @always_inline("nodebug")
     @staticmethod
-    fn from_string[value: String]() -> StringLiteral:
+    fn _from_string[value: String]() -> StringLiteral:
         """Form a string literal from an arbitrary compile-time String value.
 
         Parameters:
@@ -105,6 +105,20 @@ struct StringLiteral(
             value.unsafe_ptr().address,
             `> : !kgen.string`,
         ]
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[type: Stringable, //, value: type]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time stringable value.
+
+        Parameters:
+            type: The type of the value.
+            value: The value to serialize.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[str(value)]()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -920,14 +934,3 @@ struct StringLiteral(
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
-
-
-fn _to_string_literal[val: Int]() -> StringLiteral:
-    alias s = StringLiteral.from_string[str(val)]()
-    return s
-
-
-fn _to_string_literal[val: SIMD]() -> StringLiteral:
-    constrained[val.type.is_integral(), "input type must be integral"]()
-    alias s = StringLiteral.from_string[str(val)]()
-    return s
