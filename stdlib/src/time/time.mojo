@@ -25,6 +25,7 @@ from sys import (
     external_call,
     is_amd_gpu,
     is_nvidia_gpu,
+    is_gpu,
     llvm_intrinsic,
     os_is_linux,
     os_is_windows,
@@ -383,7 +384,7 @@ fn sleep(sec: Int):
     """
 
     @parameter
-    if is_nvidia_gpu() or is_amd_gpu():
+    if is_gpu():
         return sleep(Float64(sec))
 
     @parameter
