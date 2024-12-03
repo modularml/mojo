@@ -487,7 +487,7 @@ def test_splitlines():
         _assert_equal(s.splitlines(keepends=True), items)
 
 
-fn main() raises:
+def main():
     test_string_literal_byte_span()
     test_string_byte_span()
     test_heap_string_from_string_slice()
