@@ -80,23 +80,18 @@ struct Origin[is_mutable: Bool]:
         """
         self.value = mlir_origin
 
-    # FIXME: This will be useful to do `Origin[False].coerce[mlir_origin]()`
-    # and to replace _lit_mut_cast_origin. But:
-    # error: invalid call to 'coerce': callee parameter #1 has 'Bool'
-    # type, but value has type 'Origin[is_mutable.value]'
-    # @always_inline("nodebug")
+    # FIXME(#3833): this replaces _lit_mut_cast
     # @staticmethod
-    # fn coerce[mutable: Bool, //, origin: Origin[mutable].type]() -> Self.type:
-    #     """Return a coerced version of the Origin.
+    # fn coerce[origin: Origin[Self.is_mutable]]() -> Self:
+    #     return origin
 
-    #     Returns:
-    #         A mutable version of the Origin.
-    #     """
+    # @staticmethod
+    # fn coerce[origin: Origin[not Self.is_mutable]]() -> Self:
     #     alias result = __mlir_attr[
-    #     `#lit.origin.mutcast<`,
-    #     origin,
-    #     `> : !lit.origin<`,
-    #     +Self.is_mutable.value,
-    #     `>`,
+    #         `#lit.origin.mutcast<`,
+    #         origin,
+    #         `> : !lit.origin<`,
+    #         +Self.is_mutable.value,
+    #         `>`,
     #     ]
     #     return result

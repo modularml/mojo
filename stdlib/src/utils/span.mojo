@@ -106,28 +106,18 @@ struct Span[
         origin: The origin of the Span.
     """
 
+    # Aliases
     alias mut = Span[T, _lit_mut_cast[origin, True].result]
-    """The mutable type of the Span."""
+    """The mutable version of the Span."""
     alias immut = Span[T, _lit_mut_cast[origin, False].result]
-    """The immutable type of the Span."""
-    # Field
+    """The immutable version of the Span."""
+    # Fields
     var _data: UnsafePointer[T]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
     # Life cycle methods
     # ===------------------------------------------------------------------===#
-
-    @doc_private
-    @implicit
-    @always_inline("nodebug")
-    fn __init__(out self: Self.mut, other: Self.immut):
-        """Implicitly cast the immmutable origin of self to a mutable one.
-
-        Args:
-            other: The Span to cast.
-        """
-        self = rebind[__type_of(self)](other)
 
     @doc_private
     @implicit
