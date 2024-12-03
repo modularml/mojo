@@ -170,7 +170,7 @@ fn _memrmem[
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     forward: Bool = True,
 ]:
     """Iterator for `StringSlice` over unicode characters.
@@ -235,7 +235,7 @@ struct _StringSliceIter[
 
 @value
 @register_passable("trivial")
-struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     Stringable,
     Sized,
     Writable,

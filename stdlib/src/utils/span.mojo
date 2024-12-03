@@ -48,7 +48,7 @@ trait AsBytes:
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -70,7 +70,7 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         mut self,
-    ) -> Pointer[T, origin]:
+    ) -> Pointer[T, origin._mlir_origin]:
         @parameter
         if forward:
             self.index += 1
@@ -97,7 +97,7 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
@@ -259,7 +259,7 @@ struct Span[
 
         return self._data
 
-    fn as_ref(self) -> Pointer[T, origin]:
+    fn as_ref(self) -> Pointer[T, origin._mlir_origin]:
         """
         Gets a Pointer to the first element of this slice.
 
@@ -267,7 +267,7 @@ struct Span[
             A Pointer pointing at the first element of this slice.
         """
 
-        return Pointer[T, origin].address_of(self._data[0])
+        return Pointer[T, origin._mlir_origin].address_of(self._data[0])
 
     @always_inline
     fn copy_from[
@@ -358,13 +358,15 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
+    fn get_immutable(
+        self,
+    ) -> Span[T, _lit_mut_cast[origin._mlir_origin, False].result]:
         """
         Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
-        return Span[T, _lit_mut_cast[origin, False].result](
+        return Span[T, _lit_mut_cast[origin._mlir_origin, False].result](
             ptr=self._data, length=self._len
         )

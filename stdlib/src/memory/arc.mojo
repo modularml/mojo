@@ -146,7 +146,7 @@ struct ArcPointer[T: Movable](
     ](
         ref [self_life]self,
     ) -> ref [
-        _lit_mut_cast[self_life, result_mutable=True].result
+        _lit_mut_cast[self_life._mlir_origin, result_mutable=True].result
     ] T:
         """Returns a mutable reference to the managed value.
 

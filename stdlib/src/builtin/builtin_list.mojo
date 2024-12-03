@@ -236,7 +236,10 @@ struct _VariadicListMemIter[
     alias variadic_list_type = VariadicListMem[elt_type, elt_origin]
 
     var index: Int
-    var src: Pointer[Self.variadic_list_type, list_origin]
+    var src: Pointer[
+        Self.variadic_list_type,
+        list_origin._mlir_origin,
+    ]
 
     fn __init__(
         mut self, index: Int, ref [list_origin]list: Self.variadic_list_type

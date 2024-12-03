@@ -18,10 +18,10 @@ These are Mojo built-ins, so you don't need to import them.
 alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
 
-alias ImmutableOrigin = __mlir_type.`!lit.origin<0>`
+alias ImmutableOrigin = Origin[False]
 """Immutable origin reference type."""
 
-alias MutableOrigin = __mlir_type.`!lit.origin<1>`
+alias MutableOrigin = Origin[True]
 """Mutable origin reference type."""
 
 alias ImmutableAnyOrigin = __mlir_attr.`#lit.any.origin : !lit.origin<0>`
