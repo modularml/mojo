@@ -15,12 +15,13 @@
 
 import os
 from collections import List
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from os import PathLike, listdir, stat_result
-from sys import os_is_windows, external_call
+from sys import external_call, os_is_windows
 from sys.ffi import c_char
 
 from builtin._location import __call_location, _SourceLocation
-from memory import stack_allocation, UnsafePointer
+from memory import UnsafePointer, stack_allocation
 
 from utils import StringRef
 
@@ -44,7 +45,7 @@ fn cwd() raises -> Path:
     if res == UnsafePointer[c_char]():
         raise Error("unable to query the current directory")
 
-    return String(StringRef(buf))
+    return String(StringRef(ptr=buf))
 
 
 @always_inline
@@ -63,10 +64,11 @@ fn _dir_of_current_file_impl(file_name: StringLiteral) raises -> Path:
     return Path(str(file_name)[0:i])
 
 
+@value
 struct Path(
     Stringable,
     Boolable,
-    Formattable,
+    Writable,
     CollectionElement,
     CollectionElementNew,
     PathLike,
@@ -77,11 +79,12 @@ struct Path(
     var path: String
     """The underlying path string representation."""
 
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         """Initializes a path with the current directory."""
         self = cwd()
 
-    fn __init__(inout self, path: String):
+    @implicit
+    fn __init__(out self, path: String):
         """Initializes a path with the provided path.
 
         Args:
@@ -89,30 +92,13 @@ struct Path(
         """
         self.path = path
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
             other: The value to copy.
         """
         self.path = String(other=other.path)
-
-    fn __moveinit__(inout self, owned existing: Self):
-        """Move data of an existing Path into a new one.
-
-        Args:
-            existing: The existing Path.
-        """
-        self.path = existing.path^
-
-    @always_inline
-    fn __copyinit__(inout self, existing: Self):
-        """Copy constructor for the path struct.
-
-        Args:
-          existing: The existing struct to copy from.
-        """
-        self.path = existing.path
 
     fn __truediv__(self, suffix: Self) -> Self:
         """Joins two paths using the system-defined path separator.
@@ -156,7 +142,7 @@ struct Path(
         Returns:
           A string representation of the path.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -167,12 +153,15 @@ struct Path(
         """
         return self.path.byte_length() > 0
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
-        Formats this path to the provided formatter.
+        Formats this path to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(self.path)
@@ -235,6 +224,17 @@ struct Path(
         """
 
         return hash(self.path)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        """Updates hasher with the path string value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher.update(self.path)
 
     fn stat(self) raises -> stat_result:
         """Returns the stat information on the path.

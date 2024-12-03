@@ -12,9 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 import os
-import platform
 import shutil
-
 from pathlib import Path
 
 import lit.formats

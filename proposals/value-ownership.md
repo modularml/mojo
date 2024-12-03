@@ -638,11 +638,11 @@ and MLIR design.  For example, you could imagine things like this:
 
 ```mojo
     # Take a non-copyable SomeTy as a borrow and return owned copy
-    fn life_ex1['a: lifetime](value: 'a SomeTy) -> SomeTy:
+    fn life_ex1['a: origin](value: 'a SomeTy) -> SomeTy:
       return value.copy()
 
     # Take a non-copyable SomeTy and return the reference
-    fn life_ex2['a: lifetime](value: 'a SomeTy) -> borrowed 'a SomeTy:
+    fn life_ex2['a: origin](value: 'a SomeTy) -> borrowed 'a SomeTy:
       return value
 ```
 

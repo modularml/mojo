@@ -19,13 +19,28 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
+
+from .ffi import OpaquePointer, _external_call_const, external_call
 
 
 @always_inline("nodebug")
 fn _current_target() -> __mlir_type.`!kgen.target`:
     return __mlir_attr.`#kgen.param.expr<current_target> : !kgen.target`
+
+
+@always_inline("nodebug")
+fn _accelerator_arch() -> StringLiteral:
+    return __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
+
+
+fn _get_arch[target: __mlir_type.`!kgen.target`]() -> StringLiteral:
+    return __mlir_attr[
+        `#kgen.param.expr<target_get_field,`,
+        target,
+        `, "arch" : !kgen.string`,
+        `> : !kgen.string`,
+    ]
 
 
 @always_inline("nodebug")
@@ -371,31 +386,36 @@ fn os_is_windows() -> Bool:
 
 
 @always_inline("nodebug")
-fn _triple_attr() -> __mlir_type.`!kgen.string`:
+fn _triple_attr[
+    triple: __mlir_type.`!kgen.target` = _current_target()
+]() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
-        _current_target(),
+        triple,
         `, "triple" : !kgen.string`,
         `> : !kgen.string`,
     ]
 
 
 @always_inline("nodebug")
-fn is_triple[triple: StringLiteral]() -> Bool:
+fn is_triple[
+    name: StringLiteral, target: __mlir_type.`!kgen.target` = _current_target()
+]() -> Bool:
     """Returns True if the target triple of the compiler matches the input and
     False otherwise.
 
     Parameters:
-      triple: The triple value to be checked against.
+      name: The name of the triple value.
+      target: The triple value to be checked against.
 
     Returns:
         True if the triple matches and False otherwise.
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _triple_attr(),
+        _triple_attr[target](),
         `, `,
-        triple.value,
+        name.value,
         `> : i1`,
     ]
 
@@ -403,19 +423,19 @@ fn is_triple[triple: StringLiteral]() -> Bool:
 @always_inline("nodebug")
 fn _is_sm_8x() -> Bool:
     return (
-        triple_is_nvidia_cuda["sm_80"]()
-        or triple_is_nvidia_cuda["sm_86"]()
-        or triple_is_nvidia_cuda["sm_89"]()
+        is_nvidia_gpu["sm_80"]()
+        or is_nvidia_gpu["sm_86"]()
+        or is_nvidia_gpu["sm_89"]()
     )
 
 
 @always_inline("nodebug")
 fn _is_sm_9x() -> Bool:
-    return triple_is_nvidia_cuda["sm_90"]() or triple_is_nvidia_cuda["sm_9a"]()
+    return is_nvidia_gpu["sm_90"]() or is_nvidia_gpu["sm_90a"]()
 
 
 @always_inline("nodebug")
-fn triple_is_nvidia_cuda() -> Bool:
+fn is_nvidia_gpu() -> Bool:
     """Returns True if the target triple of the compiler is `nvptx64-nvidia-cuda`
     False otherwise.
 
@@ -426,7 +446,7 @@ fn triple_is_nvidia_cuda() -> Bool:
 
 
 @always_inline("nodebug")
-fn triple_is_nvidia_cuda[subarch: StringLiteral]() -> Bool:
+fn is_nvidia_gpu[subarch: StringLiteral]() -> Bool:
     """Returns True if the target triple of the compiler is `nvptx64-nvidia-cuda`
     and we are compiling for the specified sub-architecture and False otherwise.
 
@@ -436,7 +456,28 @@ fn triple_is_nvidia_cuda[subarch: StringLiteral]() -> Bool:
     Returns:
         True if the triple target is cuda and False otherwise.
     """
-    return triple_is_nvidia_cuda() and StringLiteral(_current_arch()) == subarch
+    return is_nvidia_gpu() and StringLiteral(_current_arch()) == subarch
+
+
+@always_inline("nodebug")
+fn is_amd_gpu() -> Bool:
+    """Returns True if the target triple of the compiler is `amdgcn-amd-amdhsa`
+    False otherwise.
+
+    Returns:
+        True if the triple target is amdgpu and False otherwise.
+    """
+    return is_triple["amdgcn-amd-amdhsa"]()
+
+
+@always_inline("nodebug")
+fn is_gpu() -> Bool:
+    """Returns True if the target triple is GPU and  False otherwise.
+
+    Returns:
+        True if the triple target is GPU and False otherwise.
+    """
+    return is_nvidia_gpu() or is_amd_gpu()
 
 
 @always_inline("nodebug")
@@ -521,13 +562,13 @@ fn is_64bit[target: __mlir_type.`!kgen.target` = _current_target()]() -> Bool:
 fn simdbitwidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
-    """Returns the vector size (in bits) of the host system.
+    """Returns the vector size (in bits) of the specified target.
 
     Parameters:
         target: The target architecture.
 
     Returns:
-        The vector size (in bits) of the host system.
+        The vector size (in bits) of the specified target.
     """
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
@@ -541,7 +582,7 @@ fn simdbitwidth[
 fn simdbytewidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
-    """Returns the vector size (in bytes) of the host system.
+    """Returns the vector size (in bytes) of the specified target.
 
     Parameters:
         target: The target architecture.
@@ -565,6 +606,22 @@ fn sizeof[
 
     Returns:
         The size of the type in bytes.
+
+    Example:
+    ```mojo
+    from sys.info import sizeof
+    def main():
+        print(
+            sizeof[UInt8]() == 1,
+            sizeof[UInt16]() == 2,
+            sizeof[Int32]() == 4,
+            sizeof[Float64]() == 8,
+            sizeof[
+                SIMD[DType.uint8, 4]
+            ]() == 4,
+        )
+    ```
+    Note: `align_of` is in same module.
     """
     alias mlir_type = __mlir_attr[
         `#kgen.param.expr<rebind, #kgen.type<!kgen.paramref<`,
@@ -787,7 +844,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     if err:
         raise "Unable to query macOS version"
 
-    var osver = String(buf.steal_data(), buf_len)
+    var osver = String(ptr=buf.steal_data(), length=buf_len)
 
     var major = 0
     var minor = 0
@@ -805,3 +862,28 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
         patch = int(osver[: osver.find(".")])
 
     return (major, minor, patch)
+
+
+# ===----------------------------------------------------------------------===#
+# Detect GPU on host side
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn has_amd_gpu() -> Bool:
+    """Returns True if the host system has an AMD GPU and False otherwise.
+
+    Returns:
+        True if the host system has an AMD GPU.
+    """
+    return "amd" in _accelerator_arch()
+
+
+@always_inline("nodebug")
+fn has_nvidia_gpu() -> Bool:
+    """Returns True if the host system has an NVIDIA GPU and False otherwise.
+
+    Returns:
+        True if the host system has an NVIDIA GPU.
+    """
+    return "nvidia" in _accelerator_arch()

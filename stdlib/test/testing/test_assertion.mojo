@@ -12,20 +12,20 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
+from builtin._location import _SourceLocation
+from python import PythonObject
 from testing import (
     assert_almost_equal,
     assert_equal,
     assert_false,
+    assert_is,
+    assert_is_not,
     assert_not_equal,
     assert_raises,
     assert_true,
-    assert_is,
-    assert_is_not,
 )
 
 from utils.numerics import inf, nan
-from builtin._location import _SourceLocation
-from python import PythonObject
 
 
 def test_assert_messages():

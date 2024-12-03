@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !system-windows
 # RUN: %mojo %s
 
-import pwd
 import os
-from testing import assert_equal, assert_true, assert_raises
+import pwd
+
+from testing import assert_equal, assert_raises, assert_true
 
 
 def test_pwuid():

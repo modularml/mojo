@@ -13,15 +13,18 @@
 """Implements a foreign functions interface (FFI)."""
 
 from os import abort
+from sys._libc import dlclose, dlerror, dlopen, dlsym
+
 from memory import UnsafePointer
 
 from utils import StringRef
 
-from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
+from .info import is_64bit, os_is_linux, os_is_macos, os_is_windows
 from .intrinsics import _mlirtype_is_eq
-from builtin.builtin_list import _LITRefPackHelper
 
-from sys._libc import dlerror, dlopen, dlclose, dlsym
+# ===-----------------------------------------------------------------------===#
+# Primitive C type aliases
+# ===-----------------------------------------------------------------------===#
 
 alias c_char = Int8
 """C `char` type."""
@@ -86,6 +89,11 @@ fn _c_long_long_dtype() -> DType:
         return abort[DType]()
 
 
+# ===-----------------------------------------------------------------------===#
+# Dynamic Library Loading
+# ===-----------------------------------------------------------------------===#
+
+
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
 
@@ -118,7 +126,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn __init__(inout self, path: String, flags: Int = DEFAULT_RTLD):
+    fn __init__(out self, path: String, flags: Int = DEFAULT_RTLD):
         """Initialize a DLHandle object by loading the dynamic library at the
         given path.
 
@@ -137,7 +145,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
         else:
             self.handle = OpaquePointer()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -317,28 +325,46 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
         return res
 
+    @always_inline
+    fn call[
+        name: StringLiteral,
+        return_type: AnyTrivialRegType = NoneType,
+        *T: AnyType,
+    ](self, *args: *T) -> return_type:
+        """Call a function with any amount of arguments.
 
-# ===----------------------------------------------------------------------===#
-# Library Load
-# ===----------------------------------------------------------------------===#
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+            T: The types of `args`.
 
+        Args:
+            args: The arguments.
 
-@always_inline
-fn _get_global[
-    name: StringLiteral,
-    init_fn: fn (OpaquePointer) -> OpaquePointer,
-    destroy_fn: fn (OpaquePointer) -> None,
-](payload: OpaquePointer = OpaquePointer()) -> OpaquePointer:
-    return external_call["KGEN_CompilerRT_GetGlobalOrCreate", OpaquePointer](
-        StringRef(name), payload, init_fn, destroy_fn
-    )
+        Returns:
+            The result.
+        """
+        return self.call[name, return_type](args)
 
+    fn call[
+        name: StringLiteral, return_type: AnyTrivialRegType = NoneType
+    ](self, args: VariadicPack[element_trait=AnyType]) -> return_type:
+        """Call a function with any amount of arguments.
 
-@always_inline
-fn _get_global_or_null[name: StringLiteral]() -> OpaquePointer:
-    return external_call["KGEN_CompilerRT_GetGlobalOrNull", OpaquePointer](
-        name.unsafe_ptr(), name.byte_length()
-    )
+        Parameters:
+            name: The name of the function.
+            return_type: The return type of the function.
+
+        Args:
+            args: The arguments.
+
+        Returns:
+            The result.
+        """
+
+        debug_assert(self.check_symbol(name), "symbol not found: " + name)
+        var v = args.get_loaded_kgen_pack()
+        return self.get_function[fn (__type_of(v)) -> return_type](name)(v)
 
 
 @always_inline
@@ -379,6 +405,64 @@ fn _get_dylib_function[
 
 
 # ===----------------------------------------------------------------------===#
+# Globals
+# ===----------------------------------------------------------------------===#
+
+
+struct _Global[
+    name: StringLiteral,
+    storage_type: Movable,
+    init_fn: fn () -> storage_type,
+]:
+    @staticmethod
+    fn _init_wrapper(payload: OpaquePointer) -> OpaquePointer:
+        # Struct-based globals don't get to take arguments to their initializer.
+        debug_assert(not payload)
+
+        # Heap allocate space to store this "global"
+        var ptr = UnsafePointer[storage_type].alloc(1)
+
+        # TODO:
+        #   Any way to avoid the move, e.g. by calling this function
+        #   with the ABI destination result pointer already set to `ptr`?
+        ptr.init_pointee_move(init_fn())
+
+        return ptr.bitcast[NoneType]()
+
+    @staticmethod
+    fn _deinit_wrapper(self_: OpaquePointer):
+        var ptr: UnsafePointer[storage_type] = self_.bitcast[storage_type]()
+
+        # Deinitialize and deallocate the global
+        ptr.destroy_pointee()
+        ptr.free()
+
+    @staticmethod
+    fn get_or_create_ptr() -> UnsafePointer[storage_type]:
+        return _get_global[
+            name, Self._init_wrapper, Self._deinit_wrapper
+        ]().bitcast[storage_type]()
+
+
+@always_inline
+fn _get_global[
+    name: StringLiteral,
+    init_fn: fn (OpaquePointer) -> OpaquePointer,
+    destroy_fn: fn (OpaquePointer) -> None,
+](payload: OpaquePointer = OpaquePointer()) -> OpaquePointer:
+    return external_call["KGEN_CompilerRT_GetGlobalOrCreate", OpaquePointer](
+        StringRef(name), payload, init_fn, destroy_fn
+    )
+
+
+@always_inline
+fn _get_global_or_null[name: StringLiteral]() -> OpaquePointer:
+    return external_call["KGEN_CompilerRT_GetGlobalOrNull", OpaquePointer](
+        name.unsafe_ptr(), name.byte_length()
+    )
+
+
+# ===----------------------------------------------------------------------===#
 # external_call
 # ===----------------------------------------------------------------------===#
 
@@ -404,7 +488,7 @@ fn external_call[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     @parameter
     if _mlirtype_is_eq[type, NoneType]():
@@ -446,7 +530,7 @@ fn _external_call_const[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
-    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
+    var loaded_pack = arguments.get_loaded_kgen_pack()
 
     return __mlir_op.`pop.external_call`[
         func = callee.value,

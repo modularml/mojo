@@ -14,26 +14,36 @@
 
 from collections import List
 
-from memory import Arc, UnsafePointer
-from testing import assert_equal, assert_false, assert_true
+from memory import ArcPointer, UnsafePointer
 from test_utils import ObservableDel
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_basic():
-    var p = Arc(4)
+    var p = ArcPointer(4)
     var p2 = p
     p2[] = 3
     assert_equal(3, p[])
 
 
+def test_is():
+    var p = ArcPointer(3)
+    var p2 = p
+    var p3 = ArcPointer(3)
+    assert_true(p is p2)
+    assert_false(p is not p2)
+    assert_false(p is p3)
+    assert_true(p is not p3)
+
+
 def test_deleter_not_called_until_no_references():
     var deleted = False
-    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
+    var p = ArcPointer(ObservableDel(UnsafePointer.address_of(deleted)))
     var p2 = p
     _ = p^
     assert_false(deleted)
 
-    var vec = List[Arc[ObservableDel]]()
+    var vec = List[ArcPointer[ObservableDel]]()
     vec.append(p2)
     _ = p2^
     assert_false(deleted)
@@ -43,13 +53,13 @@ def test_deleter_not_called_until_no_references():
 
 def test_deleter_not_called_until_no_references_explicit_copy():
     var deleted = False
-    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
-    var p2 = Arc(other=p)
+    var p = ArcPointer(ObservableDel(UnsafePointer.address_of(deleted)))
+    var p2 = ArcPointer(other=p)
     _ = p^
     assert_false(deleted)
 
-    var vec = List[Arc[ObservableDel]]()
-    vec.append(Arc(other=p2)^)
+    var vec = List[ArcPointer[ObservableDel]]()
+    vec.append(ArcPointer(other=p2)^)
     _ = p2^
     assert_false(deleted)
     _ = vec^
@@ -57,8 +67,8 @@ def test_deleter_not_called_until_no_references_explicit_copy():
 
 
 def test_count():
-    var a = Arc(10)
-    var b = Arc(other=a)
+    var a = ArcPointer(10)
+    var b = ArcPointer(other=a)
     var c = a
     assert_equal(3, a.count())
     _ = b^
@@ -69,6 +79,7 @@ def test_count():
 
 def main():
     test_basic()
+    test_is()
     test_deleter_not_called_until_no_references()
     test_deleter_not_called_until_no_references_explicit_copy()
     test_count()

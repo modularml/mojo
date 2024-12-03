@@ -53,6 +53,15 @@ def test_cast():
     )
 
 
+def test_index():
+    assert_equal(str(Index[element_bitwidth=64](1, 2, 3)), "(1, 2, 3)")
+    assert_equal(str(Index[element_bitwidth=32](1, 2, 3)), "(1, 2, 3)")
+    assert_equal(
+        str(Index[element_bitwidth=32, unsigned=True](1, 2, 3)), "(1, 2, 3)"
+    )
+
+
 def main():
     test_basics()
     test_cast()
+    test_index()

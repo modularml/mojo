@@ -51,7 +51,7 @@ def test_rebind_register():
 struct MyMemStruct[size: Int]:
     var value: Int
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         # Make sure no copy is made due to the rebind.
         print("Should not copy this!")
         self.value = existing.value

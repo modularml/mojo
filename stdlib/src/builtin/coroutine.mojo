@@ -78,8 +78,9 @@ fn _coro_resume_noop_callback(null: AnyCoroutine):
 # ===----------------------------------------------------------------------=== #
 
 
+@explicit_destroy
 @register_passable
-struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
+struct Coroutine[type: AnyType, origins: OriginSet]:
     """Represents a coroutine.
 
     Coroutines can pause execution saving the state of the program (including
@@ -89,7 +90,7 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
 
     Parameters:
         type: Type of value returned upon completion of the coroutine.
-        lifetimes: The lifetime of the coroutine's captures.
+        origins: The origin of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine
@@ -120,7 +121,8 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
         )
 
     @always_inline
-    fn __init__(inout self, handle: AnyCoroutine):
+    @implicit
+    fn __init__(out self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:
@@ -129,9 +131,10 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
         self._handle = handle
 
     @always_inline
-    fn __del__(owned self):
+    fn force_destroy(owned self):
         """Destroy the coroutine object."""
         __mlir_op.`co.destroy`(self._handle)
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
 
     @always_inline
     fn __await__(owned self) -> type as out:
@@ -157,8 +160,9 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
 # ===----------------------------------------------------------------------=== #
 
 
+@explicit_destroy
 @register_passable
-struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
+struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
     """Represents a coroutine that can raise.
 
     Coroutines can pause execution saving the state of the program (including
@@ -168,7 +172,7 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
 
     Parameters:
         type: Type of value returned upon completion of the coroutine.
-        lifetimes: The lifetime set of the coroutine's captures.
+        origins: The origin set of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine
@@ -200,7 +204,8 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         )
 
     @always_inline
-    fn __init__(inout self, handle: AnyCoroutine):
+    @implicit
+    fn __init__(out self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:
@@ -209,9 +214,10 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         self._handle = handle
 
     @always_inline
-    fn __del__(owned self):
+    fn force_destroy(owned self):
         """Destroy the coroutine object."""
         __mlir_op.`co.destroy`(self._handle)
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
 
     @always_inline
     fn __await__(owned self) raises -> type as out:

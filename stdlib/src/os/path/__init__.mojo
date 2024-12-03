@@ -12,14 +12,17 @@
 # ===----------------------------------------------------------------------=== #
 
 from .path import (
+    basename,
     dirname,
     exists,
     expanduser,
+    expandvars,
     getsize,
     isdir,
     isfile,
     islink,
     join,
-    split,
     lexists,
+    split,
+    splitroot,
 )

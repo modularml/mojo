@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import InlineArray, List
+
 from memory import UnsafePointer
 from testing import assert_equal, assert_true
 
@@ -137,10 +138,19 @@ def test_span_slice():
     assert_equal(res[0], 2)
     assert_equal(res[1], 3)
     assert_equal(res[2], 4)
-    # TODO: Fix Span slicing
-    # res = s[1::-1]
-    # assert_equal(res[0], 2)
-    # assert_equal(res[1], 1)
+    # Test slicing with negative step
+    res = s[1::-1]
+    assert_equal(res[0], 2)
+    assert_equal(res[1], 1)
+    res.unsafe_ptr().free()
+    res = s[2:1:-1]
+    assert_equal(res[0], 3)
+    assert_equal(len(res), 1)
+    res.unsafe_ptr().free()
+    res = s[5:1:-2]
+    assert_equal(res[0], 5)
+    assert_equal(res[1], 3)
+    res.unsafe_ptr().free()
 
 
 def test_copy_from():

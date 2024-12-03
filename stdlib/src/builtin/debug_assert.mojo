@@ -17,11 +17,21 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_defined, triple_is_nvidia_cuda
+from sys import is_gpu, is_nvidia_gpu, llvm_intrinsic
 from sys._build import is_debug_build
+from sys.ffi import c_char, c_size_t, c_uint, external_call
 from sys.param_env import env_get_string
 
 from builtin._location import __call_location, _SourceLocation
+from memory import UnsafePointer
+
+from utils import Span
+from utils.write import (
+    _ArgBytes,
+    _WriteBufferHeap,
+    _WriteBufferStack,
+    write_args,
+)
 
 alias defined_mode = env_get_string["ASSERT", "safe"]()
 
@@ -40,7 +50,7 @@ fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
     ]()
 
     @parameter
-    if defined_mode == "none" or (triple_is_nvidia_cuda() and cpu_only):
+    if defined_mode == "none" or (is_gpu() and cpu_only):
         return False
     elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
         return True
@@ -53,7 +63,7 @@ fn debug_assert[
     cond: fn () capturing [_] -> Bool,
     assert_mode: StringLiteral = "none",
     cpu_only: Bool = False,
-    *Ts: Formattable,
+    *Ts: Writable,
 ](*messages: *Ts):
     """Asserts that the condition is true.
 
@@ -61,13 +71,13 @@ fn debug_assert[
         cond: The function to invoke to check if the assertion holds.
         assert_mode: Determines when the assert is turned on.
         cpu_only: If true, only run the assert on CPU.
-        Ts: The element types conforming to `Formattable` for the message.
+        Ts: The element types conforming to `Writable` for the message.
 
     Args:
         messages: Arguments to convert to a `String` message.
 
 
-    You can pass in multiple args that are `Formattable` to generate a formatted
+    You can pass in multiple args that are `Writable` to generate a formatted
     message, by default this will be a no-op:
 
     ```mojo
@@ -124,7 +134,6 @@ fn debug_assert[
     ```mojo
     debug_assert[check_name, cpu_only=True]("unexpected name")
     ```
-    .
     """
 
     @parameter
@@ -138,20 +147,20 @@ fn debug_assert[
 fn debug_assert[
     assert_mode: StringLiteral = "none",
     cpu_only: Bool = False,
-    *Ts: Formattable,
+    *Ts: Writable,
 ](cond: Bool, *messages: *Ts):
     """Asserts that the condition is true.
 
     Parameters:
         assert_mode: Determines when the assert is turned on.
         cpu_only: If true, only run the assert on CPU.
-        Ts: The element types conforming to `Formattable` for the message.
+        Ts: The element types conforming to `Writable` for the message.
 
     Args:
         cond: The bool value to assert.
         messages: Arguments to convert to a `String` message.
 
-    You can pass in multiple args that are `Formattable` to generate a formatted
+    You can pass in multiple args that are `Writable` to generate a formatted
     message, by default this will be a no-op:
 
     ```mojo
@@ -208,7 +217,6 @@ fn debug_assert[
     ```mojo
     debug_assert[check_name, cpu_only=True]("unexpected name")
     ```
-    .
     """
 
     @parameter
@@ -220,7 +228,7 @@ fn debug_assert[
 
 @no_inline
 fn _debug_assert_msg(
-    messages: VariadicPack[_, Formattable, *_], loc: _SourceLocation
+    messages: VariadicPack[_, Writable, *_], loc: _SourceLocation
 ):
     """Aborts with (or prints) the given message and location.
 
@@ -231,19 +239,113 @@ fn _debug_assert_msg(
     abort's implementation could use debug_assert)
     """
 
+    var stdout = sys.stdout
+
     @parameter
-    if triple_is_nvidia_cuda():
-        # On GPUs, assert shouldn't allocate.
+    if is_gpu():
+        # Count the total length of bytes to allocate only once
+        var arg_bytes = _ArgBytes()
+        arg_bytes.write(
+            "At ",
+            loc,
+            ": ",
+            _ThreadContext(),
+            " Assert ",
+            "Warning: " if defined_mode == "warn" else " Error: ",
+        )
+        write_args(arg_bytes, messages, end="\n")
+
+        var buffer = _WriteBufferHeap(arg_bytes.size + 1)
+        buffer.write(
+            "At ",
+            loc,
+            ": ",
+            _ThreadContext(),
+            " Assert ",
+            "Warning: " if defined_mode == "warn" else "Error: ",
+        )
+        write_args(buffer, messages, end="\n")
+        buffer.data[buffer.pos] = 0
+        stdout.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](ptr=buffer.data, length=buffer.pos)
+        )
+
         @parameter
-        if defined_mode == "warn":
-            print("Assert Warning")
-        else:
+        if defined_mode != "warn":
             abort()
+
     else:
-        message = String.format_sequence(messages)
+        var buffer = _WriteBufferStack[4096](stdout)
+        buffer.write("At ", loc, ": ")
 
         @parameter
         if defined_mode == "warn":
-            print(loc.prefix("Assert Warning: " + message))
+            buffer.write(" Assert Warning: ")
         else:
-            abort(loc.prefix("Assert Error: " + message))
+            buffer.write(" Assert Error: ")
+
+        write_args(buffer, messages, end="\n")
+        buffer.flush()
+
+        @parameter
+        if defined_mode != "warn":
+            abort()
+
+
+struct _ThreadContext(Writable):
+    var block_x: Int32
+    var block_y: Int32
+    var block_z: Int32
+    var thread_x: Int32
+    var thread_y: Int32
+    var thread_z: Int32
+
+    fn __init__(out self):
+        self.block_x = _get_id["block", "x"]()
+        self.block_y = _get_id["block", "y"]()
+        self.block_z = _get_id["block", "z"]()
+        self.thread_x = _get_id["thread", "x"]()
+        self.thread_y = _get_id["thread", "y"]()
+        self.thread_z = _get_id["thread", "z"]()
+
+    fn write_to[W: Writer](self, inout writer: W):
+        writer.write(
+            "block: [",
+            self.block_x,
+            ",",
+            self.block_y,
+            ",",
+            self.block_z,
+            "] thread: [",
+            self.thread_x,
+            ",",
+            self.thread_y,
+            ",",
+            self.thread_z,
+            "]",
+        )
+
+
+fn _get_id[type: StringLiteral, dim: StringLiteral]() -> Int32:
+    alias intrinsic_name = _get_intrinsic_name[type, dim]()
+    return llvm_intrinsic[intrinsic_name, Int32, has_side_effect=False]()
+
+
+fn _get_intrinsic_name[
+    type: StringLiteral, dim: StringLiteral
+]() -> StringLiteral:
+    @parameter
+    if is_nvidia_gpu():
+
+        @parameter
+        if type == "thread":
+            return "llvm.nvvm.read.ptx.sreg.tid." + dim
+        else:
+            return "llvm.nvvm.read.ptx.sreg.ctaid." + dim
+    else:
+
+        @parameter
+        if type == "thread":
+            return "llvm.amdgcn.workitem.id." + dim
+        else:
+            return "llvm.amdgcn.workgroup.id." + dim

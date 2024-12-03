@@ -10,23 +10,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-
 # RUN: %mojo-no-debug %s -t
+# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
+# the -t flag. Remember to replace it again before pushing any code.
+
+from hashlib._ahash import (
+    MULTIPLE,
+    ROT,
+    U128,
+    U256,
+    AHasher,
+    _folded_multiply,
+    _read_small,
+)
+from hashlib._hasher import _hash_with_hasher
+from hashlib.hash import hash as old_hash
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from bit import byte_swap, rotate_bits_left
 from memory import UnsafePointer
-from hashlib.hash import hash as old_hash
-from hashlib._ahash import (
-    AHasher,
-    hash as ahash,
-    _folded_multiply,
-    read_small,
-    U256,
-    U128,
-    MULTIPLE,
-    ROT,
-)
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -618,7 +620,7 @@ fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
     @parameter
     fn call_fn():
         for w in words:
-            var h = ahash(w[].unsafe_ptr(), w[].byte_length())
+            var h = _hash_with_hasher(w[].unsafe_ptr(), w[].byte_length())
             benchmark.keep(h)
 
     b.iter[call_fn]()
@@ -640,7 +642,7 @@ fn bench_long_key_new_hash_function[s: String](inout b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
-        var h = ahash(s.unsafe_ptr(), s.byte_length())
+        var h = _hash_with_hasher(s.unsafe_ptr(), s.byte_length())
         benchmark.keep(h)
 
     b.iter[call_fn]()

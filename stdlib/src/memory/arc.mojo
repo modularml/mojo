@@ -15,31 +15,31 @@
 Example usage:
 
 ```mojo
-from memory import Arc
-var p = Arc(4)
+from memory import ArcPointer
+var p = ArcPointer(4)
 var p2 = p
 p2[]=3
 print(3 == p[])
 ```
 
 Subscripting(`[]`) is done by `Pointer`,
-in order to ensure that the underlying `Arc` outlive the operation.
+in order to ensure that the underlying `ArcPointer` outlive the operation.
 
-It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
+It is highly DISCOURAGED to manipulate an `ArcPointer` through `UnsafePointer`.
 Mojo's ASAP deletion policy ensure values are destroyed at last use.
-Do not unsafely dereference the `Arc` inner `UnsafePointer` field.
+Do not unsafely dereference the `ArcPointer` inner `UnsafePointer` field.
 See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
 
 ```mojo
 # Illustration of what NOT to do, in order to understand:
-print(Arc(String("ok"))._inner[].payload)
+print(ArcPointer(String("ok"))._inner[].payload)
 #........................^ASAP ^already freed
 ```
 
 Always use `Pointer` subscripting (`[]`):
 
 ```mojo
-print(Arc(String("ok"))[])
+print(ArcPointer(String("ok"))[])
 ```
 
 """
@@ -50,13 +50,14 @@ from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, stack_allocation
 
 
-struct _ArcInner[T: Movable]:
+struct _ArcPointerInner[T: Movable]:
     var refcount: Atomic[DType.uint64]
     var payload: T
 
-    fn __init__(inout self, owned value: T):
+    @implicit
+    fn __init__(out self, owned value: T):
         """Create an initialized instance of this with a refcount of 1."""
-        self.refcount = 1
+        self.refcount = Scalar[DType.uint64](1)
         self.payload = value^
 
     fn add_ref(inout self):
@@ -70,7 +71,9 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement, CollectionElementNew):
+struct ArcPointer[T: Movable](
+    CollectionElement, CollectionElementNew, Identifiable
+):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -85,10 +88,11 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         T: The type of the stored value.
     """
 
-    alias _inner_type = _ArcInner[T]
+    alias _inner_type = _ArcPointerInner[T]
     var _inner: UnsafePointer[Self._inner_type]
 
-    fn __init__(inout self, owned value: T):
+    @implicit
+    fn __init__(out self, owned value: T):
         """Construct a new thread-safe, reference-counted smart pointer,
         and move the value into heap memory managed by the new pointer.
 
@@ -96,12 +100,12 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             value: The value to manage.
         """
         self._inner = UnsafePointer[Self._inner_type].alloc(1)
-        # Cannot use init_pointee_move as _ArcInner isn't movable.
+        # Cannot use init_pointee_move as _ArcPointerInner isn't movable.
         __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
             value^
         )
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -110,7 +114,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         other._inner[].add_ref()
         self._inner = other._inner
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object.
 
         Args:
@@ -132,22 +136,22 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             self._inner.destroy_pointee()
             self._inner.free()
 
-    # FIXME: The lifetime returned for this is currently self lifetime, which
-    # keeps the Arc object alive as long as there are references into it.  That
-    # said, this isn't really the right modeling, we need hierarchical lifetimes
+    # FIXME: The origin returned for this is currently self origin, which
+    # keeps the ArcPointer object alive as long as there are references into it.  That
+    # said, this isn't really the right modeling, we need hierarchical origins
     # to model the mutability and invalidation of the returned reference
     # correctly.
     fn __getitem__[
-        self_life: ImmutableLifetime
+        self_life: ImmutableOrigin
     ](
-        ref [self_life]self: Self,
+        ref [self_life]self,
     ) -> ref [
         _lit_mut_cast[self_life, result_mutable=True].result
     ] T:
         """Returns a mutable reference to the managed value.
 
         Parameters:
-            self_life: The lifetime of self.
+            self_life: The origin of self.
 
         Returns:
             A reference to the managed value.
@@ -170,3 +174,25 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
             The current amount of references to the pointee.
         """
         return self._inner[].refcount.load()
+
+    fn __is__(self, rhs: Self) -> Bool:
+        """Returns True if the two ArcPointers point at the same object.
+
+        Args:
+            rhs: The other ArcPointer.
+
+        Returns:
+            True if the two ArcPointers point at the same object and False otherwise.
+        """
+        return self._inner == rhs._inner
+
+    fn __isnot__(self, rhs: Self) -> Bool:
+        """Returns True if the two ArcPointers point at different objects.
+
+        Args:
+            rhs: The other ArcPointer.
+
+        Returns:
+            True if the two ArcPointers point at different objects and False otherwise.
+        """
+        return self._inner != rhs._inner

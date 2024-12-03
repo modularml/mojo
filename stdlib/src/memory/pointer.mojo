@@ -19,8 +19,6 @@ from memory import Pointer
 ```
 """
 
-# TODO: This is kept for compatibility, remove this in the future.
-alias Reference = Pointer[*_]
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace
@@ -33,6 +31,7 @@ struct _GPUAddressSpace(EqualityComparable):
     var _value: Int
 
     # See https://docs.nvidia.com/cuda/nvvm-ir-spec/#address-space
+    # And https://llvm.org/docs/AMDGPUUsage.html#address-spaces
     alias GENERIC = AddressSpace(0)
     """Generic address space."""
     alias GLOBAL = AddressSpace(1)
@@ -47,7 +46,8 @@ struct _GPUAddressSpace(EqualityComparable):
     """Local address space."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         self._value = value
 
     @always_inline("nodebug")
@@ -161,7 +161,7 @@ struct _GPUAddressSpace(EqualityComparable):
 
 @value
 @register_passable("trivial")
-struct AddressSpace(EqualityComparable):
+struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Address space of the pointer."""
 
     var _value: Int
@@ -170,7 +170,8 @@ struct AddressSpace(EqualityComparable):
     """Generic address space."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         """Initializes the address space from the underlying integral value.
 
         Args:
@@ -179,7 +180,8 @@ struct AddressSpace(EqualityComparable):
         self._value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: _GPUAddressSpace):
+    @implicit
+    fn __init__(out self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integral value.
 
         Args:
@@ -262,6 +264,31 @@ struct AddressSpace(EqualityComparable):
         """
         return self.value() != other.value()
 
+    @always_inline("nodebug")
+    fn __str__(self) -> String:
+        """Gets a string representation of the AddressSpace.
+
+        Returns:
+            The string representation of the AddressSpace.
+        """
+        return String.write(self)
+
+    @always_inline("nodebug")
+    fn write_to[W: Writer](self, inout writer: W):
+        """
+        Formats the address space to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        if self is AddressSpace.GENERIC:
+            writer.write("AddressSpace.GENERIC")
+        else:
+            writer.write("AddressSpace(", self.value(), ")")
+
 
 # ===----------------------------------------------------------------------===#
 # Pointer
@@ -273,7 +300,7 @@ struct AddressSpace(EqualityComparable):
 struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
-    lifetime: Lifetime[is_mutable].type,
+    origin: Origin[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
@@ -281,7 +308,7 @@ struct Pointer[
     Parameters:
         is_mutable: Whether the pointee data may be mutated through this.
         type: Type of the underlying data.
-        lifetime: The lifetime of the pointer.
+        origin: The origin of the pointer.
         address_space: The address space of the pointee data.
     """
 
@@ -289,7 +316,7 @@ struct Pointer[
         `!lit.ref<`,
         type,
         `, `,
-        lifetime,
+        origin,
         `, `,
         address_space._value.value,
         `>`,
@@ -302,8 +329,9 @@ struct Pointer[
     # Initializers
     # ===------------------------------------------------------------------===#
 
+    @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, *, _mlir_value: Self._mlir_type):
+    fn __init__(out self, *, _mlir_value: Self._mlir_type):
         """Constructs a Pointer from its MLIR prepresentation.
 
         Args:
@@ -325,9 +353,7 @@ struct Pointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(
-        ref [lifetime, address_space._value.value]value: type
-    ) -> Self:
+    fn address_of(ref [origin, address_space]value: type) -> Self:
         """Constructs a Pointer from a reference to a value.
 
         Args:
@@ -338,7 +364,7 @@ struct Pointer[
         """
         return Pointer(_mlir_value=__get_mvalue_as_litref(value))
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Constructs a copy from another Pointer.
 
         Note that this does **not** copy the underlying data.
@@ -353,7 +379,7 @@ struct Pointer[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self) -> ref [lifetime, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space] type:
         """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:
@@ -364,8 +390,8 @@ struct Pointer[
     # This decorator informs the compiler that indirect address spaces are not
     # dereferenced by the method.
     # TODO: replace with a safe model that checks the body of the method for
-    # accesses to the lifetime.
-    @__unsafe_disable_nested_lifetime_exclusivity
+    # accesses to the origin.
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __eq__(self, rhs: Pointer[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are equal.
@@ -380,7 +406,7 @@ struct Pointer[
             rhs[]
         )
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __ne__(self, rhs: Pointer[type, _, address_space]) -> Bool:
         """Returns True if the two pointers are not equal.

@@ -156,6 +156,8 @@ def test_max_finite():
     assert_almost_equal(max_finite[DType.float32](), 3.4028235e38)
     assert_almost_equal(max_finite[DType.float64](), 1.7976931348623157e308)
 
+    assert_true(max_finite[DType.bool]())
+
     assert_true(overflow_int[DType.int8]())
     assert_true(overflow_int[DType.uint8]())
     assert_true(overflow_int[DType.int16]())
@@ -186,6 +188,8 @@ def test_min_finite():
     assert_almost_equal(min_finite[DType.float32](), -3.4028235e38)
     assert_almost_equal(min_finite[DType.float64](), -1.7976931348623157e308)
 
+    assert_false(min_finite[DType.bool]())
+
     assert_true(underflow_int[DType.int8]())
     assert_true(underflow_int[DType.uint8]())
     assert_true(underflow_int[DType.int16]())
@@ -202,6 +206,7 @@ def test_min_finite():
 def test_max_or_inf():
     assert_almost_equal(max_or_inf[DType.float32](), inf[DType.float32]())
     assert_almost_equal(max_or_inf[DType.float64](), inf[DType.float64]())
+    assert_true(max_or_inf[DType.bool]())
 
 
 def test_min_or_neg_inf():
@@ -211,6 +216,7 @@ def test_min_or_neg_inf():
     assert_almost_equal(
         min_or_neg_inf[DType.float64](), neg_inf[DType.float64]()
     )
+    assert_false(min_or_neg_inf[DType.bool]())
 
 
 def test_neg_inf():

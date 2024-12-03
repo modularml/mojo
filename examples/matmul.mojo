@@ -17,13 +17,12 @@
 
 from os.env import getenv
 from random import rand
-from sys import info
-from sys import simdwidthof
+from sys import info, simdwidthof
 
 import benchmark
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from algorithm import parallelize, vectorize
-from memory import memset_zero, stack_allocation, UnsafePointer
+from memory import UnsafePointer, memset_zero, stack_allocation
 from python import Python, PythonObject
 
 alias M = 512  # rows of A and C
@@ -52,12 +51,13 @@ struct Matrix[rows: Int, cols: Int]:
     var data: UnsafePointer[Scalar[type]]
 
     # Initialize zeroing all values
-    fn __init__(inout self):
+    fn __init__(out self):
         self.data = UnsafePointer[Scalar[type]].alloc(rows * cols)
         memset_zero(self.data, rows * cols)
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(inout self, data: UnsafePointer[Scalar[type]]):
+    @implicit
+    fn __init__(out self, data: UnsafePointer[Scalar[type]]):
         self.data = data
 
     ## Initialize with random values

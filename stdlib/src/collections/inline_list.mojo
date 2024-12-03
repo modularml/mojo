@@ -20,6 +20,7 @@ from collections import InlineList
 """
 
 from sys.intrinsics import _type_is_eq
+
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 
@@ -31,7 +32,7 @@ struct _InlineListIter[
     list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_lifetime: Lifetime[list_mutability].type,
+    list_origin: Origin[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
@@ -40,21 +41,21 @@ struct _InlineListIter[
         list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
         capacity: The maximum number of elements that the list can hold.
-        list_lifetime: The lifetime of the List
+        list_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = InlineList[T, capacity]
 
     var index: Int
-    var src: Pointer[Self.list_type, list_lifetime]
+    var src: Pointer[Self.list_type, list_origin]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Pointer[T, __lifetime_of(self.src[][0])]:
+    ) -> Pointer[T, __origin_of(self.src[][0])]:
         @parameter
         if forward:
             self.index += 1
@@ -64,7 +65,7 @@ struct _InlineListIter[
             return Pointer.address_of(self.src[][self.index])
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -100,7 +101,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """This constructor creates an empty InlineList."""
         self._array = InlineArray[
             UnsafeMaybeUninitialized[ElementType], capacity
@@ -109,7 +110,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
-    fn __init__(inout self, *values: ElementType):
+    @implicit
+    fn __init__(out self, *values: ElementType):
         """Constructs a list from the given values.
 
         Args:
@@ -132,7 +134,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     @always_inline
     fn __getitem__(
-        ref [_]self: Self, owned idx: Int
+        ref self, owned idx: Int
     ) -> ref [self._array] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
@@ -174,8 +176,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         return len(self) > 0
 
     fn __iter__(
-        ref [_]self: Self,
-    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
+        ref self,
+    ) -> _InlineListIter[ElementType, capacity, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -185,7 +187,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     fn __contains__[
         C: EqualityComparableCollectionElement, //
-    ](self: Self, value: C) -> Bool:
+    ](self, value: C) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -215,9 +217,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn count[
-        C: EqualityComparableCollectionElement, //
-    ](self: Self, value: C) -> Int:
+    fn count[C: EqualityComparableCollectionElement, //](self, value: C) -> Int:
         """Counts the number of occurrences of a value in the list.
 
         ```mojo

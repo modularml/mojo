@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo --debug-level full %s
 
-from sys import sizeof, simdwidthof
+from sys import simdwidthof, sizeof
 
 from memory import (
+    AddressSpace,
     UnsafePointer,
     memcmp,
     memcpy,
@@ -125,16 +126,16 @@ def test_memcmp():
 
 
 def test_memcmp_overflow():
-    var p1 = UnsafePointer[Int8].alloc(1)
-    var p2 = UnsafePointer[Int8].alloc(1)
+    p1 = UnsafePointer[Byte].alloc(1)
+    p2 = UnsafePointer[Byte].alloc(1)
     p1.store(-120)
     p2.store(120)
 
-    var c = memcmp(p1, p2, 1)
-    assert_equal(c, -1, "-120 is smaller than 120")
+    c = memcmp(p1, p2, 1)
+    assert_equal(c, 1)
 
     c = memcmp(p2, p1, 1)
-    assert_equal(c, 1, "120 is bigger than -120")
+    assert_equal(c, -1)
 
 
 def test_memcmp_simd():
@@ -365,6 +366,11 @@ def test_pointer_refitem_pair():
     ptr.free()
 
 
+def test_address_space_str():
+    assert_equal(str(AddressSpace.GENERIC), "AddressSpace.GENERIC")
+    assert_equal(str(AddressSpace(17)), "AddressSpace(17)")
+
+
 def test_dtypepointer_gather():
     var ptr = UnsafePointer[Float32].alloc(4)
     ptr.store(0, SIMD[ptr.type.type, 4](0.0, 1.0, 2.0, 3.0))
@@ -503,6 +509,8 @@ def main():
     test_pointer_refitem_string()
     test_pointer_refitem_pair()
     test_pointer_string()
+
+    test_address_space_str()
 
     test_dtypepointer_gather()
     test_dtypepointer_scatter()

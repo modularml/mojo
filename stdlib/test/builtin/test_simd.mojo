@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys import has_neon
-from memory import UnsafePointer
-
 from collections import InlineArray
+from sys import has_neon
+
 from builtin.simd import _modf
+from memory import UnsafePointer
 from testing import (
     assert_almost_equal,
     assert_equal,
@@ -24,7 +24,8 @@ from testing import (
     assert_not_equal,
     assert_true,
 )
-from utils import unroll, StaticTuple, IndexList
+
+from utils import IndexList, StaticTuple, unroll
 from utils.numerics import isfinite, isinf, isnan, nan
 
 
@@ -54,6 +55,18 @@ def test_cast():
     assert_equal(int(b.cast[DType.uint16]()), 128)
     assert_equal(int(b.cast[DType.int8]()), -128)
     assert_equal(int(b.cast[DType.int16]()), 128)
+
+    @parameter
+    if not has_neon():
+        assert_equal(
+            BFloat16(33.0).cast[DType.float32]().cast[DType.bfloat16](), 33
+        )
+        assert_equal(
+            Float16(33.0).cast[DType.float32]().cast[DType.float16](), 33
+        )
+        assert_equal(
+            Float64(33.0).cast[DType.float32]().cast[DType.float16](), 33
+        )
 
 
 def test_simd_variadic():
@@ -120,17 +133,17 @@ def test_simd_repr():
     assert_equal(Int32(4).__repr__(), "SIMD[DType.int32, 1](4)")
     assert_equal(
         Float64(235234523.3452).__repr__(),
-        "SIMD[DType.float64, 1](2.3523452334520000e+08)",
+        "SIMD[DType.float64, 1](235234523.3452)",
     )
     assert_equal(
-        Float32(2897239).__repr__(), "SIMD[DType.float32, 1](2.89723900e+06)"
+        Float32(2897239).__repr__(), "SIMD[DType.float32, 1](2897239.0)"
     )
-    assert_equal(Float16(324).__repr__(), "SIMD[DType.float16, 1](3.2400e+02)")
+    assert_equal(Float16(324).__repr__(), "SIMD[DType.float16, 1](324.0)")
     assert_equal(
         SIMD[DType.float32, 4](
             Float32.MAX, Float32.MIN, -0.0, nan[DType.float32]()
         ).__repr__(),
-        "SIMD[DType.float32, 4](inf, -inf, -0.00000000e+00, nan)",
+        "SIMD[DType.float32, 4](inf, -inf, -0.0, nan)",
     )
 
 
@@ -1535,6 +1548,29 @@ def test_powf():
     )
 
 
+def test_rpow():
+    alias F32x4 = SIMD[DType.float32, 4]
+    alias I32x4 = SIMD[DType.int32, 4]
+
+    var f32x4_val = F32x4(0, 1, 2, 3)
+    var i32x4_val = I32x4(0, 1, 2, 3)
+
+    assert_equal(0**i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(2**i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal((-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(Int(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+    assert_equal(Int(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(Int(-1) ** i32x4_val, I32x4(1, -1, 1, -1))
+
+    assert_equal(UInt(2) ** i32x4_val, I32x4(1, 2, 4, 8))
+    assert_equal(UInt(0) ** i32x4_val, I32x4(1, 0, 0, 0))
+
+    assert_almost_equal(1.0**f32x4_val, F32x4(1.0, 1.0, 1.0, 1.0))
+    assert_almost_equal(2.5**f32x4_val, F32x4(1.0, 2.5, 6.25, 15.625))
+    assert_almost_equal(3.0**f32x4_val, F32x4(1.0, 3.0, 9.0, 27.0))
+
+
 def test_modf():
     var f32 = _modf(Float32(123.5))
     assert_almost_equal(f32[0], 123)
@@ -1782,6 +1818,23 @@ def test_float_conversion():
     assert_almost_equal(float(UInt64(36)), 36.0)
 
 
+def test_reversed():
+    fn test[D: DType]() raises:
+        assert_equal(SIMD[D, 4](1, 2, 3, 4).reversed(), SIMD[D, 4](4, 3, 2, 1))
+
+    test[DType.uint8]()
+    test[DType.uint16]()
+    test[DType.uint32]()
+    test[DType.uint64]()
+    test[DType.int8]()
+    test[DType.int16]()
+    test[DType.int32]()
+    test[DType.int64]()
+    test[DType.float16]()
+    test[DType.float32]()
+    test[DType.float64]()
+
+
 def main():
     test_abs()
     test_add()
@@ -1809,6 +1862,7 @@ def main():
     test_mod()
     test_pow()
     test_powf()
+    test_rpow()
     test_radd()
     test_reduce()
     test_reduce_bit_count()
@@ -1836,4 +1890,5 @@ def main():
     test_contains()
     test_comparison()
     test_float_conversion()
+    test_reversed()
     # TODO: add tests for __and__, __or__, anc comparison operators

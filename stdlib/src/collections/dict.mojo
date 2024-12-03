@@ -31,12 +31,13 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
+from sys.ffi import OpaquePointer
+
+from bit import is_power_of_two
 from builtin.value import StringableCollectionElement
+from memory import UnsafePointer, bitcast, memcpy
 
 from .optional import Optional
-from bit import is_power_of_two
-from sys.ffi import OpaquePointer
-from memory import memcpy, bitcast, UnsafePointer
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
@@ -60,7 +61,7 @@ struct _DictEntryIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: Lifetime[dict_mutability].type,
+    dict_origin: Origin[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
@@ -69,16 +70,16 @@ struct _DictEntryIter[
         dict_mutability: Whether the reference to the dictionary is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_lifetime: The lifetime of the List
+        dict_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     var index: Int
     var seen: Int
-    var src: Pointer[Dict[K, V], dict_lifetime]
+    var src: Pointer[Dict[K, V], dict_origin]
 
     fn __init__(
-        inout self, index: Int, seen: Int, ref [dict_lifetime]dict: Dict[K, V]
+        inout self, index: Int, seen: Int, ref [dict_origin]dict: Dict[K, V]
     ):
         self.index = index
         self.seen = seen
@@ -90,9 +91,7 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Pointer[
-        DictEntry[K, V], __lifetime_of(self.src[]._entries[0].value())
-    ]:
+    ) -> Pointer[DictEntry[K, V], __origin_of(self.src[]._entries[0].value())]:
         while True:
             var opt_entry_ref = Pointer.address_of(
                 self.src[]._entries[self.index]
@@ -109,7 +108,7 @@ struct _DictEntryIter[
                 return Pointer.address_of(opt_entry_ref[].value())
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -121,7 +120,7 @@ struct _DictKeyIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: Lifetime[dict_mutability].type,
+    dict_origin: Origin[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
@@ -130,11 +129,11 @@ struct _DictKeyIter[
         dict_mutability: Whether the reference to the vector is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_lifetime: The lifetime of the List
+        dict_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias dict_entry_iter = _DictEntryIter[K, V, dict_lifetime, forward]
+    alias dict_entry_iter = _DictEntryIter[K, V, dict_origin, forward]
 
     var iter: Self.dict_entry_iter
 
@@ -143,11 +142,11 @@ struct _DictKeyIter[
 
     fn __next__(
         inout self,
-    ) -> Pointer[K, __lifetime_of(self.iter.__next__()[].key)]:
+    ) -> Pointer[K, __origin_of(self.iter.__next__()[].key)]:
         return Pointer.address_of(self.iter.__next__()[].key)
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -159,7 +158,7 @@ struct _DictValueIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_lifetime: Lifetime[dict_mutability].type,
+    dict_origin: Origin[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
@@ -169,21 +168,21 @@ struct _DictValueIter[
         dict_mutability: Whether the reference to the vector is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_lifetime: The lifetime of the List
+        dict_origin: The origin of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias ref_type = Pointer[V, dict_lifetime]
+    alias ref_type = Pointer[V, dict_origin]
 
-    var iter: _DictEntryIter[K, V, dict_lifetime, forward]
+    var iter: _DictEntryIter[K, V, dict_origin, forward]
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __reversed__(self) -> _DictValueIter[K, V, dict_lifetime, False]:
+    fn __reversed__(self) -> _DictValueIter[K, V, dict_origin, False]:
         var src = self.iter.src
         return _DictValueIter(
-            _DictEntryIter[K, V, dict_lifetime, False](
+            _DictEntryIter[K, V, dict_origin, False](
                 src[]._reserved() - 1, 0, src
             )
         )
@@ -197,7 +196,7 @@ struct _DictValueIter[
         )
 
     @always_inline
-    fn __hasmore__(self) -> Bool:
+    fn __has_next__(self) -> Bool:
         return self.__len__() > 0
 
     fn __len__(self) -> Int:
@@ -222,7 +221,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
     var value: V
     """The value associated with the key."""
 
-    fn __init__(inout self, owned key: K, owned value: V):
+    fn __init__(out self, owned key: K, owned value: V):
         """Create an entry from a key and value, computing the hash.
 
         Args:
@@ -233,7 +232,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.key = key^
         self.value = value^
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy an existing entry.
 
         Args:
@@ -272,7 +271,8 @@ struct _DictIndex:
     var data: OpaquePointer
 
     @always_inline
-    fn __init__(inout self, reserved: Int):
+    @implicit
+    fn __init__(out self, reserved: Int):
         if reserved <= 128:
             var data = UnsafePointer[Int8].alloc(reserved)
             for i in range(reserved):
@@ -314,7 +314,7 @@ struct _DictIndex:
             memcpy(new_data, data, reserved)
         return index^
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.data = existing.data
 
     fn get_index(self, reserved: Int, slot: Int) -> Int:
@@ -474,7 +474,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize an empty dictiontary."""
         self.size = 0
         self._n_entries = 0
@@ -482,7 +482,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(len(self._entries))
 
     @always_inline
-    fn __init__(inout self, *, power_of_two_initial_capacity: Int):
+    fn __init__(out self, *, power_of_two_initial_capacity: Int):
         """Initialize an empty dictiontary with a pre-reserved initial capacity.
 
         Args:
@@ -491,7 +491,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Example usage:
 
         ```mojo
-        var x = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+        from collections import Dict
+
+        var x = Dict[Int, Int](power_of_two_initial_capacity = 1024)
         # Insert (2/3 of 1024) entries without reallocation.
         ```
 
@@ -513,7 +515,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return len(self._entries)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy an existing dictiontary.
 
         Args:
@@ -535,10 +537,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The new dictionary.
         """
-        var dict = Dict[K, V]()
+        var my_dict = Dict[K, V]()
         for key in keys:
-            dict[key[]] = value
-        return dict
+            my_dict[key[]] = value
+        return my_dict
 
     @staticmethod
     fn fromkeys(
@@ -555,7 +557,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return Dict[K, Optional[V]].fromkeys(keys, value)
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy an existing dictiontary.
 
         Args:
@@ -566,7 +568,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = existing._index.copy(existing._reserved())
         self._entries = existing._entries
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move data of an existing dict into a new one.
 
         Args:
@@ -617,9 +619,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self.find(key).__bool__()
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[K, V, __lifetime_of(self)]:
+    fn __iter__(ref self) -> _DictKeyIter[K, V, __origin_of(self)]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -627,9 +627,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return _DictKeyIter(_DictEntryIter(0, 0, self))
 
-    fn __reversed__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[K, V, __lifetime_of(self), False]:
+    fn __reversed__(ref self) -> _DictKeyIter[K, V, __origin_of(self), False]:
         """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
@@ -690,6 +688,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
+        from collections import Dict
+
         var my_dict = Dict[Int, Float64]()
         my_dict[1] = 1.1
         my_dict[2] = 2.2
@@ -759,7 +759,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     # TODO(MOCO-604): Return Optional[Pointer] instead of raising
     fn _find_ref(
-        ref [_]self: Self, key: K
+        ref self, key: K
     ) raises -> ref [self._entries[0].value().value] Self.V:
         """Find a value in the dictionary by key.
 
@@ -878,7 +878,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         raise "KeyError: popitem(): dictionary is empty"
 
-    fn keys(ref [_]self: Self) -> _DictKeyIter[K, V, __lifetime_of(self)]:
+    fn keys(ref self) -> _DictKeyIter[K, V, __origin_of(self)]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -886,7 +886,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return Self.__iter__(self)
 
-    fn values(ref [_]self: Self) -> _DictValueIter[K, V, __lifetime_of(self)]:
+    fn values(ref self) -> _DictValueIter[K, V, __origin_of(self)]:
         """Iterate over the dict's values as references.
 
         Returns:
@@ -894,14 +894,20 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return _DictValueIter(_DictEntryIter(0, 0, self))
 
-    fn items(ref [_]self: Self) -> _DictEntryIter[K, V, __lifetime_of(self)]:
+    fn items(ref self) -> _DictEntryIter[K, V, __origin_of(self)]:
         """Iterate over the dict's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
         access the key and value as attributes ie.
 
         ```mojo
-        for e in dict.items():
+        from collections import Dict
+
+        var my_dict = Dict[String, Int]()
+        my_dict["a"] = 1
+        my_dict["b"] = 2
+
+        for e in my_dict.items():
             print(e[].key, e[].value)
         ```
 
@@ -1075,11 +1081,11 @@ struct OwnedKwargsDict[V: CollectionElement](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initialize an empty keyword dictionary."""
         self._dict = Dict[Self.key_type, V]()
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy an existing keyword dictionary.
 
         Args:
@@ -1087,7 +1093,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         self._dict = other._dict
 
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         """Copy an existing keyword dictionary.
 
         Args:
@@ -1095,7 +1101,7 @@ struct OwnedKwargsDict[V: CollectionElement](
         """
         self._dict = existing._dict
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Move data of an existing keyword dictionary into a new one.
 
         Args:
@@ -1207,8 +1213,8 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.pop(key)
 
     fn __iter__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self._dict)]:
+        ref self,
+    ) -> _DictKeyIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1217,8 +1223,8 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.keys()
 
     fn keys(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self._dict)]:
+        ref self,
+    ) -> _DictKeyIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1227,8 +1233,8 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.keys()
 
     fn values(
-        ref [_]self: Self,
-    ) -> _DictValueIter[Self.key_type, V, __lifetime_of(self._dict)]:
+        ref self,
+    ) -> _DictValueIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dict's values as references.
 
         Returns:
@@ -1237,15 +1243,21 @@ struct OwnedKwargsDict[V: CollectionElement](
         return self._dict.values()
 
     fn items(
-        ref [_]self: Self,
-    ) -> _DictEntryIter[Self.key_type, V, __lifetime_of(self._dict)]:
+        ref self,
+    ) -> _DictEntryIter[Self.key_type, V, __origin_of(self._dict)]:
         """Iterate over the keyword dictionary's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
         access the key and value as attributes ie.
 
         ```mojo
-        for e in dict.items():
+        from collections import Dict
+
+        var my_dict = Dict[String, Int]()
+        my_dict["a"] = 1
+        my_dict["b"] = 2
+
+        for e in my_dict.items():
             print(e[].key, e[].value)
         ```
 

@@ -15,7 +15,7 @@
 # In Python, these are in the math module, so we also expose them here.
 from utils.numerics import inf, isfinite, isinf, isnan, nan, nextafter, ulp
 
-from .constants import pi, e, tau
+from .constants import e, pi, tau
 
 # These are not part of Python's `math` module, but we define them here.
 from .math import (
@@ -23,6 +23,7 @@ from .math import (
     CeilDivable,
     CeilDivableRaising,
     Floorable,
+    Truncable,
     acos,
     acosh,
     align_down,
@@ -35,6 +36,7 @@ from .math import (
     cbrt,
     ceil,
     ceildiv,
+    clamp,
     copysign,
     cos,
     cosh,
@@ -52,19 +54,20 @@ from .math import (
     hypot,
     iota,
     isclose,
+    isqrt,
     j0,
     j1,
     lcm,
     ldexp,
     lgamma,
     log,
-    log10,
     log1p,
     log2,
+    log10,
     logb,
     modf,
+    recip,
     remainder,
-    isqrt,
     scalb,
     sin,
     sinh,
@@ -74,6 +77,4 @@ from .math import (
     trunc,
     y0,
     y1,
-    clamp,
-    recip,
 )

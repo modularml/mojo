@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 import os
-from os.path import split, expanduser
+from os.path import expanduser, split
 from pathlib import Path
 
 from builtin._location import __source_location
