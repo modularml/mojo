@@ -53,7 +53,7 @@ struct UnsafePointer[
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
-    origin: Origin[True].type = MutableAnyOrigin,
+    origin: Origin[True] = MutableAnyOrigin,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -197,7 +197,7 @@ struct UnsafePointer[
         """
 
         # We're unsafe, so we can have unsafe things.
-        alias _ref_type = Pointer[type, origin, address_space]
+        alias _ref_type = Pointer[type, origin._mlir_origin, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
                 UnsafePointer[
@@ -961,7 +961,7 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        origin: Origin[True].type = Self.origin,
+        origin: Origin[True] = Self.origin,
     ](self) -> UnsafePointer[
         T, address_space=address_space, alignment=alignment, origin=origin
     ]:
