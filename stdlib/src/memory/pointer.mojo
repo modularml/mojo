@@ -339,10 +339,10 @@ struct Pointer[
         """
         self._value = _mlir_value
 
-    # FIXME
+    # FIXME(#3617)
     # @always_inline("nodebug")
     # fn __init__(
-    #     inout self, *, ref [lifetime, address_space._value.value]to: type
+    #     inout self, *, ref [origin, address_space._value.value]to: type
     # ):
     #     """Create a pointer with the input value.
 
