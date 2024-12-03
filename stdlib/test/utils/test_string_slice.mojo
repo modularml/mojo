@@ -487,6 +487,39 @@ def test_splitlines():
         _assert_equal(s.splitlines(keepends=True), items)
 
 
+def test_iter():
+    vs = StringSlice("123")
+
+    # Borrow immutably
+    fn conc(vs: StringSlice) -> String:
+        var c = String("")
+        for v in iter(vs):
+            c += v
+        return c
+
+    assert_equal(123, atol(conc(vs)))
+
+    concat = String("")
+    for v in reversed(vs):
+        concat += v
+    assert_equal(321, atol(concat))
+
+    idx = -1
+    for item in StringSlice("mojo🔥"):
+        idx += 1
+        if idx == 0:
+            assert_equal("m", item)
+        elif idx == 1:
+            assert_equal("o", item)
+        elif idx == 2:
+            assert_equal("j", item)
+        elif idx == 3:
+            assert_equal("o", item)
+        elif idx == 4:
+            assert_equal("🔥", item)
+    assert_equal(4, idx)
+
+
 fn main() raises:
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -505,3 +538,4 @@ fn main() raises:
     test_combination_10_good_10_bad_utf8_sequences()
     test_count_utf8_continuation_bytes()
     test_splitlines()
+    test_iter()
