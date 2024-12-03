@@ -20,10 +20,12 @@ from collections import List
 """
 
 
-from sys.intrinsics import _type_is_eq
-from sys import sizeof
 from os import abort
+from sys import sizeof
+from sys.intrinsics import _type_is_eq
+
 from memory import Pointer, UnsafePointer, memcpy
+
 from utils import Span
 
 from .optional import Optional

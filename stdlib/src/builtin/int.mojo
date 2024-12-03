@@ -16,23 +16,23 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
-
-from math import Ceilable, CeilDivable, Floorable, Truncable
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from math import Ceilable, CeilDivable, Floorable, Truncable
+from sys import bitwidthof
+
+from builtin.io import _snprintf
+from memory import UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
-from memory import UnsafePointer
 
 from utils import Writable, Writer
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
-from sys import is_nvidia_gpu, bitwidthof
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -241,21 +241,39 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 
 
 fn int(value: String, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
-
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+    If base is set to 0, the string is parsed as an Integer literal, with the
+    following considerations:
+    - '0b' or '0B' prefix indicates binary (base 2)
+    - '0o' or '0O' prefix indicates octal (base 8)
+    - '0x' or '0X' prefix indicates hexadecimal (base 16)
+    - Without a prefix, it's treated as decimal (base 10)
 
     Args:
         value: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
-        An integer value that represents the string, or otherwise raises.
+        An integer value that represents the string.
+
+    Raises:
+        If the given string cannot be parsed as an integer value or if an
+        incorrect base is provided.
+
+    Examples:
+        >>> int("32")
+        32
+        >>> int("FF", 16)
+        255
+        >>> int("0xFF", 0)
+        255
+        >>> int("0b1010", 0)
+        10
+
+    Notes:
+        This follows [Python's integer literals](
+        https://docs.python.org/3/reference/lexical_analysis.html#integers).
     """
     return atol(value, base)
 

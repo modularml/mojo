@@ -19,7 +19,6 @@ from memory import Pointer
 ```
 """
 
-from sys import is_nvidia_gpu
 
 # ===----------------------------------------------------------------------===#
 # AddressSpace
@@ -342,7 +341,7 @@ struct Pointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(ref [origin, address_space._value.value]value: type) -> Self:
+    fn address_of(ref [origin, address_space]value: type) -> Self:
         """Constructs a Pointer from a reference to a value.
 
         Args:
@@ -368,7 +367,7 @@ struct Pointer[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self) -> ref [origin, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space] type:
         """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:

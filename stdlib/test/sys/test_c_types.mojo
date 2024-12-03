@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.info import os_is_linux, os_is_macos, os_is_windows, is_64bit, is_32bit
 from sys.ffi import c_int, c_long, c_long_long
+from sys.info import is_32bit, is_64bit, os_is_linux, os_is_macos, os_is_windows
 
 from testing import assert_equal, assert_true
 

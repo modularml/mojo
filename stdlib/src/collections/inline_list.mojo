@@ -20,6 +20,7 @@ from collections import InlineList
 """
 
 from sys.intrinsics import _type_is_eq
+
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 

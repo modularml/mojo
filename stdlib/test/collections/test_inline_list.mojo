@@ -13,8 +13,8 @@
 # RUN: %mojo %s
 
 from collections import InlineList, Set
-from memory import UnsafePointer
 
+from memory import UnsafePointer
 from test_utils import MoveCounter, ValueDestructorRecorder
 from testing import assert_equal, assert_false, assert_raises, assert_true
 

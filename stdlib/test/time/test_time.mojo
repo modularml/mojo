@@ -14,12 +14,12 @@
 
 from sys import os_is_windows
 from time import (
+    monotonic,
     now,
     perf_counter,
     perf_counter_ns,
     sleep,
     time_function,
-    monotonic,
 )
 
 from testing import assert_true

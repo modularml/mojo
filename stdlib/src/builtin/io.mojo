@@ -15,23 +15,31 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections import InlineArray
+from sys import _libc as libc
 from sys import (
     bitwidthof,
     external_call,
-    stdout,
+    is_amd_gpu,
+    is_gpu,
     is_nvidia_gpu,
-    _libc as libc,
+    stdout,
 )
 from sys._libc import dup, fclose, fdopen, fflush
 from sys.ffi import OpaquePointer
 
-from utils import Span, write_buffered, write_args
-from collections import InlineArray
 from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer, memcpy
 
-from utils import StringRef, StaticString, StringSlice
+from utils import (
+    Span,
+    StaticString,
+    StringRef,
+    StringSlice,
+    write_args,
+    write_buffered,
+)
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -170,6 +178,9 @@ fn _printf[
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), Pointer.address_of(loaded_pack)
         )
+    elif is_amd_gpu():
+        # constrained[False, "_printf on AMDGPU is not implemented"]()
+        pass
     else:
         with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
@@ -258,7 +269,7 @@ fn print[
     write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
 
     @parameter
-    if not is_nvidia_gpu():
+    if not is_gpu():
         if flush:
             _flush(file=file)
 

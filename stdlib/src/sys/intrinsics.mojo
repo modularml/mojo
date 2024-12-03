@@ -19,11 +19,12 @@ from sys import PrefetchLocality
 ```
 """
 
-from .info import sizeof, is_nvidia_gpu
-from ._assembly import inlined_assembly
 import math
 
 from memory import AddressSpace, UnsafePointer
+
+from ._assembly import inlined_assembly
+from .info import is_nvidia_gpu, sizeof
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic
@@ -468,7 +469,7 @@ struct PrefetchOptions:
 @always_inline("nodebug")
 fn prefetch[
     type: DType, //, params: PrefetchOptions = PrefetchOptions()
-](addr: UnsafePointer[Scalar[type], *_]):
+](addr: UnsafePointer[Scalar[type], **_]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
@@ -508,7 +509,7 @@ fn prefetch[
 fn masked_load[
     type: DType, //, size: Int
 ](
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     mask: SIMD[DType.bool, size],
     passthrough: SIMD[type, size],
     alignment: Int = 1,
@@ -555,7 +556,7 @@ fn masked_store[
     size: Int
 ](
     value: SIMD,
-    addr: UnsafePointer[Scalar[value.type], *_],
+    addr: UnsafePointer[Scalar[value.type], **_],
     mask: SIMD[DType.bool, size],
     alignment: Int = 1,
 ):
@@ -597,7 +598,7 @@ fn compressed_store[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     mask: SIMD[DType.bool, size],
 ):
     """Compresses the lanes of `value`, skipping `mask` lanes, and stores
@@ -636,7 +637,7 @@ fn compressed_store[
 fn strided_load[
     type: DType, //, simd_width: Int
 ](
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ) -> SIMD[type, simd_width]:
@@ -677,7 +678,7 @@ fn strided_store[
     type: DType, //, simd_width: Int
 ](
     value: SIMD[type, simd_width],
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ):

@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from bit import byte_swap
-from bit import rotate_bits_left
+from bit import byte_swap, rotate_bits_left
 from memory import UnsafePointer
-from ._hasher import _Hasher, _HashableWithHasher
+
+from ._hasher import _HashableWithHasher, _Hasher
 
 alias U256 = SIMD[DType.uint64, 4]
 alias U128 = SIMD[DType.uint64, 2]

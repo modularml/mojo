@@ -21,10 +21,10 @@ from collections import Deque
 ```
 """
 
-from bit import bit_ceil
 from collections import Optional
-from memory import UnsafePointer
 
+from bit import bit_ceil
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Deque

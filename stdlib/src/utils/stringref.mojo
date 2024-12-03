@@ -15,8 +15,9 @@
 
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from memory import UnsafePointer, pack_bits
+from memory import UnsafePointer
 from memory.memory import _memcmp_impl_unconstrained
+
 from utils import StringSlice
 from sys.ffi import c_char
 

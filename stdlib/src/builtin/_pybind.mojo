@@ -11,32 +11,29 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer, stack_allocation
-
-from sys import sizeof, alignof
+from collections import Optional
+from sys import alignof, sizeof
 
 import python._cpython as cp
-from python import TypedPythonObject, Python, PythonObject
-from python.python import _get_global_python_itf
-from python._cpython import (
-    PyObjectPtr,
-    PyMethodDef,
-    PyType_Slot,
-    PyType_Spec,
-    CPython,
-)
-from python._bindings import (
-    Pythonable,
+from memory import UnsafePointer, stack_allocation
+from python import Python, PythonObject, TypedPythonObject
+from python._bindings import (  # Imported for use by the compiler
     ConvertibleFromPython,
     PyMojoObject,
-    python_type_object,
-    py_c_function_wrapper,
+    Pythonable,
     check_argument_type,
-    # Imported for use by the compiler
     check_arguments_arity,
+    py_c_function_wrapper,
+    python_type_object,
 )
-
-from collections import Optional
+from python._cpython import (
+    CPython,
+    PyMethodDef,
+    PyObjectPtr,
+    PyType_Slot,
+    PyType_Spec,
+)
+from python.python import _get_global_python_itf
 
 alias PyModule = TypedPythonObject["Module"]
 

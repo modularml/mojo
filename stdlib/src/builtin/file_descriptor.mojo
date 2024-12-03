@@ -23,11 +23,13 @@ f.close()
 ```
 
 """
-from utils import Span
-from builtin.io import _printf
 from sys.ffi import external_call
-from sys.info import is_nvidia_gpu
+from sys.info import is_gpu
+
+from builtin.io import _printf
 from memory import UnsafePointer
+
+from utils import Span
 
 
 @value
@@ -67,7 +69,7 @@ struct FileDescriptor(Writer):
         var len_bytes = len(bytes)
 
         @parameter
-        if is_nvidia_gpu():
+        if is_gpu():
             _printf["%*s"](len_bytes, bytes.unsafe_ptr())
         else:
             written = external_call["write", Int32](

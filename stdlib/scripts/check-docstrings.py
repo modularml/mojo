@@ -31,7 +31,7 @@ def main():
     ]
     result = subprocess.run(command, capture_output=True)
     if result.stderr or result.returncode != 0:
-        print(f"Docstring issue found in the stdlib: ")
+        print("Docstring issue found in the stdlib: ")
         print(result.stderr.decode())
         sys.exit(1)
 

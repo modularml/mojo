@@ -14,15 +14,16 @@
 # NOTE: to test changes on the current branch using run-benchmarks.sh, remove
 # the -t flag. Remember to replace it again before pushing any code.
 
-from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
-from memory import UnsafePointer
 from random import *
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from memory import UnsafePointer
 from stdlib.builtin.sort import (
-    sort,
-    _small_sort,
-    _insertion_sort,
     _heap_sort,
+    _insertion_sort,
+    _small_sort,
     _SortWrapper,
+    sort,
 )
 
 # ===----------------------------------------------------------------------===#
