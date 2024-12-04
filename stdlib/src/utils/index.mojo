@@ -744,7 +744,7 @@ struct IndexList[
             res.write(self[i])
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            res.write(", ")
+            res.write(",")
         # Print a closing `)`.
         res.write(")")
         return res^
