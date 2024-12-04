@@ -219,6 +219,14 @@ what we publish.
   ([PR #3160](https://github.com/modularml/mojo/pull/3160) by
    [@bgreni](https://github.com/bgreni))
 
+- `Span` now has `find()` and `rfind()` methods which work for any
+  `Span[Scalar[D]]` e.g. `Span[Byte]`.
+
+- `String`, `StringSlice` and `StringLiteral` now all have `find()` and
+  `rfind()` which work on any `Stringlike` type. The `rfind()` implementation is
+  now vectorized. PR [#3548](https://github.com/modularml/mojo/pull/3548) by
+  [@martinvuyk](https://github.com/martinvuyk).
+
 - `StringRef` now implements `split()` which can be used to split a
   `StringRef` into a `List[StringRef]` by a delimiter.
   ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
@@ -570,6 +578,9 @@ what we publish.
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
   `DType` in a `Scalar[my_dtype]` to call the only overload of `bitcast` now.
+
+- `StringRef` is on the road to full deprecation
+  - removed `StringRef.find()`, use `StringSlice.find()` instead.
 
 ### 🛠️ Fixed
 
