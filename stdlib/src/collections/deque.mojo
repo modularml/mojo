@@ -995,7 +995,7 @@ struct Deque[ElementType: CollectionElement](
 struct _DequeIter[
     deque_mutability: Bool, //,
     ElementType: CollectionElement,
-    deque_lifetime: Origin[deque_mutability].type,
+    deque_lifetime: Origin[deque_mutability],
     forward: Bool = True,
 ]:
     """Iterator for Deque.

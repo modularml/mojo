@@ -238,7 +238,7 @@ struct _VariadicListMemIter[
     var index: Int
     var src: Pointer[
         Self.variadic_list_type,
-        list_origin._mlir_origin,
+        list_origin,
     ]
 
     fn __init__(
@@ -283,12 +283,12 @@ struct _lit_origin_union[
 
 struct _lit_mut_cast[
     is_mutable: Bool, //,
-    operand: Origin[is_mutable].type,
+    operand: Origin[is_mutable],
     result_mutable: Bool,
 ]:
     alias result = __mlir_attr[
         `#lit.origin.mutcast<`,
-        operand,
+        operand._mlir_origin,
         `> : !lit.origin<`,
         +result_mutable.value,
         `>`,
