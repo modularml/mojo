@@ -71,9 +71,8 @@ struct FP[type: DType, CarrierDType: DType = FPUtils[type].uint_type]:
     alias carrier_bits = sizeof[Self.CarrierDType]() * 8
     alias sig_bits = FPUtils[type].mantissa_width()
     alias exp_bits = FPUtils[type].exponent_width()
-    alias min_exponent = FPUtils[type].min_exponent()
-    alias max_exponent = FPUtils[type].max_exponent()
-    alias exp_bias = -Self.max_exponent
+    alias neg_exp_bias = -FPUtils[type].exponent_bias()
+    alias min_normal_exp = Self.neg_exp_bias + 1
     alias cache_bits = 64 if Self.CarrierDType == DType.uint32 else 128
     alias min_k = -31 if Self.CarrierDType == DType.uint32 else -292
     alias max_k = 46 if Self.CarrierDType == DType.uint32 else 326
@@ -129,7 +128,7 @@ fn _write_float[W: Writer, type: DType, //](mut writer: W, value: Scalar[type]):
         #  - The significand (sig) is the raw binary fraction
         #  - The exponent (exp) is still in biased form
         var sig = FPUtils.get_mantissa_uint(casted)
-        var exp = FPUtils.get_exponent_without_bias(casted)
+        var exp = FPUtils.get_exponent_biased(casted)
         var sign = FPUtils.get_sign(casted)
 
         if isinf(value):
@@ -235,7 +234,7 @@ fn _to_decimal[
 
     # For normal numbers
     if binary_exp != 0:
-        binary_exp += FP[type].exp_bias - FP[type].sig_bits
+        binary_exp += FP[type].neg_exp_bias - FP[type].sig_bits
         if two_fc == 0:
             var minus_k = (binary_exp * 631305 - 261663) >> 21
             var beta = binary_exp + _floor_log2_pow10(-minus_k)
@@ -293,7 +292,7 @@ fn _to_decimal[
         two_fc |= Scalar[CarrierDType](1) << (FP[type].sig_bits + 1)
     else:
         # For subnormal numbers
-        binary_exp = FP[type].min_exponent - FP[type].sig_bits
+        binary_exp = FP[type].min_normal_exp - FP[type].sig_bits
 
     ##########################################
     # Step 1: Schubfach multiplier calculation
