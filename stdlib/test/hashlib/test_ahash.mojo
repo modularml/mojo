@@ -12,14 +12,16 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from hashlib._ahash import AHasher
+from hashlib._hasher import _hash_with_hasher as hash
+from hashlib.hash import hash as old_hash
+from time import now
+
 from bit import pop_count
 from builtin._location import __call_location
-from hashlib._ahash import AHasher
-from hashlib.hash import hash as old_hash
-from hashlib._hasher import _hash_with_hasher as hash
-from testing import assert_equal, assert_not_equal, assert_true
 from memory import memset_zero, stack_allocation
-from time import now
+from testing import assert_equal, assert_not_equal, assert_true
+
 from utils import Span
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/

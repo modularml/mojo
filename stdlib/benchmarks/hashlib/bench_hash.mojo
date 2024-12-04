@@ -14,20 +14,21 @@
 # NOTE: to test changes on the current branch using run-benchmarks.sh, remove
 # the -t flag. Remember to replace it again before pushing any code.
 
-from benchmark import Bench, BenchConfig, Bencher, BenchId
-from bit import byte_swap, rotate_bits_left
-from memory import UnsafePointer
-from hashlib.hash import hash as old_hash
 from hashlib._ahash import (
+    MULTIPLE,
+    ROT,
+    U128,
+    U256,
     AHasher,
     _folded_multiply,
     _read_small,
-    U256,
-    U128,
-    MULTIPLE,
-    ROT,
 )
 from hashlib._hasher import _hash_with_hasher
+from hashlib.hash import hash as old_hash
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId
+from bit import byte_swap, rotate_bits_left
+from memory import UnsafePointer
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """
@@ -598,7 +599,7 @@ fn gen_word_pairs[words: String = words_en]() -> List[String]:
 # Benchmarks
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_small_keys[s: String](inout b: Bencher) raises:
+fn bench_small_keys[s: String](mut b: Bencher) raises:
     var words = gen_word_pairs[s]()
 
     @always_inline
@@ -612,7 +613,7 @@ fn bench_small_keys[s: String](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
+fn bench_small_keys_new_hash_function[s: String](mut b: Bencher) raises:
     var words = gen_word_pairs[s]()
 
     @always_inline
@@ -626,7 +627,7 @@ fn bench_small_keys_new_hash_function[s: String](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_long_key[s: String](inout b: Bencher) raises:
+fn bench_long_key[s: String](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -637,7 +638,7 @@ fn bench_long_key[s: String](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_long_key_new_hash_function[s: String](inout b: Bencher) raises:
+fn bench_long_key_new_hash_function[s: String](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():

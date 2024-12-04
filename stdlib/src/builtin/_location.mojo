@@ -42,7 +42,7 @@ struct _SourceLocation(Writable, Stringable):
         """
         return "At " + str(self) + ": " + str(msg)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the source location to the provided Writer.
 

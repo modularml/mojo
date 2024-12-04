@@ -15,19 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import c_char
-
-from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from sys.ffi import c_char
+
+from memory import UnsafePointer, memcpy
+
+from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
-    _StringSliceIter,
-    _to_string_list,
-)
+from utils.string_slice import _StringSliceIter, _to_string_list
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -126,7 +123,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: StringLiteral):
+    fn __iadd__(mut self, rhs: StringLiteral):
         """Concatenate a string literal to an existing one. Can only be
         evaluated at compile time using the `alias` keyword, which will write
         the result into the binary.
@@ -391,7 +388,7 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -554,7 +551,7 @@ struct StringLiteral(
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string literal to the provided Writer.
 

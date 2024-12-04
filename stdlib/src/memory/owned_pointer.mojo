@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from memory import UnsafePointer, stack_allocation, memcpy
+from memory import UnsafePointer, memcpy, stack_allocation
 
 
 struct OwnedPointer[T: AnyType]:
@@ -31,7 +31,7 @@ struct OwnedPointer[T: AnyType]:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__[T: Movable](inout self: OwnedPointer[T], owned value: T):
+    fn __init__[T: Movable](mut self: OwnedPointer[T], owned value: T):
         """Construct a new OwnedPointer[] by moving the passed value into a new backing allocation.
 
         Parameters:
@@ -45,7 +45,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: OwnedPointer[T], *, copy_value: T):
+    ](mut self: OwnedPointer[T], *, copy_value: T):
         """Construct a new OwnedPointer[] by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
@@ -59,7 +59,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: Copyable, U: NoneType = None
-    ](inout self: OwnedPointer[T], value: T):
+    ](mut self: OwnedPointer[T], value: T):
         """Construct a new OwnedPointer[] by copying the passed value into a new backing allocation.
 
         Parameters:
@@ -74,7 +74,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: OwnedPointer[T], *, other: OwnedPointer[T],):
+    ](mut self: OwnedPointer[T], *, other: OwnedPointer[T],):
         """Construct a new OwnedPointer[] by explicitly copying the value from another OwnedPointer[].
 
         Parameters:
@@ -104,8 +104,8 @@ struct OwnedPointer[T: AnyType]:
     # ===-------------------------------------------------------------------===#
 
     fn __getitem__(
-        ref [_, AddressSpace.GENERIC._value.value]self
-    ) -> ref [self, AddressSpace.GENERIC._value.value] T:
+        ref [AddressSpace.GENERIC]self,
+    ) -> ref [self, AddressSpace.GENERIC] T:
         """Returns a reference to the pointers's underlying data with parametric mutability.
 
         Returns:
@@ -116,7 +116,6 @@ struct OwnedPointer[T: AnyType]:
         # returned from UnsafePointer to be guarded behind the
         # aliasing guarantees of the origin system here.
         # All of the magic happens above in the function signature
-
         return self._inner[]
 
     # ===-------------------------------------------------------------------===#

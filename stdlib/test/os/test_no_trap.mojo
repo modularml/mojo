@@ -14,8 +14,8 @@
 # We pass an_argument here to avoid the compiler from optimizing the code
 # away.
 
-from sys import argv
 from os import abort
+from sys import argv
 
 
 # CHECK-LABEL: OK

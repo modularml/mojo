@@ -35,7 +35,6 @@ from math import isclose
 
 from builtin._location import __call_location, _SourceLocation
 
-
 # ===----------------------------------------------------------------------=== #
 # Assertions
 # ===----------------------------------------------------------------------=== #
@@ -537,7 +536,7 @@ struct assert_raises:
 
     @always_inline
     fn __init__(
-        inout self,
+        mut self,
         *,
         contains: String,
         location: Optional[_SourceLocation] = None,

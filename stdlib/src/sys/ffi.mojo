@@ -13,14 +13,14 @@
 """Implements a foreign functions interface (FFI)."""
 
 from os import abort
+from sys._libc import dlclose, dlerror, dlopen, dlsym
+
 from memory import UnsafePointer
 
 from utils import StringRef
 
-from .info import os_is_linux, os_is_windows, is_64bit, os_is_macos
+from .info import is_64bit, os_is_linux, os_is_macos, os_is_windows
 from .intrinsics import _mlirtype_is_eq
-
-from sys._libc import dlerror, dlopen, dlclose, dlsym
 
 # ===-----------------------------------------------------------------------===#
 # Primitive C type aliases
@@ -176,7 +176,7 @@ struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn close(inout self):
+    fn close(mut self):
         """Delete the DLHandle object unloading the associated dynamic library.
         """
 

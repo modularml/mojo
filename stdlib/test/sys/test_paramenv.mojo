@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -D bar=99 -D baz=hello -D foo=11 -D my_true=True -D my_false=false %s
 
-from sys import env_get_int, env_get_bool, env_get_string, is_defined
+from sys import env_get_bool, env_get_int, env_get_string, is_defined
 
 from testing import assert_equal, assert_false, assert_true
 

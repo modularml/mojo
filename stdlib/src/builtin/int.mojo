@@ -18,22 +18,26 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from bit import byte_swap
-from math import Ceilable, CeilDivable, Floorable, Truncable
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from math import Ceilable, CeilDivable, Floorable, Truncable
+from sys import bitwidthof
+
+from builtin.io import _snprintf
+from memory import UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
 from memory import memcpy, UnsafePointer
 
-from utils import Span, Writable, Writer
-from utils._visualizers import lldb_formatter_wrapping_type
-from utils._select import _select_register_value as select
 from sys import is_big_endian, bitwidthof
+
+from utils import Writable, Writer
+from utils._select import _select_register_value as select
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -419,7 +423,7 @@ struct Int(
 
     @always_inline("nodebug")
     @implicit
-    fn __init__[IndexerTy: Indexer](inout self, value: IndexerTy):
+    fn __init__[IndexerTy: Indexer](mut self, value: IndexerTy):
         """Construct Int from the given Indexer value.
 
         Parameters:
@@ -766,7 +770,7 @@ struct Int(
     # ===----------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: Int):
+    fn __iadd__(mut self, rhs: Int):
         """Compute `self + rhs` and save the result in self.
 
         Args:
@@ -775,7 +779,7 @@ struct Int(
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: Int):
+    fn __isub__(mut self, rhs: Int):
         """Compute `self - rhs` and save the result in self.
 
         Args:
@@ -784,7 +788,7 @@ struct Int(
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: Int):
+    fn __imul__(mut self, rhs: Int):
         """Compute self*rhs and save the result in self.
 
         Args:
@@ -792,7 +796,7 @@ struct Int(
         """
         self = self * rhs
 
-    fn __itruediv__(inout self, rhs: Int):
+    fn __itruediv__(mut self, rhs: Int):
         """Compute `self / rhs`, convert to int, and save the result in self.
 
         Since `floor(self / rhs)` is equivalent to `self // rhs`, this yields
@@ -804,7 +808,7 @@ struct Int(
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: Int):
+    fn __ifloordiv__(mut self, rhs: Int):
         """Compute `self // rhs` and save the result in self.
 
         Args:
@@ -812,7 +816,7 @@ struct Int(
         """
         self = self // rhs
 
-    fn __imod__(inout self, rhs: Int):
+    fn __imod__(mut self, rhs: Int):
         """Compute `self % rhs` and save the result in self.
 
         Args:
@@ -821,7 +825,7 @@ struct Int(
         self = self % rhs
 
     @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: Int):
+    fn __ipow__(mut self, rhs: Int):
         """Compute `pow(self, rhs)` and save the result in self.
 
         Args:
@@ -830,7 +834,7 @@ struct Int(
         self = self**rhs
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: Int):
+    fn __ilshift__(mut self, rhs: Int):
         """Compute `self << rhs` and save the result in self.
 
         Args:
@@ -839,7 +843,7 @@ struct Int(
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: Int):
+    fn __irshift__(mut self, rhs: Int):
         """Compute `self >> rhs` and save the result in self.
 
         Args:
@@ -848,7 +852,7 @@ struct Int(
         self = self >> rhs
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: Int):
+    fn __iand__(mut self, rhs: Int):
         """Compute `self & rhs` and save the result in self.
 
         Args:
@@ -857,7 +861,7 @@ struct Int(
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: Int):
+    fn __ixor__(mut self, rhs: Int):
         """Compute `self ^ rhs` and save the result in self.
 
         Args:
@@ -866,7 +870,7 @@ struct Int(
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: Int):
+    fn __ior__(mut self, rhs: Int):
         """Compute self|rhs and save the result in self.
 
         Args:
@@ -1142,7 +1146,7 @@ struct Int(
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.int64](self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with this int value.
 
         Parameters:
@@ -1181,7 +1185,7 @@ struct Int(
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this integer to the provided Writer.
 
@@ -1194,7 +1198,7 @@ struct Int(
 
         writer.write(Int64(self))
 
-    fn write_padded[W: Writer](self, inout writer: W, width: Int):
+    fn write_padded[W: Writer](self, mut writer: W, width: Int):
         """Write the int right-aligned to a set padding.
 
         Parameters:

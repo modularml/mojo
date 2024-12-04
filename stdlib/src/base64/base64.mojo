@@ -21,7 +21,9 @@ from base64 import b64encode
 
 from collections import List
 from sys import simdwidthof
+
 import bit
+
 from ._b64encode import b64encode_with_buffers as _b64encode_with_buffers
 
 # ===----------------------------------------------------------------------===#
@@ -63,7 +65,7 @@ fn _ascii_to_value(char: String) -> Int:
 
 
 # TODO: Use Span instead of List as input when Span is easier to use
-fn b64encode(input_bytes: List[UInt8, _], inout result: List[UInt8, _]):
+fn b64encode(input_bytes: List[UInt8, _], mut result: List[UInt8, _]):
     """Performs base64 encoding on the input string.
 
     Args:

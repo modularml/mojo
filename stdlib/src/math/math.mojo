@@ -20,24 +20,23 @@ from math import floor
 """
 
 from collections import List
-from sys._assembly import inlined_assembly
-from sys.ffi import _external_call_const
 from sys import (
-    llvm_intrinsic,
     bitwidthof,
     has_avx512f,
-    simdwidthof,
-    is_nvidia_gpu,
     is_amd_gpu,
+    is_nvidia_gpu,
+    llvm_intrinsic,
+    simdwidthof,
     sizeof,
 )
-
-from memory import UnsafePointer
+from sys._assembly import inlined_assembly
+from sys.ffi import _external_call_const
+from sys.info import _current_arch
 
 from bit import count_trailing_zeros
 from builtin.dtype import _integral_type_of
-from builtin.simd import _simd_apply, _modf
-from sys.info import _current_arch
+from builtin.simd import _modf, _simd_apply
+from memory import UnsafePointer
 
 from utils import Span
 from utils.index import IndexList
@@ -1109,7 +1108,7 @@ fn iota[
         buff.store(i, i + offset)
 
 
-fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
+fn iota[type: DType, //](mut v: List[Scalar[type], *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
@@ -1122,7 +1121,7 @@ fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
     iota(v.data, len(v), offset)
 
 
-fn iota(inout v: List[Int, *_], offset: Int = 0):
+fn iota(mut v: List[Int, *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:
@@ -1140,6 +1139,23 @@ fn iota(inout v: List[Int, *_], offset: Int = 0):
 
 @always_inline
 fn fma(a: Int, b: Int, c: Int) -> Int:
+    """Performs `fma` (fused multiply-add) on the inputs.
+
+    The result is `(a * b) + c`.
+
+    Args:
+        a: The first input.
+        b: The second input.
+        c: The third input.
+
+    Returns:
+        `(a * b) + c`.
+    """
+    return a * b + c
+
+
+@always_inline
+fn fma(a: UInt, b: UInt, c: UInt) -> UInt:
     """Performs `fma` (fused multiply-add) on the inputs.
 
     The result is `(a * b) + c`.

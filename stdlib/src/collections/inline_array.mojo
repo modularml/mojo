@@ -21,6 +21,7 @@ from collections import InlineArray
 
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
+
 from memory import UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
@@ -111,7 +112,7 @@ struct InlineArray[
         ]()
 
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned unsafe_assume_initialized: InlineArray[
             UnsafeMaybeUninitialized[Self.ElementType], Self.size
@@ -170,7 +171,7 @@ struct InlineArray[
 
     @always_inline
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned storage: VariadicListMem[Self.ElementType, _],
     ):

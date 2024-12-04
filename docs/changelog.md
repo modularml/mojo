@@ -54,6 +54,20 @@ what we publish.
   The consequence of this is that the old hack is no longer needed for these
   cases!
 
+- Various improvements to origin handling and syntax have landed, including
+  support for the ternary operator and allowing multiple arguments in a `ref`
+  specifier (which are implicitly unions).  This enables expression of simple
+  algorithms cleanly:
+
+  ```mojo
+  fn my_min[T: Comparable](ref a: T, ref b: T) -> ref [a, b] T:
+    return a if a < b else b
+  ```
+
+  It is also nice that `my_min` automatically and implicitly propagates the
+  mutability of its arguments, so things like `my_min(str1, str2) += "foo"` is
+  valid.
+
 - The `UnsafePointer` type now has an `origin` parameter that can be used when
   the `UnsafePointer` is known to point to a value with a known origin. This
   origin is propagated through the `ptr[]` indirection operation.
@@ -283,6 +297,12 @@ what we publish.
   `String` value.
 
 ### 🦋 Changed
+
+- The `inout` and `borrowed` argument conventions have been renamed to the `mut`
+  and `read` argument conventions (respectively).  These verbs reflect
+  declaratively what the callee can do to the argument value passed into the
+  caller, without tying in the requirement for the programmer to know about
+  advanced features like references.
 
 - The argument convention for `__init__` methods has been changed from `inout`
   to `out`, reflecting that an `__init__` method initializes its `self` without
@@ -580,6 +600,15 @@ what we publish.
 
 - [Issue #3710](https://github.com/modularml/mojo/issues/3710) - Mojo frees
   memory while reference to it is still in use.
+
+- [Issue #3805](https://github.com/modularml/mojo/issues/3805) - Crash When
+  Initializing !llvm.ptr.
+
+- [Issue #3816](https://github.com/modularml/mojo/issues/3816) - Ternary
+  if-operator doesn't propagate origin information.
+
+- [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
+  [BUG] Mutability not preserved when taking the union of two origins.
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 

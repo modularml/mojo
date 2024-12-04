@@ -20,10 +20,11 @@ from utils import IndexList
 ```
 """
 
+from collections.string import _calc_initial_buffer_size
 from sys import bitwidthof
+
 from builtin.dtype import _int_type_of_width, _uint_type_of_width
 from builtin.io import _get_dtype_printf_format, _snprintf
-from collections.string import _calc_initial_buffer_size
 
 from . import unroll
 from .static_tuple import StaticTuple
@@ -403,7 +404,7 @@ struct IndexList[
         return int(self.data[idx])
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Int):
+    fn __setitem__[index: Int](mut self, val: Int):
         """Sets an element in the tuple at the given static index.
 
         Parameters:
@@ -415,7 +416,7 @@ struct IndexList[
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self._int_type):
+    fn __setitem__[index: Int](mut self, val: Self._int_type):
         """Sets an element in the tuple at the given static index.
 
         Parameters:
@@ -427,7 +428,7 @@ struct IndexList[
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: Int):
+    fn __setitem__(mut self, idx: Int, val: Int):
         """Sets an element in the tuple at the given index.
 
         Args:
@@ -754,7 +755,7 @@ struct IndexList[
         return buf^
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this int tuple to the provided Writer.
 

@@ -21,8 +21,9 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Pointer, UnsafePointer
+
 from builtin.builtin_list import _lit_mut_cast
+from memory import Pointer, UnsafePointer
 
 
 trait AsBytes:
@@ -68,7 +69,7 @@ struct _SpanIter[
 
     @always_inline
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[T, origin]:
         @parameter
         if forward:
@@ -149,7 +150,7 @@ struct Span[
     @always_inline
     fn __init__[
         size: Int, //
-    ](inout self, ref [origin]array: InlineArray[T, size]):
+    ](mut self, ref [origin]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:

@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils import Writable, Writer
 import sys
+
+from utils import Writable, Writer
 
 
 fn main() raises:
@@ -25,7 +26,7 @@ struct Point(Writable):
     var x: Int
     var y: Int
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write("Point(", self.x, ", ", self.y, ")")
 
 

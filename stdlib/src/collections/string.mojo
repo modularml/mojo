@@ -17,40 +17,39 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char
-from utils import StaticString, write_args
+from sys.intrinsics import _type_is_eq
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy
 from python import PythonObject
 
-from sys.intrinsics import _type_is_eq
-from hashlib._hasher import _HashableWithHasher, _Hasher
-
 from utils import (
-    Span,
     IndexList,
+    Span,
+    StaticString,
     StringRef,
     StringSlice,
     Variant,
     Writable,
     Writer,
+    write_args,
 )
-from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
-    _utf8_byte_type,
-    _StringSliceIter,
-    _unicode_codepoint_utf8_byte_length,
-    _shift_unicode_to_utf8,
-    _to_string_list,
-)
-
 from utils._unicode import (
     is_lowercase,
     is_uppercase,
     to_lowercase,
     to_uppercase,
+)
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from utils.string_slice import (
+    _shift_unicode_to_utf8,
+    _StringSliceIter,
+    _to_string_list,
+    _unicode_codepoint_utf8_byte_length,
+    _utf8_byte_type,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -905,7 +904,7 @@ struct String(
     # Factory dunders
     # ===------------------------------------------------------------------=== #
 
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """Write a byte span to this String.
 
         Args:
@@ -914,7 +913,7 @@ struct String(
         """
         self._iadd[False](bytes)
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:
@@ -1268,7 +1267,7 @@ struct String(
         """
         return Self._add[True](other.as_bytes(), self.as_bytes())
 
-    fn _iadd[has_null: Bool](inout self, other: Span[Byte]):
+    fn _iadd[has_null: Bool](mut self, other: Span[Byte]):
         var s_len = self.byte_length()
         var o_len = len(other)
         var o_ptr = other.unsafe_ptr()
@@ -1289,7 +1288,7 @@ struct String(
             s_ptr[sum_len] = 0
 
     @always_inline
-    fn __iadd__(inout self, other: String):
+    fn __iadd__(mut self, other: String):
         """Appends another string to this string.
 
         Args:
@@ -1298,7 +1297,7 @@ struct String(
         self._iadd[True](other.as_bytes())
 
     @always_inline
-    fn __iadd__(inout self, other: StringLiteral):
+    fn __iadd__(mut self, other: StringLiteral):
         """Appends another string literal to this string.
 
         Args:
@@ -1307,7 +1306,7 @@ struct String(
         self._iadd[False](other.as_bytes())
 
     @always_inline
-    fn __iadd__(inout self, other: StringSlice):
+    fn __iadd__(mut self, other: StringSlice):
         """Appends another string slice to this string.
 
         Args:
@@ -1424,7 +1423,7 @@ struct String(
     # Methods
     # ===------------------------------------------------------------------=== #
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string to the provided Writer.
 
@@ -1623,7 +1622,7 @@ struct String(
         var length = len(self._buffer)
         return length - int(length > 0)
 
-    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
+    fn _steal_ptr(mut self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1817,7 +1816,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             for s in self[lhs:]:
-                if not str(s).isspace():  # TODO: with StringSlice.isspace()
+                if not s.isspace():
                     break
                 lhs += s.byte_length()
             # if it went until the end of the String, then
@@ -1831,7 +1830,7 @@ struct String(
                 break
             rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
             for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
-                if str(s).isspace():  # TODO: with StringSlice.isspace()
+                if s.isspace():
                     break
                 rhs += s.byte_length()
 
@@ -2015,7 +2014,7 @@ struct String(
         """
         return hash(self.as_string_slice())
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -2310,7 +2309,7 @@ struct String(
         var result = String(buffer)
         return result^
 
-    fn reserve(inout self, new_capacity: Int):
+    fn reserve(mut self, new_capacity: Int):
         """Reserves the requested capacity.
 
         Args:

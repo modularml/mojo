@@ -11,32 +11,29 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer, stack_allocation
-
-from sys import sizeof, alignof
+from collections import Optional
+from sys import alignof, sizeof
 
 import python._cpython as cp
-from python import TypedPythonObject, Python, PythonObject
-from python.python import _get_global_python_itf
-from python._cpython import (
-    PyObjectPtr,
-    PyMethodDef,
-    PyType_Slot,
-    PyType_Spec,
-    CPython,
-)
-from python._bindings import (
-    Pythonable,
+from memory import UnsafePointer, stack_allocation
+from python import Python, PythonObject, TypedPythonObject
+from python._bindings import (  # Imported for use by the compiler
     ConvertibleFromPython,
     PyMojoObject,
-    python_type_object,
-    py_c_function_wrapper,
+    Pythonable,
     check_argument_type,
-    # Imported for use by the compiler
     check_arguments_arity,
+    py_c_function_wrapper,
+    python_type_object,
 )
-
-from collections import Optional
+from python._cpython import (
+    CPython,
+    PyMethodDef,
+    PyObjectPtr,
+    PyType_Slot,
+    PyType_Spec,
+)
+from python.python import _get_global_python_itf
 
 alias PyModule = TypedPythonObject["Module"]
 
@@ -79,7 +76,7 @@ fn pointer_bitcast[
 fn gen_pytype_wrapper[
     T: Pythonable,
     name: StringLiteral,
-](inout module: PythonObject) raises:
+](mut module: PythonObject) raises:
     # TODO(MOCO-1301): Add support for member method generation.
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
     # TODO(MOCO-1307): Add support for constructor generation.
@@ -102,7 +99,7 @@ fn add_wrapper_to_module[
         PythonObject, TypedPythonObject["Tuple"]
     ) raises -> PythonObject,
     func_name: StringLiteral,
-](inout module_obj: PythonObject) raises:
+](mut module_obj: PythonObject) raises:
     var module = TypedPythonObject["Module"](unsafe_unchecked_from=module_obj)
     Python.add_functions(
         module,

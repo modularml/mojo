@@ -21,15 +21,18 @@ from utils import StringSlice
 ```
 """
 
-from bit import count_leading_zeros
-from utils import Span
-from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer, memcpy
-from sys import simdwidthof, bitwidthof
+from collections.string import _atof, _atol, _isspace
+from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
+
+from bit import count_leading_zeros
+from memory import UnsafePointer, memcmp, memcpy
 from memory.memory import _memcmp_impl_unconstrained
+
+from utils import Span
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+
 from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -77,13 +80,9 @@ fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
 
     debug_assert(
         (b & 0b1100_0000) != 0b1000_0000,
-        (
-            "Function `_utf8_first_byte_sequence_length()` does not work"
-            " correctly if given a continuation byte."
-        ),
+        "Function does not work correctly if given a continuation byte.",
     )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
+    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
@@ -183,46 +182,28 @@ struct _StringSliceIter[
     """
 
     var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
+    var ptr: UnsafePointer[Byte]
     var length: Int
 
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
+    fn __init__(mut self, *, unsafe_pointer: UnsafePointer[Byte], length: Int):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        alias S = Span[Byte, StaticConstantOrigin]
-        var s = S(ptr=self.ptr, length=self.length)
-        self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringSlice[origin]:
+    fn __next__(mut self) -> StringSlice[origin]:
         @parameter
         if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index])
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = _utf8_first_byte_sequence_length(self.ptr[self.index])
+            i = self.index
             self.index += byte_len
-            return StringSlice[origin](
-                ptr=self.ptr + (self.index - byte_len), length=byte_len
-            )
+            return StringSlice[origin](ptr=self.ptr + i, length=byte_len)
         else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = self.ptr[self.index - byte_len]
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = 1
+            while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
+                byte_len += 1
             self.index -= byte_len
             return StringSlice[origin](
                 ptr=self.ptr + self.index, length=byte_len
@@ -230,14 +211,26 @@ struct _StringSliceIter[
 
     @always_inline
     fn __has_next__(self) -> Bool:
-        return self.__len__() > 0
+        @parameter
+        if forward:
+            return self.index < self.length
+        else:
+            return self.index > 0
 
     fn __len__(self) -> Int:
         @parameter
         if forward:
-            return self.length - self.index - self.continuation_bytes
+            remaining = self.length - self.index
+            cont = _count_utf8_continuation_bytes(
+                Span[Byte, ImmutableAnyOrigin](
+                    ptr=self.ptr + self.index, length=remaining
+                )
+            )
+            return remaining - cont
         else:
-            return self.index - self.continuation_bytes
+            return self.index - _count_utf8_continuation_bytes(
+                Span[Byte, ImmutableAnyOrigin](ptr=self.ptr, length=self.index)
+            )
 
 
 @value
@@ -353,7 +346,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     @implicit
     fn __init__[
         O: ImmutableOrigin, //
-    ](inout self: StringSlice[O], ref [O]value: String):
+    ](mut self: StringSlice[O], ref [O]value: String):
         """Construct an immutable StringSlice.
 
         Parameters:
@@ -392,7 +385,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var s = S(ptr=self.unsafe_ptr(), length=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Formats this string slice to the provided `Writer`.
 
         Parameters:

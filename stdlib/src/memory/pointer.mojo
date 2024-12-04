@@ -274,7 +274,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         return String.write(self)
 
     @always_inline("nodebug")
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the address space to the provided Writer.
 
@@ -341,7 +341,7 @@ struct Pointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(ref [origin, address_space._value.value]value: type) -> Self:
+    fn address_of(ref [origin, address_space]value: type) -> Self:
         """Constructs a Pointer from a reference to a value.
 
         Args:
@@ -367,7 +367,7 @@ struct Pointer[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self) -> ref [origin, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space] type:
         """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:

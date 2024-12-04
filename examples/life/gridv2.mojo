@@ -11,9 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from collections import Optional
-from memory import memcpy, memset_zero, UnsafePointer
 import random
+from collections import Optional
+
+from memory import UnsafePointer, memcpy, memset_zero
 
 
 struct Grid[rows: Int, cols: Int](StringableRaising):
@@ -70,7 +71,7 @@ struct Grid[rows: Int, cols: Int](StringableRaising):
     def __getitem__(self, row: Int, col: Int) -> Int8:
         return (self.data + row * cols + col)[]
 
-    def __setitem__(inout self, row: Int, col: Int, value: Int8) -> None:
+    def __setitem__(mut self, row: Int, col: Int, value: Int8) -> None:
         (self.data + row * cols + col)[] = value
 
     # ===-------------------------------------------------------------------===#
