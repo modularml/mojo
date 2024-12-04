@@ -139,17 +139,15 @@ struct Deque[ElementType: CollectionElement](
         Args:
             values: The values to populate the deque with.
         """
-        self = Self(variadic_list=values^)
+        self = Self(elements=values^)
 
-    fn __init__(
-        mut self, *, owned variadic_list: VariadicListMem[ElementType, _]
-    ):
+    fn __init__(mut self, *, owned elements: VariadicListMem[ElementType, _]):
         """Constructs a deque from the given values.
 
         Args:
-            variadic_list: The values to populate the deque with.
+             elements: The values to populate the deque with.
         """
-        args_length = len(variadic_list)
+        args_length = len(elements)
 
         if args_length < self.default_capacity:
             capacity = self.default_capacity
@@ -159,12 +157,14 @@ struct Deque[ElementType: CollectionElement](
         self = Self(capacity=capacity)
 
         for i in range(args_length):
-            src = UnsafePointer.address_of(variadic_list[i])
+            src = UnsafePointer.address_of(elements[i])
             dst = self._data + i
             src.move_pointee_into(dst)
 
-        # Mark the elements as unowned to avoid del'ing uninitialized objects.
-        variadic_list._is_owned = False
+        # Do not destroy the elements when their backing storage goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(elements)
+        )
 
         self._tail = args_length
 
