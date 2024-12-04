@@ -142,7 +142,7 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_origin: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability],
 ](ref value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
     K, V, dict_origin, False
 ]:
@@ -169,7 +169,7 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_origin: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability],
 ](ref value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
     K, V, dict_origin, False
 ]:
