@@ -22,7 +22,6 @@ from utils import Span
 
 from collections import InlineArray
 
-from builtin.builtin_list import _lit_mut_cast
 from memory import Pointer, UnsafePointer
 
 
@@ -360,13 +359,13 @@ struct Span[
 
     fn get_immutable(
         self,
-    ) -> Span[T, _lit_mut_cast[origin, False].result]:
+    ) -> Span[T, ImmutableOrigin.cast_from[origin].result]:
         """
         Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
-        return Span[T, _lit_mut_cast[origin, False].result](
+        return Span[T, ImmutableOrigin.cast_from[origin].result](
             ptr=self._data, length=self._len
         )

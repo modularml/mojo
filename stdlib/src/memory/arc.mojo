@@ -46,7 +46,6 @@ print(ArcPointer(String("ok"))[])
 
 from os.atomic import Atomic
 
-from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, stack_allocation
 
 
@@ -146,7 +145,7 @@ struct ArcPointer[T: Movable](
     ](
         ref [self_life]self,
     ) -> ref [
-        _lit_mut_cast[self_life, result_mutable=True].result
+        MutableOrigin.cast_from[self_life].result
     ] T:
         """Returns a mutable reference to the managed value.
 

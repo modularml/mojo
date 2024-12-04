@@ -283,20 +283,6 @@ struct _lit_origin_union[
     ]
 
 
-struct _lit_mut_cast[
-    is_mutable: Bool, //,
-    operand: Origin[is_mutable],
-    result_mutable: Bool,
-]:
-    alias result = __mlir_attr[
-        `#lit.origin.mutcast<`,
-        operand._mlir_origin,
-        `> : !lit.origin<`,
-        +result_mutable.value,
-        `>`,
-    ]
-
-
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
@@ -443,7 +429,7 @@ struct VariadicListMem[
             # cast mutability of self to match the mutability of the element,
             # since that is what we want to use in the ultimate reference and
             # the union overall doesn't matter.
-            _lit_mut_cast[__origin_of(self), elt_is_mutable].result,
+            Origin[elt_is_mutable].cast_from[__origin_of(self)].result,
         ].result
     ] element_type:
         """Gets a single element on the variadic list.
