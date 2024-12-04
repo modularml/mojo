@@ -13,3 +13,4 @@ benchmarks = { cmd = ["./stdlib/scripts/run-benchmarks.sh"], env = { MODULAR_MOJ
 python = ">=3.12.7,<3.13"
 lit = ">=19.1.5,<19.2"
 max = ">=24.6.0.dev2024120306,<24.7"
+charset-normalizer = "*"

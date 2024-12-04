@@ -1272,7 +1272,7 @@ struct String(
             return
         elif o_len == 0:
             return
-        var sum_len = s_len + o_len
+        _ = self._buffer.pop()
         self._buffer.append(other)
         self._buffer.append(0)
 

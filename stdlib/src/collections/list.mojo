@@ -412,7 +412,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Returns:
             A string representation of the list.
         """
-        var output = String()
+        var output = String(capacity=len(self) + 1)  # at least
         self.write_to(output)
         return output^
 
@@ -498,7 +498,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             value: The value to append.
         """
         if len(self) >= self.capacity:
-            self._realloc(self.capacity * 2 + int(capacity == 0))
+            self._realloc(self.capacity * 2 + int(self.capacity == 0))
         (self.data + len(self)).init_pointee_move(value^)
         self._len += 1
 
@@ -515,7 +515,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         if len(self) + value.size > self.capacity:
             self._realloc(self.capacity + value.size)
-        (self.data + len(self)).store(value^)
+        (self.data + len(self)).store(value)
         self._len += value.size
 
     fn append[
