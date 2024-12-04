@@ -468,23 +468,23 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    # FIXME: this needs to be consistent with {String, StringSlice}.byte_length()
-    fn bytecount(self) -> Int:
-        """Gets the bytecount of the List.
+    fn byte_length(self) -> Int:
+        """Gets the byte length of the List.
 
         Returns:
-            The bytecount of the List.
+            The byte length of the List.
         """
         return len(self) * sizeof[T]()
 
     fn _realloc(mut self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
-        _move_pointee_into_many_elements[hint_trivial_type](
-            dest=new_data,
-            src=self.data,
-            size=self._len,
-        )
+        @parameter
+        if hint_trivial_type:
+            memcpy(new_data, self.data, len(self))
+        else:
+            for i in range(len(self)):
+                (self.data + i).move_pointee_into(new_data + i)
 
         if self.data:
             self.data.free()
@@ -492,7 +492,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.capacity = new_capacity
 
     fn append(mut self, owned value: T):
-        """Appends a value to this list.
+        """Appends a value to this list. If there is no capacity left, resizes
+        to twice the current capacity. Except for 0 capacity where it sets 1.
 
         Args:
             value: The value to append.
@@ -505,7 +506,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn append[
         D: DType, //
     ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _]):
-        """Appends a vector to this list.
+        """Appends a vector to this list. If there is no capacity left, resizes
+        to `len(self) + value.size`.
 
         Parameters:
             D: The DType.
@@ -513,15 +515,15 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             value: The value to append.
         """
-        if len(self) + value.size > self.capacity:
-            self._realloc(self.capacity + value.size)
+        self.reserve(len(self) + value.size)
         (self.data + len(self)).store(value)
         self._len += value.size
 
     fn append[
         D: DType, //
     ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _], count: Int):
-        """Appends count items from a vector to this list.
+        """Appends a vector to this list. If there is no capacity left, resizes
+        to `len(self) + count`.
 
         Parameters:
             D: The DType.
@@ -530,9 +532,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             value: The value to append.
             count: The ammount of items to append.
         """
-
-        if len(self) + count > self.capacity:
-            self._realloc(self.capacity + count)
+        self.reserve(len(self) + count)
         var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
         memcpy(self.data + len(self), v_ptr, count)
         self._len += count
@@ -540,7 +540,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn append[
         D: DType, //
     ](mut self: List[Scalar[D], *_, **_], value: Span[Scalar[D]]):
-        """Appends a Span to this list.
+        """Appends a Span to this list. If there is no capacity left, resizes
+        to `len(self) + len(value)`.
 
         Parameters:
             D: The DType.
@@ -548,8 +549,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             value: The value to append.
         """
-        if len(self) + len(value) > self.capacity:
-            self._realloc(self.capacity + len(value))
+        self.reserve(len(self) + len(value))
         memcpy(self.data + len(self), value.unsafe_ptr(), len(value))
         self._len += len(value)
 
@@ -986,18 +986,3 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
-
-
-fn _move_pointee_into_many_elements[
-    T: CollectionElement, //, hint_trivial_type: Bool
-](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
-    @parameter
-    if hint_trivial_type:
-        memcpy(
-            dest=dest.bitcast[Int8](),
-            src=src.bitcast[Int8](),
-            count=size * sizeof[T](),
-        )
-    else:
-        for i in range(size):
-            (src + i).move_pointee_into(dest + i)
