@@ -566,6 +566,16 @@ what we publish.
   fn take_imm_slice(a: ImmStringSlice): ...
   ```
 
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x:
+     print("1 in x")
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your

@@ -1325,6 +1325,27 @@ struct PythonObject(
         """
         return self._call_zero_arg_method("__invert__")
 
+    fn __contains__(self, rhs: PythonObject) raises -> Bool:
+        """Contains dunder.
+
+        Calls the underlying object's `__contains__` method.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            True if rhs is in self.
+        """
+        # TODO: replace/optimize with c-python function.
+        # TODO: implement __getitem__ step for cpython membership test operator.
+        var cpython = _get_global_python_itf().cpython()
+        if cpython.PyObject_HasAttrString(self.py_object, "__contains__"):
+            return self._call_single_arg_method("__contains__", rhs).__bool__()
+        for v in self:
+            if v == rhs:
+                return True
+        return False
+
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules
     fn __call__(
