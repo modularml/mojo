@@ -305,6 +305,9 @@ struct Pointer[
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
 
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
+
     Parameters:
         is_mutable: Whether the pointee data may be mutated through this.
         type: Type of the underlying data.
