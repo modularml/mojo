@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_false, assert_true
+from testing import assert_equal, assert_false, assert_true, assert_not_equal
+from sys.intrinsics import _type_is_eq
 
 
 def test_list():
@@ -66,7 +67,25 @@ def test_contains():
     assert_true("Mojo" not in h and String("Mojo") in h)
 
 
+def test_list_literal_dunder_getitem():
+    x = [0, True, 1.0, "two"]
+    assert_equal(x[0], 0)
+    assert_not_equal(x[0], 1)
+    assert_equal(x[1], True)
+    assert_not_equal(x[1], False)
+    assert_equal(x[2], 1.0)
+    assert_not_equal(x[2], 1.5)
+    assert_equal(x[3], "two")
+    assert_not_equal(x[3], "abc")
+
+    assert_true(_type_is_eq[__type_of(x[0]), Int]())
+    assert_true(_type_is_eq[__type_of(x[1]), Bool]())
+    assert_true(_type_is_eq[__type_of(x[2]), Float64]())
+    assert_true(_type_is_eq[__type_of(x[3]), StringLiteral]())
+
+
 def main():
     test_list()
     test_variadic_list()
     test_contains()
+    test_list_literal_dunder_getitem()

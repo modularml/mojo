@@ -118,6 +118,33 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         """
         return value in self.storage
 
+    @always_inline
+    fn __getitem__[
+        i: Int
+    ](ref self) -> ref [self.storage] __type_of(self.storage).element_types[
+        i.value
+    ]:
+        """Get a list element at the given index.
+
+        Parameters:
+            i: The element index.
+
+        Returns:
+            The element at the given index.
+
+        For example:
+        ```mojo
+        def main():
+            x = [0, 1.0, "two"]
+            print(
+                x[0] == 0,
+                x[1] == 1.0,
+                x[2] == "two"
+            )
+        ```.
+        """
+        return self.storage[i]
+
 
 # ===-----------------------------------------------------------------------===#
 # VariadicList / VariadicListMem

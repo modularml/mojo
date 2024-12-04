@@ -292,6 +292,20 @@ what we publish.
   allows forming a runtime-constant StringLiteral from a compile-time-dynamic
   `Stringable` value.
 
+- Add a `__getitem__` dunder method to `ListLiteral`.
+  ([PR #3835](https://github.com/modularml/mojo/pull/3835) by [@rd4com](https://github.com/rd4com)).
+  
+  For example:
+  ```mojo
+  def main():
+      x = [0, 1.0, "two"]
+      print(
+          x[0] == 0,
+          x[1] == 1.0,
+          x[2] == "two"
+      )
+  ```
+
 ### 🦋 Changed
 
 - The `inout` and `borrowed` argument conventions have been renamed to the `mut`
