@@ -294,6 +294,12 @@ what we publish.
 
 ### 🦋 Changed
 
+- The `inout` and `borrowed` argument conventions have been renamed to the `mut`
+  and `read` argument conventions (respectively).  These verbs reflect
+  declaratively what the callee can do to the argument value passed into the
+  caller, without tying in the requirement for the programmer to know about
+  advanced features like references.
+
 - The argument convention for `__init__` methods has been changed from `inout`
   to `out`, reflecting that an `__init__` method initializes its `self` without
   reading from it.  This also enables spelling the type of an initializer

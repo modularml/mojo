@@ -38,7 +38,7 @@ fn make_dict[size: Int]() -> Dict[Int, Int]:
 # Benchmark Dict init
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_init(inout b: Bencher) raises:
+fn bench_dict_init(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -54,7 +54,7 @@ fn bench_dict_init(inout b: Bencher) raises:
 # Benchmark Dict Insert
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_insert[size: Int](inout b: Bencher) raises:
+fn bench_dict_insert[size: Int](mut b: Bencher) raises:
     """Insert 100 new items."""
     var items = make_dict[size]()
 
@@ -72,7 +72,7 @@ fn bench_dict_insert[size: Int](inout b: Bencher) raises:
 # Benchmark Dict Lookup
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
+fn bench_dict_lookup[size: Int](mut b: Bencher) raises:
     """Lookup 100 items."""
     var items = make_dict[size]()
     var closest_divisor = ceil(100 / size)

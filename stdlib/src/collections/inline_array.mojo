@@ -112,7 +112,7 @@ struct InlineArray[
         ]()
 
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned unsafe_assume_initialized: InlineArray[
             UnsafeMaybeUninitialized[Self.ElementType], Self.size
@@ -171,7 +171,7 @@ struct InlineArray[
 
     @always_inline
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned storage: VariadicListMem[Self.ElementType, _],
     ):

@@ -60,11 +60,11 @@ struct _ArcPointerInner[T: Movable]:
         self.refcount = Scalar[DType.uint64](1)
         self.payload = value^
 
-    fn add_ref(inout self):
+    fn add_ref(mut self):
         """Atomically increment the refcount."""
         _ = self.refcount.fetch_add(1)
 
-    fn drop_ref(inout self) -> Bool:
+    fn drop_ref(mut self) -> Bool:
         """Atomically decrement the refcount and return true if the result
         hits zero."""
         return self.refcount.fetch_sub(1) == 1

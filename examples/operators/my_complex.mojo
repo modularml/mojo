@@ -55,7 +55,7 @@ struct Complex(
     fn __str__(self) -> String:
         return String.write(self)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write("(", self.re)
         if self.im < 0:
             writer.write(" - ", -self.im)
@@ -78,7 +78,7 @@ struct Complex(
         else:
             raise "index out of bounds"
 
-    fn __setitem__(inout self, idx: Int, value: Float64) raises:
+    fn __setitem__(mut self, idx: Int, value: Float64) raises:
         if idx == 0:
             self.re = value
         elif idx == 1:
@@ -109,11 +109,11 @@ struct Complex(
     def __radd__(self, lhs: Float64) -> Self:
         return Self(self.re + lhs, self.im)
 
-    def __iadd__(inout self, rhs: Self):
+    def __iadd__(mut self, rhs: Self):
         self.re += rhs.re
         self.im += rhs.im
 
-    def __iadd__(inout self, rhs: Float64):
+    def __iadd__(mut self, rhs: Float64):
         self.re += rhs
 
     def __sub__(self, rhs: Self) -> Self:
@@ -125,11 +125,11 @@ struct Complex(
     def __rsub__(self, lhs: Float64) -> Self:
         return Self(lhs - self.re, -self.im)
 
-    def __isub__(inout self, rhs: Self):
+    def __isub__(mut self, rhs: Self):
         self.re -= rhs.re
         self.im -= rhs.im
 
-    def __isub__(inout self, rhs: Float64):
+    def __isub__(mut self, rhs: Float64):
         self.re -= rhs
 
     def __mul__(self, rhs: Self) -> Self:
@@ -144,13 +144,13 @@ struct Complex(
     def __rmul__(self, lhs: Float64) -> Self:
         return Self(lhs * self.re, lhs * self.im)
 
-    def __imul__(inout self, rhs: Self):
+    def __imul__(mut self, rhs: Self):
         new_re = self.re * rhs.re - self.im * rhs.im
         new_im = self.re * rhs.im + self.im * rhs.re
         self.re = new_re
         self.im = new_im
 
-    def __imul__(inout self, rhs: Float64):
+    def __imul__(mut self, rhs: Float64):
         self.re *= rhs
         self.im *= rhs
 
@@ -168,14 +168,14 @@ struct Complex(
         denom = self.squared_norm()
         return Self((lhs * self.re) / denom, (-lhs * self.im) / denom)
 
-    def __itruediv__(inout self, rhs: Self):
+    def __itruediv__(mut self, rhs: Self):
         denom = rhs.squared_norm()
         new_re = (self.re * rhs.re + self.im * rhs.im) / denom
         new_im = (self.im * rhs.re - self.re * rhs.im) / denom
         self.re = new_re
         self.im = new_im
 
-    def __itruediv__(inout self, rhs: Float64):
+    def __itruediv__(mut self, rhs: Float64):
         self.re /= rhs
         self.im /= rhs
 

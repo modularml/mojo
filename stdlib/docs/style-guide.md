@@ -283,7 +283,7 @@ the same type:
 ```mojo
 struct MyStruct:
     # Invoked as `MyStruct(other)`
-    fn __init__(inout self, other: Self):
+    fn __init__(out self, other: Self):
         # do a deep copy of MyStruct
 ```
 

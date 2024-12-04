@@ -30,7 +30,7 @@ execution.
 
 <div class="mojo-function-sig">
 
-`__init__(inout self: Self, func_name: String, input_id: String)`
+`__init__(out self: Self, func_name: String, input_id: String)`
 
 </div>
 
@@ -47,7 +47,7 @@ Constructs a Benchmark Id object from input function name and Id phrase.
 
 <div class="mojo-function-sig">
 
-`__init__(inout self: Self, func_name: String)`
+`__init__(out self: Self, func_name: String)`
 
 </div>
 

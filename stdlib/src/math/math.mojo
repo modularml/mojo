@@ -1108,7 +1108,7 @@ fn iota[
         buff.store(i, i + offset)
 
 
-fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
+fn iota[type: DType, //](mut v: List[Scalar[type], *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Parameters:
@@ -1121,7 +1121,7 @@ fn iota[type: DType, //](inout v: List[Scalar[type], *_], offset: Int = 0):
     iota(v.data, len(v), offset)
 
 
-fn iota(inout v: List[Int, *_], offset: Int = 0):
+fn iota(mut v: List[Int, *_], offset: Int = 0):
     """Fill a list with consecutive numbers starting from the specified offset.
 
     Args:
@@ -1139,6 +1139,23 @@ fn iota(inout v: List[Int, *_], offset: Int = 0):
 
 @always_inline
 fn fma(a: Int, b: Int, c: Int) -> Int:
+    """Performs `fma` (fused multiply-add) on the inputs.
+
+    The result is `(a * b) + c`.
+
+    Args:
+        a: The first input.
+        b: The second input.
+        c: The third input.
+
+    Returns:
+        `(a * b) + c`.
+    """
+    return a * b + c
+
+
+@always_inline
+fn fma(a: UInt, b: UInt, c: UInt) -> UInt:
     """Performs `fma` (fused multiply-add) on the inputs.
 
     The result is `(a * b) + c`.

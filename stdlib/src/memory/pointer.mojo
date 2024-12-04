@@ -274,7 +274,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         return String.write(self)
 
     @always_inline("nodebug")
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the address space to the provided Writer.
 

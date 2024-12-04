@@ -189,7 +189,7 @@ fn _memmem_baseline[
 # Benchmarks
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_find_baseline(inout b: Bencher) raises:
+fn bench_find_baseline(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -204,7 +204,7 @@ fn bench_find_baseline(inout b: Bencher) raises:
 
 
 @parameter
-fn bench_find_optimized(inout b: Bencher) raises:
+fn bench_find_optimized(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():

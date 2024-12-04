@@ -112,7 +112,7 @@ struct FileHandle:
         except:
             pass
 
-    fn close(inout self) raises:
+    fn close(mut self) raises:
         """Closes the file handle."""
         if not self.handle:
             return
@@ -405,7 +405,7 @@ struct FileHandle:
         return pos
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a span of bytes to the file.
 
@@ -423,7 +423,7 @@ struct FileHandle:
         if err_msg:
             abort(err_msg^.consume_as_error())
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:

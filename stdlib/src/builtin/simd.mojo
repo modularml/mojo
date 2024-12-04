@@ -354,7 +354,7 @@ struct SIMD[type: DType, size: Int](
     @always_inline("nodebug")
     @implicit
     fn __init__(
-        inout self,
+        mut self,
         value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ):
         """Initializes the SIMD vector with the underlying mlir value.
@@ -588,7 +588,7 @@ struct SIMD[type: DType, size: Int](
 
     fn __init__[
         int_type: DType, //
-    ](inout self, *, from_bits: SIMD[int_type, size]):
+    ](mut self, *, from_bits: SIMD[int_type, size]):
         """Initializes the SIMD vector from the bits of an integral SIMD vector.
 
         Parameters:
@@ -619,7 +619,7 @@ struct SIMD[type: DType, size: Int](
         ](self.value, index(idx).value)
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: Scalar[type]):
+    fn __setitem__(mut self, idx: Int, val: Scalar[type]):
         """Sets an element in the vector.
 
         Args:
@@ -802,7 +802,7 @@ struct SIMD[type: DType, size: Int](
             specified exponent value.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return _pow[type, size, DType.index](self, exp)
+        return _pow(self, SIMD[DType.index, size](exp))
 
     # TODO(#22771): remove this overload.
     @always_inline("nodebug")
@@ -1076,7 +1076,7 @@ struct SIMD[type: DType, size: Int](
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: Self):
+    fn __iadd__(mut self, rhs: Self):
         """Performs in-place addition.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1089,7 +1089,7 @@ struct SIMD[type: DType, size: Int](
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: Self):
+    fn __isub__(mut self, rhs: Self):
         """Performs in-place subtraction.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1102,7 +1102,7 @@ struct SIMD[type: DType, size: Int](
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: Self):
+    fn __imul__(mut self, rhs: Self):
         """Performs in-place multiplication.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1115,7 +1115,7 @@ struct SIMD[type: DType, size: Int](
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self, rhs: Self):
+    fn __itruediv__(mut self, rhs: Self):
         """In-place true divide operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1128,7 +1128,7 @@ struct SIMD[type: DType, size: Int](
         self = self / rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: Self):
+    fn __ifloordiv__(mut self, rhs: Self):
         """In-place flood div operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1141,7 +1141,7 @@ struct SIMD[type: DType, size: Int](
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __imod__(inout self, rhs: Self):
+    fn __imod__(mut self, rhs: Self):
         """In-place mod operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1154,7 +1154,7 @@ struct SIMD[type: DType, size: Int](
         self = self.__mod__(rhs)
 
     @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: Int):
+    fn __ipow__(mut self, rhs: Int):
         """In-place pow operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -1167,7 +1167,7 @@ struct SIMD[type: DType, size: Int](
         self = self.__pow__(rhs)
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: Self):
+    fn __iand__(mut self, rhs: Self):
         """Computes `self & rhs` and save the result in `self`.
 
         Constraints:
@@ -1183,7 +1183,7 @@ struct SIMD[type: DType, size: Int](
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: Self):
+    fn __ixor__(mut self, rhs: Self):
         """Computes `self ^ rhs` and save the result in `self`.
 
         Constraints:
@@ -1199,7 +1199,7 @@ struct SIMD[type: DType, size: Int](
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: Self):
+    fn __ior__(mut self, rhs: Self):
         """Computes `self | rhs` and save the result in `self`.
 
         Constraints:
@@ -1215,7 +1215,7 @@ struct SIMD[type: DType, size: Int](
         self = self | rhs
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: Self):
+    fn __ilshift__(mut self, rhs: Self):
         """Computes `self << rhs` and save the result in `self`.
 
         Constraints:
@@ -1228,7 +1228,7 @@ struct SIMD[type: DType, size: Int](
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: Self):
+    fn __irshift__(mut self, rhs: Self):
         """Computes `self >> rhs` and save the result in `self`.
 
         Constraints:
@@ -1643,7 +1643,7 @@ struct SIMD[type: DType, size: Int](
         """
         return _hash_simd(self)
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with this SIMD value.
 
         Parameters:
@@ -1782,7 +1782,7 @@ struct SIMD[type: DType, size: Int](
         ](self.value)
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this SIMD value to the provided Writer.
 
@@ -2952,17 +2952,13 @@ fn _tbl1(
 
 @always_inline
 fn _pow[
-    BaseTy: DType, simd_width: Int, ExpTy: DType
-](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> __type_of(
-    base
-):
+    simd_width: Int
+](base: SIMD[_, simd_width], exp: SIMD[_, simd_width]) -> __type_of(base):
     """Computes the power of the elements of a SIMD vector raised to the
     corresponding elements of another SIMD vector.
 
     Parameters:
-        BaseTy: The `dtype` of the `base` SIMD vector.
         simd_width: The width of the input and output SIMD vectors.
-        ExpTy: The `dtype` of the `exp` SIMD vector.
 
     Args:
         base: Base of the power operation.
@@ -2973,9 +2969,9 @@ fn _pow[
     """
 
     @parameter
-    if ExpTy.is_floating_point() and BaseTy == ExpTy:
+    if exp.type.is_floating_point() and base.type is exp.type:
         return _powf(base, exp)
-    elif ExpTy.is_integral():
+    elif exp.type.is_integral():
         # Common cases
         if all(exp == 2):
             return base * base
@@ -3030,12 +3026,15 @@ fn _powf[
 
 
 @always_inline
-fn _powi[type: DType](base: Scalar[type], exp: Int32) -> __type_of(base):
+fn _powi(base: Scalar, exp: Int32) -> __type_of(base):
+    alias type = base.type
+
     if type.is_integral() and exp < 0:
         # Not defined for Integers, this should raise an
         # exception.
         debug_assert(False, "exponent < 0 is undefined for integers")
         return 0
+
     var a = base
     var b = abs(exp) if type.is_floating_point() else exp
     var res: Scalar[type] = 1
@@ -3422,7 +3421,7 @@ fn _floor(x: SIMD) -> __type_of(x):
 fn _write_scalar[
     dtype: DType,
     W: Writer, //,
-](inout writer: W, value: Scalar[dtype]):
+](mut writer: W, value: Scalar[dtype]):
     @parameter
     if dtype == DType.bool:
         if value:

@@ -281,7 +281,7 @@ struct Optional[T: CollectionElement](
 
     fn write_to[
         W: Writer, U: RepresentableCollectionElement, //
-    ](self: Optional[U], inout writer: W):
+    ](self: Optional[U], mut writer: W):
         """Write Optional string representation to a `Writer`.
 
         Parameters:
@@ -333,7 +333,7 @@ struct Optional[T: CollectionElement](
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value.unsafe_get[T]()
 
-    fn take(inout self) -> T:
+    fn take(mut self) -> T:
         """Move the value out of the Optional.
 
         The caller takes ownership over the new value, which is moved
@@ -351,7 +351,7 @@ struct Optional[T: CollectionElement](
             abort(".take() on empty Optional")
         return self.unsafe_take()
 
-    fn unsafe_take(inout self) -> T:
+    fn unsafe_take(mut self) -> T:
         """Unsafely move the value out of the Optional.
 
         The caller takes ownership over the new value, which is moved
