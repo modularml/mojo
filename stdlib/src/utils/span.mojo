@@ -70,7 +70,7 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         mut self,
-    ) -> Pointer[T, origin._mlir_origin]:
+    ) -> Pointer[T, origin]:
         @parameter
         if forward:
             self.index += 1
@@ -259,7 +259,7 @@ struct Span[
 
         return self._data
 
-    fn as_ref(self) -> Pointer[T, origin._mlir_origin]:
+    fn as_ref(self) -> Pointer[T, origin]:
         """
         Gets a Pointer to the first element of this slice.
 
@@ -267,7 +267,7 @@ struct Span[
             A Pointer pointing at the first element of this slice.
         """
 
-        return Pointer[T, origin._mlir_origin].address_of(self._data[0])
+        return Pointer[T, origin].address_of(self._data[0])
 
     @always_inline
     fn copy_from[
@@ -360,13 +360,13 @@ struct Span[
 
     fn get_immutable(
         self,
-    ) -> Span[T, _lit_mut_cast[origin._mlir_origin, False].result]:
+    ) -> Span[T, _lit_mut_cast[origin, False].result]:
         """
         Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
-        return Span[T, _lit_mut_cast[origin._mlir_origin, False].result](
+        return Span[T, _lit_mut_cast[origin, False].result](
             ptr=self._data, length=self._len
         )

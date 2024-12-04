@@ -300,7 +300,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
 struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
@@ -316,7 +316,7 @@ struct Pointer[
         `!lit.ref<`,
         type,
         `, `,
-        origin,
+        origin._mlir_origin,
         `, `,
         address_space._value.value,
         `>`,

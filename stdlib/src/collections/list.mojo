@@ -40,7 +40,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_origin: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability],
     forward: Bool = True,
 ]:
     """Iterator for List.
