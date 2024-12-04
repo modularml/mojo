@@ -605,7 +605,6 @@ fn test_dict_setdefault() raises:
 
 def test_dict_entries_del_count():
     alias dict_type = Dict[Int, ValueDestructorRecorder]
-    var iter = 0
     for entries_to_insert in range(16):
         var x = List[Int]()
         var y = dict_type()
@@ -637,8 +636,6 @@ def test_dict_entries_del_count():
         __type_of(y).__del__(y^)
         assert_equal(len(x), entries_to_insert)
         assert_equal(result, expected_result)
-        iter += 1
-    assert_equal(iter, 16)
 
 
 def main():
