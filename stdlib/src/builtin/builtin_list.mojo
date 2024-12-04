@@ -221,7 +221,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 struct _VariadicListMemIter[
     elt_is_mutable: Bool, //,
     elt_type: AnyType,
-    elt_origin: Origin[elt_is_mutable].type,
+    elt_origin: Origin[elt_is_mutable],
     list_origin: ImmutableOrigin,
 ]:
     """Iterator for VariadicListMem.
@@ -233,7 +233,9 @@ struct _VariadicListMemIter[
         list_origin: The origin of the VariadicListMem.
     """
 
-    alias variadic_list_type = VariadicListMem[elt_type, elt_origin]
+    alias variadic_list_type = VariadicListMem[
+        elt_type, elt_origin._mlir_origin
+    ]
 
     var index: Int
     var src: Pointer[
@@ -267,14 +269,14 @@ struct _VariadicListMemIter[
 # TODO: parametric aliases would be nice.
 struct _lit_origin_union[
     is_mutable: Bool, //,
-    a: Origin[is_mutable].type,
-    b: Origin[is_mutable].type,
+    a: Origin[is_mutable],
+    b: Origin[is_mutable],
 ]:
     alias result = __mlir_attr[
         `#lit.origin.union<`,
-        a,
+        a._mlir_origin,
         `,`,
-        b,
+        b._mlir_origin,
         `> : !lit.origin<`,
         is_mutable.value,
         `>`,
@@ -298,7 +300,7 @@ struct _lit_mut_cast[
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
-    origin: Origin[elt_is_mutable].type,
+    origin: Origin[elt_is_mutable]._mlir_type,
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes references to the elements in a
@@ -483,7 +485,7 @@ alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 @register_passable
 struct VariadicPack[
     elt_is_mutable: Bool, //,
-    origin: Origin[elt_is_mutable].type,
+    origin: Origin[elt_is_mutable]._mlir_type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
 ](Sized):

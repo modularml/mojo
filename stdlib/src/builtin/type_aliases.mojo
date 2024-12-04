@@ -51,7 +51,7 @@ struct Origin[is_mutable: Bool]:
         is_mutable: Whether the origin is mutable.
     """
 
-    alias type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!lit.origin<`,
         is_mutable.value,
         `>`,
@@ -61,7 +61,7 @@ struct Origin[is_mutable: Bool]:
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    var _mlir_origin: Self.type
+    var _mlir_origin: Self._mlir_type
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -73,7 +73,7 @@ struct Origin[is_mutable: Bool]:
     #       Span[Byte, __origin_of(self)]
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self, mlir_origin: Self.type):
+    fn __init__(out self, mlir_origin: Self._mlir_type):
         """Initialize an Origin from a raw MLIR `!lit.origin` value.
 
         Args:
