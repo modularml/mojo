@@ -21,6 +21,9 @@ struct OwnedPointer[T: AnyType]:
     system such that no more than one mutable alias for the underlying data
     may exist.
 
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
+
     Parameters:
         T: The type to be stored in the OwnedPointer[].
     """

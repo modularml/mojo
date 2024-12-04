@@ -60,7 +60,7 @@ detailed information in the following sections:
   [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) instead.
   Functions that previously took a `DTypePointer` now take an equivalent
   `UnsafePointer`. For more information on using pointers, see [Unsafe
-  pointers](/mojo/manual/pointers) in the Mojo Manual.
+  pointers](/mojo/manual/pointers/unsafe-pointers) in the Mojo Manual.
 
 - There are many new standard library APIs, with new features for strings,
   collections, and interacting with the filesystem and environment. Changes are
@@ -518,7 +518,7 @@ detailed information in the following sections:
   - `DTypePointer`, `LegacyPointer`, and `Pointer` have been removed. Use
     [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) instead.
     For more information on using pointers, see [Unsafe
-    pointers](/mojo/manual/pointers) in the Mojo Manual.
+    pointers](/mojo/manual/pointers/unsafe-pointers) in the Mojo Manual.
 
     Functions that previously took a `DTypePointer` now take an
     equivalent `UnsafePointer`. A quick rule for conversion from `DTypePointer` to
@@ -1013,7 +1013,7 @@ Big themes for this release:
 
 - New Mojo Manual pages on [Control flow](/mojo/manual/control-flow),
   [Testing](/mojo/tools/testing) and using
-  [unsafe pointers](/mojo/manual/pointers).
+  [unsafe pointers](/mojo/manual/pointers/unsafe-pointers).
 
 ### Language changes
 
