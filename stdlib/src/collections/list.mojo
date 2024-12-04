@@ -504,7 +504,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn append[
         D: DType, //
-    ](inout self: List[Scalar[D], *_, **_], owned value: SIMD[D, _]):
+    ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _]):
         """Appends a vector to this list.
 
         Parameters:
@@ -520,11 +520,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn append[
         D: DType, //
-    ](
-        inout self: List[Scalar[D], *_, **_],
-        owned value: SIMD[D, _],
-        count: Int,
-    ):
+    ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _], count: Int):
         """Appends count items from a vector to this list.
 
         Parameters:
@@ -537,14 +533,13 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         if len(self) + count > self.capacity:
             self._realloc(self.capacity + count)
-        var ptr = self.unsafe_ptr()
         var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
-        memcpy(ptr, v_ptr, count)
+        memcpy(self.data + len(self), v_ptr, count)
         self._len += count
 
     fn append[
         D: DType, //
-    ](inout self: List[Scalar[D], *_, **_], owned value: Span[Scalar[D]]):
+    ](mut self: List[Scalar[D], *_, **_], value: Span[Scalar[D]]):
         """Appends a Span to this list.
 
         Parameters:
