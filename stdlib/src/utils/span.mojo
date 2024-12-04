@@ -224,12 +224,21 @@ struct Span[
 
     @always_inline
     fn __iter__(self) -> _SpanIter[T, origin]:
-        """Get an iterator over the elements of the span.
+        """Get an iterator over the elements of the Span.
 
         Returns:
-            An iterator over the elements of the span.
+            An iterator over the elements of the Span.
         """
         return _SpanIter(0, self)
+
+    @always_inline
+    fn __reversed__(self) -> _SpanIter[T, origin, forward=False]:
+        """Iterate backwards over the Span.
+
+        Returns:
+            A reversed iterator of the Span elements.
+        """
+        return _SpanIter[forward=False](len(self), self)
 
     # ===------------------------------------------------------------------===#
     # Trait implementations

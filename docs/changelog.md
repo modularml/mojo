@@ -292,6 +292,10 @@ what we publish.
   allows forming a runtime-constant StringLiteral from a compile-time-dynamic
   `Stringable` value.
 
+- `Span` now implements `__reversed__`. This means that one can get a
+  reverse iterator over a `Span` using `reversed(my_span)`. Users should
+  currently prefer this method over `my_span[::-1]`.
+
 ### 🦋 Changed
 
 - The `inout` and `borrowed` argument conventions have been renamed to the `mut`

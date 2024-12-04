@@ -204,6 +204,16 @@ def test_ref():
     assert_true(s.as_ref() == Pointer.address_of(l.unsafe_ptr()[]))
 
 
+def test_reversed():
+    var forward = InlineArray[Int, 3](1, 2, 3)
+    var backward = InlineArray[Int, 3](3, 2, 1)
+    var s = Span[Int](forward)
+    var i = 0
+    for num in reversed(s):
+        assert_equal(num[], backward[i])
+        i += 1
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -215,3 +225,4 @@ def main():
     test_bool()
     test_fill()
     test_ref()
+    test_reversed()
