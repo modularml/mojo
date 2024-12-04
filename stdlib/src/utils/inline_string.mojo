@@ -147,28 +147,16 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             # Begin by heap allocating enough space to store the combined
             # string.
             var buffer = List[UInt8](capacity=total_len)
-
             # Copy the bytes from the current small string layout
-            memcpy(
-                dest=buffer.unsafe_ptr(),
-                src=self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr(),
-                count=len(self),
+            var span_self = Span[Byte, __origin_of(self)](
+                ptr=self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr(),
+                length=len(self),
             )
-
+            buffer.append(span_self)
             # Copy the bytes from the additional string.
-            memcpy(
-                dest=buffer.unsafe_ptr() + len(self),
-                src=str_slice.unsafe_ptr(),
-                count=str_slice.byte_length(),
-            )
-
-            # Record that we've initialized `total_len` count of elements
-            # in `buffer`
-            buffer.size = total_len
-
+            buffer.append(str_slice.as_bytes())
             # Add the NUL byte
             buffer.append(0)
-
             self._storage = Self.Layout(String(buffer^))
 
     fn __add__(self, other: StringLiteral) -> Self:

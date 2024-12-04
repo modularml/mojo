@@ -140,7 +140,7 @@ struct FileHandle:
         """Reads data from a file and sets the file handle seek position. If
         size is left as the default of -1, it will read to the end of the file.
         Setting size to a number larger than what's in the file will set
-        String.size to the total number of bytes, and read all the data.
+        the String length to the total number of bytes, and read all the data.
 
         Args:
             size: Requested number of bytes to read (Default: -1 = EOF).
@@ -284,7 +284,7 @@ struct FileHandle:
         """Reads data from a file and sets the file handle seek position. If
         size is left as default of -1, it will read to the end of the file.
         Setting size to a number larger than what's in the file will be handled
-        and set the List.size to the total number of bytes in the file.
+        and set the List length to the total number of bytes in the file.
 
         Args:
             size: Requested number of bytes to read (Default: -1 = EOF).
