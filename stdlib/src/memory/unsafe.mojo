@@ -111,3 +111,33 @@ fn pack_bits[
     return __mlir_op.`pop.bitcast`[
         _type = __mlir_type[`!pop.scalar<`, new_type.value, `>`]
     ](val.value)
+
+
+@always_inline("nodebug")
+fn unpack_bits[
+    dtype: DType, //, width: Int = bitwidthof[dtype]()
+](res: Scalar[dtype]) -> SIMD[DType.bool, width]:
+    """Pack a scalar value into a SIMD vector of boolean values.
+
+    Parameters:
+        dtype: The data type of the input scalar value.
+        width: The width of the SIMD vector.
+
+    Constraints:
+        The bitwidth of the data type must be equal to the SIMD width.
+
+    Args:
+        res: The input scalar value.
+
+    Returns:
+        A SIMD vector where each element is a boolean value representing the
+        corresponding bit of the input scalar value.
+    """
+    constrained[
+        bitwidthof[dtype]() == width,
+        "the bitwidth of the data type must be equal to the SIMD width",
+    ]()
+    b = __mlir_op.`pop.bitcast`[
+        _type = __mlir_type[`!pop.simd<`, width.value, `, bool>`]
+    ](res.value)
+    return SIMD[DType.bool, width](b)
