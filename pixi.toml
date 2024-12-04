@@ -10,7 +10,6 @@ examples = "./examples/run-examples.sh"
 benchmarks = { cmd = ["./stdlib/scripts/run-benchmarks.sh"], env = { MODULAR_MOJO_NIGHTLY_IMPORT_PATH = "$CONDA_PREFIX/lib/mojo" } }
 
 [dependencies]
-python = ">=3.12.7,<3.13"
-lit = ">=19.1.5,<19.2"
-max = ">=24.6.0.dev2024120306,<24.7"
-charset-normalizer = "*"
+python = ">=3.9,<3.13"
+lit = "*"
+max = "*"

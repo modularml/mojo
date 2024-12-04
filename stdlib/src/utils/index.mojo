@@ -747,7 +747,6 @@ struct IndexList[
             res.write(", ")
         # Print a closing `)`.
         res.write(")")
-        res.write(0)  # for the null terminator.
         return res^
 
     @no_inline
