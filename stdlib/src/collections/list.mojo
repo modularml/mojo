@@ -107,45 +107,6 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
 
-    @always_inline
-    fn __getattr__[name: StringLiteral](self) -> Int:
-        """Get the length of the list.
-
-        Parameters:
-            name: The name of the attribute (`"length"` or `"size"` (soft
-                deprecated)).
-
-        Returns:
-            The attribute value.
-        """
-
-        @parameter
-        if name == "size" or name == "length":
-            return len(self)
-        else:
-            constrained[False, "that attr does not exist"]()
-            return abort[Int]()
-
-    # FIXME: default is only because otherwise += assignments won't work
-    @always_inline
-    fn __setattr__[name: StringLiteral = "size"](inout self, value: Int):
-        """Set the length of the list.
-
-        Parameters:
-            name: The name of the attribute (`"length"` or `"size"` (soft
-                deprecated)).
-
-        Args:
-            value: The value to set the length to.
-        """
-
-        @parameter
-        if name == "size" or name == "length":
-            self._len = value
-        else:
-            constrained[False, "that attr does not exist"]()
-            abort()
-
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
@@ -537,9 +498,65 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             value: The value to append.
         """
         if len(self) >= self.capacity:
-            self._realloc(max(1, self.capacity * 2))
+            self._realloc(self.capacity * 2 + int(capacity == 0))
         (self.data + len(self)).init_pointee_move(value^)
         self._len += 1
+
+    fn append[
+        D: DType, //
+    ](inout self: List[Scalar[D], *_, **_], owned value: SIMD[D, _]):
+        """Appends a vector to this list.
+
+        Parameters:
+            D: The DType.
+
+        Args:
+            value: The value to append.
+        """
+        if len(self) + value.size > self.capacity:
+            self._realloc(self.capacity + value.size)
+        (self.data + len(self)).store(value^)
+        self._len += value.size
+
+    fn append[
+        D: DType, //
+    ](
+        inout self: List[Scalar[D], *_, **_],
+        owned value: SIMD[D, _],
+        count: Int,
+    ):
+        """Appends count items from a vector to this list.
+
+        Parameters:
+            D: The DType.
+
+        Args:
+            value: The value to append.
+            count: The ammount of items to append.
+        """
+
+        if len(self) + count > self.capacity:
+            self._realloc(self.capacity + count)
+        var ptr = self.unsafe_ptr()
+        var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
+        memcpy(ptr, v_ptr, count)
+        self._len += count
+
+    fn append[
+        D: DType, //
+    ](inout self: List[Scalar[D], *_, **_], owned value: Span[Scalar[D]]):
+        """Appends a Span to this list.
+
+        Parameters:
+            D: The DType.
+
+        Args:
+            value: The value to append.
+        """
+        if len(self) + len(value) > self.capacity:
+            self._realloc(self.capacity + len(value))
+        memcpy(self.data + len(self), value.unsafe_ptr(), len(value))
+        self._len += len(value)
 
     fn insert(mut self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
@@ -610,7 +627,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         # visible outside this function if a `__moveinit__()` constructor were
         # to throw (not currently possible AFAIK though) part way through the
         # logic below.
-        other.size = 0
+        other._len = 0
 
         var dest_ptr = self.data + len(self)
 
