@@ -15,16 +15,13 @@
    avoids heap allocations for short strings.
 """
 
-from collections import InlineArray
+from collections import InlineArray, Optional
 from os import abort
-from collections import Optional
 from sys import sizeof
-from sys.ffi import OpaquePointer
 
 from memory import UnsafePointer, memcpy
 
 from utils import StringSlice, Variant
-from utils.format import ToFormatter
 
 # ===----------------------------------------------------------------------===#
 # InlineString
@@ -54,12 +51,13 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a new empty string."""
         var fixed = _FixedString[Self.SMALL_CAP]()
         self._storage = Self.Layout(fixed^)
 
-    fn __init__(inout self, literal: StringLiteral):
+    @implicit
+    fn __init__(out self, literal: StringLiteral):
         """Constructs a InlineString value given a string literal.
 
         Args:
@@ -83,7 +81,8 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             var heap = String(literal)
             self._storage = Self.Layout(heap^)
 
-    fn __init__(inout self, owned heap_string: String):
+    @implicit
+    fn __init__(out self, owned heap_string: String):
         """Construct a new small string by taking ownership of an existing
         heap-allocated String.
 
@@ -92,7 +91,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self._storage = Self.Layout(heap_string^)
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -104,7 +103,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __iadd__(inout self, literal: StringLiteral):
+    fn __iadd__(mut self, literal: StringLiteral):
         """Appends another string to this string.
 
         Args:
@@ -112,7 +111,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(StringRef(literal))
 
-    fn __iadd__(inout self, string: String):
+    fn __iadd__(mut self, string: String):
         """Appends another string to this string.
 
         Args:
@@ -120,7 +119,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(string.as_string_slice())
 
-    fn __iadd__(inout self, str_slice: StringSlice[_]):
+    fn __iadd__(mut self, str_slice: StringSlice[_]):
         """Appends another string to this string.
 
         Args:
@@ -269,7 +268,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -282,7 +281,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -292,10 +291,8 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, __lifetime_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=len(self),
+        return Span[Byte, __origin_of(self)](
+            ptr=self.unsafe_ptr(), length=len(self)
         )
 
 
@@ -308,8 +305,8 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
 struct _FixedString[CAP: Int](
     Sized,
     Stringable,
-    Formattable,
-    ToFormatter,
+    Writable,
+    Writer,
     CollectionElement,
     CollectionElementNew,
 ):
@@ -331,12 +328,12 @@ struct _FixedString[CAP: Int](
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Constructs a new empty string."""
         self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -344,7 +341,7 @@ struct _FixedString[CAP: Int](
         """
         self = other
 
-    fn __init__(inout self, literal: StringLiteral) raises:
+    fn __init__(out self, literal: StringLiteral) raises:
         """Constructs a FixedString value given a string literal.
 
         Args:
@@ -369,27 +366,26 @@ struct _FixedString[CAP: Int](
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
-    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+    fn write[*Ts: Writable](*args: *Ts) -> Self:
         """
-        Construct a string by concatenating a sequence of formattable arguments.
+        Construct a string by concatenating a sequence of Writable arguments.
 
         Args:
-            args: A sequence of formattable arguments.
+            args: A sequence of Writable arguments.
 
         Parameters:
             Ts: The types of the arguments to format. Each type must be satisfy
-              `Formattable`.
+              `Writable`.
 
         Returns:
             A string formed by formatting the argument sequence.
         """
 
         var output = Self()
-        var writer = output._unsafe_to_formatter()
 
         @parameter
-        fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(output)
 
         args.each[write_arg]()
 
@@ -399,7 +395,7 @@ struct _FixedString[CAP: Int](
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __iadd__(inout self, literal: StringLiteral) raises:
+    fn __iadd__(mut self, literal: StringLiteral) raises:
         """Appends another string to this string.
 
         Args:
@@ -407,7 +403,7 @@ struct _FixedString[CAP: Int](
         """
         self.__iadd__(literal.as_string_slice())
 
-    fn __iadd__(inout self, string: String) raises:
+    fn __iadd__(mut self, string: String) raises:
         """Appends another string to this string.
 
         Args:
@@ -416,13 +412,13 @@ struct _FixedString[CAP: Int](
         self.__iadd__(string.as_string_slice())
 
     @always_inline
-    fn __iadd__(inout self, str_slice: StringSlice[_]) raises:
+    fn __iadd__(mut self, str_slice: StringSlice[_]) raises:
         """Appends another string to this string.
 
         Args:
             str_slice: The string to append.
         """
-        var err = self._iadd_non_raising(str_slice)
+        var err = self._iadd_non_raising(str_slice._slice)
         if err:
             raise err.value()
 
@@ -442,17 +438,17 @@ struct _FixedString[CAP: Int](
     # ===------------------------------------------------------------------=== #
 
     fn _iadd_non_raising(
-        inout self,
-        str_slice: StringSlice[_],
+        mut self,
+        bytes: Span[Byte, _],
     ) -> Optional[Error]:
-        var total_len = len(self) + str_slice.byte_length()
+        var total_len = len(self) + len(bytes)
 
         # Ensure there is sufficient capacity to append `str_slice`
         if total_len > CAP:
             return Optional(
                 Error(
                     "Insufficient capacity to append len="
-                    + str(str_slice.byte_length())
+                    + str(len(bytes))
                     + " string to len="
                     + str(len(self))
                     + " FixedString with capacity="
@@ -463,41 +459,43 @@ struct _FixedString[CAP: Int](
         # Append the bytes from `str_slice` at the end of the current string
         memcpy(
             dest=self.buffer.unsafe_ptr() + len(self),
-            src=str_slice.unsafe_ptr(),
-            count=str_slice.byte_length(),
+            src=bytes.unsafe_ptr(),
+            count=len(bytes),
         )
 
         self.size = total_len
 
         return None
 
-    fn format_to(self, inout writer: Formatter):
-        writer.write_str(self.as_string_slice())
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write_bytes(self.as_bytes())
 
-    fn _unsafe_to_formatter(inout self) -> Formatter:
-        fn write_to_string(ptr0: OpaquePointer, strref: StringRef):
-            var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
+    @always_inline
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
+        """
+        Write a byte span to this String.
 
-            var str_slice = StringSlice[ImmutableAnyLifetime](
-                unsafe_from_utf8_strref=strref
-            )
+        Args:
+            bytes: The byte span to write to this String. Must NOT be
+              null terminated.
+        """
+        _ = self._iadd_non_raising(bytes)
 
-            # FIXME(#37990):
-            #   Use `ptr[] += str_slice` and remove _iadd_non_raising after
-            #   "failed to fold operation lit.try" is fixed.
-            # try:
-            #     ptr[] += str_slice
-            # except e:
-            #     abort("error formatting to FixedString: " + str(e))
-            var err = ptr[]._iadd_non_raising(str_slice)
-            if err:
-                abort("error formatting to FixedString: " + str(err.value()))
+    fn write[*Ts: Writable](mut self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
 
-        return Formatter(
-            write_to_string,
-            # Arg data
-            UnsafePointer.address_of(self).bitcast[NoneType](),
-        )
+        Parameters:
+            Ts: Types of the provided argument sequence.
+
+        Args:
+            args: Sequence of arguments to write to this Writer.
+        """
+
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
 
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
@@ -508,7 +506,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -521,7 +519,7 @@ struct _FixedString[CAP: Int](
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -531,8 +529,6 @@ struct _FixedString[CAP: Int](
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, __lifetime_of(self)](
-            unsafe_ptr=self.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=self.size,
+        return Span[Byte, __origin_of(self)](
+            ptr=self.unsafe_ptr(), length=self.size
         )

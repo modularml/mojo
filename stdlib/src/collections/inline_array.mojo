@@ -21,6 +21,7 @@ from collections import InlineArray
 
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
+
 from memory import UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
@@ -67,7 +68,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """This constructor will always cause a compile time error if used.
         It is used to steer users away from uninitialized memory.
         """
@@ -85,7 +86,7 @@ struct InlineArray[
         ]()
 
     @always_inline
-    fn __init__(inout self, *, unsafe_uninitialized: Bool):
+    fn __init__(out self, *, unsafe_uninitialized: Bool):
         """Create an InlineArray with uninitialized memory.
 
         Note that this is highly unsafe and should be used with caution.
@@ -111,7 +112,7 @@ struct InlineArray[
         ]()
 
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned unsafe_assume_initialized: InlineArray[
             UnsafeMaybeUninitialized[Self.ElementType], Self.size
@@ -139,7 +140,8 @@ struct InlineArray[
             )
 
     @always_inline
-    fn __init__(inout self, fill: Self.ElementType):
+    @implicit
+    fn __init__(out self, fill: Self.ElementType):
         """Constructs an empty array where each element is the supplied `fill`.
 
         Args:
@@ -157,7 +159,8 @@ struct InlineArray[
             ptr.init_pointee_copy(fill)
 
     @always_inline
-    fn __init__(inout self, owned *elems: Self.ElementType):
+    @implicit
+    fn __init__(out self, owned *elems: Self.ElementType):
         """Constructs an array given a set of arguments.
 
         Args:
@@ -168,7 +171,7 @@ struct InlineArray[
 
     @always_inline
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned storage: VariadicListMem[Self.ElementType, _],
     ):
@@ -194,7 +197,7 @@ struct InlineArray[
         # Mark the elements as already destroyed.
         storage._is_owned = False
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.
 
         Args:
@@ -207,7 +210,7 @@ struct InlineArray[
             var ptr = self.unsafe_ptr() + idx
             ptr.init_pointee_copy(other[idx])
 
-    fn __copyinit__(inout self, other: Self):
+    fn __copyinit__(out self, other: Self):
         """Copy construct the array.
 
         Args:
@@ -232,7 +235,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __getitem__(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
+    fn __getitem__(ref self, idx: Int) -> ref [self] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
         Args:
@@ -245,9 +248,7 @@ struct InlineArray[
         return self.unsafe_get(normalized_index)
 
     @always_inline
-    fn __getitem__[
-        idx: Int,
-    ](ref [_]self: Self) -> ref [self] Self.ElementType:
+    fn __getitem__[idx: Int](ref self) -> ref [self] Self.ElementType:
         """Get a `Pointer` to the element at the given index.
 
         Parameters:
@@ -284,7 +285,7 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.ElementType:
+    fn unsafe_get(ref self, idx: Int) -> ref [self] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is

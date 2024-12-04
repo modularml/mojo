@@ -10,15 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !system-windows
 # RUN: %mojo %s
 
 
 import os
+from os.env import getenv, setenv
 from os.path import expanduser, join
-from os.env import setenv, getenv
-from testing import assert_equal, assert_raises, assert_true
 from sys.info import os_is_windows
+
+from testing import assert_equal, assert_raises, assert_true
 
 
 fn get_user_path() -> String:

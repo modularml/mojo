@@ -69,7 +69,7 @@ let foo: Foo = 10
 ```python
 struct Foo:
   @implicit_conversion
-  fn __init__(inout self, i: Int):
+  fn __init__(out self, i: Int):
     pass
 
 var foo: Foo = 10

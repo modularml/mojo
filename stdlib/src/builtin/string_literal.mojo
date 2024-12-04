@@ -15,15 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections import List
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_char
 
-from memory import memcpy, UnsafePointer
-from collections import List
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Formattable, Formatter
-from utils._visualizers import lldb_formatter_wrapping_type
+from memory import UnsafePointer, memcpy
 
-from collections.string import _atol, _StringSliceIter
+from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
+from utils._visualizers import lldb_formatter_wrapping_type
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from utils.string_slice import _StringSliceIter, _to_string_list
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -36,13 +37,15 @@ struct StringLiteral(
     Boolable,
     Comparable,
     CollectionElementNew,
-    Formattable,
+    Writable,
     IntableRaising,
     KeyElement,
     Representable,
     Sized,
     Stringable,
     FloatableRaising,
+    BytesCollectionElement,
+    _HashableWithHasher,
 ):
     """This type represents a string literal.
 
@@ -62,7 +65,8 @@ struct StringLiteral(
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self.type):
+    @implicit
+    fn __init__(out self, value: Self.type):
         """Create a string literal from a builtin string type.
 
         Args:
@@ -71,13 +75,36 @@ struct StringLiteral(
         self.value = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy constructor.
 
         Args:
             other: The string literal to copy.
         """
         self = other
+
+    # TODO(MOCO-1460): This should be: fn __init__[*, value: String](out self):
+    # but Mojo tries to bind the parameter in `StringLiteral["foo"]()` to the
+    # type instead of the initializer.  Use a static method to work around this
+    # for now.
+    @always_inline("nodebug")
+    @staticmethod
+    fn from_string[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The string value to use.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return __mlir_attr[
+            `#kgen.param.expr<data_to_str,`,
+            value.byte_length().value,
+            `,`,
+            value.unsafe_ptr().address,
+            `> : !kgen.string`,
+        ]
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -94,6 +121,76 @@ struct StringLiteral(
             The concatenated string.
         """
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __iadd__(mut self, rhs: StringLiteral):
+        """Concatenate a string literal to an existing one. Can only be
+        evaluated at compile time using the `alias` keyword, which will write
+        the result into the binary.
+
+        Args:
+            rhs: The string to concat.
+
+        Example:
+
+        ```mojo
+        fn add_literal(
+            owned original: StringLiteral, add: StringLiteral, n: Int
+        ) -> StringLiteral:
+            for _ in range(n):
+                original += add
+            return original
+
+
+        fn main():
+            alias original = "mojo"
+            alias concat = add_literal(original, "!", 4)
+            print(concat)
+        ```
+
+        Result:
+
+        ```
+        mojo!!!!
+        ```
+        """
+        self = self + rhs
+
+    @always_inline("nodebug")
+    fn __mul__(self, n: IntLiteral) -> StringLiteral:
+        """Concatenates the string literal `n` times. Can only be evaluated at
+        compile time using the `alias` keyword, which will write the result into
+        The binary.
+
+        Args:
+            n : The number of times to concatenate the string literal.
+
+        Returns:
+            The string concatenated `n` times.
+
+        Examples:
+
+        ```mojo
+        alias concat = "mojo" * 3
+        print(concat) # mojomojomojo
+        ```
+        .
+        """
+        var concat = ""
+        for _ in range(n):
+            concat += self
+        return concat
+
+    fn __mul__(self, n: Int) -> String:
+        """Concatenates the string `n` times.
+
+        Args:
+            n : The number of times to concatenate the string.
+
+        Returns:
+            The string concatenated `n` times.
+        """
+        return self.as_string_slice() * n
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: StringLiteral) -> Bool:
@@ -118,6 +215,30 @@ struct StringLiteral(
             True if they are not equal.
         """
         return StringRef(self) != StringRef(rhs)
+
+    @always_inline("nodebug")
+    fn __eq__(self, rhs: StringSlice) -> Bool:
+        """Compare two string literals for equality.
+
+        Args:
+            rhs: The string to compare.
+
+        Returns:
+            True if they are equal.
+        """
+        return not (self != rhs)
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: StringSlice) -> Bool:
+        """Compare two string literals for inequality.
+
+        Args:
+            rhs: The string to compare.
+
+        Returns:
+            True if they are not equal.
+        """
+        return self.as_string_slice() != rhs
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: StringLiteral) -> Bool:
@@ -203,27 +324,25 @@ struct StringLiteral(
         """
         return len(self) != 0
 
+    @always_inline
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
-
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        If the string cannot be parsed as an int, an error is raised.
 
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return int(self.as_string_slice())
 
+    @always_inline
     fn __float__(self) raises -> Float64:
-        """Parses the string as a float point number and returns that value.
-
-        If the string cannot be parsed as a float, an error is raised.
+        """Parses the string as a float point number and returns that value. If
+        the string cannot be parsed as a float, an error is raised.
 
         Returns:
             A float value that represents the string, or otherwise raises.
         """
-        return atof(self)
+        return float(self.as_string_slice())
 
     @no_inline
     fn __str__(self) -> String:
@@ -269,6 +388,17 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
+    fn __hash__[H: _Hasher](self, mut hasher: H):
+        """Updates hasher with the underlying bytes.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_bytes(self.unsafe_ptr(), self.byte_length())
+
     fn __fspath__(self) -> String:
         """Return the file system path representation of the object.
 
@@ -277,13 +407,23 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[StaticConstantLifetime]:
+    fn __iter__(ref self) -> _StringSliceIter[StaticConstantOrigin]:
         """Return an iterator over the string literal.
 
         Returns:
             An iterator over the string.
         """
-        return _StringSliceIter[StaticConstantLifetime](
+        return _StringSliceIter[StaticConstantOrigin](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantOrigin, False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator over the string.
+        """
+        return _StringSliceIter[StaticConstantOrigin, False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -318,7 +458,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
 
@@ -333,7 +473,7 @@ struct StringLiteral(
         return ptr.bitcast[UInt8]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantLifetime.
+    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
@@ -355,12 +495,10 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StaticString(
-            unsafe_from_utf8_ptr=self.unsafe_ptr(), len=self.byte_length()
-        )
+        return StaticString(ptr=self.unsafe_ptr(), length=self.byte_length())
 
     @always_inline
-    fn as_bytes(self) -> Span[UInt8, StaticConstantLifetime]:
+    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
         """
         Returns a contiguous Span of the bytes owned by this string.
 
@@ -368,20 +506,63 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, StaticConstantLifetime](
-            unsafe_ptr=self.unsafe_ptr(),
-            len=self.byte_length(),
+        return Span[Byte, StaticConstantOrigin](
+            ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn format_to(self, inout writer: Formatter):
+    @always_inline
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
-        Formats this string literal to the provided formatter.
+        # Does NOT include the NUL terminator.
+        return Span[Byte, __origin_of(self)](
+            ptr=self.unsafe_ptr(), length=self.byte_length()
+        )
+
+    @always_inline
+    fn format[*Ts: _CurlyEntryFormattable](self, *args: *Ts) raises -> String:
+        """Format a template with `*args`.
 
         Args:
-            writer: The formatter to write to.
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of substitution values that implement `Representable`
+                and `Stringable` (to be changed and made more flexible).
+
+        Returns:
+            The template with the given values substituted.
+
+        Examples:
+
+        ```mojo
+        # Manual indexing:
+        print("{0} {1} {0}".format("Mojo", 1.125)) # Mojo 1.125 Mojo
+        # Automatic indexing:
+        print("{} {}".format(True, "hello world")) # True hello world
+        ```
+        .
+        """
+        return _FormatCurlyEntry.format(self, args)
+
+    fn write_to[W: Writer](self, mut writer: W):
+        """
+        Formats this string literal to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
         """
 
-        writer.write_str(self.as_string_slice())
+        writer.write(self.as_string_slice())
 
     fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
@@ -434,16 +615,50 @@ struct StringLiteral(
         Returns:
             The joined string.
         """
+        return str(self).join(elems)
+
+    fn join(self, *elems: Int) -> String:
+        """Joins the elements from the tuple using the current string literal as a
+        delimiter.
+
+        Args:
+            elems: The input tuple.
+
+        Returns:
+            The joined string.
+        """
+        if len(elems) == 0:
+            return ""
+        var curr = str(elems[0])
+        for i in range(1, len(elems)):
+            curr += self + str(elems[i])
+        return curr
+
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            Types: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
         var result: String = ""
         var is_first = True
 
-        for e in elems:
+        @parameter
+        fn add_elt[T: Stringable](a: T):
             if is_first:
                 is_first = False
             else:
                 result += self
-            result += str(e[])
+            result += str(a)
 
+        elems.each[add_elt]()
         return result
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
@@ -492,7 +707,7 @@ struct StringLiteral(
         # Splitting a string with leading, trailing, and middle whitespaces
         _ = "      hello    world     ".split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
-        _ = "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world".split()
+        _ = "hello \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world".split()
         # ["hello", "world"]
         ```
         .
@@ -501,9 +716,9 @@ struct StringLiteral(
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string literal at line boundaries. This corresponds to Python's
-        [universal newlines](
+        [universal newlines:](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `"\\t\\n\\r\\r\\n\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
+        `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -511,7 +726,7 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return self.as_string_slice().splitlines(keepends)
+        return _to_string_list(self.as_string_slice().splitlines(keepends))
 
     fn count(self, substr: String) -> Int:
         """Return the number of non-overlapping occurrences of substring
@@ -705,3 +920,14 @@ struct StringLiteral(
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
+
+
+fn _to_string_literal[val: Int]() -> StringLiteral:
+    alias s = StringLiteral.from_string[str(val)]()
+    return s
+
+
+fn _to_string_literal[val: SIMD]() -> StringLiteral:
+    constrained[val.type.is_integral(), "input type must be integral"]()
+    alias s = StringLiteral.from_string[str(val)]()
+    return s

@@ -11,9 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from time.time import _CTimeSpec
 from collections import InlineArray
 from sys.ffi import external_call
+from time.time import _CTimeSpec
 
 from .fstat import stat_result
 
@@ -47,7 +47,7 @@ struct _c_stat(Stringable):
     var st_birthtimespec: _CTimeSpec  # time of file creation(birth)
     var unused: InlineArray[Int64, 3]  # RESERVED: DO NOT USE!
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.st_dev = 0
         self.st_mode = 0
         self.st_nlink = 0

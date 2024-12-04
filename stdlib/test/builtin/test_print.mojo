@@ -14,11 +14,11 @@
 
 
 import sys
-
 from tempfile import NamedTemporaryFile
-from testing import assert_equal
 
 from builtin._location import __call_location, _SourceLocation
+from testing import assert_equal
+
 from utils import IndexList, StringRef
 
 
@@ -47,7 +47,7 @@ struct PrintChecker:
     var call_location: _SourceLocation
 
     @always_inline
-    fn __init__(inout self) raises:
+    fn __init__(out self) raises:
         self.tmp = NamedTemporaryFile("rw")
         self.call_location = __call_location()
         self.cursor = 0
@@ -55,7 +55,7 @@ struct PrintChecker:
     fn __enter__(owned self) -> Self:
         return self^
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         self.tmp = existing.tmp^
         self.cursor = existing.cursor
         self.call_location = existing.call_location
@@ -63,7 +63,7 @@ struct PrintChecker:
     fn stream(self) -> FileDescriptor:
         return self.tmp._file_handle._get_raw_fd()
 
-    fn check_line(inout self, expected: String, msg: String = "") raises:
+    fn check_line(mut self, expected: String, msg: String = "") raises:
         print(end="", file=self.stream(), flush=True)
         _ = self.tmp.seek(self.cursor)
         var result = self.tmp.read()[:-1]
@@ -72,7 +72,7 @@ struct PrintChecker:
         self.cursor += len(result) + 1
 
     fn check_line_starts_with(
-        inout self, prefix: String, msg: String = ""
+        mut self, prefix: String, msg: String = ""
     ) raises:
         print(end="", file=self.stream(), flush=True)
         _ = self.tmp.seek(self.cursor)
@@ -104,11 +104,11 @@ def test_print():
         var float32: Float32 = 99.9
         var float64: Float64 = -129.2901823
         print(">", 3.14, file=checker.stream())
-        checker.check_line_starts_with("> 3.14000")
+        checker.check_line("> 3.14")
         print(">", float32, file=checker.stream())
-        checker.check_line_starts_with("> 99.90000")
+        checker.check_line("> 99.9")
         print(">", float64, file=checker.stream())
-        checker.check_line_starts_with("> -129.29018")
+        checker.check_line("> -129.2901823")
         print(">", IndexList[3](1, 2, 3), file=checker.stream())
         checker.check_line_starts_with("> (1, 2, 3)")
 
@@ -117,7 +117,7 @@ def test_print():
 
         var pi = 3.1415916535897743
         print(">", pi, file=checker.stream())
-        checker.check_line_starts_with("> 3.1415916535")
+        checker.check_line("> 3.1415916535897743")
         var x = (pi - 3.141591) * 1e6
         print(">", x, file=checker.stream())
         checker.check_line_starts_with("> 0.6535")

@@ -10,15 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %bare-mojo %s
+# RUN: %mojo %s
 
-# TODO: Replace %bare-mojo with %mojo
-# when  https://github.com/modularml/mojo/issues/2751 is fixed.
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+
 from memory import UnsafePointer
 from python import Python
 from testing import (
@@ -29,12 +28,12 @@ from testing import (
     assert_true,
 )
 
-from utils import StringRef
+from utils import StringRef, StringSlice
 
 
 @value
 struct AString(Stringable):
-    fn __str__(self: Self) -> String:
+    fn __str__(self) -> String:
         return "a string"
 
 
@@ -96,8 +95,12 @@ def test_constructors():
     ptr[1] = ord("b")
     ptr[2] = ord("c")
     ptr[3] = 0
-    var s3 = String(ptr, 4)
+    var s3 = String(ptr=ptr, length=4)
     assert_equal(s3, "abc")
+
+    # Construction with capacity
+    var s4 = String(capacity=1)
+    assert_equal(s4._buffer.capacity, 1)
 
 
 def test_copy():
@@ -193,6 +196,19 @@ def test_add():
     assert_equal("abc is a string", str(s8) + str(s9))
 
 
+def test_add_string_slice():
+    var s1 = String("123")
+    var s2 = StringSlice("abc")
+    var s3: StringLiteral = "abc"
+    assert_equal("123abc", s1 + s2)
+    assert_equal("123abc", s1 + s3)
+    assert_equal("abc123", s2 + s1)
+    assert_equal("abc123", s3 + s1)
+    s1 += s2
+    s1 += s3
+    assert_equal("123abcabc", s1)
+
+
 def test_string_join():
     var sep = String(",")
     var s0 = String("abc")
@@ -214,6 +230,9 @@ def test_string_join():
 
     var s5 = String(",").join(List[UInt8](1))
     assert_equal(s5, "1")
+
+    var s6 = String(",").join(List[String]("1", "2", "3"))
+    assert_equal(s6, "1,2,3")
 
 
 def test_string_literal_join():
@@ -253,7 +272,7 @@ def test_stringref():
 
 def test_stringref_from_dtypepointer():
     var a = StringRef("AAA")
-    var b = StringRef(a.data)
+    var b = StringRef(ptr=a.data)
     assert_equal(3, len(a))
     assert_equal(3, len(b))
     assert_equal(a, b)
@@ -830,71 +849,41 @@ def test_split():
 
 
 def test_splitlines():
+    alias L = List[String]
     # Test with no line breaks
-    var in1 = String("hello world")
-    var res1 = in1.splitlines()
-    assert_equal(len(res1), 1)
-    assert_equal(res1[0], "hello world")
+    assert_equal(String("hello world").splitlines(), L("hello world"))
 
-    # Test with \n line break
-    var in2 = String("hello\nworld")
-    var res2 = in2.splitlines()
-    assert_equal(len(res2), 2)
-    assert_equal(res2[0], "hello")
-    assert_equal(res2[1], "world")
-
-    # Test with \r\n line break
-    var in3 = String("hello\r\nworld")
-    var res3 = in3.splitlines()
-    assert_equal(len(res3), 2)
-    assert_equal(res3[0], "hello")
-    assert_equal(res3[1], "world")
-
-    # Test with \r line break
-    var in4 = String("hello\rworld")
-    var res4 = in4.splitlines()
-    assert_equal(len(res4), 2)
-    assert_equal(res4[0], "hello")
-    assert_equal(res4[1], "world")
+    # Test with line breaks
+    assert_equal(String("hello\nworld").splitlines(), L("hello", "world"))
+    assert_equal(String("hello\rworld").splitlines(), L("hello", "world"))
+    assert_equal(String("hello\r\nworld").splitlines(), L("hello", "world"))
 
     # Test with multiple different line breaks
-    var in5 = String("hello\nworld\r\nmojo\rlanguage")
-    var res5 = in5.splitlines()
-    assert_equal(len(res5), 4)
-    assert_equal(res5[0], "hello")
-    assert_equal(res5[1], "world")
-    assert_equal(res5[2], "mojo")
-    assert_equal(res5[3], "language")
-
-    # Test with keepends=True
-    var res6 = in5.splitlines(keepends=True)
-    assert_equal(len(res6), 4)
-    assert_equal(res6[0], "hello\n")
-    assert_equal(res6[1], "world\r\n")
-    assert_equal(res6[2], "mojo\r")
-    assert_equal(res6[3], "language")
+    s1 = String("hello\nworld\r\nmojo\rlanguage\r\n")
+    hello_mojo = L("hello", "world", "mojo", "language")
+    assert_equal(s1.splitlines(), hello_mojo)
+    assert_equal(
+        s1.splitlines(keepends=True),
+        L("hello\n", "world\r\n", "mojo\r", "language\r\n"),
+    )
 
     # Test with an empty string
-    var in7 = String("")
-    var res7 = in7.splitlines()
-    assert_equal(len(res7), 0)
-
+    assert_equal(String("").splitlines(), L())
     # test \v \f \x1c \x1d
-    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
-    var res8 = in8.splitlines()
-    assert_equal(len(res8), 4)
-    assert_equal(res8[0], "hello")
-    assert_equal(res8[1], "world")
-    assert_equal(res8[2], "mojo")
-    assert_equal(res8[3], "language")
+    s2 = String("hello\vworld\fmojo\x1clanguage\x1d")
+    assert_equal(s2.splitlines(), hello_mojo)
+    assert_equal(
+        s2.splitlines(keepends=True),
+        L("hello\v", "world\f", "mojo\x1c", "language\x1d"),
+    )
 
-    # test \x1e \x1d
-    var in9 = String("hello\x1eworld\x1dmojo")
-    var res9 = in9.splitlines()
-    assert_equal(len(res9), 3)
-    assert_equal(res9[0], "hello")
-    assert_equal(res9[1], "world")
-    assert_equal(res9[2], "mojo")
+    # test \x1c \x1d \x1e
+    s3 = String("hello\x1cworld\x1dmojo\x1elanguage\x1e")
+    assert_equal(s3.splitlines(), hello_mojo)
+    assert_equal(
+        s3.splitlines(keepends=True),
+        L("hello\x1c", "world\x1d", "mojo\x1e", "language\x1e"),
+    )
 
     # test \x85 \u2028 \u2029
     var next_line = List[UInt8](0xC2, 0x85, 0)
@@ -905,28 +894,13 @@ def test_splitlines():
     """TODO: \\u2029"""
 
     for i in List(next_line, unicode_line_sep, unicode_paragraph_sep):
-        var in9 = "hello\x1eworld" + String(i[]) + "mojo"
-        var res9 = in9.splitlines()
-        assert_equal(len(res9), 3)
-        assert_equal(res9[0], "hello")
-        assert_equal(res9[1], "world")
-        assert_equal(res9[2], "mojo")
-
-    # test with keepends=True
-    var res10 = in8.splitlines(keepends=True)
-    assert_equal(len(res10), 4)
-    assert_equal(res10[0], "hello\v")
-    assert_equal(res10[1], "world\f")
-    assert_equal(res10[2], "mojo\x1c")
-    assert_equal(res10[3], "language\x1d")
-
-    var res11 = ("hello\x1eworld" + String(next_line) + "mojo").splitlines(
-        keepends=True
-    )
-    assert_equal(len(res11), 3)
-    assert_equal(res11[0], "hello\x1e")
-    assert_equal(res11[1], "world" + String(next_line))
-    assert_equal(res11[2], "mojo")
+        u = String(i[])
+        item = String("").join("hello", u, "world", u, "mojo", u, "language", u)
+        assert_equal(item.splitlines(), hello_mojo)
+        assert_equal(
+            item.splitlines(keepends=True),
+            L("hello" + u, "world" + u, "mojo" + u, "language" + u),
+        )
 
 
 def test_isupper():
@@ -945,6 +919,8 @@ def test_isupper():
     assert_false(String("AsDG").isupper())
     assert_true(String("ABC123").isupper())
     assert_false(String("1!").isupper())
+    assert_true(String("É").isupper())
+    assert_false(String("é").isupper())
 
 
 def test_islower():
@@ -963,6 +939,8 @@ def test_islower():
     assert_false(String("asdFDg").islower())
     assert_true(String("abc123").islower())
     assert_false(String("1!").islower())
+    assert_true(String("é").islower())
+    assert_false(String("É").islower())
 
 
 def test_lower():
@@ -972,8 +950,8 @@ def test_lower():
 
     assert_equal(String("MOJO🔥").lower(), "mojo🔥")
 
-    # TODO(#26444): Non-ASCII not supported yet
-    assert_equal(String("É").lower(), "É")
+    assert_equal(String("É").lower(), "é")
+    assert_equal(String("é").lower(), "é")
 
 
 def test_upper():
@@ -983,8 +961,8 @@ def test_upper():
 
     assert_equal(String("mojo🔥").upper(), "MOJO🔥")
 
-    # TODO(#26444): Non-ASCII not supported yet
     assert_equal(String("É").upper(), "É")
+    assert_equal(String("é").upper(), "É")
 
 
 def test_isspace():
@@ -1295,19 +1273,23 @@ def test_string_iter():
 
     var idx = -1
     vs = String("mojo🔥")
-    for item in vs:
-        idx += 1
-        if idx == 0:
-            assert_equal("m", item)
-        elif idx == 1:
-            assert_equal("o", item)
-        elif idx == 2:
-            assert_equal("j", item)
-        elif idx == 3:
-            assert_equal("o", item)
-        elif idx == 4:
-            assert_equal("🔥", item)
-    assert_equal(4, idx)
+    var iterator = vs.__iter__()
+    assert_equal(5, len(iterator))
+    var item = iterator.__next__()
+    assert_equal("m", item)
+    assert_equal(4, len(iterator))
+    item = iterator.__next__()
+    assert_equal("o", item)
+    assert_equal(3, len(iterator))
+    item = iterator.__next__()
+    assert_equal("j", item)
+    assert_equal(2, len(iterator))
+    item = iterator.__next__()
+    assert_equal("o", item)
+    assert_equal(1, len(iterator))
+    item = iterator.__next__()
+    assert_equal("🔥", item)
+    assert_equal(0, len(iterator))
 
     var items = List[String](
         "mojo🔥",
@@ -1335,17 +1317,20 @@ def test_string_iter():
         "álO",
         "етйувтсвардЗ",
     )
-    var utf8_sequence_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    var items_amount_characters = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
     for item_idx in range(len(items)):
         var item = items[item_idx]
-        var utf8_sequence_len = 0
+        var ptr = item.unsafe_ptr()
+        var amnt_characters = 0
         var byte_idx = 0
         for v in item:
             var byte_len = v.byte_length()
-            assert_equal(item[byte_idx : byte_idx + byte_len], v)
+            for i in range(byte_len):
+                assert_equal(ptr[byte_idx + i], v.unsafe_ptr()[i])
             byte_idx += byte_len
-            utf8_sequence_len += 1
-        assert_equal(utf8_sequence_len, utf8_sequence_lengths[item_idx])
+            amnt_characters += 1
+
+        assert_equal(amnt_characters, items_amount_characters[item_idx])
         var concat = String("")
         for v in item.__reversed__():
             concat += v
@@ -1379,49 +1364,35 @@ def test_format_args():
     with assert_raises(contains="Index first not in kwargs"):
         _ = String("A {first} B {second}").format(1, 2)
 
-    assert_equal(
-        String(" {} , {} {} !").format(
-            "Hello",
-            "Beautiful",
-            "World",
-        ),
-        " Hello , Beautiful World !",
-    )
+    var s = String(" {} , {} {} !").format("Hello", "Beautiful", "World")
+    assert_equal(s, " Hello , Beautiful World !")
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    fn curly(c: StringLiteral) -> StringLiteral:
+        return "there is a single curly " + c + " left unclosed or unescaped"
+
+    with assert_raises(contains=curly("{")):
         _ = String("{ {}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{ {0}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{}{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("{}}").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{} {").format(1)
 
-    with assert_raises(
-        contains="there is a single curly { left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("{")):
         _ = String("{").format(1)
 
-    with assert_raises(
-        contains="there is a single curly } left unclosed or unescaped"
-    ):
+    with assert_raises(contains=curly("}")):
         _ = String("}").format(1)
+
+    with assert_raises(contains=""):
+        _ = String("{}").format()
 
     assert_equal(String("}}").format(), "}")
     assert_equal(String("{{").format(), "{")
@@ -1452,13 +1423,8 @@ def test_format_args():
     output = String(vinput).format()
     assert_equal(len(output), 0)
 
-    assert_equal(
-        String("{0} {1} ❤️‍🔥 {1} {0}").format(
-            "🔥",
-            "Mojo",
-        ),
-        "🔥 Mojo ❤️‍🔥 Mojo 🔥",
-    )
+    var res = "🔥 Mojo ❤️‍🔥 Mojo 🔥"
+    assert_equal(String("{0} {1} ❤️‍🔥 {1} {0}").format("🔥", "Mojo"), res)
 
     assert_equal(String("{0} {1}").format(True, 1.125), "True 1.125")
 
@@ -1484,25 +1450,24 @@ def test_format_conversion_flags():
     assert_equal(String("{} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{!s} {!r}").format(a, a), "Mojo 'Mojo'")
     assert_equal(String("{0!s} {0!r}").format(a), "Mojo 'Mojo'")
+    assert_equal(String("{0!s} {0!r}").format(a, "Mojo2"), "Mojo 'Mojo'")
 
     var b = 21.1
     assert_true(
-        "21.100000000000001 SIMD[DType.float64, 1](2"
-        in String("{} {!r}").format(b, b),
+        "21.1 SIMD[DType.float64, 1](2" in String("{} {!r}").format(b, b),
     )
     assert_true(
-        "21.100000000000001 SIMD[DType.float64, 1](2"
-        in String("{!s} {!r}").format(b, b),
+        "21.1 SIMD[DType.float64, 1](2" in String("{!s} {!r}").format(b, b),
     )
 
     var c = 1e100
     assert_equal(
         String("{} {!r}").format(c, c),
-        "1e+100 SIMD[DType.float64, 1](1.0000000000000000e+100)",
+        "1e+100 SIMD[DType.float64, 1](1e+100)",
     )
     assert_equal(
         String("{!s} {!r}").format(c, c),
-        "1e+100 SIMD[DType.float64, 1](1.0000000000000000e+100)",
+        "1e+100 SIMD[DType.float64, 1](1e+100)",
     )
 
     var d = 42
@@ -1532,7 +1497,7 @@ def test_format_conversion_flags():
 
     assert_equal(
         String("{3} {2} {1} {0}").format(a, d, c, b),
-        "21.100000000000001 1e+100 42 Mojo",
+        "21.1 1e+100 42 Mojo",
     )
 
     assert_true(
@@ -1614,12 +1579,27 @@ def test_float_conversion():
         _ = float(String("not a float"))
 
 
+def test_slice_contains():
+    assert_true(String("hello world").as_string_slice().__contains__("world"))
+    assert_false(
+        String("hello world").as_string_slice().__contains__("not-found")
+    )
+
+
+def test_reserve():
+    var s = String()
+    assert_equal(s._buffer.capacity, 0)
+    s.reserve(1)
+    assert_equal(s._buffer.capacity, 1)
+
+
 def main():
     test_constructors()
     test_copy()
     test_equality_operators()
     test_comparison_operators()
     test_add()
+    test_add_string_slice()
     test_stringable()
     test_repr()
     test_string_join()
@@ -1668,3 +1648,4 @@ def main():
     test_ljust()
     test_center()
     test_float_conversion()
+    test_slice_contains()

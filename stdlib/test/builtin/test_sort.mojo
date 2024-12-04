@@ -45,7 +45,7 @@ fn random_numbers[
     return result
 
 
-# fn assert_sorted[dtype: DType](inout list: List[Scalar[dtype]]) raises:
+# fn assert_sorted[dtype: DType](mut list: List[Scalar[dtype]]) raises:
 #     sort[dtype](list)
 #     for i in range(1, len(list)):
 #         assert_true(
@@ -53,7 +53,7 @@ fn random_numbers[
 #         )
 
 
-fn assert_sorted_string(inout list: List[String]) raises:
+fn assert_sorted_string(mut list: List[String]) raises:
     for i in range(1, len(list)):
         assert_true(
             list[i] >= list[i - 1], str(list[i - 1]) + " > " + str(list[i])
@@ -62,7 +62,7 @@ fn assert_sorted_string(inout list: List[String]) raises:
 
 fn assert_sorted[
     type: ComparableCollectionElement
-](inout list: List[type]) raises:
+](mut list: List[type]) raises:
     for i in range(1, len(list)):
         assert_true(list[i] >= list[i - 1], "error at index: " + str(i))
 
@@ -497,7 +497,7 @@ fn test_sort_stress() raises:
 struct MyStruct(CollectionElement):
     var val: Int
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.val = other.val
 
 
@@ -550,7 +550,7 @@ struct Person(ComparableCollectionElement):
     var name: String
     var age: Int
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.name = String(other=other.name)
         self.age = other.age
 

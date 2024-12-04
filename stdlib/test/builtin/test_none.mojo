@@ -31,16 +31,24 @@ def test_repr():
 
 
 def test_format_to():
-    assert_equal(String.format_sequence(NoneType()), "None")
+    assert_equal(String.write(NoneType()), "None")
 
 
 struct FromNone:
     var value: Int
 
-    fn __init__(inout self, none: NoneType):
+    @implicit
+    fn __init__(out self, none: NoneType):
         self.value = -1
 
-    fn __init__(inout self, value: Int):
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @always_inline
+    @implicit
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        self = NoneType()
+
+    @implicit
+    fn __init__(out self, value: Int):
         self.value = value
 
 

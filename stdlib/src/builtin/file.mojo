@@ -31,12 +31,13 @@ with open("my_file.txt", "r") as f:
 
 """
 
-from os import PathLike
+from os import PathLike, abort
 from sys import external_call, sizeof
 from sys.ffi import OpaquePointer
-from utils import Span, StringRef
 
 from memory import AddressSpace, UnsafePointer
+
+from utils import Span, StringRef, StringSlice, write_buffered
 
 
 @register_passable
@@ -44,7 +45,7 @@ struct _OwnedStringRef(Boolable):
     var data: UnsafePointer[UInt8]
     var length: Int
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.data = UnsafePointer[UInt8]()
         self.length = 0
 
@@ -73,20 +74,20 @@ struct FileHandle:
     var handle: OpaquePointer
     """The underlying pointer to the file handle."""
 
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor."""
         self.handle = OpaquePointer()
 
-    fn __init__(inout self, path: String, mode: String) raises:
+    fn __init__(out self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
 
         Args:
           path: The file path.
           mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
-        self.__init__(path._strref_dangerous(), mode._strref_dangerous())
+        self.__init__(path.as_string_slice(), mode.as_string_slice())
 
-    fn __init__(inout self, path: StringRef, mode: StringRef) raises:
+    fn __init__(out self, path: StringSlice, mode: StringSlice) raises:
         """Construct the FileHandle using the file path and string.
 
         Args:
@@ -111,7 +112,7 @@ struct FileHandle:
         except:
             pass
 
-    fn close(inout self) raises:
+    fn close(mut self) raises:
         """Closes the file handle."""
         if not self.handle:
             return
@@ -126,7 +127,7 @@ struct FileHandle:
 
         self.handle = OpaquePointer()
 
-    fn __moveinit__(inout self, owned existing: Self):
+    fn __moveinit__(out self, owned existing: Self):
         """Moves constructor for the file handle.
 
         Args:
@@ -201,7 +202,7 @@ struct FileHandle:
         if err_msg:
             raise err_msg^.consume_as_error()
 
-        return String(buf, int(size_copy) + 1)
+        return String(ptr=buf, length=int(size_copy) + 1)
 
     fn read[
         type: DType
@@ -345,7 +346,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
 
         var list = List[UInt8](
-            unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
+            ptr=buf, length=int(size_copy), capacity=int(size_copy)
         )
 
         return list
@@ -403,33 +404,42 @@ struct FileHandle:
 
         return pos
 
-    fn write(self, data: String) raises:
-        """Write the data to the file.
+    @always_inline
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
+        """
+        Write a span of bytes to the file.
 
         Args:
-          data: The data to write to the file.
+            bytes: The byte span to write to this file.
         """
-        self._write(data.unsafe_ptr(), data.byte_length())
+        var err_msg = _OwnedStringRef()
+        external_call["KGEN_CompilerRT_IO_FileWrite", NoneType](
+            self.handle,
+            bytes.unsafe_ptr(),
+            len(bytes),
+            Pointer.address_of(err_msg),
+        )
 
-    fn write(self, data: Span[UInt8, _]) raises:
-        """Write a borrowed sequence of data to the file.
+        if err_msg:
+            abort(err_msg^.consume_as_error())
+
+    fn write[*Ts: Writable](mut self, *args: *Ts):
+        """Write a sequence of Writable arguments to the provided Writer.
+
+        Parameters:
+            Ts: Types of the provided argument sequence.
 
         Args:
-          data: The data to write to the file.
+            args: Sequence of arguments to write to this Writer.
         """
-        self._write(data.unsafe_ptr(), len(data))
-
-    fn write(self, data: StringRef) raises:
-        """Write the data to the file.
-
-        Args:
-          data: The data to write to the file.
-        """
-        self._write(data.unsafe_ptr(), len(data))
+        var file = FileDescriptor(self._get_raw_fd())
+        write_buffered[buffer_size=4096](file, args)
 
     fn _write[
         address_space: AddressSpace
-    ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
+    ](
+        self, ptr: UnsafePointer[UInt8, address_space=address_space], len: Int
+    ) raises:
         """Write the data to the file.
 
         Params:

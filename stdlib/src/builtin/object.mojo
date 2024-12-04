@@ -16,10 +16,10 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-from sys.intrinsics import _type_is_eq
 from sys.ffi import OpaquePointer
+from sys.intrinsics import _type_is_eq
 
-from memory import Arc, memcmp, memcpy, UnsafePointer
+from memory import ArcPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, Variant
 
@@ -32,7 +32,7 @@ from utils import StringRef, Variant
 struct _NoneMarker(CollectionElementNew):
     """This is a trivial class to indicate that an object is `None`."""
 
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         pass
 
 
@@ -50,12 +50,12 @@ struct _ImmutableString(CollectionElement, CollectionElementNew):
     """The length of the string."""
 
     @always_inline
-    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn __init__(out self, data: UnsafePointer[UInt8], length: Int):
         self.data = data
         self.length = length
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
     @always_inline
@@ -75,11 +75,11 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    var impl: Arc[List[_ObjectImpl]]
+    var impl: ArcPointer[List[_ObjectImpl]]
     """The list value."""
 
-    fn __init__(inout self):
-        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
+    fn __init__(out self):
+        self.impl = ArcPointer[List[_ObjectImpl]](List[_ObjectImpl]())
 
 
 @register_passable("trivial")
@@ -89,13 +89,13 @@ struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     """The reference to the list."""
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         self.lst = ptr.bitcast[NoneType]()
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.lst = other.lst
 
     @always_inline
@@ -115,16 +115,16 @@ struct _RefCountedAttrsDict:
     directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
-    var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
+    var impl: ArcPointer[Dict[StringLiteral, _ObjectImpl]]
     """The implementation of the map."""
 
-    fn __init__(inout self):
-        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
+    fn __init__(out self):
+        self.impl = ArcPointer[Dict[StringLiteral, _ObjectImpl]](
             Dict[StringLiteral, _ObjectImpl]()
         )
 
     @always_inline
-    fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
+    fn set(mut self, key: StringLiteral, value: _ObjectImpl) raises:
         if key in self.impl[]:
             self.impl[][key].destroy()
             self.impl[][key] = value
@@ -159,7 +159,7 @@ struct Attr:
     """The value of the attribute."""
 
     @always_inline
-    fn __init__(inout self, key: StringLiteral, owned value: object):
+    fn __init__(out self, key: StringLiteral, owned value: object):
         """Initializes the attribute with a key and value.
 
         Args:
@@ -178,7 +178,8 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__(inout self, values: VariadicListMem[Attr, _]):
+    @implicit
+    fn __init__(out self, values: VariadicListMem[Attr, _]):
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
@@ -188,7 +189,7 @@ struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
         self.attrs = ptr.bitcast[Int8]()
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self = other
 
     @always_inline
@@ -209,14 +210,14 @@ struct _Function(CollectionElement, CollectionElementNew):
     """The function pointer."""
 
     @always_inline
-    fn __init__[FnT: AnyTrivialRegType](inout self, value: FnT):
+    fn __init__[FnT: AnyTrivialRegType](mut self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
         self.value = f
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         self.value = other.value
 
     alias fn0 = fn () raises -> object
@@ -256,7 +257,7 @@ struct _ObjectImpl(
     CollectionElementNew,
     Stringable,
     Representable,
-    Formattable,
+    Writable,
 ):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
@@ -305,19 +306,21 @@ struct _ObjectImpl(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self, value: Self.type):
+    @implicit
+    fn __init__(out self, value: Self.type):
         self.value = value
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         self.value = Self.type(_NoneMarker {})
 
     @always_inline
-    fn __init__(inout self, value: Bool):
+    @implicit
+    fn __init__(out self, value: Bool):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         @parameter
         if dt.is_integral():
             self.value = Self.type(value)
@@ -325,23 +328,27 @@ struct _ObjectImpl(
             self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _ImmutableString):
+    @implicit
+    fn __init__(out self, value: _ImmutableString):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _RefCountedListRef):
+    @implicit
+    fn __init__(out self, value: _RefCountedListRef):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _Function):
+    @implicit
+    fn __init__(out self, value: _Function):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, value: _RefCountedAttrsDictRef):
+    @implicit
+    fn __init__(out self, value: _RefCountedAttrsDictRef):
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__(inout self, *, other: Self):
+    fn __init__(out self, *, other: Self):
         """Copy the object.
 
         Args:
@@ -350,11 +357,11 @@ struct _ObjectImpl(
         self = other.value
 
     @always_inline
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(out self, existing: Self):
         self = existing.value
 
     @always_inline
-    fn __moveinit__(inout self, owned other: Self):
+    fn __moveinit__(out self, owned other: Self):
         self = other.value^
 
     @always_inline
@@ -510,7 +517,7 @@ struct _ObjectImpl(
         return self.get_as_int().cast[DType.float64]()
 
     @staticmethod
-    fn coerce_comparison_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+    fn coerce_comparison_type(mut lhs: _ObjectImpl, mut rhs: _ObjectImpl):
         """Coerces two values of arithmetic type to the appropriate
         lowest-common denominator type for performing comparisons, in order of
         increasing priority: bool, int, and then float.
@@ -521,7 +528,7 @@ struct _ObjectImpl(
             return
 
         @parameter
-        fn convert(inout value: _ObjectImpl, id: Int, to: Int):
+        fn convert(mut value: _ObjectImpl, id: Int, to: Int):
             if to == Self.int:
                 value = value.convert_bool_to_int()
             else:
@@ -536,7 +543,7 @@ struct _ObjectImpl(
             convert(lhs, lhsId, rhsId)
 
     @staticmethod
-    fn coerce_arithmetic_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+    fn coerce_arithmetic_type(mut lhs: _ObjectImpl, mut rhs: _ObjectImpl):
         """Coerces two values of arithmetic type to the appropriate
         lowest-common denominator type for performing arithmetic operations.
         Bools are always converted to integers, to match Python's behavior.
@@ -553,7 +560,7 @@ struct _ObjectImpl(
             lhs = lhs.convert_int_to_float()
 
     @staticmethod
-    fn coerce_integral_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+    fn coerce_integral_type(mut lhs: _ObjectImpl, mut rhs: _ObjectImpl):
         """Coerces two values of integral type to the appropriate
         lowest-common denominator type for performing bitwise operations.
         """
@@ -564,7 +571,7 @@ struct _ObjectImpl(
         else:
             lhs = lhs.convert_bool_to_int()
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, mut writer: W):
         """Performs conversion to string according to Python
         semantics.
         """
@@ -639,14 +646,14 @@ struct _ObjectImpl(
         Returns:
             The String representation of the object.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     # ===------------------------------------------------------------------=== #
     # List Functions
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
+    fn get_list_ptr(self) -> ArcPointer[List[_ObjectImpl]]:
         return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
 
     @always_inline
@@ -693,7 +700,7 @@ struct _ObjectImpl(
 
 
 struct object(
-    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Formattable
+    IntableRaising, ImplicitlyBoolable, Stringable, Representable, Writable
 ):
     """Represents an object without a concrete type.
 
@@ -720,12 +727,13 @@ struct object(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         """Initializes the object with a `None` value."""
         self._value = _ObjectImpl()
 
     @always_inline
-    fn __init__(inout self, impl: _ObjectImpl):
+    @implicit
+    fn __init__(out self, impl: _ObjectImpl):
         """Initializes the object with an implementation value. This is meant for
         internal use only.
 
@@ -735,7 +743,8 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__(inout self, none: NoneType):
+    @implicit
+    fn __init__(out self, none: NoneType):
         """Initializes a none value object from a `None` literal.
 
         Args:
@@ -743,8 +752,21 @@ struct object(
         """
         self._value = _ObjectImpl()
 
+    # FIXME: None literal should be of NoneType not !kgen.none.
+    @doc_private
     @always_inline
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, none: __mlir_type.`!kgen.none`):
+        """Initializes a none value object from a `None` literal.
+
+        Args:
+            none: None.
+        """
+        self = NoneType()
+
+    @always_inline
+    @implicit
+    fn __init__(out self, value: Int):
         """Initializes the object with an integer value.
 
         Args:
@@ -753,7 +775,8 @@ struct object(
         self._value = Int64(value)
 
     @always_inline
-    fn __init__(inout self, value: Float64):
+    @implicit
+    fn __init__(out self, value: Float64):
         """Initializes the object with an floating-point value.
 
         Args:
@@ -762,7 +785,7 @@ struct object(
         self._value = value
 
     @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         """Initializes the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
         converted to the appropriate integer or floating point type.
@@ -781,7 +804,8 @@ struct object(
             self._value = value
 
     @always_inline
-    fn __init__(inout self, value: Bool):
+    @implicit
+    fn __init__(out self, value: Bool):
         """Initializes the object from a bool.
 
         Args:
@@ -790,7 +814,8 @@ struct object(
         self._value = value
 
     @always_inline
-    fn __init__(inout self, value: StringLiteral):
+    @implicit
+    fn __init__(out self, value: StringLiteral):
         """Initializes the object from a string literal.
 
         Args:
@@ -799,7 +824,8 @@ struct object(
         self = object(StringRef(value))
 
     @always_inline
-    fn __init__(inout self, value: StringRef):
+    @implicit
+    fn __init__(out self, value: StringRef):
         """Initializes the object from a string reference.
 
         Args:
@@ -816,7 +842,7 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
+    fn __init__[*Ts: CollectionElement](mut self, value: ListLiteral[*Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
@@ -850,7 +876,8 @@ struct object(
                 ]()
 
     @always_inline
-    fn __init__(inout self, func: Self.nullary_function):
+    @implicit
+    fn __init__(out self, func: Self.nullary_function):
         """Initializes an object from a function that takes no arguments.
 
         Args:
@@ -859,7 +886,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.unary_function):
+    @implicit
+    fn __init__(out self, func: Self.unary_function):
         """Initializes an object from a function that takes one argument.
 
         Args:
@@ -868,7 +896,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.binary_function):
+    @implicit
+    fn __init__(out self, func: Self.binary_function):
         """Initializes an object from a function that takes two arguments.
 
         Args:
@@ -877,7 +906,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, func: Self.ternary_function):
+    @implicit
+    fn __init__(out self, func: Self.ternary_function):
         """Initializes an object from a function that takes three arguments.
 
         Args:
@@ -886,7 +916,8 @@ struct object(
         self._value = _Function(func)
 
     @always_inline
-    fn __init__(inout self, *attrs: Attr):
+    @implicit
+    fn __init__(out self, *attrs: Attr):
         """Initializes the object with a sequence of zero or more attributes.
 
         Args:
@@ -895,7 +926,7 @@ struct object(
         self._value = _RefCountedAttrsDictRef(attrs)
 
     @always_inline
-    fn __moveinit__(inout self, owned existing: object):
+    fn __moveinit__(out self, owned existing: object):
         """Move the value of an object.
 
         Args:
@@ -905,7 +936,7 @@ struct object(
         existing._value = _ObjectImpl()
 
     @always_inline
-    fn __copyinit__(inout self, existing: object):
+    fn __copyinit__(out self, existing: object):
         """Copies the object. This clones the underlying string value and
         increases the refcount of lists or dictionaries.
 
@@ -972,14 +1003,17 @@ struct object(
         """
         return self.__bool__()
 
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, mut writer: W):
         """Performs conversion to string according to Python
         semantics.
 
+        Parameters:
+            W: A type conforming to the Writable trait.
+
         Args:
-            writer: The Formatter to write to.
+            writer: The Writer to write to.
         """
-        self._value.format_to(writer)
+        self._value.write_to(writer)
 
     @no_inline
     fn __str__(self) -> String:
@@ -989,7 +1023,7 @@ struct object(
         Returns:
             The String representation of the object.
         """
-        return String.format_sequence(self._value)
+        return String.write(self._value)
 
     @no_inline
     fn __repr__(self) -> String:
@@ -1503,7 +1537,7 @@ struct object(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __iadd__(inout self, rhs: object) raises:
+    fn __iadd__(mut self, rhs: object) raises:
         """In-place addition or concatenation operator.
 
         Args:
@@ -1512,7 +1546,7 @@ struct object(
         self = self + rhs
 
     @always_inline
-    fn __isub__(inout self, rhs: object) raises:
+    fn __isub__(mut self, rhs: object) raises:
         """In-place subtraction operator.
 
         Args:
@@ -1521,7 +1555,7 @@ struct object(
         self = self - rhs
 
     @always_inline
-    fn __imul__(inout self, rhs: object) raises:
+    fn __imul__(mut self, rhs: object) raises:
         """In-place multiplication operator.
 
         Args:
@@ -1530,7 +1564,7 @@ struct object(
         self = self * rhs
 
     @always_inline
-    fn __ipow__(inout self, rhs: object) raises:
+    fn __ipow__(mut self, rhs: object) raises:
         """In-place exponentiation operator.
 
         Args:
@@ -1539,7 +1573,7 @@ struct object(
         self = self**rhs
 
     @always_inline
-    fn __imod__(inout self, rhs: object) raises:
+    fn __imod__(mut self, rhs: object) raises:
         """In-place modulo operator.
 
         Args:
@@ -1548,7 +1582,7 @@ struct object(
         self = self % rhs
 
     @always_inline
-    fn __itruediv__(inout self, rhs: object) raises:
+    fn __itruediv__(mut self, rhs: object) raises:
         """In-place true division operator.
 
         Args:
@@ -1557,7 +1591,7 @@ struct object(
         self = self / rhs
 
     @always_inline
-    fn __ifloordiv__(inout self, rhs: object) raises:
+    fn __ifloordiv__(mut self, rhs: object) raises:
         """In-place floor division operator.
 
         Args:
@@ -1566,7 +1600,7 @@ struct object(
         self = self // rhs
 
     @always_inline
-    fn __ilshift__(inout self, rhs: object) raises:
+    fn __ilshift__(mut self, rhs: object) raises:
         """In-place left shift operator.
 
         Args:
@@ -1575,7 +1609,7 @@ struct object(
         self = self << rhs
 
     @always_inline
-    fn __irshift__(inout self, rhs: object) raises:
+    fn __irshift__(mut self, rhs: object) raises:
         """In-place right shift operator.
 
         Args:
@@ -1584,7 +1618,7 @@ struct object(
         self = self >> rhs
 
     @always_inline
-    fn __iand__(inout self, rhs: object) raises:
+    fn __iand__(mut self, rhs: object) raises:
         """In-place AND operator.
 
         Args:
@@ -1593,7 +1627,7 @@ struct object(
         self = self & rhs
 
     @always_inline
-    fn __ior__(inout self, rhs: object) raises:
+    fn __ior__(mut self, rhs: object) raises:
         """In-place OR operator.
 
         Args:
@@ -1602,7 +1636,7 @@ struct object(
         self = self | rhs
 
     @always_inline
-    fn __ixor__(inout self, rhs: object) raises:
+    fn __ixor__(mut self, rhs: object) raises:
         """In-place XOR operator.
 
         Args:
@@ -1902,7 +1936,7 @@ struct object(
         return self._value.get_obj_attr(key)
 
     @always_inline
-    fn __setattr__(inout self, key: StringLiteral, value: object) raises:
+    fn __setattr__(mut self, key: StringLiteral, value: object) raises:
         """Sets the named attribute.
 
         Args:

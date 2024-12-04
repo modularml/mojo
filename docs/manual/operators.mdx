@@ -1,0 +1,1508 @@
+---
+title: Operators, expressions, and dunder methods
+sidebar_label: Operators and expressions
+---
+
+Mojo includes a variety of operators for manipulating values of different types.
+Generally, the operators are equivalent to those found in Python, though many
+operators also work with additional Mojo types such as `SIMD` vectors.
+Additionally, Mojo allows you to define the behavior of most of these operators
+for your own custom types by implementing special *dunder* (double underscore)
+methods.
+
+This document contains the following three sections:
+
+- [Operators and expressions](#operators-and-expressions) discusses Mojo's
+  built-in operators and how they work with commonly used Mojo types.
+- [Implement operators for custom types](#implement-operators-for-custom-types)
+  describes the dunder methods that you can implement to support using operators
+  with custom structs that you create.
+- [An example of implementing operators for a custom
+  type](#an-example-of-implementing-operators-for-a-custom-type) shows a
+  progressive example of writing a custom struct with support for several
+  operators.
+
+## Operators and expressions
+
+This section lists the operators that Mojo supports, their order or precedence
+and associativity, and describes how these operators behave with several
+commonly used built-in types.
+
+### Operator precedence and associativity
+
+The table below lists the various Mojo operators, along with their order of
+precedence and associativity (also referred to as grouping). This table lists
+operators from the highest precedence to the lowest precedence.
+
+| **Operators** | **Description** | **Associativity (Grouping)** |
+| ------------- | --------------- | ----------------- |
+| `()` | Parenthesized expression | Left to right |
+| `x[index]`, `x[index:index]` | Subscripting, slicing | Left to right |
+| `**` | Exponentiation | Right to left |
+| `+x`, `-x`, `~x` | Positive, negative, bitwise NOT | Right to left |
+| `*`, `@`, `/`, `//`, `%` | Multiplication, matrix, division, floor division, remainder | Left to right |
+| `+`, `–` | Addition and subtraction | Left to right |
+| `<<`, `>>` | Shifts | Left to right |
+| `&` | Bitwise AND | Left to right |
+| `^` | Bitwise XOR | Left to right |
+| `\|` | Bitwise OR | Left to right |
+| `in`, `not in`, `is`, `is not`, `<`, `<=`, `>`, `>=`, `!=`, `==` | Comparisons, membership tests, identity tests | Left to Right |
+| `not x` | Boolean NOT | Right to left |
+| `x and y` | Boolean AND | Left to right |
+| `x or y` | Boolean OR | Left to right |
+| `if-else` | Conditional expression | Right to left |
+| `:=` | Assignment expression (walrus operator) | Right to left |
+
+Mojo supports the same operators as Python (plus a few extensions), and they
+have the same precedence levels. For example, the following arithmetic
+expression evaluates to 40:
+
+```mojo
+5 + 4 * 3 ** 2 - 1
+```
+
+It is equivalent to the following parenthesized expression to explicitly control
+the order of evaluation:
+
+```mojo
+(5 + (4 * (3 ** 2))) - 1
+```
+
+Associativity defines how operators of the same precedence level are grouped
+into expressions. The table indicates whether operators of a given level are
+left- or right-associative. For example, multiplication and division are left
+associative, so the following expression results in a value of 3:
+
+```mojo
+3 * 4 / 2 / 2
+```
+
+It is equivalent to the following parenthesized expression to explicitly control
+the order of evaluation:
+
+```mojo
+((3 * 4) / 2) / 2
+```
+
+Whereas in the following, exponentiation operators are right associative
+resulting in a value of 264,144:
+
+```mojo
+4 ** 3 ** 2
+```
+
+It is equivalent to the following parenthesized expression to explicitly control
+the order of evaluation:
+
+```mojo
+4 ** (3 ** 2)
+```
+
+:::note
+
+Mojo also uses the caret (`^`) as the [*transfer
+sigil*](/mojo/manual/values/ownership#transfer-arguments-owned-and-). In
+expressions where its use might be ambiguous, Mojo treats the character as the
+bitwise XOR operator. For example, `x^+1` is treated as `(x)^(+1)`.
+
+:::
+
+### Arithmetic and bitwise operators
+
+[Numeric types](/mojo/manual/types#numeric-types) describes the different
+numeric types provided by the Mojo standard library. The arithmetic and bitwise
+operators have slightly different behavior depending on the types of values
+provided.
+
+#### `Int` and `UInt` values
+
+The [`Int`](/mojo/stdlib/builtin/int/Int) and
+[`UInt`](/mojo/stdlib/builtin/uint/UInt) types represent signed and unsigned
+integers of the [word
+size](https://en.wikipedia.org/wiki/Word_(computer_architecture)) of the CPU,
+typically 64 bits or 32 bits.
+
+The `Int` and `UInt` types support all arithmetic operators except matrix
+multiplication (`@`), as well as all bitwise and shift operators. If both
+operands to a binary operator are `Int` values the result is an `Int`, if both
+operands are `UInt` values the result is a `UInt`, and if one operand is `Int`
+and the other `UInt` the result is an `Int`. The one exception for these types
+is true division, `/`, which always returns a `Float64` type value.
+
+```mojo
+var a_int: Int = -7
+var b_int: Int = 4
+sum_int = a_int + b_int  # Result is type Int
+print("Int sum:", sum_int)
+
+var i_uint: UInt = 9
+var j_uint: UInt = 8
+sum_uint = i_uint + j_uint  # Result is type UInt
+print("UInt sum:", sum_uint)
+
+sum_mixed = a_int + i_uint  # Result is type Int
+print("Mixed sum:", sum_mixed)
+
+quotient_int = a_int / b_int  # Result is type Float64
+print("Int quotient:", quotient_int)
+quotient_uint = i_uint / j_uint  # Result is type Float64
+print("UInt quotient:", quotient_uint)
+```
+
+```output
+Int sum: -3
+UInt sum: 17
+Mixed sum: 2
+Int quotient: -1.75
+UInt quotient: 1.125
+```
+
+#### `SIMD` values
+
+The Mojo standard library defines the [`SIMD`](/mojo/stdlib/builtin/simd/SIMD)
+type to represent a fixed-size array of values that can fit into a processor's
+register. This allows you to take advantage of [single instruction, multiple
+data](https://en.wikipedia.org/wiki/Single_instruction,_multiple_data)
+operations in hardware to efficiently process multiple values in parallel.
+`SIMD` values of a numeric [`DType`](/mojo/stdlib/builtin/dtype/DType) support
+all arithmetic operators except for matrix multiplication (`@`), though the left
+shift (`<<`) and right shift (`>>`) operators support only integral types.
+Additionally, `SIMD` values of an integral or boolean type support all bitwise
+operators. `SIMD` values apply the operators in an *elementwise* fashion, as
+shown in the following example:
+
+```mojo
+simd1 = SIMD[DType.int32, 4](2, 3, 4, 5)
+simd2 = SIMD[DType.int32, 4](-1, 2, -3, 4)
+simd3 = simd1 * simd2
+print(simd3)
+```
+
+```output
+[-2, 6, -12, 20]
+```
+
+[`Scalar`](/mojo/stdlib/builtin/simd/) values are simply aliases for
+single-element `SIMD` vectors, so `Float16` is just an alias for
+`SIMD[DType.float16, 1]`. Therefore `Scalar` values support the same set of
+arithmetic and bitwise operators.
+
+```mojo
+var f1: Float16 = 2.5
+var f2: Float16 = -4.0
+var f3 = f1 * f2  # Implicitly of type Float16
+print(f3)
+```
+
+```output
+-10.0
+```
+
+When using these operators on `SIMD` values, Mojo requires both to have the same
+size and `DType`, and the result is a `SIMD` of the same size and `DType`. The
+operators do *not* automatically widen lower precision `SIMD` values to higher
+precision. This means that the `DType` of each value must be the same or else
+the result is a compilation error.
+
+```mojo
+var i8: Int8 = 8
+var f64: Float64 = 64.0
+result = i8 * f64
+```
+
+```output
+error: invalid call to '__mul__': could not deduce parameter 'type' of parent struct 'SIMD'
+    result = i8 * f64
+             ~~~^~~~~
+```
+
+If you need to perform an arithmetic or bitwise operator on two `SIMD` values of
+different types, you can explicitly
+[`cast()`](/mojo/stdlib/builtin/simd/SIMD#cast) a `SIMD` so that they have the
+same type.
+
+```mojo
+simd1 = SIMD[DType.float32, 4](2.2, 3.3, 4.4, 5.5)
+simd2 = SIMD[DType.int16, 4](-1, 2, -3, 4)
+simd3 = simd1 * simd2.cast[DType.float32]()  # Result is SIMD[DType.float32, 4]
+print(simd3)
+```
+
+```output
+[-2.2000000476837158, 6.5999999046325684, -13.200000762939453, 22.0]
+```
+
+One exception is that the exponentiation operator, `**`, is overloaded so that
+you can specify an `Int` type exponent. All values in the `SIMD` are
+exponentiated to the same power.
+
+```mojo
+base_simd = SIMD[DType.float64, 4](1.1, 2.2, 3.3, 4.4)
+var power: Int = 2
+pow_simd = base_simd ** power  # Result is SIMD[DType.float64, 4]
+print(pow_simd)
+```
+
+```output
+[1.2100000000000002, 4.8400000000000007, 10.889999999999999, 19.360000000000003]
+```
+
+There are three operators related to division:
+
+- `/`, the "true division" operator, performs floating point division for `SIMD`
+  values with a floating point `DType`. For `SIMD` values with an integral
+  `DType`, true division *truncates* the quotient to an integral result.
+
+    ```mojo
+    num_float16 = SIMD[DType.float16, 4](3.5, -3.5, 3.5, -3.5)
+    denom_float16 = SIMD[DType.float16, 4](2.5, 2.5, -2.5, -2.5)
+
+    num_int32 = SIMD[DType.int32, 4](5, -6, 7, -8)
+    denom_int32 = SIMD[DType.int32, 4](2, 3, -4, -5)
+
+    # Result is SIMD[DType.float16, 4]
+    true_quotient_float16 = num_float16 / denom_float16
+    print("True float16 division:", true_quotient_float16)
+
+    # Result is SIMD[DType.int32, 4]
+    true_quotient_int32 = num_int32 / denom_int32
+    print("True int32 division:", true_quotient_int32)
+    ```
+
+    ```output
+    True float16 division: [1.400390625, -1.400390625, -1.400390625, 1.400390625]
+    True int32 division: [2, -2, -1, 1]
+    ```
+
+- `//`, the "floor division" operator, performs division and *rounds down* the
+  result to the nearest integer. The resulting `SIMD` is still the same type as
+  the original operands. For example:
+
+    ```mojo
+    # Result is SIMD[DType.float16, 4]
+    var floor_quotient_float16 = num_float16 // denom_float16
+    print("Floor float16 division:", floor_quotient_float16)
+
+    # Result is SIMD[DType.int32, 4]
+    var floor_quotient_int32 = num_int32 // denom_int32
+    print("Floor int32 division:", floor_quotient_int32)
+    ```
+
+    ```output
+    Floor float16 division: [1.0, -2.0, -2.0, 1.0]
+    Floor int32 division: [2, -2, -2, 1]
+    ```
+
+- `%`, the modulo operator, returns the remainder after dividing the numerator
+  by the denominator an integral number of times. The relationship between the
+  `//` and `%` operators can be defined as `num == denom * (num // denom) + (num
+  % denom)`. For example:
+
+    ```mojo
+    # Result is SIMD[DType.float16, 4]
+    var remainder_float16 = num_float16 % denom_float16
+    print("Modulo float16:", remainder_float16)
+
+    # Result is SIMD[DType.int32, 4]
+    var remainder_int32 = num_int32 % denom_int32
+    print("Modulo int32:", remainder_int32)
+
+    print()
+
+    # Result is SIMD[DType.float16, 4]
+    var result_float16 = denom_float16 * floor_quotient_float16 + remainder_float16
+    print("Result float16:", result_float16)
+
+    # Result is SIMD[DType.int32, 4]
+    var result_int32 = denom_int32 * floor_quotient_int32 + remainder_int32
+    print("Result int32:", result_int32)
+    ```
+
+    ```output
+    Modulo float16: [1.0, 1.5, -1.5, -1.0]
+    Modulo int32: [1, 0, -1, -3]
+
+    Result float16: [3.5, -3.5, 3.5, -3.5]
+    Result int32: [5, -6, 7, -8]
+    ```
+
+
+#### `IntLiteral` and `FloatLiteral` values
+
+[`IntLiteral`](/mojo/stdlib/builtin/int_literal/IntLiteral) and
+[`FloatLiteral`](/mojo/stdlib/builtin/float_literal/FloatLiteral) are
+compile-time, numeric values. When they are used in a compile-time context, they
+are arbitrary-precision values. When they are used in a run-time context, they
+are materialized as `Int` and `Float64` type values, respectively.
+
+As an example, the following code causes a compile-time error because the
+calculated `IntLiteral` value is too large to store in an `Int` variable:
+
+```mojo
+alias big_int = (1 << 65) + 123456789  # IntLiteral
+var too_big_int: Int = big_int
+print("Result:", too_big_int)
+```
+
+```output
+note: integer value 36893488147542560021 requires 67 bits to store, but the destination bit width is only 64 bits wide
+```
+
+However in the following example, taking that same `IntLiteral` value, dividing
+by the `IntLiteral` 10 and then assigning the result to an `Int` variable
+compiles and runs successfully, because the final `IntLiteral` quotient can fit
+in a 64-bit `Int`.
+
+```mojo
+alias big_int = (1 << 65) + 123456789  # IntLiteral
+var not_too_big_int: Int = big_int // 10
+print("Result:", not_too_big_int)
+```
+
+```output
+Result: 3689348814754256002
+```
+
+In a compile-time context, `IntLiteral` and `FloatLiteral` values support all
+arithmetic operators *except* exponentiation (`**`), and `IntLiteral` values
+support all bitwise and shift operators. In a run-time context, materialized
+`IntLiteral` values are `Int` values and therefore support the same operators as
+`Int`, and materialized `FloatLiteral` values are `Float64` values and therefore
+support the same operators as `Float64`.
+
+### Comparison operators
+
+Mojo supports a standard set of comparison operators: `==`, `!=`, `<`, `<=`,
+`>`, and `>=`. However their behavior depends on the type of values being
+compared.
+
+- `Int`, `UInt`, `IntLiteral`, and any type that can be implicitly converted to
+  `Int` or `UInt` do standard numerical comparison with a `Bool` result.
+- Two `SIMD` values can be compared only if they are the same `DType` and size.
+  (If you need to compare two `SIMD` values of different types, you can
+  explicitly [`cast()`](/mojo/stdlib/builtin/simd/SIMD#cast) a `SIMD` so that
+  they have the same type.) Mojo performs elementwise comparison with a
+  `SIMD[DType.bool]` result. For example:
+
+    ```mojo
+    simd1 = SIMD[DType.int16, 4](-1, 2, -3, 4)
+    simd2 = SIMD[DType.int16, 4](0, 1, 2, 3)
+    simd3 = simd1 > simd2  # SIMD[DType.bool, 4]
+    print(simd3)
+    ```
+
+    ```output
+    [False, True, False, True]
+    ```
+
+- An integral type `SIMD` can be compared to an `IntLiteral`, `Int`, `UInt`, or
+  any type that can be implicitly converted to `Int` or `UInt`. Mojo performs
+  elementwise comparison against the value provided and produces a
+  `SIMD[DType.bool]` result. For example:
+
+    ```mojo
+    simd1 = SIMD[DType.int16, 4](-1, 2, -3, 4)
+    simd2 = simd1 > 2  # SIMD[DType.bool, 4]
+    print(simd2)
+    ```
+
+    ```output
+    [False, False, False, True]
+    ```
+
+- A floating point type `SIMD` can be compared to a `FloatLiteral`,
+  `IntLiteral`, `Int`, `UInt`, or any type that can be implicitly converted to
+  `Int` or `UInt`. Mojo performs elementwise comparison against the value
+  provided and produces a `SIMD[DType.bool]` result. For example:
+
+    ```mojo
+    simd1 = SIMD[DType.float32, 4](1.1, -2.2, 3.3, -4.4)
+    simd2 = simd1 > 0.5  # SIMD[DType.bool, 4]
+    print(simd2)
+    ```
+
+    ```output
+    [True, False, True, False]
+    ```
+
+- `Scalar` values are simply aliases for single-element `SIMD` vectors.
+  Therefore, the same restrictions apply against comparing different types. In
+  other words, you can't compare a `Float16` value to a `Float32` value unless
+  you cast the values to the same type. For example:
+
+    ```mojo
+    var float1: Float16 = 12.345  # SIMD[DType.float16, 1]
+    var float2: Float32 = 0.5     # SIMD[DType.float32, 1]
+    result = float1.cast[DType.float32]() > float2  # SIMD[DType.bool, 1]
+    print(result)
+    ```
+
+    ```output
+    True
+    ```
+
+    :::note
+
+    Note that the result of comparing a `Scalar` value is a `SIMD[DType.bool, 1]`,
+    which is not the same as a `Bool` value. However, `SIMD` values of size
+    1 implement the `Boolable` trait, which provides for implicit conversion to
+    a `Bool` value when used in a boolean expression.
+
+    :::
+
+- `String` and `StringLiteral` values can be compared using standard
+  lexicographical ordering, producing a `Bool`. (For example, "Zebra" is treated
+  as less than "ant" because upper case letters occur before lower case letters
+  in the character encoding.) String comparisons are discussed further in the
+  [String operators](#string-operators) section below.
+
+Several other types in the Mojo standard library support various comparison
+operators, in particular the equality and inequality comparisons. Consult the
+[API documentation](/mojo/lib) for a type to determine whether any comparison
+operators are supported.
+
+### String operators
+
+As discussed in [Strings](/mojo/manual/types#strings), the
+[`String`](/mojo/stdlib/collections/string/String) type represents a mutable
+string value. In contrast, the
+[`StringLiteral`](/mojo/stdlib/builtin/string_literal/StringLiteral) type
+represents a literal string that is embedded into your compiled program. At
+run-time a `StringLiteral` is loaded into memory as a constant that persists for
+the duration of your program's execution.
+
+The `String` type has a constructor that accepts a `StringLiteral` value, which
+means that a `StringLiteral` can be implicitly converted to a `String` at
+run-time if you pass it as an argument to a function or assign it to a `String`
+type variable. You also can use the [`String`
+constructor](/mojo/stdlib/collections/string/String#__init__) to explicitly
+convert the `StringLiteral` to a `String` value at run-time.
+
+#### String concatenation
+
+The `+` operator performs string concatenation. The `StringLiteral` type
+supports compile-time string concatenation.
+
+```mojo
+alias last_name = "Curie"
+
+# Compile-time StringLiteral alias
+alias marie = "Marie " + last_name
+print(marie)
+
+# Compile-time concatenation assigned to a run-time StringLiteral type variable
+pierre = "Pierre " + last_name
+print(pierre)
+```
+
+```output
+Marie Curie
+Pierre Curie
+```
+
+With the `String` type the `+` operator performs run-time string concatenation
+to produce a new `String` value. You can also concatenate a `String` and a
+`StringLiteral` to produce a new `String` result.
+
+```mojo
+var first_name: String = "Grace"
+var last_name: String = " Hopper"
+
+# String type result
+programmer = first_name + last_name
+print(programmer)
+
+# String type result
+singer = first_name + " Slick"
+print(singer)
+```
+
+```output
+Grace Hopper
+Grace Slick
+```
+
+#### String replication
+
+The `*` operator replicates a `String` a specified number of times. For example:
+
+```mojo
+var str1: String = "la"
+str2 = str1 * 5
+print(str2)
+```
+
+```output
+lalalalala
+```
+
+`StringLiteral` supports the `*` operator for string replication *only* at
+compile time. So the following examples compile and run successfully:
+
+```mojo
+alias divider1 = "=" * 40
+alias symbol = "#"
+alias divider2 = symbol * 40
+
+# You must define the following function using `fn` because an alias
+# initializer cannot call a function that can potentially raise an error.
+fn generate_divider(char: StringLiteral, repeat: Int) -> StringLiteral:
+    return char * repeat
+
+alias divider3 = generate_divider("~", 40)  # Evaluated at compile-time
+
+print(divider1)
+print(divider2)
+print(divider3)
+```
+
+```output
+========================================
+########################################
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+However, the following examples fail to compile because the replication
+operators would be evaluated at run-time:
+
+```mojo
+# Both of these statements would fail to compile
+var div1 = "^" * 40
+print("_" * 40)
+```
+
+#### String comparison
+
+`String` values can be compared using standard lexicographical ordering,
+producing a `Bool`. (For example, "Zebra" is treated as less than "ant" because
+upper case letters occur before lower case letters in the character encoding.)
+`StringLiteral` values can be directly compared against each other as well.
+However when comparing a `String` to a `StringLiteral` value, the `String` value
+**must** be the left-hand operand to avoid a compilation error. For example:
+
+```mojo
+var str: String = "bird"
+# Compilation error:
+# result = "cat" >= str
+# You could explicitly convert the StringLiteral to a String:
+# result = String("cat") >= str
+result = str < "cat"  # Successful comparison
+print(result)
+```
+
+```output
+True
+```
+
+#### Substring testing
+
+Both `String` and `StringLiteral` support using the `in` operator to produce a
+`Bool` result indicating whether a given substring appears within another
+string. The operator is overloaded so that you can use any combination of
+`String` and `StringLiteral` for both the substring and the string to test.
+
+```mojo
+var food: String = "peanut butter"
+
+if "nut" in food:
+    print("It contains a nut")
+else:
+    print("It doesn't contain a nut")
+```
+
+```output
+It contains a nut
+```
+
+#### String indexing and slicing
+
+Both the `String` and `StringLiteral` types allow you to use indexing to return
+a single character. Character positions are identified with a zero-based index
+starting from the first character. You can also specify a negative index to
+count backwards from the end of the string, with the last character identified
+by index -1. Specifying an index beyond the bounds of the string results in a
+run-time error.
+
+```mojo
+alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"  # StringLiteral type value
+print(alphabet[0], alphabet[-1])
+
+# The following would produce a run-time error
+# print(alphabet[45])
+```
+
+```output
+A Z
+```
+
+The `String` type—but *not* the `StringLiteral` type—also supports slices to
+return a substring from the original `String`. Providing a slice in the form
+`[start:end]` returns a substring starting with the character index specified by
+`start` and continuing up to but not including the character at index `end`. You
+can use positive or negative indexing for both the start and end values.
+Omitting `start` is the same as specifying `0`, and omitting `end` is the same
+as specifying 1 plus the length of the string.
+
+```mojo
+var alphabet: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+print(alphabet[1:4])  # The 2nd through 4th characters
+print(alphabet[:6])   # The first 6 characters
+print(alphabet[-6:])  # The last 6 characters
+```
+
+```output
+BCD
+ABCDEF
+UVWXYZ
+```
+
+You can also specify a slice with a `step` value, as in `[start:end:step]`
+indicating the increment between subsequent indices of the slide. (This is also
+sometimes referred to as a "stride.") If you provide a negative value for
+`step`, characters are selected in reverse order starting with `start` but then
+with *decreasing* index values up to but not including `end`.
+
+```mojo
+print(alphabet[1:6:2])     # The 2nd, 4th, and 6th characters
+print(alphabet[-1:-4:-1])  # The last 3 characters in reverse order
+print(alphabet[::-1])      # The entire string reversed
+```
+
+```output
+BDF
+ZYX
+ZYXWVUTSRQPONMLKJIHGFEDCBA
+```
+
+### In-place assignment operators
+
+Mutable types that support binary arithmetic, bitwise, and shift operators
+typically support equivalent in-place assignment operators. That means that for
+a type that supports the `+` operator, the following two statements are
+essentially equivalent:
+
+```mojo
+a = a + b
+a += b
+```
+
+However there is a subtle difference between the two. In the first example, the
+expression `a + b` produces a new value, which is then assigned to `a`. In
+contrast, the second example does an in-place modification of the value
+currently assigned to `a`. For register-passable types, the compiled results
+might be equivalent at run-time. But for a memory-only type, the first example
+allocates storage for the result of `a + b` and then assigns the value to the
+variable, whereas the second example can do an in-place modification of the
+existing value.
+
+:::note
+
+A type must explicitly implement in-place assignment methods, so you might
+encounter some types where in-place equivalents are not supported.
+
+:::
+
+### Assignment expressions
+
+The "walrus" operator, `:=`, allows you to assign a value to a variable within
+an expression. The value provided is both assigned to the variable and becomes
+the result of the expression. This often can simplify conditional or looping
+logic. For example, consider the following prompting loop:
+
+```mojo
+while True:
+    name = input("Enter a name or 'quit' to exit: ")
+    if name == "quit":
+        break
+    print("Hello,", name)
+```
+
+```output
+Enter a name or 'quit' to exit: Coco
+Hello, Coco
+Enter a name or 'quit' to exit: Vivienne
+Hello, Vivienne
+Enter a name or 'quit' to exit: quit
+```
+
+Using the walrus operator, you can implement the same behavior like this:
+
+```mojo
+while (name := input("Enter a name or 'quit' to exit: ")) != "quit":
+    print("Hello,", name)
+```
+
+```output
+Enter a name or 'quit' to exit: Donna
+Hello, Donna
+Enter a name or 'quit' to exit: Vera
+Hello, Vera
+Enter a name or 'quit' to exit: quit
+```
+
+## Implement operators for custom types
+
+When you create a custom struct, Mojo allows you to define the behavior of many
+of the built-in operators for that type by implementing special *dunder* (double
+underscore) methods. This section lists the dunder methods associated with the
+operators and briefly describes the requirements for implementing them.
+
+:::note
+
+Currently, Mojo doesn't support defining arbitrary custom operators (for
+example, `-^-`). You can define behaviors for only the operators listed in the
+following subsections.
+
+:::
+
+### Unary operator dunder methods
+
+A unary operator invokes an associated dunder method on the value to which it
+applies. The supported unary operators and their corresponding methods are shown
+in the table below.
+
+| **Operator**    | **Dunder method** |
+| --------------- | ----------------- |
+| `+` positive    | `__pos__()` |
+| `-` negative    | `__neg__()` |
+| `~` bitwise NOT | `__invert__()`  |
+
+For each of these methods that you decide to implement, you should return either
+the original value if unchanged, or a new value representing the result of the
+operator. For example, you could implement the `-` negative operator for a
+`MyInt` struct like this:
+
+```mojo
+@value
+struct MyInt:
+    var value: Int
+
+    def __neg__(self) -> Self:
+        return Self(-self.value)
+```
+
+### Binary arithmetic, shift, and bitwise operator dunder methods
+
+When you have a binary expression like `a + b`, there are two possible dunder
+methods that could be invoked.
+
+Mojo first determines whether the left-hand side value (`a` in this example) has
+a "normal" version of the `+` operator's dunder method defined that accepts a
+value of the right-hand side's type. If so, it then invokes that method on the
+left-hand side value and passes the right-hand side value as an argument.
+
+If Mojo doesn't find a matching "normal" dunder method on the left-hand side
+value, it then checks whether the right-hand side value has a "reflected"
+(sometimes referred to as "reversed") version of the `+` operator's dunder
+method defined that accepts a value of the left-hand side's type. If so, it then
+invokes that method on the right-hand side value and passes the left-hand side
+value as an argument.
+
+For both the normal and the reflected versions, the dunder method should return
+a new value representing the result of the operator.
+
+Additionally, there are dunder methods corresponding to the in-place assignment
+versions of the operators. These methods receive the right-hand side value as an
+argument and the methods should modify the existing left-hand side value to
+reflect the result of the operator.
+
+The table below lists the various binary arithmetic, shift, and bitwise
+operators and their corresponding normal, reflected, and in-place dunder
+methods.
+
+| **Operator** | **Normal** | **Reflected** | **In-place** |
+| ------------ | ---------- | ------------- | ------------ |
+| `+` addition | `__add__()` | `__radd__()` | `__iadd__()` |
+| `-` subtraction | `__sub__()`  | `__rsub__()`  | `__isub__()` |
+| `*` multiplication | `__mul__()`  | `__rmul__()`  | `__imul__()` |
+| `/` division | `__truediv__()`  | `__rtruediv__()`  | `__itruediv__()` |
+| `//` floor division | `__floordiv__()` | `__rfloordiv__()` | `__ifloordiv__()` |
+| `%` modulus/remainder | `__mod__()`  | `__rmod__()`  | `__imod__()` |
+| `**` exponentiation | `__pow__()`  | `__rpow__()`  | `__ipow__()` |
+| `@` matrix multiplication | `__matmul__()` | `__rmatmul__()` | `__imatmul__()` |
+| `<<` left shift | `__lshift__()` | `__rlshift__()` | `__ilshift__()` |
+| `>>` right shift | `__rshift__()` | `__rrshift__()` | `__irshift__()` |
+| `&` bitwise AND | `__and__()`  | `__rand__()`  | `__iand__()` |
+| `\|` bitwise OR | `__or__()`  | `__ror__()`  | `__ior__()`  |
+| `^` bitwise XOR | `__xor__()`  | `__rxor__()`  | `__ixor__()`  |
+
+As an example, consider implementing support for all of the `+` operator dunder
+methods for a custom `MyInt` struct. This shows supporting adding two `MyInt`
+instances as well as adding a `MyInt` and an `Int`. We can support the case of
+having the `Int` as the right-hand side argument by overloaded the definition of
+`__add__()`. But to support the case of having the `Int` as the left-hand side
+argument, we need to implement an `__radd__()` method, because the built-in
+`Int` type doesn't have an `__add__()` method that supports our custom `MyInt`
+type.
+
+```mojo
+@value
+struct MyInt:
+    var value: Int
+
+    def __add__(self, rhs: MyInt) -> Self:
+        return MyInt(self.value + rhs.value)
+
+    def __add__(self, rhs: Int) -> Self:
+        return MyInt(self.value + rhs)
+
+    def __radd__(self, lhs: Int) -> Self:
+        return MyInt(self.value + lhs)
+
+    def __iadd__(mut self, rhs: MyInt) -> None:
+        self.value += rhs.value
+
+    def __iadd__(mut self, rhs: Int) -> None:
+        self.value += rhs
+```
+
+### Comparison operator dunder methods
+
+When you have a comparison expression like `a < b`, Mojo invokes as associated
+dunder method on the left-hand side value and passes the right-hand side value
+as an argument. Mojo doesn't support "reflected" versions of these dunder
+methods because you should only compare values of the same type. The comparison
+dunder methods must return a `Bool` result representing the result of the
+comparison.
+
+There are two traits associated with the comparison dunder methods. A type that
+implements the [`Comparable`](/mojo/stdlib/builtin/comparable/Comparable) trait
+must define all of the comparison methods. However, some types don't have a
+natural ordering (for example, complex numbers). For those types you can decide
+to implement the
+[`EqualityComparable`](/mojo/stdlib/builtin/equality_comparable/EqualityComparable)
+trait, which requires defining only the equality and inequality comparison
+methods.
+
+The supported comparison operators and their corresponding methods are shown in
+the table below.
+
+| **Operator** | **Dunder method** |
+| ------------ | ----------------- |
+| `==` equality | `__eq__()` |
+| `!=` inequality | `__ne__()` |
+| `<` less than | `__lt__()` |
+| `<=` less than or equal | `__le__()` |
+| `>` greater than | `__gt__()` |
+| `>=` greater than or equal | `__ge__()` |
+
+:::note
+
+The `Comparable` and `EqualityComparable` traits don't allow the comparison
+dunder methods to raise errors. Because using `def` to define a method implies
+that it can raise an error, you must use `fn` to implement the comparison
+methods declared by these traits. See [Functions](/mojo/manual/functions) for
+more information on the differences between defining functions with `def` and
+`fn`.
+
+:::
+
+As an example, consider implementing support for all of the comparison operator
+dunder methods for a custom `MyInt` struct.
+
+```mojo
+@value
+struct MyInt(
+    Comparable
+):
+    var value: Int
+
+    fn __eq__(self, rhs: MyInt) -> Bool:
+        return self.value == rhs.value
+
+    fn __ne__(self, rhs: MyInt) -> Bool:
+        return self.value != rhs.value
+
+    fn __lt__(self, rhs: MyInt) -> Bool:
+        return self.value < rhs.value
+
+    fn __le__(self, rhs: MyInt) -> Bool:
+        return self.value <= rhs.value
+
+    fn __gt__(self, rhs: MyInt) -> Bool:
+        return self.value > rhs.value
+
+    fn __ge__(self, rhs: MyInt) -> Bool:
+        return self.value >= rhs.value
+```
+
+### Membership operator dunder methods
+
+The `in` and `not in` operators depend on a type implementing the
+`__contains__()` dunder method. Typically only collection types (such as `List`,
+`Dict`, and `Set`) implement this method. It should accept the right-hand side
+value as an argument and return a `Bool` indicating whether the value is present
+in the collection or not.
+
+### Subscript and slicing dunder methods
+
+Subscripting and slicing typically apply only to sequential collection types,
+like `List` and `String`. Subscripting references a single element of a
+collection or a dimension of a multi-dimensional container, whereas slicing
+refers to a range of values. A type supports both subscripting and slicing by
+implementing the `__getitem__()` method for retrieving values and the
+`__setitem__()` method for setting values.
+
+#### Subscripting
+
+In the simple case of a one-dimensional sequence, the `__getitem__()` and
+`__setitem__()` methods should have signatures similar to this:
+
+```mojo
+struct MySeq[type: CollectionElement]:
+    fn __getitem__(self, idx: Int) -> type:
+        # Return element at the given index
+        ...
+    fn __setitem__(mut self, idx: Int, value: type):
+        # Assign the element at the given index the provided value
+```
+
+It's also possible to support multi-dimensional collections, in which case you
+can implement both `__getitem__()` and `__setitem__()` methods to accept
+multiple index arguments—or even variadic index arguments for
+arbitrary—dimension collections.
+
+```mojo
+struct MySeq[type: CollectionElement]:
+    # 2-dimension support
+    fn __getitem__(self, x_idx: Int, y_idx: Int) -> type:
+        ...
+    # Arbitrary-dimension support
+    fn __getitem__(self, *indices: Int) -> type:
+        ...
+```
+
+#### Slicing
+
+You provide slicing support for a collection type also by implementing
+`__getitem__()` and `__setitem__()` methods. But for slicing, instead of
+accepting an `Int` index (or indices, in the case of a multi-dimensional
+collection) you implement to methods to accept a
+[`Slice`](/mojo/stdlib/builtin/builtin_slice/Slice) (or multiple `Slice`s in
+the case of a multi-dimensional collection).
+
+```mojo
+struct MySeq[type: CollectionElement]:
+    # Return a new MySeq with a subset of elements
+    fn __getitem__(self, span: Slice) -> Self:
+        ...
+
+```
+
+A `Slice` contains three fields:
+
+- `start` (`Optional[Int]`): The starting index of the slice
+- `end` (`Optional[Int]`): The ending index of the slice
+- `step` (`Optional[Int]`): The step increment value of the slice.
+
+Because the start, end, and step values are all optional when using slice
+syntax, they are represented as `Optional[Int]` values in the `Slice`. And if
+present, the index values might be negative representing a relative position
+from the end of the sequence. As a convenience, `Slice` provides an `indices()`
+method that accepts a `length` value and returns a 3-tuple of "normalized"
+start, end, and step values for the given length, all represented as
+non-negative values. You can then use these normalized values to determine the
+corresponding elements of your collection being referenced.
+
+```mojo
+struct MySeq[type: CollectionElement]:
+    var size: Int
+
+    # Return a new MySeq with a subset of elements
+    fn __getitem__(self, span: Slice) -> Self:
+        var start: Int
+        var end: Int
+        var step: Int
+        start, end, step = span.indices(self.size)
+        ...
+
+```
+
+## An example of implementing operators for a custom type
+
+As an example of implementing operators for a custom Mojo type, let's create a
+`Complex` struct to represent a single complex number, with both the real and
+imaginary components stored as `Float64` values. We'll implement most of the
+arithmetic operators, the associated in-place assignment operators, the equality
+comparison operators, and a few additional convenience methods to support
+operations like printing complex values. We'll also allow mixing `Complex` and
+`Float64` values in arithmetic expressions to produce a `Complex` result.
+
+This example builds our `Complex` struct incrementally. You can also find the
+[complete example in the public Mojo GitHub
+repo](https://github.com/modularml/mojo/tree/main/examples/operators).
+
+:::note
+
+Note that the Mojo standard library implements a parameterized
+[`ComplexSIMD`](/mojo/stdlib/complex/complex/ComplexSIMD) struct that provides
+support for a basic set of arithmetic operators. However, our `Complex` type
+will not be based on the `ComplexSIMD` struct or be compatible with it.
+
+:::
+
+### Implement lifecycle methods
+
+Our `Complex` struct is an example of a simple value type consisting of trivial
+numeric fields and requiring no special constructor or destructor behaviors.
+This means that we can take advantage of Mojo's
+[`@value`](/mojo/manual/decorators/value) decorator, which is described in
+[Simple value types](/mojo/manual/lifecycle/life#value-decorator), to
+automatically implement a member-wise initializer (a constructor with arguments
+for each field), a copy constructor, a move constructor, and a destructor.
+
+```mojo
+@value
+struct Complex():
+    var re: Float64
+    var im: Float64
+```
+
+This definition is enough for us to create `Complex` instances and access their
+real and imaginary fields.
+
+```mojo
+c1 = Complex(-1.2, 6.5)
+print(String("c1: Real: {}; Imaginary: {}").format(c1.re, c1.im))
+```
+
+```output
+c1: Real: -1.2; Imaginary: 6.5
+```
+
+As a convenience, let's add an explicit constructor to handle the case of
+creating a `Complex` instance with an imaginary component of 0.
+
+```mojo
+@value
+struct Complex():
+    var re: Float64
+    var im: Float64
+
+    fn __init__(out self, re: Float64, im: Float64 = 0.0):
+        self.re = re
+        self.im = im
+```
+
+Now we can create a `Complex` instance and provide just a real component.
+
+```mojo
+c2 = Complex(3.14159)
+print(String("c2: Real: {}; Imaginary: {}").format(c2.re, c2.im))
+```
+
+```output
+c2: Real: 3.1415899999999999; Imaginary: 0.0
+```
+
+### Implement the `Writable` and `Stringable` traits
+
+To make it simpler to print `Complex` values, let's implement the
+[Writable](/mojo/stdlib/utils/write/Writable) trait. While we're at it, let's
+also implement the [`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait so
+that we can use the `str()` function to generate a `String` representation of a
+`Complex` value. You can find out more about these traits and their associated
+methods in [The `Stringable`, `Representable`, and `Writable`
+traits](/mojo/manual/traits#the-stringable-representable-and-writable-traits).
+
+```mojo
+@value
+struct Complex(
+    Writable,
+    Stringable,
+):
+    # ...
+
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("(", self.re)
+        if self.im < 0:
+            writer.write(" - ", -self.im)
+        else:
+            writer.write(" + ", self.im)
+        writer.write("i)")
+```
+
+:::note
+
+The `Writable` trait doesn't allow the `write_to()` method to raise an error and
+the `Stringable` trait doesn't allow the `__str__()` method to raise an error.
+Because defining a method with `def` implies that it can raise an error, we
+instead have to define these methods with `fn`. See
+[Functions](/mojo/manual/functions) for more information on the differences
+between defining functions with `def` and `fn`.
+
+:::
+
+Now we can print a `Complex` value directly, and we can explicitly generate a
+`String` representation by passing a `Complex` value to `str()`.
+
+```mojo
+c3 = Complex(3.14159, -2.71828)
+print("c3 =", c3)
+
+var msg: String = "The value is: " + str(c3)
+print(msg)
+```
+
+```output
+c3 = (3.1415899999999999 - 2.71828i)
+The value is: (3.1415899999999999 - 2.71828i)
+```
+
+### Implement basic indexing
+
+Indexing usually is supported only by collection types. But as an example, let's
+implement support for accessing the real component as index 0 and the imaginary
+component as index 1. We'll not implement slicing or variadic assignment for
+this example.
+
+```mojo
+    # ...
+    def __getitem__(self, idx: Int) -> Float64:
+        if idx == 0:
+            return self.re
+        elif idx == 1:
+            return self.im
+        else:
+            raise "index out of bounds"
+
+    def __setitem__(mut self, idx: Int, value: Float64) -> None:
+        if idx == 0:
+            self.re = value
+        elif idx == 1:
+            self.im = value
+        else:
+            raise "index out of bounds"
+```
+
+Now let's try getting and setting the real and imaginary components of a
+`Complex` value using indexing.
+
+```mojo
+c2 = Complex(3.14159)
+print(String("c2[0]: {}; c2[1]: {}").format(c2[0], c2[1]))
+c2[0] = 2.71828
+c2[1] = 42
+print("c2[0] = 2.71828; c2[1] = 42; c2:", c2)
+```
+
+```output
+c2[0]: 3.1415899999999999; c2[1]: 0.0
+c2[0] = 2.71828; c2[1] = 42; c2: (2.71828 + 42.0i)
+```
+
+### Implement arithmetic operators
+
+Now let's implement the dunder methods that allow us to perform arithmetic
+operations on `Complex` values. (Refer to the [Wikipedia
+page](https://en.wikipedia.org/wiki/Complex_number) on complex numbers for a
+more in-depth explanation of the formulas for these operators.)
+
+#### Implement basic operators for `Complex` values
+
+The unary `+` operator simply returns the original value, whereas the unary `-`
+operator returns a new `Complex` value with the real and imaginary components
+negated.
+
+```mojo
+    # ...
+    def __pos__(self) -> Self:
+        return self
+
+    def __neg__(self) -> Self:
+        return Self(-self.re, -self.im)
+```
+
+Let's test these out by printing the result of applying each operator.
+
+```mojo
+c1 = Complex(-1.2, 6.5)
+print("+c1:", +c1)
+print("-c1:", -c1)
+```
+
+```output
++c1: (-1.2 + 6.5i)
+-c1: (1.2 - 6.5i)
+```
+
+Next we'll implement the basic binary operators: `+`, `-`, `*`, and `/`.
+Dividing complex numbers is a bit tricky, so we'll also define a helper method
+called `norm()` to calculate the [Euclidean
+norm](https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm_of_complex_numbers)
+of a `Complex` instance, which can also be useful for other types of analysis
+with complex numbers.
+
+For all of these dunder methods, the left-hand side operand is `self` and the
+right-hand side operand is passed as an argument. We return a new `Complex`
+value representing the result.
+
+```mojo
+from math import sqrt
+
+# ...
+
+    def __add__(self, rhs: Self) -> Self:
+        return Self(self.re + rhs.re, self.im + rhs.im)
+
+    def __sub__(self, rhs: Self) -> Self:
+        return Self(self.re - rhs.re, self.im - rhs.im)
+
+    def __mul__(self, rhs: Self) -> Self:
+        return Self(
+            self.re * rhs.re - self.im * rhs.im,
+            self.re * rhs.im + self.im * rhs.re
+        )
+
+    def __truediv__(self, rhs: Self) -> Self:
+        denom = rhs.squared_norm()
+        return Self(
+            (self.re * rhs.re + self.im * rhs.im) / denom,
+            (self.im * rhs.re - self.re * rhs.im) / denom
+        )
+
+    def squared_norm(self) -> Float64:
+        return self.re * self.re + self.im * self.im
+
+    def norm(self) -> Float64:
+        return sqrt(self.squared_norm())
+```
+
+Now we can try them out.
+
+```mojo
+c1 = Complex(-1.2, 6.5)
+c3 = Complex(3.14159, -2.71828)
+print("c1 + c3 =", c1 + c3)
+print("c1 - c3 =", c1 - c3)
+print("c1 * c3 =", c1 * c3)
+print("c1 / c3 =", c1 / c3)
+```
+
+```output
+c1 + c3 = (1.9415899999999999 + 3.78172i)
+c1 - c3 = (-4.3415900000000001 + 9.21828i)
+c1 * c3 = (13.898912000000001 + 23.682270999999997i)
+c1 / c3 = (-1.2422030701265261 + 0.99419218883955773i)
+```
+
+#### Implement overloaded arithmetic operators for `Float64` values
+
+Our initial set of binary arithmetic operators work fine if both operands are
+`Complex` instances. But if we have a `Float64` value representing just a real
+value, we'd first need to use it to create a `Complex` value before we could
+add, subtract, multiply, or divide it with another `Complex` value. If we think
+that this will be a common use case, it makes sense to overload our arithmetic
+methods to accept a `Float64` as the second operand.
+
+For the case where we have `complex1 + float1`, we can just create an overloaded
+definition of `__add__()`. But what about the case of `float1 + complex1`? By
+default, when Mojo encounters a `+` operator it tries to invoke the `__add__()`
+method of the left-hand operand, but the built-in `Float64` type doesn't
+implement support for addition with a `Complex` value. This is an example where
+we need to implement the `__radd__()` method on the `Complex` type. When Mojo
+can't find an `__add__(self, rhs: Complex) -> Complex` method defined on
+`Float64`, it uses the `__radd__(self, lhs: Float64) -> Complex` method defined
+on `Complex`.
+
+So we can support arithmetic operations on `Complex` and `Float64` values by
+implementing the following eight methods.
+
+```mojo
+    # ...
+    def __add__(self, rhs: Float64) -> Self:
+        return Self(self.re + rhs, self.im)
+
+    def __radd__(self, lhs: Float64) -> Self:
+        return Self(self.re + lhs, self.im)
+
+    def __sub__(self, rhs: Float64) -> Self:
+        return Self(self.re - rhs, self.im)
+
+    def __rsub__(self, lhs: Float64) -> Self:
+        return Self(lhs - self.re, -self.im)
+
+    def __mul__(self, rhs: Float64) -> Self:
+        return Self(self.re * rhs, self.im * rhs)
+
+    def __rmul__(self, lhs: Float64) -> Self:
+        return Self(lhs * self.re, lhs * self.im)
+
+    def __truediv__(self, rhs: Float64) -> Self:
+        return Self(self.re / rhs, self.im / rhs)
+
+    def __rtruediv__(self, lhs: Float64) -> Self:
+        denom = self.squared_norm()
+        return Self(
+            (lhs * self.re) / denom,
+            (-lhs * self.im) / denom
+        )
+```
+
+Let's see them in action.
+
+```mojo
+c1 = Complex(-1.2, 6.5)
+f1 = 2.5
+print("c1 + f1 =", c1 + f1)
+print("f1 + c1 =", f1 + c1)
+print("c1 - f1 =", c1 - f1)
+print("f1 - c1 =", f1 - c1)
+print("c1 * f1 =", c1 * f1)
+print("f1 * c1 =", f1 * c1)
+print("c1 / f1 =", c1 / f1)
+print("f1 / c1 =", f1 / c1)
+```
+
+```output
+c1 + f1 = (1.3 + 6.5i)
+f1 + c1 = (1.3 + 6.5i)
+c1 - f1 = (-3.7000000000000002 + 6.5i)
+f1 - c1 = (3.7000000000000002 - 6.5i)
+c1 * f1 = (-3.0 + 16.25i)
+f1 * c1 = (-3.0 + 16.25i)
+c1 / f1 = (-0.47999999999999998 + 2.6000000000000001i)
+f1 / c1 = (-0.068665598535133904 - 0.37193865873197529i)
+```
+
+#### Implement in-place assignment operators
+
+Now let's implement support for the in-place assignment operators: `+=`, `-=`,
+`*=`, and `/=`. These modify the original value, so we need to mark `self` as
+being an `mut` argument and update the `re` and `im` fields instead of
+returning a new `Complex` instance. And once again, we'll overload the
+definitions to support both a `Complex` and a `Float64` operand.
+
+```mojo
+    # ...
+    def __iadd__(mut self, rhs: Self) -> None:
+        self.re += rhs.re
+        self.im += rhs.im
+
+    def __iadd__(mut self, rhs: Float64) -> None:
+        self.re += rhs
+
+    def __isub__(mut self, rhs: Self) -> None:
+        self.re -= rhs.re
+        self.im -= rhs.im
+
+    def __isub__(mut self, rhs: Float64) -> None:
+        self.re -= rhs
+
+    def __imul__(mut self, rhs: Self) -> None:
+        new_re = self.re * rhs.re - self.im * rhs.im
+        new_im = self.re * rhs.im + self.im * rhs.re
+        self.re = new_re
+        self.im = new_im
+
+    def __imul__(mut self, rhs: Float64) -> None:
+        self.re *= rhs
+        self.im *= rhs
+
+    def __itruediv__(mut self, rhs: Self) -> None:
+        denom = rhs.squared_norm()
+        new_re = (self.re * rhs.re + self.im * rhs.im) / denom
+        new_im = (self.im * rhs.re - self.re * rhs.im) / denom
+        self.re = new_re
+        self.im = new_im
+
+    def __itruediv__(mut self, rhs: Float64) -> None:
+        self.re /= rhs
+        self.im /= rhs
+```
+
+And now to try them out.
+
+```mojo
+c4 = Complex(-1, -1)
+print("c4 =", c4)
+c4 += Complex(0.5, -0.5)
+print("c4 += Complex(0.5, -0.5) =>", c4)
+c4 += 2.75
+print("c4 += 2.75 =>", c4)
+c4 -= Complex(0.25, 1.5)
+print("c4 -= Complex(0.25, 1.5) =>", c4)
+c4 -= 3
+print("c4 -= 3 =>", c4)
+c4 *= Complex(-3.0, 2.0)
+print("c4 *= Complex(-3.0, 2.0) =>", c4)
+c4 *= 0.75
+print("c4 *= 0.75 =>", c4)
+c4 /= Complex(1.25, 2.0)
+print("c4 /= Complex(1.25, 2.0) =>", c4)
+c4 /= 2.0
+print("c4 /= 2.0 =>", c4)
+```
+
+```output
+c4 = (-1.0 - 1.0i)
+c4 += Complex(0.5, -0.5) => (-0.5 - 1.5i)
+c4 += 2.75 => (2.25 - 1.5i)
+c4 -= Complex(0.25, 1.5) => (2.0 - 3.0i)
+c4 -= 3 => (-1.0 - 3.0i)
+c4 *= Complex(-3.0, 2.0) => (9.0 + 7.0i)
+c4 *= 0.75 => (6.75 + 5.25i)
+c4 /= Complex(1.25, 2.0) => (3.404494382022472 - 1.247191011235955i)
+c4 /= 2.0 => (1.702247191011236 - 0.6235955056179775i)
+```
+
+### Implement equality operators
+
+The field of complex numbers is not an ordered field, so it doesn't make sense
+for us to implement the `Comparable` trait and the `>`, `>=`, `<`, and `<=`
+operators. However, we can implement the `EqualityComparable` trait and the `==`
+and `!=` operators. (Of course, this suffers the same limitation of comparing
+floating point numbers for equality because of the limited precision of
+representing floating point numbers when performing arithmetic operations. But
+we'll go ahead and implement the operators for completeness.)
+
+```mojo
+@value
+struct Complex(
+    EqualityComparable,
+    Formattable,
+    Stringable,
+):
+    # ...
+    fn __eq__(self, other: Self) -> Bool:
+        return self.re == other.re and self.im == other.im
+
+    fn __ne__(self, other: Self) -> Bool:
+        return self.re != other.re and self.im != other.im
+```
+
+:::note
+
+The `EqualityComparable` trait doesn't allow the `__eq__()` and `__ne__()`
+methods to raise errors. Because defining a method with `def` implies that it
+can raise an error, we instead have to define these methods with `fn`. See
+[Functions](/mojo/manual/functions) for more information on the differences
+between defining functions with `def` and `fn`.
+
+:::
+
+And now to try them out.
+
+```mojo
+c1 = Complex(-1.2, 6.5)
+c3 = Complex(3.14159, -2.71828)
+c5 = Complex(-1.2, 6.5)
+
+if c1 == c5:
+    print("c1 is equal to c5")
+else:
+    print("c1 is not equal to c5")
+
+if c1 != c3:
+    print("c1 is not equal to c3")
+else:
+    print("c1 is equal to c3")
+```
+
+```output
+c1 is equal to c5
+c1 is not equal to c3
+```

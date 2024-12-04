@@ -11,8 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo-no-debug %s -t
+# NOTE: to test changes on the current branch using run-benchmarks.sh, remove
+# the -t flag. Remember to replace it again before pushing any code.
 
 from sys import simdwidthof
+
 from algorithm import elementwise
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 from buffer import Buffer
@@ -24,7 +27,7 @@ from utils.index import Index, IndexList
 # Benchmark elementwise
 # ===----------------------------------------------------------------------===#
 @parameter
-fn bench_elementwise[n: Int](inout b: Bencher) raises:
+fn bench_elementwise[n: Int](mut b: Bencher) raises:
     var vector = Buffer[DType.index, n].stack_allocation()
 
     for i in range(len(vector)):

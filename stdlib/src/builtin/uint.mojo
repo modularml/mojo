@@ -15,19 +15,22 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import bitwidthof
-from utils._visualizers import lldb_formatter_wrapping_type
-from builtin._documentation import doc_private
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from hashlib.hash import _hash_simd
+from sys import bitwidthof
+
+from documentation import doc_private
+
+from utils._visualizers import lldb_formatter_wrapping_type
 
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(IntLike):
+struct UInt(IntLike, _HashableWithHasher):
     """This type represents an unsigned integer.
 
-    An unsigned integer is represents a positive integral number.
+    An unsigned integer represents a positive integral number.
 
     The size of this unsigned integer is platform-dependent.
 
@@ -53,13 +56,14 @@ struct UInt(IntLike):
     """
 
     @always_inline("nodebug")
-    fn __init__(inout self):
+    fn __init__(out self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.index):
+    @implicit
+    fn __init__(out self, value: __mlir_type.index):
         """Construct UInt from the given index value.
 
         Args:
@@ -69,7 +73,8 @@ struct UInt(IntLike):
 
     @doc_private
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
+    @implicit
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct UInt from the given Index value.
 
         Args:
@@ -80,7 +85,8 @@ struct UInt(IntLike):
         )
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
+    @implicit
+    fn __init__(out self, value: Int):
         """Construct UInt from the given index value.
 
         Args:
@@ -89,7 +95,8 @@ struct UInt(IntLike):
         self.value = value.value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: IntLiteral):
+    @implicit
+    fn __init__(out self, value: IntLiteral):
         """Construct UInt from the given IntLiteral value.
 
         Args:
@@ -120,14 +127,17 @@ struct UInt(IntLike):
         Returns:
             The string representation of this UInt.
         """
-        return String.format_sequence(self)
+        return String.write(self)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """Formats this integer to the provided formatter.
+    fn write_to[W: Writer](self, mut writer: W):
+        """Formats this integer to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
 
         Args:
-            writer: The formatter to write to.
+            writer: The object to write to.
         """
 
         writer.write(UInt64(self))
@@ -145,7 +155,7 @@ struct UInt(IntLike):
         Returns:
             The string representation of this UInt.
         """
-        return "UInt(" + str(self) + ")"
+        return String.write("UInt(", str(self), ")")
 
     fn __hash__(self) -> UInt:
         """Hash the UInt using builtin hash.
@@ -157,6 +167,17 @@ struct UInt(IntLike):
         """
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.uint64](self))
+
+    fn __hash__[H: _Hasher](self, mut hasher: H):
+        """Updates hasher with this uint value.
+
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
+        """
+        hasher._update_with_simd(UInt64(self))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: UInt) -> Bool:
@@ -364,12 +385,25 @@ struct UInt(IntLike):
         """
         return __mlir_op.`index.or`(self.value, rhs.value)
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return __mlir_op.`index.ceildivu`(self.value, denominator.value)
+
     # ===----------------------------------------------------------------------===#
     # In place operations.
     # ===----------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: UInt):
+    fn __iadd__(mut self, rhs: UInt):
         """Compute `self + rhs` and save the result in self.
 
         Args:
@@ -378,7 +412,7 @@ struct UInt(IntLike):
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: UInt):
+    fn __isub__(mut self, rhs: UInt):
         """Compute `self - rhs` and save the result in self.
 
         Args:
@@ -387,7 +421,7 @@ struct UInt(IntLike):
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: UInt):
+    fn __imul__(mut self, rhs: UInt):
         """Compute self*rhs and save the result in self.
 
         Args:
@@ -395,7 +429,7 @@ struct UInt(IntLike):
         """
         self = self * rhs
 
-    fn __itruediv__(inout self, rhs: UInt):
+    fn __itruediv__(mut self, rhs: UInt):
         """Compute `self / rhs`, convert to int, and save the result in self.
 
         Since `floor(self / rhs)` is equivalent to `self // rhs`, this yields
@@ -407,7 +441,7 @@ struct UInt(IntLike):
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: UInt):
+    fn __ifloordiv__(mut self, rhs: UInt):
         """Compute `self // rhs` and save the result in self.
 
         Args:
@@ -415,7 +449,7 @@ struct UInt(IntLike):
         """
         self = self // rhs
 
-    fn __imod__(inout self, rhs: UInt):
+    fn __imod__(mut self, rhs: UInt):
         """Compute `self % rhs` and save the result in self.
 
         Args:
@@ -424,7 +458,7 @@ struct UInt(IntLike):
         self = self % rhs
 
     @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: UInt):
+    fn __ipow__(mut self, rhs: UInt):
         """Compute `pow(self, rhs)` and save the result in self.
 
         Args:
@@ -433,7 +467,7 @@ struct UInt(IntLike):
         self = self**rhs
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: UInt):
+    fn __ilshift__(mut self, rhs: UInt):
         """Compute `self << rhs` and save the result in self.
 
         Args:
@@ -442,7 +476,7 @@ struct UInt(IntLike):
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: UInt):
+    fn __irshift__(mut self, rhs: UInt):
         """Compute `self >> rhs` and save the result in self.
 
         Args:
@@ -451,7 +485,7 @@ struct UInt(IntLike):
         self = self >> rhs
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: UInt):
+    fn __iand__(mut self, rhs: UInt):
         """Compute `self & rhs` and save the result in self.
 
         Args:
@@ -460,7 +494,7 @@ struct UInt(IntLike):
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: UInt):
+    fn __ixor__(mut self, rhs: UInt):
         """Compute `self ^ rhs` and save the result in self.
 
         Args:
@@ -469,7 +503,7 @@ struct UInt(IntLike):
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: UInt):
+    fn __ior__(mut self, rhs: UInt):
         """Compute self|rhs and save the result in self.
 
         Args:

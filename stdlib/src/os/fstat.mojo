@@ -46,7 +46,7 @@ fn _constrain_unix():
 
 
 @value
-struct stat_result(Stringable):
+struct stat_result(Stringable, Writable):
     """Object whose fields correspond  to the members of the stat structure."""
 
     var st_mode: Int
@@ -96,7 +96,7 @@ struct stat_result(Stringable):
     """User defined flags for file."""
 
     fn __init__(
-        inout self,
+        mut self,
         /,
         *,
         st_mode: Int,
@@ -151,29 +151,42 @@ struct stat_result(Stringable):
         self.st_flags = st_flags
 
     @no_inline
+    fn write_to[W: Writer](self, mut writer: W):
+        """
+        Formats this path to the provided Writer.
+
+        Parameters:
+            W: A type conforming to the Writable trait.
+
+        Args:
+            writer: The object to write to.
+        """
+        writer.write("os.stat_result(")
+        writer.write("st_mode=", self.st_mode)
+        writer.write(", st_ino=", self.st_ino)
+        writer.write(", st_dev=", self.st_dev)
+        writer.write(", st_nlink=", self.st_nlink)
+        writer.write(", st_uid=", self.st_uid)
+        writer.write(", st_gid=", self.st_gid)
+        writer.write(", st_size=", self.st_size)
+        writer.write(", st_atime=", str(self.st_atimespec))
+        writer.write(", st_mtime=", str(self.st_mtimespec))
+        writer.write(", st_ctime=", str(self.st_ctimespec))
+        writer.write(", st_birthtime=", str(self.st_birthtimespec))
+        writer.write(", st_blocks=", self.st_blocks)
+        writer.write(", st_blksize=", self.st_blksize)
+        writer.write(", st_rdev=", self.st_rdev)
+        writer.write(", st_flags=", self.st_flags)
+        writer.write(")")
+
+    @no_inline
     fn __str__(self) -> String:
         """Constructs a string representation of stat_result.
 
         Returns:
           A string representation of stat_result.
         """
-        var res = String("os.stat_result(")
-        res += "st_mode=" + str(self.st_mode)
-        res += ", st_ino=" + str(self.st_ino)
-        res += ", st_dev=" + str(self.st_dev)
-        res += ", st_nlink=" + str(self.st_nlink)
-        res += ", st_uid=" + str(self.st_uid)
-        res += ", st_gid=" + str(self.st_gid)
-        res += ", st_size=" + str(self.st_size)
-        res += ", st_atime=" + str(self.st_atimespec)
-        res += ", st_mtime=" + str(self.st_mtimespec)
-        res += ", st_ctime=" + str(self.st_ctimespec)
-        res += ", st_birthtime=" + str(self.st_birthtimespec)
-        res += ", st_blocks=" + str(self.st_blocks)
-        res += ", st_blksize=" + str(self.st_blksize)
-        res += ", st_rdev=" + str(self.st_rdev)
-        res += ", st_flags=" + str(self.st_flags)
-        return res + ")"
+        return String.write(self)
 
     fn __repr__(self) -> String:
         """Constructs a representation of stat_result.
