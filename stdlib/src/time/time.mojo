@@ -127,6 +127,13 @@ fn _gettime_as_nsec_unix(clockid: Int) -> Int:
 
 
 @always_inline
+fn _gpu_clock() -> Int:
+    """Returns a 64-bit unsigned cycle counter."""
+    alias asm = "llvm.nvvm.read.ptx.sreg.clock64" if is_nvidia_gpu() else "llvm.amdgcn.s.memtime"
+    return int(llvm_intrinsic[asm, Int64]())
+
+
+@always_inline
 fn _realtime_nanoseconds() -> Int:
     """Returns the current realtime time in nanoseconds"""
     return _gettime_as_nsec_unix(_CLOCK_REALTIME)
@@ -137,7 +144,9 @@ fn _monotonic_nanoseconds() -> Int:
     """Returns the current monotonic time in nanoseconds"""
 
     @parameter
-    if os_is_windows():
+    if is_gpu():
+        return _gpu_clock()
+    elif os_is_windows():
         var ft = _FILETIME()
         external_call["GetSystemTimePreciseAsFileTime", NoneType](
             Pointer.address_of(ft)
@@ -151,7 +160,6 @@ fn _monotonic_nanoseconds() -> Int:
 @always_inline
 fn _monotonic_raw_nanoseconds() -> Int:
     """Returns the current monotonic time in nanoseconds"""
-
     return _gettime_as_nsec_unix(_CLOCK_MONOTONIC_RAW)
 
 
@@ -204,14 +212,6 @@ fn perf_counter_ns() -> Int:
     Returns:
         The current time in ns.
     """
-
-    @parameter
-    if is_nvidia_gpu():
-        return int(
-            inlined_assembly[
-                "mov.u64 $0, %globaltimer;", UInt64, constraints="=l"
-            ]()
-        )
     return _monotonic_nanoseconds()
 
 
@@ -349,17 +349,10 @@ fn sleep(sec: Float64):
     """
 
     @parameter
-    if is_nvidia_gpu():
+    if is_gpu():
         var nsec = sec * 1.0e9
-        llvm_intrinsic["llvm.nvvm.nanosleep", NoneType](
-            nsec.cast[DType.int32]()
-        )
-        return
-    elif is_amd_gpu():
-        var nsec = sec * 1.0e9
-        llvm_intrinsic["llvm.amdgcn.s.sleep", NoneType](
-            nsec.cast[DType.int32]()
-        )
+        alias intrinsic = "llvm.nvvm.nanosleep" if is_nvidia_gpu() else "llvm.amdgcn.s.sleep"
+        llvm_intrinsic[intrinsic, NoneType](nsec.cast[DType.int32]())
         return
 
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
