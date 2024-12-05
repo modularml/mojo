@@ -28,7 +28,7 @@ from testing import assert_true
 @always_inline
 @parameter
 fn time_me():
-    sleep(1)
+    sleep(1.0)
 
 
 @always_inline
@@ -50,7 +50,7 @@ fn time_templated_function[
 fn time_capturing_function(iters: Int) -> Int:
     @parameter
     fn time_fn():
-        sleep(1)
+        sleep(1.0)
 
     return time_function[time_fn]()
 
