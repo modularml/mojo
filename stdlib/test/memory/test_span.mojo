@@ -14,10 +14,8 @@
 
 from collections import InlineArray, List
 
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 from testing import assert_equal, assert_true
-
-from utils import Span
 
 
 def test_span_list_int():

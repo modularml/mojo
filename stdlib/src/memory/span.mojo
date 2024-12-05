@@ -13,10 +13,10 @@
 
 """Implements the Span type.
 
-You can import these APIs from the `utils.span` module. For example:
+You can import these APIs from the `memory` module. For example:
 
 ```mojo
-from utils import Span
+from memory import Span
 ```
 """
 

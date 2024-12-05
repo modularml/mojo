@@ -19,9 +19,9 @@ from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_char
 
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
-from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
+from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import _StringSliceIter, _to_string_list

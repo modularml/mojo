@@ -19,10 +19,8 @@ from time import now
 
 from bit import pop_count
 from builtin._location import __call_location
-from memory import memset_zero, stack_allocation
+from memory import memset_zero, stack_allocation, Span
 from testing import assert_equal, assert_not_equal, assert_true
-
-from utils import Span
 
 # Source: https://www.101languages.net/arabic/most-common-arabic-words/
 alias words_ar = """

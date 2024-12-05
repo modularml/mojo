@@ -20,7 +20,7 @@ from sys.ffi import c_char
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from memory import UnsafePointer, memcmp, pack_bits
+from memory import UnsafePointer, memcmp, pack_bits, Span
 from memory.memory import _memcmp_impl_unconstrained
 
 from utils import StringSlice
