@@ -229,11 +229,10 @@ fn dirname[PathLike: os.PathLike, //](path: PathLike) -> String:
         The directory component of a pathname.
     """
     var fspath = path.__fspath__()
-    alias sep = str(os.sep)
-    var i = fspath.rfind(sep) + 1
+    var i = fspath.rfind(os.sep) + 1
     var head = fspath[:i]
-    if head and head != sep * len(head):
-        return head.rstrip(sep)
+    if head and head != os.sep * len(head):
+        return head.rstrip(os.sep)
     return head
 
 
@@ -365,7 +364,7 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     i = fspath.rfind(os.sep) + 1
     head, tail = fspath[:i], fspath[i:]
     if head and head != str(os.sep) * len(head):
-        head = head.rstrip(sep)
+        head = str(head.rstrip(sep))
     return head, tail
 
 
@@ -386,11 +385,10 @@ fn basename[PathLike: os.PathLike, //](path: PathLike) -> String:
         The basename from the path.
     """
     var fspath = path.__fspath__()
-    alias sep = str(os.sep)
-    var i = fspath.rfind(sep) + 1
+    var i = fspath.rfind(os.sep) + 1
     var head = fspath[i:]
-    if head and head != sep * len(head):
-        return head.rstrip(sep)
+    if head and head != os.sep * len(head):
+        return head.rstrip(os.sep)
     return head
 
 

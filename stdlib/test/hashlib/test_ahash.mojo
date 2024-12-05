@@ -580,7 +580,7 @@ fn gen_word_pairs[words: String = words_en]() -> List[String]:
     try:
         var list = words.split(", ")
         for w in list:
-            var w1 = w[].strip()
+            var w1 = str(w[].strip())
             for w in list:
                 var w2 = w[].strip()
                 result.append(w1 + " " + w2)

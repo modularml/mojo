@@ -296,6 +296,8 @@ what we publish.
   reverse iterator over a `Span` using `reversed(my_span)`. Users should
   currently prefer this method over `my_span[::-1]`.
 
+- `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
+
 ### 🦋 Changed
 
 - The `inout` and `borrowed` argument conventions have been renamed to the `mut`
