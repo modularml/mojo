@@ -930,6 +930,35 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         return self.data
 
+    fn map(ref self, func: fn (mut T) -> None) -> Self:
+        """Map the values of the list into a new list trough a function.
+
+        Args:
+            func: The function used on every elements to create the new list.
+
+        Returns:
+            A new `List` created by calling `func` on every elements of `self`.
+
+        For example:
+        ```mojo
+        fn MyFunc(mut e: Int):
+            e+=1
+
+        var MyList = List(0, 1, 2).map(MyFunc)
+
+        print(
+            MyList[0] == 1,
+            MyList[1] == 2,
+            MyList[2] == 3,
+        )
+        ```.
+
+        """
+        var tmp = self
+        for i in tmp:
+            func(i[])
+        return tmp
+
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))
