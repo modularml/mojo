@@ -265,24 +265,6 @@ struct _VariadicListMemIter[
         return len(self.src[]) - self.index
 
 
-# Helper to compute the union of two origins:
-# TODO: parametric aliases would be nice.
-struct _lit_origin_union[
-    is_mutable: Bool, //,
-    a: Origin[is_mutable],
-    b: Origin[is_mutable],
-]:
-    alias result = __mlir_attr[
-        `#lit.origin.union<`,
-        a._mlir_origin,
-        `,`,
-        b._mlir_origin,
-        `> : !lit.origin<`,
-        is_mutable.value,
-        `>`,
-    ]
-
-
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
@@ -424,13 +406,12 @@ struct VariadicListMem[
     fn __getitem__(
         self, idx: Int
     ) -> ref [
-        _lit_origin_union[
-            origin,
-            # cast mutability of self to match the mutability of the element,
-            # since that is what we want to use in the ultimate reference and
-            # the union overall doesn't matter.
-            Origin[elt_is_mutable].cast_from[__origin_of(self)].result,
-        ].result
+        # cast mutability of self to match the mutability of the element,
+        # since that is what we want to use in the ultimate reference and
+        # the union overall doesn't matter.
+        Origin[elt_is_mutable]
+        .cast_from[__origin_of(origin, self)]
+        .result
     ] element_type:
         """Gets a single element on the variadic list.
 
