@@ -1122,30 +1122,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 # ===-----------------------------------------------------------------------===#
 
 
-trait Stringlike:
-    """Trait intended to be used only with `String`, `StringLiteral` and
-    `StringSlice`."""
-
-    fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        ...
-
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        ...
-
-
 fn _to_string_list[
     T: CollectionElement,  # TODO(MOCO-1446): Make `T` parameter inferred
     len_fn: fn (T) -> Int,
