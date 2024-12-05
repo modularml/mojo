@@ -108,6 +108,19 @@ struct StringLiteral(
 
     @always_inline("nodebug")
     @staticmethod
+    fn get[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The value to convert to StringLiteral.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[value]()
+
+    @always_inline("nodebug")
+    @staticmethod
     fn get[type: Stringable, //, value: type]() -> StringLiteral:
         """Form a string literal from an arbitrary compile-time stringable value.
 
