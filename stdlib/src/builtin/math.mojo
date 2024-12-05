@@ -236,7 +236,7 @@ fn min(x: SIMD, y: __type_of(x), /) -> __type_of(x):
     corresponding elements in x and y.
 
     Constraints:
-        The type of the inputs must be numeric.
+        The type of the inputs must be numeric or boolean.
 
     Args:
         x: First SIMD vector.
@@ -245,8 +245,16 @@ fn min(x: SIMD, y: __type_of(x), /) -> __type_of(x):
     Returns:
         A SIMD vector containing the elementwise minimum of x and y.
     """
-    constrained[x.type.is_numeric(), "the SIMD type must be numeric"]()
-    return __mlir_op.`pop.min`(x.value, y.value)
+
+    @parameter
+    if x.type is DType.bool:
+        return min(x.cast[DType.uint8](), y.cast[DType.uint8]()).cast[x.type]()
+    else:
+        constrained[
+            x.type.is_numeric(), "the SIMD type must be numeric or boolean"
+        ]()
+
+        return __mlir_op.`pop.min`(x.value, y.value)
 
 
 # ===----------------------------------------------------------------------=== #
