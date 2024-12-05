@@ -620,6 +620,9 @@ what we publish.
 - [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
   [BUG] Mutability not preserved when taking the union of two origins.
 
+- [Issue #3829](https://github.com/modularml/mojo/issues/3829) - Poor error
+  message when invoking a function pointer upon an argument of the wrong origin
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
