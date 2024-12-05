@@ -24,7 +24,8 @@ import sys
 from collections import List, Optional
 from pathlib import Path
 
-from utils import Span, write_buffered
+from memory import Span
+from utils import write_buffered
 
 alias TMP_MAX = 10_000
 

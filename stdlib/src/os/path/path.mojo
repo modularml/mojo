@@ -24,7 +24,8 @@ from pwd import getpwuid
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
 
-from utils import Span, StringSlice
+from memory import Span
+from utils import StringSlice
 
 from .. import PathLike
 from .._linux_aarch64 import _lstat as _lstat_linux_arm

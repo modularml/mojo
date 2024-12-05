@@ -19,7 +19,7 @@ from collections import Deque, Dict
 from collections.deque import _DequeIter
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
-from utils.span import Span, _SpanIter
+from memory.span import Span, _SpanIter
 
 from .range import _StridedRange
 

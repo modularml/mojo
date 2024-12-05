@@ -50,9 +50,9 @@ from builtin.dtype import _uint_type_of_width
 from builtin.format_int import _try_write_int
 from builtin.io import _snprintf
 from documentation import doc_private
-from memory import UnsafePointer, bitcast
+from memory import UnsafePointer, bitcast, Span
 
-from utils import IndexList, Span, StaticTuple, StringSlice
+from utils import IndexList, StaticTuple, StringSlice
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan

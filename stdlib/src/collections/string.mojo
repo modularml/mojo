@@ -23,12 +23,11 @@ from sys.ffi import c_char
 from sys.intrinsics import _type_is_eq
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, Span
 from python import PythonObject
 
 from utils import (
     IndexList,
-    Span,
     StaticString,
     StringRef,
     StringSlice,

@@ -27,10 +27,9 @@ from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, Span
 from memory.memory import _memcmp_impl_unconstrained
 
-from utils import Span
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 
 from ._utf8_validation import _is_valid_utf8

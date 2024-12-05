@@ -16,5 +16,6 @@ from .arc import ArcPointer
 from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
 from .owned_pointer import OwnedPointer
 from .pointer import AddressSpace, Pointer
+from .span import AsBytes, Span
 from .unsafe import bitcast, pack_bits
 from .unsafe_pointer import UnsafePointer

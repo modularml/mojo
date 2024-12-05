@@ -363,7 +363,7 @@ what we publish.
   `String.write`. Here's an example of using all the changes:
 
   ```mojo
-  from utils import Span
+  from memory import Span
 
   @value
   struct NewString(Writer, Writable):
@@ -581,6 +581,8 @@ what we publish.
   x = PythonObject([1,2,3])
   if 1 in x:
      print("1 in x")
+
+- `Span` has moved from the `utils` module to the `memory` module.
 
 ### ❌ Removed
 
