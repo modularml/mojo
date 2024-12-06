@@ -13,15 +13,17 @@
 """Implements the StringRef class.
 """
 
-from bit import count_trailing_zeros
-from builtin.dtype import _uint_type_of_width
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from sys import simdwidthof
+from sys.ffi import c_char
+
+from bit import count_trailing_zeros
+from builtin.dtype import _uint_type_of_width
 from memory import UnsafePointer, memcmp, pack_bits
 from memory.memory import _memcmp_impl_unconstrained
+
 from utils import StringSlice
-from sys.ffi import c_char
-from sys import simdwidthof
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -33,9 +35,9 @@ fn _align_down(value: Int, alignment: Int) -> Int:
     return value._positive_div(alignment) * alignment
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StringRef
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -85,6 +87,7 @@ struct StringRef(
         self.length = other.length
 
     @always_inline
+    @implicit
     fn __init__(out self, str: StringLiteral):
         """Construct a StringRef value given a constant string.
 
@@ -127,6 +130,7 @@ struct StringRef(
         self = StringRef(ptr, len)
 
     @always_inline
+    @implicit
     fn __init__(out self, ptr: UnsafePointer[c_char]):
         """Construct a StringRef value given a null-terminated string.
 
@@ -213,7 +217,7 @@ struct StringRef(
             return StringRef()
         return Self(self.data, self.length - num_bytes)
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
@@ -353,7 +357,7 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -407,7 +411,7 @@ struct StringRef(
         return String.write("StringRef(", repr(str(self)), ")")
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this StringRef to the provided Writer.
 
@@ -652,9 +656,9 @@ struct StringRef(
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline

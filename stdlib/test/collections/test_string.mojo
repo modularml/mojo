@@ -17,6 +17,7 @@ from collections.string import (
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+
 from memory import UnsafePointer
 from python import Python
 from testing import (
@@ -32,7 +33,7 @@ from utils import StringRef, StringSlice
 
 @value
 struct AString(Stringable):
-    fn __str__(self: Self) -> String:
+    fn __str__(self) -> String:
         return "a string"
 
 
@@ -855,6 +856,8 @@ def test_isupper():
     assert_false(String("AsDG").isupper())
     assert_true(String("ABC123").isupper())
     assert_false(String("1!").isupper())
+    assert_true(String("É").isupper())
+    assert_false(String("é").isupper())
 
 
 def test_islower():
@@ -873,6 +876,8 @@ def test_islower():
     assert_false(String("asdFDg").islower())
     assert_true(String("abc123").islower())
     assert_false(String("1!").islower())
+    assert_true(String("é").islower())
+    assert_false(String("É").islower())
 
 
 def test_lower():
@@ -882,8 +887,8 @@ def test_lower():
 
     assert_equal(String("MOJO🔥").lower(), "mojo🔥")
 
-    # TODO(#26444): Non-ASCII not supported yet
-    assert_equal(String("É").lower(), "É")
+    assert_equal(String("É").lower(), "é")
+    assert_equal(String("é").lower(), "é")
 
 
 def test_upper():
@@ -893,8 +898,8 @@ def test_upper():
 
     assert_equal(String("mojo🔥").upper(), "MOJO🔥")
 
-    # TODO(#26444): Non-ASCII not supported yet
     assert_equal(String("É").upper(), "É")
+    assert_equal(String("é").upper(), "É")
 
 
 def test_isspace():
@@ -1205,19 +1210,23 @@ def test_string_iter():
 
     var idx = -1
     vs = String("mojo🔥")
-    for item in vs:
-        idx += 1
-        if idx == 0:
-            assert_equal("m", item)
-        elif idx == 1:
-            assert_equal("o", item)
-        elif idx == 2:
-            assert_equal("j", item)
-        elif idx == 3:
-            assert_equal("o", item)
-        elif idx == 4:
-            assert_equal("🔥", item)
-    assert_equal(4, idx)
+    var iterator = vs.__iter__()
+    assert_equal(5, len(iterator))
+    var item = iterator.__next__()
+    assert_equal("m", item)
+    assert_equal(4, len(iterator))
+    item = iterator.__next__()
+    assert_equal("o", item)
+    assert_equal(3, len(iterator))
+    item = iterator.__next__()
+    assert_equal("j", item)
+    assert_equal(2, len(iterator))
+    item = iterator.__next__()
+    assert_equal("o", item)
+    assert_equal(1, len(iterator))
+    item = iterator.__next__()
+    assert_equal("🔥", item)
+    assert_equal(0, len(iterator))
 
     var items = List[String](
         "mojo🔥",

@@ -48,7 +48,7 @@ frequency.
 <div class="mojo-function-sig">
 
 ```mojo
-__init__(inout self: out_file: Optional[Path] = None, min_runtime_secs: SIMD[float64, 1] = 1.0, max_runtime_secs: SIMD[float64, 1] = 2.0, min_warmuptime_secs: SIMD[float64, 1] = 1.0, max_batch_size: Int = 0, max_iters: Int = 1000000000, num_repetitions: Int = 1, flush_denormals: Bool = True)
+__init__(out self: out_file: Optional[Path] = None, min_runtime_secs: SIMD[float64, 1] = 1.0, max_runtime_secs: SIMD[float64, 1] = 2.0, min_warmuptime_secs: SIMD[float64, 1] = 1.0, max_batch_size: Int = 0, max_iters: Int = 1000000000, num_repetitions: Int = 1, flush_denormals: Bool = True)
 ```
 
 </div>

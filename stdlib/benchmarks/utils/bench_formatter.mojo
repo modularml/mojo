@@ -15,22 +15,23 @@
 # the -t flag. Remember to replace it again before pushing any code.
 
 from sys import simdwidthof
+
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 
 from utils.stringref import _align_down, _memchr, _memmem
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Data
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmarks
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_writer_int[n: Int](inout b: Bencher) raises:
+fn bench_writer_int[n: Int](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -42,7 +43,7 @@ fn bench_writer_int[n: Int](inout b: Bencher) raises:
 
 
 @parameter
-fn bench_writer_simd[n: Int](inout b: Bencher) raises:
+fn bench_writer_simd[n: Int](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -53,9 +54,9 @@ fn bench_writer_simd[n: Int](inout b: Bencher) raises:
     b.iter[call_fn]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 def main():
     var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_writer_int[42]](BenchId("bench_writer_int_42"))

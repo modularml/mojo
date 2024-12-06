@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_true, assert_false
+from testing import assert_equal, assert_false, assert_true
 
 from utils import Span, StringSlice
 from utils._utf8_validation import _is_valid_utf8
@@ -584,7 +584,7 @@ def test_split():
     assert_equal(",".join(st("123").split("")), ",1,2,3,")
 
 
-fn main() raises:
+def main():
     test_string_literal_byte_span()
     test_string_byte_span()
     test_heap_string_from_string_slice()

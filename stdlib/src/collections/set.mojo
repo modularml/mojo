@@ -15,9 +15,9 @@
 from .dict import (
     Dict,
     KeyElement,
+    RepresentableKeyElement,
     _DictEntryIter,
     _DictKeyIter,
-    RepresentableKeyElement,
 )
 
 
@@ -54,6 +54,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
+    @implicit
     fn __init__(out self, *ts: T):
         """Construct a set from initial elements.
 
@@ -64,6 +65,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for t in ts:
             self.add(t[])
 
+    @implicit
     fn __init__(out self, elements: Self):
         """Explicitly copy another Set instance.
 
@@ -74,6 +76,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
+    @implicit
     fn __init__(out self, elements: List[T, *_]):
         """Construct a set from a List of elements.
 
@@ -146,7 +149,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return self.intersection(other)
 
-    fn __iand__(inout self, other: Self):
+    fn __iand__(mut self, other: Self):
         """In-place set intersection.
 
         Updates the set to contain only the elements which are already in
@@ -169,7 +172,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return self.union(other)
 
-    fn __ior__(inout self, other: Self):
+    fn __ior__(mut self, other: Self):
         """In-place set union.
 
         Updates the set to contain all elements in the `other` set
@@ -192,7 +195,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return self.difference(other)
 
-    fn __isub__(inout self, other: Self):
+    fn __isub__(mut self, other: Self):
         """In-place set subtraction.
 
         Updates the set to remove any elements from the `other` set.
@@ -257,7 +260,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return self.symmetric_difference(other)
 
-    fn __ixor__(inout self, other: Self):
+    fn __ixor__(mut self, other: Self):
         """Overloads the ^= operator. Works like as `symmetric_difference_update` method.
 
         Updates the set with the symmetric difference of itself and another set.
@@ -331,7 +334,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     fn write_to[
         W: Writer,
         U: RepresentableKeyElement,
-    ](self: Set[U], inout writer: W):
+    ](self: Set[U], mut writer: W):
         """Write Set string representation to a `Writer`.
 
         Parameters:
@@ -354,9 +357,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _DictKeyIter[T, NoneType, __origin_of(self._data)]:
+    fn __iter__(ref self) -> _DictKeyIter[T, NoneType, __origin_of(self._data)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
@@ -365,7 +366,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         # here we rely on Set being a trivial wrapper of a Dict
         return _DictKeyIter(_DictEntryIter(0, 0, self._data))
 
-    fn add(inout self, t: T):
+    fn add(mut self, t: T):
         """Add an element to the set.
 
         Args:
@@ -373,7 +374,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         self._data[t] = None
 
-    fn remove(inout self, t: T) raises:
+    fn remove(mut self, t: T) raises:
         """Remove an element from the set.
 
         Args:
@@ -384,7 +385,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         self._data.pop(t)
 
-    fn pop(inout self) raises -> T:
+    fn pop(mut self) raises -> T:
         """Remove any one item from the set, and return it.
 
         As an implementation detail this will remove the first item
@@ -453,7 +454,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
                 result.add(e[])
         return result^
 
-    fn update(inout self, other: Self):
+    fn update(mut self, other: Self):
         """In-place set update.
 
         Updates the set to contain all elements in the `other` set
@@ -465,7 +466,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         for e in other:
             self.add(e[])
 
-    fn intersection_update(inout self, other: Self):
+    fn intersection_update(mut self, other: Self):
         """In-place set intersection update.
 
         Updates the set by retaining only elements found in both this set and the `other` set,
@@ -478,7 +479,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         # careful about concurrent iteration + mutation
         self.difference_update(self - other)
 
-    fn difference_update(inout self, other: Self):
+    fn difference_update(mut self, other: Self):
         """In-place set subtraction.
 
         Updates the set by removing all elements found in the `other` set,
@@ -565,7 +566,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
         return result^
 
-    fn symmetric_difference_update(inout self, other: Self):
+    fn symmetric_difference_update(mut self, other: Self):
         """Updates the set with the symmetric difference of itself and another set.
 
         Args:
@@ -573,7 +574,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         self = self.symmetric_difference(other)
 
-    fn discard(inout self, value: T):
+    fn discard(mut self, value: T):
         """Remove a value from the set if it exists. Pass otherwise.
 
         Args:
@@ -584,7 +585,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         except:
             pass
 
-    fn clear(inout self):
+    fn clear(mut self):
         """Removes all elements from the set.
 
         This method modifies the set in-place, removing all of its elements.

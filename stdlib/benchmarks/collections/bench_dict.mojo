@@ -14,19 +14,19 @@
 # NOTE: to test changes on the current branch using run-benchmarks.sh, remove
 # the -t flag. Remember to replace it again before pushing any code.
 
-from random import *
-
-from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from sys import sizeof
-from bit import bit_ceil
-from math import ceil
 from collections import Dict, Optional
 from collections.dict import DictEntry
+from math import ceil
+from random import *
+from sys import sizeof
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from bit import bit_ceil
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Data
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 fn make_dict[size: Int]() -> Dict[Int, Int]:
     var d = Dict[Int, Int]()
     for i in range(0, size):
@@ -34,11 +34,11 @@ fn make_dict[size: Int]() -> Dict[Int, Int]:
     return d
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Dict init
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_init(inout b: Bencher) raises:
+fn bench_dict_init(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -50,11 +50,11 @@ fn bench_dict_init(inout b: Bencher) raises:
     b.iter[call_fn]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Dict Insert
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_insert[size: Int](inout b: Bencher) raises:
+fn bench_dict_insert[size: Int](mut b: Bencher) raises:
     """Insert 100 new items."""
     var items = make_dict[size]()
 
@@ -68,11 +68,11 @@ fn bench_dict_insert[size: Int](inout b: Bencher) raises:
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Dict Lookup
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
+fn bench_dict_lookup[size: Int](mut b: Bencher) raises:
     """Lookup 100 items."""
     var items = make_dict[size]()
     var closest_divisor = ceil(100 / size)
@@ -96,9 +96,9 @@ fn bench_dict_lookup[size: Int](inout b: Bencher) raises:
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Dict Memory Footprint
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn total_bytes_used(items: Dict[Int, Int]) -> Int:
@@ -121,9 +121,9 @@ fn total_bytes_used(items: Dict[Int, Int]) -> Int:
     return amnt_bytes
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 def main():
     seed()
     var m = Bench(BenchConfig(num_repetitions=1))

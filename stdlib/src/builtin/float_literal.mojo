@@ -17,9 +17,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from math import Ceilable, CeilDivable, Floorable, Truncable
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # FloatLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -49,6 +49,7 @@ struct FloatLiteral(
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Self.fp_type):
         """Create a FloatLiteral value from a kgen.float_literal value.
 
@@ -58,6 +59,7 @@ struct FloatLiteral(
         self.value = value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Convert an IntLiteral to a FloatLiteral value.
 
@@ -445,6 +447,18 @@ struct FloatLiteral(
         """
         return rhs // self
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return -(self // -denominator)
+
     # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
@@ -452,7 +466,7 @@ struct FloatLiteral(
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: FloatLiteral):
+    fn __iadd__(mut self, rhs: FloatLiteral):
         """In-place addition operator.
 
         Args:
@@ -461,7 +475,7 @@ struct FloatLiteral(
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: FloatLiteral):
+    fn __isub__(mut self, rhs: FloatLiteral):
         """In-place subtraction operator.
 
         Args:
@@ -470,7 +484,7 @@ struct FloatLiteral(
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: FloatLiteral):
+    fn __imul__(mut self, rhs: FloatLiteral):
         """In-place multiplication operator.
 
         Args:
@@ -479,7 +493,7 @@ struct FloatLiteral(
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self, rhs: FloatLiteral):
+    fn __itruediv__(mut self, rhs: FloatLiteral):
         """In-place division.
 
         Args:

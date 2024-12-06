@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi import _Global
 
 from memory import UnsafePointer
-from testing import assert_equal, assert_false, assert_true
 from test_utils import ObservableDel
+from testing import assert_equal, assert_false, assert_true
 
 from utils import Variant
 
@@ -41,27 +41,21 @@ struct TestCounter(CollectionElement):
         self.moved = other.moved + 1
 
 
+alias TEST_VARIANT_POISON = _Global[
+    "TEST_VARIANT_POISON", Bool, _initialize_poison
+]
+
+
+fn _initialize_poison() -> Bool:
+    return False
+
+
 fn _poison_ptr() -> UnsafePointer[Bool]:
-    var ptr = _get_global[
-        "TEST_VARIANT_POISON", _initialize_poison, _destroy_poison
-    ]()
-    return ptr.bitcast[Bool]()
+    return TEST_VARIANT_POISON.get_or_create_ptr()
 
 
 fn assert_no_poison() raises:
     assert_false(_poison_ptr().take_pointee())
-
-
-fn _initialize_poison(
-    payload: OpaquePointer,
-) -> OpaquePointer:
-    var poison = UnsafePointer[Bool].alloc(1)
-    poison.init_pointee_move(False)
-    return poison.bitcast[NoneType]()
-
-
-fn _destroy_poison(p: OpaquePointer):
-    p.free()
 
 
 struct Poison(CollectionElement):

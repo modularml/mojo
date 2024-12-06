@@ -19,8 +19,9 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
+
+from .ffi import OpaquePointer, _external_call_const, external_call
 
 
 @always_inline("nodebug")
@@ -29,14 +30,11 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
 
 
 @always_inline("nodebug")
-fn _accelerator_arch() -> String:
-    alias arch = String(
-        __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
-    )
-    return arch
+fn _accelerator_arch() -> StringLiteral:
+    return __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
 
 
-fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
+fn _get_arch[target: __mlir_type.`!kgen.target`]() -> StringLiteral:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
         target,
@@ -388,31 +386,36 @@ fn os_is_windows() -> Bool:
 
 
 @always_inline("nodebug")
-fn _triple_attr() -> __mlir_type.`!kgen.string`:
+fn _triple_attr[
+    triple: __mlir_type.`!kgen.target` = _current_target()
+]() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
-        _current_target(),
+        triple,
         `, "triple" : !kgen.string`,
         `> : !kgen.string`,
     ]
 
 
 @always_inline("nodebug")
-fn is_triple[triple: StringLiteral]() -> Bool:
+fn is_triple[
+    name: StringLiteral, target: __mlir_type.`!kgen.target` = _current_target()
+]() -> Bool:
     """Returns True if the target triple of the compiler matches the input and
     False otherwise.
 
     Parameters:
-      triple: The triple value to be checked against.
+      name: The name of the triple value.
+      target: The triple value to be checked against.
 
     Returns:
         True if the triple matches and False otherwise.
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _triple_attr(),
+        _triple_attr[target](),
         `, `,
-        triple.value,
+        name.value,
         `> : i1`,
     ]
 
@@ -589,21 +592,6 @@ fn simdbytewidth[
     """
     alias CHAR_BIT = 8
     return simdbitwidth[target]() // CHAR_BIT
-
-
-@always_inline("nodebug")
-fn warpsize[
-    target: __mlir_type.`!kgen.target` = _current_target()
-]() -> IntLiteral:
-    """Returns the warp size of the specified target.
-
-    Parameters:
-        target: The target architecture.
-
-    Returns:
-        The warp size of the specified target.
-    """
-    return 32
 
 
 @always_inline("nodebug")
@@ -874,3 +862,28 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
         patch = int(osver[: osver.find(".")])
 
     return (major, minor, patch)
+
+
+# ===-----------------------------------------------------------------------===#
+# Detect GPU on host side
+# ===-----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn has_amd_gpu() -> Bool:
+    """Returns True if the host system has an AMD GPU and False otherwise.
+
+    Returns:
+        True if the host system has an AMD GPU.
+    """
+    return "amd" in _accelerator_arch()
+
+
+@always_inline("nodebug")
+fn has_nvidia_gpu() -> Bool:
+    """Returns True if the host system has an NVIDIA GPU and False otherwise.
+
+    Returns:
+        True if the host system has an NVIDIA GPU.
+    """
+    return "nvidia" in _accelerator_arch()

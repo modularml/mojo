@@ -15,7 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import Dict
+from collections import Deque, Dict
+from collections.deque import _DequeIter
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
 
@@ -78,7 +79,7 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 
 fn reversed[
     T: CollectionElement
-](ref [_]value: List[T, *_]) -> _ListIter[
+](ref value: List[T, *_]) -> _ListIter[
     T, __type_of(value).hint_trivial_type, __origin_of(value), False
 ]:
     """Get a reversed iterator of the input list.
@@ -98,9 +99,28 @@ fn reversed[
 
 
 fn reversed[
+    T: CollectionElement
+](ref value: Deque[T]) -> _DequeIter[T, __origin_of(value), False]:
+    """Get a reversed iterator of the deque.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        T: The type of the elements in the deque.
+
+    Args:
+        value: The deque to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the deque.
+    """
+    return value.__reversed__()
+
+
+fn reversed[
     K: KeyElement,
     V: CollectionElement,
-](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
+](ref value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
@@ -122,8 +142,8 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_origin: Origin[dict_mutability].type,
-](ref [_]value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
+    dict_origin: Origin[dict_mutability],
+](ref value: _DictValueIter[K, V, dict_origin]) -> _DictValueIter[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict values.
@@ -149,8 +169,8 @@ fn reversed[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
-    dict_origin: Origin[dict_mutability].type,
-](ref [_]value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
+    dict_origin: Origin[dict_mutability],
+](ref value: _DictEntryIter[K, V, dict_origin]) -> _DictEntryIter[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict items.

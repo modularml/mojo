@@ -16,24 +16,23 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
-
-from math import Ceilable, CeilDivable, Floorable, Truncable
-from hashlib.hash import _hash_simd
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from builtin.io import _snprintf
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
 )
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from math import Ceilable, CeilDivable, Floorable, Truncable
+from sys import bitwidthof
+
+from builtin.io import _snprintf
+from memory import UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
-from memory import UnsafePointer
 
 from utils import Writable, Writer
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value as select
-from sys import is_nvidia_gpu, bitwidthof
-from sys.ffi import OpaquePointer
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -242,21 +241,39 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 
 
 fn int(value: String, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
-
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+    If base is set to 0, the string is parsed as an Integer literal, with the
+    following considerations:
+    - '0b' or '0B' prefix indicates binary (base 2)
+    - '0o' or '0O' prefix indicates octal (base 8)
+    - '0x' or '0X' prefix indicates hexadecimal (base 16)
+    - Without a prefix, it's treated as decimal (base 10)
 
     Args:
         value: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
-        An integer value that represents the string, or otherwise raises.
+        An integer value that represents the string.
+
+    Raises:
+        If the given string cannot be parsed as an integer value or if an
+        incorrect base is provided.
+
+    Examples:
+        >>> int("32")
+        32
+        >>> int("FF", 16)
+        255
+        >>> int("0xFF", 0)
+        255
+        >>> int("0b1010", 0)
+        10
+
+    Notes:
+        This follows [Python's integer literals](
+        https://docs.python.org/3/reference/lexical_analysis.html#integers).
     """
     return atol(value, base)
 
@@ -322,6 +339,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.index):
         """Construct Int from the given index value.
 
@@ -332,6 +350,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
 
@@ -346,6 +365,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
 
@@ -360,6 +380,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
 
@@ -374,6 +395,7 @@ struct Int(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
 
@@ -385,6 +407,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: IntLiteral):
         """Construct Int from the given IntLiteral value.
 
@@ -394,7 +417,8 @@ struct Int(
         self = value.__int__()
 
     @always_inline("nodebug")
-    fn __init__[IndexerTy: Indexer](inout self, value: IndexerTy):
+    @implicit
+    fn __init__[IndexerTy: Indexer](mut self, value: IndexerTy):
         """Construct Int from the given Indexer value.
 
         Parameters:
@@ -406,6 +430,7 @@ struct Int(
         self = value.__index__()
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: UInt):
         """Construct Int from the given UInt value.
 
@@ -735,12 +760,12 @@ struct Int(
         """
         return __mlir_op.`index.or`(self.value, rhs.value)
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # In place operations.
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: Int):
+    fn __iadd__(mut self, rhs: Int):
         """Compute `self + rhs` and save the result in self.
 
         Args:
@@ -749,7 +774,7 @@ struct Int(
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: Int):
+    fn __isub__(mut self, rhs: Int):
         """Compute `self - rhs` and save the result in self.
 
         Args:
@@ -758,7 +783,7 @@ struct Int(
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: Int):
+    fn __imul__(mut self, rhs: Int):
         """Compute self*rhs and save the result in self.
 
         Args:
@@ -766,7 +791,7 @@ struct Int(
         """
         self = self * rhs
 
-    fn __itruediv__(inout self, rhs: Int):
+    fn __itruediv__(mut self, rhs: Int):
         """Compute `self / rhs`, convert to int, and save the result in self.
 
         Since `floor(self / rhs)` is equivalent to `self // rhs`, this yields
@@ -778,7 +803,7 @@ struct Int(
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: Int):
+    fn __ifloordiv__(mut self, rhs: Int):
         """Compute `self // rhs` and save the result in self.
 
         Args:
@@ -786,7 +811,7 @@ struct Int(
         """
         self = self // rhs
 
-    fn __imod__(inout self, rhs: Int):
+    fn __imod__(mut self, rhs: Int):
         """Compute `self % rhs` and save the result in self.
 
         Args:
@@ -795,7 +820,7 @@ struct Int(
         self = self % rhs
 
     @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: Int):
+    fn __ipow__(mut self, rhs: Int):
         """Compute `pow(self, rhs)` and save the result in self.
 
         Args:
@@ -804,7 +829,7 @@ struct Int(
         self = self**rhs
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: Int):
+    fn __ilshift__(mut self, rhs: Int):
         """Compute `self << rhs` and save the result in self.
 
         Args:
@@ -813,7 +838,7 @@ struct Int(
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: Int):
+    fn __irshift__(mut self, rhs: Int):
         """Compute `self >> rhs` and save the result in self.
 
         Args:
@@ -822,7 +847,7 @@ struct Int(
         self = self >> rhs
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: Int):
+    fn __iand__(mut self, rhs: Int):
         """Compute `self & rhs` and save the result in self.
 
         Args:
@@ -831,7 +856,7 @@ struct Int(
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: Int):
+    fn __ixor__(mut self, rhs: Int):
         """Compute `self ^ rhs` and save the result in self.
 
         Args:
@@ -840,7 +865,7 @@ struct Int(
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: Int):
+    fn __ior__(mut self, rhs: Int):
         """Compute self|rhs and save the result in self.
 
         Args:
@@ -848,9 +873,9 @@ struct Int(
         """
         self = self | rhs
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __radd__(self, value: Int) -> Int:
@@ -1116,7 +1141,7 @@ struct Int(
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.int64](self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with this int value.
 
         Parameters:
@@ -1138,11 +1163,24 @@ struct Int(
 
         result = Python.py_long_as_ssize_t(obj)
 
+    @always_inline
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        """Return the rounded-up result of dividing self by denominator.
+
+
+        Args:
+            denominator: The denominator.
+
+        Returns:
+            The ceiling of dividing numerator by denominator.
+        """
+        return -(self // -denominator)
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this integer to the provided Writer.
 
@@ -1155,7 +1193,7 @@ struct Int(
 
         writer.write(Int64(self))
 
-    fn write_padded[W: Writer](self, inout writer: W, width: Int):
+    fn write_padded[W: Writer](self, mut writer: W, width: Int):
         """Write the int right-aligned to a set padding.
 
         Parameters:

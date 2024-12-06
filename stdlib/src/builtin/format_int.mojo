@@ -16,16 +16,17 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections import InlineArray, List, Optional
 from os import abort
-from collections import List, Optional, InlineArray
-from utils import StringSlice, StaticString
+
+from utils import StaticString, StringSlice
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # bin
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
@@ -81,9 +82,9 @@ fn bin[T: Indexer, //](num: T, /, *, prefix: StaticString = "0b") -> String:
     return bin(Scalar[DType.index](index(num)), prefix=prefix)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # hex
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn hex(value: Scalar, /, *, prefix: StaticString = "0x") -> String:
@@ -143,9 +144,9 @@ fn hex(value: Scalar[DType.bool], /, *, prefix: StaticString = "0x") -> String:
     return hex(value.cast[DType.int8](), prefix=prefix)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # oct
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
@@ -205,9 +206,9 @@ fn oct(value: Scalar[DType.bool], /, *, prefix: StaticString = "0o") -> String:
     return oct(value.cast[DType.int8](), prefix=prefix)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Integer formatting utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn _try_format_int(
@@ -248,7 +249,7 @@ fn _write_int[
     type: DType,
     W: Writer,
 ](
-    inout writer: W,
+    mut writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,
@@ -267,7 +268,7 @@ fn _try_write_int[
     type: DType,
     W: Writer,
 ](
-    inout writer: W,
+    mut writer: W,
     value: Scalar[type],
     /,
     radix: Int = 10,

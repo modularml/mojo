@@ -78,6 +78,7 @@ fn _coro_resume_noop_callback(null: AnyCoroutine):
 # ===----------------------------------------------------------------------=== #
 
 
+@explicit_destroy
 @register_passable
 struct Coroutine[type: AnyType, origins: OriginSet]:
     """Represents a coroutine.
@@ -120,6 +121,7 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
         )
 
     @always_inline
+    @implicit
     fn __init__(out self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
@@ -129,9 +131,10 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
         self._handle = handle
 
     @always_inline
-    fn __del__(owned self):
+    fn force_destroy(owned self):
         """Destroy the coroutine object."""
         __mlir_op.`co.destroy`(self._handle)
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
 
     @always_inline
     fn __await__(owned self) -> type as out:
@@ -157,6 +160,7 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
 # ===----------------------------------------------------------------------=== #
 
 
+@explicit_destroy
 @register_passable
 struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
     """Represents a coroutine that can raise.
@@ -200,6 +204,7 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
         )
 
     @always_inline
+    @implicit
     fn __init__(out self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
@@ -209,9 +214,10 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
         self._handle = handle
 
     @always_inline
-    fn __del__(owned self):
+    fn force_destroy(owned self):
         """Destroy the coroutine object."""
         __mlir_op.`co.destroy`(self._handle)
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
 
     @always_inline
     fn __await__(owned self) raises -> type as out:

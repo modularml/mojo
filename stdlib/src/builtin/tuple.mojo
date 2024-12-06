@@ -16,13 +16,14 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from sys.intrinsics import _type_is_eq
+
 from memory import UnsafePointer
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Tuple
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
@@ -47,6 +48,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, owned *args: *element_types):
         """Construct the tuple.
 
@@ -57,7 +59,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned storage: VariadicPack[_, CollectionElement, *element_types],
     ):
@@ -79,8 +81,10 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
                 UnsafePointer.address_of(self[i])
             )
 
-        # Mark the elements as destroyed.
-        storage._is_owned = False
+        # Do not destroy the elements when 'storage' goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(storage)
+        )
 
     fn __del__(owned self):
         """Destructor that destroys all of the elements."""
@@ -124,6 +128,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             UnsafePointer.address_of(existing[i]).move_pointee_into(
                 UnsafePointer.address_of(self[i])
             )
+        # Note: The destructor on `existing` is auto-disabled in a moveinit.
 
     @always_inline
     @staticmethod
@@ -153,9 +158,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         return Self.__len__()
 
     @always_inline("nodebug")
-    fn __getitem__[
-        idx: Int
-    ](ref [_]self: Self) -> ref [self] element_types[idx.value]:
+    fn __getitem__[idx: Int](ref self) -> ref [self] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -178,7 +181,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](ref [_]self) -> ref [self] T:
+    fn get[i: Int, T: CollectionElement](ref self) -> ref [self] T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:

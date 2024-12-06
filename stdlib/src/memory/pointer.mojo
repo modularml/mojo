@@ -19,11 +19,10 @@ from memory import Pointer
 ```
 """
 
-from sys import is_nvidia_gpu
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # AddressSpace
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -47,6 +46,7 @@ struct _GPUAddressSpace(EqualityComparable):
     """Local address space."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         self._value = value
 
@@ -170,6 +170,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
     """Generic address space."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Initializes the address space from the underlying integral value.
 
@@ -179,6 +180,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         self._value = value
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integral value.
 
@@ -272,7 +274,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         return String.write(self)
 
     @always_inline("nodebug")
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the address space to the provided Writer.
 
@@ -288,9 +290,9 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
             writer.write("AddressSpace(", self.value(), ")")
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Pointer
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -298,7 +300,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
 struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
@@ -314,7 +316,7 @@ struct Pointer[
         `!lit.ref<`,
         type,
         `, `,
-        origin,
+        origin._mlir_origin,
         `, `,
         address_space._value.value,
         `>`,
@@ -339,7 +341,7 @@ struct Pointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(ref [origin, address_space._value.value]value: type) -> Self:
+    fn address_of(ref [origin, address_space]value: type) -> Self:
         """Constructs a Pointer from a reference to a value.
 
         Args:
@@ -365,7 +367,7 @@ struct Pointer[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self) -> ref [origin, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space] type:
         """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:

@@ -21,9 +21,9 @@ from utils import StaticTuple
 
 from memory import UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -33,7 +33,7 @@ fn _set_array_elem[
     type: AnyTrivialRegType,
 ](
     val: type,
-    ref [_]array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+    ref array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
 ):
     """Sets the array element at position `index` with the value `val`.
 
@@ -93,9 +93,9 @@ fn _create_array[
     return array
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StaticTuple
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn _static_tuple_construction_checks[size: Int]():
@@ -135,6 +135,17 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         ]()
 
     @always_inline
+    @implicit
+    fn __init__(out self, array: Self.type):
+        """Constructs from an array type.
+
+        Args:
+            array: Underlying MLIR array type.
+        """
+        self.array = array
+
+    @always_inline
+    @implicit
     fn __init__(out self, *elems: Self.element_type):
         """Constructs a static tuple given a set of arguments.
 
@@ -145,6 +156,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self.array = _create_array[size](elems)
 
     @always_inline
+    @implicit
     fn __init__(out self, values: VariadicList[Self.element_type]):
         """Creates a tuple constant using the specified values.
 
@@ -219,7 +231,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     @always_inline("nodebug")
     fn __setitem__[
         IntLike: IntLike, //
-    ](inout self, idx: IntLike, val: Self.element_type):
+    ](mut self, idx: IntLike, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
         Parameters:
@@ -240,7 +252,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self.element_type):
+    fn __setitem__[index: Int](mut self, val: Self.element_type):
         """Stores a single value into the tuple at the specified index.
 
         Parameters:

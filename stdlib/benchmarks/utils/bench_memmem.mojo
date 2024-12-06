@@ -15,16 +15,17 @@
 # the -t flag. Remember to replace it again before pushing any code.
 
 from sys import simdwidthof
+
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from memory import memcmp, bitcast, UnsafePointer, pack_bits
+from memory import UnsafePointer, bitcast, memcmp, pack_bits
 
 from utils.stringref import _align_down, _memchr, _memmem
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Data
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 var haystack = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer sed dictum est, et finibus ipsum. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Nam tincidunt vel lacus vitae pulvinar. Donec ac ligula elementum, mollis purus a, lacinia quam. Maecenas vulputate mauris quis sem euismod sollicitudin. Proin accumsan nulla vel nisl congue varius. Morbi a erat dui. Aliquam maximus interdum orci, vitae pretium lorem bibendum non. Vestibulum eu lacus ullamcorper, egestas dui vel, pharetra ipsum. Pellentesque sagittis, urna a tincidunt sodales, leo sem placerat eros, vitae molestie felis diam at dolor.
 
 Donec viverra sem sit amet facilisis laoreet. Morbi semper convallis nisi, vitae congue velit tincidunt vel. Fusce ultrices, libero vel venenatis placerat, justo tellus porttitor massa, at volutpat tortor nunc id dui. Morbi eu ex quis odio porttitor ultricies vel eget massa. Aenean quis luctus nulla. Fusce sit amet leo at quam hendrerit mattis. Morbi sed quam nisl. Quisque purus enim, iaculis sed laoreet vel, pellentesque ut orci. Vivamus risus orci, varius eu pharetra quis, tincidunt non enim. Suspendisse bibendum lacus ex, quis blandit lectus malesuada a. Maecenas iaculis porta lacus, sit amet tristique ante scelerisque non. Proin auctor elit in lacus dictum egestas. Pellentesque tincidunt justo sed vehicula blandit. Pellentesque vehicula facilisis tellus in viverra.
@@ -142,9 +143,9 @@ Curabitur auctor volutpat diam vitae vehicula. Vivamus est arcu, efficitur nec i
 var needle = "school"  # a word intentionally not in the test data
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Baseline `_memmem` implementation
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @always_inline
 fn _memmem_baseline[
     type: DType
@@ -184,11 +185,11 @@ fn _memmem_baseline[
     return UnsafePointer[Scalar[type]]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmarks
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_find_baseline(inout b: Bencher) raises:
+fn bench_find_baseline(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -203,7 +204,7 @@ fn bench_find_baseline(inout b: Bencher) raises:
 
 
 @parameter
-fn bench_find_optimized(inout b: Bencher) raises:
+fn bench_find_optimized(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -217,9 +218,9 @@ fn bench_find_optimized(inout b: Bencher) raises:
     b.iter[call_fn]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 def main():
     var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_find_baseline](BenchId("find_baseline"))

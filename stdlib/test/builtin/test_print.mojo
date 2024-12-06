@@ -14,11 +14,11 @@
 
 
 import sys
-
 from tempfile import NamedTemporaryFile
-from testing import assert_equal
 
 from builtin._location import __call_location, _SourceLocation
+from testing import assert_equal
+
 from utils import IndexList, StringRef
 
 
@@ -63,7 +63,7 @@ struct PrintChecker:
     fn stream(self) -> FileDescriptor:
         return self.tmp._file_handle._get_raw_fd()
 
-    fn check_line(inout self, expected: String, msg: String = "") raises:
+    fn check_line(mut self, expected: String, msg: String = "") raises:
         print(end="", file=self.stream(), flush=True)
         _ = self.tmp.seek(self.cursor)
         var result = self.tmp.read()[:-1]
@@ -72,7 +72,7 @@ struct PrintChecker:
         self.cursor += len(result) + 1
 
     fn check_line_starts_with(
-        inout self, prefix: String, msg: String = ""
+        mut self, prefix: String, msg: String = ""
     ) raises:
         print(end="", file=self.stream(), flush=True)
         _ = self.tmp.seek(self.cursor)

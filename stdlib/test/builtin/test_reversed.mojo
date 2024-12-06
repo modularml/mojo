@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from collections import Dict
+from collections import Deque, Dict
+
 from testing import assert_equal
 
 
@@ -21,6 +22,15 @@ def test_reversed_list():
     var check: Int = 6
 
     for item in reversed(list):
+        assert_equal(item[], check, "item[], check")
+        check -= 1
+
+
+def test_reversed_deque():
+    var deque = Deque[Int](1, 2, 3, 4, 5, 6)
+    var check: Int = 6
+
+    for item in reversed(deque):
         assert_equal(item[], check, "item[], check")
         check -= 1
 

@@ -27,6 +27,7 @@ struct MoveOnly[T: Movable](Movable):
     var data: T
     """Test data payload."""
 
+    @implicit
     fn __init__(out self, owned i: T):
         """Construct a MoveOnly providing the payload data.
 
@@ -53,6 +54,7 @@ struct ExplicitCopyOnly(ExplicitlyCopyable):
     var value: Int
     var copy_count: Int
 
+    @implicit
     fn __init__(out self, value: Int):
         self.value = value
         self.copy_count = 0
@@ -71,6 +73,7 @@ struct ImplicitCopyOnly(Copyable):
     var value: Int
     var copy_count: Int
 
+    @implicit
     fn __init__(out self, value: Int):
         self.value = value
         self.copy_count = 0
@@ -117,6 +120,7 @@ struct MoveCounter[T: CollectionElementNew](
     var value: T
     var move_count: Int
 
+    @implicit
     fn __init__(out self, owned value: T):
         """Construct a new instance of this type. This initial move is not counted.
         """

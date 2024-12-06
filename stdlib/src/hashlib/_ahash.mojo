@@ -11,10 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from bit import byte_swap
-from bit import rotate_bits_left
+from bit import byte_swap, rotate_bits_left
 from memory import UnsafePointer
-from ._hasher import _Hasher, _HashableWithHasher
+
+from ._hasher import _HashableWithHasher, _Hasher
 
 alias U256 = SIMD[DType.uint64, 4]
 alias U128 = SIMD[DType.uint64, 2]
@@ -61,14 +61,18 @@ fn _read_small(data: UnsafePointer[UInt8], length: Int) -> U128:
     if length >= 2:
         if length >= 4:
             # len 4-8
-            var a = data.bitcast[DType.uint32]().load().cast[DType.uint64]()
-            var b = data.offset(length - 4).bitcast[DType.uint32]().load().cast[
+            var a = data.bitcast[Scalar[DType.uint32]]().load().cast[
                 DType.uint64
             ]()
+            var b = data.offset(length - 4).bitcast[
+                Scalar[DType.uint32]
+            ]().load().cast[DType.uint64]()
             return U128(a, b)
         else:
             # len 2-3
-            var a = data.bitcast[DType.uint16]().load().cast[DType.uint64]()
+            var a = data.bitcast[Scalar[DType.uint16]]().load().cast[
+                DType.uint64
+            ]()
             var b = data.offset(length - 1).load().cast[DType.uint64]()
             return U128(a, b)
     else:
@@ -106,7 +110,7 @@ struct AHasher[key: U256](_Hasher):
         self.extra_keys = U128(pi_key[2], pi_key[3])
 
     @always_inline
-    fn _update(inout self, new_data: UInt64):
+    fn _update(mut self, new_data: UInt64):
         """Update the buffer value with new data.
 
         Args:
@@ -115,7 +119,7 @@ struct AHasher[key: U256](_Hasher):
         self.buffer = _folded_multiply(new_data ^ self.buffer, MULTIPLE)
 
     @always_inline
-    fn _large_update(inout self, new_data: U128):
+    fn _large_update(mut self, new_data: U128):
         """Update the buffer value with new data.
 
         Args:
@@ -125,7 +129,7 @@ struct AHasher[key: U256](_Hasher):
         var combined = _folded_multiply(xored[0], xored[1])
         self.buffer = rotate_bits_left[ROT]((self.buffer + self.pad) ^ combined)
 
-    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn _update_with_bytes(mut self, data: UnsafePointer[UInt8], length: Int):
         """Consume provided data to update the internal buffer.
 
         Args:
@@ -136,25 +140,27 @@ struct AHasher[key: U256](_Hasher):
         if length > 8:
             if length > 16:
                 var tail = data.offset(length - 16).bitcast[
-                    DType.uint64
+                    Scalar[DType.uint64]
                 ]().load[width=2]()
                 self._large_update(tail)
                 var offset = 0
                 while length - offset > 16:
                     var block = data.offset(offset).bitcast[
-                        DType.uint64
+                        Scalar[DType.uint64]
                     ]().load[width=2]()
                     self._large_update(block)
                     offset += 16
             else:
-                var a = data.bitcast[DType.uint64]().load()
-                var b = data.offset(length - 8).bitcast[DType.uint64]().load()
+                var a = data.bitcast[Scalar[DType.uint64]]().load()
+                var b = data.offset(length - 8).bitcast[
+                    Scalar[DType.uint64]
+                ]().load()
                 self._large_update(U128(a, b))
         else:
             var value = _read_small(data, length)
             self._large_update(value)
 
-    fn _update_with_simd(inout self, new_data: SIMD[_, _]):
+    fn _update_with_simd(mut self, new_data: SIMD[_, _]):
         """Update the buffer value with new data.
 
         Args:
@@ -176,7 +182,7 @@ struct AHasher[key: U256](_Hasher):
             for i in range(0, v64.size, 2):
                 self._large_update(U128(v64[i], v64[i + 1]))
 
-    fn update[T: _HashableWithHasher](inout self, value: T):
+    fn update[T: _HashableWithHasher](mut self, value: T):
         """Update the buffer value with new hashable value.
 
         Args:

@@ -19,15 +19,16 @@ from sys import PrefetchLocality
 ```
 """
 
-from .info import sizeof, is_nvidia_gpu
-from ._assembly import inlined_assembly
 import math
 
 from memory import AddressSpace, UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+from ._assembly import inlined_assembly
+from .info import is_nvidia_gpu, sizeof
+
+# ===-----------------------------------------------------------------------===#
 # llvm_intrinsic
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
@@ -89,9 +90,9 @@ fn llvm_intrinsic[
             ](loaded_pack)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # _gather
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 # NOTE: Converting from a scalar to a pointer is unsafe! The resulting pointer
@@ -175,9 +176,9 @@ fn gather[
     return result
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # _scatter
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
@@ -253,9 +254,9 @@ fn scatter[
     _ = base
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # prefetch
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @register_passable("trivial")
@@ -279,6 +280,7 @@ struct PrefetchLocality:
     """Extremely local locality (keep in cache)."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Constructs a prefetch locality option.
 
@@ -301,6 +303,7 @@ struct PrefetchRW:
     """Write prefetch."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Constructs a prefetch read-write option.
 
@@ -324,6 +327,7 @@ struct PrefetchCache:
     """The data prefetching option."""
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: Int):
         """Constructs a prefetch option.
 
@@ -465,7 +469,7 @@ struct PrefetchOptions:
 @always_inline("nodebug")
 fn prefetch[
     type: DType, //, params: PrefetchOptions = PrefetchOptions()
-](addr: UnsafePointer[Scalar[type], *_]):
+](addr: UnsafePointer[Scalar[type], **_]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
@@ -496,16 +500,16 @@ fn prefetch[
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # masked load
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
 fn masked_load[
     type: DType, //, size: Int
 ](
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     mask: SIMD[DType.bool, size],
     passthrough: SIMD[type, size],
     alignment: Int = 1,
@@ -542,9 +546,9 @@ fn masked_load[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # masked store
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
@@ -552,7 +556,7 @@ fn masked_store[
     size: Int
 ](
     value: SIMD,
-    addr: UnsafePointer[Scalar[value.type], *_],
+    addr: UnsafePointer[Scalar[value.type], **_],
     mask: SIMD[DType.bool, size],
     alignment: Int = 1,
 ):
@@ -584,9 +588,9 @@ fn masked_store[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # compressed store
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
@@ -594,7 +598,7 @@ fn compressed_store[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     mask: SIMD[DType.bool, size],
 ):
     """Compresses the lanes of `value`, skipping `mask` lanes, and stores
@@ -624,16 +628,16 @@ fn compressed_store[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # strided load
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
 fn strided_load[
     type: DType, //, simd_width: Int
 ](
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ) -> SIMD[type, simd_width]:
@@ -664,9 +668,9 @@ fn strided_load[
     return gather(offset, mask, passthrough)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # strided store
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
@@ -674,7 +678,7 @@ fn strided_store[
     type: DType, //, simd_width: Int
 ](
     value: SIMD[type, simd_width],
-    addr: UnsafePointer[Scalar[type], *_],
+    addr: UnsafePointer[Scalar[type], **_],
     stride: Int,
     mask: SIMD[DType.bool, simd_width] = True,
 ):

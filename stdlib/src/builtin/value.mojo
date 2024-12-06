@@ -66,6 +66,7 @@ trait Copyable:
     struct Foo(Copyable):
         var s: String
 
+        @implicit
         fn __init__(out self, s: String):
             self.s = s
 
@@ -108,7 +109,7 @@ trait ExplicitlyCopyable:
     initializer is called intentionally by the programmer.
 
     An explicit copy initializer is just a normal `__init__` method that takes
-    a `borrowed` argument of `Self`.
+    a `read-only` argument of `Self`.
 
     Example implementing the `ExplicitlyCopyable` trait on `Foo` which requires
     the `__init__(.., Self)` method:
@@ -117,9 +118,11 @@ trait ExplicitlyCopyable:
     struct Foo(ExplicitlyCopyable):
         var s: String
 
+        @implicit
         fn __init__(out self, s: String):
             self.s = s
 
+        @implicit
         fn __init__(out self, copy: Self):
             print("explicitly copying value")
             self.s = copy.s

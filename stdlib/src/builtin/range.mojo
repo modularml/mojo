@@ -16,12 +16,14 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
+from math import ceildiv
+
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
 from builtin._stubs import _IntIterable, _StridedIterable, _UIntStridedIterable
 from python import (
     PythonObject,
 )  # TODO: remove this and fixup downstream imports
-from math import ceildiv
+
 from utils._select import _select_register_value as select
 
 # ===----------------------------------------------------------------------=== #
@@ -48,6 +50,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var end: Int
 
     @always_inline
+    @implicit
     fn __init__(out self, end: Int):
         self.curr = max(0, end)
         self.end = self.curr
@@ -57,7 +60,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
         return self
 
     @always_inline
-    fn __next__(inout self) -> Int:
+    fn __next__(mut self) -> Int:
         var curr = self.curr
         self.curr -= 1
         return self.end - curr
@@ -91,7 +94,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
         return self
 
     @always_inline
-    fn __next__(inout self) -> Int:
+    fn __next__(mut self) -> Int:
         var start = self.start
         self.start += 1
         return start
@@ -131,7 +134,7 @@ struct _StridedRangeIterator(Sized):
             return 0
 
     @always_inline
-    fn __next__(inout self) -> Int:
+    fn __next__(mut self) -> Int:
         var result = self.start
         self.start += self.step
         return result
@@ -159,7 +162,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         return _StridedRangeIterator(self.start, self.end, self.step)
 
     @always_inline
-    fn __next__(inout self) -> Int:
+    fn __next__(mut self) -> Int:
         var result = self.start
         self.start += self.step
         return result
@@ -324,6 +327,7 @@ struct _UIntZeroStartingRange(UIntSized):
     var end: UInt
 
     @always_inline
+    @implicit
     fn __init__(out self, end: UInt):
         self.curr = max(0, end)
         self.end = self.curr
@@ -333,7 +337,7 @@ struct _UIntZeroStartingRange(UIntSized):
         return self
 
     @always_inline
-    fn __next__(inout self) -> UInt:
+    fn __next__(mut self) -> UInt:
         var curr = self.curr
         self.curr -= 1
         return self.end - curr
@@ -364,7 +368,7 @@ struct _UIntStridedRangeIterator(UIntSized):
         return select(self.start < self.end, self.end - self.start, 0)
 
     @always_inline
-    fn __next__(inout self) -> UInt:
+    fn __next__(mut self) -> UInt:
         var result = self.start
         self.start += self.step
         return result
@@ -402,7 +406,7 @@ struct _UIntStridedRange(UIntSized, _UIntStridedIterable):
         return _UIntStridedRangeIterator(self.start, self.end, self.step)
 
     @always_inline
-    fn __next__(inout self) -> UInt:
+    fn __next__(mut self) -> UInt:
         if self.start >= self.end:
             return self.end
         var result = self.start
@@ -464,6 +468,7 @@ struct _ZeroStartingScalarRange[type: DType]:
     var end: Scalar[type]
 
     @always_inline
+    @implicit
     fn __init__(out self, end: Scalar[type]):
         self.curr = max(0, end)
         self.end = self.curr
@@ -473,7 +478,7 @@ struct _ZeroStartingScalarRange[type: DType]:
         return self
 
     @always_inline
-    fn __next__(inout self) -> Scalar[type]:
+    fn __next__(mut self) -> Scalar[type]:
         var curr = self.curr
         self.curr -= 1
         return self.end - curr
@@ -510,7 +515,7 @@ struct _SequentialScalarRange[type: DType]:
         return self
 
     @always_inline
-    fn __next__(inout self) -> Scalar[type]:
+    fn __next__(mut self) -> Scalar[type]:
         var start = self.start
         self.start += 1
         return start
@@ -552,7 +557,7 @@ struct _StridedScalarRangeIterator[type: DType]:
             return self.end < self.start
 
     @always_inline
-    fn __next__(inout self) -> Scalar[type]:
+    fn __next__(mut self) -> Scalar[type]:
         var result = self.start
         self.start += self.step
         return result

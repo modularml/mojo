@@ -21,15 +21,16 @@ from utils import Span
 """
 
 from collections import InlineArray
-from memory import Pointer, UnsafePointer
+
 from builtin.builtin_list import _lit_mut_cast
+from memory import Pointer, UnsafePointer
 
 
 trait AsBytes:
     """The `AsBytes` trait denotes a type that can be returned as a byte span.
     """
 
-    fn as_bytes(ref [_]self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """Returns a contiguous slice of bytes.
 
         Returns:
@@ -45,7 +46,7 @@ trait AsBytes:
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -66,7 +67,7 @@ struct _SpanIter[
 
     @always_inline
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[T, origin]:
         @parameter
         if forward:
@@ -90,10 +91,11 @@ struct _SpanIter[
 
 
 @value
+@register_passable("trivial")
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
@@ -133,6 +135,7 @@ struct Span[
         self._len = other._len
 
     @always_inline
+    @implicit
     fn __init__(out self, ref [origin]list: List[T, *_]):
         """Construct a Span from a List.
 
@@ -145,7 +148,7 @@ struct Span[
     @always_inline
     fn __init__[
         size: Int, //
-    ](inout self, ref [origin]array: InlineArray[T, size]):
+    ](mut self, ref [origin]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
@@ -191,6 +194,10 @@ struct Span[
 
         Returns:
             A new span that points to the same data as the current span.
+
+        Allocation:
+            This function allocates when the step is negative, to avoid a memory
+            leak, take ownership of the value.
         """
         var start: Int
         var end: Int
@@ -349,7 +356,9 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
+    fn get_immutable(
+        self,
+    ) -> Span[T, _lit_mut_cast[origin, False].result]:
         """
         Return an immutable version of this span.
 

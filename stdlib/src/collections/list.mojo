@@ -20,17 +20,19 @@ from collections import List
 """
 
 
-from sys.intrinsics import _type_is_eq
-from sys import sizeof
 from os import abort
+from sys import sizeof
+from sys.intrinsics import _type_is_eq
+
 from memory import Pointer, UnsafePointer, memcpy
+
 from utils import Span
 
 from .optional import Optional
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # List
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -38,7 +40,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_origin: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability],
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -61,7 +63,7 @@ struct _ListIter[
         return self
 
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[T, list_origin]:
         @parameter
         if forward:
@@ -135,6 +137,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.size = 0
         self.capacity = capacity
 
+    @implicit
     fn __init__(out self, owned *values: T):
         """Constructs a list from the given values.
 
@@ -164,6 +167,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         self.size = length
 
+    @implicit
     fn __init__(out self, span: Span[T]):
         """Constructs a list from the a Span of values.
 
@@ -174,9 +178,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         for value in span:
             self.append(value[])
 
-    fn __init__(
-        inout self, *, ptr: UnsafePointer[T], length: Int, capacity: Int
-    ):
+    fn __init__(mut self, *, ptr: UnsafePointer[T], length: Int, capacity: Int):
         """Constructs a list from a pointer, its length, and its capacity.
 
         Args:
@@ -316,7 +318,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         result.__mul(x)
         return result^
 
-    fn __imul__(inout self, x: Int):
+    fn __imul__(mut self, x: Int):
         """Multiplies the list by x in place.
 
         Args:
@@ -337,7 +339,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         result.extend(other^)
         return result^
 
-    fn __iadd__(inout self, owned other: Self):
+    fn __iadd__(mut self, owned other: Self):
         """Appends the elements of other into self.
 
         Args:
@@ -345,9 +347,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self.extend(other^)
 
-    fn __iter__(
-        ref [_]self: Self,
-    ) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
+    fn __iter__(ref self) -> _ListIter[T, hint_trivial_type, __origin_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -356,7 +356,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return _ListIter(0, Pointer.address_of(self))
 
     fn __reversed__(
-        ref [_]self: Self,
+        ref self,
     ) -> _ListIter[T, hint_trivial_type, __origin_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
@@ -418,7 +418,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     @no_inline
     fn write_to[
         W: Writer, U: RepresentableCollectionElement, //
-    ](self: List[U, *_], inout writer: W):
+    ](self: List[U, *_], mut writer: W):
         """Write `my_list.__str__()` to a `Writer`.
 
         Parameters:
@@ -475,7 +475,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         return len(self) * sizeof[T]()
 
-    fn _realloc(inout self, new_capacity: Int):
+    fn _realloc(mut self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
         _move_pointee_into_many_elements[hint_trivial_type](
@@ -489,7 +489,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.data = new_data
         self.capacity = new_capacity
 
-    fn append(inout self, owned value: T):
+    fn append(mut self, owned value: T):
         """Appends a value to this list. If there is no capacity left, resizes
         to twice the current capacity. Except for 0 capacity where it sets 1.
 
@@ -501,7 +501,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    fn insert(inout self, i: Int, owned value: T):
+    fn insert(mut self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
@@ -530,7 +530,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             earlier_idx -= 1
             later_idx -= 1
 
-    fn __mul(inout self, x: Int):
+    fn __mul(mut self, x: Int):
         """Appends the original elements of this list x-1 times.
 
         ```mojo
@@ -549,7 +549,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         for i in range(x - 1):
             self.extend(orig)
 
-    fn extend(inout self, owned other: List[T, *_]):
+    fn extend(mut self, owned other: List[T, *_]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -589,7 +589,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         # list.
         self.size = final_size
 
-    fn pop(inout self, i: Int = -1) -> T:
+    fn pop(mut self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
         Args:
@@ -613,7 +613,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
                 self._realloc(self.capacity // 2)
         return ret_val^
 
-    fn reserve(inout self, new_capacity: Int):
+    fn reserve(mut self, new_capacity: Int):
         """Reserves the requested capacity.
 
         If the current capacity is greater or equal, this is a no-op.
@@ -626,7 +626,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             return
         self._realloc(new_capacity)
 
-    fn resize(inout self, new_size: Int, value: T):
+    fn resize(mut self, new_size: Int, value: T):
         """Resizes the list to the given new size.
 
         If the new size is smaller than the current one, elements at the end
@@ -645,7 +645,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
                 (self.data + i).init_pointee_copy(value)
             self.size = new_size
 
-    fn resize(inout self, new_size: Int):
+    fn resize(mut self, new_size: Int):
         """Resizes the list to the given new size.
 
         With no new value provided, the new size must be smaller than or equal
@@ -666,7 +666,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.size = new_size
         self.reserve(new_size)
 
-    fn reverse(inout self):
+    fn reverse(mut self):
         """Reverses the elements of the list."""
 
         var earlier_idx = 0
@@ -690,7 +690,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn index[
         C: EqualityComparableCollectionElement, //
     ](
-        ref [_]self: List[C, *_],
+        ref self: List[C, *_],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -743,13 +743,13 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
                 return i
         raise "ValueError: Given element is not in list"
 
-    fn clear(inout self):
+    fn clear(mut self):
         """Clears the elements in the list."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
         self.size = 0
 
-    fn steal_data(inout self) -> UnsafePointer[T]:
+    fn steal_data(mut self) -> UnsafePointer[T]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
@@ -786,7 +786,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         return res^
 
-    fn __getitem__(ref [_]self, idx: Int) -> ref [self] T:
+    fn __getitem__(ref self, idx: Int) -> ref [self] T:
         """Gets the list element at the given index.
 
         Args:
@@ -811,7 +811,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + normalized_idx)[]
 
     @always_inline
-    fn unsafe_get(ref [_]self: Self, idx: Int) -> ref [self] Self.T:
+    fn unsafe_get(ref self, idx: Int) -> ref [self] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it
@@ -839,7 +839,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         return (self.data + idx)[]
 
     @always_inline
-    fn unsafe_set(inout self, idx: Int, owned value: T):
+    fn unsafe_set(mut self, idx: Int, owned value: T):
         """Write a value to a given location without checking index bounds.
 
         Users should consider using `my_list[idx] = value` instead of this method as it
@@ -896,7 +896,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
                 count += 1
         return count
 
-    fn swap_elements(inout self, elt_idx_1: Int, elt_idx_2: Int):
+    fn swap_elements(mut self, elt_idx_1: Int, elt_idx_2: Int):
         """Swaps elements at the specified indexes if they are different.
 
         ```mojo

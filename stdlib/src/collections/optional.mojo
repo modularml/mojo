@@ -32,6 +32,7 @@ print(d)  # prints 2
 """
 
 from os import abort
+
 from utils import Variant
 
 
@@ -42,9 +43,9 @@ struct _NoneType(CollectionElement, CollectionElementNew):
         pass
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Optional
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -92,6 +93,7 @@ struct Optional[T: CollectionElement](
         """Construct an empty Optional."""
         self._value = Self._type(_NoneType())
 
+    @implicit
     fn __init__(out self, owned value: T):
         """Construct an Optional containing a value.
 
@@ -104,6 +106,7 @@ struct Optional[T: CollectionElement](
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
+    @implicit
     fn __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -112,6 +115,7 @@ struct Optional[T: CollectionElement](
         """
         self = Self(value=NoneType(value))
 
+    @implicit
     fn __init__(out self, value: NoneType):
         """Construct an empty Optional.
 
@@ -277,7 +281,7 @@ struct Optional[T: CollectionElement](
 
     fn write_to[
         W: Writer, U: RepresentableCollectionElement, //
-    ](self: Optional[U], inout writer: W):
+    ](self: Optional[U], mut writer: W):
         """Write Optional string representation to a `Writer`.
 
         Parameters:
@@ -298,7 +302,7 @@ struct Optional[T: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(ref [_]self: Self) -> ref [self._value] T:
+    fn value(ref self) -> ref [self._value] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -315,7 +319,7 @@ struct Optional[T: CollectionElement](
         return self.unsafe_value()
 
     @always_inline
-    fn unsafe_value(ref [_]self: Self) -> ref [self._value] T:
+    fn unsafe_value(ref self) -> ref [self._value] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -329,7 +333,7 @@ struct Optional[T: CollectionElement](
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value.unsafe_get[T]()
 
-    fn take(inout self) -> T:
+    fn take(mut self) -> T:
         """Move the value out of the Optional.
 
         The caller takes ownership over the new value, which is moved
@@ -347,7 +351,7 @@ struct Optional[T: CollectionElement](
             abort(".take() on empty Optional")
         return self.unsafe_take()
 
-    fn unsafe_take(inout self) -> T:
+    fn unsafe_take(mut self) -> T:
         """Unsafely move the value out of the Optional.
 
         The caller takes ownership over the new value, which is moved
@@ -379,9 +383,9 @@ struct Optional[T: CollectionElement](
         return default
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # OptionalReg
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @register_passable("trivial")
@@ -407,6 +411,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         """Create an optional with a value of None."""
         self = Self(None)
 
+    @implicit
     fn __init__(out self, value: T):
         """Create an optional with a value.
 
@@ -421,6 +426,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
     #   This initializer should not be necessary, we should need
     #   only the initilaizer from a `NoneType`.
     @doc_private
+    @implicit
     fn __init__(out self, value: NoneType._mlir_type):
         """Construct an empty Optional.
 
@@ -429,6 +435,7 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         """
         self = Self(value=NoneType(value))
 
+    @implicit
     fn __init__(out self, value: NoneType):
         """Create an optional without a value from a None literal.
 

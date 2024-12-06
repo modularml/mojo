@@ -15,19 +15,17 @@
    avoids heap allocations for short strings.
 """
 
-from collections import InlineArray
+from collections import InlineArray, Optional
 from os import abort
-from collections import Optional
 from sys import sizeof
-from sys.ffi import OpaquePointer
 
 from memory import UnsafePointer, memcpy
 
 from utils import StringSlice, Variant
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # InlineString
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -58,6 +56,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         var fixed = _FixedString[Self.SMALL_CAP]()
         self._storage = Self.Layout(fixed^)
 
+    @implicit
     fn __init__(out self, literal: StringLiteral):
         """Constructs a InlineString value given a string literal.
 
@@ -82,6 +81,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             var heap = String(literal)
             self._storage = Self.Layout(heap^)
 
+    @implicit
     fn __init__(out self, owned heap_string: String):
         """Construct a new small string by taking ownership of an existing
         heap-allocated String.
@@ -103,7 +103,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __iadd__(inout self, literal: StringLiteral):
+    fn __iadd__(mut self, literal: StringLiteral):
         """Appends another string to this string.
 
         Args:
@@ -111,7 +111,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(StringRef(literal))
 
-    fn __iadd__(inout self, string: String):
+    fn __iadd__(mut self, string: String):
         """Appends another string to this string.
 
         Args:
@@ -119,7 +119,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(string.as_string_slice())
 
-    fn __iadd__(inout self, str_slice: StringSlice[_]):
+    fn __iadd__(mut self, str_slice: StringSlice[_]):
         """Appends another string to this string.
 
         Args:
@@ -268,7 +268,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -281,7 +281,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -296,9 +296,9 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # __FixedString
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -395,7 +395,7 @@ struct _FixedString[CAP: Int](
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __iadd__(inout self, literal: StringLiteral) raises:
+    fn __iadd__(mut self, literal: StringLiteral) raises:
         """Appends another string to this string.
 
         Args:
@@ -403,7 +403,7 @@ struct _FixedString[CAP: Int](
         """
         self.__iadd__(literal.as_string_slice())
 
-    fn __iadd__(inout self, string: String) raises:
+    fn __iadd__(mut self, string: String) raises:
         """Appends another string to this string.
 
         Args:
@@ -412,7 +412,7 @@ struct _FixedString[CAP: Int](
         self.__iadd__(string.as_string_slice())
 
     @always_inline
-    fn __iadd__(inout self, str_slice: StringSlice[_]) raises:
+    fn __iadd__(mut self, str_slice: StringSlice[_]) raises:
         """Appends another string to this string.
 
         Args:
@@ -438,7 +438,7 @@ struct _FixedString[CAP: Int](
     # ===------------------------------------------------------------------=== #
 
     fn _iadd_non_raising(
-        inout self,
+        mut self,
         bytes: Span[Byte, _],
     ) -> Optional[Error]:
         var total_len = len(self) + len(bytes)
@@ -467,11 +467,11 @@ struct _FixedString[CAP: Int](
 
         return None
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write_bytes(self.as_bytes())
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a byte span to this String.
 
@@ -481,7 +481,7 @@ struct _FixedString[CAP: Int](
         """
         _ = self._iadd_non_raising(bytes)
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:
@@ -506,7 +506,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__origin_of(self)]:
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -519,7 +519,7 @@ struct _FixedString[CAP: Int](
         return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
-    fn as_bytes(ref [_]self: Self) -> Span[Byte, __origin_of(self)]:
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 

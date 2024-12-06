@@ -13,8 +13,9 @@
 # RUN: %mojo %s
 
 from collections import List
-from memory import UnsafePointer
 from sys.info import sizeof
+
+from memory import UnsafePointer
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
@@ -555,6 +556,7 @@ struct CopyCountedStruct(CollectionElement):
         self.counter = CopyCounter(other=other.counter)
         self.value = String(other=other.value)
 
+    @implicit
     fn __init__(out self, value: String):
         self.counter = CopyCounter()
         self.value = value

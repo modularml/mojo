@@ -10,7 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-
 """Implements the StringSlice type.
 
 You can import these APIs from the `utils.string_slice` module.
@@ -23,13 +22,19 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from utils.span import Span, AsBytes
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer, memcpy
-from sys import simdwidthof, bitwidthof
+from collections.string import _atof, _atol, _isspace
+from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
+
+from bit import count_leading_zeros
+from memory import UnsafePointer, memcmp, memcpy
 from memory.memory import _memcmp_impl_unconstrained
+
+from utils import Span, AsBytes
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+
 from ._utf8_validation import _is_valid_utf8
 from builtin.builtin_list import _lit_mut_cast
 
@@ -171,7 +176,7 @@ fn _memrmem[
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     forward: Bool = True,
 ]:
     """Iterator for `StringSlice` over unicode characters.
@@ -183,46 +188,28 @@ struct _StringSliceIter[
     """
 
     var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
+    var ptr: UnsafePointer[Byte]
     var length: Int
 
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
+    fn __init__(mut self, *, unsafe_pointer: UnsafePointer[Byte], length: Int):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        alias S = Span[Byte, StaticConstantOrigin]
-        var s = S(ptr=self.ptr, length=self.length)
-        self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringSlice[origin]:
+    fn __next__(mut self) -> StringSlice[origin]:
         @parameter
         if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index])
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = _utf8_first_byte_sequence_length(self.ptr[self.index])
+            i = self.index
             self.index += byte_len
-            return StringSlice[origin](
-                ptr=self.ptr + (self.index - byte_len), length=byte_len
-            )
+            return StringSlice[origin](ptr=self.ptr + i, length=byte_len)
         else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = self.ptr[self.index - byte_len]
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = 1
+            while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
+                byte_len += 1
             self.index -= byte_len
             return StringSlice[origin](
                 ptr=self.ptr + self.index, length=byte_len
@@ -230,18 +217,31 @@ struct _StringSliceIter[
 
     @always_inline
     fn __has_next__(self) -> Bool:
-        return self.__len__() > 0
+        @parameter
+        if forward:
+            return self.index < self.length
+        else:
+            return self.index > 0
 
     fn __len__(self) -> Int:
         @parameter
         if forward:
-            return self.length - self.index - self.continuation_bytes
+            remaining = self.length - self.index
+            cont = _count_utf8_continuation_bytes(
+                Span[Byte, ImmutableAnyOrigin](
+                    ptr=self.ptr + self.index, length=remaining
+                )
+            )
+            return remaining - cont
         else:
-            return self.index - self.continuation_bytes
+            return self.index - _count_utf8_continuation_bytes(
+                Span[Byte, ImmutableAnyOrigin](ptr=self.ptr, length=self.index)
+            )
 
 
 @value
-struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+@register_passable("trivial")
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     Stringable,
     Sized,
     Writable,
@@ -268,6 +268,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     # ===------------------------------------------------------------------===#
 
     @always_inline
+    @implicit
     fn __init__(out self: StaticString, lit: StringLiteral):
         """Construct a new `StringSlice` from a `StringLiteral`.
 
@@ -302,7 +303,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         # debug_assert(
         #     _is_valid_utf8(unsafe_from_utf8), "value is not valid utf8"
         # )
-        self._slice = unsafe_from_utf8^
+        self._slice = unsafe_from_utf8
 
     fn __init__(out self, *, unsafe_from_utf8_strref: StringRef):
         """Construct a new StringSlice from a `StringRef` pointing to UTF-8
@@ -352,9 +353,10 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         self._slice = other._slice
 
+    @implicit
     fn __init__[
         O: ImmutableOrigin, //
-    ](inout self: StringSlice[O], ref [O]value: String):
+    ](mut self: StringSlice[O], ref [O]value: String):
         """Construct an immutable StringSlice.
 
         Parameters:
@@ -389,7 +391,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var s = S(ptr=self.unsafe_ptr(), length=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Formats this string slice to the provided `Writer`.
 
         Parameters:
@@ -582,7 +584,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         buf.append(0)
         return String(buf^)
 
-    fn __contains__(ref [_]self, substr: StringSlice[_]) -> Bool:
+    fn __contains__(ref self, substr: StringSlice[_]) -> Bool:
         """Returns True if the substring is contained within the current string.
 
         Args:
@@ -711,7 +713,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         """
         if end == -1:
             return self.find(prefix, start) == start
-        return StringSlice[__origin_of(self)](
+        return StringSlice[origin](
             ptr=self.unsafe_ptr() + start, length=end - start
         ).startswith(prefix)
 
@@ -733,7 +735,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
             return False
         if end == -1:
             return self.rfind(suffix, start) + len(suffix) == len(self)
-        return StringSlice[__origin_of(self)](
+        return StringSlice[origin](
             ptr=self.unsafe_ptr() + start, length=end - start
         ).endswith(suffix)
 
@@ -1154,15 +1156,15 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
 
             str_len = eol_start - offset + int(keepends) * eol_length
             s = StringSlice[O](ptr=ptr + offset, length=str_len)
-            output.append(s^)
+            output.append(s)
             offset = eol_start + eol_length
 
         return output^
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utils
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 trait Stringlike(CollectionElement, CollectionElementNew):
@@ -1220,7 +1222,7 @@ trait Stringlike(CollectionElement, CollectionElementNew):
 
 
 fn _to_string_list[
-    T: CollectionElement, //,
+    T: CollectionElement,  # TODO(MOCO-1446): Make `T` parameter inferred
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
@@ -1262,7 +1264,7 @@ fn _to_string_list[
     fn len_fn(v: StringSlice[O]) -> Int:
         return v.byte_length()
 
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
 
 
 @always_inline
@@ -1287,7 +1289,7 @@ fn _to_string_list[
     fn len_fn(v: Span[Byte, O]) -> Int:
         return len(v)
 
-    return _to_string_list[len_fn, unsafe_ptr_fn](items)
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
 
 
 @always_inline

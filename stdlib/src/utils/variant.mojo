@@ -18,7 +18,7 @@ You can use this type to implement variant/sum types. For example:
 from utils import Variant
 
 alias IntOrString = Variant[Int, String]
-fn to_string(inout x: IntOrString) -> String:
+fn to_string(mut x: IntOrString) -> String:
   if x.isa[String]():
     return x[String]
   # x.isa[Int]()
@@ -81,7 +81,7 @@ struct Variant[*Ts: CollectionElement](
     ```mojo
     from utils import Variant
     alias IntOrString = Variant[Int, String]
-    fn to_string(inout x: IntOrString) -> String:
+    fn to_string(mut x: IntOrString) -> String:
         if x.isa[String]():
             return x[String]
         # x.isa[Int]()
@@ -123,7 +123,8 @@ struct Variant[*Ts: CollectionElement](
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, Self._mlir_type]
 
-    fn __init__[T: CollectionElement](inout self, owned value: T):
+    @implicit
+    fn __init__[T: CollectionElement](mut self, owned value: T):
         """Create a variant with one of the types.
 
         Parameters:
@@ -194,7 +195,7 @@ struct Variant[*Ts: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __getitem__[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
+    fn __getitem__[T: CollectionElement](ref self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -230,7 +231,7 @@ struct Variant[*Ts: CollectionElement](
         return discr_ptr
 
     @always_inline("nodebug")
-    fn _get_discr(ref [_]self: Self) -> ref [self] UInt8:
+    fn _get_discr(ref self) -> ref [self] UInt8:
         var ptr = UnsafePointer.address_of(self._impl).address
         var discr_ptr = __mlir_op.`pop.variant.discr_gep`[
             _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
@@ -238,7 +239,7 @@ struct Variant[*Ts: CollectionElement](
         return UnsafePointer(discr_ptr).bitcast[UInt8]()[]
 
     @always_inline
-    fn take[T: CollectionElement](inout self) -> T:
+    fn take[T: CollectionElement](mut self) -> T:
         """Take the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -259,7 +260,7 @@ struct Variant[*Ts: CollectionElement](
         return self.unsafe_take[T]()
 
     @always_inline
-    fn unsafe_take[T: CollectionElement](inout self) -> T:
+    fn unsafe_take[T: CollectionElement](mut self) -> T:
         """Unsafely take the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -283,7 +284,7 @@ struct Variant[*Ts: CollectionElement](
     @always_inline
     fn replace[
         Tin: CollectionElement, Tout: CollectionElement
-    ](inout self, owned value: Tin) -> Tout:
+    ](mut self, owned value: Tin) -> Tout:
         """Replace the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -310,7 +311,7 @@ struct Variant[*Ts: CollectionElement](
     @always_inline
     fn unsafe_replace[
         Tin: CollectionElement, Tout: CollectionElement
-    ](inout self, owned value: Tin) -> Tout:
+    ](mut self, owned value: Tin) -> Tout:
         """Unsafely replace the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -336,7 +337,7 @@ struct Variant[*Ts: CollectionElement](
         self.set[Tin](value^)
         return x^
 
-    fn set[T: CollectionElement](inout self, owned value: T):
+    fn set[T: CollectionElement](mut self, owned value: T):
         """Set the variant value.
 
         This will call the destructor on the old value, and update the variant's
@@ -362,7 +363,7 @@ struct Variant[*Ts: CollectionElement](
         alias idx = Self._check[T]()
         return self._get_discr() == idx
 
-    fn unsafe_get[T: CollectionElement](ref [_]self: Self) -> ref [self] T:
+    fn unsafe_get[T: CollectionElement](ref self) -> ref [self] T:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!

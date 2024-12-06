@@ -13,8 +13,8 @@
 # RUN: %mojo %s
 
 from sys.ffi import c_char
-from memory import UnsafePointer
 
+from memory import UnsafePointer
 from testing import (
     assert_equal,
     assert_false,
@@ -65,6 +65,15 @@ def test_equality():
 
     assert_true(StringLiteral.__ne__("five", "six"))
     assert_false(StringLiteral.__ne__("six", "six"))
+
+    var hello = str("hello")
+    var hello_ref = hello.as_string_slice()
+
+    assert_false(StringLiteral.__eq__("goodbye", hello))
+    assert_true(StringLiteral.__eq__("hello", hello))
+
+    assert_false(StringLiteral.__eq__("goodbye", hello_ref))
+    assert_true(StringLiteral.__eq__("hello", hello_ref))
 
 
 def test_len():
@@ -208,6 +217,20 @@ def test_intable():
 
     with assert_raises():
         _ = StringLiteral.__int__("hi")
+
+
+def test_join():
+    assert_equal("".join(), "")
+    assert_equal("".join("a", "b", "c"), "abc")
+    assert_equal(" ".join("a", "b", "c"), "a b c")
+    assert_equal(" ".join("a", "b", "c", ""), "a b c ")
+    assert_equal(" ".join("a", "b", "c", " "), "a b c  ")
+
+    var sep = ","
+    var s = String("abc")
+    assert_equal(sep.join(s, s, s, s), "abc,abc,abc,abc")
+    assert_equal(sep.join(1, 2, 3), "1,2,3")
+    assert_equal(sep.join(1, "abc", 3), "1,abc,3")
 
 
 def test_isdigit():
@@ -474,6 +497,15 @@ def test_float_conversion():
         _ = ("not a float").__float__()
 
 
+def test_string_literal_from_stringable():
+    assert_equal(StringLiteral.get["hello"](), "hello")
+    assert_equal(StringLiteral.get[String("hello")](), "hello")
+    assert_equal(StringLiteral.get[42](), "42")
+    assert_equal(
+        StringLiteral.get[SIMD[DType.int64, 4](1, 2, 3, 4)](), "[1, 2, 3, 4]"
+    )
+
+
 def main():
     test_add()
     test_iadd()
@@ -483,6 +515,7 @@ def main():
     test_bool()
     test_contains()
     test_find()
+    test_join()
     test_rfind()
     test_replace()
     test_comparison_operators()
@@ -505,3 +538,4 @@ def main():
     test_split()
     test_splitlines()
     test_float_conversion()
+    test_string_literal_from_stringable()

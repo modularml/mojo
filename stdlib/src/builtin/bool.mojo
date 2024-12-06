@@ -15,10 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import Set, List
+from collections import List, Set
 
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils._select import _select_register_value
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Boolable
@@ -131,6 +131,7 @@ struct Bool(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.i1):
         """Construct a Bool value given a __mlir_type.i1 value.
 
@@ -141,6 +142,7 @@ struct Bool(
 
     @doc_private
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<bool>`):
         """Construct a Bool value given a `!pop.scalar<bool>` value.
 
@@ -152,7 +154,8 @@ struct Bool(
         )
 
     @always_inline("nodebug")
-    fn __init__[T: ImplicitlyBoolable, //](inout self, value: T):
+    @implicit
+    fn __init__[T: ImplicitlyBoolable, //](mut self, value: T):
         """Convert an ImplicitlyBoolable value to a Bool.
 
         Parameters:
@@ -164,6 +167,7 @@ struct Bool(
         self = value.__bool__()
 
     @always_inline("nodebug")
+    @implicit
     fn __init__(out self, value: SIMD[DType.bool, 1]):
         """Convert a scalar SIMD value to a Bool.
 
@@ -222,7 +226,7 @@ struct Bool(
         return String.write(self)
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this boolean to the provided Writer.
 
@@ -252,7 +256,7 @@ struct Bool(
         Returns:
             1 if the Bool is True, 0 otherwise.
         """
-        return _select_register_value(self.value, Int(1), Int(0))
+        return _select_register_value(self, Int(1), Int(0))
 
     @always_inline("nodebug")
     fn __float__(self) -> Float64:
@@ -261,7 +265,7 @@ struct Bool(
         Returns:
             1.0 if True else 0.0 otherwise.
         """
-        return _select_register_value(self.value, Float64(1.0), Float64(0.0))
+        return _select_register_value(self, Float64(1.0), Float64(0.0))
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:
@@ -400,7 +404,7 @@ struct Bool(
         return __mlir_op.`pop.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: Bool):
+    fn __iand__(mut self, rhs: Bool):
         """Computes `self & rhs` and store the result in `self`.
 
         Args:
@@ -436,7 +440,7 @@ struct Bool(
         return __mlir_op.`pop.or`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: Bool):
+    fn __ior__(mut self, rhs: Bool):
         """Computes `self | rhs` and store the result in `self`.
 
         Args:
@@ -472,7 +476,7 @@ struct Bool(
         return __mlir_op.`pop.xor`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: Bool):
+    fn __ixor__(mut self, rhs: Bool):
         """Computes `self ^ rhs` and stores the result in `self`.
 
         Args:
