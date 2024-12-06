@@ -870,6 +870,16 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
 
 
 @always_inline("nodebug")
+fn has_accelerator() -> Bool:
+    """Returns True if the host system has an accelerator and False otherwise.
+
+    Returns:
+        True if the host system has an accelerator.
+    """
+    return _accelerator_arch() != ""
+
+
+@always_inline("nodebug")
 fn has_amd_gpu_accelerator() -> Bool:
     """Returns True if the host system has an AMD GPU and False otherwise.
 

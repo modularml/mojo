@@ -19,6 +19,7 @@ from .ffi import DEFAULT_RTLD, RTLD, DLHandle, external_call
 from .info import (
     alignof,
     bitwidthof,
+    has_accelerator,
     has_amd_gpu_accelerator,
     has_avx,
     has_avx2,
