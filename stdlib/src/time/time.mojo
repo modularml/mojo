@@ -15,7 +15,7 @@
 You can import these APIs from the `time` package. For example:
 
 ```mojo
-from time import now
+from time import perf_counter_ns
 ```
 """
 
@@ -213,26 +213,6 @@ fn perf_counter_ns() -> UInt:
         The current time in ns.
     """
     return _monotonic_nanoseconds()
-
-
-# ===-----------------------------------------------------------------------===#
-# now
-# ===-----------------------------------------------------------------------===#
-
-
-@always_inline
-fn now() -> UInt:
-    """Deprecated: Please use time.perf_counter_ns instead.
-
-    Returns the current monotonic time time in nanoseconds. This function
-    queries the current platform's monotonic clock, making it useful for
-    measuring time differences, but the significance of the returned value
-    varies depending on the underlying implementation.
-
-    Returns:
-        The current time in ns.
-    """
-    return perf_counter_ns()
 
 
 # ===-----------------------------------------------------------------------===#
