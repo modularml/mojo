@@ -148,7 +148,7 @@ struct OwnedPointer[T: AnyType]:
         """
         var r = self._inner.take_pointee()
         self._inner.free()
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
         return r^
 
@@ -171,6 +171,6 @@ struct OwnedPointer[T: AnyType]:
         var ptr = self._inner
 
         # Prevent the destructor from running on `self`
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
         return ptr

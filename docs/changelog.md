@@ -298,6 +298,10 @@ what we publish.
 
 - `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
 
+- Introduced the `@explicit_destroy` annotation, the `__disable_del` keyword,
+  the `UnknownDestructibility` trait, and the `ImplicitlyDestructible` keyword,
+  for the experimental explicitly destroyed types feature.
+
 ### 🦋 Changed
 
 - The `inout` and `borrowed` argument conventions have been renamed to the `mut`
