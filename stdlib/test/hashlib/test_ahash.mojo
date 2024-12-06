@@ -15,7 +15,6 @@
 from hashlib._ahash import AHasher
 from hashlib._hasher import _hash_with_hasher as hash
 from hashlib.hash import hash as old_hash
-from time import now
 
 from bit import pop_count
 from builtin._location import __call_location
