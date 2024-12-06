@@ -21,7 +21,6 @@ from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char
 from sys.intrinsics import _type_is_eq
-from builtin.builtin_list import _lit_mut_cast
 
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy

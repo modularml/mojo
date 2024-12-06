@@ -30,8 +30,6 @@ from utils.string_slice import (
     Stringlike,
     _split,
 )
-from collections.string import _atol
-from builtin.builtin_list import _lit_mut_cast
 
 # ===-----------------------------------------------------------------------===#
 # StringLiteral
