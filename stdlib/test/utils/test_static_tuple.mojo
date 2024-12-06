@@ -46,6 +46,10 @@ def test_setitem():
     t[2] = 300
     assert_equal(t[2], 300)
 
+    alias idx: Int = 0
+    t.__setitem__[idx](400)
+    assert_equal(t[0], 400)
+
 
 def main():
     test_getitem()

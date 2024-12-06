@@ -257,6 +257,4 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
             val: The value to store.
         """
         constrained[index < size]()
-        var tmp = self
-        _set_array_elem[index, size, Self.element_type](val, tmp.array)
-        self = tmp
+        _set_array_elem[index, size, Self.element_type](val, self.array)
