@@ -32,7 +32,6 @@ from utils import (
     Span,
     StaticString,
     StringRef,
-    StringSlice,
     Variant,
     Writable,
     Writer,
@@ -1316,7 +1315,7 @@ struct String(
         """
         self._iadd[False](other.as_bytes())
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+    fn __iter__(ref self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over the string unicode characters.
 
         Returns:
@@ -1327,7 +1326,7 @@ struct String(
         )
 
     fn __reversed__(
-        ref [_]self,
+        ref self,
     ) -> _StringSliceIter[__origin_of(self), forward=False]:
         """Iterate backwards over the string unicode characters.
 
@@ -1337,40 +1336,6 @@ struct String(
         return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
-
-    fn __iter__[
-        is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> _StringSliceIter[_lit_mut_cast[origin, is_mutable].result]:
-        """Iterate over the string unicode characters.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
-
-        Returns:
-            An iterator of references to the string unicode characters.
-        """
-        return _StringSliceIter[_lit_mut_cast[origin, is_mutable].result](
-            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
-        )
-
-    fn __reversed__[
-        is_mutable: Bool, origin: Origin[is_mutable].type
-    ](self) -> _StringSliceIter[
-        _lit_mut_cast[origin, is_mutable].result, forward=False
-    ]:
-        """Iterate backwards over the string unicode characters.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
-
-        Returns:
-            A reversed iterator of references to the string unicode characters.
-        """
-        return _StringSliceIter[
-            _lit_mut_cast[origin, is_mutable].result, forward=False
-        ](unsafe_pointer=self.unsafe_ptr(), length=self.byte_length())
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -1640,7 +1605,7 @@ struct String(
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        return StringSlice(self)
+        return StringSlice(unsafe_from_utf8=self.as_bytes())
 
     @always_inline
     fn byte_length(self) -> Int:

@@ -24,7 +24,12 @@ from memory import UnsafePointer, memcpy
 from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import _StringSliceIter, _to_string_list
+from utils.string_slice import (
+    _StringSliceIter,
+    _to_string_list,
+    Stringlike,
+    _split,
+)
 from collections.string import _atol
 from builtin.builtin_list import _lit_mut_cast
 
@@ -424,45 +429,25 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__[
-        is_mutable: Bool = False,
-        origin: Origin[is_mutable]
-        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
-        .result,
-    ](self) -> _StringSliceIter[_lit_mut_cast[origin, is_mutable].result]:
+    fn __iter__(ref self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over the string unicode characters.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
 
         Returns:
             An iterator of references to the string unicode characters.
         """
-        constrained[not is_mutable, "StringLiteral can't be mutated"]()
-        return _StringSliceIter[origin](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__[
-        is_mutable: Bool = False,
-        origin: Origin[is_mutable]
-        .type = _lit_mut_cast[StaticConstantOrigin, is_mutable]
-        .result,
-    ](self) -> _StringSliceIter[
-        _lit_mut_cast[origin, is_mutable].result, forward=False
-    ]:
+    fn __reversed__(
+        ref self,
+    ) -> _StringSliceIter[__origin_of(self), forward=False]:
         """Iterate backwards over the string unicode characters.
-
-        Parameters:
-            is_mutable: Whether the result will be mutable.
-            origin: The origin of the data.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
-        constrained[not is_mutable, "StringLiteral can't be mutated"]()
-        return _StringSliceIter[origin, forward=False](
+        return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
