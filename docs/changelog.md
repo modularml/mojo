@@ -302,6 +302,10 @@ what we publish.
   the `UnknownDestructibility` trait, and the `ImplicitlyDestructible` keyword,
   for the experimental explicitly destroyed types feature.
 
+- Added associated types; we can now have aliases like `alias T: AnyType`,
+  `alias N: Int`, etc. in a trait, and then specify them in structs that conform
+  to that trait.
+
 ### 🦋 Changed
 
 - The `inout` and `borrowed` argument conventions have been renamed to the `mut`
