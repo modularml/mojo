@@ -1919,7 +1919,6 @@ struct String(
         """Return a copy of the string with leading and trailing characters
         removed.
 
-
         Args:
             chars: A set of characters to be removed. Defaults to whitespace.
 
