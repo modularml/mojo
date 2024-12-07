@@ -35,7 +35,6 @@ from memory.memory import _memcmp_impl_unconstrained
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 
 from ._utf8_validation import _is_valid_utf8
-from builtin.type_aliases import _lit_mut_cast
 
 
 alias StaticString = StringSlice[StaticConstantOrigin]
