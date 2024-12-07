@@ -21,15 +21,17 @@ from utils import StringSlice
 ```
 """
 
-from bit import count_leading_zeros
-from utils import Span
-from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
-from memory import memcmp, UnsafePointer, memcpy
-from sys import simdwidthof, bitwidthof
+from collections.string import _atof, _atol, _isspace
+from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
+
+from bit import count_leading_zeros
+from memory import UnsafePointer, memcmp, memcpy, Span
 from memory.memory import _memcmp_impl_unconstrained
+
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+
 from ._utf8_validation import _is_valid_utf8
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -77,13 +79,9 @@ fn _utf8_first_byte_sequence_length(b: Byte) -> Int:
 
     debug_assert(
         (b & 0b1100_0000) != 0b1000_0000,
-        (
-            "Function `_utf8_first_byte_sequence_length()` does not work"
-            " correctly if given a continuation byte."
-        ),
+        "Function does not work correctly if given a continuation byte.",
     )
-    var flipped = ~b
-    return int(count_leading_zeros(flipped) + (flipped >> 7))
+    return int(count_leading_zeros(~b)) + int(b < 0b1000_0000)
 
 
 fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
@@ -171,7 +169,7 @@ fn _memrmem[
 @value
 struct _StringSliceIter[
     is_mutable: Bool, //,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     forward: Bool = True,
 ]:
     """Iterator for `StringSlice` over unicode characters.
@@ -183,46 +181,28 @@ struct _StringSliceIter[
     """
 
     var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
+    var ptr: UnsafePointer[Byte]
     var length: Int
 
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
+    fn __init__(mut self, *, unsafe_pointer: UnsafePointer[Byte], length: Int):
         self.index = 0 if forward else length
         self.ptr = unsafe_pointer
         self.length = length
-        alias S = Span[Byte, StaticConstantOrigin]
-        var s = S(ptr=self.ptr, length=self.length)
-        self.continuation_bytes = _count_utf8_continuation_bytes(s)
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringSlice[origin]:
+    fn __next__(mut self) -> StringSlice[origin]:
         @parameter
         if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index])
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = _utf8_first_byte_sequence_length(self.ptr[self.index])
+            i = self.index
             self.index += byte_len
-            return StringSlice[origin](
-                ptr=self.ptr + (self.index - byte_len), length=byte_len
-            )
+            return StringSlice[origin](ptr=self.ptr + i, length=byte_len)
         else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = self.ptr[self.index - byte_len]
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
+            byte_len = 1
+            while _utf8_byte_type(self.ptr[self.index - byte_len]) == 1:
+                byte_len += 1
             self.index -= byte_len
             return StringSlice[origin](
                 ptr=self.ptr + self.index, length=byte_len
@@ -230,19 +210,31 @@ struct _StringSliceIter[
 
     @always_inline
     fn __has_next__(self) -> Bool:
-        return self.__len__() > 0
+        @parameter
+        if forward:
+            return self.index < self.length
+        else:
+            return self.index > 0
 
     fn __len__(self) -> Int:
         @parameter
         if forward:
-            return self.length - self.index - self.continuation_bytes
+            remaining = self.length - self.index
+            cont = _count_utf8_continuation_bytes(
+                Span[Byte, ImmutableAnyOrigin](
+                    ptr=self.ptr + self.index, length=remaining
+                )
+            )
+            return remaining - cont
         else:
-            return self.index - self.continuation_bytes
+            return self.index - _count_utf8_continuation_bytes(
+                Span[Byte, ImmutableAnyOrigin](ptr=self.ptr, length=self.index)
+            )
 
 
 @value
 @register_passable("trivial")
-struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     Stringable,
     Sized,
     Writable,
@@ -353,7 +345,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     @implicit
     fn __init__[
         O: ImmutableOrigin, //
-    ](inout self: StringSlice[O], ref [O]value: String):
+    ](mut self: StringSlice[O], ref [O]value: String):
         """Construct an immutable StringSlice.
 
         Parameters:
@@ -392,7 +384,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         var s = S(ptr=self.unsafe_ptr(), length=b_len)
         return b_len - _count_utf8_continuation_bytes(s)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Formats this string slice to the provided `Writer`.
 
         Parameters:
@@ -623,13 +615,33 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn strip(self) -> StringSlice[origin]:
-        """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes ASCII whitespace into account:
-        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
+    fn strip(self, chars: StringSlice) -> Self:
+        """Return a copy of the string with leading and trailing characters
+        removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-            A StringRef with leading and trailing whitespaces removed.
+            A copy of the string with no leading or trailing characters.
+
+        Examples:
+
+        ```mojo
+        print("himojohi".strip("hi")) # "mojo"
+        ```
+        .
+        """
+
+        return self.lstrip(chars).rstrip(chars)
+
+    @always_inline
+    fn strip(self) -> Self:
+        """Return a copy of the string with leading and trailing whitespaces
+        removed.
+
+        Returns:
+            A copy of the string with no leading or trailing whitespaces.
 
         Examples:
 
@@ -638,15 +650,103 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         ```
         .
         """
-        # FIXME: this can already do full isspace support with iterator
-        var start: Int = 0
-        var end: Int = len(self)
-        var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
-            start += 1
-        while end > start and _isspace(ptr[end - 1]):
-            end -= 1
-        return StringSlice[origin](ptr=ptr + start, length=end - start)
+        return self.lstrip().rstrip()
+
+    @always_inline
+    fn rstrip(self, chars: StringSlice) -> Self:
+        """Return a copy of the string with trailing characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A copy of the string with no trailing characters.
+
+        Examples:
+
+        ```mojo
+        print("mojohi".strip("hi")) # "mojo"
+        ```
+        .
+        """
+
+        var r_idx = self.byte_length()
+        while r_idx > 0 and self[r_idx - 1] in chars:
+            r_idx -= 1
+
+        return Self(unsafe_from_utf8=self.as_bytes()[:r_idx])
+
+    @always_inline
+    fn rstrip(self) -> Self:
+        """Return a copy of the string with trailing whitespaces removed.
+
+        Returns:
+            A copy of the string with no trailing whitespaces.
+
+        Examples:
+
+        ```mojo
+        print("mojo  ".strip()) # "mojo"
+        ```
+        .
+        """
+        var r_idx = self.byte_length()
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self.__reversed__():
+        #     if not s.isspace():
+        #         break
+        #     r_idx -= 1
+        while r_idx > 0 and _isspace(self.as_bytes()[r_idx - 1]):
+            r_idx -= 1
+        return Self(unsafe_from_utf8=self.as_bytes()[:r_idx])
+
+    @always_inline
+    fn lstrip(self, chars: StringSlice) -> Self:
+        """Return a copy of the string with leading characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A copy of the string with no leading characters.
+
+        Examples:
+
+        ```mojo
+        print("himojo".strip("hi")) # "mojo"
+        ```
+        .
+        """
+
+        var l_idx = 0
+        while l_idx < self.byte_length() and self[l_idx] in chars:
+            l_idx += 1
+
+        return Self(unsafe_from_utf8=self.as_bytes()[l_idx:])
+
+    @always_inline
+    fn lstrip(self) -> Self:
+        """Return a copy of the string with leading whitespaces removed.
+
+        Returns:
+            A copy of the string with no leading whitespaces.
+
+        Examples:
+
+        ```mojo
+        print("  mojo".strip()) # "mojo"
+        ```
+        .
+        """
+        var l_idx = 0
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self:
+        #     if not s.isspace():
+        #         break
+        #     l_idx += 1
+        while l_idx < self.byte_length() and _isspace(self.as_bytes()[l_idx]):
+            l_idx += 1
+        return Self(unsafe_from_utf8=self.as_bytes()[l_idx:])
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, origin]:
@@ -1017,33 +1117,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type,](
         return output^
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utils
-# ===----------------------------------------------------------------------===#
-
-
-trait Stringlike:
-    """Trait intended to be used only with `String`, `StringLiteral` and
-    `StringSlice`."""
-
-    fn byte_length(self) -> Int:
-        """Get the string length in bytes.
-
-        Returns:
-            The length of this string in bytes.
-
-        Notes:
-            This does not include the trailing null terminator in the count.
-        """
-        ...
-
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        """Get raw pointer to the underlying data.
-
-        Returns:
-            The raw pointer to the data.
-        """
-        ...
+# ===-----------------------------------------------------------------------===#
 
 
 fn _to_string_list[

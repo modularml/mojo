@@ -13,12 +13,14 @@
 # RUN: %mojo %s
 
 
-from hashlib._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
 from hashlib._ahash import AHasher
-from memory import UnsafePointer
+from hashlib._hasher import _hash_with_hasher, _HashableWithHasher, _Hasher
 from pathlib import Path
+
+from memory import UnsafePointer
 from python import Python, PythonObject
 from testing import assert_equal, assert_true
+
 from utils import StringRef
 
 
@@ -28,14 +30,14 @@ struct DummyHasher(_Hasher):
     fn __init__(out self):
         self._dummy_value = 0
 
-    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn _update_with_bytes(mut self, data: UnsafePointer[UInt8], length: Int):
         for i in range(length):
             self._dummy_value += data[i].cast[DType.uint64]()
 
-    fn _update_with_simd(inout self, value: SIMD[_, _]):
+    fn _update_with_simd(mut self, value: SIMD[_, _]):
         self._dummy_value += value.cast[DType.uint64]().reduce_add()
 
-    fn update[T: _HashableWithHasher](inout self, value: T):
+    fn update[T: _HashableWithHasher](mut self, value: T):
         value.__hash__(self)
 
     fn finish(owned self) -> UInt64:
@@ -46,7 +48,7 @@ struct DummyHasher(_Hasher):
 struct SomeHashableStruct(_HashableWithHasher):
     var _value: Int64
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         hasher._update_with_simd(self._value)
 
 
@@ -67,7 +69,7 @@ struct ComplexeHashableStruct(_HashableWithHasher):
     var _value1: SomeHashableStruct
     var _value2: SomeHashableStruct
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         hasher.update(self._value1)
         hasher.update(self._value2)
 
@@ -94,10 +96,10 @@ struct ComplexHashableStructWithList(_HashableWithHasher):
     var _value2: SomeHashableStruct
     var _value3: List[UInt8]
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         hasher.update(self._value1)
         hasher.update(self._value2)
-        # This is okay because self is passed as borrowed so the pointer will
+        # This is okay because self is passed as read-only so the pointer will
         # be valid until at least the end of the function
         hasher._update_with_bytes(
             data=self._value3.unsafe_ptr(),
@@ -113,10 +115,10 @@ struct ComplexHashableStructWithListAndWideSIMD(_HashableWithHasher):
     var _value3: List[UInt8]
     var _value4: SIMD[DType.uint32, 4]
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         hasher.update(self._value1)
         hasher.update(self._value2)
-        # This is okay because self is passed as borrowed so the pointer will
+        # This is okay because self is passed as read-only so the pointer will
         # be valid until at least the end of the function
         hasher._update_with_bytes(
             data=self._value3.unsafe_ptr(),

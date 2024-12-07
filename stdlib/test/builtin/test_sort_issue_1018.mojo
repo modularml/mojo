@@ -14,8 +14,8 @@
 # RUN: %mojo %s | FileCheck %s
 
 from random import rand
-from memory import UnsafePointer
-from utils import Span
+
+from memory import UnsafePointer, Span
 
 
 fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:

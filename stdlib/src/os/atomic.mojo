@@ -19,18 +19,20 @@ from os import Atomic
 ```
 """
 
-from builtin.dtype import _integral_type_of, _unsigned_integral_type_of
-from memory import UnsafePointer, bitcast
 from sys.info import is_nvidia_gpu
 
+from builtin.dtype import _integral_type_of, _unsigned_integral_type_of
+from memory import UnsafePointer, bitcast
 
-struct Atomic[type: DType]:
+
+struct Atomic[type: DType, *, scope: StringLiteral = ""]:
     """Represents a value with atomic operations.
 
     The class provides atomic `add` and `sub` methods for mutating the value.
 
     Parameters:
         type: DType of the value.
+        scope: The memory synchronization scope.
     """
 
     var value: Scalar[type]
@@ -51,7 +53,7 @@ struct Atomic[type: DType]:
         self.value = value
 
     @always_inline
-    fn load(inout self) -> Scalar[type]:
+    fn load(mut self) -> Scalar[type]:
         """Loads the current value from the atomic.
 
         Returns:
@@ -62,7 +64,7 @@ struct Atomic[type: DType]:
     @staticmethod
     @always_inline
     fn _fetch_add(
-        ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]
+        ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]
     ) -> Scalar[type]:
         """Performs atomic in-place add.
 
@@ -82,6 +84,7 @@ struct Atomic[type: DType]:
         return __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op add>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+            syncscope = scope.value,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](
             ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]().address,
@@ -89,7 +92,7 @@ struct Atomic[type: DType]:
         )
 
     @always_inline
-    fn fetch_add(inout self, rhs: Scalar[type]) -> Scalar[type]:
+    fn fetch_add(mut self, rhs: Scalar[type]) -> Scalar[type]:
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -108,7 +111,7 @@ struct Atomic[type: DType]:
         return Self._fetch_add(value_addr, rhs)
 
     @always_inline
-    fn __iadd__(inout self, rhs: Scalar[type]):
+    fn __iadd__(mut self, rhs: Scalar[type]):
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -123,7 +126,7 @@ struct Atomic[type: DType]:
         _ = self.fetch_add(rhs)
 
     @always_inline
-    fn fetch_sub(inout self, rhs: Scalar[type]) -> Scalar[type]:
+    fn fetch_sub(mut self, rhs: Scalar[type]) -> Scalar[type]:
         """Performs atomic in-place sub.
 
         Atomically replaces the current value with the result of arithmetic
@@ -142,11 +145,12 @@ struct Atomic[type: DType]:
         return __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op sub>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+            syncscope = scope.value,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](value_addr.address, rhs.value)
 
     @always_inline
-    fn __isub__(inout self, rhs: Scalar[type]):
+    fn __isub__(mut self, rhs: Scalar[type]):
         """Performs atomic in-place sub.
 
         Atomically replaces the current value with the result of arithmetic
@@ -162,7 +166,7 @@ struct Atomic[type: DType]:
 
     @always_inline
     fn compare_exchange_weak(
-        inout self, inout expected: Scalar[type], desired: Scalar[type]
+        mut self, mut expected: Scalar[type], desired: Scalar[type]
     ) -> Bool:
         """Atomically compares the self value with that of the expected value.
         If the values are equal, then the self value is replaced with the
@@ -180,7 +184,7 @@ struct Atomic[type: DType]:
 
         @parameter
         if type.is_integral():
-            return _compare_exchange_weak_integral_impl(
+            return _compare_exchange_weak_integral_impl[scope=scope](
                 UnsafePointer.address_of(self.value), expected, desired
             )
 
@@ -194,13 +198,13 @@ struct Atomic[type: DType]:
         ]()
         var expected_integral = bitcast[integral_type](expected)
         var desired_integral = bitcast[integral_type](desired)
-        return _compare_exchange_weak_integral_impl(
+        return _compare_exchange_weak_integral_impl[scope=scope](
             value_integral_addr, expected_integral, desired_integral
         )
 
     @staticmethod
     @always_inline
-    fn max(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    fn max(ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
         """Performs atomic in-place max on the pointer.
 
         Atomically replaces the current value pointer to by `ptr` by the result
@@ -217,10 +221,10 @@ struct Atomic[type: DType]:
         """
         constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        _max_impl(ptr, rhs)
+        _max_impl[scope=scope](ptr, rhs)
 
     @always_inline
-    fn max(inout self, rhs: Scalar[type]):
+    fn max(mut self, rhs: Scalar[type]):
         """Performs atomic in-place max.
 
         Atomically replaces the current value with the result of max of the
@@ -240,7 +244,7 @@ struct Atomic[type: DType]:
 
     @staticmethod
     @always_inline
-    fn min(ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    fn min(ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
         """Performs atomic in-place min on the pointer.
 
         Atomically replaces the current value pointer to by `ptr` by the result
@@ -257,10 +261,10 @@ struct Atomic[type: DType]:
         """
         constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
-        _min_impl(ptr, rhs)
+        _min_impl[scope=scope](ptr, rhs)
 
     @always_inline
-    fn min(inout self, rhs: Scalar[type]):
+    fn min(mut self, rhs: Scalar[type]):
         """Performs atomic in-place min.
 
         Atomically replaces the current value with the result of min of the
@@ -280,17 +284,17 @@ struct Atomic[type: DType]:
         Self.min(UnsafePointer.address_of(self.value), rhs)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
 fn _compare_exchange_weak_integral_impl[
-    type: DType, //
+    type: DType, //, *, scope: StringLiteral
 ](
-    value_addr: UnsafePointer[Scalar[type], *_],
-    inout expected: Scalar[type],
+    value_addr: UnsafePointer[Scalar[type], **_],
+    mut expected: Scalar[type],
     desired: Scalar[type],
 ) -> Bool:
     constrained[type.is_integral(), "the input type must be integral"]()
@@ -298,6 +302,7 @@ fn _compare_exchange_weak_integral_impl[
         bin_op = __mlir_attr.`#pop<bin_op sub>`,
         failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
         success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        syncscope = scope.value,
     ](
         value_addr.bitcast[
             __mlir_type[`!pop.scalar<`, type.value, `>`]
@@ -317,69 +322,71 @@ fn _compare_exchange_weak_integral_impl[
 
 @always_inline
 fn _max_impl_base[
-    type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    type: DType, //, *, scope: StringLiteral
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     var value_addr = ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]()
     _ = __mlir_op.`pop.atomic.rmw`[
         bin_op = __mlir_attr.`#pop<bin_op max>`,
         ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        syncscope = scope.value,
         _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
     ](value_addr.address, rhs.value)
 
 
 @always_inline
 fn _min_impl_base[
-    type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    type: DType, //, *, scope: StringLiteral
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     var value_addr = ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]()
     _ = __mlir_op.`pop.atomic.rmw`[
         bin_op = __mlir_attr.`#pop<bin_op min>`,
         ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
+        syncscope = scope.value,
         _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
     ](value_addr.address, rhs.value)
 
 
 @always_inline
 fn _max_impl[
-    type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    type: DType, //, *, scope: StringLiteral
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     @parameter
     if is_nvidia_gpu() and type.is_floating_point():
         alias integral_type = _integral_type_of[type]()
         alias unsigned_integral_type = _unsigned_integral_type_of[type]()
         if rhs >= 0:
-            _max_impl_base(
+            _max_impl_base[scope=scope](
                 ptr.bitcast[Scalar[integral_type]](),
                 bitcast[integral_type](rhs),
             )
             return
-        _min_impl_base(
+        _min_impl_base[scope=scope](
             ptr.bitcast[Scalar[unsigned_integral_type]](),
             bitcast[unsigned_integral_type](rhs),
         )
         return
 
-    _max_impl_base(ptr, rhs)
+    _max_impl_base[scope=scope](ptr, rhs)
 
 
 @always_inline
 fn _min_impl[
-    type: DType, //
-](ptr: UnsafePointer[Scalar[type], *_], rhs: Scalar[type]):
+    type: DType, //, *, scope: StringLiteral
+](ptr: UnsafePointer[Scalar[type], **_], rhs: Scalar[type]):
     @parameter
     if is_nvidia_gpu() and type.is_floating_point():
         alias integral_type = _integral_type_of[type]()
         alias unsigned_integral_type = _unsigned_integral_type_of[type]()
         if rhs >= 0:
-            _min_impl_base(
+            _min_impl_base[scope=scope](
                 ptr.bitcast[Scalar[integral_type]](),
                 bitcast[integral_type](rhs),
             )
             return
-        _max_impl_base(
+        _max_impl_base[scope=scope](
             ptr.bitcast[Scalar[unsigned_integral_type]](),
             bitcast[unsigned_integral_type](rhs),
         )
         return
 
-    _min_impl_base(ptr, rhs)
+    _min_impl_base[scope=scope](ptr, rhs)

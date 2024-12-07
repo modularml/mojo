@@ -15,18 +15,17 @@
    avoids heap allocations for short strings.
 """
 
-from collections import InlineArray
+from collections import InlineArray, Optional
 from os import abort
-from collections import Optional
 from sys import sizeof
 
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
 from utils import StringSlice, Variant
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # InlineString
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -104,7 +103,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __iadd__(inout self, literal: StringLiteral):
+    fn __iadd__(mut self, literal: StringLiteral):
         """Appends another string to this string.
 
         Args:
@@ -112,7 +111,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(StringRef(literal))
 
-    fn __iadd__(inout self, string: String):
+    fn __iadd__(mut self, string: String):
         """Appends another string to this string.
 
         Args:
@@ -120,7 +119,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(string.as_string_slice())
 
-    fn __iadd__(inout self, str_slice: StringSlice[_]):
+    fn __iadd__(mut self, str_slice: StringSlice[_]):
         """Appends another string to this string.
 
         Args:
@@ -297,9 +296,9 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # __FixedString
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -396,7 +395,7 @@ struct _FixedString[CAP: Int](
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __iadd__(inout self, literal: StringLiteral) raises:
+    fn __iadd__(mut self, literal: StringLiteral) raises:
         """Appends another string to this string.
 
         Args:
@@ -404,7 +403,7 @@ struct _FixedString[CAP: Int](
         """
         self.__iadd__(literal.as_string_slice())
 
-    fn __iadd__(inout self, string: String) raises:
+    fn __iadd__(mut self, string: String) raises:
         """Appends another string to this string.
 
         Args:
@@ -413,7 +412,7 @@ struct _FixedString[CAP: Int](
         self.__iadd__(string.as_string_slice())
 
     @always_inline
-    fn __iadd__(inout self, str_slice: StringSlice[_]) raises:
+    fn __iadd__(mut self, str_slice: StringSlice[_]) raises:
         """Appends another string to this string.
 
         Args:
@@ -439,7 +438,7 @@ struct _FixedString[CAP: Int](
     # ===------------------------------------------------------------------=== #
 
     fn _iadd_non_raising(
-        inout self,
+        mut self,
         bytes: Span[Byte, _],
     ) -> Optional[Error]:
         var total_len = len(self) + len(bytes)
@@ -468,11 +467,11 @@ struct _FixedString[CAP: Int](
 
         return None
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write_bytes(self.as_bytes())
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a byte span to this String.
 
@@ -482,7 +481,7 @@ struct _FixedString[CAP: Int](
         """
         _ = self._iadd_non_raising(bytes)
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:

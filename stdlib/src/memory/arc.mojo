@@ -10,43 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Pointer-counted smart pointers.
+"""Reference-counted smart pointers.
 
-Example usage:
+You can import these APIs from the `memory` package. For example:
 
 ```mojo
 from memory import ArcPointer
-var p = ArcPointer(4)
-var p2 = p
-p2[]=3
-print(3 == p[])
 ```
-
-Subscripting(`[]`) is done by `Pointer`,
-in order to ensure that the underlying `ArcPointer` outlive the operation.
-
-It is highly DISCOURAGED to manipulate an `ArcPointer` through `UnsafePointer`.
-Mojo's ASAP deletion policy ensure values are destroyed at last use.
-Do not unsafely dereference the `ArcPointer` inner `UnsafePointer` field.
-See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
-
-```mojo
-# Illustration of what NOT to do, in order to understand:
-print(ArcPointer(String("ok"))._inner[].payload)
-#........................^ASAP ^already freed
-```
-
-Always use `Pointer` subscripting (`[]`):
-
-```mojo
-print(ArcPointer(String("ok"))[])
-```
-
 """
 
 from os.atomic import Atomic
 
-from builtin.builtin_list import _lit_mut_cast
 from memory import UnsafePointer, stack_allocation
 
 
@@ -60,11 +34,11 @@ struct _ArcPointerInner[T: Movable]:
         self.refcount = Scalar[DType.uint64](1)
         self.payload = value^
 
-    fn add_ref(inout self):
+    fn add_ref(mut self):
         """Atomically increment the refcount."""
         _ = self.refcount.fetch_add(1)
 
-    fn drop_ref(inout self) -> Bool:
+    fn drop_ref(mut self) -> Bool:
         """Atomically decrement the refcount and return true if the result
         hits zero."""
         return self.refcount.fetch_sub(1) == 1
@@ -80,9 +54,34 @@ struct ArcPointer[T: Movable](
     This pointer is copyable, including across threads, maintaining a reference
     count to the underlying data.
 
+    When you initialize an `ArcPointer` with a value, it allocates memory and
+    moves the value into the allocated memory. Copying an instance of an
+    `ArcPointer` increments the reference count. Destroying an instance
+    decrements the reference count. When the reference count reaches zero,
+    `ArcPointer` destroys the value and frees its memory.
+
     This pointer itself is thread-safe using atomic accesses to reference count
     the underlying data, but references returned to the underlying data are not
-    thread safe.
+    thread-safe.
+
+    Subscripting an `ArcPointer` (`ptr[]`) returns a mutable reference to the
+    stored value. This is the only safe way to access the stored value. Other
+    methods, such as using the `unsafe_ptr()` method to retrieve an unsafe
+    pointer to the stored value, or accessing the private fields of an
+    `ArcPointer`, are unsafe and may result in memory errors.
+
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
+
+    Examples:
+
+    ```mojo
+    from memory import ArcPointer
+    var p = ArcPointer(4)
+    var p2 = p
+    p2[]=3
+    print(3 == p[])
+    ```
 
     Parameters:
         T: The type of the stored value.
@@ -127,9 +126,9 @@ struct ArcPointer[T: Movable](
 
     @no_inline
     fn __del__(owned self):
-        """Delete the smart pointer reference.
+        """Delete the smart pointer.
 
-        Decrement the ref count for the reference. If there are no more
+        Decrement the reference count for the stored value. If there are no more
         references, delete the object and free its memory."""
         if self._inner[].drop_ref():
             # Call inner destructor, then free the memory.
@@ -146,7 +145,7 @@ struct ArcPointer[T: Movable](
     ](
         ref [self_life]self,
     ) -> ref [
-        _lit_mut_cast[self_life, result_mutable=True].result
+        MutableOrigin.cast_from[self_life].result
     ] T:
         """Returns a mutable reference to the managed value.
 
@@ -162,7 +161,7 @@ struct ArcPointer[T: Movable](
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The UnsafePointer to the underlying memory.
+            The `UnsafePointer` to the pointee.
         """
         # TODO: consider removing this method.
         return UnsafePointer.address_of(self._inner[].payload)
@@ -176,23 +175,27 @@ struct ArcPointer[T: Movable](
         return self._inner[].refcount.load()
 
     fn __is__(self, rhs: Self) -> Bool:
-        """Returns True if the two ArcPointers point at the same object.
+        """Returns True if the two `ArcPointer` instances point at the same
+        object.
 
         Args:
-            rhs: The other ArcPointer.
+            rhs: The other `ArcPointer`.
 
         Returns:
-            True if the two ArcPointers point at the same object and False otherwise.
+            True if the two `ArcPointers` instances point at the same object and
+            False otherwise.
         """
         return self._inner == rhs._inner
 
     fn __isnot__(self, rhs: Self) -> Bool:
-        """Returns True if the two ArcPointers point at different objects.
+        """Returns True if the two `ArcPointer` instances point at different
+        objects.
 
         Args:
-            rhs: The other ArcPointer.
+            rhs: The other `ArcPointer`.
 
         Returns:
-            True if the two ArcPointers point at different objects and False otherwise.
+            True if the two `ArcPointer` instances point at different objects
+            and False otherwise.
         """
         return self._inner != rhs._inner

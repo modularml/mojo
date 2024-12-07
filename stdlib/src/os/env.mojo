@@ -23,6 +23,7 @@ from sys import external_call, os_is_linux, os_is_macos, os_is_windows
 from sys.ffi import c_int
 
 from memory import UnsafePointer
+
 from utils import StringRef
 
 

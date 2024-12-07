@@ -15,23 +15,20 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import c_char
-
-from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from sys.ffi import c_char
+
+from memory import UnsafePointer, memcpy, Span
+
+from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
-    _StringSliceIter,
-    _to_string_list,
-)
+from utils.string_slice import _StringSliceIter, _to_string_list
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StringLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
@@ -86,6 +83,56 @@ struct StringLiteral(
         """
         self = other
 
+    # TODO(MOCO-1460): This should be: fn __init__[*, value: String](out self):
+    # but Mojo tries to bind the parameter in `StringLiteral["foo"]()` to the
+    # type instead of the initializer.  Use a static method to work around this
+    # for now.
+    @always_inline("nodebug")
+    @staticmethod
+    fn _from_string[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The string value to use.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return __mlir_attr[
+            `#kgen.param.expr<data_to_str,`,
+            value.byte_length().value,
+            `,`,
+            value.unsafe_ptr().address,
+            `> : !kgen.string`,
+        ]
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The value to convert to StringLiteral.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[value]()
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[type: Stringable, //, value: type]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time stringable value.
+
+        Parameters:
+            type: The type of the value.
+            value: The value to serialize.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[str(value)]()
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
@@ -103,7 +150,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: StringLiteral):
+    fn __iadd__(mut self, rhs: StringLiteral):
         """Concatenate a string literal to an existing one. Can only be
         evaluated at compile time using the `alias` keyword, which will write
         the result into the binary.
@@ -368,7 +415,7 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -531,7 +578,7 @@ struct StringLiteral(
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string literal to the provided Writer.
 
@@ -900,11 +947,3 @@ struct StringLiteral(
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
-
-
-fn _to_string_literal(i: Int) -> StringLiteral:
-    return __mlir_op.`pop.string.create`(i)
-
-
-fn _to_string_literal(i: SIMD) -> StringLiteral:
-    return __mlir_op.`pop.string.create`(i)

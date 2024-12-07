@@ -25,10 +25,12 @@
 # ===----------------------------------------------------------------------=== #
 from collections import InlineArray
 from math import log2
-from memory import bitcast
 from sys.info import sizeof
-from utils import StaticTuple, Span
+
 from builtin.io import _printf
+from memory import bitcast, Span
+
+from utils import StaticTuple
 from utils.numerics import FPUtils, isinf, isnan
 
 
@@ -38,7 +40,7 @@ struct _UInt128:
     var high: UInt64
     var low: UInt64
 
-    fn __iadd__(inout self, n: UInt64):
+    fn __iadd__(mut self, n: UInt64):
         var sum = (self.low + n) & UInt64.MAX
         self.high += 1 if sum < self.low else 0
         self.low = sum
@@ -69,9 +71,8 @@ struct FP[type: DType, CarrierDType: DType = FPUtils[type].uint_type]:
     alias carrier_bits = sizeof[Self.CarrierDType]() * 8
     alias sig_bits = FPUtils[type].mantissa_width()
     alias exp_bits = FPUtils[type].exponent_width()
-    alias min_exponent = FPUtils[type].min_exponent()
-    alias max_exponent = FPUtils[type].max_exponent()
-    alias exp_bias = -Self.max_exponent
+    alias neg_exp_bias = -FPUtils[type].exponent_bias()
+    alias min_normal_exp = Self.neg_exp_bias + 1
     alias cache_bits = 64 if Self.CarrierDType == DType.uint32 else 128
     alias min_k = -31 if Self.CarrierDType == DType.uint32 else -292
     alias max_k = 46 if Self.CarrierDType == DType.uint32 else 326
@@ -87,9 +88,7 @@ struct FP[type: DType, CarrierDType: DType = FPUtils[type].uint_type]:
     alias small_divisor = pow(10, Self.kappa)
 
 
-fn _write_float[
-    W: Writer, type: DType, //
-](inout writer: W, value: Scalar[type]):
+fn _write_float[W: Writer, type: DType, //](mut writer: W, value: Scalar[type]):
     """Write a SIMD float type into a Writer, using the dragonbox algorithm for
     perfect roundtrip, shortest representable format, and high performance.
     Paper: https://github.com/jk-jeon/dragonbox/blob/master/other_files/Dragonbox.pdf
@@ -105,117 +104,128 @@ fn _write_float[
     """
     constrained[type.is_floating_point()]()
 
-    # Currently only specialized for float32 and float64, upcast anything else
-    # to float32
-    casted = value.cast[
-        DType.float64 if type == DType.float64 else DType.float32
-    ]()
+    @parameter
+    if type is DType.float8e5m2:
+        return writer.write(float8e5m2_to_str[int(bitcast[DType.uint8](value))])
+    elif type is DType.float8e4m3:
+        return writer.write(float8e4m3_to_str[int(bitcast[DType.uint8](value))])
+    elif type is DType.float8e5m2fnuz:
+        return writer.write(
+            float8e5m2fnuz_to_str[int(bitcast[DType.uint8](value))]
+        )
+    elif type is DType.float8e4m3fnuz:
+        return writer.write(
+            float8e4m3fnuz_to_str[int(bitcast[DType.uint8](value))]
+        )
+    else:
+        # Upcast the float16 types to float32
+        casted = value.cast[
+            DType.float64 if type == DType.float64 else DType.float32
+        ]()
 
-    # Bitcast the float and separate the sig and exp, to enable manipulating
-    # bits as a UInt64 and Int:
-    #  - The significand (sig) is the raw binary fraction
-    #  - The exponent (exp) is still in biased form
-    var sig = FPUtils.get_mantissa_uint(casted)
-    var exp = FPUtils.get_exponent_without_bias(casted)
-    var sign = FPUtils.get_sign(casted)
+        # Bitcast the float and separate the sig and exp, to enable manipulating
+        # bits as a UInt64 and Int:
+        #  - The significand (sig) is the raw binary fraction
+        #  - The exponent (exp) is still in biased form
+        var sig = FPUtils.get_mantissa_uint(casted)
+        var exp = FPUtils.get_exponent_biased(casted)
+        var sign = FPUtils.get_sign(casted)
 
-    if isinf(value):
+        if isinf(value):
+            if sign:
+                return writer.write("-inf")
+            return writer.write("inf")
+
+        if isnan(value):
+            return writer.write("nan")
+
         if sign:
             writer.write("-")
-        writer.write("inf")
-        return
 
-    if isnan(value):
-        writer.write("nan")
-        return
+        if not sig and not exp:
+            return writer.write("0.0")
 
-    if sign:
-        writer.write("-")
+        # Convert the binary components to a decimal representation:
+        #   - The raw binary sig into a decimal sig
+        #   - The biased binary exp into a decimal power of 10 exp
+        # This does all the heavy lifting for perfect roundtrip, shortest
+        # representable format, bankers rounding etc.
+        _to_decimal[casted.type](sig, exp)
 
-    if not sig and not exp:
-        writer.write("0.0")
-        return
+        # This is a custom routine for writing the decimal following python
+        # behavior.  it can be further optimized with a lookup table, there is
+        # overhead here compared to snprintf.
+        var orig_sig = sig
+        var abs_exp = abs(exp)
+        var digits = StaticTuple[Byte, 21]()
+        var idx = 0
+        while sig > 0:
+            digits[idx] = (sig % 10).cast[DType.uint8]()
+            sig //= 10
+            idx += 1
+            if sig > 0:
+                exp += 1
+        var leading_zeroes = abs_exp - idx
 
-    # Convert the binary components to a decimal representation:
-    #   - The raw binary sig into a decimal sig
-    #   - The biased binary exp into a decimal power of 10 exp
-    # This does all the heavy lifting for perfect roundtrip, shortest
-    # representable format, bankers rounding etc.
-    _to_decimal[casted.type](sig, exp)
-
-    # This is a custom routine for writing the decimal following python behavior.
-    # it can be further optimized with a lookup table, there is overhead here
-    # compared to snprintf.
-    var orig_sig = sig
-    var abs_exp = abs(exp)
-    var digits = StaticTuple[Byte, 21]()
-    var idx = 0
-    while sig > 0:
-        digits[idx] = (sig % 10).cast[DType.uint8]()
-        sig //= 10
-        idx += 1
-        if sig > 0:
-            exp += 1
-    var leading_zeroes = abs_exp - idx
-
-    # Write in scientific notation if < 0.0001 or exp > 15
-    if (exp < 0 and leading_zeroes > 3) or exp > 15:
-        # Handle single digit case
-        if orig_sig < 10:
-            writer.write(orig_sig)
-        else:
-            # Write digit before decimal point
-            writer.write(digits[idx - 1])
-            writer.write(".")
-        # Write digits after decimal point
-        for i in reversed(range(idx - 1)):
-            writer.write(digits[i])
-        # Write exponent
-        if exp < 0:
-            writer.write("e-")
-            exp = -exp
-        else:
-            writer.write("e+")
-        # Pad exponent with a 0 if less than two digits
-        if exp < 10:
-            writer.write("0")
-        var exp_digits = StaticTuple[Byte, 10]()
-        var exp_idx = 0
-        while exp > 0:
-            exp_digits[exp_idx] = exp % 10
-            exp //= 10
-            exp_idx += 1
-        for i in reversed(range(exp_idx)):
-            writer.write(exp_digits[i])
-    # If between 0 and 0.0001
-    elif exp < 0 and leading_zeroes > 0:
-        writer.write("0.")
-        for _ in range(leading_zeroes):
-            writer.write("0")
-        for i in reversed(range(idx)):
-            writer.write(digits[i])
-    # All other floats > 0.0001 with an exponent <= 15
-    else:
-        var point_written = False
-        for i in reversed(range(idx)):
-            if leading_zeroes < 1 and exp == idx - i - 2:
-                # No integer part so write leading 0
-                if i == idx - 1:
-                    writer.write("0")
+        # Write in scientific notation if < 0.0001 or exp > 15
+        if (exp < 0 and leading_zeroes > 3) or exp > 15:
+            # Handle single digit case
+            if orig_sig < 10:
+                writer.write(orig_sig)
+            else:
+                # Write digit before decimal point
+                writer.write(digits[idx - 1])
                 writer.write(".")
-                point_written = True
-            writer.write(digits[i])
+            # Write digits after decimal point
+            for i in reversed(range(idx - 1)):
+                writer.write(digits[i])
+            # Write exponent
+            if exp < 0:
+                writer.write("e-")
+                exp = -exp
+            else:
+                writer.write("e+")
+            # Pad exponent with a 0 if less than two digits
+            if exp < 10:
+                writer.write("0")
+            var exp_digits = StaticTuple[Byte, 10]()
+            var exp_idx = 0
+            while exp > 0:
+                exp_digits[exp_idx] = exp % 10
+                exp //= 10
+                exp_idx += 1
+            for i in reversed(range(exp_idx)):
+                writer.write(exp_digits[i])
+        # If between 0 and 0.0001
+        elif exp < 0 and leading_zeroes > 0:
+            writer.write("0.")
+            for _ in range(leading_zeroes):
+                writer.write("0")
+            for i in reversed(range(idx)):
+                writer.write(digits[i])
+        # All other floats > 0.0001 with an exponent <= 15
+        else:
+            var point_written = False
+            for i in reversed(range(idx)):
+                if leading_zeroes < 1 and exp == idx - i - 2:
+                    # No integer part so write leading 0
+                    if i == idx - 1:
+                        writer.write("0")
+                    writer.write(".")
+                    point_written = True
+                writer.write(digits[i])
 
-        # If exp - idx + 1 > 0 it's a positive number with more 0's than the sig
-        for _ in range(exp - idx + 1):
-            writer.write("0")
-        if not point_written:
-            writer.write(".0")
+            # If exp - idx + 1 > 0 it's a positive number with more 0's than the
+            # sig
+            for _ in range(exp - idx + 1):
+                writer.write("0")
+            if not point_written:
+                writer.write(".0")
 
 
 fn _to_decimal[
     CarrierDType: DType, //, type: DType
-](inout sig: Scalar[CarrierDType], inout exp: Int):
+](mut sig: Scalar[CarrierDType], mut exp: Int):
     """Transform the raw binary significand to decimal significand,
     and biased binary exponent into a decimal power of 10 exponent.
     """
@@ -224,7 +234,7 @@ fn _to_decimal[
 
     # For normal numbers
     if binary_exp != 0:
-        binary_exp += FP[type].exp_bias - FP[type].sig_bits
+        binary_exp += FP[type].neg_exp_bias - FP[type].sig_bits
         if two_fc == 0:
             var minus_k = (binary_exp * 631305 - 261663) >> 21
             var beta = binary_exp + _floor_log2_pow10(-minus_k)
@@ -282,7 +292,7 @@ fn _to_decimal[
         two_fc |= Scalar[CarrierDType](1) << (FP[type].sig_bits + 1)
     else:
         # For subnormal numbers
-        binary_exp = FP[type].min_exponent - FP[type].sig_bits
+        binary_exp = FP[type].min_normal_exp - FP[type].sig_bits
 
     ##########################################
     # Step 1: Schubfach multiplier calculation
@@ -368,7 +378,7 @@ fn _compute_endpoint[
     CarrierDType: DType, sig_bits: Int, total_bits: Int, cache_bits: Int
 ](cache_index: Int, beta: Int, left_endpoint: Bool) -> Scalar[CarrierDType]:
     @parameter
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var cache = cache_f64[cache_index]
         if left_endpoint:
             return (
@@ -405,9 +415,9 @@ fn _print_bits[type: DType](x: Scalar[type]) -> String:
             if i % 8 == 0:
                 output.write(" ")
     else:
-        alias sig_bits = 23 if type == DType.float32 else 52
-        alias exp_bits = 8 if type == DType.float32 else 11
-        alias cast_type = DType.uint32 if type == DType.float32 else DType.uint64
+        alias sig_bits = 23 if type is DType.float32 else 52
+        alias exp_bits = 8 if type is DType.float32 else 11
+        alias cast_type = DType.uint32 if type is DType.float32 else DType.uint64
         var casted = bitcast[cast_type](x)
         for i in reversed(range(total_bits)):
             output.write((casted >> i) & 1)
@@ -433,7 +443,7 @@ fn _rotr[
     CarrierDType: DType
 ](n: Scalar[CarrierDType], r: Scalar[CarrierDType]) -> Scalar[CarrierDType]:
     @parameter
-    if CarrierDType == DType.uint32:
+    if CarrierDType is DType.uint32:
         var r_masked = r & 31
         return (n >> r_masked) | (n << ((32 - r_masked) & 31))
     else:
@@ -487,13 +497,13 @@ fn _umul128[
 
 fn _remove_trailing_zeros[
     CarrierDType: DType
-](inout sig: Scalar[CarrierDType], inout exp: Int):
+](mut sig: Scalar[CarrierDType], mut exp: Int):
     """Fastest alg for removing trailing zeroes:
     https://github.com/jk-jeon/rtz_benchmark.
     """
 
     @parameter
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var r = _rotr(sig * 28999941890838049, 8)
         var b = r < 184467440738
         var s = int(b)
@@ -545,7 +555,7 @@ fn _divide_by_pow10[
     CarrierDType: DType, //, N: Int, n_max: Scalar[CarrierDType]
 ](n: Scalar[CarrierDType]) -> Scalar[CarrierDType]:
     @parameter
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
 
         @parameter
         if N == 1 and bool(n_max <= 4611686018427387908):
@@ -581,7 +591,7 @@ fn _umul192_lower128(x: UInt64, y: _UInt128) -> _UInt128:
 fn _compute_mul_parity[
     CarrierDType: DType
 ](two_f: Scalar[CarrierDType], cache_index: Int, beta: Int) -> _MulParity:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         debug_assert(1 <= beta < 64, "beta must be between 1 and 64")
         var r = _umul192_lower128(
             two_f.cast[DType.uint64](), cache_f64[cache_index]
@@ -616,7 +626,7 @@ fn _check_divisibility_and_divide_by_pow10[
     CarrierDType: DType, //,
     carrier_bits: Int,
     divide_magic_number: StaticTuple[UInt32, 2],
-](inout n: Scalar[CarrierDType], N: Int) -> Bool:
+](mut n: Scalar[CarrierDType], N: Int) -> Bool:
     # Make sure the computation for max_n does not overflow.
     debug_assert(N + 1 <= _floor_log10_pow2(carrier_bits))
 
@@ -653,7 +663,7 @@ fn _umul96_upper64[
 fn _compute_mul[
     CarrierDType: DType
 ](u: Scalar[CarrierDType], cache_index: Int) -> _MulResult[CarrierDType]:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var r = _umul192_upper128(u, cache_f64[cache_index])
         return _MulResult[CarrierDType](r.high.cast[CarrierDType](), r.low == 0)
     else:
@@ -667,7 +677,7 @@ fn _compute_mul[
 fn _compute_delta[
     CarrierDType: DType, total_bits: Int, cache_bits: Int
 ](cache_index: Int, beta: Int) -> Scalar[CarrierDType]:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var cache = cache_f64[cache_index]
         return (cache.high >> (total_bits - 1 - beta)).cast[CarrierDType]()
     else:
@@ -722,7 +732,7 @@ fn _count_factors[
 fn _compute_round_up_for_shorter_interval_case[
     CarrierDType: DType, total_bits: Int, sig_bits: Int, cache_bits: Int
 ](cache_index: Int, beta: Int) -> Scalar[CarrierDType]:
-    if CarrierDType == DType.uint64:
+    if CarrierDType is DType.uint64:
         var cache = cache_f64[cache_index]
         return (
             (
@@ -1425,4 +1435,1040 @@ alias cache_f64 = StaticTuple[_UInt128, 619](
     _UInt128(0x9E19DB92B4E31BA9, 0x6C07A2C26A8346D2),
     _UInt128(0xC5A05277621BE293, 0xC7098B7305241886),
     _UInt128(0xF70867153AA2DB38, 0xB8CBEE4FC66D1EA8),
+)
+
+alias float8e5m2_to_str = StaticTuple[StringLiteral, 256](
+    "0.0",
+    "1.52587890625e-05",
+    "3.0517578125e-05",
+    "4.57763671875e-05",
+    "6.103515625e-05",
+    "7.62939453125e-05",
+    "9.1552734375e-05",
+    "0.0001068115234375",
+    "0.0001220703125",
+    "0.000152587890625",
+    "0.00018310546875",
+    "0.000213623046875",
+    "0.000244140625",
+    "0.00030517578125",
+    "0.0003662109375",
+    "0.00042724609375",
+    "0.00048828125",
+    "0.0006103515625",
+    "0.000732421875",
+    "0.0008544921875",
+    "0.0009765625",
+    "0.001220703125",
+    "0.00146484375",
+    "0.001708984375",
+    "0.001953125",
+    "0.00244140625",
+    "0.0029296875",
+    "0.00341796875",
+    "0.00390625",
+    "0.0048828125",
+    "0.005859375",
+    "0.0068359375",
+    "0.0078125",
+    "0.009765625",
+    "0.01171875",
+    "0.013671875",
+    "0.015625",
+    "0.01953125",
+    "0.0234375",
+    "0.02734375",
+    "0.03125",
+    "0.0390625",
+    "0.046875",
+    "0.0546875",
+    "0.0625",
+    "0.078125",
+    "0.09375",
+    "0.109375",
+    "0.125",
+    "0.15625",
+    "0.1875",
+    "0.21875",
+    "0.25",
+    "0.3125",
+    "0.375",
+    "0.4375",
+    "0.5",
+    "0.625",
+    "0.75",
+    "0.875",
+    "1.0",
+    "1.25",
+    "1.5",
+    "1.75",
+    "2.0",
+    "2.5",
+    "3.0",
+    "3.5",
+    "4.0",
+    "5.0",
+    "6.0",
+    "7.0",
+    "8.0",
+    "10.0",
+    "12.0",
+    "14.0",
+    "16.0",
+    "20.0",
+    "24.0",
+    "28.0",
+    "32.0",
+    "40.0",
+    "48.0",
+    "56.0",
+    "64.0",
+    "80.0",
+    "96.0",
+    "112.0",
+    "128.0",
+    "160.0",
+    "192.0",
+    "224.0",
+    "256.0",
+    "320.0",
+    "384.0",
+    "448.0",
+    "512.0",
+    "640.0",
+    "768.0",
+    "896.0",
+    "1024.0",
+    "1280.0",
+    "1536.0",
+    "1792.0",
+    "2048.0",
+    "2560.0",
+    "3072.0",
+    "3584.0",
+    "4096.0",
+    "5120.0",
+    "6144.0",
+    "7168.0",
+    "8192.0",
+    "10240.0",
+    "12288.0",
+    "14336.0",
+    "16384.0",
+    "20480.0",
+    "24576.0",
+    "28672.0",
+    "32768.0",
+    "40960.0",
+    "49152.0",
+    "57344.0",
+    "inf",
+    "nan",
+    "nan",
+    "nan",
+    "-0.0",
+    "-1.52587890625e-05",
+    "-3.0517578125e-05",
+    "-4.57763671875e-05",
+    "-6.103515625e-05",
+    "-7.62939453125e-05",
+    "-9.1552734375e-05",
+    "-0.0001068115234375",
+    "-0.0001220703125",
+    "-0.000152587890625",
+    "-0.00018310546875",
+    "-0.000213623046875",
+    "-0.000244140625",
+    "-0.00030517578125",
+    "-0.0003662109375",
+    "-0.00042724609375",
+    "-0.00048828125",
+    "-0.0006103515625",
+    "-0.000732421875",
+    "-0.0008544921875",
+    "-0.0009765625",
+    "-0.001220703125",
+    "-0.00146484375",
+    "-0.001708984375",
+    "-0.001953125",
+    "-0.00244140625",
+    "-0.0029296875",
+    "-0.00341796875",
+    "-0.00390625",
+    "-0.0048828125",
+    "-0.005859375",
+    "-0.0068359375",
+    "-0.0078125",
+    "-0.009765625",
+    "-0.01171875",
+    "-0.013671875",
+    "-0.015625",
+    "-0.01953125",
+    "-0.0234375",
+    "-0.02734375",
+    "-0.03125",
+    "-0.0390625",
+    "-0.046875",
+    "-0.0546875",
+    "-0.0625",
+    "-0.078125",
+    "-0.09375",
+    "-0.109375",
+    "-0.125",
+    "-0.15625",
+    "-0.1875",
+    "-0.21875",
+    "-0.25",
+    "-0.3125",
+    "-0.375",
+    "-0.4375",
+    "-0.5",
+    "-0.625",
+    "-0.75",
+    "-0.875",
+    "-1.0",
+    "-1.25",
+    "-1.5",
+    "-1.75",
+    "-2.0",
+    "-2.5",
+    "-3.0",
+    "-3.5",
+    "-4.0",
+    "-5.0",
+    "-6.0",
+    "-7.0",
+    "-8.0",
+    "-10.0",
+    "-12.0",
+    "-14.0",
+    "-16.0",
+    "-20.0",
+    "-24.0",
+    "-28.0",
+    "-32.0",
+    "-40.0",
+    "-48.0",
+    "-56.0",
+    "-64.0",
+    "-80.0",
+    "-96.0",
+    "-112.0",
+    "-128.0",
+    "-160.0",
+    "-192.0",
+    "-224.0",
+    "-256.0",
+    "-320.0",
+    "-384.0",
+    "-448.0",
+    "-512.0",
+    "-640.0",
+    "-768.0",
+    "-896.0",
+    "-1024.0",
+    "-1280.0",
+    "-1536.0",
+    "-1792.0",
+    "-2048.0",
+    "-2560.0",
+    "-3072.0",
+    "-3584.0",
+    "-4096.0",
+    "-5120.0",
+    "-6144.0",
+    "-7168.0",
+    "-8192.0",
+    "-10240.0",
+    "-12288.0",
+    "-14336.0",
+    "-16384.0",
+    "-20480.0",
+    "-24576.0",
+    "-28672.0",
+    "-32768.0",
+    "-40960.0",
+    "-49152.0",
+    "-57344.0",
+    "-inf",
+    "nan",
+    "nan",
+    "nan",
+)
+
+alias float8e4m3_to_str = StaticTuple[StringLiteral, 256](
+    "0.0",
+    "0.001953125",
+    "0.00390625",
+    "0.005859375",
+    "0.0078125",
+    "0.009765625",
+    "0.01171875",
+    "0.013671875",
+    "0.015625",
+    "0.017578125",
+    "0.01953125",
+    "0.021484375",
+    "0.0234375",
+    "0.025390625",
+    "0.02734375",
+    "0.029296875",
+    "0.03125",
+    "0.03515625",
+    "0.0390625",
+    "0.04296875",
+    "0.046875",
+    "0.05078125",
+    "0.0546875",
+    "0.05859375",
+    "0.0625",
+    "0.0703125",
+    "0.078125",
+    "0.0859375",
+    "0.09375",
+    "0.1015625",
+    "0.109375",
+    "0.1171875",
+    "0.125",
+    "0.140625",
+    "0.15625",
+    "0.171875",
+    "0.1875",
+    "0.203125",
+    "0.21875",
+    "0.234375",
+    "0.25",
+    "0.28125",
+    "0.3125",
+    "0.34375",
+    "0.375",
+    "0.40625",
+    "0.4375",
+    "0.46875",
+    "0.5",
+    "0.5625",
+    "0.625",
+    "0.6875",
+    "0.75",
+    "0.8125",
+    "0.875",
+    "0.9375",
+    "1.0",
+    "1.125",
+    "1.25",
+    "1.375",
+    "1.5",
+    "1.625",
+    "1.75",
+    "1.875",
+    "2.0",
+    "2.25",
+    "2.5",
+    "2.75",
+    "3.0",
+    "3.25",
+    "3.5",
+    "3.75",
+    "4.0",
+    "4.5",
+    "5.0",
+    "5.5",
+    "6.0",
+    "6.5",
+    "7.0",
+    "7.5",
+    "8.0",
+    "9.0",
+    "10.0",
+    "11.0",
+    "12.0",
+    "13.0",
+    "14.0",
+    "15.0",
+    "16.0",
+    "18.0",
+    "20.0",
+    "22.0",
+    "24.0",
+    "26.0",
+    "28.0",
+    "30.0",
+    "32.0",
+    "36.0",
+    "40.0",
+    "44.0",
+    "48.0",
+    "52.0",
+    "56.0",
+    "60.0",
+    "64.0",
+    "72.0",
+    "80.0",
+    "88.0",
+    "96.0",
+    "104.0",
+    "112.0",
+    "120.0",
+    "128.0",
+    "144.0",
+    "160.0",
+    "176.0",
+    "192.0",
+    "208.0",
+    "224.0",
+    "240.0",
+    "256.0",
+    "288.0",
+    "320.0",
+    "352.0",
+    "384.0",
+    "416.0",
+    "448.0",
+    "nan",
+    "-0.0",
+    "-0.001953125",
+    "-0.00390625",
+    "-0.005859375",
+    "-0.0078125",
+    "-0.009765625",
+    "-0.01171875",
+    "-0.013671875",
+    "-0.015625",
+    "-0.017578125",
+    "-0.01953125",
+    "-0.021484375",
+    "-0.0234375",
+    "-0.025390625",
+    "-0.02734375",
+    "-0.029296875",
+    "-0.03125",
+    "-0.03515625",
+    "-0.0390625",
+    "-0.04296875",
+    "-0.046875",
+    "-0.05078125",
+    "-0.0546875",
+    "-0.05859375",
+    "-0.0625",
+    "-0.0703125",
+    "-0.078125",
+    "-0.0859375",
+    "-0.09375",
+    "-0.1015625",
+    "-0.109375",
+    "-0.1171875",
+    "-0.125",
+    "-0.140625",
+    "-0.15625",
+    "-0.171875",
+    "-0.1875",
+    "-0.203125",
+    "-0.21875",
+    "-0.234375",
+    "-0.25",
+    "-0.28125",
+    "-0.3125",
+    "-0.34375",
+    "-0.375",
+    "-0.40625",
+    "-0.4375",
+    "-0.46875",
+    "-0.5",
+    "-0.5625",
+    "-0.625",
+    "-0.6875",
+    "-0.75",
+    "-0.8125",
+    "-0.875",
+    "-0.9375",
+    "-1.0",
+    "-1.125",
+    "-1.25",
+    "-1.375",
+    "-1.5",
+    "-1.625",
+    "-1.75",
+    "-1.875",
+    "-2.0",
+    "-2.25",
+    "-2.5",
+    "-2.75",
+    "-3.0",
+    "-3.25",
+    "-3.5",
+    "-3.75",
+    "-4.0",
+    "-4.5",
+    "-5.0",
+    "-5.5",
+    "-6.0",
+    "-6.5",
+    "-7.0",
+    "-7.5",
+    "-8.0",
+    "-9.0",
+    "-10.0",
+    "-11.0",
+    "-12.0",
+    "-13.0",
+    "-14.0",
+    "-15.0",
+    "-16.0",
+    "-18.0",
+    "-20.0",
+    "-22.0",
+    "-24.0",
+    "-26.0",
+    "-28.0",
+    "-30.0",
+    "-32.0",
+    "-36.0",
+    "-40.0",
+    "-44.0",
+    "-48.0",
+    "-52.0",
+    "-56.0",
+    "-60.0",
+    "-64.0",
+    "-72.0",
+    "-80.0",
+    "-88.0",
+    "-96.0",
+    "-104.0",
+    "-112.0",
+    "-120.0",
+    "-128.0",
+    "-144.0",
+    "-160.0",
+    "-176.0",
+    "-192.0",
+    "-208.0",
+    "-224.0",
+    "-240.0",
+    "-256.0",
+    "-288.0",
+    "-320.0",
+    "-352.0",
+    "-384.0",
+    "-416.0",
+    "-448.0",
+    "nan",
+)
+
+alias float8e5m2fnuz_to_str = StaticTuple[StringLiteral, 256](
+    "0.0",
+    "7.62939453125e-06",
+    "1.52587890625e-05",
+    "2.288818359375e-05",
+    "3.0517578125e-05",
+    "3.814697265625e-05",
+    "4.57763671875e-05",
+    "5.340576171875e-05",
+    "6.103515625e-05",
+    "7.62939453125e-05",
+    "9.1552734375e-05",
+    "0.0001068115234375",
+    "0.0001220703125",
+    "0.000152587890625",
+    "0.00018310546875",
+    "0.000213623046875",
+    "0.000244140625",
+    "0.00030517578125",
+    "0.0003662109375",
+    "0.00042724609375",
+    "0.00048828125",
+    "0.0006103515625",
+    "0.000732421875",
+    "0.0008544921875",
+    "0.0009765625",
+    "0.001220703125",
+    "0.00146484375",
+    "0.001708984375",
+    "0.001953125",
+    "0.00244140625",
+    "0.0029296875",
+    "0.00341796875",
+    "0.00390625",
+    "0.0048828125",
+    "0.005859375",
+    "0.0068359375",
+    "0.0078125",
+    "0.009765625",
+    "0.01171875",
+    "0.013671875",
+    "0.015625",
+    "0.01953125",
+    "0.0234375",
+    "0.02734375",
+    "0.03125",
+    "0.0390625",
+    "0.046875",
+    "0.0546875",
+    "0.0625",
+    "0.078125",
+    "0.09375",
+    "0.109375",
+    "0.125",
+    "0.15625",
+    "0.1875",
+    "0.21875",
+    "0.25",
+    "0.3125",
+    "0.375",
+    "0.4375",
+    "0.5",
+    "0.625",
+    "0.75",
+    "0.875",
+    "1.0",
+    "1.25",
+    "1.5",
+    "1.75",
+    "2.0",
+    "2.5",
+    "3.0",
+    "3.5",
+    "4.0",
+    "5.0",
+    "6.0",
+    "7.0",
+    "8.0",
+    "10.0",
+    "12.0",
+    "14.0",
+    "16.0",
+    "20.0",
+    "24.0",
+    "28.0",
+    "32.0",
+    "40.0",
+    "48.0",
+    "56.0",
+    "64.0",
+    "80.0",
+    "96.0",
+    "112.0",
+    "128.0",
+    "160.0",
+    "192.0",
+    "224.0",
+    "256.0",
+    "320.0",
+    "384.0",
+    "448.0",
+    "512.0",
+    "640.0",
+    "768.0",
+    "896.0",
+    "1024.0",
+    "1280.0",
+    "1536.0",
+    "1792.0",
+    "2048.0",
+    "2560.0",
+    "3072.0",
+    "3584.0",
+    "4096.0",
+    "5120.0",
+    "6144.0",
+    "7168.0",
+    "8192.0",
+    "10240.0",
+    "12288.0",
+    "14336.0",
+    "16384.0",
+    "20480.0",
+    "24576.0",
+    "28672.0",
+    "32768.0",
+    "40960.0",
+    "49152.0",
+    "57344.0",
+    "nan",
+    "-7.62939453125e-06",
+    "-1.52587890625e-05",
+    "-2.288818359375e-05",
+    "-3.0517578125e-05",
+    "-3.814697265625e-05",
+    "-4.57763671875e-05",
+    "-5.340576171875e-05",
+    "-6.103515625e-05",
+    "-7.62939453125e-05",
+    "-9.1552734375e-05",
+    "-0.0001068115234375",
+    "-0.0001220703125",
+    "-0.000152587890625",
+    "-0.00018310546875",
+    "-0.000213623046875",
+    "-0.000244140625",
+    "-0.00030517578125",
+    "-0.0003662109375",
+    "-0.00042724609375",
+    "-0.00048828125",
+    "-0.0006103515625",
+    "-0.000732421875",
+    "-0.0008544921875",
+    "-0.0009765625",
+    "-0.001220703125",
+    "-0.00146484375",
+    "-0.001708984375",
+    "-0.001953125",
+    "-0.00244140625",
+    "-0.0029296875",
+    "-0.00341796875",
+    "-0.00390625",
+    "-0.0048828125",
+    "-0.005859375",
+    "-0.0068359375",
+    "-0.0078125",
+    "-0.009765625",
+    "-0.01171875",
+    "-0.013671875",
+    "-0.015625",
+    "-0.01953125",
+    "-0.0234375",
+    "-0.02734375",
+    "-0.03125",
+    "-0.0390625",
+    "-0.046875",
+    "-0.0546875",
+    "-0.0625",
+    "-0.078125",
+    "-0.09375",
+    "-0.109375",
+    "-0.125",
+    "-0.15625",
+    "-0.1875",
+    "-0.21875",
+    "-0.25",
+    "-0.3125",
+    "-0.375",
+    "-0.4375",
+    "-0.5",
+    "-0.625",
+    "-0.75",
+    "-0.875",
+    "-1.0",
+    "-1.25",
+    "-1.5",
+    "-1.75",
+    "-2.0",
+    "-2.5",
+    "-3.0",
+    "-3.5",
+    "-4.0",
+    "-5.0",
+    "-6.0",
+    "-7.0",
+    "-8.0",
+    "-10.0",
+    "-12.0",
+    "-14.0",
+    "-16.0",
+    "-20.0",
+    "-24.0",
+    "-28.0",
+    "-32.0",
+    "-40.0",
+    "-48.0",
+    "-56.0",
+    "-64.0",
+    "-80.0",
+    "-96.0",
+    "-112.0",
+    "-128.0",
+    "-160.0",
+    "-192.0",
+    "-224.0",
+    "-256.0",
+    "-320.0",
+    "-384.0",
+    "-448.0",
+    "-512.0",
+    "-640.0",
+    "-768.0",
+    "-896.0",
+    "-1024.0",
+    "-1280.0",
+    "-1536.0",
+    "-1792.0",
+    "-2048.0",
+    "-2560.0",
+    "-3072.0",
+    "-3584.0",
+    "-4096.0",
+    "-5120.0",
+    "-6144.0",
+    "-7168.0",
+    "-8192.0",
+    "-10240.0",
+    "-12288.0",
+    "-14336.0",
+    "-16384.0",
+    "-20480.0",
+    "-24576.0",
+    "-28672.0",
+    "-32768.0",
+    "-40960.0",
+    "-49152.0",
+    "-57344.0",
+)
+
+alias float8e4m3fnuz_to_str = StaticTuple[StringLiteral, 256](
+    "0.0",
+    "0.0009765625",
+    "0.001953125",
+    "0.0029296875",
+    "0.00390625",
+    "0.0048828125",
+    "0.005859375",
+    "0.0068359375",
+    "0.0078125",
+    "0.0087890625",
+    "0.009765625",
+    "0.0107421875",
+    "0.01171875",
+    "0.0126953125",
+    "0.013671875",
+    "0.0146484375",
+    "0.015625",
+    "0.017578125",
+    "0.01953125",
+    "0.021484375",
+    "0.0234375",
+    "0.025390625",
+    "0.02734375",
+    "0.029296875",
+    "0.03125",
+    "0.03515625",
+    "0.0390625",
+    "0.04296875",
+    "0.046875",
+    "0.05078125",
+    "0.0546875",
+    "0.05859375",
+    "0.0625",
+    "0.0703125",
+    "0.078125",
+    "0.0859375",
+    "0.09375",
+    "0.1015625",
+    "0.109375",
+    "0.1171875",
+    "0.125",
+    "0.140625",
+    "0.15625",
+    "0.171875",
+    "0.1875",
+    "0.203125",
+    "0.21875",
+    "0.234375",
+    "0.25",
+    "0.28125",
+    "0.3125",
+    "0.34375",
+    "0.375",
+    "0.40625",
+    "0.4375",
+    "0.46875",
+    "0.5",
+    "0.5625",
+    "0.625",
+    "0.6875",
+    "0.75",
+    "0.8125",
+    "0.875",
+    "0.9375",
+    "1.0",
+    "1.125",
+    "1.25",
+    "1.375",
+    "1.5",
+    "1.625",
+    "1.75",
+    "1.875",
+    "2.0",
+    "2.25",
+    "2.5",
+    "2.75",
+    "3.0",
+    "3.25",
+    "3.5",
+    "3.75",
+    "4.0",
+    "4.5",
+    "5.0",
+    "5.5",
+    "6.0",
+    "6.5",
+    "7.0",
+    "7.5",
+    "8.0",
+    "9.0",
+    "10.0",
+    "11.0",
+    "12.0",
+    "13.0",
+    "14.0",
+    "15.0",
+    "16.0",
+    "18.0",
+    "20.0",
+    "22.0",
+    "24.0",
+    "26.0",
+    "28.0",
+    "30.0",
+    "32.0",
+    "36.0",
+    "40.0",
+    "44.0",
+    "48.0",
+    "52.0",
+    "56.0",
+    "60.0",
+    "64.0",
+    "72.0",
+    "80.0",
+    "88.0",
+    "96.0",
+    "104.0",
+    "112.0",
+    "120.0",
+    "128.0",
+    "144.0",
+    "160.0",
+    "176.0",
+    "192.0",
+    "208.0",
+    "224.0",
+    "240.0",
+    "nan",
+    "-0.0009765625",
+    "-0.001953125",
+    "-0.0029296875",
+    "-0.00390625",
+    "-0.0048828125",
+    "-0.005859375",
+    "-0.0068359375",
+    "-0.0078125",
+    "-0.0087890625",
+    "-0.009765625",
+    "-0.0107421875",
+    "-0.01171875",
+    "-0.0126953125",
+    "-0.013671875",
+    "-0.0146484375",
+    "-0.015625",
+    "-0.017578125",
+    "-0.01953125",
+    "-0.021484375",
+    "-0.0234375",
+    "-0.025390625",
+    "-0.02734375",
+    "-0.029296875",
+    "-0.03125",
+    "-0.03515625",
+    "-0.0390625",
+    "-0.04296875",
+    "-0.046875",
+    "-0.05078125",
+    "-0.0546875",
+    "-0.05859375",
+    "-0.0625",
+    "-0.0703125",
+    "-0.078125",
+    "-0.0859375",
+    "-0.09375",
+    "-0.1015625",
+    "-0.109375",
+    "-0.1171875",
+    "-0.125",
+    "-0.140625",
+    "-0.15625",
+    "-0.171875",
+    "-0.1875",
+    "-0.203125",
+    "-0.21875",
+    "-0.234375",
+    "-0.25",
+    "-0.28125",
+    "-0.3125",
+    "-0.34375",
+    "-0.375",
+    "-0.40625",
+    "-0.4375",
+    "-0.46875",
+    "-0.5",
+    "-0.5625",
+    "-0.625",
+    "-0.6875",
+    "-0.75",
+    "-0.8125",
+    "-0.875",
+    "-0.9375",
+    "-1.0",
+    "-1.125",
+    "-1.25",
+    "-1.375",
+    "-1.5",
+    "-1.625",
+    "-1.75",
+    "-1.875",
+    "-2.0",
+    "-2.25",
+    "-2.5",
+    "-2.75",
+    "-3.0",
+    "-3.25",
+    "-3.5",
+    "-3.75",
+    "-4.0",
+    "-4.5",
+    "-5.0",
+    "-5.5",
+    "-6.0",
+    "-6.5",
+    "-7.0",
+    "-7.5",
+    "-8.0",
+    "-9.0",
+    "-10.0",
+    "-11.0",
+    "-12.0",
+    "-13.0",
+    "-14.0",
+    "-15.0",
+    "-16.0",
+    "-18.0",
+    "-20.0",
+    "-22.0",
+    "-24.0",
+    "-26.0",
+    "-28.0",
+    "-30.0",
+    "-32.0",
+    "-36.0",
+    "-40.0",
+    "-44.0",
+    "-48.0",
+    "-52.0",
+    "-56.0",
+    "-60.0",
+    "-64.0",
+    "-72.0",
+    "-80.0",
+    "-88.0",
+    "-96.0",
+    "-104.0",
+    "-112.0",
+    "-120.0",
+    "-128.0",
+    "-144.0",
+    "-160.0",
+    "-176.0",
+    "-192.0",
+    "-208.0",
+    "-224.0",
+    "-240.0",
 )

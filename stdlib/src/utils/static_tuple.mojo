@@ -21,9 +21,9 @@ from utils import StaticTuple
 
 from memory import UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -93,9 +93,9 @@ fn _create_array[
     return array
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StaticTuple
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn _static_tuple_construction_checks[size: Int]():
@@ -218,20 +218,15 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         debug_assert(
             int(idx.__mlir_index__()) < size, "index must be within bounds"
         )
-        # Copy the array so we can get its address, because we can't take the
-        # address of 'self' in a non-mutating method.
-        var array_copy = self.array
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(array_copy).address, idx.__mlir_index__()
+            UnsafePointer.address_of(self.array).address, idx.__mlir_index__()
         )
-        var result = UnsafePointer(ptr)[]
-        _ = array_copy
-        return result
+        return UnsafePointer(ptr)[]
 
     @always_inline("nodebug")
     fn __setitem__[
         IntLike: IntLike, //
-    ](inout self, idx: IntLike, val: Self.element_type):
+    ](mut self, idx: IntLike, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
         Parameters:
@@ -252,7 +247,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self.element_type):
+    fn __setitem__[index: Int](mut self, val: Self.element_type):
         """Stores a single value into the tuple at the specified index.
 
         Parameters:

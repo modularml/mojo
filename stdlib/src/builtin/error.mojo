@@ -23,9 +23,9 @@ from memory.memory import _free
 
 from utils import StringRef
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Error
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @register_passable
@@ -162,7 +162,7 @@ struct Error(
         return String.write(self)
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this error to the provided Writer.
 

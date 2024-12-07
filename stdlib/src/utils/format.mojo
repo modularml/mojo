@@ -13,16 +13,16 @@
 """Implements Formatting utilities."""
 
 from collections import Optional
+
 from memory import UnsafePointer
-from utils.string_slice import Stringlike
 
 # TODO: _FormatCurlyEntry and _FormatSpec should be public in the future for
 # people who want to write their own templating engines. This is not yet done
 # because the implementation is incomplete and we are missing crucial features.
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Formatter
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 # NOTE(#3765): an interesting idea would be to allow custom start and end
@@ -34,7 +34,7 @@ from utils.string_slice import Stringlike
 # a trait that all format specifications conform to)
 @value
 struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
-    """The struct that handles `Stringlike` formatting by curly braces entries.
+    """The struct that handles string formatting by curly braces entries.
     This is internal for the types: `String`, `StringLiteral` and `StringSlice`.
     """
 
@@ -78,7 +78,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         self.format_spec = other.format_spec
 
     fn __init__(
-        inout self,
+        mut self,
         first_curly: Int,
         last_curly: Int,
         field: Self._FieldVariantType,
@@ -139,7 +139,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[Int]()
 
     @staticmethod
-    fn format[T: Stringlike](fmt_src: T, args: Self._args_t) raises -> String:
+    fn format(fmt_src: StringSlice, args: Self._args_t) raises -> String:
         """Format the entries.
 
         Args:
@@ -175,9 +175,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return res^
 
     @staticmethod
-    fn _create_entries[
-        T: Stringlike
-    ](fmt_src: T, len_pos_args: Int) raises -> (List[Self], Int):
+    fn _create_entries(
+        fmt_src: StringSlice, len_pos_args: Int
+    ) raises -> (List[Self], Int):
         """Returns a list of entries and its total estimated entry byte width.
         """
         var manual_indexing_count = 0
@@ -262,20 +262,18 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             raise Error(l_err)
         return entries^, total_estimated_entry_byte_width
 
-    fn _handle_field_and_break[
-        T: Stringlike
-    ](
-        inout self,
-        fmt_src: T,
+    fn _handle_field_and_break(
+        mut self,
+        fmt_src: StringSlice,
         len_pos_args: Int,
         i: Int,
         start_value: Int,
-        inout automatic_indexing_count: Int,
-        inout raised_automatic_index: Optional[Int],
-        inout manual_indexing_count: Int,
-        inout raised_manual_index: Optional[Int],
-        inout raised_kwarg_field: Optional[String],
-        inout total_estimated_entry_byte_width: Int,
+        mut automatic_indexing_count: Int,
+        mut raised_automatic_index: Optional[Int],
+        mut manual_indexing_count: Int,
+        mut raised_manual_index: Optional[Int],
+        mut raised_kwarg_field: Optional[String],
+        mut total_estimated_entry_byte_width: Int,
     ) raises -> Bool:
         alias S = StringSlice[StaticConstantOrigin]
 
@@ -348,7 +346,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
 
     fn _format_entry[
         len_pos_args: Int
-    ](self, inout res: String, args: Self._args_t, inout auto_idx: Int) raises:
+    ](self, mut res: String, args: Self._args_t, mut auto_idx: Int) raises:
         # TODO(#3403 and/or #3252): this function should be able to use
         # Writer syntax when the type implements it, since it will give great
         # performance benefits. This also needs to be able to check if the given
@@ -415,9 +413,9 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
             auto_idx += 1
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Format Specification
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 trait _CurlyEntryFormattable(Stringable, Representable):
@@ -601,7 +599,7 @@ struct _FormatSpec:
     """
 
     fn __init__(
-        inout self,
+        mut self,
         fill: UInt8 = ord(" "),
         align: UInt8 = 0,
         sign: UInt8 = ord("-"),
@@ -678,7 +676,7 @@ struct _FormatSpec:
         return None
 
     # TODO: this should be in StringSlice.__format__(self, spec: FormatSpec, *, writer: Writer):
-    fn format(self, inout res: String, item: StringSlice) raises:
+    fn format(self, mut res: String, item: StringSlice) raises:
         """Transform a String according to its format specification.
 
         Args:
@@ -689,9 +687,7 @@ struct _FormatSpec:
         # TODO: align, fill, etc.
         res += item
 
-    fn format[
-        T: _CurlyEntryFormattable
-    ](self, inout res: String, item: T) raises:
+    fn format[T: _CurlyEntryFormattable](self, mut res: String, item: T) raises:
         """Stringify a type according to its format specification.
 
         Args:
@@ -714,6 +710,6 @@ struct _FormatSpec:
         res += str(item)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utils
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#

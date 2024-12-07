@@ -42,7 +42,7 @@ struct _SourceLocation(Writable, Stringable):
         """
         return "At " + str(self) + ": " + str(msg)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the source location to the provided Writer.
 
@@ -57,7 +57,7 @@ struct _SourceLocation(Writable, Stringable):
 
 @always_inline("nodebug")
 fn __source_location() -> _SourceLocation:
-    """Returns the location where it's called.
+    """Returns the location for where this function is called.
 
     This currently doesn't work when called in a parameter expression.
 
@@ -68,7 +68,7 @@ fn __source_location() -> _SourceLocation:
     var col: __mlir_type.index
     var file_name: __mlir_type.`!kgen.string`
     line, col, file_name = __mlir_op.`kgen.source_loc`[
-        _properties = __mlir_attr.`{inlineCount = 0 : i64}`,
+        inlineCount = Int(0).value,
         _type = (
             __mlir_type.index,
             __mlir_type.index,
@@ -80,26 +80,35 @@ fn __source_location() -> _SourceLocation:
 
 
 @always_inline("nodebug")
-fn __call_location() -> _SourceLocation:
-    """Returns the location where the enclosing function is called.
+fn __call_location[inline_count: Int = 1]() -> _SourceLocation:
+    """Returns the location for where the caller of this function is called. An
+    optional `inline_count` parameter can be specified to skip over that many
+    levels of calling functions.
 
-    This should only be used in `@always_inline` or `@always_inline("nodebug")`
-    functions so that it returns the source location of where the enclosing
-    function is called at (even if inside another `@always_inline("nodebug")`
-    function).
+    This should only be used when enclosed in a series of `@always_inline` or
+    `@always_inline("nodebug")` function calls, where the layers of calling
+    functions is no fewer than `inline_count`.
 
-    This currently doesn't work when this or the enclosing function is called in
-    a parameter expression.
+    For example, when `inline_count = 1`, only the caller of this function needs
+    to be `@always_inline` or `@always_inline("nodebug")`. This function will
+    return the source location of the caller's invocation.
+
+    When `inline_count = 2`, the caller of the caller of this function also
+    needs to be inlined. This function will return the source location of the
+    caller's caller's invocation.
+
+    This currently doesn't work when the `inline_count`-th wrapping caller is
+    called in a parameter expression.
 
     Returns:
-        The location information of where the enclosing function (i.e. the
+        The location information of where the caller of this function (i.e. the
           function whose body __call_location() is used in) is called.
     """
     var line: __mlir_type.index
     var col: __mlir_type.index
     var file_name: __mlir_type.`!kgen.string`
     line, col, file_name = __mlir_op.`kgen.source_loc`[
-        _properties = __mlir_attr.`{inlineCount = 1 : i64}`,
+        inlineCount = inline_count.value,
         _type = (
             __mlir_type.index,
             __mlir_type.index,

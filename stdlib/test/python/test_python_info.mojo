@@ -19,7 +19,7 @@ from python._cpython import PythonVersion
 from testing import assert_equal
 
 
-fn test_python_version(inout python: Python) raises:
+fn test_python_version(mut python: Python) raises:
     var version = "3.10.8 (main, Nov 24 2022, 08:08:27) [Clang 14.0.6 ]"
     var python_version = PythonVersion(version)
     assert_equal(python_version.major, 3)

@@ -13,9 +13,9 @@
 # RUN: %mojo %s
 
 from os import abort
+
 from memory import UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
-
 from test_utils import CopyCounter, MoveCounter, ValueDestructorRecorder
 from testing import assert_equal
 

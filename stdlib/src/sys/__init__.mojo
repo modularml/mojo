@@ -19,6 +19,8 @@ from .ffi import DEFAULT_RTLD, RTLD, DLHandle, external_call
 from .info import (
     alignof,
     bitwidthof,
+    has_accelerator,
+    has_amd_gpu_accelerator,
     has_avx,
     has_avx2,
     has_avx512f,
@@ -27,15 +29,19 @@ from .info import (
     has_neon,
     has_neon_int8_dotprod,
     has_neon_int8_matmul,
+    has_nvidia_gpu_accelerator,
     has_sse4,
     has_vnni,
+    is_amd_gpu,
     is_apple_m1,
     is_apple_m2,
     is_apple_m3,
     is_apple_silicon,
     is_big_endian,
+    is_gpu,
     is_little_endian,
     is_neoverse_n1,
+    is_nvidia_gpu,
     is_x86,
     num_logical_cores,
     num_performance_cores,
@@ -47,9 +53,6 @@ from .info import (
     simdbytewidth,
     simdwidthof,
     sizeof,
-    is_nvidia_gpu,
-    is_amd_gpu,
-    is_gpu,
 )
 from .intrinsics import (
     PrefetchCache,
@@ -67,5 +70,5 @@ from .intrinsics import (
     strided_load,
     strided_store,
 )
-from .param_env import env_get_int, env_get_string, env_get_bool, is_defined
+from .param_env import env_get_bool, env_get_int, env_get_string, is_defined
 from .terminate import exit

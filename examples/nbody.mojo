@@ -35,7 +35,7 @@ struct Planet:
     var mass: Float64
 
     fn __init__(
-        inout self,
+        mut self,
         pos: SIMD[DType.float64, 4],
         velocity: SIMD[DType.float64, 4],
         mass: Float64,
@@ -119,7 +119,7 @@ alias INITIAL_SYSTEM = List[Planet](Sun, Jupiter, Saturn, Uranus, Neptune)
 
 
 @always_inline
-fn offset_momentum(inout bodies: List[Planet]):
+fn offset_momentum(mut bodies: List[Planet]):
     var p = SIMD[DType.float64, 4]()
 
     for body in bodies:
@@ -132,7 +132,7 @@ fn offset_momentum(inout bodies: List[Planet]):
 
 
 @always_inline
-fn advance(inout bodies: List[Planet], dt: Float64):
+fn advance(mut bodies: List[Planet], dt: Float64):
     for i in range(len(INITIAL_SYSTEM)):
         for j in range(len(INITIAL_SYSTEM) - i - 1):
             var body_i = bodies[i]

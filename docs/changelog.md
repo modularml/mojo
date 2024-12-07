@@ -50,6 +50,20 @@ what we publish.
   The consequence of this is that the old hack is no longer needed for these
   cases!
 
+- Various improvements to origin handling and syntax have landed, including
+  support for the ternary operator and allowing multiple arguments in a `ref`
+  specifier (which are implicitly unions).  This enables expression of simple
+  algorithms cleanly:
+
+  ```mojo
+  fn my_min[T: Comparable](ref a: T, ref b: T) -> ref [a, b] T:
+    return a if a < b else b
+  ```
+
+  It is also nice that `my_min` automatically and implicitly propagates the
+  mutability of its arguments, so things like `my_min(str1, str2) += "foo"` is
+  valid.
+
 - The `UnsafePointer` type now has an `origin` parameter that can be used when
   the `UnsafePointer` is known to point to a value with a known origin. This
   origin is propagated through the `ptr[]` indirection operation.
@@ -121,7 +135,7 @@ what we publish.
   var l = List[Int](1, 2, 3, 4, 5)
   shuffle(l)
   ```
-  
+
 - The `Dict.__getitem__` method now returns a reference instead of a copy of
   the value (or raises).  This improves the performance of common code that
   uses `Dict` by allowing borrows from the `Dict` elements.
@@ -274,7 +288,23 @@ what we publish.
   memory allocation and performance. These options allow for optimized memory usage
   and reduced buffer reallocations, providing flexibility based on application requirements.
 
+- A new `StringLiteral.get[some_stringable]()` method is available.  It
+  allows forming a runtime-constant StringLiteral from a compile-time-dynamic
+  `Stringable` value.
+
+- `Span` now implements `__reversed__`. This means that one can get a
+  reverse iterator over a `Span` using `reversed(my_span)`. Users should
+  currently prefer this method over `my_span[::-1]`.
+
+- `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
+
 ### 🦋 Changed
+
+- The `inout` and `borrowed` argument conventions have been renamed to the `mut`
+  and `read` argument conventions (respectively).  These verbs reflect
+  declaratively what the callee can do to the argument value passed into the
+  caller, without tying in the requirement for the programmer to know about
+  advanced features like references.
 
 - The argument convention for `__init__` methods has been changed from `inout`
   to `out`, reflecting that an `__init__` method initializes its `self` without
@@ -333,7 +363,7 @@ what we publish.
   `String.write`. Here's an example of using all the changes:
 
   ```mojo
-  from utils import Span
+  from memory import Span
 
   @value
   struct NewString(Writer, Writable):
@@ -529,6 +559,31 @@ what we publish.
 
 - `Arc` has been renamed to `ArcPointer`, for consistency with `OwnedPointer`.
 
+- `UnsafePointer` parameters (other than the type) are now keyword-only.
+
+- Inferred-only parameters may now be explicitly bound with keywords, enabling
+  some important patterns in the standard library:
+
+  ```mojo
+  struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]]: ...
+  alias ImmStringSlice = StringSlice[is_mutable=False]
+  # This auto-parameterizes on the origin, but constrains it to being an
+  # immutable slice instead of a potentially mutable one.
+  fn take_imm_slice(a: ImmStringSlice): ...
+  ```
+
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x:
+     print("1 in x")
+
+- `Span` has moved from the `utils` module to the `memory` module.
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -560,6 +615,18 @@ what we publish.
 - [Issue #3710](https://github.com/modularml/mojo/issues/3710) - Mojo frees
   memory while reference to it is still in use.
 
+- [Issue #3805](https://github.com/modularml/mojo/issues/3805) - Crash When
+  Initializing !llvm.ptr.
+
+- [Issue #3816](https://github.com/modularml/mojo/issues/3816) - Ternary
+  if-operator doesn't propagate origin information.
+
+- [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
+  [BUG] Mutability not preserved when taking the union of two origins.
+
+- [Issue #3829](https://github.com/modularml/mojo/issues/3829) - Poor error
+  message when invoking a function pointer upon an argument of the wrong origin
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
@@ -586,3 +653,6 @@ what we publish.
 
 - Tooling now prints the origins of `ref` arguments and results correctly, and
   prints `self` instead of `self: Self` in methods.
+
+- The LSP and generated documentation now print parametric result types
+  correctly, e.g. showing `SIMD[type, simd_width]` instead of `SIMD[$0, $1]`.

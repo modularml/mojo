@@ -20,7 +20,7 @@ from sys import (
     strided_load,
     strided_store,
 )
-from sys.intrinsics import likely, unlikely, assume
+from sys.intrinsics import assume, likely, unlikely
 
 from memory import UnsafePointer, memset_zero
 from testing import assert_equal
