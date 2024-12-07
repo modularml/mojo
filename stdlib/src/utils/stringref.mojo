@@ -20,7 +20,7 @@ from sys.ffi import c_char
 
 from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
-from memory import UnsafePointer, memcmp, pack_bits
+from memory import UnsafePointer, memcmp, pack_bits, Span
 from memory.memory import _memcmp_impl_unconstrained
 
 from utils import StringSlice
@@ -35,9 +35,9 @@ fn _align_down(value: Int, alignment: Int) -> Int:
     return value._positive_div(alignment) * alignment
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StringRef
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -357,7 +357,7 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -411,7 +411,7 @@ struct StringRef(
         return String.write("StringRef(", repr(str(self)), ")")
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this StringRef to the provided Writer.
 
@@ -691,9 +691,9 @@ struct StringRef(
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline

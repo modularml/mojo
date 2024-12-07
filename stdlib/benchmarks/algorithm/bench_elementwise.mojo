@@ -23,11 +23,11 @@ from buffer import Buffer
 from utils.index import Index, IndexList
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark elementwise
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_elementwise[n: Int](inout b: Bencher) raises:
+fn bench_elementwise[n: Int](mut b: Bencher) raises:
     var vector = Buffer[DType.index, n].stack_allocation()
 
     for i in range(len(vector)):

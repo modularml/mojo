@@ -110,7 +110,7 @@ struct AHasher[key: U256](_Hasher):
         self.extra_keys = U128(pi_key[2], pi_key[3])
 
     @always_inline
-    fn _update(inout self, new_data: UInt64):
+    fn _update(mut self, new_data: UInt64):
         """Update the buffer value with new data.
 
         Args:
@@ -119,7 +119,7 @@ struct AHasher[key: U256](_Hasher):
         self.buffer = _folded_multiply(new_data ^ self.buffer, MULTIPLE)
 
     @always_inline
-    fn _large_update(inout self, new_data: U128):
+    fn _large_update(mut self, new_data: U128):
         """Update the buffer value with new data.
 
         Args:
@@ -129,7 +129,7 @@ struct AHasher[key: U256](_Hasher):
         var combined = _folded_multiply(xored[0], xored[1])
         self.buffer = rotate_bits_left[ROT]((self.buffer + self.pad) ^ combined)
 
-    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn _update_with_bytes(mut self, data: UnsafePointer[UInt8], length: Int):
         """Consume provided data to update the internal buffer.
 
         Args:
@@ -160,7 +160,7 @@ struct AHasher[key: U256](_Hasher):
             var value = _read_small(data, length)
             self._large_update(value)
 
-    fn _update_with_simd(inout self, new_data: SIMD[_, _]):
+    fn _update_with_simd(mut self, new_data: SIMD[_, _]):
         """Update the buffer value with new data.
 
         Args:
@@ -182,7 +182,7 @@ struct AHasher[key: U256](_Hasher):
             for i in range(0, v64.size, 2):
                 self._large_update(U128(v64[i], v64[i + 1]))
 
-    fn update[T: _HashableWithHasher](inout self, value: T):
+    fn update[T: _HashableWithHasher](mut self, value: T):
         """Update the buffer value with new hashable value.
 
         Args:

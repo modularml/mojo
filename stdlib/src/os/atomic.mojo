@@ -53,7 +53,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         self.value = value
 
     @always_inline
-    fn load(inout self) -> Scalar[type]:
+    fn load(mut self) -> Scalar[type]:
         """Loads the current value from the atomic.
 
         Returns:
@@ -92,7 +92,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         )
 
     @always_inline
-    fn fetch_add(inout self, rhs: Scalar[type]) -> Scalar[type]:
+    fn fetch_add(mut self, rhs: Scalar[type]) -> Scalar[type]:
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -111,7 +111,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         return Self._fetch_add(value_addr, rhs)
 
     @always_inline
-    fn __iadd__(inout self, rhs: Scalar[type]):
+    fn __iadd__(mut self, rhs: Scalar[type]):
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -126,7 +126,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         _ = self.fetch_add(rhs)
 
     @always_inline
-    fn fetch_sub(inout self, rhs: Scalar[type]) -> Scalar[type]:
+    fn fetch_sub(mut self, rhs: Scalar[type]) -> Scalar[type]:
         """Performs atomic in-place sub.
 
         Atomically replaces the current value with the result of arithmetic
@@ -150,7 +150,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         ](value_addr.address, rhs.value)
 
     @always_inline
-    fn __isub__(inout self, rhs: Scalar[type]):
+    fn __isub__(mut self, rhs: Scalar[type]):
         """Performs atomic in-place sub.
 
         Atomically replaces the current value with the result of arithmetic
@@ -166,7 +166,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
 
     @always_inline
     fn compare_exchange_weak(
-        inout self, inout expected: Scalar[type], desired: Scalar[type]
+        mut self, mut expected: Scalar[type], desired: Scalar[type]
     ) -> Bool:
         """Atomically compares the self value with that of the expected value.
         If the values are equal, then the self value is replaced with the
@@ -224,7 +224,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         _max_impl[scope=scope](ptr, rhs)
 
     @always_inline
-    fn max(inout self, rhs: Scalar[type]):
+    fn max(mut self, rhs: Scalar[type]):
         """Performs atomic in-place max.
 
         Atomically replaces the current value with the result of max of the
@@ -264,7 +264,7 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         _min_impl[scope=scope](ptr, rhs)
 
     @always_inline
-    fn min(inout self, rhs: Scalar[type]):
+    fn min(mut self, rhs: Scalar[type]):
         """Performs atomic in-place min.
 
         Atomically replaces the current value with the result of min of the
@@ -284,9 +284,9 @@ struct Atomic[type: DType, *, scope: StringLiteral = ""]:
         Self.min(UnsafePointer.address_of(self.value), rhs)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -294,7 +294,7 @@ fn _compare_exchange_weak_integral_impl[
     type: DType, //, *, scope: StringLiteral
 ](
     value_addr: UnsafePointer[Scalar[type], **_],
-    inout expected: Scalar[type],
+    mut expected: Scalar[type],
     desired: Scalar[type],
 ) -> Bool:
     constrained[type.is_integral(), "the input type must be integral"]()

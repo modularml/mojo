@@ -25,9 +25,9 @@ from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from utils._utf8_validation import _is_valid_utf8
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Data
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 fn make_string[
     length: UInt = 0
 ](filename: StringLiteral = "UN_charter_EN.txt") -> String:
@@ -61,11 +61,11 @@ fn make_string[
     return abort[String]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string init
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_string_init(inout b: Bencher) raises:
+fn bench_string_init(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -76,15 +76,15 @@ fn bench_string_init(inout b: Bencher) raises:
     b.iter[call_fn]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string count
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_count[
     length: UInt = 0,
     filename: StringLiteral = "UN_charter_EN",
     sequence: StringLiteral = "a",
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -97,15 +97,15 @@ fn bench_string_count[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string split
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_split[
     length: UInt = 0,
     filename: StringLiteral = "UN_charter_EN",
     sequence: Optional[StringLiteral] = None,
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -124,13 +124,13 @@ fn bench_string_split[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string splitlines
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_splitlines[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -143,13 +143,13 @@ fn bench_string_splitlines[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string lower
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_lower[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -162,13 +162,13 @@ fn bench_string_lower[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string upper
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_upper[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -181,16 +181,16 @@ fn bench_string_upper[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string replace
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_replace[
     length: UInt = 0,
     filename: StringLiteral = "UN_charter_EN",
     old: StringLiteral = "a",
     new: StringLiteral = "A",
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".txt")
 
     @always_inline
@@ -203,13 +203,13 @@ fn bench_string_replace[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark string _is_valid_utf8
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
 fn bench_string_is_valid_utf8[
     length: UInt = 0, filename: StringLiteral = "UN_charter_EN"
-](inout b: Bencher) raises:
+](mut b: Bencher) raises:
     var items = make_string[length](filename + ".html")
 
     @always_inline
@@ -222,9 +222,9 @@ fn bench_string_is_valid_utf8[
     keep(bool(items))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 def main():
     seed()
     var m = Bench(BenchConfig(num_repetitions=5))

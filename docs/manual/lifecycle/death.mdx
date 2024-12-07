@@ -353,7 +353,7 @@ struct TwoStrings:
         # self.str1 has been transferred so it is also destroyed now;
         # `self.__del__()` is not called (avoiding an infinite loop).
 
-    fn dump(inout self):
+    fn dump(mut self):
         print('str1:', self.str1)
         print('str2:', self.str2)
 

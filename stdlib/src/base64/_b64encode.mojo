@@ -213,7 +213,7 @@ fn store_incomplete_simd[
 # TODO: Use Span instead of List as input when Span is easier to use
 @no_inline
 fn b64encode_with_buffers(
-    input_bytes: List[UInt8, _], inout result: List[UInt8, _]
+    input_bytes: List[UInt8, _], mut result: List[UInt8, _]
 ):
     alias simd_width = sys.simdbytewidth()
     alias input_simd_width = simd_width * 3 // 4

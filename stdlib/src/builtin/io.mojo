@@ -33,7 +33,6 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer, memcpy
 
 from utils import (
-    Span,
     StaticString,
     StringRef,
     StringSlice,
@@ -266,6 +265,12 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
+
+    # TODO(MSTDL-1027): Print on AMD GPUs is not implemented yet.
+    @parameter
+    if is_amd_gpu():
+        return
+
     write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
 
     @parameter

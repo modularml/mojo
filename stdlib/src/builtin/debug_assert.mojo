@@ -23,9 +23,8 @@ from sys.ffi import c_char, c_size_t, c_uint, external_call
 from sys.param_env import env_get_string
 
 from builtin._location import __call_location, _SourceLocation
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 
-from utils import Span
 from utils.write import (
     _ArgBytes,
     _WriteBufferHeap,
@@ -308,7 +307,7 @@ struct _ThreadContext(Writable):
         self.thread_y = _get_id["thread", "y"]()
         self.thread_z = _get_id["thread", "z"]()
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write(
             "block: [",
             self.block_x,

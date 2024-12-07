@@ -474,6 +474,15 @@ def test_float_conversion():
         _ = ("not a float").__float__()
 
 
+def test_string_literal_from_stringable():
+    assert_equal(StringLiteral.get["hello"](), "hello")
+    assert_equal(StringLiteral.get[String("hello")](), "hello")
+    assert_equal(StringLiteral.get[42](), "42")
+    assert_equal(
+        StringLiteral.get[SIMD[DType.int64, 4](1, 2, 3, 4)](), "[1, 2, 3, 4]"
+    )
+
+
 def main():
     test_add()
     test_iadd()
@@ -506,3 +515,4 @@ def main():
     test_split()
     test_splitlines()
     test_float_conversion()
+    test_string_literal_from_stringable()

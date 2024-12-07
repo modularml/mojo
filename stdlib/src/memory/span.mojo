@@ -13,15 +13,15 @@
 
 """Implements the Span type.
 
-You can import these APIs from the `utils.span` module. For example:
+You can import these APIs from the `memory` module. For example:
 
 ```mojo
-from utils import Span
+from memory import Span
 ```
 """
 
-from builtin.builtin_list import _lit_mut_cast
 from collections import InlineArray
+
 from memory import Pointer, UnsafePointer
 
 
@@ -47,7 +47,7 @@ trait AsBytes:
 struct _SpanIter[
     is_mutable: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     forward: Bool = True,
 ]:
     """Iterator for Span.
@@ -68,7 +68,7 @@ struct _SpanIter[
 
     @always_inline
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[T, origin]:
         @parameter
         if forward:
@@ -96,7 +96,7 @@ struct _SpanIter[
 struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
@@ -106,29 +106,13 @@ struct Span[
         origin: The origin of the Span.
     """
 
-    # Aliases
-    alias mut = Span[T, _lit_mut_cast[origin, True].result]
-    """The mutable version of the Span."""
-    alias immut = Span[T, _lit_mut_cast[origin, False].result]
-    """The immutable version of the Span."""
-    # Fields
+    # Field
     var _data: UnsafePointer[T]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
     # Life cycle methods
     # ===------------------------------------------------------------------===#
-
-    @doc_private
-    @implicit
-    @always_inline("nodebug")
-    fn __init__(out self: Self.immut, other: Self.mut):
-        """Implicitly cast the mutable origin of self to an immutable one.
-
-        Args:
-            other: The Span to cast.
-        """
-        self = rebind[__type_of(self)](other)
 
     @always_inline
     fn __init__(out self, *, ptr: UnsafePointer[T], length: Int):
@@ -165,7 +149,7 @@ struct Span[
     @always_inline
     fn __init__[
         size: Int, //
-    ](inout self, ref [origin]array: InlineArray[T, size]):
+    ](mut self, ref [origin]array: InlineArray[T, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
@@ -221,16 +205,9 @@ struct Span[
         var step: Int
         start, end, step = slc.indices(len(self))
 
-        if step < 0:
-            step = -step
-            var new_len = (start - end + step - 1) // step
-            var buff = UnsafePointer[T].alloc(new_len)
-            i = 0
-            while start > end:
-                buff[i] = self._data[start]
-                start -= step
-                i += 1
-            return Span[T, origin](ptr=buff, length=new_len)
+        debug_assert(
+            step == 1, "Slice must be within bounds and step must be 1"
+        )
 
         var res = Self(
             ptr=(self._data + start), length=len(range(start, end, step))
@@ -240,12 +217,21 @@ struct Span[
 
     @always_inline
     fn __iter__(self) -> _SpanIter[T, origin]:
-        """Get an iterator over the elements of the span.
+        """Get an iterator over the elements of the Span.
 
         Returns:
-            An iterator over the elements of the span.
+            An iterator over the elements of the Span.
         """
         return _SpanIter(0, self)
+
+    @always_inline
+    fn __reversed__(self) -> _SpanIter[T, origin, forward=False]:
+        """Iterate backwards over the Span.
+
+        Returns:
+            A reversed iterator of the Span elements.
+        """
+        return _SpanIter[forward=False](len(self), self)
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -372,3 +358,16 @@ struct Span[
         """
         for element in self:
             element[] = value
+
+    fn get_immutable(
+        self,
+    ) -> Span[T, ImmutableOrigin.cast_from[origin].result]:
+        """
+        Return an immutable version of this span.
+
+        Returns:
+            A span covering the same elements, but without mutability.
+        """
+        return Span[T, ImmutableOrigin.cast_from[origin].result](
+            ptr=self._data, length=self._len
+        )

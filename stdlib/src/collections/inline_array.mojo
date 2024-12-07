@@ -25,9 +25,9 @@ from sys.intrinsics import _type_is_eq
 from memory import UnsafePointer
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Array
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn _inline_array_construction_checks[size: Int]():
@@ -112,7 +112,7 @@ struct InlineArray[
         ]()
 
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned unsafe_assume_initialized: InlineArray[
             UnsafeMaybeUninitialized[Self.ElementType], Self.size
@@ -171,7 +171,7 @@ struct InlineArray[
 
     @always_inline
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned storage: VariadicListMem[Self.ElementType, _],
     ):
@@ -194,8 +194,10 @@ struct InlineArray[
             var eltptr = UnsafePointer.address_of(self.unsafe_get(i))
             UnsafePointer.address_of(storage[i]).move_pointee_into(eltptr)
 
-        # Mark the elements as already destroyed.
-        storage._is_owned = False
+        # Do not destroy the elements when their backing storage goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(storage)
+        )
 
     fn __init__(out self, *, other: Self):
         """Explicitly copy the provided value.

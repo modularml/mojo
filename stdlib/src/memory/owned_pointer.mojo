@@ -21,6 +21,9 @@ struct OwnedPointer[T: AnyType]:
     system such that no more than one mutable alias for the underlying data
     may exist.
 
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
+
     Parameters:
         T: The type to be stored in the OwnedPointer[].
     """
@@ -31,7 +34,7 @@ struct OwnedPointer[T: AnyType]:
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__[T: Movable](inout self: OwnedPointer[T], owned value: T):
+    fn __init__[T: Movable](mut self: OwnedPointer[T], owned value: T):
         """Construct a new OwnedPointer[] by moving the passed value into a new backing allocation.
 
         Parameters:
@@ -45,7 +48,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: OwnedPointer[T], *, copy_value: T):
+    ](mut self: OwnedPointer[T], *, copy_value: T):
         """Construct a new OwnedPointer[] by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
@@ -59,7 +62,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: Copyable, U: NoneType = None
-    ](inout self: OwnedPointer[T], value: T):
+    ](mut self: OwnedPointer[T], value: T):
         """Construct a new OwnedPointer[] by copying the passed value into a new backing allocation.
 
         Parameters:
@@ -74,7 +77,7 @@ struct OwnedPointer[T: AnyType]:
 
     fn __init__[
         T: ExplicitlyCopyable
-    ](inout self: OwnedPointer[T], *, other: OwnedPointer[T],):
+    ](mut self: OwnedPointer[T], *, other: OwnedPointer[T],):
         """Construct a new OwnedPointer[] by explicitly copying the value from another OwnedPointer[].
 
         Parameters:
@@ -145,7 +148,7 @@ struct OwnedPointer[T: AnyType]:
         """
         var r = self._inner.take_pointee()
         self._inner.free()
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
         return r^
 
@@ -168,6 +171,6 @@ struct OwnedPointer[T: AnyType]:
         var ptr = self._inner
 
         # Prevent the destructor from running on `self`
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
         return ptr

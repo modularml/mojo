@@ -17,11 +17,11 @@
 from benchmark import Bench, BenchConfig, Bencher, BenchId
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmarks
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_stringify_small_integers(inout b: Bencher) raises:
+fn bench_stringify_small_integers(mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn():
@@ -32,9 +32,9 @@ fn bench_stringify_small_integers(inout b: Bencher) raises:
     b.iter[call_fn]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 def main():
     var m = Bench(BenchConfig(num_repetitions=1))
     m.bench_function[bench_stringify_small_integers](

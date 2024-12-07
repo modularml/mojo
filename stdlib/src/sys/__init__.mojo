@@ -19,7 +19,8 @@ from .ffi import DEFAULT_RTLD, RTLD, DLHandle, external_call
 from .info import (
     alignof,
     bitwidthof,
-    has_amd_gpu,
+    has_accelerator,
+    has_amd_gpu_accelerator,
     has_avx,
     has_avx2,
     has_avx512f,
@@ -28,7 +29,7 @@ from .info import (
     has_neon,
     has_neon_int8_dotprod,
     has_neon_int8_matmul,
-    has_nvidia_gpu,
+    has_nvidia_gpu_accelerator,
     has_sse4,
     has_vnni,
     is_amd_gpu,
