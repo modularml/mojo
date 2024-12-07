@@ -644,6 +644,15 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable].type](
     # ===------------------------------------------------------------------===#
 
     @always_inline
+    fn get_immut(self) -> Self.immut:
+        """Return an immutable version of this StringSlice.
+
+        Returns:
+            An immutable version of the same StringSlice.
+        """
+        return Self.immut(self)
+
+    @always_inline
     fn strip(self) -> StringSlice[origin]:
         """Gets a StringRef with leading and trailing whitespaces removed.
         This only takes ASCII whitespace into account:
