@@ -21,7 +21,6 @@ from utils import StringSlice
 ```
 """
 
-from builtin.builtin_list import _lit_mut_cast
 from collections import List, Optional
 from collections.string import _atof, _atol, _isspace
 from sys import bitwidthof, simdwidthof
@@ -255,9 +254,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     """
 
     # Aliases
-    alias mut = StringSlice[_lit_mut_cast[origin, True].result]
+    alias mut = StringSlice[MutableOrigin.cast_from[origin].result]
     """The mutable version of the StringSlice."""
-    alias immut = StringSlice[_lit_mut_cast[origin, False].result]
+    alias immut = StringSlice[ImmutableOrigin.cast_from[origin].result]
     """The immutable version of the StringSlice."""
     # Fields
     var _slice: Span[Byte, origin]
@@ -275,7 +274,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         Args:
             other: The StringSlice to cast.
         """
-        self = rebind[__type_of(self)](other)
+        self = rebind[Self.immut](other)
 
     @always_inline
     @implicit
@@ -639,7 +638,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         Returns:
             An immutable version of the same StringSlice.
         """
-        return Self.immut(self)
+        return rebind[Self.immut](self)
 
     @always_inline
     fn strip(self, chars: StringSlice) -> Self:
