@@ -155,6 +155,16 @@ struct DType(
         """
         self = other
 
+    @always_inline
+    @implicit
+    fn __init__(out self, value: Self.type):
+        """Construct a DType from MLIR dtype.
+
+        Args:
+            value: The MLIR dtype.
+        """
+        self.value = value
+
     @staticmethod
     fn _from_str(str: String) -> DType:
         """Construct a DType from a string.
