@@ -19,7 +19,7 @@ from collections import InlineArray, Optional
 from os import abort
 from sys import sizeof
 
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
 from utils import StringSlice, Variant
 

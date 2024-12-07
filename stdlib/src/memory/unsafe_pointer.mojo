@@ -63,7 +63,17 @@ struct UnsafePointer[
     Intable,
     Comparable,
 ):
-    """This is a pointer type that can point to any generic value that is movable.
+    """UnsafePointer[T] represents an indirect reference to one or more values of
+    type T consecutively in memory, and can refer to uninitialized memory.
+
+    Because it supports referring to uninitialized memory, it provides unsafe
+    methods for initializing and destroying instances of T, as well as methods
+    for accessing the values once they are initialized.
+
+    For more information see [Unsafe
+    pointers](/mojo/manual/pointers/unsafe-pointers) in the Mojo Manual. For a
+    comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/).
 
     Parameters:
         type: The type the pointer points to.
@@ -84,12 +94,12 @@ struct UnsafePointer[
         address_space._value.value,
         `>`,
     ]
+    """The underlying pointer type."""
 
     # ===-------------------------------------------------------------------===#
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    """The underlying pointer type."""
     var address: Self._mlir_type
     """The underlying pointer."""
 
@@ -106,7 +116,7 @@ struct UnsafePointer[
     @always_inline
     @implicit
     fn __init__(out self, value: Self._mlir_type):
-        """Create a pointer with the input value.
+        """Create a pointer from a low-level pointer primitive.
 
         Args:
             value: The MLIR value of the pointer to construct with.
@@ -129,7 +139,7 @@ struct UnsafePointer[
 
     @always_inline
     fn __init__(out self, *, other: Self):
-        """Copy the object.
+        """Copy an existing pointer.
 
         Args:
             other: The value to copy.

@@ -57,6 +57,18 @@ struct Origin[is_mutable: Bool]:
         `>`,
     ]
 
+    alias cast_from = _lit_mut_cast[result_mutable=is_mutable]
+    """Cast an existing Origin to be of the specified mutability.
+
+    This is a low-level way to coerce Origin mutability. This should be used
+    rarely, typically when building low-level fundamental abstractions. Strongly
+    consider alternatives before reaching for this "escape hatch".
+
+    Safety:
+        This is an UNSAFE operation if used to cast an immutable origin to
+        a mutable origin.
+    """
+
     # ===-------------------------------------------------------------------===#
     # Fields
     # ===-------------------------------------------------------------------===#
@@ -79,3 +91,17 @@ struct Origin[is_mutable: Bool]:
         Args:
             mlir_origin: The raw MLIR origin value."""
         self._mlir_origin = mlir_origin
+
+
+struct _lit_mut_cast[
+    is_mutable: Bool, //,
+    result_mutable: Bool,
+    operand: Origin[is_mutable],
+]:
+    alias result = __mlir_attr[
+        `#lit.origin.mutcast<`,
+        operand._mlir_origin,
+        `> : !lit.origin<`,
+        result_mutable.value,
+        `>`,
+    ]

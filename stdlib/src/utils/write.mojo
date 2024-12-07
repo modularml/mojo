@@ -15,10 +15,9 @@
 from collections import InlineArray
 from sys.info import is_gpu
 
-from builtin.io import _printf
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
-from utils import Span, StaticString
+from utils import StaticString
 
 # ===-----------------------------------------------------------------------===#
 
@@ -36,7 +35,7 @@ trait Writer:
     Example:
 
     ```mojo
-    from utils import Span
+    from memory import Span
 
     @value
     struct NewString(Writer, Writable):

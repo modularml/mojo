@@ -23,12 +23,11 @@ from sys.ffi import c_char
 from sys.intrinsics import _type_is_eq
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, Span
 from python import PythonObject
 
 from utils import (
     IndexList,
-    Span,
     StaticString,
     StringRef,
     Variant,
@@ -1890,7 +1889,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String) -> String:
+    fn strip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing characters
         removed.
 
@@ -1903,7 +1902,7 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn strip(self) -> String:
+    fn strip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing whitespaces
         removed.
 
@@ -1912,7 +1911,7 @@ struct String(
         """
         return self.lstrip().rstrip()
 
-    fn rstrip(self, chars: String) -> String:
+    fn rstrip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1922,29 +1921,17 @@ struct String(
             A copy of the string with no trailing characters.
         """
 
-        var r_idx = self.byte_length()
-        while r_idx > 0 and self[r_idx - 1] in chars:
-            r_idx -= 1
+        return self.as_string_slice().rstrip(chars)
 
-        return self[:r_idx]
-
-    fn rstrip(self) -> String:
+    fn rstrip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with trailing whitespaces removed.
 
         Returns:
             A copy of the string with no trailing whitespaces.
         """
-        var r_idx = self.byte_length()
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self.__reversed__():
-        #     if not s.isspace():
-        #         break
-        #     r_idx -= 1
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
-            r_idx -= 1
-        return self[:r_idx]
+        return self.as_string_slice().rstrip()
 
-    fn lstrip(self, chars: String) -> String:
+    fn lstrip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading characters removed.
 
         Args:
@@ -1954,29 +1941,15 @@ struct String(
             A copy of the string with no leading characters.
         """
 
-        var l_idx = 0
-        while l_idx < self.byte_length() and self[l_idx] in chars:
-            l_idx += 1
+        return self.as_string_slice().lstrip(chars)
 
-        return self[l_idx:]
-
-    fn lstrip(self) -> String:
+    fn lstrip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading whitespaces removed.
 
         Returns:
             A copy of the string with no leading whitespaces.
         """
-        var l_idx = 0
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self:
-        #     if not s.isspace():
-        #         break
-        #     l_idx += 1
-        while l_idx < self.byte_length() and _isspace(
-            self._buffer.unsafe_get(l_idx)
-        ):
-            l_idx += 1
-        return self[l_idx:]
+        return self.as_string_slice().lstrip()
 
     fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.

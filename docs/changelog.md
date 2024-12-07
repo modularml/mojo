@@ -308,6 +308,20 @@ what we publish.
   allows forming a runtime-constant StringLiteral from a compile-time-dynamic
   `Stringable` value.
 
+- `Span` now implements `__reversed__`. This means that one can get a
+  reverse iterator over a `Span` using `reversed(my_span)`. Users should
+  currently prefer this method over `my_span[::-1]`.
+
+- `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
+
+- Introduced the `@explicit_destroy` annotation, the `__disable_del` keyword,
+  the `UnknownDestructibility` trait, and the `ImplicitlyDestructible` keyword,
+  for the experimental explicitly destroyed types feature.
+
+- Added associated types; we can now have aliases like `alias T: AnyType`,
+  `alias N: Int`, etc. in a trait, and then specify them in structs that conform
+  to that trait.
+
 ### 🦋 Changed
 
 - The `inout` and `borrowed` argument conventions have been renamed to the `mut`
@@ -373,7 +387,7 @@ what we publish.
   `String.write`. Here's an example of using all the changes:
 
   ```mojo
-  from utils import Span
+  from memory import Span
 
   @value
   struct NewString(Writer, Writable):
@@ -582,6 +596,18 @@ what we publish.
   fn take_imm_slice(a: ImmStringSlice): ...
   ```
 
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x:
+     print("1 in x")
+
+- `Span` has moved from the `utils` module to the `memory` module.
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -621,6 +647,9 @@ what we publish.
 
 - [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
   [BUG] Mutability not preserved when taking the union of two origins.
+
+- [Issue #3829](https://github.com/modularml/mojo/issues/3829) - Poor error
+  message when invoking a function pointer upon an argument of the wrong origin
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 

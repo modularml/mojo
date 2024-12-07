@@ -15,11 +15,9 @@
 from collections import List
 from sys.info import sizeof
 
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
-
-from utils import Span
 
 
 def test_mojo_issue_698():

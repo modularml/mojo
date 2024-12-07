@@ -20,9 +20,7 @@ from math import ceil
 from sys import bitwidthof
 
 from bit import count_leading_zeros
-from memory import UnsafePointer
-
-from utils import Span
+from memory import UnsafePointer, Span
 
 # ===-----------------------------------------------------------------------===#
 # sort

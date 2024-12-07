@@ -14,7 +14,8 @@
 
 from testing import assert_equal, assert_false, assert_true
 
-from utils import Span, StringSlice
+from memory import Span
+from utils import StringSlice
 from utils._utf8_validation import _is_valid_utf8
 from utils.string_slice import _count_utf8_continuation_bytes
 
@@ -584,6 +585,102 @@ def test_split():
     assert_equal(",".join(st("123").split("")), ",1,2,3,")
 
 
+def test_rstrip():
+    # with default rstrip chars
+    var empty_string = "".as_string_slice()
+    assert_true(empty_string.rstrip() == "")
+
+    var space_string = " \t\n\r\v\f  ".as_string_slice()
+    assert_true(space_string.rstrip() == "")
+
+    var str0 = "     n ".as_string_slice()
+    assert_true(str0.rstrip() == "     n")
+
+    var str1 = "string".as_string_slice()
+    assert_true(str1.rstrip() == "string")
+
+    var str2 = "something \t\n\t\v\f".as_string_slice()
+    assert_true(str2.rstrip() == "something")
+
+    # with custom chars for rstrip
+    var str3 = "mississippi".as_string_slice()
+    assert_true(str3.rstrip("sip") == "m")
+
+    var str4 = "mississippimississippi \n ".as_string_slice()
+    assert_true(str4.rstrip("sip ") == "mississippimississippi \n")
+    assert_true(str4.rstrip("sip \n") == "mississippim")
+
+
+def test_lstrip():
+    # with default lstrip chars
+    var empty_string = "".as_string_slice()
+    assert_true(empty_string.lstrip() == "")
+
+    var space_string = " \t\n\r\v\f  ".as_string_slice()
+    assert_true(space_string.lstrip() == "")
+
+    var str0 = "     n ".as_string_slice()
+    assert_true(str0.lstrip() == "n ")
+
+    var str1 = "string".as_string_slice()
+    assert_true(str1.lstrip() == "string")
+
+    var str2 = " \t\n\t\v\fsomething".as_string_slice()
+    assert_true(str2.lstrip() == "something")
+
+    # with custom chars for lstrip
+    var str3 = "mississippi".as_string_slice()
+    assert_true(str3.lstrip("mis") == "ppi")
+
+    var str4 = " \n mississippimississippi".as_string_slice()
+    assert_true(str4.lstrip("mis ") == "\n mississippimississippi")
+    assert_true(str4.lstrip("mis \n") == "ppimississippi")
+
+
+def test_strip():
+    # with default strip chars
+    var empty_string = "".as_string_slice()
+    assert_true(empty_string.strip() == "")
+    alias comp_empty_string_stripped = "".as_string_slice().strip()
+    assert_true(comp_empty_string_stripped == "")
+
+    var space_string = " \t\n\r\v\f  ".as_string_slice()
+    assert_true(space_string.strip() == "")
+    alias comp_space_string_stripped = " \t\n\r\v\f  ".as_string_slice().strip()
+    assert_true(comp_space_string_stripped == "")
+
+    var str0 = "     n ".as_string_slice()
+    assert_true(str0.strip() == "n")
+    alias comp_str0_stripped = "     n ".as_string_slice().strip()
+    assert_true(comp_str0_stripped == "n")
+
+    var str1 = "string".as_string_slice()
+    assert_true(str1.strip() == "string")
+    alias comp_str1_stripped = ("string").strip()
+    assert_true(comp_str1_stripped == "string")
+
+    var str2 = " \t\n\t\v\fsomething \t\n\t\v\f".as_string_slice()
+    alias comp_str2_stripped = (" \t\n\t\v\fsomething \t\n\t\v\f").strip()
+    assert_true(str2.strip() == "something")
+    assert_true(comp_str2_stripped == "something")
+
+    # with custom strip chars
+    var str3 = "mississippi".as_string_slice()
+    assert_true(str3.strip("mips") == "")
+    assert_true(str3.strip("mip") == "ssiss")
+    alias comp_str3_stripped = "mississippi".as_string_slice().strip("mips")
+    assert_true(comp_str3_stripped == "")
+
+    var str4 = " \n mississippimississippi \n ".as_string_slice()
+    assert_true(str4.strip(" ") == "\n mississippimississippi \n")
+    assert_true(str4.strip("\nmip ") == "ssissippimississ")
+
+    alias comp_str4_stripped = (
+        " \n mississippimississippi \n ".as_string_slice().strip(" ")
+    )
+    assert_true(comp_str4_stripped == "\n mississippimississippi \n")
+
+
 def main():
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -603,3 +700,6 @@ def main():
     test_count_utf8_continuation_bytes()
     test_splitlines()
     test_split()
+    test_rstrip()
+    test_lstrip()
+    test_strip()

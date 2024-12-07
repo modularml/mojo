@@ -13,16 +13,15 @@
 
 """Implements the Span type.
 
-You can import these APIs from the `utils.span` module. For example:
+You can import these APIs from the `memory` module. For example:
 
 ```mojo
-from utils import Span
+from memory import Span
 ```
 """
 
 from collections import InlineArray
 
-from builtin.builtin_list import _lit_mut_cast
 from memory import Pointer, UnsafePointer
 
 
@@ -204,16 +203,9 @@ struct Span[
         var step: Int
         start, end, step = slc.indices(len(self))
 
-        if step < 0:
-            step = -step
-            var new_len = (start - end + step - 1) // step
-            var buff = UnsafePointer[T].alloc(new_len)
-            i = 0
-            while start > end:
-                buff[i] = self._data[start]
-                start -= step
-                i += 1
-            return Span[T, origin](ptr=buff, length=new_len)
+        debug_assert(
+            step == 1, "Slice must be within bounds and step must be 1"
+        )
 
         var res = Self(
             ptr=(self._data + start), length=len(range(start, end, step))
@@ -223,12 +215,21 @@ struct Span[
 
     @always_inline
     fn __iter__(self) -> _SpanIter[T, origin]:
-        """Get an iterator over the elements of the span.
+        """Get an iterator over the elements of the Span.
 
         Returns:
-            An iterator over the elements of the span.
+            An iterator over the elements of the Span.
         """
         return _SpanIter(0, self)
+
+    @always_inline
+    fn __reversed__(self) -> _SpanIter[T, origin, forward=False]:
+        """Iterate backwards over the Span.
+
+        Returns:
+            A reversed iterator of the Span elements.
+        """
+        return _SpanIter[forward=False](len(self), self)
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -358,13 +359,13 @@ struct Span[
 
     fn get_immutable(
         self,
-    ) -> Span[T, _lit_mut_cast[origin, False].result]:
+    ) -> Span[T, ImmutableOrigin.cast_from[origin].result]:
         """
         Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
-        return Span[T, _lit_mut_cast[origin, False].result](
+        return Span[T, ImmutableOrigin.cast_from[origin].result](
             ptr=self._data, length=self._len
         )

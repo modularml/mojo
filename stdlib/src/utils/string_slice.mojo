@@ -29,7 +29,7 @@ from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, Span
 from memory.memory import _memcmp_impl_unconstrained
 
 from utils import Span, AsBytes
@@ -622,13 +622,33 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn strip(self) -> StringSlice[origin]:
-        """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes ASCII whitespace into account:
-        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
+    fn strip(self, chars: StringSlice) -> Self:
+        """Return a copy of the string with leading and trailing characters
+        removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-            A StringRef with leading and trailing whitespaces removed.
+            A copy of the string with no leading or trailing characters.
+
+        Examples:
+
+        ```mojo
+        print("himojohi".strip("hi")) # "mojo"
+        ```
+        .
+        """
+
+        return self.lstrip(chars).rstrip(chars)
+
+    @always_inline
+    fn strip(self) -> Self:
+        """Return a copy of the string with leading and trailing whitespaces
+        removed.
+
+        Returns:
+            A copy of the string with no leading or trailing whitespaces.
 
         Examples:
 
@@ -637,15 +657,103 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         ```
         .
         """
-        # FIXME: this can already do full isspace support with iterator
-        var start: Int = 0
-        var end: Int = len(self)
-        var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
-            start += 1
-        while end > start and _isspace(ptr[end - 1]):
-            end -= 1
-        return StringSlice[origin](ptr=ptr + start, length=end - start)
+        return self.lstrip().rstrip()
+
+    @always_inline
+    fn rstrip(self, chars: StringSlice) -> Self:
+        """Return a copy of the string with trailing characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A copy of the string with no trailing characters.
+
+        Examples:
+
+        ```mojo
+        print("mojohi".strip("hi")) # "mojo"
+        ```
+        .
+        """
+
+        var r_idx = self.byte_length()
+        while r_idx > 0 and self[r_idx - 1] in chars:
+            r_idx -= 1
+
+        return Self(unsafe_from_utf8=self.as_bytes()[:r_idx])
+
+    @always_inline
+    fn rstrip(self) -> Self:
+        """Return a copy of the string with trailing whitespaces removed.
+
+        Returns:
+            A copy of the string with no trailing whitespaces.
+
+        Examples:
+
+        ```mojo
+        print("mojo  ".strip()) # "mojo"
+        ```
+        .
+        """
+        var r_idx = self.byte_length()
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self.__reversed__():
+        #     if not s.isspace():
+        #         break
+        #     r_idx -= 1
+        while r_idx > 0 and _isspace(self.as_bytes()[r_idx - 1]):
+            r_idx -= 1
+        return Self(unsafe_from_utf8=self.as_bytes()[:r_idx])
+
+    @always_inline
+    fn lstrip(self, chars: StringSlice) -> Self:
+        """Return a copy of the string with leading characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+            A copy of the string with no leading characters.
+
+        Examples:
+
+        ```mojo
+        print("himojo".strip("hi")) # "mojo"
+        ```
+        .
+        """
+
+        var l_idx = 0
+        while l_idx < self.byte_length() and self[l_idx] in chars:
+            l_idx += 1
+
+        return Self(unsafe_from_utf8=self.as_bytes()[l_idx:])
+
+    @always_inline
+    fn lstrip(self) -> Self:
+        """Return a copy of the string with leading whitespaces removed.
+
+        Returns:
+            A copy of the string with no leading whitespaces.
+
+        Examples:
+
+        ```mojo
+        print("  mojo".strip()) # "mojo"
+        ```
+        .
+        """
+        var l_idx = 0
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self:
+        #     if not s.isspace():
+        #         break
+        #     l_idx += 1
+        while l_idx < self.byte_length() and _isspace(self.as_bytes()[l_idx]):
+            l_idx += 1
+        return Self(unsafe_from_utf8=self.as_bytes()[l_idx:])
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, origin]:

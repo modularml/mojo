@@ -19,6 +19,7 @@ from collections import Deque, Dict
 from collections.deque import _DequeIter
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
+from memory.span import Span, _SpanIter
 
 from .range import _StridedRange
 
@@ -193,3 +194,23 @@ fn reversed[
     return _DictEntryIter[K, V, dict_origin, False](
         src[]._reserved() - 1, 0, src
     )
+
+
+@always_inline
+fn reversed[
+    T: CollectionElement
+](value: Span[T]) -> _SpanIter[T, value.origin, forward=False]:
+    """Get a reversed iterator of the input Span.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        T: The type of the elements in the Span.
+
+    Args:
+        value: The Span to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the Span.
+    """
+    return value.__reversed__()
