@@ -29,14 +29,13 @@ from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy, Span
+from memory import UnsafePointer, memcmp, memcpy, Span, AsBytes
 from memory.memory import _memcmp_impl_unconstrained
 
-from utils import Span, AsBytes
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 
 from ._utf8_validation import _is_valid_utf8
-from builtin.builtin_list import _lit_mut_cast
+from builtin.type_aliases import _lit_mut_cast
 
 
 alias StaticString = StringSlice[StaticConstantOrigin]
@@ -1258,8 +1257,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
 
 trait Stringlike(CollectionElement, CollectionElementNew):
-    """Trait intended to be used only with `String`, `StringLiteral` and
-    `StringSlice`."""
+    """Trait intended to be used as a generic entrypoint for all String-like
+    types."""
 
     fn byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1423,7 +1422,7 @@ fn _split_impl[
     if sep_len == 0:
         var ptr = src_str.unsafe_ptr()
         var iterator = _StringSliceIter[
-            _lit_mut_cast[__origin_of(src_str), False].result
+            _lit_mut_cast[False, __origin_of(src_str)].result
         ](unsafe_pointer=ptr, length=src_str.byte_length())
         var i_len = len(iterator) + 2
         var out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
