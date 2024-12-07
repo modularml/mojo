@@ -1421,15 +1421,15 @@ fn _split_impl[
     var sep_len = sep.byte_length()
     if sep_len == 0:
         var ptr = src_str.unsafe_ptr()
-        var iterator = _StringSliceIter[
-            _lit_mut_cast[False, __origin_of(src_str)].result
-        ](unsafe_pointer=ptr, length=src_str.byte_length())
+        var iterator = _StringSliceIter[O](
+            unsafe_pointer=ptr, length=src_str.byte_length()
+        )
         var i_len = len(iterator) + 2
         var out_ptr = UnsafePointer[Span[Byte, O]].alloc(i_len)
         out_ptr[0] = Span[Byte, O](ptr=ptr, length=0)
         var i = 1
         for s in iterator:
-            out_ptr[i] = rebind[Span[Byte, O]](s.as_bytes())
+            out_ptr[i] = s.as_bytes()
             i += 1
         out_ptr[i] = Span[Byte, O](ptr=ptr + i, length=0)
         output = __type_of(output)(ptr=out_ptr, length=i_len, capacity=i_len)
