@@ -635,6 +635,9 @@ what we publish.
 - [Issue #3829](https://github.com/modularml/mojo/issues/3829) - Poor error
   message when invoking a function pointer upon an argument of the wrong origin
 
+- [Issue #3830](https://github.com/modularml/mojo/issues/3830) - Failures
+  emitting register RValues to ref arguments.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
