@@ -183,7 +183,7 @@ its own type. For example, if you assign an integer to a variable that has a
 floating-point type, it converts the value instead of giving a compiler error:
 
 ```mojo
-var number: Float64 = 1
+var number: Float64 = Int(1)
 ```
 
 ```output
@@ -191,8 +191,13 @@ var number: Float64 = 1
 ```
 
 As shown above, value assignment can be converted into a constructor call if the
-target type has a constructor that takes a single argument that matches the
-value being assigned. So, this code uses the `Float64` constructor that takes an
+target type has a constructor that meets the following criteria:
+
+- It's decorated with the `@implicit` decorator.
+
+- It takes a single required argument that matches the value being assigned.
+
+So, this code uses the `Float64` constructor that takes an
 integer: `__init__(out self, value: Int)`.
 
 In general, implicit conversions should only be supported where the conversion
@@ -200,7 +205,7 @@ is lossless.
 
 Implicit conversion follows the logic of [overloaded
 functions](/mojo/manual/functions#overloaded-functions). If the destination
-type has a single-argument constructor that takes an argument of the source
+type has a viable implicit conversion constructor for the source
 type, it can be invoked for implicit conversion.
 
 So assigning an integer to a `Float64` variable is exactly the same as this:
@@ -215,7 +220,8 @@ implicitly convert to the required type (using one of the type's overloaded
 constructors).
 
 For example, you can pass an `Int` to a function that expects a `Float64`,
-because `Float64` includes a constructor that takes an `Int`:
+because `Float64` includes an implicit conversion constructor that takes an
+`Int`:
 
 ```mojo
 fn take_float(value: Float64):
