@@ -335,6 +335,24 @@ what we publish.
   release of Mojo, but will be removed in the future.  Please migrate to the
   new syntax.
 
+- Similarly, the spelling of "named functions results" has switched to use `out`
+  syntax instead of `-> T as name`.  Functions may have at most one named result
+  or return type specified with the usual `->` syntax.  `out` arguments may
+  occur anywhere in the argument list, but are typically last (except for
+  `__init__` methods, where they are typically first).
+
+  ```mojo
+  # This function has type "fn() -> String"
+  fn example(out result: String):
+    result = "foo"
+  ```
+
+  The parser still accepts the old syntax as a synonym for this, but that will
+  eventually be deprecated and removed.
+
+  This was [discussed extensively in a public
+  proposal](https://github.com/modularml/mojo/issues/3623).
+
 - More things have been removed from the auto-exported set of entities in the `prelude`
   module from the Mojo standard library.
   - `UnsafePointer` has been removed. Please explicitly import it via

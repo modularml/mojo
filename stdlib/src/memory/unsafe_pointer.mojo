@@ -154,13 +154,14 @@ struct UnsafePointer[
     @always_inline("nodebug")
     fn address_of(
         ref [address_space]arg: type,
-    ) -> UnsafePointer[
-        type,
-        address_space=address_space,
-        alignment=1,
-        origin=MutableAnyOrigin
-        # TODO: Propagate origin of the argument.
-    ] as result:
+        out result: UnsafePointer[
+            type,
+            address_space=address_space,
+            alignment=1,
+            origin=MutableAnyOrigin
+            # TODO: Propagate origin of the argument.
+        ],
+    ):
         """Gets the address of the argument.
 
         Args:

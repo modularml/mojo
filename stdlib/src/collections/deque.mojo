@@ -794,7 +794,7 @@ struct Deque[ElementType: CollectionElement](
 
         return (self._data + self._head)[]
 
-    fn pop(mut self) raises -> ElementType as element:
+    fn pop(mut self, out element: ElementType) raises:
         """Removes and returns the element from the right side of the deque.
 
         Returns:
@@ -818,7 +818,7 @@ struct Deque[ElementType: CollectionElement](
 
         return
 
-    fn popleft(mut self) raises -> ElementType as element:
+    fn popleft(mut self, out element: ElementType) raises:
         """Removes and returns the element from the left side of the deque.
 
         Returns:

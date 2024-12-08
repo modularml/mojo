@@ -2329,7 +2329,7 @@ struct SIMD[type: DType, size: Int](
         ](self, value, Int64(offset))
 
     @always_inline("nodebug")
-    fn join(self, other: Self) -> SIMD[type, 2 * size] as result:
+    fn join(self, other: Self, out result: SIMD[type, 2 * size]):
         """Concatenates the two vectors together.
 
         Args:
