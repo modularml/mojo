@@ -207,13 +207,22 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             existing: The list to copy.
         """
         self = Self(capacity=existing.capacity)
-        for i in range(len(existing)):
-            self.append(existing[i])
+
+        @parameter
+        if hint_trivial_type:
+            memcpy(self.data, existing.data, len(existing))
+            self.size = existing.size
+        else:
+            for i in range(len(existing)):
+                self.append(existing[i])
 
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
-        for i in range(self.size):
-            (self.data + i).destroy_pointee()
+
+        @parameter
+        if not hint_trivial_type:
+            for i in range(self.size):
+                (self.data + i).destroy_pointee()
         self.data.free()
 
     # ===-------------------------------------------------------------------===#
