@@ -1154,7 +1154,7 @@ struct Int(
 
     @doc_private
     @staticmethod
-    fn try_from_python(obj: PythonObject) raises -> Self as result:
+    fn try_from_python(obj: PythonObject, out result: Self) raises:
         """Construct an `Int` from a Python integer value.
 
         Raises:
