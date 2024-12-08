@@ -84,21 +84,23 @@ struct _CTimeSpec(Stringable):
 @value
 @register_passable("trivial")
 struct _FILETIME:
-    var dwLowDateTime: UInt32
-    var dwHighDateTime: UInt32
+    var dw_low_date_time: UInt32
+    var dw_high_date_time: UInt32
 
     fn __init__(out self):
-        self.dwLowDateTime = 0
-        self.dwHighDateTime = 0
+        self.dw_low_date_time = 0
+        self.dw_high_date_time = 0
 
     fn as_nanoseconds(self) -> UInt:
         # AFTER subtracting windows offset the return value fits in a signed int64
         # BEFORE subtracting windows offset the return value does not fit in a signed int64
         # Taken from https://github.com/microsoft/STL/blob/c8d1efb6d504f6392acf8f6d01fd703f7c8826c0/stl/src/xtime.cpp#L50
-        alias windowsToUnixEpochOffsetNs: Int = 0x19DB1DED53E8000
+        alias windows_to_unix_epoch_offset_ns: Int = 0x19DB1DED53E8000
         var interval_count: UInt64 = (
-            self.dwHighDateTime.cast[DType.uint64]() << 32
-        ) + self.dwLowDateTime.cast[DType.uint64]() - windowsToUnixEpochOffsetNs
+            self.dw_high_date_time.cast[DType.uint64]() << 32
+        ) + self.dw_low_date_time.cast[
+            DType.uint64
+        ]() - windows_to_unix_epoch_offset_ns
         return int(interval_count * 100)
 
 
