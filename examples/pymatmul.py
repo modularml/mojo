@@ -17,7 +17,7 @@ from timeit import timeit
 import check_mod
 
 check_mod.install_if_missing("numpy")
-import numpy as np
+import numpy as np  # noqa
 
 
 class PyMatrix:
