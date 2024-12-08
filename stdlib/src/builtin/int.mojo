@@ -16,6 +16,8 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import KeyElement
+
+from bit import byte_swap
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -29,8 +31,11 @@ from builtin.io import _snprintf
 from memory import UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
+from memory import memcpy, UnsafePointer
 
-from utils import Writable, Writer
+from sys import is_big_endian, bitwidthof
+
+from utils import Span, Writable, Writer
 from utils._select import _select_register_value as select
 from utils._visualizers import lldb_formatter_wrapping_type
 
@@ -1211,6 +1216,65 @@ struct Int(
                 writer.write(" ")
 
         writer.write(self)
+
+    @staticmethod
+    fn from_bytes[
+        D: DType, big_endian: Bool = False
+    ](bytes: Span[Byte]) raises -> Self:
+        """Converts a byte array to an integer.
+
+        Args:
+            bytes: The byte array to convert.
+
+        Parameters:
+            D: The type of the integer.
+            big_endian: Whether the byte array is big-endian.
+
+        Returns:
+            The integer value.
+        """
+        if D.sizeof() != len(bytes):
+            raise Error("Byte array size does not match the integer size.")
+
+        var ptr: UnsafePointer[Scalar[D]] = bytes.unsafe_ptr().bitcast[
+            Scalar[D]
+        ]()
+        var value = ptr[]
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+        return int(value)
+
+    fn as_bytes[D: DType, big_endian: Bool = False](self) -> List[Byte]:
+        """Convert the integer to a byte array.
+
+        Parameters:
+            D: The type of the integer.
+            big_endian: Whether the byte array should be big-endian.
+
+        Returns:
+            The byte array.
+        """
+        alias type_len = D.sizeof()
+        var value = Scalar[D](self)
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+
+        var ptr = UnsafePointer.address_of(value)
+        var list = List[Byte](capacity=type_len)
+
+        # TODO: Maybe this can be a List.extend(ptr, count) method
+        memcpy(list.unsafe_ptr(), ptr.bitcast[Byte](), type_len)
+        list.size = type_len
+
+        return list^
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
