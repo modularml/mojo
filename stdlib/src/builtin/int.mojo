@@ -618,14 +618,11 @@ struct Int(
             `floor(self/rhs)` value.
         """
         # This should raise an exception
-        var denominator = select(rhs == 0, 1, rhs)
-        var div: Int = self._positive_div(denominator)
-
-        var mod = self - div * rhs
-        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, div - 1, div)
-        div = select(self > 0 & rhs > 0, div, div_mod)
-        div = select(rhs == 0, 0, div)
-        return div
+        var denom = select(rhs == 0, 1, rhs)
+        var div = self._positive_div(denom)
+        var rem = self._positive_rem(denom)
+        var res = select(((rhs < 0) ^ (self < 0)) & rem, div - 1, div)
+        return select(rhs == 0, 0, res)
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: Int) -> Int:
@@ -637,16 +634,10 @@ struct Int(
         Returns:
             The remainder of dividing self by rhs.
         """
-        var denominator = select(rhs == 0, 1, rhs)
-        var div: Int = self._positive_div(denominator)
-
-        var mod = self - div * rhs
-        var div_mod = select(((rhs < 0) ^ (self < 0)) & mod, mod + rhs, mod)
-        mod = select(
-            self > 0 & rhs > 0, self._positive_rem(denominator), div_mod
-        )
-        mod = select(rhs == 0, 0, mod)
-        return mod
+        var denom = select(rhs == 0, 1, rhs)
+        var rem = self._positive_rem(denom)
+        var res = select(((rhs < 0) ^ (self < 0)) & rem, rem + rhs, rem)
+        return select(rhs == 0, 0, res)
 
     @always_inline("nodebug")
     fn __divmod__(self, rhs: Int) -> Tuple[Int, Int]:
@@ -656,17 +647,9 @@ struct Int(
             rhs: The value to divide on.
 
         Returns:
-            The quotient and remainder as a `Tuple(self // rhs, self % rhs)`.
+            The quotient and remainder as a tuple `(self // rhs, self % rhs)`.
         """
-        if rhs == 0:
-            return 0, 0
-        var div: Int = self._positive_div(rhs)
-        if rhs > 0 & self > 0:
-            return div, self._positive_rem(rhs)
-        var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) & mod:
-            return div - 1, mod + rhs
-        return div, mod
+        return self // rhs, self % rhs
 
     @always_inline("nodebug")
     fn __pow__(self, exp: Self) -> Self:
