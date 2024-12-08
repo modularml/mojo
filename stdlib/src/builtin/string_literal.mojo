@@ -889,8 +889,9 @@ struct StringLiteral(
         return str(self).islower()
 
     fn strip(self) -> String:
-        """Return a copy of the string literal with leading and trailing whitespaces
-        removed.
+        """Return a copy of the string literal with leading and trailing
+        whitespaces removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A string with no leading or trailing whitespaces.
@@ -922,7 +923,9 @@ struct StringLiteral(
         return str(self).rstrip(chars)
 
     fn rstrip(self) -> String:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -941,7 +944,9 @@ struct StringLiteral(
         return str(self).lstrip(chars)
 
     fn lstrip(self) -> String:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.
