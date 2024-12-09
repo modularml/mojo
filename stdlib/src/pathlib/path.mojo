@@ -264,7 +264,7 @@ struct Path(
         return os.path.exists(self)
 
     fn expanduser(self) raises -> Path:
-        """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on
+        """Expands a prefixed `~` with `$HOME` on posix or `$USERPROFILE` on
         windows. If environment variables are not set or the `path` is not
         prefixed with `~`, returns the `path` unmodified.
 
@@ -275,7 +275,7 @@ struct Path(
 
     @staticmethod
     fn home() raises -> Path:
-        """Returns $HOME on posix or $USERPROFILE on windows. If environment
+        """Returns `$HOME` on posix or `$USERPROFILE` on windows. If environment
         variables are not set it returns `~`.
 
         Returns:
