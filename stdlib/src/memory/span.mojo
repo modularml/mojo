@@ -107,7 +107,7 @@ struct _SpanSIMDIter[
     fn __has_next__(self) -> Bool:
         @parameter
         if forward:
-            return (len(self.src[].src) - self.src[].index) > Self._width
+            return (len(self.src[].src) - self.src[].index) >= Self._width
         else:
             return self.src[].index > 0
 
