@@ -20,6 +20,7 @@ from math import ceildiv
 
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
 from builtin._stubs import _IntIterable, _StridedIterable, _UIntStridedIterable
+from memory.span import Span, _SpanIter
 from python import (
     PythonObject,
 )  # TODO: remove this and fixup downstream imports
@@ -630,3 +631,26 @@ fn range[
         The constructed range.
     """
     return _StridedScalarRange(start, end, step)
+
+
+# ===----------------------------------------------------------------------=== #
+# Utils
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn iter[
+    T: CollectionElement
+](value: Span[T, *_]) -> _SpanIter[T, __type_of(value).origin, forward=True]:
+    """Return an iterator.
+
+    Parameters:
+        T: The type that the iterator yields.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return value.__iter__()
