@@ -867,7 +867,7 @@ struct String(
         Args:
             other: The value to copy.
         """
-        self.__copyinit__(other)
+        self = other  # Just use the implicit copyinit.
 
     @implicit
     fn __init__(out self, str: StringRef):

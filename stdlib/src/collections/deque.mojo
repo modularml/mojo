@@ -88,8 +88,8 @@ struct Deque[ElementType: CollectionElement](
         out self,
         *,
         owned elements: Optional[List[ElementType]] = None,
-        capacity: Int = self.default_capacity,
-        min_capacity: Int = self.default_capacity,
+        capacity: Int = Self.default_capacity,
+        min_capacity: Int = Self.default_capacity,
         maxlen: Int = -1,
         shrink: Bool = True,
     ):
