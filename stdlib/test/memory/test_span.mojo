@@ -16,6 +16,7 @@ from collections import InlineArray, List
 
 from memory import UnsafePointer, Span
 from testing import assert_equal, assert_true
+from sys.info import simdwidthof
 
 
 def test_span_list_int():
@@ -199,6 +200,46 @@ def test_reversed():
         i += 1
 
 
+def test_iter():
+    items = Span(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+    count = 0
+    accum = 0
+    for item in iter(items):
+        count += 1
+        accum += int(item[])
+    assert_equal(count, 10)
+    assert_equal(accum, 55)
+
+
+def test_vectorized_iter():
+    items = Span(List[UInt64](1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
+    count = 0
+    accum = 0
+    iterator = iter(items)
+    for vec in iterator.vectorized():
+        count += 1
+        accum += int(vec.reduce_add())
+    assert_equal(count, len(items) // simdwidthof[UInt64]())
+
+    count = 0
+    for item in iterator:
+        count += 1
+        accum += int(item[])
+    assert_equal(count, len(items) % simdwidthof[UInt64]())
+    assert_equal(accum, 55)
+
+    iterator = iter(items)
+    var has_a_10 = False
+
+    for v in iterator.vectorized():
+        has_a_10 |= any(v == 10)
+
+    for s in iterator:
+        has_a_10 |= s[] == 10
+
+    assert_true(has_a_10)
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -211,3 +252,5 @@ def main():
     test_fill()
     test_ref()
     test_reversed()
+    test_iter()
+    test_vectorized_iter()
