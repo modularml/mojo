@@ -63,5 +63,11 @@ def main():
 
     # Test with __source_location()
     source_location = __source_location().file_name
+    s_len = source_location.byte_length()
+    file_name = "test_split.mojo"
+    assert_equal(
+        source_location.__fspath__().rfind(os.sep), s_len - len(file_name) - 1
+    )
     head, tail = split(source_location)
+    assert_equal(tail, file_name)
     assert_equal(head + os.sep + tail, source_location)
