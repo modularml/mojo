@@ -72,7 +72,7 @@ struct _SpanSIMDIter[
         has_a_10 |= any(v == 10)
 
     for s in iterator:
-        has_a_10 |= s == 10
+        has_a_10 |= s[] == 10
 
     print(has_a_10) # True
     ```
@@ -173,7 +173,7 @@ struct _SpanIter[
             has_a_10 |= any(v == 10)
 
         for s in iterator:
-            has_a_10 |= s == 10
+            has_a_10 |= s[] == 10
 
         print(has_a_10) # True
         ```
