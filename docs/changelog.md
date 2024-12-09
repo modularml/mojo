@@ -485,6 +485,19 @@ what we publish.
   for more information and rationale.  As a consequence the `__lifetime_of()`
   operator is now named `__origin_of()`.
 
+- `Origin` is now a complete wrapper around the MLIR origin type.
+
+  - The `Origin.type` alias has been renamed to `_mlir_origin`. In parameter
+    lists, you can now write just `Origin[..]`, instead of `Origin[..].type`.
+
+  - `ImmutableOrigin` and `MutableOrigin` are now, respectively, just aliases
+    for `Origin[False]` and `Origin[True]`.
+
+  - `Origin` struct values are now supported in the brackets of a `ref [..]`
+    argument.
+
+  - Added `Origin.cast_from` for casting the mutability of an origin value.
+
 - You can now use the `+=` and `*` operators on a `StringLiteral` at compile
   time using the `alias` keyword:
 
