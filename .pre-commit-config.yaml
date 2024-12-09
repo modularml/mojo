@@ -5,7 +5,7 @@ repos:
         name: mojo-format
         entry: mojo format
         language: system
-        files: '\.(mojo|🔥|py)$'
+        files: '\.(mojo|🔥)$'
         stages: [commit]
       - id: check-docstrings
         name: check-docstrings
@@ -24,3 +24,9 @@ repos:
     hooks:
     - id: markdownlint
       args: ['--config', 'stdlib/scripts/.markdownlint.yaml', '--fix']
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
