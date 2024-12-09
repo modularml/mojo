@@ -26,9 +26,9 @@ from collections import Optional
 from bit import bit_ceil
 from memory import UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Deque
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 struct Deque[ElementType: CollectionElement](
@@ -139,17 +139,15 @@ struct Deque[ElementType: CollectionElement](
         Args:
             values: The values to populate the deque with.
         """
-        self = Self(variadic_list=values^)
+        self = Self(elements=values^)
 
-    fn __init__(
-        inout self, *, owned variadic_list: VariadicListMem[ElementType, _]
-    ):
+    fn __init__(mut self, *, owned elements: VariadicListMem[ElementType, _]):
         """Constructs a deque from the given values.
 
         Args:
-            variadic_list: The values to populate the deque with.
+             elements: The values to populate the deque with.
         """
-        args_length = len(variadic_list)
+        args_length = len(elements)
 
         if args_length < self.default_capacity:
             capacity = self.default_capacity
@@ -159,12 +157,14 @@ struct Deque[ElementType: CollectionElement](
         self = Self(capacity=capacity)
 
         for i in range(args_length):
-            src = UnsafePointer.address_of(variadic_list[i])
+            src = UnsafePointer.address_of(elements[i])
             dst = self._data + i
             src.move_pointee_into(dst)
 
-        # Mark the elements as unowned to avoid del'ing uninitialized objects.
-        variadic_list._is_owned = False
+        # Do not destroy the elements when their backing storage goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(elements)
+        )
 
         self._tail = args_length
 
@@ -226,7 +226,7 @@ struct Deque[ElementType: CollectionElement](
             new.append(element[])
         return new^
 
-    fn __iadd__(inout self, other: Self):
+    fn __iadd__(mut self, other: Self):
         """Appends the elements of other deque into self.
 
         Args:
@@ -257,7 +257,7 @@ struct Deque[ElementType: CollectionElement](
                 new.append(element[])
         return new^
 
-    fn __imul__(inout self, n: Int):
+    fn __imul__(mut self, n: Int):
         """Concatenates self `n` times in place.
 
         Args:
@@ -410,7 +410,7 @@ struct Deque[ElementType: CollectionElement](
     fn write_to[
         RepresentableElementType: RepresentableCollectionElement,
         WriterType: Writer, //,
-    ](self: Deque[RepresentableElementType], inout writer: WriterType):
+    ](self: Deque[RepresentableElementType], mut writer: WriterType):
         """Writes `my_deque.__str__()` to a `Writer`.
 
         Parameters:
@@ -491,7 +491,7 @@ struct Deque[ElementType: CollectionElement](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn append(inout self, owned value: ElementType):
+    fn append(mut self, owned value: ElementType):
         """Appends a value to the right side of the deque.
 
         Args:
@@ -508,7 +508,7 @@ struct Deque[ElementType: CollectionElement](
         if self._head == self._tail:
             self._realloc(self._capacity << 1)
 
-    fn appendleft(inout self, owned value: ElementType):
+    fn appendleft(mut self, owned value: ElementType):
         """Appends a value to the left side of the deque.
 
         Args:
@@ -525,7 +525,7 @@ struct Deque[ElementType: CollectionElement](
         if self._head == self._tail:
             self._realloc(self._capacity << 1)
 
-    fn clear(inout self):
+    fn clear(mut self):
         """Removes all elements from the deque leaving it with length 0.
 
         Resets the underlying storage capacity to `_min_capacity`.
@@ -561,7 +561,7 @@ struct Deque[ElementType: CollectionElement](
                 count += 1
         return count
 
-    fn extend(inout self, owned values: List[ElementType]):
+    fn extend(mut self, owned values: List[ElementType]):
         """Extends the right side of the deque by consuming elements of the list argument.
 
         Args:
@@ -593,7 +593,7 @@ struct Deque[ElementType: CollectionElement](
             (src + i).move_pointee_into(self._data + self._tail)
             self._tail = self._physical_index(self._tail + 1)
 
-    fn extendleft(inout self, owned values: List[ElementType]):
+    fn extendleft(mut self, owned values: List[ElementType]):
         """Extends the left side of the deque by consuming elements from the list argument.
 
         Acts as series of left appends resulting in reversed order of elements in the list argument.
@@ -676,7 +676,7 @@ struct Deque[ElementType: CollectionElement](
                 return idx
         raise "ValueError: Given element is not in deque"
 
-    fn insert(inout self, idx: Int, owned value: ElementType) raises:
+    fn insert(mut self, idx: Int, owned value: ElementType) raises:
         """Inserts the `value` into the deque at position `idx`.
 
         Args:
@@ -723,10 +723,7 @@ struct Deque[ElementType: CollectionElement](
 
     fn remove[
         EqualityElementType: EqualityComparableCollectionElement, //
-    ](
-        inout self: Deque[EqualityElementType],
-        value: EqualityElementType,
-    ) raises:
+    ](mut self: Deque[EqualityElementType], value: EqualityElementType,) raises:
         """Removes the first occurrence of the `value`.
 
         Parameters:
@@ -797,7 +794,7 @@ struct Deque[ElementType: CollectionElement](
 
         return (self._data + self._head)[]
 
-    fn pop(inout self) raises -> ElementType as element:
+    fn pop(mut self) raises -> ElementType as element:
         """Removes and returns the element from the right side of the deque.
 
         Returns:
@@ -821,7 +818,7 @@ struct Deque[ElementType: CollectionElement](
 
         return
 
-    fn popleft(inout self) raises -> ElementType as element:
+    fn popleft(mut self) raises -> ElementType as element:
         """Removes and returns the element from the left side of the deque.
 
         Returns:
@@ -845,7 +842,7 @@ struct Deque[ElementType: CollectionElement](
 
         return
 
-    fn reverse(inout self):
+    fn reverse(mut self):
         """Reverses the elements of the deque in-place."""
         last = self._head + len(self) - 1
         for i in range(len(self) // 2):
@@ -855,7 +852,7 @@ struct Deque[ElementType: CollectionElement](
             (self._data + src).move_pointee_into(self._data + dst)
             (self._data + src).init_pointee_move(tmp^)
 
-    fn rotate(inout self, n: Int = 1):
+    fn rotate(mut self, n: Int = 1):
         """Rotates the deque by `n` steps.
 
         If `n` is positive, rotates to the right.
@@ -932,7 +929,7 @@ struct Deque[ElementType: CollectionElement](
         """
         return logical_index & (self._capacity - 1)
 
-    fn _prepare_for_new_elements(inout self, n_total: Int, n_retain: Int):
+    fn _prepare_for_new_elements(mut self, n_total: Int, n_retain: Int):
         """Prepares the deque’s internal buffer for adding new elements by
         reallocating memory and retaining the specified number of existing elements.
 
@@ -958,7 +955,7 @@ struct Deque[ElementType: CollectionElement](
         self._head = 0
         self._tail = n_retain
 
-    fn _realloc(inout self, new_capacity: Int):
+    fn _realloc(mut self, new_capacity: Int):
         """Relocates data to a new storage buffer.
 
         Args:
@@ -998,7 +995,7 @@ struct Deque[ElementType: CollectionElement](
 struct _DequeIter[
     deque_mutability: Bool, //,
     ElementType: CollectionElement,
-    deque_lifetime: Origin[deque_mutability].type,
+    deque_lifetime: Origin[deque_mutability],
     forward: Bool = True,
 ]:
     """Iterator for Deque.
@@ -1018,7 +1015,7 @@ struct _DequeIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> Pointer[ElementType, deque_lifetime]:
+    fn __next__(mut self) -> Pointer[ElementType, deque_lifetime]:
         @parameter
         if forward:
             self.index += 1

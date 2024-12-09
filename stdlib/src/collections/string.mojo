@@ -23,12 +23,11 @@ from sys.ffi import c_char
 from sys.intrinsics import _type_is_eq
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, Span
 from python import PythonObject
 
 from utils import (
     IndexList,
-    Span,
     StaticString,
     StringRef,
     StringSlice,
@@ -786,7 +785,8 @@ struct String(
     @always_inline
     @implicit
     fn __init__(out self, owned impl: List[UInt8, *_]):
-        """Construct a string from a buffer of bytes.
+        """Construct a string from a buffer of bytes without copying the
+        allocated data.
 
         The buffer must be terminated with a null byte:
 
@@ -815,6 +815,37 @@ struct String(
         self._buffer = Self._buffer_type(
             ptr=impl.steal_data(), length=size, capacity=capacity
         )
+
+    @always_inline
+    @implicit
+    fn __init__(out self, impl: Self._buffer_type):
+        """Construct a string from a buffer of bytes, copying the allocated
+        data. Use the transfer operator ^ to avoid the copy.
+
+        The buffer must be terminated with a null byte:
+
+        ```mojo
+        var buf = List[UInt8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
+
+        Args:
+            impl: The buffer.
+        """
+        debug_assert(
+            len(impl) > 0 and impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        # We make a backup because steal_data() will clear size and capacity.
+        var size = impl.size
+        debug_assert(
+            impl[size - 1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        self._buffer = impl
 
     @always_inline
     fn __init__(out self):
@@ -904,7 +935,7 @@ struct String(
     # Factory dunders
     # ===------------------------------------------------------------------=== #
 
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """Write a byte span to this String.
 
         Args:
@@ -913,7 +944,7 @@ struct String(
         """
         self._iadd[False](bytes)
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:
@@ -1267,7 +1298,7 @@ struct String(
         """
         return Self._add[True](other.as_bytes(), self.as_bytes())
 
-    fn _iadd[has_null: Bool](inout self, other: Span[Byte]):
+    fn _iadd[has_null: Bool](mut self, other: Span[Byte]):
         var s_len = self.byte_length()
         var o_len = len(other)
         var o_ptr = other.unsafe_ptr()
@@ -1288,7 +1319,7 @@ struct String(
             s_ptr[sum_len] = 0
 
     @always_inline
-    fn __iadd__(inout self, other: String):
+    fn __iadd__(mut self, other: String):
         """Appends another string to this string.
 
         Args:
@@ -1297,7 +1328,7 @@ struct String(
         self._iadd[True](other.as_bytes())
 
     @always_inline
-    fn __iadd__(inout self, other: StringLiteral):
+    fn __iadd__(mut self, other: StringLiteral):
         """Appends another string literal to this string.
 
         Args:
@@ -1306,7 +1337,7 @@ struct String(
         self._iadd[False](other.as_bytes())
 
     @always_inline
-    fn __iadd__(inout self, other: StringSlice):
+    fn __iadd__(mut self, other: StringSlice):
         """Appends another string slice to this string.
 
         Args:
@@ -1423,7 +1454,7 @@ struct String(
     # Methods
     # ===------------------------------------------------------------------=== #
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string to the provided Writer.
 
@@ -1622,7 +1653,7 @@ struct String(
         var length = len(self._buffer)
         return length - int(length > 0)
 
-    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
+    fn _steal_ptr(mut self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1814,7 +1845,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             for s in self[lhs:]:
-                if not str(s).isspace():  # TODO: with StringSlice.isspace()
+                if not s.isspace():
                     break
                 lhs += s.byte_length()
             # if it went until the end of the String, then
@@ -1828,7 +1859,7 @@ struct String(
                 break
             rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
             for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
-                if str(s).isspace():  # TODO: with StringSlice.isspace()
+                if s.isspace():
                     break
                 rhs += s.byte_length()
 
@@ -1914,7 +1945,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String) -> String:
+    fn strip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing characters
         removed.
 
@@ -1927,7 +1958,7 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn strip(self) -> String:
+    fn strip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing whitespaces
         removed.
 
@@ -1936,7 +1967,7 @@ struct String(
         """
         return self.lstrip().rstrip()
 
-    fn rstrip(self, chars: String) -> String:
+    fn rstrip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1946,29 +1977,17 @@ struct String(
             A copy of the string with no trailing characters.
         """
 
-        var r_idx = self.byte_length()
-        while r_idx > 0 and self[r_idx - 1] in chars:
-            r_idx -= 1
+        return self.as_string_slice().rstrip(chars)
 
-        return self[:r_idx]
-
-    fn rstrip(self) -> String:
+    fn rstrip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with trailing whitespaces removed.
 
         Returns:
             A copy of the string with no trailing whitespaces.
         """
-        var r_idx = self.byte_length()
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self.__reversed__():
-        #     if not s.isspace():
-        #         break
-        #     r_idx -= 1
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
-            r_idx -= 1
-        return self[:r_idx]
+        return self.as_string_slice().rstrip()
 
-    fn lstrip(self, chars: String) -> String:
+    fn lstrip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading characters removed.
 
         Args:
@@ -1978,29 +1997,15 @@ struct String(
             A copy of the string with no leading characters.
         """
 
-        var l_idx = 0
-        while l_idx < self.byte_length() and self[l_idx] in chars:
-            l_idx += 1
+        return self.as_string_slice().lstrip(chars)
 
-        return self[l_idx:]
-
-    fn lstrip(self) -> String:
+    fn lstrip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading whitespaces removed.
 
         Returns:
             A copy of the string with no leading whitespaces.
         """
-        var l_idx = 0
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self:
-        #     if not s.isspace():
-        #         break
-        #     l_idx += 1
-        while l_idx < self.byte_length() and _isspace(
-            self._buffer.unsafe_get(l_idx)
-        ):
-            l_idx += 1
-        return self[l_idx:]
+        return self.as_string_slice().lstrip()
 
     fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
@@ -2012,7 +2017,7 @@ struct String(
         """
         return hash(self.as_string_slice())
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -2307,7 +2312,7 @@ struct String(
         var result = String(buffer)
         return result^
 
-    fn reserve(inout self, new_capacity: Int):
+    fn reserve(mut self, new_capacity: Int):
         """Reserves the requested capacity.
 
         Args:

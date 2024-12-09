@@ -3,11 +3,24 @@ title: "Parameterization: compile-time metaprogramming"
 description: An introduction to parameters and compile-time metaprogramming.
 ---
 
-Many languages have facilities for *metaprogramming*: that is, for writing code that generates or modifies code. Python has facilities for dynamic metaprogramming: features like decorators, metaclasses, and many more. These features make Python very flexible and productive, but since they're dynamic, they come with runtime overhead. Other languages have static or compile-time metaprogramming features, like C preprocessor macros and C++ templates. These can be limiting and hard to use.
+Many languages have facilities for *metaprogramming*: that is, for writing code that
+generates or modifies code. Python has facilities for dynamic metaprogramming: features
+like decorators, metaclasses, and many more. These features make Python very flexible
+and productive, but since they're dynamic, they come with runtime overhead. Other
+languages have static or compile-time metaprogramming features, like C preprocessor
+macros and C++ templates. These can be limiting and hard to use.
 
-To support Modular's work in AI, Mojo aims to provide powerful, easy-to-use metaprogramming with zero runtime cost. This compile-time metaprogramming uses the same language as runtime programs, so you don't have to learn a new language—just a few new features.
+To support Modular's work in AI, Mojo aims to provide powerful, easy-to-use
+metaprogramming with zero runtime cost. This compile-time metaprogramming uses the same
+language as runtime programs, so you don't have to learn a new language—just a few new
+features.
 
-The main new feature is *parameters*. You can think of a parameter as a compile-time variable that becomes a runtime constant. This usage of "parameter" is probably different from what you're used to from other languages, where "parameter" and "argument" are often used interchangeably. In Mojo, "parameter" and "parameter expression" refer to compile-time values, and "argument" and "expression" refer to runtime values.
+The main new feature is *parameters*. You can think of a parameter as a
+compile-time variable that becomes a runtime constant. This usage of "parameter"
+is probably different from what you're used to from other languages, where
+"parameter" and "argument" are often used interchangeably. In Mojo, "parameter"
+and "parameter expression" refer to compile-time values, and "argument" and
+"expression" refer to runtime values.
 
 In Mojo, you can add parameters to a struct or function. You can also define
 named parameter expressions—aliases—that you can use as runtime constants.
@@ -104,9 +117,9 @@ repeat[count=2](42)
 This updated function takes any `Stringable` type, so you can pass it an `Int`,
 `String`, or `Bool` value.
 
-You can't pass the `count` as a positional keyword without also specifying `MsgType`.
-You can put `//` after `MsgType` to specify that it's always inferred by the argument. Now
-you can pass the following parameter `count` positionally:
+You can't pass the `count` as a positional keyword without also specifying
+`MsgType`. You can put `//` after `MsgType` to specify that it's always inferred
+by the argument. Now you can pass the following parameter `count` positionally:
 
 ```mojo
 fn repeat[MsgType: Stringable, //, count: Int](msg: MsgType):
@@ -173,8 +186,8 @@ use a parameterized struct. In this case, when you create an instance of
 passing in this case is a *type*. That's OK: a Mojo type is a valid compile-time
 value.)
 
-You'll see that `ElementType` is used throughout the struct where you'd usually see a
-type name. For example, as the formal type for the `elements` in the
+You'll see that `ElementType` is used throughout the struct where you'd usually
+see a type name. For example, as the formal type for the `elements` in the
 constructor, and the return type of the `__getitem__()` method.
 
 Here's an example of using `GenericArray`:
@@ -216,10 +229,10 @@ The method returns an instance of `GenericArray[Float64]`.
 
 When creating a generic struct, you might want to define some methods that
 require extra features. For example, consider a collection like `GenericArray`
-that holds instances of `CollectionElement`. The `CollectionElement` trait
-only requires that the stored data type be copyable and movable. This
-imposes a lot of limitations: you can't implement a `sort()` method because
-you can't guarantee that the stored type supports the comparison operators; you can't
+that holds instances of `CollectionElement`. The `CollectionElement` trait only
+requires that the stored data type be copyable and movable. This imposes a lot
+of limitations: you can't implement a `sort()` method because you can't
+guarantee that the stored type supports the comparison operators; you can't
 write a useful `__str__()` or `__repr__()` dunder method because you can't
 guarantee that the stored type supports conversion to a string.
 
@@ -293,9 +306,9 @@ floating point numbers, so it's not practical to define all of the possible SIMD
 variations.
 
 Mojo's [`SIMD`](/mojo/stdlib/builtin/simd/SIMD) type (defined as a struct)
-exposes the common SIMD operations through its methods, and makes the SIMD data type
-and size values parametric. This allows you to directly map your data to the
-SIMD vectors on any hardware.
+exposes the common SIMD operations through its methods, and makes the SIMD data
+type and size values parametric. This allows you to directly map your data to
+the SIMD vectors on any hardware.
 
 Here's a cut-down (non-functional) version of Mojo's `SIMD` type definition:
 
@@ -402,7 +415,7 @@ struct MyStruct:
     fn __init__(out self):
         pass
 
-    fn foo(inout self):
+    fn foo(mut self):
         print("calling instance method")
 
     @staticmethod
@@ -411,7 +424,7 @@ struct MyStruct:
 
 fn test_static_overload():
     var a = MyStruct()
-    # `foo(inout self)` takes precedence over a static method.
+    # `foo(mut self)` takes precedence over a static method.
     a.foo()
 ```
 
@@ -590,8 +603,8 @@ fn use_defaults() raises:
 ```
 
 Recall that when a parametric function is called, Mojo can infer the parameter values.
-That is, it can use the parameter values attached to an argument value (see the `sqrt[]()`
-example above). If the parametric function also has a default value defined,
+That is, it can use the parameter values attached to an argument value (see the
+`sqrt[]()` example above). If the parametric function also has a default value defined,
 then the inferred parameter type takes precedence.
 
 For example, in the following code, we update the parametric `speak[]()` function
@@ -661,9 +674,9 @@ you can't leave it out of the parameter list and let Mojo infer it from `value`:
 dependent_type[Float64(2.2)]() # Error!
 ```
 
-Infer-only parameters are a special class of parameters that are **always**
-inferred from context. Infer-only parameters are placed at the **beginning** of
-the parameter list, set off from other parameters by the `//` sigil:
+Infer-only parameters are a special class of parameters that are **always** either
+inferred from context or specified by keyword. Infer-only parameters are placed at the
+**beginning** of the parameter list, set off from other parameters by the `//` sigil:
 
 ```mojo
 fn example[type: CollectionElement, //, list: List[type]]()
@@ -688,8 +701,25 @@ Because infer-only parameters are declared at the beginning of the parameter
 list, other parameters can depend on them, and the compiler will always attempt
 to infer the infer-only values from bound parameters or arguments.
 
-If the compiler can't infer the value of an infer-only parameter, compilation
-fails.
+There are sometimes cases where it's useful to specify an infer-only parameter by
+keyword. For example, the [`StringSlice`](/mojo/stdlib/utils/string_slice/StringSlice)
+type is parametric on [origin](/mojo/manual/values/lifetimes):
+
+```mojo
+struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]]: ...
+```
+
+Here, the `StringSlice` `is_mutable` parameter is infer-only. The value is usually
+inferred when you create an instance of `StringSlice`. Binding the `is_mutable`
+parameter by keyword lets you define a new type that's constrained to an
+immutable origin:
+
+```mojo
+alias ImmutableStringSlice = StringSlice[is_mutable=False]
+```
+
+If the compiler can't infer the value of an infer-only parameter, and it's not
+specified by keyword, compilation fails.
 
 ## Variadic parameters
 
@@ -757,7 +787,8 @@ print('result type:', x.element_type, 'length:', len(x))
 result type: float32 length: 4
 ```
 
-Note that the resulting length is the sum of the input vector lengths, and this is expressed with a simple `+` operation.
+Note that the resulting length is the sum of the input vector lengths, and this is
+expressed with a simple `+` operation.
 
 ### Powerful compile-time programming
 
@@ -797,11 +828,11 @@ print("Elements sum:", reduce_add(x))
 Elements sum: 10
 ```
 
-This makes use of the [`@parameter`](/mojo/manual/decorators/parameter) decorator to create a parametric if condition, which is an `if` statement that
-runs at compile-time. It requires that its condition be a valid parameter
-expression, and ensures that only the live branch of the `if` statement is
-compiled into the program. (This is similar to use of the `@parameter` decorator
-with a `for` loop shown earlier.)
+This makes use of the [`@parameter`](/mojo/manual/decorators/parameter) decorator to
+create a parametric if condition, which is an `if` statement that runs at compile-time.
+It requires that its condition be a valid parameter expression, and ensures that only
+the live branch of the `if` statement is compiled into the program. (This is similar to
+use of the `@parameter` decorator with a `for` loop shown earlier.)
 
 ## Mojo types are just parameter expressions
 
@@ -960,9 +991,27 @@ MyType["Hello", *_]
 MyType["Hello", _, _, _]
 ```
 
-When a parameter is explicitly unbound with the `_` or `*_` expression, you
-**must** specify a value for that parameter to use the type. Any default value
-from the original type declaration is ignored.
+The `*_` expression specifically matches any parameters that can be specified by
+position (positional-only or positional-or-keyword). To unbind keyword-only parameters,
+use the double-star-underscore expression, `**_`, which matches any parameters that can
+be specified by keyword (positional-or-keyword or keyword-only).
+
+```mojo
+@value
+struct KeyWordStruct[pos_or_kw: Int, *, kw_only: Int = 10]:
+    pass
+
+# Unbind both pos_or_kw and kw_only parameters
+fn use_kw_struct(k: KeyWordStruct[**_]):
+    pass
+
+def main():
+    use_kw_struct(KeyWordStruct[10, kw_only=11]())
+```
+
+When a parameter is explicitly unbound with the `_`, `*_`, or `**_` expressions, you
+**must** specify a value for that parameter to use the type. Any default value from the
+original type declaration is ignored.
 
 Partially-bound and unbound parametric types can be used in some contexts where
 the missing (unbound) parameters will be supplied later—such as in
@@ -1025,11 +1074,11 @@ parameterized. The `vec` argument takes an argument of type `SIMD[*_]`. This is
 an [unbound parameterized
 type](#fully-bound-partially-bound-and-unbound-types)—that is, it doesn't
 specify any parameter values for the type. Mojo treats the unbound parameters
-on `vec` as implicit parameters on the function. This is roughly equivalent to
-the following code, which includes *explicit* input parameters:
+on `vec` as infer-only parameters on the function. This is roughly equivalent to
+the following codes:
 
 ```mojo
-fn print_params[t: DType, s: Int](vec: SIMD[t, s]):
+fn print_params[t: DType, s: Int, //](vec: SIMD[t, s]):
     print(vec.type)
     print(vec.size)
 ```
@@ -1084,7 +1133,23 @@ print(c)
 [1, 0, 2, 0, 3, 0, 4, 0]
 ```
 
-As shown in the example, you can use the magic  `__type_of(x)` call if you just want to match the type of an argument. In this case, it's more convenient and compact that writing the equivalent `SIMD[v1.type, v1.size]`.
+As shown in the example, you can use the magic `__type_of(x)` call if you just want to
+match the type of an argument. In this case, it's more convenient and compact that
+writing the equivalent `SIMD[v1.type, v1.size]`.
+
+### Automatic parameterization of parameters
+
+You can also take advantage of automatic parameterization in a function's
+parameter list. For example:
+
+```mojo
+fn foo[value: SIMD]():
+    pass
+
+# Equivalent to:
+fn foo[type: DType, size: Int, //, value: SIMD[type, size]]():
+    pass
+```
 
 ### Automatic parameterization with partially-bound types
 

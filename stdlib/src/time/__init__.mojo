@@ -14,7 +14,6 @@
 
 from .time import (
     monotonic,
-    now,
     perf_counter,
     perf_counter_ns,
     sleep,

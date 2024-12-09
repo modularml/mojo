@@ -53,7 +53,7 @@ struct UnsafePointer[
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
-    origin: Origin[True].type = MutableAnyOrigin,
+    origin: Origin[True] = MutableAnyOrigin,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -63,7 +63,17 @@ struct UnsafePointer[
     Intable,
     Comparable,
 ):
-    """This is a pointer type that can point to any generic value that is movable.
+    """UnsafePointer[T] represents an indirect reference to one or more values of
+    type T consecutively in memory, and can refer to uninitialized memory.
+
+    Because it supports referring to uninitialized memory, it provides unsafe
+    methods for initializing and destroying instances of T, as well as methods
+    for accessing the values once they are initialized.
+
+    For more information see [Unsafe
+    pointers](/mojo/manual/pointers/unsafe-pointers) in the Mojo Manual. For a
+    comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/).
 
     Parameters:
         type: The type the pointer points to.
@@ -84,12 +94,12 @@ struct UnsafePointer[
         address_space._value.value,
         `>`,
     ]
+    """The underlying pointer type."""
 
     # ===-------------------------------------------------------------------===#
     # Fields
     # ===-------------------------------------------------------------------===#
 
-    """The underlying pointer type."""
     var address: Self._mlir_type
     """The underlying pointer."""
 
@@ -106,7 +116,7 @@ struct UnsafePointer[
     @always_inline
     @implicit
     fn __init__(out self, value: Self._mlir_type):
-        """Create a pointer with the input value.
+        """Create a pointer from a low-level pointer primitive.
 
         Args:
             value: The MLIR value of the pointer to construct with.
@@ -129,7 +139,7 @@ struct UnsafePointer[
 
     @always_inline
     fn __init__(out self, *, other: Self):
-        """Copy the object.
+        """Copy an existing pointer.
 
         Args:
             other: The value to copy.
@@ -272,7 +282,7 @@ struct UnsafePointer[
         return self + (-1 * Int(offset.__mlir_index__()))
 
     @always_inline
-    fn __iadd__[T: IntLike, //](inout self, offset: T):
+    fn __iadd__[T: IntLike, //](mut self, offset: T):
         """Add an offset to this pointer.
 
         Parameters:
@@ -284,7 +294,7 @@ struct UnsafePointer[
         self = self + offset
 
     @always_inline
-    fn __isub__[T: IntLike, //](inout self, offset: T):
+    fn __isub__[T: IntLike, //](mut self, offset: T):
         """Subtract an offset from this pointer.
 
         Parameters:
@@ -420,7 +430,7 @@ struct UnsafePointer[
         return hex(int(self))
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this pointer address to the provided Writer.
 
@@ -961,7 +971,7 @@ struct UnsafePointer[
         /,
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
-        origin: Origin[True].type = Self.origin,
+        origin: Origin[True] = Self.origin,
     ](self) -> UnsafePointer[
         T, address_space=address_space, alignment=alignment, origin=origin
     ]:

@@ -51,7 +51,7 @@ Here's everything to know about `fn`:
   value).
 
 * By default, arguments are received as an immutable reference (values are
-  read-only, using the `borrowed` [argument
+  read-only, using the `read` [argument
   convention](/mojo/manual/values/ownership#argument-conventions)).
 
   This prevents accidental mutations, and permits the use of non-copyable types
@@ -59,7 +59,7 @@ Here's everything to know about `fn`:
 
   If you want a local copy, you can simply assign the value to a local
   variable. Or, you can get a mutable reference to the value by declaring the
-  `inout` [argument
+  `mut` [argument
   convention](/mojo/manual/values/ownership#argument-conventions)).
 
 * If the function raises an exception, it must be explicitly declared with the
@@ -106,7 +106,7 @@ Here's everything to know about `def`:
   `def` function doesn't declare a return type of `None`, it's considered to
   return an `object` by default.)
 
-* Arguments are mutable. Arguments default to using the `borrowed`
+* Arguments are mutable. Arguments default to using the `read`
   [argument convention](/mojo/manual/values/ownership#argument-conventions)
   like an `fn` function, with a special addition: if the function mutates the
   argument, it makes a mutable copy.
@@ -179,7 +179,7 @@ fn use_defaults():
 ```
 
 However, you cannot define a default value for an argument that's declared as
-[`inout`](/mojo/manual/values/ownership#mutable-arguments-inout).
+[`mut`](/mojo/manual/values/ownership#mutable-arguments-mut).
 
 Any optional arguments must appear after any required arguments. [Keyword-only
 arguments](#positional-only-and-keyword-only-arguments), discussed later, can
@@ -280,7 +280,7 @@ of the value itself. You must add an empty subscript operator `[]` to
 dereference the reference and retrieve the value:
 
 ```mojo
-def make_worldly(inout *strs: String):
+def make_worldly(mut *strs: String):
     # Requires extra [] to dereference the reference for now.
     for i in strs:
         i[] += " world"
@@ -291,7 +291,7 @@ Alternately, subscripting into a `VariadicListMem` returns the argument value,
 and doesn't require any dereferencing:
 
 ```mojo
-fn make_worldly(inout *strs: String):
+fn make_worldly(mut *strs: String):
     # This "just works" as you'd expect!
     for i in range(len(strs)):
         strs[i] += " world"
@@ -415,7 +415,7 @@ There are currently a few limitations:
 
   ```mojo
   # Not supported yet.
-  fn borrowed_var_kwargs(borrowed **kwargs: Int): ...
+  fn read_var_kwargs(read **kwargs: Int): ...
   ```
 
 * All the variadic keyword arguments must have the same type, and this

@@ -114,7 +114,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self.get(key, 0)
 
-    fn __setitem__(inout self, value: V, count: Int):
+    fn __setitem__(mut self, value: V, count: Int):
         """Set a value in the keyword Counter by key.
 
         Args:
@@ -276,7 +276,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return +result^  # Remove zero and negative counts
 
-    fn __iadd__(inout self, other: Self):
+    fn __iadd__(mut self, other: Self):
         """Add counts from another Counter to this Counter.
 
         Args:
@@ -301,7 +301,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return +result^  # Remove zero and negative counts
 
-    fn __isub__(inout self, other: Self):
+    fn __isub__(mut self, other: Self):
         """Subtract counts from another Counter from this Counter.
 
         Args:
@@ -329,7 +329,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return result^
 
-    fn __iand__(inout self, other: Self):
+    fn __iand__(mut self, other: Self):
         """Intersection: keep common elements with the minimum count.
 
         Args:
@@ -370,7 +370,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return result^
 
-    fn __ior__(inout self, other: Self):
+    fn __ior__(mut self, other: Self):
         """Union: keep all elements with the maximum count.
 
         Args:
@@ -382,7 +382,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             if newcount > 0:
                 self[key] = newcount
 
-    fn _keep_positive(inout self):
+    fn _keep_positive(mut self):
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
             var key = key_ref[]
@@ -451,7 +451,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.get(value, default)
 
-    fn pop(inout self, value: V) raises -> Int:
+    fn pop(mut self, value: V) raises -> Int:
         """Remove a value from the Counter by value.
 
         Args:
@@ -465,7 +465,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.pop(value)
 
-    fn pop(inout self, value: V, owned default: Int) raises -> Int:
+    fn pop(mut self, value: V, owned default: Int) raises -> Int:
         """Remove a value from the Counter by value.
 
         Args:
@@ -507,11 +507,11 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.items()
 
-    fn clear(inout self):
+    fn clear(mut self):
         """Remove all elements from the Counter."""
         self._data.clear()
 
-    fn popitem(inout self) raises -> CountTuple[V]:
+    fn popitem(mut self) raises -> CountTuple[V]:
         """Remove and return an arbitrary (key, value) pair from the Counter.
 
         Returns:
@@ -573,7 +573,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
                 elements.append(item.key)
         return elements
 
-    fn update(inout self, other: Self):
+    fn update(mut self, other: Self):
         """Update the Counter, like `dict.update()` but add counts instead of
         replacing them.
 
@@ -584,7 +584,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var item = item_ref[]
             self._data[item.key] = self._data.get(item.key, 0) + item.value
 
-    fn subtract(inout self, other: Self):
+    fn subtract(mut self, other: Self):
         """Subtract count. Both inputs and outputs may be zero or negative.
 
         Args:

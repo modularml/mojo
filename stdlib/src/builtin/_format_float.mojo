@@ -28,9 +28,9 @@ from math import log2
 from sys.info import sizeof
 
 from builtin.io import _printf
-from memory import bitcast
+from memory import bitcast, Span
 
-from utils import Span, StaticTuple
+from utils import StaticTuple
 from utils.numerics import FPUtils, isinf, isnan
 
 
@@ -40,7 +40,7 @@ struct _UInt128:
     var high: UInt64
     var low: UInt64
 
-    fn __iadd__(inout self, n: UInt64):
+    fn __iadd__(mut self, n: UInt64):
         var sum = (self.low + n) & UInt64.MAX
         self.high += 1 if sum < self.low else 0
         self.low = sum
@@ -71,9 +71,8 @@ struct FP[type: DType, CarrierDType: DType = FPUtils[type].uint_type]:
     alias carrier_bits = sizeof[Self.CarrierDType]() * 8
     alias sig_bits = FPUtils[type].mantissa_width()
     alias exp_bits = FPUtils[type].exponent_width()
-    alias min_exponent = FPUtils[type].min_exponent()
-    alias max_exponent = FPUtils[type].max_exponent()
-    alias exp_bias = -Self.max_exponent
+    alias neg_exp_bias = -FPUtils[type].exponent_bias()
+    alias min_normal_exp = Self.neg_exp_bias + 1
     alias cache_bits = 64 if Self.CarrierDType == DType.uint32 else 128
     alias min_k = -31 if Self.CarrierDType == DType.uint32 else -292
     alias max_k = 46 if Self.CarrierDType == DType.uint32 else 326
@@ -89,9 +88,7 @@ struct FP[type: DType, CarrierDType: DType = FPUtils[type].uint_type]:
     alias small_divisor = pow(10, Self.kappa)
 
 
-fn _write_float[
-    W: Writer, type: DType, //
-](inout writer: W, value: Scalar[type]):
+fn _write_float[W: Writer, type: DType, //](mut writer: W, value: Scalar[type]):
     """Write a SIMD float type into a Writer, using the dragonbox algorithm for
     perfect roundtrip, shortest representable format, and high performance.
     Paper: https://github.com/jk-jeon/dragonbox/blob/master/other_files/Dragonbox.pdf
@@ -131,7 +128,7 @@ fn _write_float[
         #  - The significand (sig) is the raw binary fraction
         #  - The exponent (exp) is still in biased form
         var sig = FPUtils.get_mantissa_uint(casted)
-        var exp = FPUtils.get_exponent_without_bias(casted)
+        var exp = FPUtils.get_exponent_biased(casted)
         var sign = FPUtils.get_sign(casted)
 
         if isinf(value):
@@ -228,7 +225,7 @@ fn _write_float[
 
 fn _to_decimal[
     CarrierDType: DType, //, type: DType
-](inout sig: Scalar[CarrierDType], inout exp: Int):
+](mut sig: Scalar[CarrierDType], mut exp: Int):
     """Transform the raw binary significand to decimal significand,
     and biased binary exponent into a decimal power of 10 exponent.
     """
@@ -237,7 +234,7 @@ fn _to_decimal[
 
     # For normal numbers
     if binary_exp != 0:
-        binary_exp += FP[type].exp_bias - FP[type].sig_bits
+        binary_exp += FP[type].neg_exp_bias - FP[type].sig_bits
         if two_fc == 0:
             var minus_k = (binary_exp * 631305 - 261663) >> 21
             var beta = binary_exp + _floor_log2_pow10(-minus_k)
@@ -295,7 +292,7 @@ fn _to_decimal[
         two_fc |= Scalar[CarrierDType](1) << (FP[type].sig_bits + 1)
     else:
         # For subnormal numbers
-        binary_exp = FP[type].min_exponent - FP[type].sig_bits
+        binary_exp = FP[type].min_normal_exp - FP[type].sig_bits
 
     ##########################################
     # Step 1: Schubfach multiplier calculation
@@ -500,7 +497,7 @@ fn _umul128[
 
 fn _remove_trailing_zeros[
     CarrierDType: DType
-](inout sig: Scalar[CarrierDType], inout exp: Int):
+](mut sig: Scalar[CarrierDType], mut exp: Int):
     """Fastest alg for removing trailing zeroes:
     https://github.com/jk-jeon/rtz_benchmark.
     """
@@ -629,7 +626,7 @@ fn _check_divisibility_and_divide_by_pow10[
     CarrierDType: DType, //,
     carrier_bits: Int,
     divide_magic_number: StaticTuple[UInt32, 2],
-](inout n: Scalar[CarrierDType], N: Int) -> Bool:
+](mut n: Scalar[CarrierDType], N: Int) -> Bool:
     # Make sure the computation for max_n does not overflow.
     debug_assert(N + 1 <= _floor_log10_pow2(carrier_bits))
 

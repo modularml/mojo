@@ -536,7 +536,7 @@ struct assert_raises:
 
     @always_inline
     fn __init__(
-        inout self,
+        mut self,
         *,
         contains: String,
         location: Optional[_SourceLocation] = None,

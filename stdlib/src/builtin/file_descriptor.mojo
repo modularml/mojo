@@ -27,9 +27,7 @@ from sys.ffi import external_call
 from sys.info import is_gpu
 
 from builtin.io import _printf
-from memory import UnsafePointer
-
-from utils import Span
+from memory import UnsafePointer, Span
 
 
 @value
@@ -59,7 +57,7 @@ struct FileDescriptor(Writer):
         self.value = f._get_raw_fd()
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a span of bytes to the file.
 
@@ -83,7 +81,7 @@ struct FileDescriptor(Writer):
                 written,
             )
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:

@@ -15,7 +15,7 @@
 
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 from memory.memory import _memcmp_impl_unconstrained
 
 from utils import StringSlice
@@ -28,7 +28,7 @@ from sys.ffi import c_char
 
 # ===----------------------------------------------------------------------===#
 # StringRef
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -350,7 +350,7 @@ struct StringRef(
         """
         return hash(self.data, self.length)
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -404,7 +404,7 @@ struct StringRef(
         return String.write("StringRef(", repr(str(self)), ")")
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this StringRef to the provided Writer.
 

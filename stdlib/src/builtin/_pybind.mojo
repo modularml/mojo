@@ -76,7 +76,7 @@ fn pointer_bitcast[
 fn gen_pytype_wrapper[
     T: Pythonable,
     name: StringLiteral,
-](inout module: PythonObject) raises:
+](mut module: PythonObject) raises:
     # TODO(MOCO-1301): Add support for member method generation.
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
     # TODO(MOCO-1307): Add support for constructor generation.
@@ -99,7 +99,7 @@ fn add_wrapper_to_module[
         PythonObject, TypedPythonObject["Tuple"]
     ) raises -> PythonObject,
     func_name: StringLiteral,
-](inout module_obj: PythonObject) raises:
+](mut module_obj: PythonObject) raises:
     var module = TypedPythonObject["Module"](unsafe_unchecked_from=module_obj)
     Python.add_functions(
         module,

@@ -441,7 +441,7 @@ struct Dog(Stringable, Representable, Writable):
     fn __str__(self) -> String:
         return String.write(self)
 
-    fn write_to[W: Writer](self, inout writer: W) -> None:
+    fn write_to[W: Writer](self, mut writer: W) -> None:
         writer.write("Dog(", self.name, ", ", self.age, ")")
 
 var dog = Dog("Rex", 5)

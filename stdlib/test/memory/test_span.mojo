@@ -14,10 +14,8 @@
 
 from collections import InlineArray, List
 
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 from testing import assert_equal, assert_true
-
-from utils import Span
 
 
 def test_span_list_int():
@@ -138,19 +136,6 @@ def test_span_slice():
     assert_equal(res[0], 2)
     assert_equal(res[1], 3)
     assert_equal(res[2], 4)
-    # Test slicing with negative step
-    res = s[1::-1]
-    assert_equal(res[0], 2)
-    assert_equal(res[1], 1)
-    res.unsafe_ptr().free()
-    res = s[2:1:-1]
-    assert_equal(res[0], 3)
-    assert_equal(len(res), 1)
-    res.unsafe_ptr().free()
-    res = s[5:1:-2]
-    assert_equal(res[0], 5)
-    assert_equal(res[1], 3)
-    res.unsafe_ptr().free()
 
 
 def test_copy_from():
@@ -204,6 +189,16 @@ def test_ref():
     assert_true(s.as_ref() == Pointer.address_of(l.unsafe_ptr()[]))
 
 
+def test_reversed():
+    var forward = InlineArray[Int, 3](1, 2, 3)
+    var backward = InlineArray[Int, 3](3, 2, 1)
+    var s = Span[Int](forward)
+    var i = 0
+    for num in reversed(s):
+        assert_equal(num[], backward[i])
+        i += 1
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -215,3 +210,4 @@ def main():
     test_bool()
     test_fill()
     test_ref()
+    test_reversed()
