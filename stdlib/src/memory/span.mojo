@@ -60,20 +60,18 @@ struct _SpanSIMDIter[
         forward: The iteration direction. `False` is backwards.
 
     Notes:
-        This iterator must be used on 2 loops.
+        This iterator should be used on 2 loops.
 
     Examples:
 
     ```mojo
-    var vec_iter = iter(
-        Span(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-    ).vectorized()
+    var iterator = iter(Span(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
     var has_a_10 = False
 
-    for v in vec_iter:
+    for v in iterator.vectorized():
         has_a_10 |= any(v == 10)
 
-    for s in vec_iter.remainder():
+    for s in iterator:
         has_a_10 |= s == 10
 
     print(has_a_10) # True
