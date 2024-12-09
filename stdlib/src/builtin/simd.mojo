@@ -1584,7 +1584,7 @@ struct SIMD[type: DType, size: Int](
                 output.write(", ")
             _write_scalar(output, element)
         output.write(")")
-        return output
+        return output^
 
     @always_inline("nodebug")
     fn __floor__(self) -> Self:

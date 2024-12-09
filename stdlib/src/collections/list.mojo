@@ -121,7 +121,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             other: The list to copy.
         """
-        self.__init__(capacity=other.capacity)
+        self = Self(capacity=other.capacity)
         for e in other:
             self.append(e[])
 
