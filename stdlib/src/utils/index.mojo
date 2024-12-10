@@ -731,29 +731,24 @@ struct IndexList[
         """
         # Reserve space for opening and closing parentheses, plus each element
         # and its trailing commas.
-        var buf = String._buffer_type()
         var initial_buffer_size = 2
         for i in range(size):
             initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
-        buf.reserve(initial_buffer_size)
+        var res = String(capacity=initial_buffer_size)
 
         # Print an opening `(`.
-        buf.size += _snprintf["("](buf.data, 2)
+        res.write("(")
         for i in range(size):
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf[", "](buf.data + buf.size, 3)
-            buf.size += _snprintf[_get_dtype_printf_format[DType.index]()](
-                buf.data + buf.size, _calc_initial_buffer_size(self[i]), self[i]
-            )
+                res.write(", ")
+            res.write(self[i])
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            buf.size += _snprintf[","](buf.data + buf.size, 2)
+            res.write(",")
         # Print a closing `)`.
-        buf.size += _snprintf[")"](buf.data + buf.size, 2)
-
-        buf.size += 1  # for the null terminator.
-        return buf^
+        res.write(")")
+        return res^
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):

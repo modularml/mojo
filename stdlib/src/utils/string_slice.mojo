@@ -602,13 +602,11 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
         var len_self = self.byte_length()
         var count = len_self * n + 1
-        var buf = String._buffer_type(capacity=count)
-        buf.size = count
-        var b_ptr = buf.unsafe_ptr()
+        var b_ptr = UnsafePointer[Byte].alloc(count)
         for i in range(n):
             memcpy(b_ptr + len_self * i, self.unsafe_ptr(), len_self)
         b_ptr[count - 1] = 0
-        return String(buf^)
+        return String(List(ptr=b_ptr, length=count, capacity=count))
 
     # ===------------------------------------------------------------------===#
     # Methods

@@ -627,6 +627,7 @@ what we publish.
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
   `DType` in a `Scalar[my_dtype]` to call the only overload of `bitcast` now.
+- Direct access to `List.size` has been removed. Use the public API instead.
 
 ### 🛠️ Fixed
 

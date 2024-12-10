@@ -153,8 +153,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         entries, size_estimation = Self._create_entries(fmt_src, len_pos_args)
         var fmt_len = fmt_src.byte_length()
         var buf = String._buffer_type(capacity=fmt_len + size_estimation)
-        buf.size = 1
-        buf.unsafe_set(0, 0)
+        buf.append(0)
         var res = String(buf^)
         var offset = 0
         var ptr = fmt_src.unsafe_ptr()
