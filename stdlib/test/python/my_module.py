@@ -25,7 +25,8 @@ class Foo:
 
 class AbstractPerson(ABC):
     @abstractmethod
-    def method(self): ...
+    def method(self):
+        ...
 
 
 def my_function(name):
