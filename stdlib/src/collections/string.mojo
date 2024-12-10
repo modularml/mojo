@@ -1679,13 +1679,15 @@ struct String(
         Returns:
           The number of occurrences of `substr`.
         """
+
+        var s_len = len(self)
         if not substr:
-            return len(self) + 1
+            return s_len + 1
 
         var res = 0
         var offset = 0
 
-        while True:
+        while offset < s_len:
             var pos = self.find(substr, offset)
             if pos == -1:
                 break
@@ -1717,7 +1719,6 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-
         return self.as_string_slice().find(substr.as_string_slice(), start)
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
@@ -1731,10 +1732,7 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-
-        return self.as_string_slice().rfind(
-            substr.as_string_slice(), start=start
-        )
+        return self.as_string_slice().rfind(substr.as_string_slice(), start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given String is a
@@ -1905,7 +1903,7 @@ struct String(
             return self._interleave(new)
 
         var occurrences = self.count(old)
-        if occurrences == -1:
+        if occurrences == len(self) + 1:
             return self
 
         var self_start = self.unsafe_ptr()
