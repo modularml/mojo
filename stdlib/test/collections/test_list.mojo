@@ -935,6 +935,21 @@ def test_list_repr():
     assert_equal(empty.__repr__(), "[]")
 
 
+def test_list_map():
+    fn MyFunc(mut e: Int):
+        e += 1
+
+    var lst = List(0, 1, 2).map(MyFunc)
+    for e in range(len(lst)):
+        assert_equal(lst[e], e + 1)
+
+    lst = List(0, 1, 2)
+    var lst2 = lst.map(MyFunc)
+    for e in range(len(lst)):
+        assert_equal(lst[e], e)
+        assert_equal(lst2[e], e + 1)
+
+
 # ===-------------------------------------------------------------------===#
 # main
 # ===-------------------------------------------------------------------===#
@@ -974,3 +989,4 @@ def main():
     test_list_dtor()
     test_destructor_trivial_elements()
     test_list_repr()
+    test_list_map()
