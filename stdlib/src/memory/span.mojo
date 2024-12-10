@@ -23,6 +23,7 @@ from memory import Span
 from collections import InlineArray
 
 from memory import Pointer, UnsafePointer
+from sys.info import simdwidthof
 
 
 trait AsBytes:
@@ -41,6 +42,83 @@ trait AsBytes:
             This does not include the trailing null terminator.
         """
         ...
+
+
+@value
+struct _SpanSIMDIter[
+    D: DType,
+    span_origin: Origin[False],
+    iter_origin: Origin[True],
+    width: Int,
+    forward: Bool = True,
+]:
+    """SIMD Iterator for Span.
+
+    Parameters:
+        D: The DType of the elements in the span.
+        span_origin: The origin of the Span.
+        iter_origin: The origin of the _SpanIter.
+        width: The width of the resulting vector.
+        forward: The iteration direction. `False` is backwards.
+
+    Notes:
+        This iterator should be used on 2 loops.
+
+    Examples:
+
+    ```mojo
+    var iterator = iter(Span(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+    var has_a_10 = False
+
+    for v in iterator.vectorized():
+        has_a_10 |= any(v == 10)
+
+    for s in iterator:
+        has_a_10 |= s[] == 10
+
+    print(has_a_10) # True
+    ```
+    .
+    """
+
+    var src: Pointer[
+        _SpanIter[Scalar[D], span_origin, forward=forward], iter_origin
+    ]
+
+    @always_inline
+    fn __iter__(self) -> Self:
+        return self
+
+    @always_inline
+    fn __next__(mut self) -> SIMD[D, width]:
+        @parameter
+        if forward:
+            var i = self.src[].index
+            self.src[].index += width
+            return (self.src[].src.unsafe_ptr() + i).load[width=width]()
+        else:
+            self.src[].index -= width
+            return (
+                (self.src[].src.unsafe_ptr() + self.src[].index)
+                .load[width=width]()
+                .reversed()
+            )
+
+    @always_inline
+    fn __has_next__(self) -> Bool:
+        @parameter
+        if forward:
+            return (len(self.src[].src) - self.src[].index) >= width
+        else:
+            return self.src[].index > 0
+
+    @always_inline
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return (len(self.src[].src) - self.src[].index) // width
+        else:
+            return self.src[].index // width
 
 
 @value
@@ -67,9 +145,7 @@ struct _SpanIter[
         return self
 
     @always_inline
-    fn __next__(
-        mut self,
-    ) -> Pointer[T, origin]:
+    fn __next__(mut self) -> Pointer[T, origin]:
         @parameter
         if forward:
             self.index += 1
@@ -77,6 +153,41 @@ struct _SpanIter[
         else:
             self.index -= 1
             return Pointer.address_of(self.src[self.index])
+
+    fn vectorized[
+        D: DType, O: ImmutableOrigin, //, width: Int = simdwidthof[D]()
+    ](mut self: _SpanIter[Scalar[D], O, forward=True]) -> _SpanSIMDIter[
+        D, O, __origin_of(self), width, forward=True
+    ]:
+        """Return a vectorized Span iterator.
+
+        Parameters:
+            D: The DType of the elements in the span.
+            O: The origin of the Span.
+            width: The width of the resulting vector.
+
+        Notes:
+            This iterator should be used on 2 loops.
+
+        Examples:
+
+        ```mojo
+        var iterator = iter(Span(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9, 10)))
+        var has_a_10 = False
+
+        for v in iterator.vectorized():
+            has_a_10 |= any(v == 10)
+
+        for s in iterator:
+            has_a_10 |= s[] == 10
+
+        print(has_a_10) # True
+        ```
+        .
+        """
+        return _SpanSIMDIter[D, O, __origin_of(self), width, forward=True](
+            Pointer.address_of(self)
+        )
 
     @always_inline
     fn __has_next__(self) -> Bool:
