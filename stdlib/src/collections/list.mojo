@@ -493,15 +493,66 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.capacity = new_capacity
 
     fn append(mut self, owned value: T):
-        """Appends a value to this list.
+        """Appends a value to this list. If there is no capacity left, resizes
+        to twice the current capacity. Except for 0 capacity where it sets 1.
 
         Args:
             value: The value to append.
         """
-        if self.size >= self.capacity:
-            self._realloc(max(1, self.capacity * 2))
-        (self.data + self.size).init_pointee_move(value^)
-        self.size += 1
+        if len(self) >= self.capacity:
+            self._realloc(self.capacity * 2 + int(self.capacity == 0))
+        (self.data + len(self)).init_pointee_move(value^)
+        self._len += 1
+
+    fn append[
+        D: DType, //
+    ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _]):
+        """Appends a vector to this list. If there is no capacity left, resizes
+        to `len(self) + value.size`.
+
+        Parameters:
+            D: The DType.
+
+        Args:
+            value: The value to append.
+        """
+        self.reserve(len(self) + value.size)
+        (self.data + len(self)).store(value)
+        self._len += value.size
+
+    fn append[
+        D: DType, //
+    ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _], count: Int):
+        """Appends a vector to this list. If there is no capacity left, resizes
+        to `len(self) + count`.
+
+        Parameters:
+            D: The DType.
+
+        Args:
+            value: The value to append.
+            count: The ammount of items to append.
+        """
+        self.reserve(len(self) + count)
+        var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
+        memcpy(self.data + len(self), v_ptr, count)
+        self._len += count
+
+    fn append[
+        D: DType, //
+    ](mut self: List[Scalar[D], *_, **_], value: Span[Scalar[D]]):
+        """Appends a Span to this list. If there is no capacity left, resizes
+        to `len(self) + len(value)`.
+
+        Parameters:
+            D: The DType.
+
+        Args:
+            value: The value to append.
+        """
+        self.reserve(len(self) + len(value))
+        memcpy(self.data + len(self), value.unsafe_ptr(), len(value))
+        self._len += len(value)
 
     fn insert(mut self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
