@@ -10,9 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-from .pwd import Passwd
-from memory import UnsafePointer
 from sys.ffi import c_char, external_call
+
+from memory import UnsafePointer
+
+from .pwd import Passwd
 
 alias uid_t = Int32
 alias gid_t = Int32

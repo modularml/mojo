@@ -15,14 +15,13 @@
 
 import os
 from collections import List
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from os import PathLike, listdir, stat_result
-from sys import os_is_windows, external_call
+from sys import external_call, os_is_windows
 from sys.ffi import c_char
 
 from builtin._location import __call_location, _SourceLocation
-from memory import stack_allocation, UnsafePointer
-
-from hashlib._hasher import _HashableWithHasher, _Hasher
+from memory import UnsafePointer, stack_allocation
 
 from utils import StringRef
 
@@ -125,7 +124,7 @@ struct Path(
         res /= suffix
         return res
 
-    fn __itruediv__(inout self, suffix: String):
+    fn __itruediv__(mut self, suffix: String):
         """Joins two paths using the system-defined path separator.
 
         Args:
@@ -154,7 +153,7 @@ struct Path(
         """
         return self.path.byte_length() > 0
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this path to the provided Writer.
 
@@ -226,7 +225,7 @@ struct Path(
 
         return hash(self.path)
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the path string value.
 
         Parameters:

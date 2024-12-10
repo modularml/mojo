@@ -19,11 +19,12 @@ from os import listdir
 ```
 """
 
-from collections import List, InlineArray
-from sys import os_is_linux, os_is_windows, is_nvidia_gpu, external_call
-from sys.ffi import c_char, OpaquePointer
+from collections import InlineArray, List
+from sys import external_call, is_gpu, os_is_linux, os_is_windows
+from sys.ffi import OpaquePointer, c_char
 
 from memory import UnsafePointer
+
 from utils import StringRef
 
 from .path import isdir, split
@@ -265,7 +266,7 @@ fn abort[
     """
 
     @parameter
-    if not is_nvidia_gpu():
+    if not is_gpu():
         print(message, flush=True)
 
     return abort[result]()

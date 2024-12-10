@@ -109,7 +109,7 @@ trait ExplicitlyCopyable:
     initializer is called intentionally by the programmer.
 
     An explicit copy initializer is just a normal `__init__` method that takes
-    a `borrowed` argument of `Self`.
+    a `read-only` argument of `Self`.
 
     Example implementing the `ExplicitlyCopyable` trait on `Foo` which requires
     the `__init__(.., Self)` method:

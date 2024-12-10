@@ -11,12 +11,13 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from sys import os_is_linux, os_is_macos, os_is_windows
+
 # ===----------------------------------------------------------------------=== #
 # Passwd
 # ===----------------------------------------------------------------------=== #
 from ._linux import _getpw_linux
 from ._macos import _getpw_macos
-from sys import os_is_windows, os_is_macos, os_is_linux
 
 
 @value
@@ -39,7 +40,7 @@ struct Passwd(Stringable):
     var pw_shell: String
     """Shell program."""
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Formats this string to the provided Writer.
 
         Parameters:

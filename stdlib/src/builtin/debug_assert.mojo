@@ -17,15 +17,20 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_nvidia_gpu, llvm_intrinsic
+from sys import is_gpu, is_nvidia_gpu, llvm_intrinsic
 from sys._build import is_debug_build
+from sys.ffi import c_char, c_size_t, c_uint, external_call
 from sys.param_env import env_get_string
-from sys.ffi import external_call, c_uint, c_size_t, c_char
-from memory import UnsafePointer
-from utils.write import _WriteBufferHeap, _WriteBufferStack, write_args
-
 
 from builtin._location import __call_location, _SourceLocation
+from memory import UnsafePointer, Span
+
+from utils.write import (
+    _ArgBytes,
+    _WriteBufferHeap,
+    _WriteBufferStack,
+    write_args,
+)
 
 alias defined_mode = env_get_string["ASSERT", "safe"]()
 
@@ -44,7 +49,7 @@ fn _assert_enabled[assert_mode: StringLiteral, cpu_only: Bool]() -> Bool:
     ]()
 
     @parameter
-    if defined_mode == "none" or (is_nvidia_gpu() and cpu_only):
+    if defined_mode == "none" or (is_gpu() and cpu_only):
         return False
     elif defined_mode == "all" or defined_mode == "warn" or is_debug_build():
         return True
@@ -236,19 +241,33 @@ fn _debug_assert_msg(
     var stdout = sys.stdout
 
     @parameter
-    if is_nvidia_gpu():
-        var buffer = _WriteBufferHeap[4096](stdout)
-        buffer.write("At ", loc, ": ")
-        _write_gpu_thread_context(buffer)
+    if is_gpu():
+        # Count the total length of bytes to allocate only once
+        var arg_bytes = _ArgBytes()
+        arg_bytes.write(
+            "At ",
+            loc,
+            ": ",
+            _ThreadContext(),
+            " Assert ",
+            "Warning: " if defined_mode == "warn" else " Error: ",
+        )
+        write_args(arg_bytes, messages, end="\n")
 
-        @parameter
-        if defined_mode == "warn":
-            buffer.write(" Assert Warning: ")
-        else:
-            buffer.write(" Assert Error: ")
-
+        var buffer = _WriteBufferHeap(arg_bytes.size + 1)
+        buffer.write(
+            "At ",
+            loc,
+            ": ",
+            _ThreadContext(),
+            " Assert ",
+            "Warning: " if defined_mode == "warn" else "Error: ",
+        )
         write_args(buffer, messages, end="\n")
-        buffer.flush()
+        buffer.data[buffer.pos] = 0
+        stdout.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](ptr=buffer.data, length=buffer.pos)
+        )
 
         @parameter
         if defined_mode != "warn":
@@ -272,28 +291,43 @@ fn _debug_assert_msg(
             abort()
 
 
-# Can't import gpu module at this stage in compilation for thread/block idx
-fn _write_gpu_thread_context[W: Writer](inout writer: W):
-    writer.write("block: [")
-    _write_id["block", "x"](writer)
-    writer.write(",")
-    _write_id["block", "y"](writer)
-    writer.write(",")
-    _write_id["block", "z"](writer)
-    writer.write("] thread: [")
-    _write_id["thread", "x"](writer)
-    writer.write(",")
-    _write_id["thread", "y"](writer)
-    writer.write(",")
-    _write_id["thread", "z"](writer)
-    writer.write("]")
+struct _ThreadContext(Writable):
+    var block_x: Int32
+    var block_y: Int32
+    var block_z: Int32
+    var thread_x: Int32
+    var thread_y: Int32
+    var thread_z: Int32
+
+    fn __init__(out self):
+        self.block_x = _get_id["block", "x"]()
+        self.block_y = _get_id["block", "y"]()
+        self.block_z = _get_id["block", "z"]()
+        self.thread_x = _get_id["thread", "x"]()
+        self.thread_y = _get_id["thread", "y"]()
+        self.thread_z = _get_id["thread", "z"]()
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(
+            "block: [",
+            self.block_x,
+            ",",
+            self.block_y,
+            ",",
+            self.block_z,
+            "] thread: [",
+            self.thread_x,
+            ",",
+            self.thread_y,
+            ",",
+            self.thread_z,
+            "]",
+        )
 
 
-fn _write_id[
-    W: Writer, //, type: StringLiteral, dim: StringLiteral
-](inout writer: W):
+fn _get_id[type: StringLiteral, dim: StringLiteral]() -> Int32:
     alias intrinsic_name = _get_intrinsic_name[type, dim]()
-    writer.write(llvm_intrinsic[intrinsic_name, Int32, has_side_effect=False]())
+    return llvm_intrinsic[intrinsic_name, Int32, has_side_effect=False]()
 
 
 fn _get_intrinsic_name[

@@ -17,7 +17,7 @@ from python import Python, PythonObject
 from testing import assert_equal, assert_false, assert_true
 
 
-fn test_string_to_python_to_mojo(inout python: Python) raises:
+fn test_string_to_python_to_mojo(mut python: Python) raises:
     var py_string = PythonObject("mojo")
     var py_string_capitalized = py_string.capitalize()
 

@@ -12,9 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 import os
-import platform
 import shutil
-
 from pathlib import Path
 
 import lit.formats
@@ -80,8 +78,9 @@ else:
     # with assertions enabled.
     config.substitutions.insert(1, ("%bare-mojo", "mojo"))
 
-    # NOTE: Right now this is the same as %mojo but we should start testing
+    # NOTE: Right now these are the same as %mojo but we should start testing
     # with debug info as well
+    config.substitutions.insert(0, ("%mojo-no-debug-no-assert", "mojo"))
     config.substitutions.insert(0, ("%mojo-no-debug", base_mojo_command))
 
     # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the

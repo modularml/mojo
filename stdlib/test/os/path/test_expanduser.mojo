@@ -14,10 +14,11 @@
 
 
 import os
+from os.env import getenv, setenv
 from os.path import expanduser, join
-from os.env import setenv, getenv
-from testing import assert_equal, assert_raises, assert_true
 from sys.info import os_is_windows
+
+from testing import assert_equal, assert_raises, assert_true
 
 
 fn get_user_path() -> String:

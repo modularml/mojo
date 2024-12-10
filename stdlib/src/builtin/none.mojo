@@ -75,7 +75,7 @@ struct NoneType(
         return "None"
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Write `None` to a writer stream.
 
         Parameters:

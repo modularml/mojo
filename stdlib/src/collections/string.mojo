@@ -17,41 +17,38 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
+from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import c_char
-from utils import StaticString, write_args
+from sys.intrinsics import _type_is_eq
 
 from bit import count_leading_zeros
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcmp, memcpy, Span
 from python import PythonObject
 
-from sys.intrinsics import _type_is_eq
-from hashlib._hasher import _HashableWithHasher, _Hasher
-
 from utils import (
-    Span,
     IndexList,
+    StaticString,
     StringRef,
     StringSlice,
     Variant,
     Writable,
     Writer,
+    write_args,
 )
-from utils.string_slice import (
-    _utf8_byte_type,
-    _StringSliceIter,
-    _unicode_codepoint_utf8_byte_length,
-    _shift_unicode_to_utf8,
-    _FormatCurlyEntry,
-    _CurlyEntryFormattable,
-    _to_string_list,
-)
-
 from utils._unicode import (
     is_lowercase,
     is_uppercase,
     to_lowercase,
     to_uppercase,
+)
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from utils.string_slice import (
+    _shift_unicode_to_utf8,
+    _StringSliceIter,
+    _to_string_list,
+    _unicode_codepoint_utf8_byte_length,
+    _utf8_byte_type,
 )
 
 # ===----------------------------------------------------------------------=== #
@@ -235,15 +232,15 @@ fn ascii(value: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
-    """Implementation of `atol` for StringRef inputs.
+fn _atol(str_slice: StringSlice, base: Int = 10) raises -> Int:
+    """Implementation of `atol` for StringSlice inputs.
 
     Please see its docstring for details.
     """
     if (base != 0) and (base < 2 or base > 36):
         raise Error("Base must be >= 2 and <= 36, or 0.")
-    if not str_ref:
-        raise Error(_atol_error(base, str_ref))
+    if not str_slice:
+        raise Error(_str_to_base_error(base, str_slice))
 
     var real_base: Int
     var ord_num_max: Int
@@ -253,53 +250,23 @@ fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
     var is_negative: Bool = False
     var has_prefix: Bool = False
     var start: Int = 0
-    var str_len = len(str_ref)
-    var buff = str_ref.unsafe_ptr()
+    var str_len = str_slice.byte_length()
 
-    for pos in range(start, str_len):
-        if _isspace(buff[pos]):
-            continue
-
-        if str_ref[pos] == "-":
-            is_negative = True
-            start = pos + 1
-        elif str_ref[pos] == "+":
-            start = pos + 1
-        else:
-            start = pos
-        break
-
-    if str_ref[start] == "0" and start + 1 < str_len:
-        if base == 2 and (
-            str_ref[start + 1] == "b" or str_ref[start + 1] == "B"
-        ):
-            start += 2
-            has_prefix = True
-        elif base == 8 and (
-            str_ref[start + 1] == "o" or str_ref[start + 1] == "O"
-        ):
-            start += 2
-            has_prefix = True
-        elif base == 16 and (
-            str_ref[start + 1] == "x" or str_ref[start + 1] == "X"
-        ):
-            start += 2
-            has_prefix = True
+    start, is_negative = _trim_and_handle_sign(str_slice, str_len)
 
     alias ord_0 = ord("0")
-    # FIXME:
-    #   Change this to `alias` after fixing support for __getitem__ of alias.
-    var ord_letter_min = (ord("a"), ord("A"))
+    alias ord_letter_min = (ord("a"), ord("A"))
     alias ord_underscore = ord("_")
 
     if base == 0:
-        var real_base_new_start = _identify_base(str_ref, start)
+        var real_base_new_start = _identify_base(str_slice, start)
         real_base = real_base_new_start[0]
         start = real_base_new_start[1]
         has_prefix = real_base != 10
         if real_base == -1:
-            raise Error(_atol_error(base, str_ref))
+            raise Error(_str_to_base_error(base, str_slice))
     else:
+        start, has_prefix = _handle_base_prefix(start, str_slice, str_len, base)
         real_base = base
 
     if real_base <= 10:
@@ -311,21 +278,23 @@ fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
             ord("A") + (real_base - 11),
         )
 
+    var buff = str_slice.unsafe_ptr()
     var found_valid_chars_after_start = False
     var has_space_after_number = False
+
     # Prefixed integer literals with real_base 2, 8, 16 may begin with leading
     # underscores under the conditions they have a prefix
-    var was_last_digit_undescore = not (real_base in (2, 8, 16) and has_prefix)
+    var was_last_digit_underscore = not (real_base in (2, 8, 16) and has_prefix)
     for pos in range(start, str_len):
         var ord_current = int(buff[pos])
         if ord_current == ord_underscore:
-            if was_last_digit_undescore:
-                raise Error(_atol_error(base, str_ref))
+            if was_last_digit_underscore:
+                raise Error(_str_to_base_error(base, str_slice))
             else:
-                was_last_digit_undescore = True
+                was_last_digit_underscore = True
                 continue
         else:
-            was_last_digit_undescore = False
+            was_last_digit_underscore = False
         if ord_0 <= ord_current <= ord_num_max:
             result += ord_current - ord_0
             found_valid_chars_after_start = True
@@ -340,45 +309,100 @@ fn _atol(str_ref: StringSlice[_], base: Int = 10) raises -> Int:
             start = pos + 1
             break
         else:
-            raise Error(_atol_error(base, str_ref))
+            raise Error(_str_to_base_error(base, str_slice))
         if pos + 1 < str_len and not _isspace(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
-                    _atol_error(base, str_ref)
+                    _str_to_base_error(base, str_slice)
                     + " String expresses an integer too large to store in Int."
                 )
             result = nextresult
 
-    if was_last_digit_undescore or (not found_valid_chars_after_start):
-        raise Error(_atol_error(base, str_ref))
+    if was_last_digit_underscore or (not found_valid_chars_after_start):
+        raise Error(_str_to_base_error(base, str_slice))
 
     if has_space_after_number:
         for pos in range(start, str_len):
             if not _isspace(buff[pos]):
-                raise Error(_atol_error(base, str_ref))
+                raise Error(_str_to_base_error(base, str_slice))
     if is_negative:
         result = -result
     return result
 
 
-fn _atol_error(base: Int, str_ref: StringSlice[_]) -> String:
+@always_inline
+fn _trim_and_handle_sign(str_slice: StringSlice, str_len: Int) -> (Int, Bool):
+    """Trims leading whitespace, handles the sign of the number in the string.
+
+    Args:
+        str_slice: A StringSlice containing the number to parse.
+        str_len: The length of the string.
+
+    Returns:
+        A tuple containing:
+        - The starting index of the number after whitespace and sign.
+        - A boolean indicating whether the number is negative.
+    """
+    var buff = str_slice.unsafe_ptr()
+    var start: Int = 0
+    while start < str_len and _isspace(buff[start]):
+        start += 1
+    var p: Bool = buff[start] == ord("+")
+    var n: Bool = buff[start] == ord("-")
+    return start + (p or n), n
+
+
+@always_inline
+fn _handle_base_prefix(
+    pos: Int, str_slice: StringSlice, str_len: Int, base: Int
+) -> (Int, Bool):
+    """Adjusts the starting position if a valid base prefix is present.
+
+    Handles "0b"/"0B" for base 2, "0o"/"0O" for base 8, and "0x"/"0X" for base
+    16. Only adjusts if the base matches the prefix.
+
+    Args:
+        pos: Current position in the string.
+        str_slice: The input StringSlice.
+        str_len: Length of the input string.
+        base: The specified base.
+
+    Returns:
+        A tuple containing:
+            - Updated position after the prefix, if applicable.
+            - A boolean indicating if the prefix was valid for the given base.
+    """
+    var start = pos
+    var buff = str_slice.unsafe_ptr()
+    if start + 1 < str_len:
+        var prefix_char = chr(int(buff[start + 1]))
+        if buff[start] == ord("0") and (
+            (base == 2 and (prefix_char == "b" or prefix_char == "B"))
+            or (base == 8 and (prefix_char == "o" or prefix_char == "O"))
+            or (base == 16 and (prefix_char == "x" or prefix_char == "X"))
+        ):
+            start += 2
+    return start, start != pos
+
+
+fn _str_to_base_error(base: Int, str_slice: StringSlice) -> String:
     return (
         "String is not convertible to integer with base "
         + str(base)
         + ": '"
-        + str(str_ref)
+        + str(str_slice)
         + "'"
     )
 
 
-fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
-    var length = len(str_ref)
+fn _identify_base(str_slice: StringSlice[_], start: Int) -> Tuple[Int, Int]:
+    var length = str_slice.byte_length()
     # just 1 digit, assume base 10
     if start == (length - 1):
         return 10, start
-    if str_ref[start] == "0":
-        var second_digit = str_ref[start + 1]
+    if str_slice[start] == "0":
+        var second_digit = str_slice[start + 1]
         if second_digit == "b" or second_digit == "B":
             return 2, start + 2
         if second_digit == "o" or second_digit == "O":
@@ -388,7 +412,7 @@ fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
         # checking for special case of all "0", "_" are also allowed
         var was_last_character_underscore = False
         for i in range(start + 1, length):
-            if str_ref[i] == "_":
+            if str_slice[i] == "_":
                 if was_last_character_underscore:
                     return -1, -1
                 else:
@@ -396,9 +420,9 @@ fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
                     continue
             else:
                 was_last_character_underscore = False
-            if str_ref[i] != "0":
+            if str_slice[i] != "0":
                 return -1, -1
-    elif ord("1") <= ord(str_ref[start]) <= ord("9"):
+    elif ord("1") <= ord(str_slice[start]) <= ord("9"):
         return 10, start
     else:
         return -1, -1
@@ -409,19 +433,37 @@ fn _identify_base(str_ref: StringSlice[_], start: Int) -> Tuple[Int, Int]:
 fn atol(str: String, base: Int = 10) raises -> Int:
     """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If base is 0 the the string is
-    parsed as an Integer literal, see: https://docs.python.org/3/reference/lexical_analysis.html#integers.
-
-    Raises:
-        If the given string cannot be parsed as an integer value. For example in
-        `atol("hi")`.
+    If base is set to 0, the string is parsed as an Integer literal, with the
+    following considerations:
+    - '0b' or '0B' prefix indicates binary (base 2)
+    - '0o' or '0O' prefix indicates octal (base 8)
+    - '0x' or '0X' prefix indicates hexadecimal (base 16)
+    - Without a prefix, it's treated as decimal (base 10)
 
     Args:
         str: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
-        An integer value that represents the string, or otherwise raises.
+        An integer value that represents the string.
+
+    Raises:
+        If the given string cannot be parsed as an integer value or if an
+        incorrect base is provided.
+
+    Examples:
+        >>> atol("32")
+        32
+        >>> atol("FF", 16)
+        255
+        >>> atol("0xFF", 0)
+        255
+        >>> atol("0b1010", 0)
+        10
+
+    Notes:
+        This follows [Python's integer literals](
+        https://docs.python.org/3/reference/lexical_analysis.html#integers).
     """
     return _atol(str.as_string_slice(), base)
 
@@ -743,7 +785,8 @@ struct String(
     @always_inline
     @implicit
     fn __init__(out self, owned impl: List[UInt8, *_]):
-        """Construct a string from a buffer of bytes.
+        """Construct a string from a buffer of bytes without copying the
+        allocated data.
 
         The buffer must be terminated with a null byte:
 
@@ -772,6 +815,37 @@ struct String(
         self._buffer = Self._buffer_type(
             ptr=impl.steal_data(), length=size, capacity=capacity
         )
+
+    @always_inline
+    @implicit
+    fn __init__(out self, impl: Self._buffer_type):
+        """Construct a string from a buffer of bytes, copying the allocated
+        data. Use the transfer operator ^ to avoid the copy.
+
+        The buffer must be terminated with a null byte:
+
+        ```mojo
+        var buf = List[UInt8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
+
+        Args:
+            impl: The buffer.
+        """
+        debug_assert(
+            len(impl) > 0 and impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        # We make a backup because steal_data() will clear size and capacity.
+        var size = impl.size
+        debug_assert(
+            impl[size - 1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        self._buffer = impl
 
     @always_inline
     fn __init__(out self):
@@ -861,7 +935,7 @@ struct String(
     # Factory dunders
     # ===------------------------------------------------------------------=== #
 
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """Write a byte span to this String.
 
         Args:
@@ -870,7 +944,7 @@ struct String(
         """
         self._iadd[False](bytes)
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:
@@ -1224,7 +1298,7 @@ struct String(
         """
         return Self._add[True](other.as_bytes(), self.as_bytes())
 
-    fn _iadd[has_null: Bool](inout self, other: Span[Byte]):
+    fn _iadd[has_null: Bool](mut self, other: Span[Byte]):
         var s_len = self.byte_length()
         var o_len = len(other)
         var o_ptr = other.unsafe_ptr()
@@ -1245,7 +1319,7 @@ struct String(
             s_ptr[sum_len] = 0
 
     @always_inline
-    fn __iadd__(inout self, other: String):
+    fn __iadd__(mut self, other: String):
         """Appends another string to this string.
 
         Args:
@@ -1254,7 +1328,7 @@ struct String(
         self._iadd[True](other.as_bytes())
 
     @always_inline
-    fn __iadd__(inout self, other: StringLiteral):
+    fn __iadd__(mut self, other: StringLiteral):
         """Appends another string literal to this string.
 
         Args:
@@ -1263,7 +1337,7 @@ struct String(
         self._iadd[False](other.as_bytes())
 
     @always_inline
-    fn __iadd__(inout self, other: StringSlice):
+    fn __iadd__(mut self, other: StringSlice):
         """Appends another string slice to this string.
 
         Args:
@@ -1380,7 +1454,7 @@ struct String(
     # Methods
     # ===------------------------------------------------------------------=== #
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string to the provided Writer.
 
@@ -1435,7 +1509,6 @@ struct String(
             result.write(a)
 
         elems.each[add_elt]()
-        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T, *_]) -> String:
@@ -1580,7 +1653,7 @@ struct String(
         var length = len(self._buffer)
         return length - int(length > 0)
 
-    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
+    fn _steal_ptr(mut self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1774,7 +1847,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             for s in self[lhs:]:
-                if not str(s).isspace():  # TODO: with StringSlice.isspace()
+                if not s.isspace():
                     break
                 lhs += s.byte_length()
             # if it went until the end of the String, then
@@ -1788,7 +1861,7 @@ struct String(
                 break
             rhs = lhs + num_bytes(self.unsafe_ptr()[lhs])
             for s in self[lhs + num_bytes(self.unsafe_ptr()[lhs]) :]:
-                if str(s).isspace():  # TODO: with StringSlice.isspace()
+                if s.isspace():
                     break
                 rhs += s.byte_length()
 
@@ -1874,7 +1947,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String) -> String:
+    fn strip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing characters
         removed.
 
@@ -1887,7 +1960,7 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn strip(self) -> String:
+    fn strip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing whitespaces
         removed.
 
@@ -1896,7 +1969,7 @@ struct String(
         """
         return self.lstrip().rstrip()
 
-    fn rstrip(self, chars: String) -> String:
+    fn rstrip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1906,29 +1979,17 @@ struct String(
             A copy of the string with no trailing characters.
         """
 
-        var r_idx = self.byte_length()
-        while r_idx > 0 and self[r_idx - 1] in chars:
-            r_idx -= 1
+        return self.as_string_slice().rstrip(chars)
 
-        return self[:r_idx]
-
-    fn rstrip(self) -> String:
+    fn rstrip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with trailing whitespaces removed.
 
         Returns:
             A copy of the string with no trailing whitespaces.
         """
-        var r_idx = self.byte_length()
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self.__reversed__():
-        #     if not s.isspace():
-        #         break
-        #     r_idx -= 1
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
-            r_idx -= 1
-        return self[:r_idx]
+        return self.as_string_slice().rstrip()
 
-    fn lstrip(self, chars: String) -> String:
+    fn lstrip(self, chars: StringSlice) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading characters removed.
 
         Args:
@@ -1938,29 +1999,15 @@ struct String(
             A copy of the string with no leading characters.
         """
 
-        var l_idx = 0
-        while l_idx < self.byte_length() and self[l_idx] in chars:
-            l_idx += 1
+        return self.as_string_slice().lstrip(chars)
 
-        return self[l_idx:]
-
-    fn lstrip(self) -> String:
+    fn lstrip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading whitespaces removed.
 
         Returns:
             A copy of the string with no leading whitespaces.
         """
-        var l_idx = 0
-        # TODO (#933): should use this once llvm intrinsics can be used at comp time
-        # for s in self:
-        #     if not s.isspace():
-        #         break
-        #     l_idx += 1
-        while l_idx < self.byte_length() and _isspace(
-            self._buffer.unsafe_get(l_idx)
-        ):
-            l_idx += 1
-        return self[l_idx:]
+        return self.as_string_slice().lstrip()
 
     fn __hash__(self) -> UInt:
         """Hash the underlying buffer using builtin hash.
@@ -1972,7 +2019,7 @@ struct String(
         """
         return hash(self.as_string_slice())
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -2267,7 +2314,7 @@ struct String(
         var result = String(buffer)
         return result^
 
-    fn reserve(inout self, new_capacity: Int):
+    fn reserve(mut self, new_capacity: Int):
         """Reserves the requested capacity.
 
         Args:

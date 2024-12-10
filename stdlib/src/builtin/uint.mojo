@@ -15,11 +15,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import bitwidthof
-from utils._visualizers import lldb_formatter_wrapping_type
-from documentation import doc_private
-from hashlib.hash import _hash_simd
 from hashlib._hasher import _HashableWithHasher, _Hasher
+from hashlib.hash import _hash_simd
+from sys import bitwidthof
+
+from documentation import doc_private
+
+from utils._visualizers import lldb_formatter_wrapping_type
 
 
 @lldb_formatter_wrapping_type
@@ -128,7 +130,7 @@ struct UInt(IntLike, _HashableWithHasher):
         return String.write(self)
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Formats this integer to the provided Writer.
 
         Parameters:
@@ -166,7 +168,7 @@ struct UInt(IntLike, _HashableWithHasher):
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.uint64](self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with this uint value.
 
         Parameters:
@@ -396,12 +398,12 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         return __mlir_op.`index.ceildivu`(self.value, denominator.value)
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # In place operations.
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: UInt):
+    fn __iadd__(mut self, rhs: UInt):
         """Compute `self + rhs` and save the result in self.
 
         Args:
@@ -410,7 +412,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: UInt):
+    fn __isub__(mut self, rhs: UInt):
         """Compute `self - rhs` and save the result in self.
 
         Args:
@@ -419,7 +421,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: UInt):
+    fn __imul__(mut self, rhs: UInt):
         """Compute self*rhs and save the result in self.
 
         Args:
@@ -427,7 +429,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         self = self * rhs
 
-    fn __itruediv__(inout self, rhs: UInt):
+    fn __itruediv__(mut self, rhs: UInt):
         """Compute `self / rhs`, convert to int, and save the result in self.
 
         Since `floor(self / rhs)` is equivalent to `self // rhs`, this yields
@@ -439,7 +441,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: UInt):
+    fn __ifloordiv__(mut self, rhs: UInt):
         """Compute `self // rhs` and save the result in self.
 
         Args:
@@ -447,7 +449,7 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         self = self // rhs
 
-    fn __imod__(inout self, rhs: UInt):
+    fn __imod__(mut self, rhs: UInt):
         """Compute `self % rhs` and save the result in self.
 
         Args:
@@ -456,7 +458,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self % rhs
 
     @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: UInt):
+    fn __ipow__(mut self, rhs: UInt):
         """Compute `pow(self, rhs)` and save the result in self.
 
         Args:
@@ -465,7 +467,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self**rhs
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: UInt):
+    fn __ilshift__(mut self, rhs: UInt):
         """Compute `self << rhs` and save the result in self.
 
         Args:
@@ -474,7 +476,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: UInt):
+    fn __irshift__(mut self, rhs: UInt):
         """Compute `self >> rhs` and save the result in self.
 
         Args:
@@ -483,7 +485,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self >> rhs
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: UInt):
+    fn __iand__(mut self, rhs: UInt):
         """Compute `self & rhs` and save the result in self.
 
         Args:
@@ -492,7 +494,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: UInt):
+    fn __ixor__(mut self, rhs: UInt):
         """Compute `self ^ rhs` and save the result in self.
 
         Args:
@@ -501,7 +503,7 @@ struct UInt(IntLike, _HashableWithHasher):
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: UInt):
+    fn __ior__(mut self, rhs: UInt):
         """Compute self|rhs and save the result in self.
 
         Args:
@@ -509,9 +511,9 @@ struct UInt(IntLike, _HashableWithHasher):
         """
         self = self | rhs
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __radd__(self, value: Self) -> Self:

@@ -14,6 +14,7 @@
 
 import os
 from os.path import expandvars
+
 from testing import assert_equal
 
 
@@ -21,7 +22,7 @@ from testing import assert_equal
 struct EnvVar:
     var name: String
 
-    fn __init__(out self, name: String, value: String) -> None:
+    fn __init__(out self, name: String, value: String):
         self.name = name
         _ = os.setenv(name, value)
 

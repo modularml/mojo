@@ -13,13 +13,13 @@
 """Establishes the contract between `Writer` and `Writable` types."""
 
 from collections import InlineArray
-from memory import memcpy, UnsafePointer
-from utils import Span, StaticString
-from sys.info import is_nvidia_gpu
-from builtin.io import _printf
+from sys.info import is_gpu
 
+from memory import UnsafePointer, memcpy, Span
 
-# ===----------------------------------------------------------------------===#
+from utils import StaticString
+
+# ===-----------------------------------------------------------------------===#
 
 
 trait Writer:
@@ -35,18 +35,18 @@ trait Writer:
     Example:
 
     ```mojo
-    from utils import Span
+    from memory import Span
 
     @value
     struct NewString(Writer, Writable):
         var s: String
 
         # Writer requirement to write a Span of Bytes
-        fn write_bytes(inout self, bytes: Span[Byte, _]):
+        fn write_bytes(mut self, bytes: Span[Byte, _]):
             self.s._iadd[False](bytes)
 
         # Writer requirement to take multiple args
-        fn write[*Ts: Writable](inout self, *args: *Ts):
+        fn write[*Ts: Writable](mut self, *args: *Ts):
             @parameter
             fn write_arg[T: Writable](arg: T):
                 arg.write_to(self)
@@ -54,7 +54,7 @@ trait Writer:
             args.each[write_arg]()
 
         # Also make it Writable to allow `print` to write the inner String
-        fn write_to[W: Writer](self, inout writer: W):
+        fn write_to[W: Writer](self, mut writer: W):
             writer.write(self.s)
 
 
@@ -65,7 +65,7 @@ trait Writer:
 
         # Pass multiple args to the Writer. The Int and StringLiteral types
         # call `writer.write_bytes` in their own `write_to` implementations.
-        fn write_to[W: Writer](self, inout writer: W):
+        fn write_to[W: Writer](self, mut writer: W):
             writer.write("Point(", self.x, ", ", self.y, ")")
 
         # Enable conversion to a String using `str(point)`
@@ -89,7 +89,7 @@ trait Writer:
     """
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a `Span[Byte]` to this `Writer`.
 
@@ -99,7 +99,7 @@ trait Writer:
         """
         ...
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:
@@ -118,9 +118,9 @@ trait Writer:
         # To only have to implement `write_bytes` to make a type a valid Writer
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Writable
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 trait Writable:
@@ -134,7 +134,7 @@ trait Writable:
         var x: Float64
         var y: Float64
 
-        fn write_to[W: Writer](self, inout writer: W):
+        fn write_to[W: Writer](self, mut writer: W):
             var string = "Point"
             # Write a single `Span[Byte]`:
             writer.write_bytes(string.as_bytes())
@@ -143,7 +143,7 @@ trait Writable:
     ```
     """
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the string representation of this type to the provided Writer.
 
@@ -156,15 +156,15 @@ trait Writable:
         ...
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utils
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn write_args[
     W: Writer, *Ts: Writable
 ](
-    inout writer: W,
+    mut writer: W,
     args: VariadicPack[_, Writable, *Ts],
     *,
     sep: StaticString = "",
@@ -223,47 +223,48 @@ trait MovableWriter(Movable, Writer):
     ...
 
 
-struct _WriteBufferHeap[W: MovableWriter, //, capacity: Int](Writer):
+struct _WriteBufferHeap(Writer):
     var data: UnsafePointer[UInt8]
     var pos: Int
-    var writer: W
 
-    @implicit
-    fn __init__(out self, owned writer: W):
+    fn __init__(out self, size: Int):
         self.data = UnsafePointer[
-            UInt8,
-            address_space = AddressSpace.GENERIC,
-        ].alloc(capacity)
+            UInt8, address_space = AddressSpace.GENERIC
+        ].alloc(size)
         self.pos = 0
-        self.writer = writer^
 
-    fn flush(inout self):
-        self.writer.write_bytes(
-            Span[Byte, ImmutableAnyOrigin](ptr=self.data, length=self.pos)
-        )
-        self.pos = 0
+    fn __del__(owned self):
+        self.data.free()
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[UInt8, _]):
+    fn write_bytes(mut self, bytes: Span[UInt8, _]):
         len_bytes = len(bytes)
         # If empty then return
         if len_bytes == 0:
             return
-        # If span is too large to fit in buffer, write directly and return
-        if len_bytes > capacity:
-            self.flush()
-            self.writer.write_bytes(bytes)
-            return
-        # If buffer would overflow, flush writer and reset pos to 0.
-        if self.pos + len_bytes > capacity:
-            self.flush()
-        ptr = bytes.unsafe_ptr()
-        # Continue writing to buffer
+        var ptr = bytes.unsafe_ptr()
         for i in range(len_bytes):
             self.data[i + self.pos] = ptr[i]
         self.pos += len_bytes
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
+        @parameter
+        fn write_arg[T: Writable](arg: T):
+            arg.write_to(self)
+
+        args.each[write_arg]()
+
+
+struct _ArgBytes(Writer):
+    var size: Int
+
+    fn __init__(out self):
+        self.size = 0
+
+    fn write_bytes(mut self, bytes: Span[UInt8, _]):
+        self.size += len(bytes)
+
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         @parameter
         fn write_arg[T: Writable](arg: T):
             arg.write_to(self)
@@ -282,7 +283,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
         self.pos = 0
         self.writer = writer^
 
-    fn flush(inout self):
+    fn flush(mut self):
         self.writer.write_bytes(
             Span[Byte, ImmutableAnyOrigin](
                 ptr=self.data.unsafe_ptr(), length=self.pos
@@ -290,7 +291,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
         )
         self.pos = 0
 
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         len_bytes = len(bytes)
         # If empty then return
         if len_bytes == 0:
@@ -307,7 +308,7 @@ struct _WriteBufferStack[W: MovableWriter, //, capacity: Int](Writer):
         memcpy(self.data.unsafe_ptr() + self.pos, bytes.unsafe_ptr(), len_bytes)
         self.pos += len_bytes
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         @parameter
         fn write_arg[T: Writable](arg: T):
             arg.write_to(self)
@@ -365,11 +366,18 @@ fn write_buffered[
     """
 
     @parameter
-    if is_nvidia_gpu():
+    if is_gpu():
         # Stack space is very small on GPU due to many threads, so use heap
-        var buffer = _WriteBufferHeap[buffer_size](writer^)
+        # Count the total length of bytes to allocate only once
+        var arg_bytes = _ArgBytes()
+        write_args(arg_bytes, args, sep=sep, end=end)
+
+        var buffer = _WriteBufferHeap(arg_bytes.size + 1)
         write_args(buffer, args, sep=sep, end=end)
-        buffer.flush()
+        buffer.data[buffer.pos] = 0
+        writer.write_bytes(
+            Span[Byte, ImmutableAnyOrigin](ptr=buffer.data, length=buffer.pos)
+        )
     else:
         var buffer = _WriteBufferStack[buffer_size](writer^)
         write_args(buffer, args, sep=sep, end=end)

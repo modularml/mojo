@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from sys import sizeof, bitwidthof, os_is_windows
+from sys import bitwidthof, os_is_windows, sizeof
 
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
@@ -66,11 +66,65 @@ struct DType(
     alias float8e5m2 = DType(
         __mlir_attr.`#kgen.dtype.constant<f8e5m2> : !kgen.dtype`
     )
-    """Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+    """Represents a FP8E5M2 floating point format from the [OFP8
+    standard](https://www.opencompute.org/documents/ocp-8-bit-floating-point-specification-ofp8-revision-1-0-2023-12-01-pdf-1).
+
+    The 8 bits are encoded as `seeeeemm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 5 bits
+    - (m)antissa: 2 bits
+    - exponent bias: 15
+    - nan: {0,1}11111{01,10,11}
+    - inf: 01111100
+    - -inf: 11111100
+    - -0: 10000000
+    """
+    alias float8e5m2fnuz = DType(
+        __mlir_attr.`#kgen.dtype.constant<f8e5m2fnuz> : !kgen.dtype`
+    )
+    """Represents a FP8E5M2FNUZ floating point format.
+
+    The 8 bits are encoded as `seeeeemm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 5 bits
+    - (m)antissa: 2 bits
+    - exponent bias: 16
+    - nan: 10000000
+    - fn: finite (no inf or -inf encodings)
+    - uz: unsigned zero (no -0 encoding)
+    """
     alias float8e4m3 = DType(
         __mlir_attr.`#kgen.dtype.constant<f8e4m3> : !kgen.dtype`
     )
-    """Represents a FP8E4M3 floating point format whose bitwidth is 8."""
+    """Represents a FP8E4M3 floating point format from the [OFP8
+    standard](https://www.opencompute.org/documents/ocp-8-bit-floating-point-specification-ofp8-revision-1-0-2023-12-01-pdf-1).
+
+    This type is named `float8_e4m3fn` (the "fn" stands for "finite") in some
+    frameworks, as it does not encode -inf or inf.
+
+    The 8 bits are encoded as `seeeemmm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 4 bits
+    - (m)antissa: 3 bits
+    - exponent bias: 7
+    - nan: 01111111, 11111111
+    - -0: 10000000
+    - fn: finite (no inf or -inf encodings)
+    """
+    alias float8e4m3fnuz = DType(
+        __mlir_attr.`#kgen.dtype.constant<f8e4m3fnuz> : !kgen.dtype`
+    )
+    """Represents a FP8E4M3FNUZ floating point format.
+
+    The 8 bits are encoded as `seeeemmm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 4 bits
+    - (m)antissa: 3 bits
+    - exponent bias: 8
+    - nan: 10000000
+    - fn: finite (no inf or -inf encodings)
+    - uz: unsigned zero (no -0 encoding)
+    """
     alias bfloat16 = DType(
         __mlir_attr.`#kgen.dtype.constant<bf16> : !kgen.dtype`
     )
@@ -100,6 +154,16 @@ struct DType(
             other: The DType to copy.
         """
         self = other
+
+    @always_inline
+    @implicit
+    fn __init__(out self, value: Self.type):
+        """Construct a DType from MLIR dtype.
+
+        Args:
+            value: The MLIR dtype.
+        """
+        self.value = value
 
     @staticmethod
     fn _from_str(str: String) -> DType:
@@ -132,8 +196,12 @@ struct DType(
             return DType.index
         elif str == String("float8e5m2"):
             return DType.float8e5m2
+        elif str == String("float8e5m2fnuz"):
+            return DType.float8e5m2fnuz
         elif str == String("float8e4m3"):
             return DType.float8e4m3
+        elif str == String("float8e4m3fnuz"):
+            return DType.float8e4m3fnuz
         elif str == String("bfloat16"):
             return DType.bfloat16
         elif str == String("float16"):
@@ -160,7 +228,7 @@ struct DType(
         return String.write(self)
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this dtype to the provided Writer.
 
@@ -193,8 +261,12 @@ struct DType(
             return writer.write("index")
         if self == DType.float8e5m2:
             return writer.write("float8e5m2")
+        if self == DType.float8e5m2fnuz:
+            return writer.write("float8e5m2fnuz")
         if self == DType.float8e4m3:
             return writer.write("float8e4m3")
+        if self == DType.float8e4m3fnuz:
+            return writer.write("float8e4m3fnuz")
         if self == DType.bfloat16:
             return writer.write("bfloat16")
         if self == DType.float16:
@@ -307,7 +379,7 @@ struct DType(
         """
         return hash(UInt8(self._as_i8()))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with this `DType` value.
 
         Parameters:
@@ -397,13 +469,18 @@ struct DType(
     @always_inline("nodebug")
     fn is_float8(self) -> Bool:
         """Returns True if the type is a 8bit-precision floating point type,
-        e.g. either float8e5m2 or float8e4m3.
+        e.g. float8e5m2, float8e5m2fnuz, float8e4m3 and float8e4m3fnuz.
 
         Returns:
             True if the type is a 8bit-precision float, false otherwise.
         """
 
-        return self in (DType.float8e5m2, DType.float8e4m3)
+        return self in (
+            DType.float8e5m2,
+            DType.float8e4m3,
+            DType.float8e5m2fnuz,
+            DType.float8e4m3fnuz,
+        )
 
     @always_inline("nodebug")
     fn is_half_float(self) -> Bool:
@@ -459,8 +536,12 @@ struct DType(
             return sizeof[DType.index]()
         if self == DType.float8e5m2:
             return sizeof[DType.float8e5m2]()
+        if self == DType.float8e5m2fnuz:
+            return sizeof[DType.float8e5m2fnuz]()
         if self == DType.float8e4m3:
             return sizeof[DType.float8e4m3]()
+        if self == DType.float8e4m3fnuz:
+            return sizeof[DType.float8e4m3fnuz]()
         if self == DType.bfloat16:
             return sizeof[DType.bfloat16]()
         if self == DType.float16:
@@ -482,9 +563,9 @@ struct DType(
         """
         return 8 * self.sizeof()
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # dispatch_integral
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn dispatch_integral[
@@ -519,9 +600,9 @@ struct DType(
         else:
             raise Error("only integral types are supported")
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # dispatch_floating
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn dispatch_floating[
@@ -597,9 +678,9 @@ struct DType(
             "dispatch_custom: dynamic_type does not match any dtype parameters"
         )
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # dispatch_arithmetic
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn dispatch_arithmetic[

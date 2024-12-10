@@ -11,7 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 from bit import count_leading_zeros
-from memory import memcpy, UnsafePointer
+from memory import UnsafePointer, memcpy
+
 from ._unicode_lookups import *
 
 

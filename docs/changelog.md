@@ -50,6 +50,20 @@ what we publish.
   The consequence of this is that the old hack is no longer needed for these
   cases!
 
+- Various improvements to origin handling and syntax have landed, including
+  support for the ternary operator and allowing multiple arguments in a `ref`
+  specifier (which are implicitly unions).  This enables expression of simple
+  algorithms cleanly:
+
+  ```mojo
+  fn my_min[T: Comparable](ref a: T, ref b: T) -> ref [a, b] T:
+    return a if a < b else b
+  ```
+
+  It is also nice that `my_min` automatically and implicitly propagates the
+  mutability of its arguments, so things like `my_min(str1, str2) += "foo"` is
+  valid.
+
 - The `UnsafePointer` type now has an `origin` parameter that can be used when
   the `UnsafePointer` is known to point to a value with a known origin. This
   origin is propagated through the `ptr[]` indirection operation.
@@ -109,6 +123,18 @@ what we publish.
 
 - The `rebind` standard library function now works with memory-only types in
   addition to `@register_passable("trivial")` ones, without requiring a copy.
+
+- Introduce `random.shuffle` for `List`.
+  ([PR #3327](https://github.com/modularml/mojo/pull/3327) by [@jjvraw](https://github.com/jjvraw))
+
+  Example:
+
+  ```mojo
+  from random import shuffle
+
+  var l = List[Int](1, 2, 3, 4, 5)
+  shuffle(l)
+  ```
 
 - The `Dict.__getitem__` method now returns a reference instead of a copy of
   the value (or raises).  This improves the performance of common code that
@@ -240,8 +266,10 @@ what we publish.
   of variables that are handled as synthetic types, e.g. `List` from Mojo or
   `std::vector` from C++.
 
-- Added `os.path.expandvars` to expand environment variables in a string.
-  ([PR #3735](https://github.com/modularml/mojo/pull/3735) by [@thatstoasty](https://github.com/thatstoasty)).
+- Expanded `os.path` with new functions (by [@thatstoasty](https://github.com/thatstoasty)):
+  - `os.path.expandvars`: Expands environment variables in a path ([PR #3735](https://github.com/modularml/mojo/pull/3735)).
+  - `os.path.splitroot`: Split a path into drive, root and tail.
+  ([PR #3780](https://github.com/modularml/mojo/pull/3780)).
 
 - Added a `reserve` method and new constructor to the `String` struct to
   allocate additional capacity.
@@ -250,7 +278,7 @@ what we publish.
 - Introduced a new `Deque` (double-ended queue) collection type, based on a
   dynamically resizing circular buffer for efficient O(1) additions and removals
   at both ends as well as O(1) direct access to all elements.
-  
+
   The `Deque` supports the full Python `collections.deque` API, ensuring that all
   expected deque operations perform as in Python.
 
@@ -260,7 +288,31 @@ what we publish.
   memory allocation and performance. These options allow for optimized memory usage
   and reduced buffer reallocations, providing flexibility based on application requirements.
 
+- A new `StringLiteral.get[some_stringable]()` method is available.  It
+  allows forming a runtime-constant StringLiteral from a compile-time-dynamic
+  `Stringable` value.
+
+- `Span` now implements `__reversed__`. This means that one can get a
+  reverse iterator over a `Span` using `reversed(my_span)`. Users should
+  currently prefer this method over `my_span[::-1]`.
+
+- `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
+
+- Introduced the `@explicit_destroy` annotation, the `__disable_del` keyword,
+  the `UnknownDestructibility` trait, and the `ImplicitlyDestructible` keyword,
+  for the experimental explicitly destroyed types feature.
+
+- Added associated types; we can now have aliases like `alias T: AnyType`,
+  `alias N: Int`, etc. in a trait, and then specify them in structs that conform
+  to that trait.
+
 ### 🦋 Changed
+
+- The `inout` and `borrowed` argument conventions have been renamed to the `mut`
+  and `read` argument conventions (respectively).  These verbs reflect
+  declaratively what the callee can do to the argument value passed into the
+  caller, without tying in the requirement for the programmer to know about
+  advanced features like references.
 
 - The argument convention for `__init__` methods has been changed from `inout`
   to `out`, reflecting that an `__init__` method initializes its `self` without
@@ -282,6 +334,24 @@ what we publish.
   The previous `fn __init__(inout self)` syntax is still supported in this
   release of Mojo, but will be removed in the future.  Please migrate to the
   new syntax.
+
+- Similarly, the spelling of "named functions results" has switched to use `out`
+  syntax instead of `-> T as name`.  Functions may have at most one named result
+  or return type specified with the usual `->` syntax.  `out` arguments may
+  occur anywhere in the argument list, but are typically last (except for
+  `__init__` methods, where they are typically first).
+
+  ```mojo
+  # This function has type "fn() -> String"
+  fn example(out result: String):
+    result = "foo"
+  ```
+
+  The parser still accepts the old syntax as a synonym for this, but that will
+  eventually be deprecated and removed.
+
+  This was [discussed extensively in a public
+  proposal](https://github.com/modularml/mojo/issues/3623).
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
   module from the Mojo standard library.
@@ -319,7 +389,7 @@ what we publish.
   `String.write`. Here's an example of using all the changes:
 
   ```mojo
-  from utils import Span
+  from memory import Span
 
   @value
   struct NewString(Writer, Writable):
@@ -414,6 +484,19 @@ what we publish.
   is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
   for more information and rationale.  As a consequence the `__lifetime_of()`
   operator is now named `__origin_of()`.
+
+- `Origin` is now a complete wrapper around the MLIR origin type.
+
+  - The `Origin.type` alias has been renamed to `_mlir_origin`. In parameter
+    lists, you can now write just `Origin[..]`, instead of `Origin[..].type`.
+
+  - `ImmutableOrigin` and `MutableOrigin` are now, respectively, just aliases
+    for `Origin[False]` and `Origin[True]`.
+
+  - `Origin` struct values are now supported in the brackets of a `ref [..]`
+    argument.
+
+  - Added `Origin.cast_from` for casting the mutability of an origin value.
 
 - You can now use the `+=` and `*` operators on a `StringLiteral` at compile
   time using the `alias` keyword:
@@ -513,6 +596,33 @@ what we publish.
           self.value = value
   ```
 
+- `Arc` has been renamed to `ArcPointer`, for consistency with `OwnedPointer`.
+
+- `UnsafePointer` parameters (other than the type) are now keyword-only.
+
+- Inferred-only parameters may now be explicitly bound with keywords, enabling
+  some important patterns in the standard library:
+
+  ```mojo
+  struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]]: ...
+  alias ImmStringSlice = StringSlice[is_mutable=False]
+  # This auto-parameterizes on the origin, but constrains it to being an
+  # immutable slice instead of a potentially mutable one.
+  fn take_imm_slice(a: ImmStringSlice): ...
+  ```
+
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x:
+     print("1 in x")
+
+- `Span` has moved from the `utils` module to the `memory` module.
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -544,6 +654,21 @@ what we publish.
 - [Issue #3710](https://github.com/modularml/mojo/issues/3710) - Mojo frees
   memory while reference to it is still in use.
 
+- [Issue #3805](https://github.com/modularml/mojo/issues/3805) - Crash When
+  Initializing !llvm.ptr.
+
+- [Issue #3816](https://github.com/modularml/mojo/issues/3816) - Ternary
+  if-operator doesn't propagate origin information.
+
+- [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
+  [BUG] Mutability not preserved when taking the union of two origins.
+
+- [Issue #3829](https://github.com/modularml/mojo/issues/3829) - Poor error
+  message when invoking a function pointer upon an argument of the wrong origin
+
+- [Issue #3830](https://github.com/modularml/mojo/issues/3830) - Failures
+  emitting register RValues to ref arguments.
+
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 
 - The variadic initializer for `SIMD` now works in parameter expressions.
@@ -557,7 +682,7 @@ what we publish.
 - Error messages that include type names no longer include inferred or defaulted
   parameters when they aren't needed.  For example, previously Mojo complained
   about things like:
-  
+
   ```plaintext
   ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
   ```
@@ -570,3 +695,6 @@ what we publish.
 
 - Tooling now prints the origins of `ref` arguments and results correctly, and
   prints `self` instead of `self: Self` in methods.
+
+- The LSP and generated documentation now print parametric result types
+  correctly, e.g. showing `SIMD[type, simd_width]` instead of `SIMD[$0, $1]`.
