@@ -20,7 +20,7 @@ from collections.deque import _DequeIter
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
 from memory.span import Span, _SpanIter
-from utils.string_slice import _StringSliceIter, StringSlice, Stringlike
+from utils.string_slice import _StringSliceIter, StringSlice
 
 from .range import _StridedRange
 
@@ -207,14 +207,12 @@ fn reversed[
     return value.__reversed__()
 
 
-@always_inline
-fn reversed[
-    T: Stringlike
-](ref [_]value: T) -> _StringSliceIter[__origin_of(value), forward=False]:
-    """Return a reversed iterator.
+alias _S = _StringSliceIter[_, forward=False]
 
-    Parameters:
-        T: The Stringlike type.
+
+@always_inline
+fn reversed(ref value: String) -> _S[__origin_of(value)]:
+    """Return a reversed iterator.
 
     Args:
         value: The iterable value.
@@ -223,3 +221,29 @@ fn reversed[
         The type's reversed Iterator.
     """
     return value.__reversed__()
+
+
+@always_inline
+fn reversed(value: StringLiteral) -> _S[StaticConstantOrigin]:
+    """Return a reversed iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's reversed Iterator.
+    """
+    return rebind[_S[StaticConstantOrigin]](value.__reversed__())
+
+
+@always_inline
+fn reversed(value: StringSlice) -> _S[__type_of(value).origin]:
+    """Return a reversed iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's reversed Iterator.
+    """
+    return rebind[_S[__type_of(value).origin]](value.__reversed__())

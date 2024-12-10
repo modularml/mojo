@@ -25,7 +25,7 @@ from python import (
 )  # TODO: remove this and fixup downstream imports
 
 from utils._select import _select_register_value as select
-from utils.string_slice import StringSlice, _StringSliceIter, Stringlike
+from utils.string_slice import StringSlice, _StringSliceIter
 from collections.list import _ListIter
 from collections.dict import (
     Dict,
@@ -802,11 +802,8 @@ fn iter[
 
 
 @always_inline
-fn iter[T: Stringlike](ref [_]value: T) -> _StringSliceIter[__origin_of(value)]:
+fn iter(ref value: String) -> _StringSliceIter[__origin_of(value)]:
     """Return an iterator.
-
-    Parameters:
-        T: The type that the iterator yields.
 
     Args:
         value: The iterable value.
@@ -815,6 +812,32 @@ fn iter[T: Stringlike](ref [_]value: T) -> _StringSliceIter[__origin_of(value)]:
         The type's Iterator.
     """
     return value.__iter__()
+
+
+@always_inline
+fn iter(value: StringLiteral) -> _StringSliceIter[StaticConstantOrigin]:
+    """Return an iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return rebind[_StringSliceIter[StaticConstantOrigin]](value.__iter__())
+
+
+@always_inline
+fn iter(value: StringSlice) -> _StringSliceIter[__type_of(value).origin]:
+    """Return an iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's Iterator.
+    """
+    return rebind[_StringSliceIter[__type_of(value).origin]](value.__iter__())
 
 
 fn next[T: DType](inout value: _ZeroStartingScalarRange[T]) -> Scalar[T]:

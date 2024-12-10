@@ -521,7 +521,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
             self.unsafe_ptr(), rhs.unsafe_ptr(), min(len1, len2)
         )
 
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
+    fn __iter__(ref self) -> _StringSliceIter[__origin_of(self)]:
         """Iterate over the string unicode characters.
 
         Returns:
@@ -1120,22 +1120,6 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 # ===-----------------------------------------------------------------------===#
 # Utils
 # ===-----------------------------------------------------------------------===#
-
-    fn __iter__(ref [_]self) -> _StringSliceIter[__origin_of(self)]:
-        """Iterate over the string unicode characters.
-
-        Returns:
-            An iterator of references to the string unicode characters.
-        """
-        ...
-
-    fn __reversed__(ref self) -> _StringSliceIter[__origin_of(self), False]:
-        """Iterate backwards over the string unicode characters.
-
-        Returns:
-            A reversed iterator of references to the string unicode characters.
-        """
-        ...
 
 
 fn _to_string_list[
