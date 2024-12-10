@@ -245,6 +245,58 @@ def test_conversion_from_python():
     assert_equal(Int.try_from_python(PythonObject(-1)), -1)
 
 
+def test_from_bytes_as_bytes():
+    alias Bytes = List[Byte]
+
+    assert_equal(Int.from_bytes[DType.int16, big_endian=True](Bytes(0, 16)), 16)
+    assert_equal(
+        Int.from_bytes[DType.int16, big_endian=False](Bytes(0, 16)), 4096
+    )
+    assert_equal(
+        Int.from_bytes[DType.int16, big_endian=True](Bytes(252, 0)), -1024
+    )
+    assert_equal(
+        Int.from_bytes[DType.uint16, big_endian=True](Bytes(252, 0)), 64512
+    )
+    assert_equal(
+        Int.from_bytes[DType.int16, big_endian=False](Bytes(252, 0)), 252
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(0, 0, 0, 1)), 1
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32, big_endian=False](Bytes(0, 0, 0, 1)),
+        16777216,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(1, 0, 0, 0)),
+        16777216,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(1, 0, 0, 1)),
+        16777217,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32, big_endian=False](Bytes(1, 0, 0, 1)),
+        16777217,
+    )
+    assert_equal(
+        Int.from_bytes[DType.int32, big_endian=True](Bytes(255, 0, 0, 0)),
+        -16777216,
+    )
+    for x_ref in List[Int](10, 100, -12, 0, 1, -1, 1000, -1000):
+        x = x_ref[]
+
+        @parameter
+        for b in range(2):
+            assert_equal(
+                Int.from_bytes[DType.int16, big_endian=b](
+                    Int(x).as_bytes[DType.int16, big_endian=b]()
+                ),
+                x,
+            )
+
+
 def main():
     test_properties()
     test_add()
@@ -268,3 +320,4 @@ def main():
     test_int_uint()
     test_float_conversion()
     test_conversion_from_python()
+    test_from_bytes_as_bytes()
