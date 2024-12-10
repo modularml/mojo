@@ -121,9 +121,14 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             other: The list to copy.
         """
-        self.__init__(capacity=other.capacity)
-        for e in other:
-            self.append(e[])
+        if other.data:
+            self.data = UnsafePointer[T].alloc(other.capacity)
+            self.size = other.size
+            self.capacity = other.capacity
+            for idx in range(len(other)):
+                (self.data + idx).init_pointee_copy((other.data + idx)[])
+        else:
+            self = Self()
 
     fn __init__(out self, *, capacity: Int):
         """Constructs a list with the given capacity.
@@ -206,9 +211,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             existing: The list to copy.
         """
-        self = Self(capacity=existing.capacity)
-        for i in range(len(existing)):
-            self.append(existing[i])
+        self = Self(other=existing)
 
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
