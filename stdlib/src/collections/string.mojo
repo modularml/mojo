@@ -835,7 +835,7 @@ struct String(
         # We make a backup because steal_data() will clear length and capacity.
         var length = len(impl)
         debug_assert(
-            length > 0 and impl[length-1] == 0,
+            length > 0 and impl[length - 1] == 0,
             "expected last element of String buffer to be null terminator",
         )
         self._buffer = impl
