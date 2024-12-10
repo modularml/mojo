@@ -521,23 +521,23 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
             self.unsafe_ptr(), rhs.unsafe_ptr(), min(len1, len2)
         )
 
-    fn __iter__(self) -> _StringSliceIter[origin]:
-        """Iterate over the string, returning immutable references.
+    fn __iter__(ref self) -> _StringSliceIter[__origin_of(self)]:
+        """Iterate over the string unicode characters.
 
         Returns:
-            An iterator of references to the string elements.
+            An iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[origin](
+        return _StringSliceIter[__origin_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(self) -> _StringSliceIter[origin, False]:
-        """Iterate backwards over the string, returning immutable references.
+    fn __reversed__(ref self) -> _StringSliceIter[__origin_of(self), False]:
+        """Iterate backwards over the string unicode characters.
 
         Returns:
-            A reversed iterator of references to the string elements.
+            A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[origin, forward=False](
+        return _StringSliceIter[__origin_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 

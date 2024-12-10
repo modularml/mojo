@@ -20,6 +20,7 @@ from collections.deque import _DequeIter
 from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
 from memory.span import Span, _SpanIter
+from utils.string_slice import _StringSliceIter, StringSlice
 
 from .range import _StridedRange
 
@@ -61,10 +62,9 @@ trait ReversibleRange:
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
 fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     """Get a reversed iterator of the input range.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         T: The type conforming to ReversibleRange.
@@ -78,14 +78,13 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     T: CollectionElement
 ](ref value: List[T, *_]) -> _ListIter[
     T, __type_of(value).hint_trivial_type, __origin_of(value), False
 ]:
     """Get a reversed iterator of the input list.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         T: The type of the elements in the list.
@@ -99,6 +98,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     T: CollectionElement
 ](ref value: Deque[T]) -> _DequeIter[T, __origin_of(value), False]:
@@ -118,13 +118,12 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
 ](ref value: Dict[K, V],) -> _DictKeyIter[K, V, __origin_of(value), False]:
     """Get a reversed iterator of the input dict.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
@@ -139,6 +138,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
@@ -148,8 +148,6 @@ fn reversed[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict values.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
@@ -166,6 +164,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
@@ -175,8 +174,6 @@ fn reversed[
     K, V, dict_origin, False
 ]:
     """Get a reversed iterator of the input dict items.
-
-    **Note**: iterators are currently non-raising.
 
     Parameters:
         K: The type of the keys in the dict.
@@ -214,3 +211,45 @@ fn reversed[
         The reversed iterator of the Span.
     """
     return value.__reversed__()
+
+
+alias _S = _StringSliceIter[_, forward=False]
+
+
+@always_inline
+fn reversed(ref value: String) -> _S[__origin_of(value)]:
+    """Return a reversed iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's reversed Iterator.
+    """
+    return value.__reversed__()
+
+
+@always_inline
+fn reversed(value: StringLiteral) -> _S[StaticConstantOrigin]:
+    """Return a reversed iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's reversed Iterator.
+    """
+    return rebind[_S[StaticConstantOrigin]](value.__reversed__())
+
+
+@always_inline
+fn reversed(value: StringSlice) -> _S[__type_of(value).origin]:
+    """Return a reversed iterator.
+
+    Args:
+        value: The iterable value.
+
+    Returns:
+        The type's reversed Iterator.
+    """
+    return rebind[_S[__type_of(value).origin]](value.__reversed__())
