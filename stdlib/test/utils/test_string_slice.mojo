@@ -506,7 +506,7 @@ def test_iter():
     assert_equal(321, atol(concat))
 
     idx = -1
-    for item in StringSlice("mojo🔥"):
+    for item in iter(StringSlice("mojo🔥")):
         idx += 1
         if idx == 0:
             assert_equal("m", item)

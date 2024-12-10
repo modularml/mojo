@@ -276,7 +276,7 @@ def test_iter():
 
     idx = -1
     vs = "mojo🔥"
-    for item in vs:
+    for item in iter(vs):
         idx += 1
         if idx == 0:
             assert_equal("m", item)
