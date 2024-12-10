@@ -19,16 +19,16 @@ from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_char
 
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
-from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
+from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import _StringSliceIter, _to_string_list
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StringLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
@@ -89,7 +89,7 @@ struct StringLiteral(
     # for now.
     @always_inline("nodebug")
     @staticmethod
-    fn from_string[value: String]() -> StringLiteral:
+    fn _from_string[value: String]() -> StringLiteral:
         """Form a string literal from an arbitrary compile-time String value.
 
         Parameters:
@@ -105,6 +105,33 @@ struct StringLiteral(
             value.unsafe_ptr().address,
             `> : !kgen.string`,
         ]
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The value to convert to StringLiteral.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[value]()
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[type: Stringable, //, value: type]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time stringable value.
+
+        Parameters:
+            type: The type of the value.
+            value: The value to serialize.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[str(value)]()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -914,14 +941,3 @@ struct StringLiteral(
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
-
-
-fn _to_string_literal[val: Int]() -> StringLiteral:
-    alias s = StringLiteral.from_string[str(val)]()
-    return s
-
-
-fn _to_string_literal[val: SIMD]() -> StringLiteral:
-    constrained[val.type.is_integral(), "input type must be integral"]()
-    alias s = StringLiteral.from_string[str(val)]()
-    return s

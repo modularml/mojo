@@ -1348,7 +1348,16 @@ struct CPython:
             ", parent obj:",
             obj._get_ptr_as_int(),
         )
+        return r
 
+    fn PyObject_HasAttrString(
+        mut self,
+        obj: PyObjectPtr,
+        name: StringRef,
+    ) -> Int:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, UnsafePointer[UInt8]) -> Int
+        ]("PyObject_HasAttrString")(obj, name.data)
         return r
 
     fn PyObject_GetAttrString(

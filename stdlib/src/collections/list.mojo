@@ -24,15 +24,13 @@ from os import abort
 from sys import sizeof
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, UnsafePointer, memcpy
-
-from utils import Span
+from memory import Pointer, UnsafePointer, memcpy, Span
 
 from .optional import Optional
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # List
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -40,7 +38,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_origin: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability],
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -144,26 +142,28 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             values: The values to populate the list with.
         """
-        self = Self(variadic_list=values^)
+        self = Self(elements=values^)
 
-    fn __init__(out self, *, owned variadic_list: VariadicListMem[T, _]):
+    fn __init__(out self, *, owned elements: VariadicListMem[T, _]):
         """Constructs a list from the given values.
 
         Args:
-            variadic_list: The values to populate the list with.
+            elements: The values to populate the list with.
         """
-        var length = len(variadic_list)
+        var length = len(elements)
 
         self = Self(capacity=length)
 
         for i in range(length):
-            var src = UnsafePointer.address_of(variadic_list[i])
+            var src = UnsafePointer.address_of(elements[i])
             var dest = self.data + i
 
             src.move_pointee_into(dest)
 
-        # Mark the elements as unowned to avoid del'ing uninitialized objects.
-        variadic_list._is_owned = False
+        # Do not destroy the elements when their backing storage goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(elements)
+        )
 
         self._len = length
 

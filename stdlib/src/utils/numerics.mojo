@@ -84,41 +84,25 @@ struct FPUtils[
     @staticmethod
     @always_inline("nodebug")
     fn max_exponent() -> IntLiteral:
-        """Returns the max exponent of a floating point type, taking into
-        account special reserved cases such infinity and nan.
+        """Returns the max exponent of a floating point type without accounting
+        for inf representations. This is not
+        the maximum representable exponent, which is generally equal to
+        the exponent_bias.
 
         Returns:
             The max exponent.
         """
 
         @parameter
-        if type is DType.float8e4m3:
-            return 7
-        elif type is DType.float8e4m3fnuz:
+        if type in (DType.float8e4m3, DType.float8e4m3fnuz):
             return 8
-        elif type is DType.float8e5m2:
-            return 15
-        elif type is DType.float8e5m2fnuz:
+        elif type in (DType.float8e5m2, DType.float8e5m2fnuz, DType.float16):
             return 16
-        elif type is DType.float16:
-            return 15
-        elif type is DType.float32 or type is DType.bfloat16:
-            return 127
+        elif type in (DType.bfloat16, DType.float32):
+            return 128
         else:
             constrained[type is DType.float64, "unsupported float type"]()
-            return 1023
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn min_exponent() -> IntLiteral:
-        """Returns the min exponent of a floating point type, taking into
-        account special reserved cases such as infinity and nan.
-
-        Returns:
-            The min exponent.
-        """
-
-        return -Self.max_exponent() + 1
+            return 1024
 
     @staticmethod
     @always_inline("nodebug")
@@ -132,11 +116,9 @@ struct FPUtils[
         @parameter
         if type in (DType.float8e4m3, DType.float8e4m3fnuz):
             return 4
-        elif type in (DType.float8e5m2, DType.float8e5m2fnuz):
+        elif type in (DType.float8e5m2, DType.float8e5m2fnuz, DType.float16):
             return 5
-        elif type is DType.float16:
-            return 5
-        elif type is DType.float32 or type is DType.bfloat16:
+        elif type in (DType.float32, DType.bfloat16):
             return 8
         else:
             constrained[type is DType.float64, "unsupported float type"]()
@@ -160,7 +142,12 @@ struct FPUtils[
         Returns:
             The exponent bias.
         """
-        return Self.max_exponent()
+
+        @parameter
+        if type in (DType.float8e4m3fnuz, DType.float8e5m2fnuz):
+            return Self.max_exponent()
+        else:
+            return Self.max_exponent() - 1
 
     @staticmethod
     @always_inline
@@ -306,14 +293,15 @@ struct FPUtils[
 
     @staticmethod
     @always_inline
-    fn get_exponent_without_bias(value: Scalar[type]) -> Int:
-        """Returns the exponent bits of the floating-point value.
+    fn get_exponent_biased(value: Scalar[type]) -> Int:
+        """Returns the biased exponent of the floating-point value as an Int,
+        this is how the value is stored before subtracting the exponent bias.
 
         Args:
             value: The floating-point value.
 
         Returns:
-            Returns the exponent bits.
+            The biased exponent as an Int.
         """
         return int(
             Self.bitcast_to_uint(value) >> Self.mantissa_width()

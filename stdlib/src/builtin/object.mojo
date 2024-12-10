@@ -320,6 +320,7 @@ struct _ObjectImpl(
         self.value = Self.type(value)
 
     @always_inline
+    @implicit
     fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         @parameter
         if dt.is_integral():
@@ -785,6 +786,7 @@ struct object(
         self._value = value
 
     @always_inline
+    @implicit
     fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         """Initializes the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
@@ -842,6 +844,7 @@ struct object(
         self._value = impl
 
     @always_inline
+    @implicit
     fn __init__[*Ts: CollectionElement](mut self, value: ListLiteral[*Ts]):
         """Initializes the object from a list literal.
 
@@ -1861,7 +1864,7 @@ struct object(
             var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
             var char = self._value.get_as_string().data[index]
             impl.data.init_pointee_move(char)
-            return _ObjectImpl(impl)
+            return object(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
     @always_inline

@@ -23,9 +23,8 @@ from sys.ffi import c_char, c_size_t, c_uint, external_call
 from sys.param_env import env_get_string
 
 from builtin._location import __call_location, _SourceLocation
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 
-from utils import Span
 from utils.write import (
     _ArgBytes,
     _WriteBufferHeap,

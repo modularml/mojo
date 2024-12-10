@@ -288,9 +288,23 @@ what we publish.
   memory allocation and performance. These options allow for optimized memory usage
   and reduced buffer reallocations, providing flexibility based on application requirements.
 
-- A new `StringLiteral.from_string[someString]()` method is available.  It
+- A new `StringLiteral.get[some_stringable]()` method is available.  It
   allows forming a runtime-constant StringLiteral from a compile-time-dynamic
-  `String` value.
+  `Stringable` value.
+
+- `Span` now implements `__reversed__`. This means that one can get a
+  reverse iterator over a `Span` using `reversed(my_span)`. Users should
+  currently prefer this method over `my_span[::-1]`.
+
+- `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
+
+- Introduced the `@explicit_destroy` annotation, the `__disable_del` keyword,
+  the `UnknownDestructibility` trait, and the `ImplicitlyDestructible` keyword,
+  for the experimental explicitly destroyed types feature.
+
+- Added associated types; we can now have aliases like `alias T: AnyType`,
+  `alias N: Int`, etc. in a trait, and then specify them in structs that conform
+  to that trait.
 
 ### 🦋 Changed
 
@@ -320,6 +334,24 @@ what we publish.
   The previous `fn __init__(inout self)` syntax is still supported in this
   release of Mojo, but will be removed in the future.  Please migrate to the
   new syntax.
+
+- Similarly, the spelling of "named functions results" has switched to use `out`
+  syntax instead of `-> T as name`.  Functions may have at most one named result
+  or return type specified with the usual `->` syntax.  `out` arguments may
+  occur anywhere in the argument list, but are typically last (except for
+  `__init__` methods, where they are typically first).
+
+  ```mojo
+  # This function has type "fn() -> String"
+  fn example(out result: String):
+    result = "foo"
+  ```
+
+  The parser still accepts the old syntax as a synonym for this, but that will
+  eventually be deprecated and removed.
+
+  This was [discussed extensively in a public
+  proposal](https://github.com/modularml/mojo/issues/3623).
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
   module from the Mojo standard library.
@@ -357,7 +389,7 @@ what we publish.
   `String.write`. Here's an example of using all the changes:
 
   ```mojo
-  from utils import Span
+  from memory import Span
 
   @value
   struct NewString(Writer, Writable):
@@ -452,6 +484,19 @@ what we publish.
   is initialized and destroyed.  Please see [the proposal](https://github.com/modularml/mojo/blob/main/proposals/lifetimes-keyword-renaming.md)
   for more information and rationale.  As a consequence the `__lifetime_of()`
   operator is now named `__origin_of()`.
+
+- `Origin` is now a complete wrapper around the MLIR origin type.
+
+  - The `Origin.type` alias has been renamed to `_mlir_origin`. In parameter
+    lists, you can now write just `Origin[..]`, instead of `Origin[..].type`.
+
+  - `ImmutableOrigin` and `MutableOrigin` are now, respectively, just aliases
+    for `Origin[False]` and `Origin[True]`.
+
+  - `Origin` struct values are now supported in the brackets of a `ref [..]`
+    argument.
+
+  - Added `Origin.cast_from` for casting the mutability of an origin value.
 
 - You can now use the `+=` and `*` operators on a `StringLiteral` at compile
   time using the `alias` keyword:
@@ -566,6 +611,18 @@ what we publish.
   fn take_imm_slice(a: ImmStringSlice): ...
   ```
 
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x:
+     print("1 in x")
+
+- `Span` has moved from the `utils` module to the `memory` module.
+
 ### ❌ Removed
 
 - The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
@@ -606,6 +663,12 @@ what we publish.
 
 - [Issue #3815](https://github.com/modularml/mojo/issues/3815) -
   [BUG] Mutability not preserved when taking the union of two origins.
+
+- [Issue #3829](https://github.com/modularml/mojo/issues/3829) - Poor error
+  message when invoking a function pointer upon an argument of the wrong origin
+
+- [Issue #3830](https://github.com/modularml/mojo/issues/3830) - Failures
+  emitting register RValues to ref arguments.
 
 - The VS Code extension now auto-updates its private copy of the MAX SDK.
 

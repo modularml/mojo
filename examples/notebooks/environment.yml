@@ -1,0 +1,14 @@
+name: mojo-notebooks
+channels:
+  - pytorch
+  - https://conda.modular.com/max/
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.11,<3.12
+  - max>=24.4.0dev6
+  - max = "*"
+pip = ">=24.0,<25"
+jupyterlab = ">=4.2.5,<5"
+matplotlib = ">=3.9.2,<4"
+numpy = ">=1.26.4,<2"

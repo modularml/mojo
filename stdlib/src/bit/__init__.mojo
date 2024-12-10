@@ -21,6 +21,7 @@ from .bit import (
     byte_swap,
     count_leading_zeros,
     count_trailing_zeros,
+    log2_floor,
     is_power_of_two,
     pop_count,
     rotate_bits_left,

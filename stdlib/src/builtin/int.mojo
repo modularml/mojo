@@ -760,9 +760,9 @@ struct Int(
         """
         return __mlir_op.`index.or`(self.value, rhs.value)
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # In place operations.
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __iadd__(mut self, rhs: Int):
@@ -873,9 +873,9 @@ struct Int(
         """
         self = self | rhs
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __radd__(self, value: Int) -> Int:
@@ -1154,7 +1154,7 @@ struct Int(
 
     @doc_private
     @staticmethod
-    fn try_from_python(obj: PythonObject) raises -> Self as result:
+    fn try_from_python(obj: PythonObject, out result: Self) raises:
         """Construct an `Int` from a Python integer value.
 
         Raises:

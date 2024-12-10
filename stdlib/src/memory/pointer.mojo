@@ -20,9 +20,9 @@ from memory import Pointer
 """
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # AddressSpace
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -290,9 +290,9 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
             writer.write("AddressSpace(", self.value(), ")")
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Pointer
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -300,10 +300,13 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
 struct Pointer[
     is_mutable: Bool, //,
     type: AnyType,
-    origin: Origin[is_mutable].type,
+    origin: Origin[is_mutable],
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
+
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
 
     Parameters:
         is_mutable: Whether the pointee data may be mutated through this.
@@ -316,7 +319,7 @@ struct Pointer[
         `!lit.ref<`,
         type,
         `, `,
-        origin,
+        origin._mlir_origin,
         `, `,
         address_space._value.value,
         `>`,

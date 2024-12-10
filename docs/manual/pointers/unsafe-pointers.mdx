@@ -3,26 +3,24 @@ title: Unsafe pointers
 description: Using unsafe pointers to access dynamically-allocated memory.
 ---
 
-The [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) type
-creates an indirect reference to a location in memory.
+The [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) type is
+one of several pointer types available in the standard library to indirectly
+reference locations in memory.
+
 You can use an `UnsafePointer` to dynamically allocate and free memory, or to
 point to memory allocated by some other piece of code. You can use these
 pointers to write code that interacts with low-level interfaces, to interface
-with other programming languages, or to build certain kinds of data structures.
+with other programming languages, or to build array-like data structures.
 But as the name suggests, they're inherently *unsafe*. For example, when using
 unsafe pointers, you're responsible for ensuring that memory gets allocated and
 freed correctly.
 
-:::note
+In general, you should prefer safe pointer types when possible, reserving
+`UnsafePointer` for those use cases where no other pointer type works.
+For a comparison of standard library pointer types, see [Intro to
+pointers](/mojo/manual/pointers/).
 
-In addition to unsafe pointers, Mojo supports a safe
-[`Pointer`](/mojo/stdlib/memory/pointer/Pointer) type. See
-[`UnsafePointer` and `Pointer`](#unsafepointer-and-pointer) for a brief
-comparison of the types.
-
-:::
-
-## What is a pointer?
+## Unsafe pointer basics
 
 An `UnsafePointer` is a type that holds an address to memory. You can store
 and retrieve values in that memory. The `UnsafePointer` type is *generic*—it can
@@ -40,8 +38,8 @@ ptr.init_pointee_copy(100)
 
 <figure>
 
-![](./images/pointer-diagram.png#light)
-![](./images/pointer-diagram-dark.png#dark)
+![](../images/pointer-diagram.png#light)
+![](../images/pointer-diagram-dark.png#dark)
 
 <figcaption><b>Figure 1.</b> Pointer and pointee</figcaption>
 </figure>
@@ -69,20 +67,20 @@ structures. For details, see
 
 At any given time, a pointer can be in one of several states:
 
-* Uninitialized. Just like any variable, a variable of type `UnsafePointer` can
+- Uninitialized. Just like any variable, a variable of type `UnsafePointer` can
   be declared but uninitialized.
 
   ```mojo
   var ptr: UnsafePointer[Int]
   ```
 
-* Null. A null pointer has an address of 0, indicating an invalid pointer.
+- Null. A null pointer has an address of 0, indicating an invalid pointer.
 
   ```mojo
   ptr = UnsafePointer[Int]()
   ```
 
-* Pointing to allocated, uninitialized memory. The `alloc()` static method
+- Pointing to allocated, uninitialized memory. The `alloc()` static method
   returns a pointer to a newly-allocated block of memory with space for the
   specified number of elements of the pointee's type.
 
@@ -93,7 +91,7 @@ At any given time, a pointer can be in one of several states:
   Trying to dereference a pointer to uninitialized memory results in undefined
   behavior.
 
-* Pointing to initialized memory. You can initialize an allocated, uninitialized
+- Pointing to initialized memory. You can initialize an allocated, uninitialized
   pointer by moving or copying an existing value into the memory. Or you can use
   the `address_of()` static method to get a pointer to an existing value.
 
@@ -113,7 +111,7 @@ At any given time, a pointer can be in one of several states:
   ptr[] = newValue
   ```
 
-* Dangling. When you free the pointer's allocated memory, you're left with a
+- Dangling. When you free the pointer's allocated memory, you're left with a
   *dangling pointer*. The address still points to its previous location, but the
   memory is no longer allocated to this pointer. Trying to dereference the
   pointer, or calling any method that would access the memory location results
@@ -127,8 +125,8 @@ The following diagram shows the lifecycle of an `UnsafePointer`:
 
 <figure>
 
-![](./images/pointer-lifecycle.png#light)
-![](./images/pointer-lifecycle-dark.png#dark)
+![](../images/pointer-lifecycle.png#light)
+![](../images/pointer-lifecycle-dark.png#dark)
 
 <figcaption><b>Figure 2.</b> Lifecycle of an <code>UnsafePointer</code></figcaption>
 </figure>
@@ -293,8 +291,8 @@ ptr += 1
 
 <figure>
 
-![](./images/pointer-offset.png#light)
-![](./images/pointer-offset-dark.png#dark)
+![](../images/pointer-offset.png#light)
+![](../images/pointer-offset-dark.png#dark)
 
 <figcaption><b>Figure 3.</b> Pointer arithmetic</figcaption>
 </figure>
@@ -353,7 +351,7 @@ from memory import UnsafePointer
 def share_array():
     np = Python.import_module("numpy")
     arr = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-    ptr = arr.__array_interface__["data"][0].unsafe_get_as_pointer[DType.int64]()
+    ptr = arr.ctypes.data.unsafe_get_as_pointer[DType.int64]()
     for i in range(9):
         print(ptr[i], end=", ")
 
@@ -364,11 +362,10 @@ share_array()
 1, 2, 3, 4, 5, 6, 7, 8, 9,
 ```
 
-NumPy arrays implement the
-[array interface protocol](https://numpy.org/doc/stable/reference/arrays.interface.html),
-which defines the `__array_interface__` object used in the example, where
-`__array_interface__["data"][0]` is a Python integer holding the address of the
-underlying data. The `unsafe_get_as_pointer()` method constructs an
+This example uses the NumPy
+[`ndarray.ctype`](https://numpy.org/doc/stable/reference/generated/numpy.ndarray.ctypes.html#numpy.ndarray.ctypes)
+attribute to access the raw pointer to the underlying storage
+(`ndarray.ctype.data`). The `unsafe_get_as_pointer()` method constructs an
 `UnsafePointer` to this address.
 
 ### Working with C/C++ pointers
@@ -459,8 +456,8 @@ you want to access just the red values, you can use a strided load or store.
 
 <figure>
 
-![](./images/strided-load-storage.png#light)
-![](./images/strided-load-storage-dark.png#dark)
+![](../images/strided-load-storage.png#light)
+![](../images/strided-load-storage-dark.png#dark)
 
 <figcaption><b>Figure 4.</b> Strided load</figcaption>
 </figure>
@@ -496,35 +493,14 @@ from (pointer address) + <var>offset[n]</var>.
 
 Unsafe pointers are unsafe for several reasons:
 
-* Memory management is up to the user. You need to manually allocate
+- Memory management is up to the user. You need to manually allocate
   and free memory, and be aware of when other APIs are allocating or freeing
   memory for you.
 
-* `UnsafePointer` values are *nullable*—that is, the pointer
+- `UnsafePointer` values are *nullable*—that is, the pointer
   is not guaranteed to point to anything. And even when a pointer points to
   allocated memory, that memory may not be *initialized*.
 
-* Mojo doesn't track lifetimes for the data pointed to by an `UnsafePointer`.
+- Mojo doesn't track lifetimes for the data pointed to by an `UnsafePointer`.
   When you use an `UnsafePointer`, managing memory and knowing when to destroy
   objects is your responsibility.
-
-## `UnsafePointer` and `Pointer`
-
-The [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) type is essentially a
-safe pointer type. Like a pointer, you can derference a `Pointer` using the
-dereference operator, `[]`. However, the `Pointer` type has several
-differences from `UnsafePointer` which make it safer:
-
-* A `Pointer` is *non-nullable*: it always points to something.
-* You can't allocate or free memory using a `Pointer`—only point to an
-  existing value.
-* A `Pointer` only refers to a single value. You can't do pointer arithmetic
-  with a `Pointer`.
-* A `Pointer` has an associated *origin*, which connects it back to an
-  original, owned value. The origin ensures that the value won't be destroyed
-  while the pointer exists.
-
-The `Pointer` type shouldn't be confused with the immutable and mutable
-references used with the `read` and `mut` argument conventions. Those
-references do not require explicit dereferencing, unlike a `Pointer` or
-`UnsafePointer`.

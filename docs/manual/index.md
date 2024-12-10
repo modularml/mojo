@@ -56,7 +56,8 @@ feedback](https://www.modular.com/community).
 
 - **Pointers**
 
-  - [Unsafe pointers](/mojo/manual/pointers)
+  - [Intro to pointers](/mojo/manual/pointers/)
+  - [Unsafe pointers](/mojo/manual/pointers/unsafe-pointers)
 
 - **Python**
 
