@@ -758,13 +758,14 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         return self._slice
 
     @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:
             A pointer pointing at the first element of this string slice.
         """
-
         return self._slice.unsafe_ptr()
 
     @always_inline

@@ -153,7 +153,9 @@ fn memcmp[
 
 @always_inline
 fn _memcpy_impl(
-    dest_data: UnsafePointer[Byte, **_], src_data: __type_of(dest_data), n: Int
+    dest_data: UnsafePointer[Byte, is_mutable=True, **_],
+    src_data: __type_of(dest_data),
+    n: Int,
 ):
     """Copies a memory area.
 

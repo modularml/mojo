@@ -1594,13 +1594,19 @@ struct String(
         buf.append(0)
         return String(buf^)
 
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        ref self,
+    ) -> UnsafePointer[
+        Byte,
+        is_mutable = Origin(__origin_of(self)).is_mutable,
+        origin = __origin_of(self),
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data
+        return self._buffer.unsafe_ptr()
 
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.

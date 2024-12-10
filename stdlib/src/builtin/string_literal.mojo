@@ -485,8 +485,9 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, is_mutable=False, origin=StaticConstantOrigin]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -497,11 +498,14 @@ struct StringLiteral(
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return ptr.bitcast[UInt8]()
+        return ptr.bitcast[
+            Byte, is_mutable=False, origin=StaticConstantOrigin
+        ]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
+    fn unsafe_cstr_ptr(
+        self,
+    ) -> UnsafePointer[c_char, is_mutable=False, origin=StaticConstantOrigin]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.
