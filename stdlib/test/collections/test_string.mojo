@@ -1593,6 +1593,26 @@ def test_reserve():
     assert_equal(s._buffer.capacity, 1)
 
 
+def test_copyinit():
+    alias sizes = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
+    assert_equal(len(sizes), 10)
+    var test_current_size = 1
+
+    @parameter
+    for sizes_index in range(len(sizes)):
+        alias current_size = sizes.get[sizes_index, Int]()
+        x = String("")
+        for i in range(current_size):
+            x += str(i)[0]
+        y = x
+        assert_equal(x._buffer, y._buffer)
+        assert_equal(test_current_size, current_size)
+        assert_equal(len(y), current_size)
+        assert_not_equal(int(x._buffer.data), int(y._buffer.data))
+        test_current_size *= 2
+    assert_equal(test_current_size, 1024)
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1649,3 +1669,4 @@ def main():
     test_center()
     test_float_conversion()
     test_slice_contains()
+    test_copyinit()

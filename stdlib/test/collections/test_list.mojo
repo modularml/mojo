@@ -18,6 +18,7 @@ from sys.info import sizeof
 from memory import UnsafePointer, Span
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
+from testing import assert_not_equal
 
 
 def test_mojo_issue_698():
@@ -935,6 +936,48 @@ def test_list_repr():
     assert_equal(empty.__repr__(), "[]")
 
 
+def test_copyinit_trivial_types[dt: DType, hint_trivial_type: Bool]():
+    alias sizes = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
+    assert_equal(len(sizes), 10)
+    var test_current_size = 1
+
+    @parameter
+    for sizes_index in range(len(sizes)):
+        alias current_size = sizes.get[sizes_index, Int]()
+        x = List[Scalar[dt], hint_trivial_type]()
+        for i in range(current_size):
+            x.append(i)
+        y = x
+        assert_equal(test_current_size, current_size)
+        assert_equal(len(y), current_size)
+        assert_not_equal(int(x.data), int(y.data))
+        for i in range(current_size):
+            assert_equal(i, x[i])
+            assert_equal(y[i], x[i])
+        test_current_size *= 2
+    assert_equal(test_current_size, 1024)
+
+
+def test_copyinit_trivial_types_dtypes():
+    alias dtypes = (
+        DType.int64,
+        DType.int32,
+        DType.float64,
+        DType.float32,
+        DType.uint8,
+        DType.int8,
+        DType.bool,
+    )
+    var test_index_dtype = 0
+
+    @parameter
+    for index_dtype in range(len(dtypes)):
+        test_copyinit_trivial_types[dtypes.get[index_dtype, DType](), True]()
+        test_copyinit_trivial_types[dtypes.get[index_dtype, DType](), False]()
+        test_index_dtype += 1
+    assert_equal(test_index_dtype, 7)
+
+
 # ===-------------------------------------------------------------------===#
 # main
 # ===-------------------------------------------------------------------===#
@@ -974,3 +1017,4 @@ def main():
     test_list_dtor()
     test_destructor_trivial_elements()
     test_list_repr()
+    test_copyinit_trivial_types_dtypes()
