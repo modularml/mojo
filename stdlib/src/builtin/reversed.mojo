@@ -62,6 +62,7 @@ trait ReversibleRange:
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
 fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     """Get a reversed iterator of the input range.
 
@@ -77,6 +78,7 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     T: CollectionElement
 ](ref value: List[T, *_]) -> _ListIter[
@@ -96,6 +98,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     T: CollectionElement
 ](ref value: Deque[T]) -> _DequeIter[T, __origin_of(value), False]:
@@ -115,6 +118,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
@@ -134,6 +138,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
@@ -159,6 +164,7 @@ fn reversed[
     return value.__reversed__()
 
 
+@always_inline
 fn reversed[
     K: KeyElement,
     V: CollectionElement,

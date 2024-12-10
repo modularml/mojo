@@ -646,49 +646,7 @@ fn range[
 # ===----------------------------------------------------------------------=== #
 
 
-trait _Iterator:
-    fn __iter__(self) -> Self:
-        ...
-
-    fn __has_next__(self) -> Bool:
-        ...
-
-
-# TODO: this is the goal
-#     fn __next__(inout self) -> ref [origin]T:
-#         ...
-
-
-#     fn __bool__(self) -> Bool:
-#         return self.__has_next__()
-
-
-# trait _Iterable[T: AnyType]:
-#     fn __iter__[
-#         is_mutable: Bool, origin: Origin[is_mutable].type
-#     ](ref [_]self) -> _Iterator[T, origin]:
-#         ...
-
-
-# fn iter[
-#     is_mutable: Bool,
-#     origin: Origin[is_mutable].type,
-#     T: AnyType,
-#     I: _Iterable[T],
-# ](ref [_]value: I) -> _Iterator[T, origin]:
-#     return value.__iter__[is_mutable, origin]()
-
-
-# fn next[
-#     is_mutable: Bool,
-#     origin: Origin[is_mutable].type,
-#     T: AnyType,
-#     I: _Iterator[T, origin],
-# ](value: I) -> ref [origin]T:
-#     debug_assert(bool(value), "iterator has no next value to yield")
-#     return value.__next__()
-
-
+@always_inline
 fn iter[T: _Iterator](value: T) -> T:
     """Get an iterator from the iterator.
 
@@ -704,6 +662,7 @@ fn iter[T: _Iterator](value: T) -> T:
     return value.__iter__()
 
 
+@always_inline
 fn iter[
     T: DType
 ](value: _StridedScalarRange[T]) -> _StridedScalarRangeIterator[T]:
@@ -741,6 +700,7 @@ fn iter[
     return value.__iter__()
 
 
+@always_inline
 fn iter[
     K: KeyElement, V: CollectionElement
 ](ref [_]value: Dict[K, V]) -> _DictKeyIter[K, V, __origin_of(value)]:
@@ -759,6 +719,7 @@ fn iter[
     return value.__iter__()
 
 
+@always_inline
 fn iter[
     K: KeyElement, V: CollectionElement
 ](ref [_]value: _DictValueIter[K, V, *_]) -> _DictValueIter[
@@ -779,6 +740,7 @@ fn iter[
     output = rebind[__type_of(output)](value.__iter__())
 
 
+@always_inline
 fn iter[
     K: KeyElement,
     V: CollectionElement,
@@ -840,7 +802,8 @@ fn iter(value: StringSlice) -> _StringSliceIter[__type_of(value).origin]:
     return rebind[_StringSliceIter[__type_of(value).origin]](value.__iter__())
 
 
-fn next[T: DType](inout value: _ZeroStartingScalarRange[T]) -> Scalar[T]:
+@always_inline
+fn next[T: DType](mut value: _ZeroStartingScalarRange[T]) -> Scalar[T]:
     """Return an iterator.
 
     Parameters:
@@ -856,7 +819,8 @@ fn next[T: DType](inout value: _ZeroStartingScalarRange[T]) -> Scalar[T]:
     return value.__next__()
 
 
-fn next[T: DType](inout value: _SequentialScalarRange[T]) -> Scalar[T]:
+@always_inline
+fn next[T: DType](mut value: _SequentialScalarRange[T]) -> Scalar[T]:
     """Return an iterator.
 
     Parameters:
@@ -872,7 +836,8 @@ fn next[T: DType](inout value: _SequentialScalarRange[T]) -> Scalar[T]:
     return value.__next__()
 
 
-fn next[T: DType](inout value: _StridedScalarRangeIterator[T]) -> Scalar[T]:
+@always_inline
+fn next[T: DType](mut value: _StridedScalarRangeIterator[T]) -> Scalar[T]:
     """Return an iterator.
 
     Parameters:
@@ -888,7 +853,8 @@ fn next[T: DType](inout value: _StridedScalarRangeIterator[T]) -> Scalar[T]:
     return value.__next__()
 
 
-fn next(inout value: _UIntZeroStartingRange) -> UInt:
+@always_inline
+fn next(mut value: _UIntZeroStartingRange) -> UInt:
     """Return an iterator.
 
     Args:
@@ -901,7 +867,8 @@ fn next(inout value: _UIntZeroStartingRange) -> UInt:
     return value.__next__()
 
 
-fn next(inout value: _UIntStridedRangeIterator) -> UInt:
+@always_inline
+fn next(mut value: _UIntStridedRangeIterator) -> UInt:
     """Return an iterator.
 
     Args:
@@ -917,7 +884,7 @@ fn next(inout value: _UIntStridedRangeIterator) -> UInt:
 @always_inline
 fn next[
     T: CollectionElement
-](inout value: _ListIter[T, *_]) -> Pointer[T, __type_of(value).list_origin]:
+](mut value: _ListIter[T, *_]) -> Pointer[T, __type_of(value).list_origin]:
     """Return an iterator.
 
     Parameters:
@@ -933,9 +900,10 @@ fn next[
     return value.__next__()
 
 
+@always_inline
 fn next[
     K: KeyElement, V: CollectionElement
-](inout value: _DictValueIter[K, V, *_]) -> Pointer[
+](mut value: _DictValueIter[K, V, *_]) -> Pointer[
     V, __type_of(value).dict_origin
 ]:
     """Get an iterator of the input dict values.
@@ -954,9 +922,10 @@ fn next[
     return value.__next__()
 
 
+@always_inline
 fn next[
     K: KeyElement, V: CollectionElement
-](inout value: _DictEntryIter[K, V, *_]) -> Pointer[
+](mut value: _DictEntryIter[K, V, *_]) -> Pointer[
     DictEntry[K, V], __type_of(value).dict_origin
 ] as output:
     """Get an iterator of the input dict items.
@@ -976,7 +945,7 @@ fn next[
 
 
 @always_inline
-fn next(inout value: _StringSliceIter) -> StringSlice[__type_of(value).origin]:
+fn next(mut value: _StringSliceIter) -> StringSlice[__type_of(value).origin]:
     """Return an iterator.
 
     Args:
