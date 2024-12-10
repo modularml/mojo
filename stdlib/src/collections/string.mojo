@@ -1962,7 +1962,8 @@ struct String(
 
     fn strip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing whitespaces
-        removed.
+        removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading or trailing whitespaces.
@@ -1982,7 +1983,9 @@ struct String(
         return self.as_string_slice().rstrip(chars)
 
     fn rstrip(self) -> StringSlice[__origin_of(self)]:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -2002,7 +2005,9 @@ struct String(
         return self.as_string_slice().lstrip(chars)
 
     fn lstrip(self) -> StringSlice[__origin_of(self)]:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.

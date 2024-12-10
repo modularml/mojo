@@ -638,7 +638,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     @always_inline
     fn strip(self) -> Self:
         """Return a copy of the string with leading and trailing whitespaces
-        removed.
+        removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading or trailing whitespaces.
@@ -678,7 +679,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
     @always_inline
     fn rstrip(self) -> Self:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -726,7 +729,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
     @always_inline
     fn lstrip(self) -> Self:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.
