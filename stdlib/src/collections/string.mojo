@@ -819,30 +819,23 @@ struct String(
     @always_inline
     @implicit
     fn __init__(out self, impl: Self._buffer_type):
-        """Construct a string from a buffer of bytes, copying the allocated
-        data. Use the transfer operator ^ to avoid the copy.
-
-        The buffer must be terminated with a null byte:
-
-        ```mojo
-        var buf = List[UInt8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
+        """Construct a string from a buffer of null terminated bytes, copying
+        the allocated data. Use the transfer operator `^` to avoid the copy.
 
         Args:
-            impl: The buffer.
+            impl: The null-terminated buffer.
+
+        Examples:
+
+        ```mojo
+        print(String(List[Byte](ord('h'), ord('i'), 0))) # hi
+        ```
+        .
         """
+        # We make a backup because steal_data() will clear length and capacity.
+        var length = len(impl)
         debug_assert(
-            len(impl) > 0 and impl[-1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        # We make a backup because steal_data() will clear size and capacity.
-        var size = impl.size
-        debug_assert(
-            impl[size - 1] == 0,
+            length > 0 and impl[length-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
         self._buffer = impl
