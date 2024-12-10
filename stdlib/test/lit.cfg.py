@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+# ruff: noqa
+
 import os
 import shutil
 from pathlib import Path

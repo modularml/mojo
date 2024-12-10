@@ -37,5 +37,5 @@ def install_if_missing(name: str):
             raise ImportError("python not on path" + FIX)
         subprocess.check_call([python, "-m", "pip", "install", name])
         return
-    except:
+    except subprocess.CalledProcessError:
         raise ImportError(f"{name} not found" + FIX)

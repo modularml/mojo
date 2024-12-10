@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+# ruff: noqa
+
 import os
 from pathlib import Path
 
@@ -55,9 +57,9 @@ pre_built_packages_path = os.environ.get(
     / "mojo",
 )
 
-os.environ[
-    "MODULAR_MOJO_NIGHTLY_IMPORT_PATH"
-] = f"{build_root},{pre_built_packages_path}"
+os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = (
+    f"{build_root},{pre_built_packages_path}"
+)
 
 # Pass through several environment variables
 # to the underlying subprocesses that run the tests.
