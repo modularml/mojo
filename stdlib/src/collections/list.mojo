@@ -470,22 +470,23 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn bytecount(self) -> Int:
-        """Gets the bytecount of the List.
+    fn byte_length(self) -> Int:
+        """Gets the byte length of the List.
 
         Returns:
-            The bytecount of the List.
+            The byte length of the List.
         """
         return len(self) * sizeof[T]()
 
     fn _realloc(mut self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
-        _move_pointee_into_many_elements[hint_trivial_type](
-            dest=new_data,
-            src=self.data,
-            size=self.size,
-        )
+        @parameter
+        if hint_trivial_type:
+            memcpy(new_data, self.data, self.byte_length())
+        else:
+            for i in range(size):
+                (src + i).move_pointee_into(dest + i)
 
         if self.data:
             self.data.free()
@@ -737,8 +738,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if stop_normalized < 0:
             stop_normalized += len(self)
 
-        start_normalized = _clip(start_normalized, 0, len(self))
-        stop_normalized = _clip(stop_normalized, 0, len(self))
+        start_normalized = max(start_normalized, min(0, len(self)))
+        stop_normalized = max(stop_normalized, min(0, len(self)))
 
         for i in range(start_normalized, stop_normalized):
             if self[i] == value:
@@ -932,22 +933,3 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             The UnsafePointer to the underlying memory.
         """
         return self.data
-
-
-fn _clip(value: Int, start: Int, end: Int) -> Int:
-    return max(start, min(value, end))
-
-
-fn _move_pointee_into_many_elements[
-    T: CollectionElement, //, hint_trivial_type: Bool
-](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
-    @parameter
-    if hint_trivial_type:
-        memcpy(
-            dest=dest.bitcast[Int8](),
-            src=src.bitcast[Int8](),
-            count=size * sizeof[T](),
-        )
-    else:
-        for i in range(size):
-            (src + i).move_pointee_into(dest + i)
