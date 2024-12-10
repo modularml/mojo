@@ -486,7 +486,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             memcpy(new_data, self.data, self.byte_length())
         else:
             for i in range(len(self)):
-                (self.data + i).move_pointee_into(dest + i)
+                (self.data + i).move_pointee_into(new_data + i)
 
         if self.data:
             self.data.free()
