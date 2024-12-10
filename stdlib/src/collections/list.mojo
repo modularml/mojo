@@ -502,7 +502,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if len(self) >= self.capacity:
             self._realloc(self.capacity * 2 + int(self.capacity == 0))
         (self.data + len(self)).init_pointee_move(value^)
-        self._len += 1
+        self.size += 1
 
     fn append[
         D: DType, //
@@ -518,7 +518,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self.reserve(len(self) + value.size)
         (self.data + len(self)).store(value)
-        self._len += value.size
+        self.size += value.size
 
     fn append[
         D: DType, //
@@ -536,7 +536,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.reserve(len(self) + count)
         var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
         memcpy(self.data + len(self), v_ptr, count)
-        self._len += count
+        self.size += count
 
     fn append[
         D: DType, //
@@ -552,7 +552,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         """
         self.reserve(len(self) + len(value))
         memcpy(self.data + len(self), value.unsafe_ptr(), len(value))
-        self._len += len(value)
+        self.size += len(value)
 
     fn insert(mut self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
