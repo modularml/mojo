@@ -738,8 +738,8 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if stop_normalized < 0:
             stop_normalized += len(self)
 
-        start_normalized = max(start_normalized, min(0, len(self)))
-        stop_normalized = max(stop_normalized, min(0, len(self)))
+        start_normalized = max(0, min(start_normalized, len(self)))
+        stop_normalized = max(0, min(stop_normalized, len(self)))
 
         for i in range(start_normalized, stop_normalized):
             if self[i] == value:
