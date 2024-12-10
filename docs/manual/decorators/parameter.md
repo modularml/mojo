@@ -29,9 +29,9 @@ this will be included in the binary
 
 ## Parametric for statement
 
-You can add the `@parameter` decorator to an `for` loop to create a loop that's
+You can add the `@parameter` decorator to a `for` loop to create a loop that's
 evaluated at compile time. The loop sequence and induction values must be
-a valid parameter expressions (that is, an expressions that evaluate at compile
+valid parameter expressions (that is, expressions that evaluate at compile
 time).
 
 This has the effect of "unrolling" the loop.
