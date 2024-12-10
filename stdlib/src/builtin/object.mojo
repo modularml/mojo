@@ -16,10 +16,10 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-from sys.intrinsics import _type_is_eq
 from sys.ffi import OpaquePointer
+from sys.intrinsics import _type_is_eq
 
-from memory import ArcPointer, memcmp, memcpy, UnsafePointer
+from memory import ArcPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, Variant
 
@@ -124,7 +124,7 @@ struct _RefCountedAttrsDict:
         )
 
     @always_inline
-    fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
+    fn set(mut self, key: StringLiteral, value: _ObjectImpl) raises:
         if key in self.impl[]:
             self.impl[][key].destroy()
             self.impl[][key] = value
@@ -210,7 +210,7 @@ struct _Function(CollectionElement, CollectionElementNew):
     """The function pointer."""
 
     @always_inline
-    fn __init__[FnT: AnyTrivialRegType](inout self, value: FnT):
+    fn __init__[FnT: AnyTrivialRegType](mut self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
@@ -320,7 +320,8 @@ struct _ObjectImpl(
         self.value = Self.type(value)
 
     @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    @implicit
+    fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         @parameter
         if dt.is_integral():
             self.value = Self.type(value)
@@ -517,7 +518,7 @@ struct _ObjectImpl(
         return self.get_as_int().cast[DType.float64]()
 
     @staticmethod
-    fn coerce_comparison_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+    fn coerce_comparison_type(mut lhs: _ObjectImpl, mut rhs: _ObjectImpl):
         """Coerces two values of arithmetic type to the appropriate
         lowest-common denominator type for performing comparisons, in order of
         increasing priority: bool, int, and then float.
@@ -528,7 +529,7 @@ struct _ObjectImpl(
             return
 
         @parameter
-        fn convert(inout value: _ObjectImpl, id: Int, to: Int):
+        fn convert(mut value: _ObjectImpl, id: Int, to: Int):
             if to == Self.int:
                 value = value.convert_bool_to_int()
             else:
@@ -543,7 +544,7 @@ struct _ObjectImpl(
             convert(lhs, lhsId, rhsId)
 
     @staticmethod
-    fn coerce_arithmetic_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+    fn coerce_arithmetic_type(mut lhs: _ObjectImpl, mut rhs: _ObjectImpl):
         """Coerces two values of arithmetic type to the appropriate
         lowest-common denominator type for performing arithmetic operations.
         Bools are always converted to integers, to match Python's behavior.
@@ -560,7 +561,7 @@ struct _ObjectImpl(
             lhs = lhs.convert_int_to_float()
 
     @staticmethod
-    fn coerce_integral_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+    fn coerce_integral_type(mut lhs: _ObjectImpl, mut rhs: _ObjectImpl):
         """Coerces two values of integral type to the appropriate
         lowest-common denominator type for performing bitwise operations.
         """
@@ -571,7 +572,7 @@ struct _ObjectImpl(
         else:
             lhs = lhs.convert_bool_to_int()
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Performs conversion to string according to Python
         semantics.
         """
@@ -785,7 +786,8 @@ struct object(
         self._value = value
 
     @always_inline
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    @implicit
+    fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         """Initializes the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
         converted to the appropriate integer or floating point type.
@@ -842,7 +844,8 @@ struct object(
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
+    @implicit
+    fn __init__[*Ts: CollectionElement](mut self, value: ListLiteral[*Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
@@ -1003,7 +1006,7 @@ struct object(
         """
         return self.__bool__()
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """Performs conversion to string according to Python
         semantics.
 
@@ -1537,7 +1540,7 @@ struct object(
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __iadd__(inout self, rhs: object) raises:
+    fn __iadd__(mut self, rhs: object) raises:
         """In-place addition or concatenation operator.
 
         Args:
@@ -1546,7 +1549,7 @@ struct object(
         self = self + rhs
 
     @always_inline
-    fn __isub__(inout self, rhs: object) raises:
+    fn __isub__(mut self, rhs: object) raises:
         """In-place subtraction operator.
 
         Args:
@@ -1555,7 +1558,7 @@ struct object(
         self = self - rhs
 
     @always_inline
-    fn __imul__(inout self, rhs: object) raises:
+    fn __imul__(mut self, rhs: object) raises:
         """In-place multiplication operator.
 
         Args:
@@ -1564,7 +1567,7 @@ struct object(
         self = self * rhs
 
     @always_inline
-    fn __ipow__(inout self, rhs: object) raises:
+    fn __ipow__(mut self, rhs: object) raises:
         """In-place exponentiation operator.
 
         Args:
@@ -1573,7 +1576,7 @@ struct object(
         self = self**rhs
 
     @always_inline
-    fn __imod__(inout self, rhs: object) raises:
+    fn __imod__(mut self, rhs: object) raises:
         """In-place modulo operator.
 
         Args:
@@ -1582,7 +1585,7 @@ struct object(
         self = self % rhs
 
     @always_inline
-    fn __itruediv__(inout self, rhs: object) raises:
+    fn __itruediv__(mut self, rhs: object) raises:
         """In-place true division operator.
 
         Args:
@@ -1591,7 +1594,7 @@ struct object(
         self = self / rhs
 
     @always_inline
-    fn __ifloordiv__(inout self, rhs: object) raises:
+    fn __ifloordiv__(mut self, rhs: object) raises:
         """In-place floor division operator.
 
         Args:
@@ -1600,7 +1603,7 @@ struct object(
         self = self // rhs
 
     @always_inline
-    fn __ilshift__(inout self, rhs: object) raises:
+    fn __ilshift__(mut self, rhs: object) raises:
         """In-place left shift operator.
 
         Args:
@@ -1609,7 +1612,7 @@ struct object(
         self = self << rhs
 
     @always_inline
-    fn __irshift__(inout self, rhs: object) raises:
+    fn __irshift__(mut self, rhs: object) raises:
         """In-place right shift operator.
 
         Args:
@@ -1618,7 +1621,7 @@ struct object(
         self = self >> rhs
 
     @always_inline
-    fn __iand__(inout self, rhs: object) raises:
+    fn __iand__(mut self, rhs: object) raises:
         """In-place AND operator.
 
         Args:
@@ -1627,7 +1630,7 @@ struct object(
         self = self & rhs
 
     @always_inline
-    fn __ior__(inout self, rhs: object) raises:
+    fn __ior__(mut self, rhs: object) raises:
         """In-place OR operator.
 
         Args:
@@ -1636,7 +1639,7 @@ struct object(
         self = self | rhs
 
     @always_inline
-    fn __ixor__(inout self, rhs: object) raises:
+    fn __ixor__(mut self, rhs: object) raises:
         """In-place XOR operator.
 
         Args:
@@ -1861,7 +1864,7 @@ struct object(
             var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
             var char = self._value.get_as_string().data[index]
             impl.data.init_pointee_move(char)
-            return _ObjectImpl(impl)
+            return object(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
     @always_inline
@@ -1936,7 +1939,7 @@ struct object(
         return self._value.get_obj_attr(key)
 
     @always_inline
-    fn __setattr__(inout self, key: StringLiteral, value: object) raises:
+    fn __setattr__(mut self, key: StringLiteral, value: object) raises:
         """Sets the named attribute.
 
         Args:

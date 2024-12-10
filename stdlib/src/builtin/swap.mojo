@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 @always_inline
-fn swap[T: Movable](inout lhs: T, inout rhs: T):
+fn swap[T: Movable](mut lhs: T, mut rhs: T):
     """Swaps the two given arguments.
 
     Parameters:

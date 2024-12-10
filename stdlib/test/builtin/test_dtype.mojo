@@ -13,9 +13,9 @@
 # RUN: %mojo %s
 
 from collections import Set
+from sys import sizeof
 
 from testing import assert_equal, assert_false, assert_true
-from sys import sizeof
 
 
 fn test_equality() raises:

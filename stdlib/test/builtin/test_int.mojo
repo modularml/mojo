@@ -14,10 +14,9 @@
 
 from sys.info import bitwidthof
 
-from testing import assert_equal, assert_true, assert_false, assert_raises
-
-from python import PythonObject
 from memory import UnsafePointer
+from python import PythonObject
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_properties():

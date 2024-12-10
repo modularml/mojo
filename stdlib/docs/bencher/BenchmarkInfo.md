@@ -33,7 +33,7 @@ Defines a Benchmark Info struct to record execution Statistics.
 
 <div class="mojo-function-sig">
 
-`__init__(inout self: Self, name: String, result: Report, elems: Optional[Int])`
+`__init__(out self: Self, name: String, result: Report, elems: Optional[Int])`
 
 </div>
 

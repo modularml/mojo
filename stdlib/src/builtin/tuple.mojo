@@ -16,13 +16,14 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from sys.intrinsics import _type_is_eq
+
 from memory import UnsafePointer
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Tuple
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
@@ -58,7 +59,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn __init__(
-        inout self,
+        mut self,
         *,
         owned storage: VariadicPack[_, CollectionElement, *element_types],
     ):
@@ -80,8 +81,10 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
                 UnsafePointer.address_of(self[i])
             )
 
-        # Mark the elements as destroyed.
-        storage._is_owned = False
+        # Do not destroy the elements when 'storage' goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(storage)
+        )
 
     fn __del__(owned self):
         """Destructor that destroys all of the elements."""
@@ -125,6 +128,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             UnsafePointer.address_of(existing[i]).move_pointee_into(
                 UnsafePointer.address_of(self[i])
             )
+        # Note: The destructor on `existing` is auto-disabled in a moveinit.
 
     @always_inline
     @staticmethod

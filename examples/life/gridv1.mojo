@@ -11,8 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from collections import Optional
 import random
+from collections import Optional
 
 
 @value
@@ -32,7 +32,7 @@ struct Grid(StringableRaising):
     def __getitem__(self, row: Int, col: Int) -> Int:
         return self.data[row][col]
 
-    def __setitem__(inout self, row: Int, col: Int, value: Int) -> None:
+    def __setitem__(mut self, row: Int, col: Int, value: Int) -> None:
         self.data[row][col] = value
 
     # ===-------------------------------------------------------------------===#

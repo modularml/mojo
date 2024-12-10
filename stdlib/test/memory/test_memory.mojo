@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo --debug-level full %s
 
-from sys import sizeof, simdwidthof
+from sys import simdwidthof, sizeof
 
 from memory import (
     AddressSpace,

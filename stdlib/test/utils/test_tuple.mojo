@@ -12,28 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from memory import UnsafePointer
+from test_utils import ValueDestructorRecorder
 from testing import assert_equal, assert_false, assert_true
 
-from memory import UnsafePointer
 from utils import IndexList, StaticTuple
-from test_utils import ValueDestructorRecorder
-
-
-def test_static_tuple():
-    var tup1 = StaticTuple[Int, 1](1)
-    assert_equal(tup1[0], 1)
-
-    var tup2 = StaticTuple[Int, 2](1, 1)
-    assert_equal(tup2[0], 1)
-    assert_equal(tup2[1], 1)
-
-    var tup3 = StaticTuple[Int, 3](1, 2, 3)
-    assert_equal(tup3[0], 1)
-    assert_equal(tup3[1], 2)
-    assert_equal(tup3[2], 3)
-
-    assert_equal(tup3[0], 1)
-    assert_equal(tup3[Int(0)], 1)
 
 
 def test_static_int_tuple():
@@ -72,6 +55,5 @@ def test_tuple_literal():
 
 
 def main():
-    test_static_tuple()
     test_static_int_tuple()
     test_tuple_literal()

@@ -11,12 +11,13 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from ._ahash import AHasher
 from memory import UnsafePointer
+
+from ._ahash import AHasher
 
 
 trait _HashableWithHasher:
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         ...
 
 
@@ -24,13 +25,13 @@ trait _Hasher:
     fn __init__(out self):
         ...
 
-    fn _update_with_bytes(inout self, data: UnsafePointer[UInt8], length: Int):
+    fn _update_with_bytes(mut self, data: UnsafePointer[UInt8], length: Int):
         ...
 
-    fn _update_with_simd(inout self, value: SIMD[_, _]):
+    fn _update_with_simd(mut self, value: SIMD[_, _]):
         ...
 
-    fn update[T: _HashableWithHasher](inout self, value: T):
+    fn update[T: _HashableWithHasher](mut self, value: T):
         ...
 
     fn finish(owned self) -> UInt64:

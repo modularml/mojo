@@ -17,21 +17,20 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
-from sys import is_nvidia_gpu, is_gpu, llvm_intrinsic
+from sys import is_gpu, is_nvidia_gpu, llvm_intrinsic
 from sys._build import is_debug_build
+from sys.ffi import c_char, c_size_t, c_uint, external_call
 from sys.param_env import env_get_string
-from sys.ffi import external_call, c_uint, c_size_t, c_char
-from memory import UnsafePointer
-from utils.write import (
-    _WriteBufferHeap,
-    _WriteBufferStack,
-    _ArgBytes,
-    write_args,
-)
-from utils import Span
-
 
 from builtin._location import __call_location, _SourceLocation
+from memory import UnsafePointer, Span
+
+from utils.write import (
+    _ArgBytes,
+    _WriteBufferHeap,
+    _WriteBufferStack,
+    write_args,
+)
 
 alias defined_mode = env_get_string["ASSERT", "safe"]()
 
@@ -308,7 +307,7 @@ struct _ThreadContext(Writable):
         self.thread_y = _get_id["thread", "y"]()
         self.thread_z = _get_id["thread", "z"]()
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         writer.write(
             "block: [",
             self.block_x,

@@ -373,12 +373,12 @@ struct IntLiteral(
             ](self.value, rhs.value)
         )
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # In place operations.
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: Self):
+    fn __iadd__(mut self, rhs: Self):
         """Compute `self + rhs` and save the result in self.
 
         Args:
@@ -387,7 +387,7 @@ struct IntLiteral(
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: Self):
+    fn __isub__(mut self, rhs: Self):
         """Compute `self - rhs` and save the result in self.
 
         Args:
@@ -396,7 +396,7 @@ struct IntLiteral(
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: Self):
+    fn __imul__(mut self, rhs: Self):
         """Compute self*rhs and save the result in self.
 
         Args:
@@ -405,7 +405,7 @@ struct IntLiteral(
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: Self):
+    fn __ifloordiv__(mut self, rhs: Self):
         """Compute self//rhs and save the result in self.
 
         Args:
@@ -414,7 +414,7 @@ struct IntLiteral(
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: Self):
+    fn __ilshift__(mut self, rhs: Self):
         """Compute `self << rhs` and save the result in self.
 
         Args:
@@ -423,7 +423,7 @@ struct IntLiteral(
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: Self):
+    fn __irshift__(mut self, rhs: Self):
         """Compute `self >> rhs` and save the result in self.
 
         Args:
@@ -432,7 +432,7 @@ struct IntLiteral(
         self = self >> rhs
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: Self):
+    fn __iand__(mut self, rhs: Self):
         """Compute `self & rhs` and save the result in self.
 
         Args:
@@ -441,7 +441,7 @@ struct IntLiteral(
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: Self):
+    fn __ixor__(mut self, rhs: Self):
         """Compute `self ^ rhs` and save the result in self.
 
         Args:
@@ -450,7 +450,7 @@ struct IntLiteral(
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: Self):
+    fn __ior__(mut self, rhs: Self):
         """Compute self|rhs and save the result in self.
 
         Args:
@@ -458,9 +458,9 @@ struct IntLiteral(
         """
         self = self | rhs
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __radd__(self, value: Self) -> Self:
@@ -717,9 +717,9 @@ struct IntLiteral(
         """
         return -(self // -denominator)
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # Methods
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn _bit_width(self) -> IntLiteral:

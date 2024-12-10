@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 """Implements functionality to start a mojo execution."""
 
-from memory import UnsafePointer
 from sys import external_call
-from sys.ffi import _get_global, OpaquePointer
+from sys.ffi import OpaquePointer, _get_global
+
+from memory import UnsafePointer
 
 
 fn _init_global_runtime(ignored: OpaquePointer) -> OpaquePointer:

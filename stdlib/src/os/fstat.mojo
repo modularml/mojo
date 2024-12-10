@@ -96,7 +96,7 @@ struct stat_result(Stringable, Writable):
     """User defined flags for file."""
 
     fn __init__(
-        inout self,
+        mut self,
         /,
         *,
         st_mode: Int,
@@ -151,7 +151,7 @@ struct stat_result(Stringable, Writable):
         self.st_flags = st_flags
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this path to the provided Writer.
 
