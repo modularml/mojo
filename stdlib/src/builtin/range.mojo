@@ -647,22 +647,6 @@ fn range[
 
 
 @always_inline
-fn iter[T: _Iterator](value: T) -> T:
-    """Get an iterator from the iterator.
-
-    Parameters:
-        T: The type conforming to _Iterator.
-
-    Args:
-        value: The value to get the iterator of.
-
-    Returns:
-        The iterator of the value.
-    """
-    return value.__iter__()
-
-
-@always_inline
 fn iter[
     T: DType
 ](value: _StridedScalarRange[T]) -> _StridedScalarRangeIterator[T]:
