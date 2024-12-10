@@ -8,7 +8,7 @@ version = "0.1.0"
 
 [dependencies]
 max = "*"
-python = "3.12.*"
+python = ">=3.11,<3.13"
 pygame = ">=2.6.1,<3"
 
 [tasks]
