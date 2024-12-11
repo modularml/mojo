@@ -885,9 +885,13 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(ref self, substr: StringSlice, start: Int = 0) -> Int:
+    # FIXME(#3526): this should return unicode codepoint offsets
+    fn find[T: Stringlike, //](ref self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
+
+        Parameters:
+            T: The Stringlike type.
 
         Args:
             substr: The substring to find.
@@ -918,9 +922,13 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
         return int(loc) - int(self.unsafe_ptr())
 
-    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
+    # FIXME(#3526): this should return unicode codepoint offsets
+    fn rfind[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
+
+        Parameters:
+            T: The Stringlike type.
 
         Args:
             substr: The substring to find.
@@ -930,9 +938,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
             The offset of `substr` relative to the beginning of the string.
         """
         if not substr:
-            return len(self)
+            return self.byte_length()
 
-        if len(self) < len(substr) + start:
+        if self.byte_length() < substr.byte_length() + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
@@ -1089,6 +1097,43 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 # ===-----------------------------------------------------------------------===#
 # Utils
 # ===-----------------------------------------------------------------------===#
+
+
+trait Stringlike(CollectionElement, CollectionElementNew):
+    """Trait intended to be used as a generic entrypoint for all String-like
+    types."""
+
+    fn byte_length(self) -> Int:
+        """Get the string length in bytes.
+        Returns:
+            The length of this string in bytes.
+        Notes:
+            This does not include the trailing null terminator in the count.
+        """
+        ...
+
+    fn unsafe_ptr(self) -> UnsafePointer[Byte]:
+        """Get raw pointer to the underlying data.
+        Returns:
+            The raw pointer to the data.
+        """
+        ...
+
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+        """Finds the offset of the first occurrence of `substr` starting at
+        `start`. If not found, returns -1.
+
+        Parameters:
+            T: The type of the substring.
+
+        Args:
+            substr: The substring to find.
+            start: The offset from which to find.
+
+        Returns:
+            The offset of `substr` relative to the beginning of the string.
+        """
+        ...
 
 
 fn _to_string_list[

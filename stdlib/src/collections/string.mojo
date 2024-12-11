@@ -1706,10 +1706,13 @@ struct String(
         """
         return substr.as_string_slice() in self.as_string_slice()
 
-    fn find(self, substr: String, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            T: The Stringlike type.
+
         Args:
           substr: The substring to find.
           start: The offset from which to find.
@@ -1717,13 +1720,15 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
+        return self.as_string_slice().find(substr, start)
 
-        return self.as_string_slice().find(substr.as_string_slice(), start)
-
-    fn rfind(self, substr: String, start: Int = 0) -> Int:
+    fn rfind[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            The Stringlike type.
+
         Args:
           substr: The substring to find.
           start: The offset from which to find.
@@ -1731,10 +1736,7 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-
-        return self.as_string_slice().rfind(
-            substr.as_string_slice(), start=start
-        )
+        return self.as_string_slice().rfind(substr, start=start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given String is a

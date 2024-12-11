@@ -591,10 +591,13 @@ struct StringLiteral(
 
         writer.write(self.as_string_slice())
 
-    fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            T: The Stringlike type.
+
         Args:
           substr: The substring to find.
           start: The offset from which to find.
@@ -602,12 +605,15 @@ struct StringLiteral(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).find(substr, start=start)
+        return self.as_string_slice().find(substr, start=start)
 
-    fn rfind(self, substr: StringLiteral, start: Int = 0) -> Int:
+    fn rfind[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
+        Parameters:
+            T: The Stringlike type.
+
         Args:
           substr: The substring to find.
           start: The offset from which to find.
@@ -615,7 +621,7 @@ struct StringLiteral(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).rfind(substr, start=start)
+        return self.as_string_slice().rfind(substr, start=start)
 
     fn replace(self, old: StringLiteral, new: StringLiteral) -> StringLiteral:
         """Return a copy of the string with all occurrences of substring `old`
