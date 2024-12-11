@@ -38,12 +38,10 @@ struct _GPUAddressSpace(EqualityComparable):
     """Generic address space."""
     alias GLOBAL = AddressSpace(1)
     """Global address space."""
-    alias CONSTANT = AddressSpace(2) if is_nvidia_gpu() else AddressSpace(4)
-    """Constant address space."""
     alias SHARED = AddressSpace(3)
     """Shared address space."""
-    alias PARAM = AddressSpace(4)
-    """Param address space."""
+    alias CONSTANT = AddressSpace(4)
+    """Constant address space."""
     alias LOCAL = AddressSpace(5) if is_nvidia_gpu() else AddressSpace(3)
     """Local address space."""
 

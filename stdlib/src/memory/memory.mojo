@@ -414,9 +414,12 @@ fn stack_allocation[
 
     @parameter
     if is_gpu():
-        # On NVGPU, SHARED and PARAM address spaces lower to global memory.
+        # On NVGPU, SHARED and CONSTANT address spaces lower to global memory.
         @parameter
-        if address_space in (_GPUAddressSpace.SHARED, _GPUAddressSpace.PARAM):
+        if address_space in (
+            _GPUAddressSpace.SHARED,
+            _GPUAddressSpace.CONSTANT,
+        ):
             alias global_name = name.value() if name else "_global_alloc"
             return __mlir_op.`pop.global_alloc`[
                 name = global_name.value,
