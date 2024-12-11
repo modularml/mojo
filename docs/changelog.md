@@ -30,3 +30,11 @@ what we publish.
 ### ❌ Removed
 
 ### 🛠️ Fixed
+
+- The Mojo Kernel for Jupyter Notebooks is working again on nightly releases.
+
+- The command `mojo debug --vscode` now sets the current working directory
+  properly.
+
+- The Mojo Language Server doesn't crash anymore on empty **init**.mojo files.
+  [Issue #3826](https://github.com/modularml/mojo/issues/3826).
