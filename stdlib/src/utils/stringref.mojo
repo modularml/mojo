@@ -13,7 +13,7 @@
 """Implements the StringRef class.
 """
 
-from collections.string import _atol, _isspace
+from collections.string import _atol, _is_ascii_space
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys import simdwidthof
 from sys.ffi import c_char
@@ -609,9 +609,9 @@ struct StringRef(
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
+        while start < end and _is_ascii_space(ptr[start]):
             start += 1
-        while end > start and _isspace(ptr[end - 1]):
+        while end > start and _is_ascii_space(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
 
