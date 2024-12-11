@@ -44,6 +44,7 @@ from utils._unicode import (
 )
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
+    Stringlike,
     _shift_unicode_to_utf8,
     _StringSliceIter,
     _to_string_list,
@@ -742,6 +743,7 @@ fn isprintable(c: UInt8) -> Bool:
 
 @value
 struct String(
+    Stringlike,
     Sized,
     Stringable,
     AsBytes,
@@ -752,7 +754,6 @@ struct String(
     Boolable,
     Writable,
     Writer,
-    CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
 ):

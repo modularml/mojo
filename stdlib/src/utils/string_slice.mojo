@@ -235,11 +235,10 @@ struct _StringSliceIter[
 @value
 @register_passable("trivial")
 struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
+    Stringlike,
     Stringable,
     Sized,
     Writable,
-    CollectionElement,
-    CollectionElementNew,
     Hashable,
 ):
     """A non-owning view to encoded string data.

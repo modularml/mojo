@@ -24,7 +24,7 @@ from memory import UnsafePointer, memcpy, Span
 from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import _StringSliceIter, _to_string_list
+from utils.string_slice import Stringlike, _StringSliceIter, _to_string_list
 
 # ===-----------------------------------------------------------------------===#
 # StringLiteral
@@ -34,9 +34,9 @@ from utils.string_slice import _StringSliceIter, _to_string_list
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct StringLiteral(
+    Stringlike,
     Boolable,
     Comparable,
-    CollectionElementNew,
     Writable,
     IntableRaising,
     KeyElement,
