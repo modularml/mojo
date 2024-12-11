@@ -249,35 +249,6 @@ def test_string_literal_join():
     assert_equal(s5, "1")
 
 
-def test_stringref():
-    var a = StringRef("AAA")
-    var b = StringRef("BBB")
-    var c = StringRef("AAA")
-
-    assert_equal(3, len(a))
-    assert_equal(3, len(b))
-    assert_equal(3, len(c))
-    assert_equal(4, len("ABBA"))
-
-    # Equality operators
-    assert_not_equal(a, b)
-    assert_not_equal(b, a)
-
-    # Self equality
-    assert_equal(a, a)
-
-    # Value equality
-    assert_equal(a, c)
-
-
-def test_stringref_from_dtypepointer():
-    var a = StringRef("AAA")
-    var b = StringRef(ptr=a.data)
-    assert_equal(3, len(a))
-    assert_equal(3, len(b))
-    assert_equal(a, b)
-
-
 def test_ord():
     # Regular ASCII
     assert_equal(ord("A"), 65)
@@ -1593,8 +1564,6 @@ def main():
     test_repr()
     test_string_join()
     test_string_literal_join()
-    test_stringref()
-    test_stringref_from_dtypepointer()
     test_ord()
     test_chr()
     test_string_indexing()
