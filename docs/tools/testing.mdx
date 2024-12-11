@@ -14,7 +14,7 @@ consists of a set of assertions defined as part of the
 
 ## Get started
 
-Let’s start with a simple example of writing and running Mojo tests.
+Let's start with a simple example of writing and running Mojo tests.
 
 ### 1. Write tests
 
@@ -106,7 +106,7 @@ its error message.
 
 The Mojo standard library includes a [`testing`](/mojo/stdlib/testing/testing/)
 module that defines several assertion functions for implementing tests. Each
-assertion returns `None` if its condition is met or raises an error if it isn’t.
+assertion returns `None` if its condition is met or raises an error if it isn't.
 
 * [`assert_true()`](/mojo/stdlib/testing/testing/assert_true):
   Asserts that the input value is `True`.
@@ -597,8 +597,8 @@ a += 1
 
 Test suite scopes do *not* nest. In other words, the test suite scope of a
 module is completely independent of the test suite scope of a function or struct
-defined within that module. For example, this means that if a module’s test
-suite creates a variable, that variable is *not* accessible to a function’s test
+defined within that module. For example, this means that if a module's test
+suite creates a variable, that variable is *not* accessible to a function's test
 suite within the same module.
 
 :::
