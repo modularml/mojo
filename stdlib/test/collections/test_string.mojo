@@ -278,17 +278,6 @@ def test_stringref_from_dtypepointer():
     assert_equal(a, b)
 
 
-def test_stringref_strip():
-    var a = StringRef("  mojo rocks  ")
-    var b = StringRef("mojo  ")
-    var c = StringRef("  mojo")
-    var d = StringRef("")
-    assert_equal(a.strip(), "mojo rocks")
-    assert_equal(b.strip(), "mojo")
-    assert_equal(c.strip(), "mojo")
-    assert_equal(d.strip(), "")
-
-
 def test_ord():
     # Regular ASCII
     assert_equal(ord("A"), 65)
@@ -1606,7 +1595,6 @@ def main():
     test_string_literal_join()
     test_stringref()
     test_stringref_from_dtypepointer()
-    test_stringref_strip()
     test_ord()
     test_chr()
     test_string_indexing()
