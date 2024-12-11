@@ -235,20 +235,6 @@ def test_string_join():
     assert_equal(s6, "1,2,3")
 
 
-def test_string_literal_join():
-    var s2 = ",".join(List[UInt8](1, 2, 3))
-    assert_equal(s2, "1,2,3")
-
-    var s3 = ",".join(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9))
-    assert_equal(s3, "1,2,3,4,5,6,7,8,9")
-
-    var s4 = ",".join(List[UInt8]())
-    assert_equal(s4, "")
-
-    var s5 = ",".join(List[UInt8](1))
-    assert_equal(s5, "1")
-
-
 def test_ord():
     # Regular ASCII
     assert_equal(ord("A"), 65)
@@ -1563,7 +1549,6 @@ def main():
     test_stringable()
     test_repr()
     test_string_join()
-    test_string_literal_join()
     test_ord()
     test_chr()
     test_string_indexing()
