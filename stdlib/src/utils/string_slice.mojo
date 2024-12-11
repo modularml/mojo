@@ -948,9 +948,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
         var loc = _memrmem(
             haystack_str.unsafe_ptr(),
-            len(haystack_str),
+            haystack_str.byte_length(),
             substr.unsafe_ptr(),
-            len(substr),
+            substr.byte_length(),
         )
 
         if not loc:
