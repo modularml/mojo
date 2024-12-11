@@ -750,10 +750,13 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, origin]:
-        """Get the sequence of encoded bytes of the underlying string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A slice containing the underlying sequence of encoded bytes.
+            A contiguous slice pointing to bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
         return self._slice
 

@@ -1614,18 +1614,16 @@ struct String(
 
     @always_inline
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
         """
-
-        # Does NOT include the NUL terminator.
         return Span[Byte, __origin_of(self)](
-            ptr=self._buffer.unsafe_ptr(), length=self.byte_length()
+            ptr=self.unsafe_ptr(), length=self.byte_length()
         )
 
     @always_inline

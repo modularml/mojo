@@ -26,16 +26,14 @@ from memory import Pointer, UnsafePointer
 
 
 trait AsBytes:
-    """
-    The `AsBytes` trait denotes a type that can be returned as a immutable byte
-    span.
+    """The `AsBytes` trait denotes a type that can be returned as a byte span.
     """
 
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of the bytes owned by this string.
+        """Returns a contiguous slice of bytes.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by this string.
+            A contiguous slice pointing to bytes.
 
         Notes:
             This does not include the trailing null terminator.
