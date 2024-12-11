@@ -24,6 +24,9 @@ what we publish.
 
 ### Tooling changes
 
+- mblack (aka `mojo format`) no longer formats non-mojo files. This prevents
+  unexpected formatting of python files.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
