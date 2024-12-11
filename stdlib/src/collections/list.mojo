@@ -483,7 +483,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
         @parameter
         if hint_trivial_type:
-            memcpy(new_data, self.data, self.byte_length())
+            memcpy(new_data, self.data, len(self))
         else:
             for i in range(len(self)):
                 (self.data + i).move_pointee_into(new_data + i)
@@ -724,22 +724,23 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Raises:
             ValueError: If the value is not found in the list.
         """
-        var start_normalized = start
 
+        var s_len = len(self)
+        var start_normalized = start
         var stop_normalized: Int
         if stop is None:
             # Default end
-            stop_normalized = len(self)
+            stop_normalized = s_len
         else:
             stop_normalized = stop.value()
 
         if start_normalized < 0:
-            start_normalized += len(self)
+            start_normalized += s_len
         if stop_normalized < 0:
-            stop_normalized += len(self)
+            stop_normalized += s_len
 
-        start_normalized = max(0, min(start_normalized, len(self)))
-        stop_normalized = max(0, min(stop_normalized, len(self)))
+        start_normalized = max(0, min(start_normalized, s_len))
+        stop_normalized = max(0, min(stop_normalized, s_len))
 
         for i in range(start_normalized, stop_normalized):
             if self[i] == value:

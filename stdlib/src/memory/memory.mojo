@@ -251,11 +251,10 @@ fn memcpy[
         src: The source pointer.
         count: The number of elements to copy.
     """
-    var n = count * sizeof[dest.type]()
     _memcpy_impl(
         dest.bitcast[Byte, origin=MutableAnyOrigin](),
         src.bitcast[Byte, origin=MutableAnyOrigin](),
-        n,
+        count * sizeof[T](),
     )
 
 
