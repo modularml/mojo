@@ -29,4 +29,7 @@ what we publish.
 
 ### ❌ Removed
 
+- `StringRef` is being deprecated. Use `StringSlice` instead.
+  - removed `StringRef.find()` and `StringRef.rfind()`
+
 ### 🛠️ Fixed
