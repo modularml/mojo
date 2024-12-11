@@ -540,6 +540,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Notes:
             If there is no capacity left, resizes to `len(self) + count`.
         """
+        debug_assert(count <= value.size, "count must be <= value.size")
         self.reserve(self.size + count)
         var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
         memcpy(self.data + self.size, v_ptr, count)
