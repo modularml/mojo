@@ -759,8 +759,12 @@ struct String(
 ):
     """Represents a mutable string."""
 
-    # Fields
+    alias is_mutable = Origin(__origin_of(Self())).is_mutable
+    """The mutability of the origin."""
+    alias origin = __origin_of(Self())
+    """The origin of the data."""
     alias _buffer_type = List[UInt8, hint_trivial_type=True]
+    # Fields
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -1596,11 +1600,9 @@ struct String(
         return String(buf^)
 
     fn unsafe_ptr(
-        ref self,
+        self,
     ) -> UnsafePointer[
-        Byte,
-        is_mutable = Origin(__origin_of(self)).is_mutable,
-        origin = __origin_of(self),
+        Byte, is_mutable = Self.is_mutable, origin = Self.origin
     ]:
         """Retrieves a pointer to the underlying memory.
 

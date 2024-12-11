@@ -762,9 +762,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         return self._slice
 
     @always_inline
-    fn unsafe_ptr(
-        self,
-    ) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
+    fn unsafe_ptr[
+        is_mutable: Bool = Self.is_mutable,
+        origin: Origin[is_mutable] = Origin[is_mutable]
+        .cast_from[origin]
+        .result,
+    ](self,) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:
@@ -1108,6 +1111,11 @@ trait Stringlike(CollectionElement, CollectionElementNew):
     """Trait intended to be used as a generic entrypoint for all String-like
     types."""
 
+    alias is_mutable: Bool
+    """The mutability of the origin."""
+    alias origin: Origin[is_mutable]
+    """The origin of the data."""
+
     fn byte_length(self) -> Int:
         """Get the string length in bytes.
 
@@ -1119,7 +1127,9 @@ trait Stringlike(CollectionElement, CollectionElementNew):
         """
         ...
 
-    fn unsafe_ptr(self) -> UnsafePointer[Byte]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Get raw pointer to the underlying data.
 
         Returns:

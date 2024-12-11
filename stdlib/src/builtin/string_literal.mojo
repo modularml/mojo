@@ -54,9 +54,12 @@ struct StringLiteral(
     and this does not include the null terminator.
     """
 
-    # Fields
+    alias is_mutable = False
+    """The mutability of the origin."""
+    alias origin = rebind[Origin[Self.is_mutable]](StaticConstantOrigin)
+    """The origin of the data."""
     alias type = __mlir_type.`!kgen.string`
-
+    # Fields
     var value: Self.type
     """The underlying storage for the string literal."""
 
@@ -487,7 +490,9 @@ struct StringLiteral(
     @always_inline("nodebug")
     fn unsafe_ptr(
         self,
-    ) -> UnsafePointer[Byte, is_mutable=False, origin=StaticConstantOrigin]:
+    ) -> UnsafePointer[
+        Byte, is_mutable = Self.is_mutable, origin = Self.origin
+    ]:
         """Get raw pointer to the underlying data.
 
         Returns:
