@@ -493,38 +493,42 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.capacity = new_capacity
 
     fn append(mut self, owned value: T):
-        """Appends a value to this list. If there is no capacity left, resizes
-        to twice the current capacity. Except for 0 capacity where it sets 1.
+        """Appends a value to this list.
 
         Args:
             value: The value to append.
+
+        Notes:
+            If there is no capacity left, resizes to twice the current capacity.
+            Except for 0 capacity where it sets 1.
         """
-        if len(self) >= self.capacity:
+        if self.size >= self.capacity:
             self._realloc(self.capacity * 2 + int(self.capacity == 0))
-        (self.data + len(self)).init_pointee_move(value^)
+        (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
     fn append[
         D: DType, //
     ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _]):
-        """Appends a vector to this list. If there is no capacity left, resizes
-        to `len(self) + value.size`.
+        """Appends a vector to this list.
 
         Parameters:
             D: The DType.
 
         Args:
             value: The value to append.
+
+        Notes:
+            If there is no capacity left, resizes to `len(self) + value.size`.
         """
-        self.reserve(len(self) + value.size)
-        (self.data + len(self)).store(value)
+        self.reserve(self.size + value.size)
+        (self.data + self.size).store(value)
         self.size += value.size
 
     fn append[
         D: DType, //
     ](mut self: List[Scalar[D], *_, **_], value: SIMD[D, _], count: Int):
-        """Appends a vector to this list. If there is no capacity left, resizes
-        to `len(self) + count`.
+        """Appends a vector to this list.
 
         Parameters:
             D: The DType.
@@ -532,26 +536,31 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             value: The value to append.
             count: The ammount of items to append.
+
+        Notes:
+            If there is no capacity left, resizes to `len(self) + count`.
         """
-        self.reserve(len(self) + count)
+        self.reserve(self.size + count)
         var v_ptr = UnsafePointer.address_of(value).bitcast[Scalar[D]]()
-        memcpy(self.data + len(self), v_ptr, count)
+        memcpy(self.data + self.size, v_ptr, count)
         self.size += count
 
     fn append[
         D: DType, //
     ](mut self: List[Scalar[D], *_, **_], value: Span[Scalar[D]]):
-        """Appends a Span to this list. If there is no capacity left, resizes
-        to `len(self) + len(value)`.
+        """Appends a Span to this list.
 
         Parameters:
             D: The DType.
 
         Args:
             value: The value to append.
+
+        Notes:
+            If there is no capacity left, resizes to `len(self) + len(value)`.
         """
-        self.reserve(len(self) + len(value))
-        memcpy(self.data + len(self), value.unsafe_ptr(), len(value))
+        self.reserve(self.size + len(value))
+        memcpy(self.data + self.size, value.unsafe_ptr(), len(value))
         self.size += len(value)
 
     fn insert(mut self, i: Int, owned value: T):
