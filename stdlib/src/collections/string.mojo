@@ -206,11 +206,6 @@ fn _is_python_printable_vec[
 
 
 @always_inline
-fn _is_python_printable(b: Byte) -> Bool:
-    return _is_python_printable_vec(b)
-
-
-@always_inline
 fn _nonprintable_python[w: Int](v: SIMD[DType.uint8, w]) -> SIMD[DType.bool, w]:
     return (~_is_python_printable_vec(v)) & (v < 0b1000_0000)
 
@@ -248,11 +243,6 @@ fn _is_ascii_uppercase(c: Byte) -> Bool:
 
 
 @always_inline
-fn _is_ascii_uppercase(v: SIMD[DType.uint8]) -> Bool:
-    return _is_ascii_uppercase_vec(v).reduce_and()
-
-
-@always_inline
 fn isupper(c: Byte) -> Bool:
     """Determines whether the given character is an ASCII uppercase character:
     `"ABCDEFGHIJKLMNOPQRSTUVWXYZ"`.
@@ -286,10 +276,6 @@ fn _is_ascii_lowercase(c: Byte) -> Bool:
 
 
 @always_inline
-fn _is_ascii_lowercase(v: SIMD[DType.uint8]) -> Bool:
-    return _is_ascii_lowercase_vec(v).reduce_and()
-
-
 fn islower(c: Byte) -> Bool:
     """Determines whether the given character is an ASCII lowercase character:
     `"abcdefghijklmnopqrstuvwxyz"`.
