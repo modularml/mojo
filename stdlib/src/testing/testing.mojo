@@ -32,7 +32,7 @@ def main():
 """
 from collections import Optional
 from math import isclose
-
+from memory import memcmp
 from builtin._location import __call_location, _SourceLocation
 
 # ===----------------------------------------------------------------------=== #
@@ -228,6 +228,43 @@ fn assert_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
+        raise _assert_cmp_error["`left == right` comparison"](
+            lhs.__str__(),
+            rhs.__str__(),
+            msg=msg,
+            loc=location.or_else(__call_location()),
+        )
+
+
+@always_inline
+fn assert_equal[
+    D: DType
+](
+    lhs: List[Scalar[D]],
+    rhs: List[Scalar[D]],
+    msg: String = "",
+    *,
+    location: Optional[_SourceLocation] = None,
+) raises:
+    """Asserts that two lists are equal.
+
+    Parameters:
+        D: A DType.
+
+    Args:
+        lhs: The left-hand side list.
+        rhs: The right-hand side list.
+        msg: The message to be printed if the assertion fails.
+        location: The location of the error (default to the `__call_location`).
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    var length = len(lhs)
+    if (
+        length != len(rhs)
+        or memcmp(lhs.unsafe_ptr(), rhs.unsafe_ptr(), length) != 0
+    ):
         raise _assert_cmp_error["`left == right` comparison"](
             lhs.__str__(),
             rhs.__str__(),

@@ -437,32 +437,33 @@ def test_list_index():
         _ = test_list_b.index(20, start=4, stop=5)
 
 
+def test_list_append():
+    items = List[UInt32]()
+    items.append(1)
+    items.append(2)
+    items.append(3)
+    assert_equal(items, List[UInt32](1, 2, 3))
+
+    # append span
+    copy = items
+    items.append(Span(copy))
+    assert_equal(items, List[UInt32](1, 2, 3, 1, 2, 3))
+
+    # whole SIMD
+    items = List[UInt32](1, 2, 3)
+    items.append(SIMD[DType.uint32, 4](1, 2, 3, 4))
+    assert_equal(items, List[UInt32](1, 2, 3, 1, 2, 3, 4))
+    # part of SIMD
+    items = List[UInt32](1, 2, 3)
+    items.append(SIMD[DType.uint32, 4](1, 2, 3, 4), 3)
+    assert_equal(items, List[UInt32](1, 2, 3, 1, 2, 3))
+
+
 def test_list_extend():
-    #
-    # Test extending the list [1, 2, 3] with itself
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-
-    var copy = vec
-    vec.extend(copy)
-
-    # vec == [1, 2, 3, 1, 2, 3]
-    assert_equal(len(vec), 6)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 1)
-    assert_equal(vec[4], 2)
-    assert_equal(vec[5], 3)
+    items = List[Int](1, 2, 3)
+    copy = items
+    items.extend(copy)
+    assert_equal(items, List[Int](1, 2, 3, 1, 2, 3))
 
 
 def test_list_extend_non_trivial():
@@ -952,6 +953,7 @@ def main():
     test_list_reverse_move_count()
     test_list_insert()
     test_list_index()
+    test_list_append()
     test_list_extend()
     test_list_extend_non_trivial()
     test_list_explicit_copy()
