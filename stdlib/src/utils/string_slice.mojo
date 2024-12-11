@@ -429,13 +429,12 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         """
 
         var s_len = self.byte_length()
+        s_ptr, rhs_ptr = self.unsafe_ptr(), rhs.unsafe_ptr()
         if s_len != rhs.byte_length():
             return False
-        elif s_len == 0:
+        elif s_len == 0 or s_ptr == rhs_ptr: # same pointer and length, so equal
             return True
-        elif self._slice.unsafe_ptr() == rhs._slice.unsafe_ptr():
-            return True  # same pointer and length, so equal
-        return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), s_len) == 0
+        return memcmp(s_ptr, rhs_ptr, s_len) == 0
 
     @always_inline
     fn __eq__(self, rhs: String) -> Bool:
