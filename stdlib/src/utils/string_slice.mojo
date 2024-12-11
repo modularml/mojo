@@ -899,7 +899,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
+        if substr.byte_length() == 0:
             return 0
 
         if self.byte_length() < substr.byte_length() + start:
@@ -936,7 +936,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
+        if substr.byte_length() == 0:
             return self.byte_length()
 
         if self.byte_length() < substr.byte_length() + start:
