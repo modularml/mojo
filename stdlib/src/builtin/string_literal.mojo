@@ -485,8 +485,9 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, is_mutable=False, origin=StaticConstantOrigin]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -497,11 +498,14 @@ struct StringLiteral(
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return ptr.bitcast[UInt8]()
+        return ptr.bitcast[
+            Byte, is_mutable=False, origin=StaticConstantOrigin
+        ]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
+    fn unsafe_cstr_ptr(
+        self,
+    ) -> UnsafePointer[c_char, is_mutable=False, origin=StaticConstantOrigin]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.
@@ -889,8 +893,9 @@ struct StringLiteral(
         return str(self).islower()
 
     fn strip(self) -> String:
-        """Return a copy of the string literal with leading and trailing whitespaces
-        removed.
+        """Return a copy of the string literal with leading and trailing
+        whitespaces removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A string with no leading or trailing whitespaces.
@@ -922,7 +927,9 @@ struct StringLiteral(
         return str(self).rstrip(chars)
 
     fn rstrip(self) -> String:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -941,7 +948,9 @@ struct StringLiteral(
         return str(self).lstrip(chars)
 
     fn lstrip(self) -> String:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.
