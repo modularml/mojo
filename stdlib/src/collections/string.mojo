@@ -1728,7 +1728,7 @@ struct String(
         `start`. If not found, returns -1.
 
         Parameters:
-            The Stringlike type.
+            T: The Stringlike type.
 
         Args:
           substr: The substring to find.

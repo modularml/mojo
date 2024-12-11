@@ -885,7 +885,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         return _FormatCurlyEntry.format(self, args)
 
     # FIXME(#3526): this should return unicode codepoint offsets
-    fn find[T: Stringlike, //](ref self, substr: T, start: Int = 0) -> Int:
+    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
 
