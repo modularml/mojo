@@ -164,9 +164,7 @@ def test_str_and_ref():
 
 def main():
     test_strref_from_start()
-    test_stringref_split()
     test_comparison_operators()
     test_intable()
     test_indexing()
-    test_endswith()
     test_str_and_ref()

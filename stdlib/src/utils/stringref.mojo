@@ -253,17 +253,6 @@ struct StringRef(
         """
         return not (self != rhs)
 
-    fn __contains__(self, substr: StringRef) -> Bool:
-        """Returns True if the substring is contained within the current string.
-
-        Args:
-          substr: The substring to check.
-
-        Returns:
-          True if the string contains the substring.
-        """
-        return self.find(substr) != -1
-
     @always_inline
     fn __ne__(self, rhs: StringRef) -> Bool:
         """Compares two strings are not equal.
@@ -459,35 +448,6 @@ struct StringRef(
         """
         return self.length == 0
 
-    fn count(self, substr: StringRef) -> Int:
-        """Return the number of non-overlapping occurrences of substring
-        `substr` in the string.
-
-        If sub is empty, returns the number of empty strings between characters
-        which is the length of the string plus one.
-
-        Args:
-          substr: The substring to count.
-
-        Returns:
-          The number of occurrences of `substr`.
-        """
-        if not substr:
-            return len(self) + 1
-
-        var res = 0
-        var offset = 0
-
-        while True:
-            var pos = self.find(substr, offset)
-            if pos == -1:
-                break
-            res += 1
-
-            offset = pos + len(substr)
-
-        return res
-
     fn _from_start(self, start: Int) -> StringRef:
         """Gets the StringRef pointing to the substring after the specified slice start position.
 
@@ -546,78 +506,3 @@ struct StringRef(
         while end > start and _isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
-
-    fn split(self, delimiter: StringRef) raises -> List[StringRef]:
-        """Split the StringRef by a delimiter.
-
-        Args:
-            delimiter: The StringRef to split on.
-
-        Returns:
-            A List of StringRefs containing the input split by the delimiter.
-
-        Raises:
-            Error if an empty delimiter is specified.
-        """
-        if not delimiter:
-            raise Error("empty delimiter not allowed to be passed to split.")
-
-        var output = List[StringRef]()
-        var ptr = self.unsafe_ptr()
-
-        var current_offset = 0
-        while True:
-            var loc = self.find(delimiter, current_offset)
-            # delimiter not found, so add the search slice from where we're currently at
-            if loc == -1:
-                output.append(
-                    StringRef(ptr + current_offset, len(self) - current_offset)
-                )
-                break
-
-            # We found a delimiter, so add the preceding string slice
-            output.append(StringRef(ptr + current_offset, loc - current_offset))
-
-            # Advance our search offset past the delimiter
-            current_offset = loc + len(delimiter)
-        return output
-
-    fn startswith(
-        self, prefix: StringRef, start: Int = 0, end: Int = -1
-    ) -> Bool:
-        """Checks if the StringRef starts with the specified prefix between start
-        and end positions. Returns True if found and False otherwise.
-
-        Args:
-          prefix: The prefix to check.
-          start: The start offset from which to check.
-          end: The end offset from which to check.
-
-        Returns:
-          True if the self[start:end] is prefixed by the input prefix.
-        """
-        if end == -1:
-            return self.find(prefix, start) == start
-        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
-            prefix
-        )
-
-    fn endswith(self, suffix: StringRef, start: Int = 0, end: Int = -1) -> Bool:
-        """Checks if the StringRef end with the specified suffix between start
-        and end positions. Returns True if found and False otherwise.
-
-        Args:
-          suffix: The suffix to check.
-          start: The start offset from which to check.
-          end: The end offset from which to check.
-
-        Returns:
-          True if the self[start:end] is suffixed by the input suffix.
-        """
-        if len(suffix) > len(self):
-            return False
-        if end == -1:
-            return self.rfind(suffix, start) + len(suffix) == len(self)
-        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
-            suffix
-        )

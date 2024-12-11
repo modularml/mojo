@@ -31,5 +31,7 @@ what we publish.
 
 - `StringRef` is being deprecated. Use `StringSlice` instead.
   - removed `StringRef.find()` and `StringRef.rfind()`
+  - removed `StringRef.count()`
+  - removed `StringRef.__contains__()`
 
 ### 🛠️ Fixed
