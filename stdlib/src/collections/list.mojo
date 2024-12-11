@@ -22,7 +22,6 @@ from collections import List
 
 from os import abort
 from sys import sizeof
-from sys.intrinsics import _type_is_eq
 
 from memory import Pointer, UnsafePointer, memcpy, Span
 
@@ -121,7 +120,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             other: The list to copy.
         """
-        self.__init__(capacity=other.capacity)
+        self = Self(capacity=other.capacity)
         for e in other:
             self.append(e[])
 
@@ -212,8 +211,11 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
-        for i in range(self.size):
-            (self.data + i).destroy_pointee()
+
+        @parameter
+        if not hint_trivial_type:
+            for i in range(self.size):
+                (self.data + i).destroy_pointee()
         self.data.free()
 
     # ===-------------------------------------------------------------------===#
@@ -921,12 +923,17 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if elt_idx_1 != elt_idx_2:
             swap((self.data + elt_idx_1)[], (self.data + elt_idx_2)[])
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr(
+        ref self,
+    ) -> UnsafePointer[
+        T,
+        is_mutable = Origin(__origin_of(self)).is_mutable,
+        origin = __origin_of(self),
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The UnsafePointer to the underlying memory.
+            The pointer to the underlying memory.
         """
         return self.data
 

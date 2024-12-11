@@ -1,5 +1,5 @@
 ---
-title: Ownership and borrowing
+title: Ownership
 sidebar_position: 3
 description: How Mojo shares references through function arguments.
 ---
@@ -84,6 +84,13 @@ keyword at the beginning of an argument declaration:
   `ref` arguments are an advanced topic, and they're described in more detail in
   [Lifetimes and references](/mojo/manual/values/lifetimes).
 
+* `out`: A special convention used for the `self` argument in
+  [constructors](/mojo/manual/lifecycle/life#constructor) and for
+  [named results](/mojo/manual/functions#named-function-results). An `out`
+  argument is uninitialized at the beginning of the function, and must be
+  initialized before the function returns. Although `out` arguments show up in
+  the argument list, they're never passed in by the caller.
+
 For example, this function has one argument that's a mutable
 reference and one that's immutable:
 
@@ -148,7 +155,7 @@ doesn't do any copying.
 
 In general, passing an immutable reference is much more efficient
 when handling large or expensive-to-copy values, because the copy constructor
-and destructor are not invoked for a borrow.
+and destructor are not invoked for a `read` argument.
 
 ### Compared to C++ and Rust
 
@@ -168,9 +175,9 @@ mutability in the callee. However, the read convention differs from
   when compared to languages like C++ and Rust, and moves this optimization from
   every call site to a declaration on the type definition.
 
-The major difference between Rust and Mojo is that Mojo does not require a
-sigil on the caller side to pass by borrow. Also, Mojo is more efficient when
-passing small values, and Rust defaults to moving values instead of passing
+The major difference between Rust and Mojo is that Mojo does not require a sigil
+on the caller side to pass by immutable reference. Also, Mojo is more efficient
+when passing small values, and Rust defaults to moving values instead of passing
 them around by borrow. These policy and syntax decisions allow Mojo to provide
 an easier-to-use programming model.
 
@@ -448,7 +455,7 @@ like `object` are cheap to copy. However, copying large types that allocate heap
 storage can be expensive. (For example, copying `List` or `Dict` types, or
 copying large numbers of strings.)
 
-### Borrowed versus owned in `def` functions
+### `read` versus `owned` in `def` functions
 
 The difference between `read` and `owned` in a `def` function may be a
 little subtle. In both cases, you can end up with a uniquely-owned value that's

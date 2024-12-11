@@ -88,7 +88,7 @@ struct Slice(
         Args:
             other: The slice to copy.
         """
-        self.__init__(start=other.start, end=other.end, step=other.step)
+        self = Self(start=other.start, end=other.end, step=other.step)
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations

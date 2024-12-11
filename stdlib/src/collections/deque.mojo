@@ -88,8 +88,8 @@ struct Deque[ElementType: CollectionElement](
         out self,
         *,
         owned elements: Optional[List[ElementType]] = None,
-        capacity: Int = self.default_capacity,
-        min_capacity: Int = self.default_capacity,
+        capacity: Int = Self.default_capacity,
+        min_capacity: Int = Self.default_capacity,
         maxlen: Int = -1,
         shrink: Bool = True,
     ):
@@ -794,7 +794,7 @@ struct Deque[ElementType: CollectionElement](
 
         return (self._data + self._head)[]
 
-    fn pop(mut self, out element: ElementType) raises:
+    fn pop(mut self) raises -> ElementType:
         """Removes and returns the element from the right side of the deque.
 
         Returns:
@@ -816,9 +816,9 @@ struct Deque[ElementType: CollectionElement](
         ):
             self._realloc(self._capacity >> 1)
 
-        return
+        return element
 
-    fn popleft(mut self, out element: ElementType) raises:
+    fn popleft(mut self) raises -> ElementType:
         """Removes and returns the element from the left side of the deque.
 
         Returns:
@@ -840,7 +840,7 @@ struct Deque[ElementType: CollectionElement](
         ):
             self._realloc(self._capacity >> 1)
 
-        return
+        return element
 
     fn reverse(mut self):
         """Reverses the elements of the deque in-place."""
