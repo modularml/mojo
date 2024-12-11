@@ -1104,8 +1104,10 @@ trait Stringlike(CollectionElement, CollectionElementNew):
 
     fn byte_length(self) -> Int:
         """Get the string length in bytes.
+
         Returns:
             The length of this string in bytes.
+
         Notes:
             This does not include the trailing null terminator in the count.
         """
@@ -1113,6 +1115,7 @@ trait Stringlike(CollectionElement, CollectionElementNew):
 
     fn unsafe_ptr(self) -> UnsafePointer[Byte]:
         """Get raw pointer to the underlying data.
+
         Returns:
             The raw pointer to the data.
         """
