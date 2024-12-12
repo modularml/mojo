@@ -384,7 +384,7 @@ struct Span[
         alias widths = (256, 128, 64, 32, 16, 8, 4, 2)
         var ptr = self.unsafe_ptr()
         var length = len(self)
-        var middle = length // 2
+        middle, is_odd = length // 2, length % 2 != 0
         var processed = 0
 
         @parameter
@@ -402,7 +402,7 @@ struct Span[
                     rhs_ptr.store(lhs_v)
                     processed += w
 
-        if middle * 2 != length:
+        if is_odd:
             var value = ptr[middle + 1]
             (ptr + middle - 1).move_pointee_into(ptr + middle + 1)
             (ptr + middle - 1).init_pointee_move(value)
