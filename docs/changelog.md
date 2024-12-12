@@ -27,6 +27,10 @@ what we publish.
 - mblack (aka `mojo format`) no longer formats non-mojo files. This prevents
   unexpected formatting of python files.
 
+- Full struct signature information is now exposed in the documentation
+  generator, and in the symbol outline and hover markdown via the Mojo Language
+  Server.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
