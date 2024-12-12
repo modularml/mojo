@@ -24,6 +24,7 @@ from collections import InlineArray
 
 from memory import Pointer, UnsafePointer
 from sys.info import simdwidthof, sizeof
+from utils import StringSlice
 
 
 trait AsBytes:
