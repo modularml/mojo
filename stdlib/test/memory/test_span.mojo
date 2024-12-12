@@ -199,6 +199,30 @@ def test_reversed():
         i += 1
 
 
+def test_reverse():
+    def _test_dtype[D: DType]():
+        forward = InlineArray[Scalar[D], 11](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+        backward = InlineArray[Scalar[D], 11](11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+        s = Span(forward)
+        s.reverse()
+        i = 0
+        for num in s:
+            assert_equal(num[], backward[i])
+            i += 1
+
+    _test_dtype[DType.uint8]()
+    _test_dtype[DType.uint16]()
+    _test_dtype[DType.uint32]()
+    _test_dtype[DType.uint64]()
+    _test_dtype[DType.int8]()
+    _test_dtype[DType.int16]()
+    _test_dtype[DType.int32]()
+    _test_dtype[DType.int64]()
+    _test_dtype[DType.float16]()
+    _test_dtype[DType.float32]()
+    _test_dtype[DType.float64]()
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -211,3 +235,4 @@ def main():
     test_fill()
     test_ref()
     test_reversed()
+    test_reverse()

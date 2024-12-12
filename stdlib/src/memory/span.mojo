@@ -23,6 +23,7 @@ from memory import Span
 from collections import InlineArray
 
 from memory import Pointer, UnsafePointer
+from sys.info import simdwidthof
 
 
 trait AsBytes:
@@ -371,3 +372,37 @@ struct Span[
         return Span[T, ImmutableOrigin.cast_from[origin].result](
             ptr=self._data, length=self._len
         )
+
+    fn reverse[D: DType, O: MutableOrigin, //](self: Span[Scalar[D], O]):
+        """Reverse the elements of the Span inplace.
+
+        Parameters:
+            D: The DType of the scalars the Span stores.
+            O: The origin of the Span.
+        """
+
+        alias widths = (256, 128, 64, 32, 16, 8, 4, 2)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var middle = length // 2
+        var processed = 0
+
+        @parameter
+        for i in range(len(widths)):
+            alias w = widths.get[i, Int]()
+
+            @parameter
+            if simdwidthof[D]() >= w:
+                for _ in range((middle - processed) // w):
+                    var lhs_ptr = ptr + processed
+                    var rhs_ptr = ptr + length - (processed + w)
+                    var lhs_v = lhs_ptr.load[width=w]().reversed()
+                    var rhs_v = rhs_ptr.load[width=w]().reversed()
+                    lhs_ptr.store(rhs_v)
+                    rhs_ptr.store(lhs_v)
+                    processed += w
+
+        if middle * 2 != length:
+            var value = ptr[middle + 1]
+            (ptr + middle - 1).move_pointee_into(ptr + middle + 1)
+            (ptr + middle - 1).init_pointee_move(value)
