@@ -390,37 +390,41 @@ fn write_buffered[
 
 
 @always_inline
-fn _hex_num_to_hex_string(b: Byte) -> Byte:
+fn _hex_digit_to_hex_char(b: SIMD[DType.uint8, _]) -> __type_of(b):
     alias `0` = Byte(ord("0"))
     alias `9` = Byte(ord("9"))
     alias `a` = Byte(ord("a"))
-    return `0` + int(b > 9) * (`a` - `9` - 1) + b
+    return `0` + (b > 9).cast[DType.uint8]() * (`a` - `9` - 1) + b
 
 
 @always_inline
 fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], decimal: Int):
     """Write a python compliant hexadecimal value into an uninitialized pointer
-    location, assumed to be large enough for the value to be written."""
+    location, assumed to be large enough for the value to be written.
+    """
+
+    constrained[amnt_hex_bytes in (2, 4, 8), "only 2 or 4 or 8 sequences"]()
+
     alias `\\` = Byte(ord("\\"))
     alias `x` = Byte(ord("x"))
     alias `u` = Byte(ord("u"))
     alias `U` = Byte(ord("U"))
 
-    constrained[amnt_hex_bytes in (2, 4, 8), "only 2 or 4 or 8 sequences"]()
-    p.init_pointee_copy(`\\`)
+    p.init_pointee_move(`\\`)
 
     @parameter
     if amnt_hex_bytes == 2:
-        (p + 1).init_pointee_copy(`x`)
+        (p + 1).init_pointee_move(`x`)
     elif amnt_hex_bytes == 4:
-        (p + 1).init_pointee_copy(`u`)
+        (p + 1).init_pointee_move(`u`)
     else:
-        (p + 1).init_pointee_copy(`U`)
-    var idx = 2
+        (p + 1).init_pointee_move(`U`)
+
+    var idx = 0
+    var digits = SIMD[DType.uint8, amnt_hex_bytes](0)
 
     @parameter
     for i in reversed(range(amnt_hex_bytes)):
-        (p + idx).init_pointee_copy(
-            _hex_num_to_hex_string((decimal // (16**i)) % 16)
-        )
+        digits[idx] = Byte((decimal // (16**i)) % 16)
         idx += 1
+    (p + 2).store(_hex_digit_to_hex_char(digits))
