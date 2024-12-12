@@ -1,0 +1,272 @@
+---
+title: Intro to pointers
+sidebar_position: 1
+description: An overview of accessing memory using Mojo's pointer types.
+---
+
+A pointer is an indirect reference to one or more values stored in memory. The
+pointer is a value that holds an address to memory, and provides APIs to store
+and retrieve values to that memory. The value pointed to by a pointer is also
+known as a _pointee_.
+
+The Mojo standard library includes several types of pointers, which provide
+different sets of features. All of these pointer types are _generic_—they can
+point to any type of value, and the value type is specified as a parameter. For
+example, the following code creates an `OwnedPointer` that points to an `Int`
+value:
+
+```mojo
+var ptr: OwnedPointer[Int]
+ptr = OwnedPointer(100)
+```
+
+The `ptr` variable has a value of type `OwnedPointer[Int]`. The pointer *points
+to* a value of type `Int`, as shown in Figure 1.
+
+
+<figure>
+
+![](../images/owned-pointer-diagram.png#light)
+![](../images/owned-pointer-diagram-dark.png#dark)
+
+<figcaption><b>Figure 1.</b> Pointer and pointee</figcaption>
+</figure>
+
+Accessing the memory—to retrieve or update a value—is called
+_dereferencing_ the pointer. You can dereference a pointer by following the
+variable name with an empty pair of square brackets:
+
+```mojo
+# Update an initialized value
+ptr[] += 10
+# Access an initialized value
+print(ptr[])
+```
+
+## Pointer terminology
+
+Before we jump into the pointer types, here are a few terms you'll run across. Some
+of them may already be familiar to you.
+
+- **Safe pointers**: are designed to prevent memory errors. Unless you use one
+  of the APIs that are specially designated as unsafe, you can use these
+  pointers without worrying about memory issues like double-free or
+  use-after-free.
+
+- **Nullable pointers**: can point to an invalid memory location (typically 0,
+or a “null pointer”). Safe pointers aren't nullable.
+
+- **Smart pointers**: own their pointees, which means that the value they point
+  to may be deallocated when the pointer itself is destroyed. Non-owning
+  pointers may point to values owned elsewhere, or may require some manual
+  management of the value lifecycle.
+
+- **Memory allocation**: some pointer types can allocate memory to store their
+  pointees, while other pointers can only point to pre-existing values. Memory
+  allocation can either be implicit (that is, performed automatically when
+  initializing a pointer with a value) or explicit.
+
+- **Uninitialized memory**: refers to memory locations that haven't been
+  initialized with a value, which may therefore contain random data.
+  Newly-allocated memory is uninitialized. The safe pointer types don't allow
+  users to access memory that's uninitialized. Unsafe pointers can allocate a
+  block of uninitialized memory locations and then initialize them one at a time.
+  Being able to access uninitialized memory is unsafe by definition.
+
+- **Copyable types**: can be copied implicitly (for example, by assigning a
+  value to a variable). Also called *implicitly copyable types*.
+
+  ```mojo
+  copied_ptr = ptr
+  ```
+
+  *Explicitly copyable* types require the user to request a copy, using a
+    constructor with a keyword argument:
+
+  ```mojo
+  copied_owned_ptr = OwnedPointer(other=owned_ptr)
+  ```
+
+## Pointer types
+
+The Mojo standard library includes several pointer types with different
+characteristics:
+
+- [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) is a safe pointer that points
+  to a single value that it doesn't own.
+
+- [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer) is a smart
+  pointer that points to a single value, and maintains exclusive ownership of
+  that value.
+
+- [`ArcPointer`](/mojo/stdlib/memory/arc/ArcPointer) is a reference-counted
+  smart pointer that points to an owned value with ownership potentially shared
+  with other instances of `ArcPointer`.
+
+- [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) points to
+  one or more consecutive memory locations, and can refer to uninitialized
+  memory.
+
+Table 1 summarizes the different types of pointers:
+
+<figure>
+
+|  | `Pointer` | `OwnedPointer` | `ArcPointer` | `UnsafePointer` |
+| --- | --- | --- | --- | --- |
+| Safe | Yes | Yes | Yes | No |
+| Allocates memory | No | Implicitly <sup>1</sup> | Implicitly <sup>1</sup> | Explicitly |
+| Owns pointee(s) | No | Yes | Yes | No <sup>2</sup> |
+| Copyable | Yes | No <sup>3</sup> | Yes | Yes |
+| Nullable | No | No | No | Yes |
+| Can point to uninitialized memory | No | No | No | Yes |
+| Can point to multiple values (array-like access) | No | No | No | Yes |
+
+<figcaption><b>Table 1.</b> Pointer types</figcaption>
+</figure>
+
+<sup>1</sup> `OwnedPointer` and `ArcPointer` implicitly allocate memory when you
+initialize the pointer with a value.
+
+<sup>2</sup> `UnsafePointer` provides unsafe methods for initializing and
+destroying instances of the stored type. The user is responsible for managing
+the lifecycle of stored values.
+
+<sup>3</sup> `OwnedPointer` is explicitly copyable, but explicitly copying an
+`OwnedPointer` copies the *stored value* into a new `OwnedPointer`.
+
+The following sections provide more details on each pointer type.
+
+## `Pointer`
+
+The [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) type is a safe pointer that
+points to a initialized value that it doesn't own. Some example use cases for a
+`Pointer` include:
+
+- Storing a reference to a related type. For example, a list's iterator object
+might hold a `Pointer` back to the original list.
+
+- Passing the memory location for a single value to external code via
+`external_call()`.
+
+- Where you need an API to return a long-lived reference to a value. (Currently
+the iterators for standard library collection types like `List` return
+pointers.)
+
+You can construct a `Pointer` using the `address_of()` static method:
+
+```python
+ptr = Pointer.address_of(some_value)
+```
+
+You can also create a `Pointer` by copying an existing `Pointer`.
+
+A `Pointer` carries an [`origin`](/mojo/manual/values/lifetimes) for the stored
+value, so Mojo can track the lifetime of the referenced value.
+
+## `OwnedPointer`
+
+The [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer) type is a
+smart pointer designed for cases where there is single ownership of the
+underlying data. An `OwnedPointer` points to a single item, which is passed in
+when you initialize the `OwnedPointer`. The `OwnedPointer` allocates memory and
+moves or copies the value into the reserved memory.
+
+```python
+o_ptr = OwnedPointer(some_big_struct)
+```
+
+An owned pointer can hold almost any type of item, but the stored item must be
+either `Movable`, `Copyable`, or `ExplicitlyCopyable`.
+
+Since an `OwnedPointer` is designed to enforce single ownership, the pointer
+itself can be moved, but not copied.
+
+Note: Currently, you can't create an `Optional[OwnedPointer[T]]` because the
+`Optional` type only works with types that are both movable and copyable. This
+restricts some use cases that would otherwise be a natural fit
+for`OwnedPointer`, including self-referential data structures like linked lists
+and trees. (Until this use case is supported for `OwnedPointer`, it's possible
+to use`ArcPointer` where you need a smart pointer that can be `Optional`.)
+
+## `ArcPointer`
+
+An [`ArcPointer`](/mojo/stdlib/memory/arc/ArcPointer) is a reference-counted
+smart pointer, ideal for shared resources where the last owner for a given value
+may not be clear. Like an `OwnedPointer`, it points to a single value, and it
+allocates memory when you initialize the `ArcPointer` with a value:
+
+```python
+attributesDict = Dict[String, String]()
+attributes = ArcPointer(attributesDict)
+```
+
+Unlike an `OwnedPointer`, an `ArcPointer` can be freely copied. All instances
+of a given `ArcPointer` share a reference count, which is incremented whenever
+the `ArcPointer` is copied and decremented whenever an instance is destroyed.
+When the reference count reaches zero, the stored value is destroyed and the
+allocated memory is freed.
+
+You can use `ArcPointer` to implement safe reference-semantic types. For
+example, in the following code snippet `SharedDict` uses an `ArcPointer` to
+store a dictionary. Copying an instance of `SharedDict` only copies the
+`ArcPointer`, not the dictionary, which is shared between all of the copies.
+
+```python
+from memory import ArcPointer
+from collections import Dict
+
+struct SharedDict:
+    var attributes: ArcPointer[Dict[String, String]]
+
+    fn __init__(out self):
+        attributesDict = Dict[String, String]()
+        self.attributes = ArcPointer(attributesDict)
+
+    fn __copyinit__(out self, other: Self):
+        self.attributes = other.attributes
+
+    def __setitem__(inout self, key: String, value: String):
+        self.attributes[][key] = value
+
+    def __getitem__(self, key: String) -> String:
+        return self.attributes[].get(key, default="")
+
+def main():
+    thing1 = SharedDict()
+    thing2 = thing1
+    thing1["Flip"] = "Flop"
+    print(thing2["Flip"])
+```
+
+Note: The reference count is stored using an
+[`Atomic`]([/mojo/stdlib/os/atomic/Atomic](https://docs.modular-staging.com/mojo/stdlib/os/atomic/Atomic))
+value to ensure that updates to the reference count are thread-safe. However,
+Mojo doesn't currently enforce exclusive access across thread boundaries, so
+it's possible to form race conditions.
+
+## UnsafePointer
+
+[`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) is a
+low-level pointer that can access a block of contiguous memory locations, which
+might be uninitialized. It's analogous to a raw pointer in the C and C++
+programming languages. `UnsafePointer` provides unsafe methods for initializing
+and destroying stored values, as well as for accessing the values once they're
+initialized.
+
+As the name suggests, `UnsafePointer` doesn't provide any memory safety
+guarantees, so you should reserve it for cases when none of the other pointer
+types will do the job. Here are some use cases where you might want to use an
+`UnsafePointer`:
+
+- Building a high-performance array-like structure, such as `List` or `Tensor`.
+  A single `UnsafePointer` can access many values, and gives you a lot of
+  control over how you allocate, use, and deallocate memory. Being able to
+  access uninitialized memory means that you can preallocate a block of memory,
+  and initialize values incrementally as they are added to the collection.
+
+- Interacting with external libraries including C++ and Python. You can
+  use`UnsafePointer` to pass a buffer full of data to or from an external
+  library.
+
+For more information, see [Unsafe
+pointers](/mojo/manual/pointers/unsafe-pointers).

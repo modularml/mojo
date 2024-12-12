@@ -17,6 +17,7 @@ from collections.string import (
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+
 from memory import UnsafePointer
 from python import Python
 from testing import (
@@ -1262,7 +1263,7 @@ def test_string_iter():
     assert_equal(321, atol(concat))
 
     for v in vs:
-        v.unsafe_ptr()[] = ord("1")
+        v.unsafe_ptr().bitcast[is_mutable=True]()[] = ord("1")
 
     # Borrow immutably
     for v in vs:
@@ -1272,19 +1273,23 @@ def test_string_iter():
 
     var idx = -1
     vs = String("mojo🔥")
-    for item in vs:
-        idx += 1
-        if idx == 0:
-            assert_equal("m", item)
-        elif idx == 1:
-            assert_equal("o", item)
-        elif idx == 2:
-            assert_equal("j", item)
-        elif idx == 3:
-            assert_equal("o", item)
-        elif idx == 4:
-            assert_equal("🔥", item)
-    assert_equal(4, idx)
+    var iterator = vs.__iter__()
+    assert_equal(5, len(iterator))
+    var item = iterator.__next__()
+    assert_equal("m", item)
+    assert_equal(4, len(iterator))
+    item = iterator.__next__()
+    assert_equal("o", item)
+    assert_equal(3, len(iterator))
+    item = iterator.__next__()
+    assert_equal("j", item)
+    assert_equal(2, len(iterator))
+    item = iterator.__next__()
+    assert_equal("o", item)
+    assert_equal(1, len(iterator))
+    item = iterator.__next__()
+    assert_equal("🔥", item)
+    assert_equal(0, len(iterator))
 
     var items = List[String](
         "mojo🔥",

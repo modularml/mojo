@@ -34,9 +34,10 @@ with open("my_file.txt", "r") as f:
 from os import PathLike, abort
 from sys import external_call, sizeof
 from sys.ffi import OpaquePointer
-from utils import Span, StringRef, StringSlice, write_buffered
 
-from memory import AddressSpace, UnsafePointer
+from memory import AddressSpace, UnsafePointer, Span
+
+from utils import StringRef, StringSlice, write_buffered
 
 
 @register_passable
@@ -111,7 +112,7 @@ struct FileHandle:
         except:
             pass
 
-    fn close(inout self) raises:
+    fn close(mut self) raises:
         """Closes the file handle."""
         if not self.handle:
             return
@@ -404,7 +405,7 @@ struct FileHandle:
         return pos
 
     @always_inline
-    fn write_bytes(inout self, bytes: Span[Byte, _]):
+    fn write_bytes(mut self, bytes: Span[Byte, _]):
         """
         Write a span of bytes to the file.
 
@@ -422,7 +423,7 @@ struct FileHandle:
         if err_msg:
             abort(err_msg^.consume_as_error())
 
-    fn write[*Ts: Writable](inout self, *args: *Ts):
+    fn write[*Ts: Writable](mut self, *args: *Ts):
         """Write a sequence of Writable arguments to the provided Writer.
 
         Parameters:
@@ -436,7 +437,9 @@ struct FileHandle:
 
     fn _write[
         address_space: AddressSpace
-    ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
+    ](
+        self, ptr: UnsafePointer[UInt8, address_space=address_space], len: Int
+    ) raises:
         """Write the data to the file.
 
         Params:

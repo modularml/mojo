@@ -11,32 +11,29 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer, stack_allocation
-
-from sys import sizeof, alignof
+from collections import Optional
+from sys import alignof, sizeof
 
 import python._cpython as cp
-from python import TypedPythonObject, Python, PythonObject
-from python.python import _get_global_python_itf
-from python._cpython import (
-    PyObjectPtr,
-    PyMethodDef,
-    PyType_Slot,
-    PyType_Spec,
-    CPython,
-)
-from python._bindings import (
-    Pythonable,
+from memory import UnsafePointer, stack_allocation
+from python import Python, PythonObject, TypedPythonObject
+from python._bindings import (  # Imported for use by the compiler
     ConvertibleFromPython,
     PyMojoObject,
-    python_type_object,
-    py_c_function_wrapper,
+    Pythonable,
     check_argument_type,
-    # Imported for use by the compiler
     check_arguments_arity,
+    py_c_function_wrapper,
+    python_type_object,
 )
-
-from collections import Optional
+from python._cpython import (
+    CPython,
+    PyMethodDef,
+    PyObjectPtr,
+    PyType_Slot,
+    PyType_Spec,
+)
+from python.python import _get_global_python_itf
 
 alias PyModule = TypedPythonObject["Module"]
 
@@ -64,10 +61,13 @@ fn fail_initialization(owned err: Error) -> PythonObject:
 
 fn pointer_bitcast[
     To: AnyType
-](ptr: Pointer) -> Pointer[To, ptr.origin, ptr.address_space, *_, **_] as out:
-    return __type_of(out)(
+](
+    ptr: Pointer,
+    out result: Pointer[To, ptr.origin, ptr.address_space, *_, **_],
+):
+    return __type_of(result)(
         _mlir_value=__mlir_op.`lit.ref.from_pointer`[
-            _type = __type_of(out)._mlir_type
+            _type = __type_of(result)._mlir_type
         ](
             UnsafePointer(__mlir_op.`lit.ref.to_pointer`(ptr._value))
             .bitcast[To]()
@@ -79,7 +79,7 @@ fn pointer_bitcast[
 fn gen_pytype_wrapper[
     T: Pythonable,
     name: StringLiteral,
-](inout module: PythonObject) raises:
+](mut module: PythonObject) raises:
     # TODO(MOCO-1301): Add support for member method generation.
     # TODO(MOCO-1302): Add support for generating member field as computed properties.
     # TODO(MOCO-1307): Add support for constructor generation.
@@ -102,7 +102,7 @@ fn add_wrapper_to_module[
         PythonObject, TypedPythonObject["Tuple"]
     ) raises -> PythonObject,
     func_name: StringLiteral,
-](inout module_obj: PythonObject) raises:
+](mut module_obj: PythonObject) raises:
     var module = TypedPythonObject["Module"](unsafe_unchecked_from=module_obj)
     Python.add_functions(
         module,
@@ -165,7 +165,8 @@ fn _try_convert_arg[
     type_name_id: StringLiteral,
     py_args: TypedPythonObject["Tuple"],
     argidx: Int,
-) raises -> T as result:
+    out result: T,
+) raises:
     try:
         result = T.try_from_python(py_args[argidx])
     except convert_err:

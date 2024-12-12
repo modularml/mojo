@@ -15,25 +15,20 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.ffi import c_char
-
-from memory import memcpy, UnsafePointer
 from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from utils import StringRef, Span, StringSlice, StaticString
-from utils import Writable, Writer
+from sys.ffi import c_char
+
+from memory import UnsafePointer, memcpy, Span
+
+from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from utils.string_slice import _StringSliceIter, _to_string_list
 
-from utils.string_slice import (
-    _StringSliceIter,
-    _FormatCurlyEntry,
-    _CurlyEntryFormattable,
-    _to_string_list,
-)
-
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StringLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
@@ -88,6 +83,56 @@ struct StringLiteral(
         """
         self = other
 
+    # TODO(MOCO-1460): This should be: fn __init__[*, value: String](out self):
+    # but Mojo tries to bind the parameter in `StringLiteral["foo"]()` to the
+    # type instead of the initializer.  Use a static method to work around this
+    # for now.
+    @always_inline("nodebug")
+    @staticmethod
+    fn _from_string[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The string value to use.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return __mlir_attr[
+            `#kgen.param.expr<data_to_str,`,
+            value.byte_length().value,
+            `,`,
+            value.unsafe_ptr().address,
+            `> : !kgen.string`,
+        ]
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The value to convert to StringLiteral.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[value]()
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[type: Stringable, //, value: type]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time stringable value.
+
+        Parameters:
+            type: The type of the value.
+            value: The value to serialize.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[str(value)]()
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
@@ -105,7 +150,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.concat`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: StringLiteral):
+    fn __iadd__(mut self, rhs: StringLiteral):
         """Concatenate a string literal to an existing one. Can only be
         evaluated at compile time using the `alias` keyword, which will write
         the result into the binary.
@@ -370,7 +415,7 @@ struct StringLiteral(
         """
         return hash(self.unsafe_ptr(), len(self))
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:
@@ -440,8 +485,9 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, is_mutable=False, origin=StaticConstantOrigin]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -452,11 +498,14 @@ struct StringLiteral(
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return ptr.bitcast[UInt8]()
+        return ptr.bitcast[
+            Byte, is_mutable=False, origin=StaticConstantOrigin
+        ]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
+    fn unsafe_cstr_ptr(
+        self,
+    ) -> UnsafePointer[c_char, is_mutable=False, origin=StaticConstantOrigin]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.
@@ -533,7 +582,7 @@ struct StringLiteral(
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this string literal to the provided Writer.
 
@@ -598,6 +647,50 @@ struct StringLiteral(
             The joined string.
         """
         return str(self).join(elems)
+
+    fn join(self, *elems: Int) -> String:
+        """Joins the elements from the tuple using the current string literal as a
+        delimiter.
+
+        Args:
+            elems: The input tuple.
+
+        Returns:
+            The joined string.
+        """
+        if len(elems) == 0:
+            return ""
+        var curr = str(elems[0])
+        for i in range(1, len(elems)):
+            curr += self + str(elems[i])
+        return curr
+
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            Types: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+
+        var result: String = ""
+        var is_first = True
+
+        @parameter
+        fn add_elt[T: Stringable](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(a)
+
+        elems.each[add_elt]()
+        return result
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string literal by a separator.
@@ -800,8 +893,9 @@ struct StringLiteral(
         return str(self).islower()
 
     fn strip(self) -> String:
-        """Return a copy of the string literal with leading and trailing whitespaces
-        removed.
+        """Return a copy of the string literal with leading and trailing
+        whitespaces removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A string with no leading or trailing whitespaces.
@@ -833,7 +927,9 @@ struct StringLiteral(
         return str(self).rstrip(chars)
 
     fn rstrip(self) -> String:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -852,7 +948,9 @@ struct StringLiteral(
         return str(self).lstrip(chars)
 
     fn lstrip(self) -> String:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.

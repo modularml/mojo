@@ -12,9 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from memory import UnsafePointer, AddressSpace
+from memory import AddressSpace, UnsafePointer
 from test_utils import ExplicitCopyOnly, MoveCounter
-from testing import assert_equal, assert_not_equal, assert_true, assert_false
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
 
 
 struct MoveOnlyType(Movable):
@@ -150,15 +150,15 @@ def test_unsafepointer_string():
 
 def test_eq():
     var local = 1
-    var p1 = UnsafePointer[Int].address_of(local)
+    var p1 = UnsafePointer.address_of(local).bitcast[is_mutable=False]()
     var p2 = p1
     assert_equal(p1, p2)
 
     var other_local = 2
-    var p3 = UnsafePointer[Int].address_of(other_local)
+    var p3 = UnsafePointer.address_of(other_local).bitcast[is_mutable=False]()
     assert_not_equal(p1, p3)
 
-    var p4 = UnsafePointer[Int].address_of(local)
+    var p4 = UnsafePointer.address_of(local).bitcast[is_mutable=False]()
     assert_equal(p1, p4)
     _ = local
     _ = other_local
@@ -178,10 +178,10 @@ def test_comparisons():
 
 
 def test_unsafepointer_address_space():
-    var p1 = UnsafePointer[Int, AddressSpace(0)].alloc(1)
+    var p1 = UnsafePointer[Int, address_space = AddressSpace(0)].alloc(1)
     p1.free()
 
-    var p2 = UnsafePointer[Int, AddressSpace.GENERIC].alloc(1)
+    var p2 = UnsafePointer[Int, address_space = AddressSpace.GENERIC].alloc(1)
     p2.free()
 
 

@@ -1,0 +1,19 @@
+[project]
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+description = "Introduction to Mojo Tutorial: Conway's Game of Life"
+name = "life"
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
+version = "0.1.0"
+
+[dependencies]
+max = "*"
+python = ">=3.11,<3.13"
+pygame = ">=2.6.1,<3"
+
+[tasks]
+lifev1 = "mojo run lifev1.mojo"
+lifev2 = "mojo run lifev2.mojo"
+main = "mojo run benchmark.mojo"
+benchmark = "mojo run benchmark.mojo"
+tests = "mojo test -I . test"

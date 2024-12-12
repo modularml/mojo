@@ -14,12 +14,11 @@
 
 from sys import os_is_windows
 from time import (
-    now,
+    monotonic,
     perf_counter,
     perf_counter_ns,
     sleep,
     time_function,
-    monotonic,
 )
 
 from testing import assert_true
@@ -28,7 +27,7 @@ from testing import assert_true
 @always_inline
 @parameter
 fn time_me():
-    sleep(1)
+    sleep(1.0)
 
 
 @always_inline
@@ -50,7 +49,7 @@ fn time_templated_function[
 fn time_capturing_function(iters: Int) -> Int:
     @parameter
     fn time_fn():
-        sleep(1)
+        sleep(1.0)
 
     return time_function[time_fn]()
 
@@ -60,7 +59,6 @@ fn test_time() raises:
 
     assert_true(perf_counter() > 0)
     assert_true(perf_counter_ns() > 0)
-    assert_true(now() > 0)
     assert_true(monotonic() > 0)
 
     var t1 = time_function[time_me]()

@@ -17,13 +17,12 @@
 
 from os.env import getenv
 from random import rand
-from sys import info
-from sys import simdwidthof
+from sys import info, simdwidthof
 
 import benchmark
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from algorithm import parallelize, vectorize
-from memory import memset_zero, stack_allocation, UnsafePointer
+from memory import UnsafePointer, memset_zero, stack_allocation
 from python import Python, PythonObject
 
 alias M = 512  # rows of A and C
@@ -71,7 +70,7 @@ struct Matrix[rows: Int, cols: Int]:
     fn __getitem__(self, y: Int, x: Int) -> Scalar[type]:
         return self.load(y, x)
 
-    fn __setitem__(inout self, y: Int, x: Int, val: Scalar[type]):
+    fn __setitem__(mut self, y: Int, x: Int, val: Scalar[type]):
         self.store(y, x, val)
 
     fn load[nelts: Int = 1](self, y: Int, x: Int) -> SIMD[type, nelts]:
@@ -101,7 +100,7 @@ def run_matmul_numpy() -> Float64:
     return gflops
 
 
-fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_naive(mut C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
         for k in range(A.cols):
             for n in range(C.cols):
@@ -109,7 +108,7 @@ fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
 
 
 # Using stdlib vectorize function
-fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_vectorized(mut C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
         for k in range(A.cols):
 
@@ -124,7 +123,7 @@ fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
 
 # Parallelize the code by using the builtin parallelize function
 # num_workers is the number of worker threads to use in parallalize
-fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_parallelized(mut C: Matrix, A: Matrix, B: Matrix):
     var num_workers = C.rows
 
     @parameter
@@ -151,7 +150,7 @@ fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
 
 # Use the above tile function to perform tiled matmul
 # Also parallelize with num_workers threads
-fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_tiled(mut C: Matrix, A: Matrix, B: Matrix):
     var num_workers = C.rows
 
     @parameter
@@ -178,7 +177,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
 
 # Unroll the vectorized loop by a constant factor
 # Also parallelize with num_workers threads
-fn matmul_unrolled[mode: Int](inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_unrolled[mode: Int](mut C: Matrix, A: Matrix, B: Matrix):
     var num_workers: Int
     if mode == 1:
         num_workers = info.num_physical_cores()
@@ -233,7 +232,7 @@ fn tile_parallel[
 # a global memory location, which can thrash the cache.
 # Also partially unroll the loop over the reduction dimension (K)
 # and reorder the reduction inner loop with the row iteration inner loop
-fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_reordered(mut C: Matrix, A: Matrix, B: Matrix):
     alias tile_m = 32
     alias tile_n = 32
     alias tile_k = max(4, K // 256)
@@ -283,7 +282,7 @@ fn matmul_reordered(inout C: Matrix, A: Matrix, B: Matrix):
 
 @always_inline
 fn bench[
-    func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
+    func: fn (mut Matrix, Matrix, Matrix) -> None, name: StringLiteral
 ](base_gflops: Float64, np_gflops: Float64) raises:
     var A = Matrix[M, K].rand()
     var B = Matrix[K, N].rand()
@@ -314,7 +313,7 @@ fn bench[
 
 @always_inline
 fn test_matrix_equal[
-    func: fn (inout Matrix, Matrix, Matrix) -> None
+    func: fn (mut Matrix, Matrix, Matrix) -> None
 ](C: Matrix, A: Matrix, B: Matrix) raises -> Bool:
     """Runs a matmul function on A and B and tests the result for equality with
     C on every element.

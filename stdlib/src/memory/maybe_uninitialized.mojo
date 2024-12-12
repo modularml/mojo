@@ -62,7 +62,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     fn __init__[
         MovableType: Movable
     ](
-        inout self: UnsafeMaybeUninitialized[MovableType],
+        mut self: UnsafeMaybeUninitialized[MovableType],
         owned value: MovableType,
     ):
         """The memory is now considered initialized.
@@ -98,7 +98,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     fn copy_from[
         CopyableType: ExplicitlyCopyable
     ](
-        inout self: UnsafeMaybeUninitialized[CopyableType],
+        mut self: UnsafeMaybeUninitialized[CopyableType],
         other: UnsafeMaybeUninitialized[CopyableType],
     ):
         """Copy another object.
@@ -117,7 +117,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     @always_inline
     fn copy_from[
         CopyableType: ExplicitlyCopyable
-    ](inout self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType):
+    ](mut self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType):
         """Copy another object.
 
         This function assumes that the current memory is uninitialized.
@@ -152,8 +152,8 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     fn move_from[
         MovableType: Movable
     ](
-        inout self: UnsafeMaybeUninitialized[MovableType],
-        inout other: UnsafeMaybeUninitialized[MovableType],
+        mut self: UnsafeMaybeUninitialized[MovableType],
+        mut other: UnsafeMaybeUninitialized[MovableType],
     ):
         """Move another object.
 
@@ -174,7 +174,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     fn move_from[
         MovableType: Movable
     ](
-        inout self: UnsafeMaybeUninitialized[MovableType],
+        mut self: UnsafeMaybeUninitialized[MovableType],
         other: UnsafePointer[MovableType],
     ):
         """Move another object.
@@ -196,7 +196,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     fn write[
         MovableType: Movable
     ](
-        inout self: UnsafeMaybeUninitialized[MovableType],
+        mut self: UnsafeMaybeUninitialized[MovableType],
         owned value: MovableType,
     ):
         """Write a value into an uninitialized memory location.
@@ -235,7 +235,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn assume_initialized_destroy(inout self):
+    fn assume_initialized_destroy(mut self):
         """Runs the destructor of the internal value.
 
         Calling this method assumes that the memory is initialized.

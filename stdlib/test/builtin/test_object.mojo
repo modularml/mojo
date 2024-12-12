@@ -183,7 +183,7 @@ def test_function(lhs, rhs) -> object:
     return lhs + rhs
 
 
-# These are all marked borrowed because 'object' doesn't support function
+# These are all marked read-only because 'object' doesn't support function
 # types with owned arguments.
 def test_function_raises(a) -> object:
     raise Error("Error from function type")

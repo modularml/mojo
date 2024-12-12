@@ -11,16 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer
 from os import Atomic
-from time import sleep
 from sys import external_call
 from sys.ffi import OpaquePointer
+from time import sleep
 
+from memory import UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # SpinWaiter
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 struct SpinWaiter:
@@ -65,7 +65,7 @@ struct BlockingSpinLock:
 
         self.counter = Atomic[DType.int64](Self.UNLOCKED)
 
-    fn lock(inout self, owner: Int):
+    fn lock(mut self, owner: Int):
         """Acquires the lock.
 
         Args:
@@ -79,7 +79,7 @@ struct BlockingSpinLock:
             waiter.wait()
             expected = Self.UNLOCKED
 
-    fn unlock(inout self, owner: Int) -> Bool:
+    fn unlock(mut self, owner: Int) -> Bool:
         """Releases the lock.
 
         Args:
@@ -108,7 +108,7 @@ struct BlockingScopedLock:
     """The underlying lock instance."""
 
     fn __init__(
-        inout self,
+        mut self,
         lock: UnsafePointer[Self.LockType],
     ):
         """Primary constructor.
@@ -120,8 +120,8 @@ struct BlockingScopedLock:
         self.lock = lock
 
     fn __init__(
-        inout self,
-        inout lock: Self.LockType,
+        mut self,
+        mut lock: Self.LockType,
     ):
         """Secondary constructor.
 
@@ -132,14 +132,14 @@ struct BlockingScopedLock:
         self.lock = UnsafePointer.address_of(lock)
 
     @no_inline
-    fn __enter__(inout self):
+    fn __enter__(mut self):
         """Acquire the lock on entry.
         This is done by setting the owner of the lock to own address."""
         var address = UnsafePointer[Self].address_of(self)
         self.lock[].lock(int(address))
 
     @no_inline
-    fn __exit__(inout self):
+    fn __exit__(mut self):
         """Release the lock on exit.
         Reset the address on the underlying lock."""
         var address = UnsafePointer[Self].address_of(self)

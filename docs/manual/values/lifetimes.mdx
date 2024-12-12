@@ -1,0 +1,476 @@
+---
+title: Lifetimes, origins, and references
+sidebar_position: 4
+description: Working with origins and references.
+---
+
+The Mojo compiler includes a lifetime checker, a compiler pass that analyzes
+dataflow through your program. It identifies when variables are valid and
+inserts destructor calls when a variable's lifetime ends.
+
+The Mojo compiler uses a special value called an *origin* to track the lifetime
+of variables and the validity of references.
+
+Specifically, an origin answers two questions:
+
+* What variable "owns" this value?
+* Can the value be mutated using this reference?
+
+For example, consider the following code:
+
+```mojo
+fn print_str(s: String):
+    print(s)
+
+name = String("Joan")
+print_str(name)
+```
+
+```output
+Joan
+```
+
+The line `name = String("Joan")` declares a variable with an identifier (`name`)
+and logical storage space for a `String` value. When you pass `name` into the
+`print_str()` function, the function gets an immutable reference to the value.
+So both `name` and `s` refer to the same logical storage space, and have
+associated origin values that lets the Mojo compiler reason about them.
+
+Most of the time, origins are handled automatically by the compiler.
+However, in some cases you'll need to interact with origins directly:
+
+* When working with references—specifically `ref` arguments and `ref` return
+  values.
+
+* When working with types like
+  [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) or
+  [`Span`](/mojo/stdlib/utils/span/Span) which are parameterized on the
+  origin of the data they refer to.
+
+This section also covers [`ref` arguments](#ref-arguments) and
+[`ref` return values](#ref-return-values), which let functions
+take arguments and provide return values as references with parametric
+origins.
+
+## Working with origins
+
+Mojo's origin values are unlike most other values in the language, because
+they're primitive values, not Mojo structs.
+
+Likewise, because these values are mostly created by the
+compiler, you can't just create your own origin value—you usually need to
+derive an origin from an existing value.
+
+### Origin types
+
+Mojo supplies a struct and a set of aliases that you can use to specify
+origin types. As the names suggest, the `ImmutableOrigin` and
+`MutableOrigin` aliases represent immutable and mutable origins,
+respectively:
+
+```mojo
+struct ImmutableRef[origin: ImmutableOrigin]:
+    pass
+```
+
+Or you can use the [`Origin`](/mojo/stdlib/builtin/type_aliases/Origin)
+struct to specify an origin with parametric mutability:
+
+```mojo
+struct ParametricRef[
+    is_mutable: Bool,
+    //,
+    origin: Origin[is_mutable]
+]:
+    pass
+```
+
+Origin types carry the mutability of a reference as a boolean parameter value,
+indicating whether the origin is mutable, immutable, or even with mutability
+depending on a parameter specified by the enclosing API.
+
+The `is_mutable` parameter here is an [infer-only
+parameter](/mojo/manual/parameters/#infer-only-parameters). The `origin` value
+is often inferred, as well. For example, the following code creates a
+[`Pointer`](/mojo/stdlib/memory/pointer/Pointer) to an existing value, but
+doesn't need to specify an origin—the `origin` is inferred from the variable
+passed in to the `address_of()` method.
+
+```mojo
+from memory import Pointer
+
+def use_pointer():
+    a = 10
+    ptr = Pointer.address_of(a)
+```
+
+A final type of origin value is an `OriginSet`. As the name suggests, an
+`OriginSet` represents a group of origins.
+
+### Origin values
+
+Most origin values are created by the compiler. As a developer, there are a
+few ways to specify origin values:
+
+* Static origin. The `StaticConstantOrigin` alias is an origin value
+  representing immutable values that that last for the duration of the program.
+  String literal values have a `StaticConstantOrigin`.
+* Derived origin. The `__origin_of()` magic function returns the origin
+  associated with the value (or values) passed in.
+* Inferred origin. You can use inferred parameters to capture the origin of a
+  value passed in to a function.
+* Wildcard origins. The `ImmutableAnyOrigin` and `MutableAnyOrigin` aliases are
+  special cases indicating a reference that might access any live value.
+
+#### Static origins
+
+You can use the static origin `StaticConstantOrigin` when you have a
+value that exists for the entire duration of the program.
+
+For example, the `StringLiteral` method
+[`as_string_slice()`](/mojo/stdlib/builtin/string_literal/StringLiteral#as_string_slice)
+returns a [`StringSlice`](/mojo/stdlib/utils/string_slice/StringSlice) pointing
+to the original string literal. String literals are static—they're allocated at
+compile time and never destroyed—so the slice is created with an immutable,
+static origin.
+
+#### Derived origins
+
+Use the `__origin_of(value)` operator to obtain a value's origin. An argument
+to `__origin_of()` can take an arbitrary expression that yields one of the
+following:
+
+- An origin value.
+
+- A value with a memory location.
+
+For example:
+
+```mojo
+__origin_of(self)
+__origin_of(x.y)
+__origin_of(foo())
+```
+
+The `__origin_of()` operator is analyzed statically at compile time;
+The expressions passed to `__origin_of()` are never evaluated. (For example,
+when the compiler analyzes `__origin_of(foo())`, it doesn't run the `foo()`
+function.)
+
+The following struct stores a string value using a
+[`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer): a smart
+pointer that holds an owned value. The `as_ptr()` method returns a `Pointer` to
+the stored string, using the same origin as the original `OwnedPointer`.
+
+```mojo
+from memory import OwnedPointer, Pointer
+
+struct BoxedString:
+    var o_ptr: OwnedPointer[String]
+
+    fn __init__(out self, value: String):
+        self.o_ptr = OwnedPointer(value)
+
+    fn as_ptr(mut self) -> Pointer[String, __origin_of(self.o_ptr)]:
+        return Pointer.address_of(self.o_ptr[])
+```
+
+Note that the `as_ptr()` method takes its `self` argument as `mut self`. If it
+used the default `read` argument convention, it would be immutable, and the
+derived origin (`__origin_of(self.o_ptr)`) would also be immutable.
+
+You can also pass multiple expressions to `__origin_of()` to express the union
+of two or more origins:
+
+`__origin_of(a, b)`
+
+#### Inferred origins
+
+The other common way to access an origin value is to *infer* it from the
+the arguments passed to a function or method. For example, the `Span` type
+has an associated `origin`:
+
+```mojo
+struct Span[
+    is_mutable: Bool, //,
+    T: CollectionElement,
+    origin: Origin[is_mutable],
+](CollectionElementNew):
+    """A non owning view of contiguous data.
+```
+
+One of its constructors creates a `Span` from an existing `List`, and infers
+its `origin` value from the list:
+
+```mojo
+    fn __init__(out self, ref [origin]list: List[T, *_]):
+        """Construct a Span from a List.
+
+        Args:
+            list: The list to which the span refers.
+        """
+        self._data = list.data
+        self._len = len(list)
+```
+
+## Working with references
+
+You can use the `ref` keyword with arguments and return values to specify a
+reference with parametric mutability. That is, they can be either mutable or
+immutable.
+
+From inside the called function, a `ref` argument looks like a `read` or
+`mut` argument.
+
+A `ref` return value looks like any other return value to the calling function,
+but it is a *reference* to an existing value, not a copy.
+
+### `ref` arguments
+
+The `ref` argument convention lets you specify an argument of parametric
+mutability: that is, you don't need to know in advance whether the passed
+argument will be mutable or immutable. There are several reasons you might want
+to use a `ref` argument:
+
+* You want to accept an argument with parametric mutability.
+
+* You want to tie the lifetime of one argument to the lifetime of another
+  argument.
+
+* When you want an argument that is guaranteed to be passed in memory: this can
+  be important and useful for generic arguments that need an identity,
+  irrespective of whether the concrete type is register passable.
+
+The syntax for a `ref` argument is:
+
+<code><strong>ref</strong> <var>arg_name</var>: <var>arg_type</var></code>
+
+Or:
+
+<code><strong>ref [</strong><var>origin_specifier(s)</var><strong>]</strong>
+<var>arg_name</var>: <var>arg_type</var></code>
+
+In the first form, the origin and mutability of the `ref` argument is inferred
+from the value passed in. The second form includes an origin clause, consisting
+of one or more origin specifiers inside square brackets. An origin
+specifier can be either:
+
+* An origin value.
+
+* An arbitrary expression, which is treated as shorthand for
+  `__origin_of(expression)`. In other words, the following declarations are
+  equivalent:
+
+  ```mojo
+  ref [__origin_of(self)]
+  ref [self]
+  ```
+
+* An [`AddressSpace`](/nightly/mojo/stdlib/memory/pointer/AddressSpace) value.
+
+* An underscore character (`_`) to indicate that the origin is *unbound*. This
+  is equivalent to omitting the origin specifier.
+
+  ```mojo
+  def add_ref(ref a: Int, b: Int) -> Int:
+    return a+b
+  ```
+
+You can also name the origin explicitly. This is useful if you want to specify
+an `ImmutableOrigin` or `MutableOrigin`, or if you want to bind to
+the `is_mutable` parameter.
+
+```mojo
+def take_str_ref[
+      is_mutable: Bool, //,
+      origin: Origin[is_mutable]
+    ](ref [origin] s: String):
+    @parameter
+    if is_mutable:
+        print("Mutable: " + s)
+    else:
+        print("Immutable: " + s)
+
+def pass_refs(s1: String, owned s2: String):
+    take_str_ref(s1)
+    take_str_ref(s2)
+
+pass_refs("Hello", "Goodbye")
+```
+
+```output
+Immutable: Hello
+Mutable: Goodbye
+```
+
+### `ref` return values
+
+Like `ref` arguments, `ref` return values allow a function to return a mutable
+or immutable reference to a value. The syntax for a `ref` return value is:
+
+<code><strong>-> ref [</strong><var>origin_specifier(s)</var><strong>]</strong>
+ <var>arg_type</var></code>
+
+Note that you **must** specify an origin specifier for a `ref` return value. The
+values allowed for origin specifiers are the same as the ones listed for
+[`ref` arguments](#ref-arguments).
+
+`ref` return values can be an efficient way to handle updating items in a
+collection. The standard way to do this is by implementing the `__getitem__()`
+and `__setitem__()` dunder methods. These are invoked to read from and write to
+a subscripted item in a collection:
+
+```mojo
+value = list[a]
+list[b] += 10
+```
+
+With a `ref` argument, `__getitem__()` can return a mutable reference that can
+be modified directly. This has pros and cons compared to using a `__setitem__()`
+method:
+
+* The mutable reference is more efficient—a single update isn't broken up across
+  two methods. However, the referenced value must be in memory.
+
+* A `__getitem__()`/`__setitem__()` pair allows for arbitrary code to be run
+  when values are retrieved and set. For example, `__setitem__()` can validate
+  or constrain input values.
+
+For example, in the following example, `NameList` has a `__getitem__()` method
+that returns a reference:
+
+```mojo
+struct NameList:
+    var names: List[String]
+
+    def __init__(out self, *names: String):
+        self.names = List[String]()
+        for name in names:
+            self.names.append(name[])
+
+    def __getitem__(ref self, index: Int) ->
+        ref [self.names] String:
+        if (index >=0 and index < len(self.names)):
+            return self.names[index]
+        else:
+            raise Error("index out of bounds")
+
+def use_name_list():
+    list = NameList("Thor", "Athena", "Dana", "Vrinda")
+    print(list[2])
+    list[2] += "?"
+    print(list[2])
+
+use_name_list()
+
+```
+
+```output
+Dana
+Dana?
+```
+
+Note that this update succeeds, even though `NameList` doesn't define a
+`__setitem__()` method:
+
+```mojo
+list[2] += "?"
+```
+
+Also note that the code uses the return value directly each time, rather than
+assigning the return value to a variable, like this:
+
+```mojo
+name = list[2]
+name += "?"
+```
+
+Since a variable needs to own its value, `name` would end up with an owned
+*copy* of the referenced value. Mojo doesn't currently have
+syntax to express that you want to keep the original reference in `name`. This
+will be added in a future release.
+
+If you're working with an API that returns a reference, and you want to avoid
+copying the referenced value, you can use a
+[`Pointer`](/mojo/stdlib/memory/pointer/Pointer) to hold an indirect reference.
+You can assign a `Pointer` to a variable, but you need to use the dereference
+operator (`[]`) to access the underlying value.
+
+```mojo
+name_ptr = Pointer.address_of(list[2])
+name_ptr[] += "?"
+```
+
+Similarly, when designing an API you might want to return a `Pointer` instead of
+a `ref` to allow users to assign the return value to a variable. For example,
+iterators for the standard library collections return pointers, so they can be
+used in `for..in` loops:
+
+```mojo
+nums = List(1, 2, 3)
+for item in nums: # List iterator returns a Pointer, which must be dereferenced
+    print(item[])
+for i in range(len(nums)):
+    print(nums[i]) # List __getitem__() returns a ref
+```
+
+```output
+1
+2
+3
+1
+2
+3
+```
+
+(You can find the code for the
+`List` iterator in the [Mojo
+repo](https://github.com/modularml/mojo/blob/main/stdlib/src/collections/list.mojo#L63).)
+
+#### Parametric mutability of return values
+
+Another advantage of `ref` return arguments is the ability to support parametric
+mutability.  For example, recall the signature of the `__getitem__()` method
+above:
+
+```mojo
+def __getitem__(ref self, index: Int) ->
+    ref [self] String:
+```
+
+Since the `origin` of the return value is tied to the origin of `self`, the
+returned reference will be mutable if the method was called using a
+mutable reference. The method still works if you have an immutable reference
+to the `NameList`, but it returns an immutable reference:
+
+```mojo
+fn pass_immutable_list(list: NameList) raises:
+    print(list[2])
+    # list[2] += "?" # Error, this list is immutable
+
+def use_name_list_again():
+    list = NameList("Sophie", "Jack", "Diana")
+    pass_immutable_list(list)
+
+use_name_list_again()
+```
+
+```output
+Diana
+```
+
+Without parametric mutability, you'd need to write two versions of
+`__getitem__()`, one that accepts an immutable `self` and another that accepts
+a mutable `self`.
+
+#### Return values with union origins
+
+A `ref` return value can include multiple values in its origin specifier, which
+yields the union of the origins. For example, the following `pick_one()`
+function returns a reference to one of the two input strings, with an origin
+that's a union of both origins.
+
+```mojo
+def pick_one(cond: Bool, ref a: String, ref b: String) -> ref [a, b] String:
+    return a if cond else b
+```

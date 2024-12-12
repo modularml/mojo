@@ -19,8 +19,9 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
+
+from .ffi import OpaquePointer, _external_call_const, external_call
 
 
 @always_inline("nodebug")
@@ -33,15 +34,13 @@ fn _accelerator_arch() -> StringLiteral:
     return __mlir_attr.`#kgen.param.expr<accelerator_arch> : !kgen.string`
 
 
-fn _get_arch[target: __mlir_type.`!kgen.target`]() -> String:
-    return String(
-        __mlir_attr[
-            `#kgen.param.expr<target_get_field,`,
-            target,
-            `, "arch" : !kgen.string`,
-            `> : !kgen.string`,
-        ]
-    )
+fn _get_arch[target: __mlir_type.`!kgen.target`]() -> StringLiteral:
+    return __mlir_attr[
+        `#kgen.param.expr<target_get_field,`,
+        target,
+        `, "arch" : !kgen.string`,
+        `> : !kgen.string`,
+    ]
 
 
 @always_inline("nodebug")
@@ -863,3 +862,38 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
         patch = int(osver[: osver.find(".")])
 
     return (major, minor, patch)
+
+
+# ===-----------------------------------------------------------------------===#
+# Detect GPU on host side
+# ===-----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn has_accelerator() -> Bool:
+    """Returns True if the host system has an accelerator and False otherwise.
+
+    Returns:
+        True if the host system has an accelerator.
+    """
+    return _accelerator_arch() != ""
+
+
+@always_inline("nodebug")
+fn has_amd_gpu_accelerator() -> Bool:
+    """Returns True if the host system has an AMD GPU and False otherwise.
+
+    Returns:
+        True if the host system has an AMD GPU.
+    """
+    return "amd" in _accelerator_arch()
+
+
+@always_inline("nodebug")
+fn has_nvidia_gpu_accelerator() -> Bool:
+    """Returns True if the host system has an NVIDIA GPU and False otherwise.
+
+    Returns:
+        True if the host system has an NVIDIA GPU.
+    """
+    return "nvidia" in _accelerator_arch()
