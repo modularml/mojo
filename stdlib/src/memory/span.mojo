@@ -386,11 +386,10 @@ struct Span[
         """
 
         if len(sub) == 1:
-            var s = sub.unsafe_ptr()[0]
 
             @parameter
             fn equal_fn[w: Int](v: SIMD[D, w]) -> SIMD[DType.bool, w]:
-                return v == SIMD[D, w](s)
+                return v == SIMD[D, w](sub.unsafe_ptr()[0])
 
             return self.count[func=equal_fn]()
 
