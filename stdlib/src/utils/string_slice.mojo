@@ -429,7 +429,8 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         """
 
         var s_len = self.byte_length()
-        s_ptr, rhs_ptr = self.unsafe_ptr(), rhs.unsafe_ptr()
+        var s_ptr = self.unsafe_ptr()
+        var rhs_ptr = rhs.unsafe_ptr()
         if s_len != rhs.byte_length():
             return False
         # same pointer and length, so equal
