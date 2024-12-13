@@ -376,9 +376,7 @@ struct Span[
     fn apply[
         D: DType, O: MutableOrigin, //,
         func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
-    ](
-        mut self: Span[Scalar[D], O],
-    ):
+    ](mut self: Span[Scalar[D], O]):
         """Apply the function to the `Span` inplace.
 
         Parameters:
@@ -411,9 +409,7 @@ struct Span[
         func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
         *,
         where: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w],
-    ](
-        mut self: Span[Scalar[D], O],
-    ):
+    ](mut self: Span[Scalar[D], O]):
         """Apply the function to the `Span` inplace where the condition is
         `True`.
 
