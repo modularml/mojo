@@ -212,14 +212,14 @@ def test_apply():
         )
         twice = items
         span = Span(twice)
-        span.apply(_twice[D])
+        span.apply[func=_twice[D]]()
         for i in range(len(items)):
             assert_true(span[i] == items[i] * 2)
 
         # twice only even numbers
         twice = items
         span = Span(twice)
-        span.apply(_twice[D], where=_where[D])
+        span.apply[func=_twice[D], where=_where[D]]()
         for i in range(len(items)):
             if items[i] % 2 == 0:
                 assert_true(span[i] == items[i] * 2)
