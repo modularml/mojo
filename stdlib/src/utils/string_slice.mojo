@@ -168,14 +168,14 @@ fn _memrmem[
 
 @value
 struct _StringSliceIter[
-    is_mutable: Bool, //,
-    origin: Origin[is_mutable],
+    mut: Bool, //,
+    origin: Origin[mut],
     forward: Bool = True,
 ]:
     """Iterator for `StringSlice` over unicode characters.
 
     Parameters:
-        is_mutable: Whether the slice is mutable.
+        mut: Whether the slice is mutable.
         origin: The origin of the underlying string data.
         forward: The iteration direction. `False` is backwards.
     """
@@ -234,7 +234,7 @@ struct _StringSliceIter[
 
 @value
 @register_passable("trivial")
-struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
+struct StringSlice[mut: Bool, //, origin: Origin[mut]](
     Stringable,
     Sized,
     Writable,
@@ -245,7 +245,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     """A non-owning view to encoded string data.
 
     Parameters:
-        is_mutable: Whether the slice is mutable.
+        mut: Whether the slice is mutable.
         origin: The origin of the underlying string data.
 
     Notes:
@@ -559,7 +559,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         buf.append(0)
         return String(buf^)
 
-    fn __contains__(ref self, substr: StringSlice[_]) -> Bool:
+    fn __contains__(ref self, substr: StringSlice) -> Bool:
         """Returns True if the substring is contained within the current string.
 
         Args:
@@ -765,7 +765,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
     @always_inline
     fn unsafe_ptr(
         self,
-    ) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
+    ) -> UnsafePointer[Byte, is_mutable=mut, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:
@@ -783,8 +783,22 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 
         return len(self.as_bytes())
 
+    fn get_immutable(
+        self,
+    ) -> StringSlice[ImmutableOrigin.cast_from[origin].result]:
+        """
+        Return an immutable version of this string slice.
+
+        Returns:
+            A string slice covering the same elements, but without mutability.
+        """
+        return StringSlice[ImmutableOrigin.cast_from[origin].result](
+            ptr=self._slice.unsafe_ptr(),
+            length=len(self),
+        )
+
     fn startswith(
-        self, prefix: StringSlice[_], start: Int = 0, end: Int = -1
+        self, prefix: StringSlice, start: Int = 0, end: Int = -1
     ) -> Bool:
         """Verify if the `StringSlice` starts with the specified prefix between
         start and end positions.
@@ -804,7 +818,7 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         ).startswith(prefix)
 
     fn endswith(
-        self, suffix: StringSlice[_], start: Int = 0, end: Int = -1
+        self, suffix: StringSlice, start: Int = 0, end: Int = -1
     ) -> Bool:
         """Verify if the `StringSlice` end with the specified suffix between
         start and end positions.

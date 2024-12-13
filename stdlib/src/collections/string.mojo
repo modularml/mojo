@@ -396,7 +396,7 @@ fn _str_to_base_error(base: Int, str_slice: StringSlice) -> String:
     )
 
 
-fn _identify_base(str_slice: StringSlice[_], start: Int) -> Tuple[Int, Int]:
+fn _identify_base(str_slice: StringSlice, start: Int) -> Tuple[Int, Int]:
     var length = str_slice.byte_length()
     # just 1 digit, assume base 10
     if start == (length - 1):
@@ -468,11 +468,11 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     return _atol(str.as_string_slice(), base)
 
 
-fn _atof_error(str_ref: StringSlice[_]) -> Error:
+fn _atof_error(str_ref: StringSlice) -> Error:
     return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
-fn _atof(str_ref: StringSlice[_]) raises -> Float64:
+fn _atof(str_ref: StringSlice) raises -> Float64:
     """Implementation of `atof` for StringRef inputs.
 
     Please see its docstring for details.

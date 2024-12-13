@@ -52,7 +52,7 @@ from builtin.io import _snprintf
 from documentation import doc_private
 from memory import UnsafePointer, bitcast, Span
 
-from utils import IndexList, StaticTuple, StringSlice
+from utils import IndexList, StaticTuple
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
