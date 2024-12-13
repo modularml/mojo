@@ -374,15 +374,18 @@ struct Span[
         )
 
     fn apply[
-        D: DType,
-        O: MutableOrigin, //,
+        D: DType, O: MutableOrigin, //
+    ](
+        mut self: Span[Scalar[D], O],
         func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
-    ](mut self: Span[Scalar[D], O]):
+    ):
         """Apply the function to the `Span` inplace.
 
         Parameters:
             D: The DType.
             O: The origin of the `Span`.
+
+        Args:
             func: The function to evaluate.
         """
 
@@ -406,18 +409,21 @@ struct Span[
             (ptr + processed + i).init_pointee_move(func(ptr[processed + i]))
 
     fn apply[
-        D: DType,
-        O: MutableOrigin, //,
+        D: DType, O: MutableOrigin, //
+    ](
+        mut self: Span[Scalar[D], O],
         func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
         *,
         where: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w],
-    ](mut self: Span[Scalar[D], O]):
+    ):
         """Apply the function to the `Span` inplace where the condition is
         `True`.
 
         Parameters:
             D: The DType.
             O: The origin of the `Span`.
+
+        Args:
             func: The function to evaluate.
             where: The condition to apply the function.
         """
