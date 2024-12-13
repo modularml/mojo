@@ -373,74 +373,74 @@ struct Span[
             ptr=self._data, length=self._len
         )
 
-fn apply[
-    D: DType,
-    O: MutableOrigin, //,
-    func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
-](mut self: Span[Scalar[D], O]):
-    """Apply the function to the `Span` inplace.
+    fn apply[
+        D: DType,
+        O: MutableOrigin, //,
+        func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
+    ](mut self: Span[Scalar[D], O]):
+        """Apply the function to the `Span` inplace.
 
-    Parameters:
-        D: The DType.
-        O: The origin of the `Span`.
-        func: The function to evaluate.
-    """
+        Parameters:
+            D: The DType.
+            O: The origin of the `Span`.
+            func: The function to evaluate.
+        """
 
-    alias widths = (256, 128, 64, 32, 16, 8, 4)
-    var ptr = self.unsafe_ptr()
-    var length = len(self)
-    var processed = 0
-
-    @parameter
-    for i in range(len(widths)):
-        alias w = widths.get[i, Int]()
+        alias widths = (256, 128, 64, 32, 16, 8, 4)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var processed = 0
 
         @parameter
-        if simdwidthof[D]() >= w:
-            for _ in range((length - processed) // w):
-                var p_curr = ptr + processed
-                p_curr.store(func(p_curr.load[width=w]()))
-                processed += w
+        for i in range(len(widths)):
+            alias w = widths.get[i, Int]()
 
-    for i in range(length - processed):
-        (ptr + processed + i).init_pointee_move(func(ptr[processed + i]))
+            @parameter
+            if simdwidthof[D]() >= w:
+                for _ in range((length - processed) // w):
+                    var p_curr = ptr + processed
+                    p_curr.store(func(p_curr.load[width=w]()))
+                    processed += w
+
+        for i in range(length - processed):
+            (ptr + processed + i).init_pointee_move(func(ptr[processed + i]))
 
 
-fn apply[
-    D: DType,
-    O: MutableOrigin, //,
-    func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
-    *,
-    where: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w],
-](mut self: Span[Scalar[D], O]):
-    """Apply the function to the `Span` inplace where the condition is
-    `True`.
+    fn apply[
+        D: DType,
+        O: MutableOrigin, //,
+        func: fn[w: Int] (SIMD[D, w]) -> SIMD[D, w],
+        *,
+        where: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w],
+    ](mut self: Span[Scalar[D], O]):
+        """Apply the function to the `Span` inplace where the condition is
+        `True`.
 
-    Parameters:
-        D: The DType.
-        O: The origin of the `Span`.
-        func: The function to evaluate.
-        where: The condition to apply the function.
-    """
+        Parameters:
+            D: The DType.
+            O: The origin of the `Span`.
+            func: The function to evaluate.
+            where: The condition to apply the function.
+        """
 
-    alias widths = (256, 128, 64, 32, 16, 8, 4)
-    var ptr = self.unsafe_ptr()
-    var length = len(self)
-    var processed = 0
-
-    @parameter
-    for i in range(len(widths)):
-        alias w = widths.get[i, Int]()
+        alias widths = (256, 128, 64, 32, 16, 8, 4)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var processed = 0
 
         @parameter
-        if simdwidthof[D]() >= w:
-            for _ in range((length - processed) // w):
-                var p_curr = ptr + processed
-                var vec = p_curr.load[width=w]()
-                p_curr.store(where(vec).select(func(vec), vec))
-                processed += w
+        for i in range(len(widths)):
+            alias w = widths.get[i, Int]()
 
-    for i in range(length - processed):
-        var vec = ptr[processed + i]
-        if where(vec):
-            (ptr + processed + i).init_pointee_move(func(vec))
+            @parameter
+            if simdwidthof[D]() >= w:
+                for _ in range((length - processed) // w):
+                    var p_curr = ptr + processed
+                    var vec = p_curr.load[width=w]()
+                    p_curr.store(where(vec).select(func(vec), vec))
+                    processed += w
+
+        for i in range(length - processed):
+            var vec = ptr[processed + i]
+            if where(vec):
+                (ptr + processed + i).init_pointee_move(func(vec))
