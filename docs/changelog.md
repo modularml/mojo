@@ -27,9 +27,21 @@ what we publish.
 - mblack (aka `mojo format`) no longer formats non-mojo files. This prevents
   unexpected formatting of python files.
 
+- Full struct signature information is now exposed in the documentation
+  generator, and in the symbol outline and hover markdown via the Mojo Language
+  Server.
+
 ### ❌ Removed
 
 - `StringRef` is being deprecated. Use `StringSlice` instead.
   - removed `StringRef.startswith()` and `StringRef.endswith()`
 
 ### 🛠️ Fixed
+
+- The Mojo Kernel for Jupyter Notebooks is working again on nightly releases.
+
+- The command `mojo debug --vscode` now sets the current working directory
+  properly.
+
+- The Mojo Language Server doesn't crash anymore on empty **init**.mojo files.
+  [Issue #3826](https://github.com/modularml/mojo/issues/3826).

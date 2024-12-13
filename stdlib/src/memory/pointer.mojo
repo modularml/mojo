@@ -42,7 +42,7 @@ struct _GPUAddressSpace(EqualityComparable):
     """Shared address space."""
     alias CONSTANT = AddressSpace(4)
     """Constant address space."""
-    alias LOCAL = AddressSpace(5) if is_nvidia_gpu() else AddressSpace(3)
+    alias LOCAL = AddressSpace(5)
     """Local address space."""
 
     @always_inline("nodebug")
