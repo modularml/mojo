@@ -73,6 +73,9 @@ what we publish.
 
 ### ❌ Removed
 
+- `StringRef` is being deprecated. Use `StringSlice` instead.
+  - removed `StringRef.startswith()` and `StringRef.endswith()`
+
 ### 🛠️ Fixed
 
 - The Mojo Kernel for Jupyter Notebooks is working again on nightly releases.
