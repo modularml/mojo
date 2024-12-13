@@ -107,7 +107,7 @@ struct Span[
     """
 
     # Field
-    var _data: UnsafePointer[T, is_mutable=is_mutable, origin=origin]
+    var _data: UnsafePointer[T, mut=is_mutable, origin=origin]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
@@ -250,9 +250,7 @@ struct Span[
     # Methods
     # ===------------------------------------------------------------------===#
 
-    fn unsafe_ptr(
-        self,
-    ) -> UnsafePointer[T, is_mutable=is_mutable, origin=origin]:
+    fn unsafe_ptr(self) -> UnsafePointer[T, mut=is_mutable, origin=origin]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:

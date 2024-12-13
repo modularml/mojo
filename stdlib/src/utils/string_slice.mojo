@@ -765,7 +765,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
     @always_inline
     fn unsafe_ptr(
         self,
-    ) -> UnsafePointer[Byte, is_mutable=mut, origin=origin]:
+    ) -> UnsafePointer[Byte, mut=mut, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:

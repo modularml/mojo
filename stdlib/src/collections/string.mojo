@@ -1598,7 +1598,7 @@ struct String(
         ref self,
     ) -> UnsafePointer[
         Byte,
-        is_mutable = Origin(__origin_of(self)).is_mutable,
+        mut = Origin(__origin_of(self)).is_mutable,
         origin = __origin_of(self),
     ]:
         """Retrieves a pointer to the underlying memory.
