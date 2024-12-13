@@ -405,7 +405,6 @@ struct Span[
         for i in range(length - processed):
             (ptr + processed + i).init_pointee_move(func(ptr[processed + i]))
 
-
     fn apply[
         D: DType,
         O: MutableOrigin, //,
