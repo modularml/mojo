@@ -23,6 +23,7 @@ from memory import Span
 from collections import InlineArray
 
 from memory import Pointer, UnsafePointer
+from sys.info import simdwidthof
 
 
 trait AsBytes:
@@ -245,6 +246,42 @@ struct Span[
             The size of the span.
         """
         return self._len
+
+    fn __contains__[
+        type: DType, //
+    ](self: Span[Scalar[type]], value: Scalar[type]) -> Bool:
+        """Verify if a given value is present in the Span.
+
+        Parameters:
+            type: The DType of the scalars stored in the Span.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+
+        alias widths = InlineArray[Int, 6](256, 128, 64, 32, 16, 8)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var processed = 0
+
+        @parameter
+        for i in range(len(widths)):
+            alias width = widths[i]
+
+            @parameter
+            if simdwidthof[type]() >= width:
+                for _ in range((length - processed) // width):
+                    if value in (ptr + processed).load[width=width]():
+                        return True
+                    processed += width
+
+        for i in range(length - processed):
+            if ptr[processed + i] == value:
+                return True
+        return False
 
     # ===------------------------------------------------------------------===#
     # Methods
