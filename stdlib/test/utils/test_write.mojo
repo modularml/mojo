@@ -15,7 +15,7 @@
 from testing import assert_equal
 
 from utils import Writable, Writer
-from utils.inline_string import _FixedString
+from collections.string.inline_string import _FixedString
 
 
 fn main() raises:
