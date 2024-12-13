@@ -391,7 +391,7 @@ struct Span[
             fn equal_fn[w: Int](v: SIMD[D, w]) -> SIMD[DType.bool, w]:
                 return v == SIMD[D, w](sub.unsafe_ptr()[0])
 
-            return self.count(equal_fn)
+            return self.count[func=equal_fn]()
 
         # HACK(#3548): this is a hack until we have Span.find(). All count
         # implementations should delegate to Span.count() eventually.
@@ -410,14 +410,12 @@ struct Span[
         )
 
     fn count[
-        D: DType, //
-    ](self: Span[Scalar[D]], func: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w]) -> UInt:
+        D: DType, //, func: fn[w: Int] (SIMD[D, w]) -> SIMD[DType.bool, w]
+    ](self: Span[Scalar[D]]) -> UInt:
         """Count the amount of times the function returns `True`.
 
         Parameters:
             D: The DType.
-        
-        Args:
             func: The function to evaluate.
 
         Returns:
@@ -453,14 +451,13 @@ struct Span[
 
     # FIXME(#2535): delete once function effects can be parametrized
     fn count[
-        D: DType, //
-    ](self: Span[Scalar[D]], func: fn[w: Int] (SIMD[D, w]) capturing -> SIMD[DType.bool, w]) -> UInt:
+        D: DType, //,
+        func: fn[w: Int] (SIMD[D, w]) capturing -> SIMD[DType.bool, w],
+    ](self: Span[Scalar[D]]) -> UInt:
         """Count the amount of times the function returns `True`.
 
         Parameters:
             D: The DType.
-        
-        Args:
             func: The function to evaluate.
 
         Returns:
