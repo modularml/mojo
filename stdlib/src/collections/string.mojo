@@ -784,7 +784,7 @@ struct String(
 
     @always_inline
     @implicit
-    fn __init__(out self, impl: List[Byte, *_]):
+    fn __init__(out self, owned impl: List[Byte, *_]):
         """Construct a string from a buffer of null-terminated bytes, copying
         the allocated data. Use the transfer operator `^` to avoid the copy.
 
