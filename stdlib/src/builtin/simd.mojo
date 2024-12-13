@@ -17,7 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 import math
 from collections import InlineArray
-from collections.string import (
+from collections.string import StringSlice
+from collections.string.string import (
     _calc_format_buffer_size,
     _calc_initial_buffer_size,
 )
@@ -52,7 +53,7 @@ from builtin.io import _snprintf
 from documentation import doc_private
 from memory import UnsafePointer, bitcast, Span
 
-from utils import IndexList, StaticTuple, StringSlice
+from utils import IndexList, StaticTuple
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan

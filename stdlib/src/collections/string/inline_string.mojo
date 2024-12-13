@@ -16,12 +16,12 @@
 """
 
 from collections import InlineArray, Optional
+from collections.string import StringSlice
+from memory import UnsafePointer, memcpy, Span
 from os import abort
 from sys import sizeof
+from utils import Variant, StringRef
 
-from memory import UnsafePointer, memcpy, Span
-
-from utils import StringSlice, Variant
 
 # ===-----------------------------------------------------------------------===#
 # InlineString
