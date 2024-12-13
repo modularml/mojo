@@ -1,6 +1,6 @@
 [project]
 authors = ["Modular <hello@modular.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max-nightly/"]
+channels = ["conda-forge", "https://conda.modular.com/max/"]
 description = "Introduction to Mojo Tutorial: Conway's Game of Life"
 name = "life"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
