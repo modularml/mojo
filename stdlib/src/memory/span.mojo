@@ -23,6 +23,7 @@ from memory import Span
 from collections import InlineArray
 
 from memory import Pointer, UnsafePointer
+from sys.info import simdwidthof
 
 
 trait AsBytes:
@@ -43,15 +44,15 @@ trait AsBytes:
 
 @value
 struct _SpanIter[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable],
+    origin: Origin[mut],
     forward: Bool = True,
 ]:
     """Iterator for Span.
 
     Parameters:
-        is_mutable: Whether the reference to the span is mutable.
+        mut: Whether the reference to the span is mutable.
         T: The type of the elements in the span.
         origin: The origin of the Span.
         forward: The iteration direction. `False` is backwards.
@@ -92,20 +93,20 @@ struct _SpanIter[
 @value
 @register_passable("trivial")
 struct Span[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable],
+    origin: Origin[mut],
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
     Parameters:
-        is_mutable: Whether the span is mutable.
+        mut: Whether the span is mutable.
         T: The type of the elements in the span.
         origin: The origin of the Span.
     """
 
     # Field
-    var _data: UnsafePointer[T]
+    var _data: UnsafePointer[T, mut=mut, origin=origin]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
@@ -244,18 +245,52 @@ struct Span[
         """
         return self._len
 
+    fn __contains__[
+        type: DType, //
+    ](self: Span[Scalar[type]], value: Scalar[type]) -> Bool:
+        """Verify if a given value is present in the Span.
+
+        Parameters:
+            type: The DType of the scalars stored in the Span.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+
+        alias widths = InlineArray[Int, 6](256, 128, 64, 32, 16, 8)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var processed = 0
+
+        @parameter
+        for i in range(len(widths)):
+            alias width = widths[i]
+
+            @parameter
+            if simdwidthof[type]() >= width:
+                for _ in range((length - processed) // width):
+                    if value in (ptr + processed).load[width=width]():
+                        return True
+                    processed += width
+
+        for i in range(length - processed):
+            if ptr[processed + i] == value:
+                return True
+        return False
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
 
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
-        """
-        Gets a pointer to the first element of this slice.
+    fn unsafe_ptr(self) -> UnsafePointer[T, mut=mut, origin=origin]:
+        """Retrieves a pointer to the underlying memory.
 
         Returns:
-            A pointer pointing at the first element of this slice.
+            The pointer to the underlying memory.
         """
-
         return self._data
 
     fn as_ref(self) -> Pointer[T, origin]:

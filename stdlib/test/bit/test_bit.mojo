@@ -25,7 +25,9 @@ from bit import (
     pop_count,
     rotate_bits_left,
     rotate_bits_right,
+    log2_floor,
 )
+from math import log2, floor
 from testing import assert_equal
 
 
@@ -497,6 +499,30 @@ def test_rotate_bits_simd():
     assert_equal(rotate_bits_right[6](Scalar[type](96)), 129)
 
 
+fn _log2_floor(n: Int) -> Int:
+    return int(floor(log2(float(n))))
+
+
+def test_log2_floor():
+    assert_equal(log2_floor(0), 0)
+    for i in range(1, 100):
+        assert_equal(
+            log2_floor(i),
+            _log2_floor(i),
+            msg="mismatching value for the input value of " + str(i),
+        )
+
+    fn _check_alias[n: Int](expected: Int) raises:
+        alias res = log2_floor(n)
+        assert_equal(res, expected)
+
+    _check_alias[0](0)
+    _check_alias[1](0)
+    _check_alias[2](1)
+    _check_alias[15](3)
+    _check_alias[32](5)
+
+
 def main():
     test_rotate_bits_int()
     test_rotate_bits_simd()
@@ -519,3 +545,4 @@ def main():
     test_pop_count()
     test_pop_count_simd()
     test_bit_not_simd()
+    test_log2_floor()

@@ -378,7 +378,7 @@ struct MyInt:
     """A type that is implicitly convertible to `Int`."""
     var value: Int
 
-    @always_inline("nodebug")
+    @implicit
     fn __init__(out self, _a: Int):
         self.value = _a
 

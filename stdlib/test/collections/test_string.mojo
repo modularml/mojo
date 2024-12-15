@@ -1200,7 +1200,7 @@ def test_string_iter():
     assert_equal(321, atol(concat))
 
     for v in vs:
-        v.unsafe_ptr()[] = ord("1")
+        v.unsafe_ptr().bitcast[mut=True]()[] = ord("1")
 
     # Borrow immutably
     for v in vs:

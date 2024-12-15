@@ -52,7 +52,7 @@ from builtin.io import _snprintf
 from documentation import doc_private
 from memory import UnsafePointer, bitcast, Span
 
-from utils import IndexList, StaticTuple, StringSlice
+from utils import IndexList, StaticTuple
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -1584,7 +1584,7 @@ struct SIMD[type: DType, size: Int](
                 output.write(", ")
             _write_scalar(output, element)
         output.write(")")
-        return output
+        return output^
 
     @always_inline("nodebug")
     fn __floor__(self) -> Self:
@@ -2329,7 +2329,7 @@ struct SIMD[type: DType, size: Int](
         ](self, value, Int64(offset))
 
     @always_inline("nodebug")
-    fn join(self, other: Self) -> SIMD[type, 2 * size] as result:
+    fn join(self, other: Self, out result: SIMD[type, 2 * size]):
         """Concatenates the two vectors together.
 
         Args:

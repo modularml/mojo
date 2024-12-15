@@ -98,13 +98,16 @@ struct Grid[rows: Int, cols: Int](StringableRaising):
         next_generation = Self()
 
         for row in range(rows):
+            # Calculate neighboring row indices, handling "wrap-around"
             row_above = (row - 1) % rows
             row_below = (row + 1) % rows
 
             for col in range(cols):
+                # Calculate neighboring column indices, handling "wrap-around"
                 col_left = (col - 1) % cols
                 col_right = (col + 1) % cols
 
+                # Determine number of populated cells around the current cell
                 num_neighbors = (
                     self[row_above, col_left]
                     + self[row_above, col]

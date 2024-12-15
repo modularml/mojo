@@ -50,14 +50,16 @@ struct MyPair:
         self.second = second
 ```
 
-Notice that the first argument in the `__init__()` method is `out self`. For
-now, ignore `out` (it's an [argument
-convention](/mojo/manual/values/ownership#argument-conventions) that
-declares `self` as a mutable reference); all you need to know right now is that
-`self` must be the first argument. It references the current struct instance
-(it allows code in the method to refer to "itself"). *When you call the
-constructor, you never pass a value for `self`—Mojo passes it in
-automatically.*
+Notice that the first argument in the `__init__()` method is `out self`. You'll
+have a `self` argument as the first argument on all struct methods. It
+references the current struct instance (it allows code in the method to refer to
+"itself"). *When you call the constructor, you never pass a value for
+`self`—Mojo passes it in automatically.*
+
+The `out` portion of `out self` is an [argument
+convention](/mojo/manual/values/ownership#argument-conventions) that declares
+`self` as a mutable reference that starts out as uninitialized and must be
+initialized before the function returns.
 
 The `__init__()` method is one of many [special methods](#special-methods)
 (also known as "dunder methods" because they have *d*ouble *under*scores) with
@@ -193,15 +195,15 @@ Syntactically, the biggest difference compared to a Python class is that all
 fields in a struct must be explicitly declared with `var`.
 
 In Mojo, the structure and contents of a struct are set at compile time and
-can’t be changed while the program is running. Unlike in Python, where you can
-add, remove, or change attributes of an object on the fly, Mojo doesn’t allow
+can't be changed while the program is running. Unlike in Python, where you can
+add, remove, or change attributes of an object on the fly, Mojo doesn't allow
 that for structs.
 
 However, the static nature of structs helps Mojo run your code faster. The
-program knows exactly where to find the struct’s information and how to use it
+program knows exactly where to find the struct's information and how to use it
 without any extra steps or delays at runtime.
 
-Mojo’s structs also work really well with features you might already know from
+Mojo's structs also work really well with features you might already know from
 Python, like operator overloading (which lets you change how math symbols like
 `+` and `-` work with your own data, using [special
 methods](#special-methods)).

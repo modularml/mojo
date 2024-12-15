@@ -344,9 +344,29 @@ fn bit_width[
 
 
 # ===-----------------------------------------------------------------------===#
+# log2_floor
+# ===-----------------------------------------------------------------------===#
+
+
+@always_inline
+fn log2_floor(val: Int) -> Int:
+    """Returns the floor of the base-2 logarithm of an integer value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The floor of the base-2 logarithm of the input value, which is equal to
+        the position of the highest set bit. Returns -1 if val is 0.
+    """
+    if val <= 1:
+        return 0
+    return bitwidthof[Int]() - count_leading_zeros(val) - 1
+
+
+# ===-----------------------------------------------------------------------===#
 # is_power_of_two
 # ===-----------------------------------------------------------------------===#
-# reference: https://en.cppreference.com/w/cpp/numeric/has_single_bit
 
 
 @always_inline
