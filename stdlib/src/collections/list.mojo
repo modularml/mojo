@@ -502,7 +502,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             Except for 0 capacity where it sets 1.
         """
         if self.size >= self.capacity:
-            self._realloc(self.capacity * 2 + int(self.capacity == 0))
+            self._realloc(self.capacity * 2 | int(self.capacity == 0))
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
