@@ -411,7 +411,7 @@ fn _get_dylib_function[
 
 struct _Global[
     name: StringLiteral,
-    storage_type: Movable,
+    storage_type: AnyType,
     init_fn: fn () -> storage_type,
 ]:
     @staticmethod
@@ -422,10 +422,17 @@ struct _Global[
         # Heap allocate space to store this "global"
         var ptr = UnsafePointer[storage_type].alloc(1)
 
-        # TODO:
-        #   Any way to avoid the move, e.g. by calling this function
-        #   with the ABI destination result pointer already set to `ptr`?
-        ptr.init_pointee_move(init_fn())
+        # Emplace the value into the space
+        __get_address_as_uninit_lvalue(ptr.address) = init_fn()
+
+        # Note: the stub is to use the pointer as an uninitialized lvalue
+        #       and emplacing an rvalue into it (saving the move)
+        #       (like assigning to an uninitialized variable)
+        # More magic operators for pointers and values:
+        # (there are multiple ones, but this one seem to be the most useful)
+        # (because most of them are already wrapped into the UnsafePointer api)
+        # (maybe __get_as_uninit(self) = arg could be added but not sure)
+        # https://docs.modular.com/mojo/changelog#week-of-2023-04-17
 
         return ptr.bitcast[NoneType]()
 
