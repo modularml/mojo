@@ -152,8 +152,11 @@ struct BitMask:
             return abort[__type_of(lhs)]()
 
     @staticmethod
-    fn compare[D: DType, //, comp: Int](lhs: Int, rhs: Int) -> Int:
+    fn compare[comp: Int](lhs: Int, rhs: Int) -> Int:
         """Get a bitmask of the comparison between the two values.
+
+        Parameters:
+            comp: The comparison operator, e.g. `BitMask.EQ`.
 
         Args:
             lhs: The value to check.
