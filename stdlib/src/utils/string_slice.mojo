@@ -22,14 +22,12 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from bit.utils import is_negative_bitmask, are_equal_bitmask
 from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
 from collections.string import _atof, _atol, _isspace
 from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely, likely
 
-from bit import count_leading_zeros
 from memory import UnsafePointer, memcmp, memcpy, Span, AsBytes
 from memory.memory import _memcmp_impl_unconstrained
 
