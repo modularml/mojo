@@ -1001,7 +1001,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
             # highly performance sensitive code, benchmark before touching
             var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
-            if no_null_len == 1:
+            if likely(no_null_len == 1):
                 return _isspace(ptr[0])
             elif no_null_len == 2:
                 return ptr[0] == 0xC2 and ptr[1] == 0x85  # next_line: \x85
@@ -1348,28 +1348,36 @@ fn _is_newline_char[
 fn _split[
     has_maxsplit: Bool
 ](src_str: String, sep: NoneType, maxsplit: Int) -> List[String]:
-    return _to_string_list(_split_impl[has_maxsplit](src_str, maxsplit))
+    return _to_string_list(
+        _split_impl[has_maxsplit](src_str.as_string_slice(), maxsplit)
+    )
 
 
 @always_inline
 fn _split[
     has_maxsplit: Bool
 ](src_str: String, sep: StringSlice, maxsplit: Int) -> List[String]:
-    return _to_string_list(_split_impl[has_maxsplit](src_str, sep, maxsplit))
+    return _to_string_list(
+        _split_impl[has_maxsplit](src_str.as_string_slice(), sep, maxsplit)
+    )
 
 
 @always_inline
 fn _split[
     has_maxsplit: Bool
 ](src_str: StringLiteral, sep: NoneType, maxsplit: Int) -> List[String]:
-    return _to_string_list(_split_impl[has_maxsplit](src_str, maxsplit))
+    return _to_string_list(
+        _split_impl[has_maxsplit](src_str.as_string_slice(), maxsplit)
+    )
 
 
 @always_inline
 fn _split[
     has_maxsplit: Bool
 ](src_str: StringLiteral, sep: StringSlice, maxsplit: Int) -> List[String]:
-    return _to_string_list(_split_impl[has_maxsplit](src_str, sep, maxsplit))
+    return _to_string_list(
+        _split_impl[has_maxsplit](src_str.as_string_slice(), sep, maxsplit)
+    )
 
 
 @always_inline
@@ -1433,11 +1441,11 @@ fn _split_impl[
         # FIXME(#3526): use str_span and sep_span
         rhs = src_str.find(sep, lhs)
         # if not found go to the end
-        rhs += is_negative_bitmask(rhs) & (str_byte_len + 1)
+        rhs += int(rhs == -1) * (str_byte_len + 1)
 
         @parameter
         if has_maxsplit:
-            rhs += are_equal_bitmask(items, maxsplit) & (str_byte_len - rhs)
+            rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
         output.append(S(ptr=ptr + lhs, length=rhs - lhs))
@@ -1485,7 +1493,7 @@ fn _split_impl[
 
         @parameter
         if has_maxsplit:
-            rhs += are_equal_bitmask(items, maxsplit) & (str_byte_len - rhs)
+            rhs += int(items == maxsplit) * (str_byte_len - rhs)
             items += 1
 
         output.append(S(ptr=ptr + lhs, length=rhs - lhs))
