@@ -45,7 +45,7 @@ print(ptr[])
 
 ## Pointer terminology
 
-Before we jump into the pointer types, here are a few terms you’ll run across. Some
+Before we jump into the pointer types, here are a few terms you'll run across. Some
 of them may already be familiar to you.
 
 - **Safe pointers**: are designed to prevent memory errors. Unless you use one
@@ -54,7 +54,7 @@ of them may already be familiar to you.
   use-after-free.
 
 - **Nullable pointers**: can point to an invalid memory location (typically 0,
-or a “null pointer”). Safe pointers aren’t nullable.
+or a “null pointer”). Safe pointers aren't nullable.
 
 - **Smart pointers**: own their pointees, which means that the value they point
   to may be deallocated when the pointer itself is destroyed. Non-owning
@@ -66,10 +66,10 @@ or a “null pointer”). Safe pointers aren’t nullable.
   allocation can either be implicit (that is, performed automatically when
   initializing a pointer with a value) or explicit.
 
-- **Uninitialized memory**: refers to memory locations that haven’t been
+- **Uninitialized memory**: refers to memory locations that haven't been
   initialized with a value, which may therefore contain random data.
-  Newly-allocated memory is uninitialized. The safe pointer types don’t allow
-  users to access memory that’s uninitialized. Unsafe pointers can allocate a
+  Newly-allocated memory is uninitialized. The safe pointer types don't allow
+  users to access memory that's uninitialized. Unsafe pointers can allocate a
   block of uninitialized memory locations and then initialize them one at a time.
   Being able to access uninitialized memory is unsafe by definition.
 
@@ -93,7 +93,7 @@ The Mojo standard library includes several pointer types with different
 characteristics:
 
 - [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) is a safe pointer that points
-  to a single value that it doesn’t own.
+  to a single value that it doesn't own.
 
 - [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer) is a smart
   pointer that points to a single value, and maintains exclusive ownership of
@@ -139,10 +139,10 @@ The following sections provide more details on each pointer type.
 ## `Pointer`
 
 The [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) type is a safe pointer that
-points to a initialized value that it doesn’t own. Some example use cases for a
+points to a initialized value that it doesn't own. Some example use cases for a
 `Pointer` include:
 
-- Storing a reference to a related type. For example, a list’s iterator object
+- Storing a reference to a related type. For example, a list's iterator object
 might hold a `Pointer` back to the original list.
 
 - Passing the memory location for a single value to external code via
@@ -181,11 +181,11 @@ either `Movable`, `Copyable`, or `ExplicitlyCopyable`.
 Since an `OwnedPointer` is designed to enforce single ownership, the pointer
 itself can be moved, but not copied.
 
-Note: Currently, you can’t create an `Optional[OwnedPointer[T]]` because the
+Note: Currently, you can't create an `Optional[OwnedPointer[T]]` because the
 `Optional` type only works with types that are both movable and copyable. This
 restricts some use cases that would otherwise be a natural fit
 for`OwnedPointer`, including self-referential data structures like linked lists
-and trees. (Until this use case is supported for `OwnedPointer`, it’s possible
+and trees. (Until this use case is supported for `OwnedPointer`, it's possible
 to use`ArcPointer` where you need a smart pointer that can be `Optional`.)
 
 ## `ArcPointer`
@@ -241,19 +241,19 @@ def main():
 Note: The reference count is stored using an
 [`Atomic`]([/mojo/stdlib/os/atomic/Atomic](https://docs.modular-staging.com/mojo/stdlib/os/atomic/Atomic))
 value to ensure that updates to the reference count are thread-safe. However,
-Mojo doesn’t currently enforce exclusive access across thread boundaries, so
-it’s possible to form race conditions.
+Mojo doesn't currently enforce exclusive access across thread boundaries, so
+it's possible to form race conditions.
 
 ## UnsafePointer
 
 [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) is a
 low-level pointer that can access a block of contiguous memory locations, which
-might be uninitialized. It’s analogous to a raw pointer in the C and C++
+might be uninitialized. It's analogous to a raw pointer in the C and C++
 programming languages. `UnsafePointer` provides unsafe methods for initializing
-and destroying stored values, as well as for accessing the values once they’re
+and destroying stored values, as well as for accessing the values once they're
 initialized.
 
-As the name suggests, `UnsafePointer` doesn’t provide any memory safety
+As the name suggests, `UnsafePointer` doesn't provide any memory safety
 guarantees, so you should reserve it for cases when none of the other pointer
 types will do the job. Here are some use cases where you might want to use an
 `UnsafePointer`:

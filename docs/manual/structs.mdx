@@ -195,15 +195,15 @@ Syntactically, the biggest difference compared to a Python class is that all
 fields in a struct must be explicitly declared with `var`.
 
 In Mojo, the structure and contents of a struct are set at compile time and
-can’t be changed while the program is running. Unlike in Python, where you can
-add, remove, or change attributes of an object on the fly, Mojo doesn’t allow
+can't be changed while the program is running. Unlike in Python, where you can
+add, remove, or change attributes of an object on the fly, Mojo doesn't allow
 that for structs.
 
 However, the static nature of structs helps Mojo run your code faster. The
-program knows exactly where to find the struct’s information and how to use it
+program knows exactly where to find the struct's information and how to use it
 without any extra steps or delays at runtime.
 
-Mojo’s structs also work really well with features you might already know from
+Mojo's structs also work really well with features you might already know from
 Python, like operator overloading (which lets you change how math symbols like
 `+` and `-` work with your own data, using [special
 methods](#special-methods)).
