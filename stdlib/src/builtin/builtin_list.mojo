@@ -17,9 +17,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from memory import Pointer, UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # ListLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
@@ -119,9 +119,9 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         return value in self.storage
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # VariadicList / VariadicListMem
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -221,7 +221,7 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 struct _VariadicListMemIter[
     elt_is_mutable: Bool, //,
     elt_type: AnyType,
-    elt_origin: Origin[elt_is_mutable].type,
+    elt_origin: Origin[elt_is_mutable],
     list_origin: ImmutableOrigin,
 ]:
     """Iterator for VariadicListMem.
@@ -233,10 +233,15 @@ struct _VariadicListMemIter[
         list_origin: The origin of the VariadicListMem.
     """
 
-    alias variadic_list_type = VariadicListMem[elt_type, elt_origin]
+    alias variadic_list_type = VariadicListMem[
+        elt_type, elt_origin._mlir_origin
+    ]
 
     var index: Int
-    var src: Pointer[Self.variadic_list_type, list_origin]
+    var src: Pointer[
+        Self.variadic_list_type,
+        list_origin,
+    ]
 
     fn __init__(
         mut self, index: Int, ref [list_origin]list: Self.variadic_list_type
@@ -260,42 +265,10 @@ struct _VariadicListMemIter[
         return len(self.src[]) - self.index
 
 
-# Helper to compute the union of two origins:
-# TODO: parametric aliases would be nice.
-struct _lit_origin_union[
-    is_mutable: Bool, //,
-    a: Origin[is_mutable].type,
-    b: Origin[is_mutable].type,
-]:
-    alias result = __mlir_attr[
-        `#lit.origin.union<`,
-        a,
-        `,`,
-        b,
-        `> : !lit.origin<`,
-        is_mutable.value,
-        `>`,
-    ]
-
-
-struct _lit_mut_cast[
-    is_mutable: Bool, //,
-    operand: Origin[is_mutable].type,
-    result_mutable: Bool,
-]:
-    alias result = __mlir_attr[
-        `#lit.origin.mutcast<`,
-        operand,
-        `> : !lit.origin<`,
-        +result_mutable.value,
-        `>`,
-    ]
-
-
 struct VariadicListMem[
     elt_is_mutable: Bool, //,
     element_type: AnyType,
-    origin: Origin[elt_is_mutable].type,
+    origin: Origin[elt_is_mutable]._mlir_type,
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes references to the elements in a
@@ -433,13 +406,12 @@ struct VariadicListMem[
     fn __getitem__(
         self, idx: Int
     ) -> ref [
-        _lit_origin_union[
-            origin,
-            # cast mutability of self to match the mutability of the element,
-            # since that is what we want to use in the ultimate reference and
-            # the union overall doesn't matter.
-            _lit_mut_cast[__origin_of(self), elt_is_mutable].result,
-        ].result
+        # cast mutability of self to match the mutability of the element,
+        # since that is what we want to use in the ultimate reference and
+        # the union overall doesn't matter.
+        Origin[elt_is_mutable]
+        .cast_from[__origin_of(origin, self)]
+        .result
     ] element_type:
         """Gets a single element on the variadic list.
 
@@ -469,9 +441,9 @@ struct VariadicListMem[
         ](0, self)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # VariadicPack
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
@@ -480,7 +452,7 @@ alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 @register_passable
 struct VariadicPack[
     elt_is_mutable: Bool, //,
-    origin: Origin[elt_is_mutable].type,
+    origin: Origin[elt_is_mutable]._mlir_type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
 ](Sized):

@@ -29,11 +29,13 @@ feedback](https://www.modular.com/community).
 
 - **Language basics**
 
-  - [Introduction to Mojo](/mojo/manual/basics)
+  - [Overview](/mojo/manual/basics)
   - [Functions](/mojo/manual/functions)
   - [Variables](/mojo/manual/variables)
   - [Types](/mojo/manual/types)
+  - [Operators and expressions](/mojo/manual/operators)
   - [Control flow](/mojo/manual/control-flow)
+  - [Errors and context managers](/mojo/manual/errors)
   - [Structs](/mojo/manual/structs)
   - [Modules and packages](/mojo/manual/packages)
 
@@ -41,7 +43,8 @@ feedback](https://www.modular.com/community).
 
   - [Intro to value ownership](/mojo/manual/values/)
   - [Value semantics](/mojo/manual/values/value-semantics)
-  - [Ownership and borrowing](/mojo/manual/values/ownership)
+  - [Ownership](/mojo/manual/values/ownership)
+  - [Lifetimes, origins, and references](/mojo/manual/values/lifetimes)
 
 - **Value lifecycle**
 
@@ -56,7 +59,8 @@ feedback](https://www.modular.com/community).
 
 - **Pointers**
 
-  - [Unsafe pointers](/mojo/manual/pointers)
+  - [Intro to pointers](/mojo/manual/pointers/)
+  - [Unsafe pointers](/mojo/manual/pointers/unsafe-pointers)
 
 - **Python**
 

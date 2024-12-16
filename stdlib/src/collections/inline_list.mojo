@@ -24,15 +24,15 @@ from sys.intrinsics import _type_is_eq
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # InlineList
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @value
 struct _InlineListIter[
     list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_origin: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability],
     forward: Bool = True,
 ]:
     """Iterator for InlineList.

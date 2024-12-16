@@ -22,17 +22,14 @@ from collections import List
 
 from os import abort
 from sys import sizeof
-from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, UnsafePointer, memcpy
-
-from utils import Span
+from memory import Pointer, UnsafePointer, memcpy, Span
 
 from .optional import Optional
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # List
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -40,7 +37,7 @@ struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
     hint_trivial_type: Bool,
-    list_origin: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability],
     forward: Bool = True,
 ]:
     """Iterator for List.
@@ -123,7 +120,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             other: The list to copy.
         """
-        self.__init__(capacity=other.capacity)
+        self = Self(capacity=other.capacity)
         for e in other:
             self.append(e[])
 
@@ -144,26 +141,28 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Args:
             values: The values to populate the list with.
         """
-        self = Self(variadic_list=values^)
+        self = Self(elements=values^)
 
-    fn __init__(out self, *, owned variadic_list: VariadicListMem[T, _]):
+    fn __init__(out self, *, owned elements: VariadicListMem[T, _]):
         """Constructs a list from the given values.
 
         Args:
-            variadic_list: The values to populate the list with.
+            elements: The values to populate the list with.
         """
-        var length = len(variadic_list)
+        var length = len(elements)
 
         self = Self(capacity=length)
 
         for i in range(length):
-            var src = UnsafePointer.address_of(variadic_list[i])
+            var src = UnsafePointer.address_of(elements[i])
             var dest = self.data + i
 
             src.move_pointee_into(dest)
 
-        # Mark the elements as unowned to avoid del'ing uninitialized objects.
-        variadic_list._is_owned = False
+        # Do not destroy the elements when their backing storage goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(elements)
+        )
 
         self.size = length
 
@@ -212,8 +211,11 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
 
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
-        for i in range(self.size):
-            (self.data + i).destroy_pointee()
+
+        @parameter
+        if not hint_trivial_type:
+            for i in range(self.size):
+                (self.data + i).destroy_pointee()
         self.data.free()
 
     # ===-------------------------------------------------------------------===#
@@ -921,12 +923,17 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         if elt_idx_1 != elt_idx_2:
             swap((self.data + elt_idx_1)[], (self.data + elt_idx_2)[])
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr(
+        ref self,
+    ) -> UnsafePointer[
+        T,
+        mut = Origin(__origin_of(self)).is_mutable,
+        origin = __origin_of(self),
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The UnsafePointer to the underlying memory.
+            The pointer to the underlying memory.
         """
         return self.data
 

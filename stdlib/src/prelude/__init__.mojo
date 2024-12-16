@@ -136,4 +136,5 @@ from builtin.value import (
 from documentation import doc_private
 from memory import AddressSpace, Pointer
 
-from utils import AsBytes, Writable, Writer
+from memory.span import AsBytes
+from utils import Writable, Writer

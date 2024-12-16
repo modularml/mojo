@@ -19,16 +19,16 @@ from collections import List
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_char
 
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
-from utils import Span, StaticString, StringRef, StringSlice, Writable, Writer
+from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import _StringSliceIter, _to_string_list
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # StringLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
@@ -89,7 +89,7 @@ struct StringLiteral(
     # for now.
     @always_inline("nodebug")
     @staticmethod
-    fn from_string[value: String]() -> StringLiteral:
+    fn _from_string[value: String]() -> StringLiteral:
         """Form a string literal from an arbitrary compile-time String value.
 
         Parameters:
@@ -105,6 +105,33 @@ struct StringLiteral(
             value.unsafe_ptr().address,
             `> : !kgen.string`,
         ]
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[value: String]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time String value.
+
+        Parameters:
+            value: The value to convert to StringLiteral.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[value]()
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn get[type: Stringable, //, value: type]() -> StringLiteral:
+        """Form a string literal from an arbitrary compile-time stringable value.
+
+        Parameters:
+            type: The type of the value.
+            value: The value to serialize.
+
+        Returns:
+            The string value as a StringLiteral.
+        """
+        return Self._from_string[str(value)]()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -458,8 +485,9 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, mut=False, origin=StaticConstantOrigin]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -470,11 +498,12 @@ struct StringLiteral(
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return ptr.bitcast[UInt8]()
+        return ptr.bitcast[Byte, mut=False, origin=StaticConstantOrigin]()
 
     @always_inline
-    # FIXME(MSTDL-956): This should return a pointer with StaticConstantOrigin.
-    fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
+    fn unsafe_cstr_ptr(
+        self,
+    ) -> UnsafePointer[c_char, mut=False, origin=StaticConstantOrigin]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.
@@ -862,8 +891,9 @@ struct StringLiteral(
         return str(self).islower()
 
     fn strip(self) -> String:
-        """Return a copy of the string literal with leading and trailing whitespaces
-        removed.
+        """Return a copy of the string literal with leading and trailing
+        whitespaces removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A string with no leading or trailing whitespaces.
@@ -895,7 +925,9 @@ struct StringLiteral(
         return str(self).rstrip(chars)
 
     fn rstrip(self) -> String:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -914,20 +946,11 @@ struct StringLiteral(
         return str(self).lstrip(chars)
 
     fn lstrip(self) -> String:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.
         """
         return str(self).lstrip()
-
-
-fn _to_string_literal[val: Int]() -> StringLiteral:
-    alias s = StringLiteral.from_string[str(val)]()
-    return s
-
-
-fn _to_string_literal[val: SIMD]() -> StringLiteral:
-    constrained[val.type.is_integral(), "input type must be integral"]()
-    alias s = StringLiteral.from_string[str(val)]()
-    return s

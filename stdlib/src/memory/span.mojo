@@ -13,17 +13,17 @@
 
 """Implements the Span type.
 
-You can import these APIs from the `utils.span` module. For example:
+You can import these APIs from the `memory` module. For example:
 
 ```mojo
-from utils import Span
+from memory import Span
 ```
 """
 
 from collections import InlineArray
 
-from builtin.builtin_list import _lit_mut_cast
 from memory import Pointer, UnsafePointer
+from sys.info import simdwidthof
 
 
 trait AsBytes:
@@ -46,15 +46,15 @@ trait AsBytes:
 
 @value
 struct _SpanIter[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[mut],
     forward: Bool = True,
 ]:
     """Iterator for Span.
 
     Parameters:
-        is_mutable: Whether the reference to the span is mutable.
+        mut: Whether the reference to the span is mutable.
         T: The type of the elements in the span.
         origin: The origin of the Span.
         forward: The iteration direction. `False` is backwards.
@@ -95,20 +95,20 @@ struct _SpanIter[
 @value
 @register_passable("trivial")
 struct Span[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable].type,
+    origin: Origin[mut],
 ](CollectionElementNew):
     """A non owning view of contiguous data.
 
     Parameters:
-        is_mutable: Whether the span is mutable.
+        mut: Whether the span is mutable.
         T: The type of the elements in the span.
         origin: The origin of the Span.
     """
 
     # Field
-    var _data: UnsafePointer[T]
+    var _data: UnsafePointer[T, mut=mut, origin=origin]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
@@ -206,16 +206,9 @@ struct Span[
         var step: Int
         start, end, step = slc.indices(len(self))
 
-        if step < 0:
-            step = -step
-            var new_len = (start - end + step - 1) // step
-            var buff = UnsafePointer[T].alloc(new_len)
-            i = 0
-            while start > end:
-                buff[i] = self._data[start]
-                start -= step
-                i += 1
-            return Span[T, origin](ptr=buff, length=new_len)
+        debug_assert(
+            step == 1, "Slice must be within bounds and step must be 1"
+        )
 
         var res = Self(
             ptr=(self._data + start), length=len(range(start, end, step))
@@ -225,12 +218,21 @@ struct Span[
 
     @always_inline
     fn __iter__(self) -> _SpanIter[T, origin]:
-        """Get an iterator over the elements of the span.
+        """Get an iterator over the elements of the Span.
 
         Returns:
-            An iterator over the elements of the span.
+            An iterator over the elements of the Span.
         """
         return _SpanIter(0, self)
+
+    @always_inline
+    fn __reversed__(self) -> _SpanIter[T, origin, forward=False]:
+        """Iterate backwards over the Span.
+
+        Returns:
+            A reversed iterator of the Span elements.
+        """
+        return _SpanIter[forward=False](len(self), self)
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
@@ -245,18 +247,52 @@ struct Span[
         """
         return self._len
 
+    fn __contains__[
+        type: DType, //
+    ](self: Span[Scalar[type]], value: Scalar[type]) -> Bool:
+        """Verify if a given value is present in the Span.
+
+        Parameters:
+            type: The DType of the scalars stored in the Span.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+
+        alias widths = InlineArray[Int, 6](256, 128, 64, 32, 16, 8)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var processed = 0
+
+        @parameter
+        for i in range(len(widths)):
+            alias width = widths[i]
+
+            @parameter
+            if simdwidthof[type]() >= width:
+                for _ in range((length - processed) // width):
+                    if value in (ptr + processed).load[width=width]():
+                        return True
+                    processed += width
+
+        for i in range(length - processed):
+            if ptr[processed + i] == value:
+                return True
+        return False
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
 
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
-        """
-        Gets a pointer to the first element of this slice.
+    fn unsafe_ptr(self) -> UnsafePointer[T, mut=mut, origin=origin]:
+        """Retrieves a pointer to the underlying memory.
 
         Returns:
-            A pointer pointing at the first element of this slice.
+            The pointer to the underlying memory.
         """
-
         return self._data
 
     fn as_ref(self) -> Pointer[T, origin]:
@@ -358,13 +394,15 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn get_immutable(self) -> Span[T, _lit_mut_cast[origin, False].result]:
+    fn get_immutable(
+        self,
+    ) -> Span[T, ImmutableOrigin.cast_from[origin].result]:
         """
         Return an immutable version of this span.
 
         Returns:
             A span covering the same elements, but without mutability.
         """
-        return Span[T, _lit_mut_cast[origin, False].result](
+        return Span[T, ImmutableOrigin.cast_from[origin].result](
             ptr=self._data, length=self._len
         )

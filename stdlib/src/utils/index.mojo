@@ -29,9 +29,9 @@ from builtin.io import _get_dtype_printf_format, _snprintf
 from . import unroll
 from .static_tuple import StaticTuple
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -48,10 +48,10 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
     return a and b
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Integer and Bool Tuple Utilities:
 #   Utilities to operate on tuples of integers or tuples of bools.
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -147,9 +147,9 @@ fn _bool_tuple_reduce[
     return c
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # IndexList:
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn _type_of_width[bitwidth: Int, unsigned: Bool]() -> DType:
@@ -454,9 +454,10 @@ struct IndexList[
     @always_inline("nodebug")
     fn canonicalize(
         self,
-    ) -> IndexList[
-        size, element_bitwidth = bitwidthof[Int](), unsigned=False
-    ] as result:
+        out result: IndexList[
+            size, element_bitwidth = bitwidthof[Int](), unsigned=False
+        ],
+    ):
         """Canonicalizes the IndexList.
 
         Returns:
@@ -772,11 +773,14 @@ struct IndexList[
     @always_inline
     fn cast[
         type: DType
-    ](self) -> IndexList[
-        size,
-        element_bitwidth = bitwidthof[type](),
-        unsigned = _is_unsigned[type](),
-    ] as result:
+    ](
+        self,
+        out result: IndexList[
+            size,
+            element_bitwidth = bitwidthof[type](),
+            unsigned = _is_unsigned[type](),
+        ],
+    ):
         """Casts to the target DType.
 
         Parameters:
@@ -803,9 +807,12 @@ struct IndexList[
         *,
         element_bitwidth: Int = Self.element_bitwidth,
         unsigned: Bool = Self.unsigned,
-    ](self) -> IndexList[
-        size, element_bitwidth=element_bitwidth, unsigned=unsigned
-    ] as result:
+    ](
+        self,
+        out result: IndexList[
+            size, element_bitwidth=element_bitwidth, unsigned=unsigned
+        ],
+    ):
         """Casts to the target DType.
 
         Parameters:
@@ -828,18 +835,21 @@ struct IndexList[
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Factory functions for creating index.
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @always_inline
 fn Index[
     T0: Intable, //,
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0) -> IndexList[
-    1, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    out result: IndexList[
+        1, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -859,9 +869,12 @@ fn Index[
 @always_inline
 fn Index[
     *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
-](x: UInt) -> IndexList[
-    1, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: UInt,
+    out result: IndexList[
+        1, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -884,9 +897,13 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1) -> IndexList[
-    2, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    out result: IndexList[
+        2, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -908,9 +925,13 @@ fn Index[
 @always_inline
 fn Index[
     *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
-](x: UInt, y: UInt) -> IndexList[
-    2, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: UInt,
+    y: UInt,
+    out result: IndexList[
+        2, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -935,9 +956,14 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1, z: T2) -> IndexList[
-    3, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    z: T2,
+    out result: IndexList[
+        3, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 3-D Index from the given values.
 
     Parameters:
@@ -967,9 +993,15 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1, z: T2, w: T3) -> IndexList[
-    4, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    z: T2,
+    w: T3,
+    out result: IndexList[
+        4, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 4-D Index from the given values.
 
     Parameters:
@@ -1002,9 +1034,16 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[
-    5, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    z: T2,
+    w: T3,
+    v: T4,
+    out result: IndexList[
+        5, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 5-D Index from the given values.
 
     Parameters:
@@ -1029,9 +1068,9 @@ fn Index[
     return __type_of(result)(int(x), int(y), int(z), int(w), int(v))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utils
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline

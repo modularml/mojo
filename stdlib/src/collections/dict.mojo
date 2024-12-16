@@ -61,7 +61,7 @@ struct _DictEntryIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_origin: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability],
     forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
@@ -120,7 +120,7 @@ struct _DictKeyIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_origin: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability],
     forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
@@ -158,7 +158,7 @@ struct _DictValueIter[
     dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_origin: Origin[dict_mutability].type,
+    dict_origin: Origin[dict_mutability],
     forward: Bool = True,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
@@ -192,7 +192,9 @@ struct _DictValueIter[
         # Cast through a pointer to grant additional mutability because
         # _DictEntryIter.next erases it.
         return Self.ref_type.address_of(
-            UnsafePointer.address_of(entry_ref[].value)[]
+            UnsafePointer.address_of(entry_ref[].value).bitcast[
+                origin=dict_origin
+            ]()[]
         )
 
     @always_inline
@@ -242,14 +244,14 @@ struct DictEntry[K: KeyElement, V: CollectionElement](
         self.key = other.key
         self.value = other.value
 
-    fn reap_value(owned self) -> V:
+    fn reap_value(owned self) -> V as out:
         """Take the value from an owned entry.
 
         Returns:
             The value of the entry.
         """
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
-        return self.value^
+        out = self.value^
+        __disable_del self
 
 
 alias _EMPTY = -1

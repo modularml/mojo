@@ -41,9 +41,9 @@ struct _PyIter(Sized):
 
     var iterator: PythonObject
     """The iterator object that stores location."""
-    var preparedNextItem: PythonObject
+    var prepared_next_item: PythonObject
     """The next item to vend or zero if there are no items."""
-    var isDone: Bool
+    var is_done: Bool
     """Stores True if the iterator is pointing to the last item."""
 
     # ===-------------------------------------------------------------------===#
@@ -57,8 +57,8 @@ struct _PyIter(Sized):
             existing: Initialized _PyIter instance.
         """
         self.iterator = existing.iterator
-        self.preparedNextItem = existing.preparedNextItem
-        self.isDone = existing.isDone
+        self.prepared_next_item = existing.prepared_next_item
+        self.is_done = existing.is_done
 
     @implicit
     fn __init__(out self, iter: PythonObject):
@@ -69,19 +69,19 @@ struct _PyIter(Sized):
         """
         var cpython = _get_global_python_itf().cpython()
         self.iterator = iter
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
-        if maybeNextItem.is_null():
-            self.isDone = True
-            self.preparedNextItem = PythonObject(PyObjectPtr())
+        var maybe_next_item = cpython.PyIter_Next(self.iterator.py_object)
+        if maybe_next_item.is_null():
+            self.is_done = True
+            self.prepared_next_item = PythonObject(PyObjectPtr())
         else:
-            self.preparedNextItem = PythonObject(maybeNextItem)
-            self.isDone = False
+            self.prepared_next_item = PythonObject(maybe_next_item)
+            self.is_done = False
 
     fn __init__(out self):
         """Initialize an empty iterator."""
         self.iterator = PythonObject(PyObjectPtr())
-        self.isDone = True
-        self.preparedNextItem = PythonObject(PyObjectPtr())
+        self.is_done = True
+        self.prepared_next_item = PythonObject(PyObjectPtr())
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -97,12 +97,12 @@ struct _PyIter(Sized):
         if not self.iterator:
             return self.iterator
         var cpython = _get_global_python_itf().cpython()
-        var current = self.preparedNextItem
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
-        if maybeNextItem.is_null():
-            self.isDone = True
+        var current = self.prepared_next_item
+        var maybe_next_item = cpython.PyIter_Next(self.iterator.py_object)
+        if maybe_next_item.is_null():
+            self.is_done = True
         else:
-            self.preparedNextItem = PythonObject(maybeNextItem)
+            self.prepared_next_item = PythonObject(maybe_next_item)
         return current
 
     @always_inline
@@ -115,7 +115,7 @@ struct _PyIter(Sized):
         Returns:
             0 if the traversal is complete and 1 otherwise.
         """
-        if self.isDone:
+        if self.is_done:
             return 0
         else:
             return 1
@@ -596,19 +596,19 @@ struct PythonObject(
             raise Error("Attribute is not found.")
         return PythonObject(result)
 
-    fn __setattr__(self, name: StringLiteral, newValue: PythonObject) raises:
+    fn __setattr__(self, name: StringLiteral, new_value: PythonObject) raises:
         """Set the given value for the object attribute with the given name.
 
         Args:
             name: The name of the object attribute to set.
-            newValue: The new value to be set for that attribute.
+            new_value: The new value to be set for that attribute.
         """
-        return self._setattr(name, newValue.py_object)
+        return self._setattr(name, new_value.py_object)
 
-    fn _setattr(self, name: StringLiteral, newValue: PyObjectPtr) raises:
+    fn _setattr(self, name: StringLiteral, new_value: PyObjectPtr) raises:
         var cpython = _get_global_python_itf().cpython()
         var result = cpython.PyObject_SetAttrString(
-            self.py_object, name, newValue
+            self.py_object, name, new_value
         )
         Python.throw_python_exception_if_error_state(cpython)
         if result < 0:
@@ -1324,6 +1324,27 @@ struct PythonObject(
             all bits are flipped, from zero to one, and from one to zero.
         """
         return self._call_zero_arg_method("__invert__")
+
+    fn __contains__(self, rhs: PythonObject) raises -> Bool:
+        """Contains dunder.
+
+        Calls the underlying object's `__contains__` method.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            True if rhs is in self.
+        """
+        # TODO: replace/optimize with c-python function.
+        # TODO: implement __getitem__ step for cpython membership test operator.
+        var cpython = _get_global_python_itf().cpython()
+        if cpython.PyObject_HasAttrString(self.py_object, "__contains__"):
+            return self._call_single_arg_method("__contains__", rhs).__bool__()
+        for v in self:
+            if v == rhs:
+                return True
+        return False
 
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules

@@ -134,7 +134,7 @@ fn _serialize[
             if row_idx != row_elem_count:
                 serialize_fn(",")
 
-            # Intermediate rows are filled with "..." and rowIdx is advanced to third
+            # Intermediate rows are filled with "..." and row_idx is advanced to third
             # from last.
             if (
                 row_elem_count >= _kCompactMaxElemsToPrint

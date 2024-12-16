@@ -21,6 +21,9 @@ struct OwnedPointer[T: AnyType]:
     system such that no more than one mutable alias for the underlying data
     may exist.
 
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
+
     Parameters:
         T: The type to be stored in the OwnedPointer[].
     """
@@ -145,7 +148,7 @@ struct OwnedPointer[T: AnyType]:
         """
         var r = self._inner.take_pointee()
         self._inner.free()
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
         return r^
 
@@ -168,6 +171,6 @@ struct OwnedPointer[T: AnyType]:
         var ptr = self._inner
 
         # Prevent the destructor from running on `self`
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
         return ptr

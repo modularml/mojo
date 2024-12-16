@@ -4,9 +4,7 @@ Mojo supports programming in [Jupyter notebooks](https://jupyter.org/), just
 like Python.
 
 This page explains how to get started with Mojo notebooks, and this repo
-directory contains notebooks that demonstrate some of Mojo's features
-(most of which we originally published on the [Mojo
-Playground](https://playground.modular.com/)).
+directory contains notebooks that demonstrate some of Mojo's features.
 
 If you're not familiar with Jupyter notebooks, they're files that allow you to
 create documents with live code, equations, visualizations, and explanatory
@@ -67,6 +65,7 @@ If you have [`magic`](https://docs.modular.com/magic) you can run the following
 command to launch JupyterLab from this directory:
 
 ```sh
+# Run from an active conda or magic shell environment
 magic run jupyter lab
 ```
 
@@ -74,7 +73,20 @@ After a moment, it will open a browser window with JupterLab running.
 
 #### Using conda
 
-Create a Conda environment, activate that enviroment, and install JupyterLab.
+Conda allows you to export environments in `.yml` format. (For more
+information, see
+[Managing environments](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html)
+in the Conda documentation.)
+
+If you already have a working Jupyter environment on a different computer and
+server you can export it using the following command.
+
+```sh
+# Example of exporting environment.yml from a conda environment named `your-env`
+conda env export --name your_env > environment.yml
+```
+
+To create a Conda environment, activate that environment, and install JupyterLab.
 
 ``` sh
 # Create a Conda environment if you don't have one
@@ -86,6 +98,19 @@ conda run -n mojo-repo jupyter lab
 ```
 
 After a moment, it will open a browser window with JupterLab running.
+
+#### Using more magic
+
+Magic allows you to create an environment from a Conda `environment.yml`.
+
+```sh
+# Create a magic environment if you don't have one
+magic init mojo-repo --import environment.yml
+# Activate the environment
+cd mojo-repo && magic shell
+# run JupyterLab
+magic run jupyter lab
+```
 
 ### 2. Run the .ipynb notebooks
 

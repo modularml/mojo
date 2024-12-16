@@ -35,9 +35,9 @@ from os import PathLike, abort
 from sys import external_call, sizeof
 from sys.ffi import OpaquePointer
 
-from memory import AddressSpace, UnsafePointer
+from memory import AddressSpace, UnsafePointer, Span
 
-from utils import Span, StringRef, StringSlice, write_buffered
+from utils import StringRef, StringSlice, write_buffered
 
 
 @register_passable

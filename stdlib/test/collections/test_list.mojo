@@ -15,11 +15,9 @@
 from collections import List
 from sys.info import sizeof
 
-from memory import UnsafePointer
+from memory import UnsafePointer, Span
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
-
-from utils import Span
 
 
 def test_mojo_issue_698():
@@ -917,6 +915,19 @@ def test_list_dtor():
     assert_equal(g_dtor_count, 1)
 
 
+# Verify we skip calling destructors for the trivial elements
+def test_destructor_trivial_elements():
+    # explicitly reset global counter
+    g_dtor_count = 0
+
+    var l = List[DtorCounter, hint_trivial_type=True]()
+    l.append(DtorCounter())
+
+    l^.__del__()
+
+    assert_equal(g_dtor_count, 0)
+
+
 def test_list_repr():
     var l = List(1, 2, 3)
     assert_equal(l.__repr__(), "[1, 2, 3]")
@@ -961,4 +972,5 @@ def main():
     test_list_contains()
     test_indexing()
     test_list_dtor()
+    test_destructor_trivial_elements()
     test_list_repr()

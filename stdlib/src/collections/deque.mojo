@@ -26,9 +26,9 @@ from collections import Optional
 from bit import bit_ceil
 from memory import UnsafePointer
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Deque
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 struct Deque[ElementType: CollectionElement](
@@ -88,8 +88,8 @@ struct Deque[ElementType: CollectionElement](
         out self,
         *,
         owned elements: Optional[List[ElementType]] = None,
-        capacity: Int = self.default_capacity,
-        min_capacity: Int = self.default_capacity,
+        capacity: Int = Self.default_capacity,
+        min_capacity: Int = Self.default_capacity,
         maxlen: Int = -1,
         shrink: Bool = True,
     ):
@@ -139,17 +139,15 @@ struct Deque[ElementType: CollectionElement](
         Args:
             values: The values to populate the deque with.
         """
-        self = Self(variadic_list=values^)
+        self = Self(elements=values^)
 
-    fn __init__(
-        mut self, *, owned variadic_list: VariadicListMem[ElementType, _]
-    ):
+    fn __init__(mut self, *, owned elements: VariadicListMem[ElementType, _]):
         """Constructs a deque from the given values.
 
         Args:
-            variadic_list: The values to populate the deque with.
+             elements: The values to populate the deque with.
         """
-        args_length = len(variadic_list)
+        args_length = len(elements)
 
         if args_length < self.default_capacity:
             capacity = self.default_capacity
@@ -159,12 +157,14 @@ struct Deque[ElementType: CollectionElement](
         self = Self(capacity=capacity)
 
         for i in range(args_length):
-            src = UnsafePointer.address_of(variadic_list[i])
+            src = UnsafePointer.address_of(elements[i])
             dst = self._data + i
             src.move_pointee_into(dst)
 
-        # Mark the elements as unowned to avoid del'ing uninitialized objects.
-        variadic_list._is_owned = False
+        # Do not destroy the elements when their backing storage goes away.
+        __mlir_op.`lit.ownership.mark_destroyed`(
+            __get_mvalue_as_litref(elements)
+        )
 
         self._tail = args_length
 
@@ -794,7 +794,7 @@ struct Deque[ElementType: CollectionElement](
 
         return (self._data + self._head)[]
 
-    fn pop(mut self) raises -> ElementType as element:
+    fn pop(mut self) raises -> ElementType:
         """Removes and returns the element from the right side of the deque.
 
         Returns:
@@ -816,9 +816,9 @@ struct Deque[ElementType: CollectionElement](
         ):
             self._realloc(self._capacity >> 1)
 
-        return
+        return element
 
-    fn popleft(mut self) raises -> ElementType as element:
+    fn popleft(mut self) raises -> ElementType:
         """Removes and returns the element from the left side of the deque.
 
         Returns:
@@ -840,7 +840,7 @@ struct Deque[ElementType: CollectionElement](
         ):
             self._realloc(self._capacity >> 1)
 
-        return
+        return element
 
     fn reverse(mut self):
         """Reverses the elements of the deque in-place."""
@@ -995,7 +995,7 @@ struct Deque[ElementType: CollectionElement](
 struct _DequeIter[
     deque_mutability: Bool, //,
     ElementType: CollectionElement,
-    deque_lifetime: Origin[deque_mutability].type,
+    deque_lifetime: Origin[deque_mutability],
     forward: Bool = True,
 ]:
     """Iterator for Deque.

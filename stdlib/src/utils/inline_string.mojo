@@ -19,13 +19,13 @@ from collections import InlineArray, Optional
 from os import abort
 from sys import sizeof
 
-from memory import UnsafePointer, memcpy
+from memory import UnsafePointer, memcpy, Span
 
 from utils import StringSlice, Variant
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # InlineString
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -119,7 +119,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         """
         self.__iadd__(string.as_string_slice())
 
-    fn __iadd__(mut self, str_slice: StringSlice[_]):
+    fn __iadd__(mut self, str_slice: StringSlice):
         """Appends another string to this string.
 
         Args:
@@ -296,9 +296,9 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # __FixedString
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -412,7 +412,7 @@ struct _FixedString[CAP: Int](
         self.__iadd__(string.as_string_slice())
 
     @always_inline
-    fn __iadd__(mut self, str_slice: StringSlice[_]) raises:
+    fn __iadd__(mut self, str_slice: StringSlice) raises:
         """Appends another string to this string.
 
         Args:

@@ -66,23 +66,65 @@ struct DType(
     alias float8e5m2 = DType(
         __mlir_attr.`#kgen.dtype.constant<f8e5m2> : !kgen.dtype`
     )
-    """Represents a FP8E5M2 floating point format whose bitwidth is 8."""
+    """Represents a FP8E5M2 floating point format from the [OFP8
+    standard](https://www.opencompute.org/documents/ocp-8-bit-floating-point-specification-ofp8-revision-1-0-2023-12-01-pdf-1).
+
+    The 8 bits are encoded as `seeeeemm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 5 bits
+    - (m)antissa: 2 bits
+    - exponent bias: 15
+    - nan: {0,1}11111{01,10,11}
+    - inf: 01111100
+    - -inf: 11111100
+    - -0: 10000000
+    """
     alias float8e5m2fnuz = DType(
         __mlir_attr.`#kgen.dtype.constant<f8e5m2fnuz> : !kgen.dtype`
     )
-    """Represents a FP8E5M2FNUZ floating point format for AMD GPU whose bitwdith is 8.
-       This dtype only supports finite and NaN values. NaN is when sign bit is
-       set and all other exponent and mantissa bits are 0."""
+    """Represents a FP8E5M2FNUZ floating point format.
+
+    The 8 bits are encoded as `seeeeemm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 5 bits
+    - (m)antissa: 2 bits
+    - exponent bias: 16
+    - nan: 10000000
+    - fn: finite (no inf or -inf encodings)
+    - uz: unsigned zero (no -0 encoding)
+    """
     alias float8e4m3 = DType(
         __mlir_attr.`#kgen.dtype.constant<f8e4m3> : !kgen.dtype`
     )
-    """Represents a FP8E4M3 floating point format whose bitwidth is 8."""
+    """Represents a FP8E4M3 floating point format from the [OFP8
+    standard](https://www.opencompute.org/documents/ocp-8-bit-floating-point-specification-ofp8-revision-1-0-2023-12-01-pdf-1).
+
+    This type is named `float8_e4m3fn` (the "fn" stands for "finite") in some
+    frameworks, as it does not encode -inf or inf.
+
+    The 8 bits are encoded as `seeeemmm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 4 bits
+    - (m)antissa: 3 bits
+    - exponent bias: 7
+    - nan: 01111111, 11111111
+    - -0: 10000000
+    - fn: finite (no inf or -inf encodings)
+    """
     alias float8e4m3fnuz = DType(
         __mlir_attr.`#kgen.dtype.constant<f8e4m3fnuz> : !kgen.dtype`
     )
-    """Represents a FP8E4M3FNUZ floating point format for AMD GPU whose bitwdith is 8.
-       This dtype only supports finite and NaN values. NaN is when sign bit is
-       set and all other exponent and mantissa bits are 0."""
+    """Represents a FP8E4M3FNUZ floating point format.
+
+    The 8 bits are encoded as `seeeemmm`:
+    - (s)ign: 1 bit
+    - (e)xponent: 4 bits
+    - (m)antissa: 3 bits
+    - exponent bias: 8
+    - nan: 10000000
+    - fn: finite (no inf or -inf encodings)
+    - uz: unsigned zero (no -0 encoding)
+    """
     alias bfloat16 = DType(
         __mlir_attr.`#kgen.dtype.constant<bf16> : !kgen.dtype`
     )
@@ -112,6 +154,16 @@ struct DType(
             other: The DType to copy.
         """
         self = other
+
+    @always_inline
+    @implicit
+    fn __init__(out self, value: Self.type):
+        """Construct a DType from MLIR dtype.
+
+        Args:
+            value: The MLIR dtype.
+        """
+        self.value = value
 
     @staticmethod
     fn _from_str(str: String) -> DType:
@@ -511,9 +563,9 @@ struct DType(
         """
         return 8 * self.sizeof()
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # dispatch_integral
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn dispatch_integral[
@@ -548,9 +600,9 @@ struct DType(
         else:
             raise Error("only integral types are supported")
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # dispatch_floating
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn dispatch_floating[
@@ -626,9 +678,9 @@ struct DType(
             "dispatch_custom: dynamic_type does not match any dtype parameters"
         )
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # dispatch_arithmetic
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn dispatch_arithmetic[

@@ -33,10 +33,8 @@ from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer, memcpy
 
 from utils import (
-    Span,
     StaticString,
     StringRef,
-    StringSlice,
     write_args,
     write_buffered,
 )

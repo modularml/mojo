@@ -61,10 +61,13 @@ fn fail_initialization(owned err: Error) -> PythonObject:
 
 fn pointer_bitcast[
     To: AnyType
-](ptr: Pointer) -> Pointer[To, ptr.origin, ptr.address_space, *_, **_] as out:
-    return __type_of(out)(
+](
+    ptr: Pointer,
+    out result: Pointer[To, ptr.origin, ptr.address_space, *_, **_],
+):
+    return __type_of(result)(
         _mlir_value=__mlir_op.`lit.ref.from_pointer`[
-            _type = __type_of(out)._mlir_type
+            _type = __type_of(result)._mlir_type
         ](
             UnsafePointer(__mlir_op.`lit.ref.to_pointer`(ptr._value))
             .bitcast[To]()
@@ -162,7 +165,8 @@ fn _try_convert_arg[
     type_name_id: StringLiteral,
     py_args: TypedPythonObject["Tuple"],
     argidx: Int,
-) raises -> T as result:
+    out result: T,
+) raises:
     try:
         result = T.try_from_python(py_args[argidx])
     except convert_err:

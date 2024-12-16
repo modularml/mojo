@@ -1348,7 +1348,16 @@ struct CPython:
             ", parent obj:",
             obj._get_ptr_as_int(),
         )
+        return r
 
+    fn PyObject_HasAttrString(
+        mut self,
+        obj: PyObjectPtr,
+        name: StringRef,
+    ) -> Int:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, UnsafePointer[UInt8]) -> Int
+        ]("PyObject_HasAttrString")(obj, name.data)
         return r
 
     fn PyObject_GetAttrString(
@@ -1469,14 +1478,13 @@ struct CPython:
         return int(self.lib.call["PyObject_Hash", Int](obj))
 
     fn PyObject_GetIter(
-        mut self, traversablePyObject: PyObjectPtr
+        mut self, traversable_py_object: PyObjectPtr
     ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetIter).
         """
-
         var iterator = self.lib.call["PyObject_GetIter", PyObjectPtr](
-            traversablePyObject
+            traversable_py_object
         )
 
         self.log(
@@ -1484,9 +1492,9 @@ struct CPython:
             " NEWREF PyObject_GetIter, refcnt:",
             self._Py_REFCNT(iterator),
             "referencing ",
-            traversablePyObject._get_ptr_as_int(),
+            traversable_py_object._get_ptr_as_int(),
             "refcnt of traversable: ",
-            self._Py_REFCNT(traversablePyObject),
+            self._Py_REFCNT(traversable_py_object),
         )
 
         self._inc_total_rc()

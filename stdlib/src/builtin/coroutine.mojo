@@ -134,10 +134,10 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
     fn force_destroy(owned self):
         """Destroy the coroutine object."""
         __mlir_op.`co.destroy`(self._handle)
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
     @always_inline
-    fn __await__(owned self) -> type as out:
+    fn __await__(owned self, out result: type):
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
@@ -147,12 +147,14 @@ struct Coroutine[type: AnyType, origins: OriginSet]:
         # Black magic! Internal implementation detail!
         # Don't you dare copy this code! 😤
         var handle = self._handle
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
         __mlir_op.`co.await`[_type=NoneType](
             handle,
-            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(result)),
         )
-        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
+        __mlir_op.`lit.ownership.mark_initialized`(
+            __get_mvalue_as_litref(result)
+        )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -217,10 +219,10 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
     fn force_destroy(owned self):
         """Destroy the coroutine object."""
         __mlir_op.`co.destroy`(self._handle)
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
 
     @always_inline
-    fn __await__(owned self) raises -> type as out:
+    fn __await__(owned self, out result: type) raises:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
@@ -230,10 +232,10 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
         # Black magic! Internal implementation detail!
         # Don't you dare copy this code! 😤
         var handle = self._handle
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        __disable_del self
         if __mlir_op.`co.await`[_type = __mlir_type.i1](
             handle,
-            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(result)),
             __mlir_op.`lit.ref.to_pointer`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             ),
@@ -242,4 +244,6 @@ struct RaisingCoroutine[type: AnyType, origins: OriginSet]:
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             )
             __mlir_op.`lit.raise`()
-        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
+        __mlir_op.`lit.ownership.mark_initialized`(
+            __get_mvalue_as_litref(result)
+        )
