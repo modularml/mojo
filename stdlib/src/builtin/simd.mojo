@@ -33,6 +33,7 @@ from sys import (
     bitwidthof,
     has_neon,
     is_amd_gpu,
+    is_big_endian,
     is_gpu,
     is_nvidia_gpu,
     is_x86,
@@ -44,7 +45,7 @@ from sys import (
 from sys._assembly import inlined_assembly
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
 
-from bit import pop_count
+from bit import pop_count, byte_swap
 from builtin._format_float import _write_float
 from builtin.dtype import _uint_type_of_width
 from builtin.format_int import _try_write_int
@@ -1878,6 +1879,36 @@ struct SIMD[type: DType, size: Int](
         ]()
 
         return bitcast[_integral_type_of[type](), size](self).cast[int_dtype]()
+
+    @staticmethod
+    fn from_bytes[
+        big_endian: Bool = False
+    ](bytes: Span[Byte]) raises -> Scalar[type]:
+        """Converts a byte array to an integer.
+
+        Args:
+            bytes: The byte array to convert.
+
+        Parameters:
+            big_endian: Whether the byte array is big-endian.
+
+        Returns:
+            The integer value.
+        """
+        if type.sizeof() != len(bytes):
+            raise Error("Byte array size does not match the integer size.")
+
+        var ptr: UnsafePointer[Scalar[type]] = bytes.unsafe_ptr().bitcast[
+            Scalar[type]
+        ]()
+        var value = ptr[]
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+        return value
 
     fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[

@@ -28,14 +28,14 @@ from math import Ceilable, CeilDivable, Floorable, Truncable
 from sys import bitwidthof
 
 from builtin.io import _snprintf
-from memory import UnsafePointer
+from memory import Span, UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
 from memory import memcpy, UnsafePointer
 
 from sys import is_big_endian, bitwidthof
 
-from utils import Span, Writable, Writer
+from utils import Writable, Writer
 from utils._select import _select_register_value as select
 from utils._visualizers import lldb_formatter_wrapping_type
 
@@ -1233,20 +1233,7 @@ struct Int(
         Returns:
             The integer value.
         """
-        if D.sizeof() != len(bytes):
-            raise Error("Byte array size does not match the integer size.")
-
-        var ptr: UnsafePointer[Scalar[D]] = bytes.unsafe_ptr().bitcast[
-            Scalar[D]
-        ]()
-        var value = ptr[]
-
-        @parameter
-        if is_big_endian() and not big_endian:
-            value = byte_swap(value)
-        elif not is_big_endian() and big_endian:
-            value = byte_swap(value)
-        return int(value)
+        return int(Scalar[D].from_bytes[big_endian](bytes))
 
     fn as_bytes[D: DType, big_endian: Bool = False](self) -> List[Byte]:
         """Convert the integer to a byte array.
