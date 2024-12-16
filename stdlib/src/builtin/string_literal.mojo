@@ -27,7 +27,6 @@ from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
     _StringSliceIter,
     _to_string_list,
-    Stringlike,
     _split,
 )
 
@@ -51,7 +50,6 @@ struct StringLiteral(
     FloatableRaising,
     BytesCollectionElement,
     _HashableWithHasher,
-    Stringlike,
 ):
     """This type represents a string literal.
 
@@ -440,25 +438,23 @@ struct StringLiteral(
         """
         return self.__str__()
 
-    fn __iter__(ref self) -> _StringSliceIter[__origin_of(self)]:
+    fn __iter__(ref self) -> _StringSliceIter[StaticConstantOrigin]:
         """Iterate over the string unicode characters.
 
         Returns:
             An iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[__origin_of(self)](
+        return _StringSliceIter[StaticConstantOrigin](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(
-        ref self,
-    ) -> _StringSliceIter[__origin_of(self), forward=False]:
+    fn __reversed__(self) -> _StringSliceIter[StaticConstantOrigin, False]:
         """Iterate backwards over the string unicode characters.
 
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[__origin_of(self), forward=False](
+        return _StringSliceIter[StaticConstantOrigin, forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -532,10 +528,10 @@ struct StringLiteral(
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
-        """Returns a contiguous slice of bytes.
+        """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
-            A contiguous slice pointing to bytes.
+            A contiguous slice pointing to the bytes owned by this string.
 
         Notes:
             This does not include the trailing null terminator.
@@ -546,10 +542,10 @@ struct StringLiteral(
 
     @always_inline
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of bytes.
+        """Returns a contiguous Span of the bytes owned by this string.
 
         Returns:
-            A contiguous slice pointing to bytes.
+            A contiguous slice pointing to the bytes owned by this string.
 
         Notes:
             This does not include the trailing null terminator.
@@ -597,12 +593,9 @@ struct StringLiteral(
 
         writer.write(self.as_string_slice())
 
-    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
-
-        Parameters:
-            T: The type of the substring.
 
         Args:
             substr: The substring to find.
@@ -698,11 +691,8 @@ struct StringLiteral(
         return result
 
     @always_inline
-    fn split[T: Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
+    fn split(self, sep: StringSlice, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
-
-        Parameters:
-            T: The type of the separator.
 
         Args:
             sep: The string to split on.
@@ -722,14 +712,11 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
+        return _split[has_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: Stringlike, //](self, sep: T) -> List[String]:
+    fn split(self, sep: StringSlice) -> List[String]:
         """Split the string by a separator.
-
-        Parameters:
-            T: The type of the separator.
 
         Args:
             sep: The string to split on.
@@ -750,7 +737,7 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=False, has_sep=True](self, sep, -1)
+        return _split[has_maxsplit=False](self, sep, -1)
 
     @always_inline
     fn split(self, *, maxsplit: Int) -> List[String]:
@@ -770,7 +757,7 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=True, has_sep=False](self, None, maxsplit)
+        return _split[has_maxsplit=True](self, None, maxsplit)
 
     @always_inline
     fn split(self, sep: NoneType = None) -> List[String]:
@@ -797,7 +784,7 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=False, has_sep=False](self, sep, -1)
+        return _split[has_maxsplit=False](self, None, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string literal at line boundaries. This corresponds to Python's

@@ -44,7 +44,6 @@ from utils._unicode import (
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
     StringSlice,
-    Stringlike,
     _shift_unicode_to_utf8,
     _StringSliceIter,
     _to_string_list,
@@ -758,7 +757,6 @@ struct String(
     CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
-    Stringlike,
 ):
     """Represents a mutable string."""
 
@@ -1622,10 +1620,10 @@ struct String(
 
     @always_inline
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of bytes.
+        """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
-            A contiguous slice pointing to bytes.
+            A contiguous slice pointing to the bytes owned by this string.
 
         Notes:
             This does not include the trailing null terminator.
@@ -1709,12 +1707,9 @@ struct String(
         """
         return substr.as_string_slice() in self.as_string_slice()
 
-    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
-
-        Parameters:
-            T: The type of the substring.
 
         Args:
             substr: The substring to find.
@@ -1723,23 +1718,20 @@ struct String(
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        return self.as_string_slice().find(substr, start)
+        return self.as_string_slice().find(substr.as_string_slice(), start)
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
         Args:
-          substr: The substring to find.
-          start: The offset from which to find.
+            substr: The substring to find.
+            start: The offset from which to find.
 
         Returns:
-          The offset of `substr` relative to the beginning of the string.
+            The offset of `substr` relative to the beginning of the string.
         """
-
-        return self.as_string_slice().rfind(
-            substr.as_string_slice(), start=start
-        )
+        return self.as_string_slice().rfind(substr.as_string_slice(), start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given String is a
@@ -1755,11 +1747,8 @@ struct String(
         return self.as_string_slice().isspace()
 
     @always_inline
-    fn split[T: Stringlike, //](self, sep: T, maxsplit: Int) -> List[String]:
+    fn split(self, sep: StringSlice, maxsplit: Int) -> List[String]:
         """Split the string by a separator.
-
-        Parameters:
-            T: The type of the separator.
 
         Args:
             sep: The string to split on.
@@ -1779,14 +1768,11 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=True, has_sep=True](self, sep, maxsplit)
+        return _split[has_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[T: Stringlike, //](self, sep: T) -> List[String]:
+    fn split(self, sep: StringSlice) -> List[String]:
         """Split the string by a separator.
-
-        Parameters:
-            T: The type of the separator.
 
         Args:
             sep: The string to split on.
@@ -1807,7 +1793,7 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=False, has_sep=True](self, sep, -1)
+        return _split[has_maxsplit=False](self, sep, -1)
 
     @always_inline
     fn split(self, *, maxsplit: Int) -> List[String]:
@@ -1827,7 +1813,7 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=True, has_sep=False](self, None, maxsplit)
+        return _split[has_maxsplit=True](self, None, maxsplit)
 
     @always_inline
     fn split(self, sep: NoneType = None) -> List[String]:
@@ -1854,7 +1840,7 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=False, has_sep=False](self, None, -1)
+        return _split[has_maxsplit=False](self, None, -1)
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's

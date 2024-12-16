@@ -492,14 +492,13 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         self.capacity = new_capacity
 
     fn append(mut self, owned value: T):
-        """Appends a value to this list. If there is no capacity left, resizes
-        to twice the current capacity. Except for 0 capacity where it sets 1.
+        """Appends a value to this list.
 
         Args:
             value: The value to append.
         """
         if self.size >= self.capacity:
-            self._realloc(self.capacity * 2 + int(self.capacity == 0))
+            self._realloc(max(1, self.capacity * 2))
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
