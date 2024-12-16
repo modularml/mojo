@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Provides functions for bit manipulation.
+"""Provides functions for bit masks.
 
 You can import these APIs from the `bit` package. For example:
 
 ```mojo
-from bit.utils import count_leading_zeros
+from bit.mask import BitMask
 ```
 """
 
