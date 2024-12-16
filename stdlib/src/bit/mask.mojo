@@ -121,6 +121,10 @@ struct BitMask:
     ](lhs: SIMD[D, _], rhs: __type_of(lhs)) -> __type_of(lhs):
         """Get a bitmask of the comparison between the two values.
 
+        Parameters:
+            D: The DType.
+            comp: The comparison operator, e.g. `BitMask.EQ`.
+
         Args:
             lhs: The value to check.
             rhs: The value to check.
