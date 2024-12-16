@@ -22,19 +22,17 @@ from utils import StringSlice
 """
 
 from bit import count_leading_zeros
-from collections.string import _isspace, _atol, _atof
 from collections import List, Optional
 from collections.string import _atof, _atol, _isspace
 from sys import bitwidthof, simdwidthof
 from sys.intrinsics import unlikely, likely
 
-from memory import UnsafePointer, memcmp, memcpy, Span, AsBytes
+from memory import UnsafePointer, memcmp, memcpy, Span
 from memory.memory import _memcmp_impl_unconstrained
 
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 
 from ._utf8_validation import _is_valid_utf8
-
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
