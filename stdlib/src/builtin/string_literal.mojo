@@ -487,7 +487,7 @@ struct StringLiteral(
     @always_inline("nodebug")
     fn unsafe_ptr(
         self,
-    ) -> UnsafePointer[Byte, is_mutable=False, origin=StaticConstantOrigin]:
+    ) -> UnsafePointer[Byte, mut=False, origin=StaticConstantOrigin]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -498,14 +498,12 @@ struct StringLiteral(
         # TODO(MSTDL-555):
         #   Remove bitcast after changing pop.string.address
         #   return type.
-        return ptr.bitcast[
-            Byte, is_mutable=False, origin=StaticConstantOrigin
-        ]()
+        return ptr.bitcast[Byte, mut=False, origin=StaticConstantOrigin]()
 
     @always_inline
     fn unsafe_cstr_ptr(
         self,
-    ) -> UnsafePointer[c_char, is_mutable=False, origin=StaticConstantOrigin]:
+    ) -> UnsafePointer[c_char, mut=False, origin=StaticConstantOrigin]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
 
         The returned pointer is guaranteed to be NUL terminated, and not null.

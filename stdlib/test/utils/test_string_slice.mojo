@@ -584,6 +584,46 @@ def test_strip():
     assert_true(comp_str4_stripped == "\n mississippimississippi \n")
 
 
+def test_startswith():
+    var empty = StringSlice("")
+    assert_true(empty.startswith(""))
+    assert_false(empty.startswith("a"))
+    assert_false(empty.startswith("ab"))
+
+    var a = StringSlice("a")
+    assert_true(a.startswith(""))
+    assert_true(a.startswith("a"))
+    assert_false(a.startswith("ab"))
+
+    var ab = StringSlice("ab")
+    assert_true(ab.startswith(""))
+    assert_true(ab.startswith("a"))
+    assert_false(ab.startswith("b"))
+    assert_true(ab.startswith("b", start=1))
+    assert_true(ab.startswith("a", end=1))
+    assert_true(ab.startswith("ab"))
+
+
+def test_endswith():
+    var empty = StringSlice("")
+    assert_true(empty.endswith(""))
+    assert_false(empty.endswith("a"))
+    assert_false(empty.endswith("ab"))
+
+    var a = StringSlice("a")
+    assert_true(a.endswith(""))
+    assert_true(a.endswith("a"))
+    assert_false(a.endswith("ab"))
+
+    var ab = StringSlice("ab")
+    assert_true(ab.endswith(""))
+    assert_false(ab.endswith("a"))
+    assert_true(ab.endswith("b"))
+    assert_true(ab.endswith("b", start=1))
+    assert_true(ab.endswith("a", end=1))
+    assert_true(ab.endswith("ab"))
+
+
 def main():
     test_string_literal_byte_span()
     test_string_byte_span()
@@ -605,3 +645,5 @@ def main():
     test_rstrip()
     test_lstrip()
     test_strip()
+    test_startswith()
+    test_endswith()
