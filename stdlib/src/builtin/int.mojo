@@ -17,7 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from bit import byte_swap
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -31,9 +30,6 @@ from builtin.io import _snprintf
 from memory import Span, UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
-from memory import memcpy, UnsafePointer
-
-from sys import is_big_endian, bitwidthof
 
 from utils import Writable, Writer
 from utils._select import _select_register_value as select
