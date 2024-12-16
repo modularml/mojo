@@ -317,15 +317,8 @@ fn _to_decimal[
 
     while True:
         if r < deltai:
-            # Exclude the right endpoint if necessary
-            if (
-                r
-                | Scalar[CarrierDType](not z_result.is_integer)
-                | Scalar[CarrierDType](1)
-            ) == 0:
-                sig -= 1
-                r = FP[type].big_divisor
-                break
+            # TODO(MSTDL-1064): Exclude the right endpoint if necessary
+            pass
         elif r > deltai:
             break
         else:
