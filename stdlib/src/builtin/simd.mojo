@@ -51,7 +51,7 @@ from builtin.dtype import _uint_type_of_width
 from builtin.format_int import _try_write_int
 from builtin.io import _snprintf
 from documentation import doc_private
-from memory import UnsafePointer, bitcast, Span
+from memory import UnsafePointer, bitcast, memcpy, Span
 
 from utils import IndexList, StaticTuple
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -1909,6 +1909,33 @@ struct SIMD[type: DType, size: Int](
         elif not is_big_endian() and big_endian:
             value = byte_swap(value)
         return value
+
+    fn as_bytes[big_endian: Bool = False](self) -> List[Byte]:
+        """Convert the integer to a byte array.
+
+        Parameters:
+            big_endian: Whether the byte array should be big-endian.
+
+        Returns:
+            The byte array.
+        """
+        alias type_len = type.sizeof()
+        var value = self
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+
+        var ptr = UnsafePointer.address_of(value)
+        var list = List[Byte](capacity=type_len)
+
+        # TODO: Maybe this can be a List.extend(ptr, count) method
+        memcpy(list.unsafe_ptr(), ptr.bitcast[Byte](), type_len)
+        list.size = type_len
+
+        return list^
 
     fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[

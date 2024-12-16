@@ -1245,23 +1245,8 @@ struct Int(
         Returns:
             The byte array.
         """
-        alias type_len = D.sizeof()
         var value = Scalar[D](self)
-
-        @parameter
-        if is_big_endian() and not big_endian:
-            value = byte_swap(value)
-        elif not is_big_endian() and big_endian:
-            value = byte_swap(value)
-
-        var ptr = UnsafePointer.address_of(value)
-        var list = List[Byte](capacity=type_len)
-
-        # TODO: Maybe this can be a List.extend(ptr, count) method
-        memcpy(list.unsafe_ptr(), ptr.bitcast[Byte](), type_len)
-        list.size = type_len
-
-        return list^
+        return value.as_bytes[big_endian]()
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
