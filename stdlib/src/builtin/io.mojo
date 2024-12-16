@@ -35,7 +35,6 @@ from memory import UnsafePointer, memcpy
 from utils import (
     StaticString,
     StringRef,
-    StringSlice,
     write_args,
     write_buffered,
 )
