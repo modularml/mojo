@@ -99,7 +99,7 @@ struct Python:
         """
         self.impl = existing.impl
 
-    fn eval(mut self, code: StringSlice[is_mutable=False]) -> Bool:
+    fn eval(mut self, code: StringSlice[mut=False]) -> Bool:
         """Executes the given Python code.
 
         Args:
@@ -114,7 +114,7 @@ struct Python:
 
     @staticmethod
     fn evaluate(
-        expr: StringSlice[is_mutable=False],
+        expr: StringSlice[mut=False],
         file: Bool = False,
         name: StaticString = "__main__",
     ) raises -> PythonObject:
@@ -205,7 +205,7 @@ struct Python:
     # TODO(MSTDL-880): Change this to return `TypedPythonObject["Module"]`
     @staticmethod
     fn import_module(
-        module: StringSlice[is_mutable=False],
+        module: StringSlice[mut=False],
     ) raises -> PythonObject:
         """Imports a Python module.
 
