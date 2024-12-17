@@ -896,7 +896,7 @@ struct String(
         """
 
         var length = str_slice.byte_length()
-        var ptr = UnsafePointer[Byte].alloc(length + 1)
+        var ptr = UnsafePointer[Byte].alloc(length + 1) # null terminator
         memcpy(ptr, str_slice.unsafe_ptr(), length)
         ptr[length] = 0
         self = String(ptr=ptr, length=length + 1)
