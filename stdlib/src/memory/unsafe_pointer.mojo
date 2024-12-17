@@ -55,10 +55,8 @@ struct UnsafePointer[
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,
     alignment: Int = _default_alignment[type](),
-    is_mutable: Bool = True,
-    origin: Origin[is_mutable] = Origin[is_mutable]
-    .cast_from[MutableAnyOrigin]
-    .result,
+    mut: Bool = True,
+    origin: Origin[mut] = Origin[mut].cast_from[MutableAnyOrigin].result,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -84,7 +82,7 @@ struct UnsafePointer[
         type: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
         alignment: The minimum alignment of this pointer known statically.
-        is_mutable: Whether the origin is mutable.
+        mut: Whether the origin is mutable.
         origin: The origin of the memory being addressed.
     """
 
@@ -164,7 +162,7 @@ struct UnsafePointer[
             type,
             address_space=address_space,
             alignment=1,
-            is_mutable = Origin(__origin_of(arg)).is_mutable,
+            mut = Origin(__origin_of(arg)).is_mutable,
             origin = __origin_of(arg),
         ],
     ):
@@ -638,7 +636,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         self.offset(offset)._store[alignment=alignment, volatile=volatile](val)
 
     @always_inline
@@ -671,7 +669,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         self.offset(offset).store[alignment=alignment, volatile=volatile](val)
 
     @always_inline
@@ -701,7 +699,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         constrained[offset_type.is_integral(), "offset must be integer"]()
         self.offset(int(offset))._store[alignment=alignment, volatile=volatile](
             val
@@ -736,7 +734,7 @@ struct UnsafePointer[
             offset: The offset to store to.
             val: The value to store.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         constrained[offset_type.is_integral(), "offset must be integer"]()
         self.offset(int(offset))._store[alignment=alignment, volatile=volatile](
             val
@@ -762,7 +760,7 @@ struct UnsafePointer[
         Args:
             val: The value to store.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         self._store[alignment=alignment, volatile=volatile](val)
 
     @always_inline("nodebug")
@@ -787,7 +785,7 @@ struct UnsafePointer[
         Args:
             val: The value to store.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         self._store[alignment=alignment, volatile=volatile](val)
 
     @always_inline("nodebug")
@@ -798,7 +796,7 @@ struct UnsafePointer[
         alignment: Int = _default_alignment[type, width](),
         volatile: Bool = False,
     ](self: UnsafePointer[Scalar[type], **_], val: SIMD[type, width]):
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         constrained[width > 0, "width must be a positive integer value"]()
         constrained[
             alignment > 0, "alignment must be a positive integer value"
@@ -854,7 +852,7 @@ struct UnsafePointer[
             val: The SIMD value to store.
             stride: The stride between stores.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         strided_store(val, self, int(stride), True)
 
     @always_inline("nodebug")
@@ -954,7 +952,7 @@ struct UnsafePointer[
             mask: The SIMD vector of boolean values, indicating for each
                 element whether to store at memory or not.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         constrained[
             offset.type.is_integral(),
             "offset type must be an integral type",
@@ -979,15 +977,13 @@ struct UnsafePointer[
         address_space: AddressSpace = Self.address_space,
         alignment: Int = Self.alignment,
         *,
-        is_mutable: Bool = Self.is_mutable,
-        origin: Origin[is_mutable] = Origin[is_mutable]
-        .cast_from[Self.origin]
-        .result,
+        mut: Bool = Self.mut,
+        origin: Origin[mut] = Origin[mut].cast_from[Self.origin].result,
     ](self) -> UnsafePointer[
         T,
         address_space=address_space,
         alignment=alignment,
-        is_mutable=is_mutable,
+        mut=mut,
         origin=origin,
     ]:
         """Bitcasts a UnsafePointer to a different type.
@@ -996,7 +992,7 @@ struct UnsafePointer[
             T: The target type.
             address_space: The address space of the result.
             alignment: Alignment of the destination pointer.
-            is_mutable: Whether the origin is mutable.
+            mut: Whether the origin is mutable.
             origin: Origin of the destination pointer.
 
         Returns:
@@ -1021,7 +1017,7 @@ struct UnsafePointer[
         more efficient because it doesn't invoke `__moveinit__`.
 
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         _ = __get_address_as_owned_value(self.address)
 
     @always_inline
@@ -1044,7 +1040,7 @@ struct UnsafePointer[
         Returns:
             The value at the pointer.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         return __get_address_as_owned_value(self.address)
 
     # TODO: Allow overloading on more specific traits
@@ -1071,7 +1067,7 @@ struct UnsafePointer[
         Args:
             value: The value to emplace.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(self.address) = value^
 
     @always_inline
@@ -1097,7 +1093,7 @@ struct UnsafePointer[
         Args:
             value: The value to emplace.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(self.address) = value
 
     @always_inline
@@ -1124,7 +1120,7 @@ struct UnsafePointer[
         Args:
             value: The value to emplace.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(self.address) = T(other=value)
 
     @always_inline
@@ -1159,7 +1155,7 @@ struct UnsafePointer[
         Args:
             dst: Destination pointer that the value will be moved into.
         """
-        constrained[is_mutable, _must_be_mut_err]()
+        constrained[mut, _must_be_mut_err]()
         __get_address_as_uninit_lvalue(
             dst.address
         ) = __get_address_as_owned_value(self.address)

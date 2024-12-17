@@ -28,15 +28,20 @@ Here's a brief summary of some of the major changes in this release, with more
 detailed information in the following sections:
 
 - The `inout` and `borrowed` argument conventions have been renamed to `mut`
-  and `read`, respectively. See Language changes for details.
+  and `read`, respectively. A new `out` convention has been added for the `self`
+  argument in constructors and for named results. See
+  [Language changes](#24-6-language-changes) for details.
 
-- `Lifetime` and related types have been renamed to `Origin` in the standard
-  library to better clarify that parameters of this type indicate where a
-  reference is derived from, not the more complicated notion of where a variable
-  is initialized and destroyed. As a consequence the `__lifetime_of()` operator
-  is now named `__origin_of()`. There are also a number of other origin-related
-  improvements in this release, described under Language changes and Standard
-  library changes below.
+- `Lifetime` and related types in the standard library have been renamed to
+  [`Origin`](/mojo/stdlib/builtin/type_aliases/Origin) to better clarify that
+  parameters of this type indicate where a reference is derived from, not the
+  more complicated notion of where a variable is initialized and destroyed. As a
+  consequence the `__lifetime_of()` operator is now named `__origin_of()`.
+
+  There are also a number of other origin-related improvements in this release,
+  including being able to specify a union of origins by listing multiple values
+  in the `__origin_of()` operator or inside the `ref` origin specifier
+  (`ref [a, b]`). For details, see [Language changes](#24-6-language-changes).
 
   For background information and rationale on the name change see
   [the proposal](https://github.com/modularml/mojo/issues/3623). For more
@@ -44,70 +49,92 @@ detailed information in the following sections:
   [Lifetimes, origins and references](/mojo/manual/values/lifetimes) in the Mojo
   Manual.
 
-- Implicit conversions are now opt-in using the `@implicit` decorator. See
-  Language changes for details.
+- Implicit conversions are now opt-in using the
+  [`@implicit`](/mojo/manual/decorators/implicit) decorator. See
+  [Language changes](#24-6-language-changes) for details.
 
-- Lots of new docs, including a brand new
+- The standard library has added several new types, including
+  [`Deque`](/mojo/stdlib/collections/deque/Deque) (a double-ended queue) and
+  [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer) (safe,
+  single-owner, non-nullable smart pointer). See
+  [Standard library changes](#standard-library-changes-24-6-standard-library-changes)
+  for details.
+
+- The VS Code extension now supports setting data breakpoints and function
+  breakpoints, and the Mojo LLDB debugger supports symbol breakpoints, such
+  as `b main` or `b my_module::main`.
+
+- We've made a number of improvement to how information is displayed in error
+  messages, LSP, and generated API documentation. For details, see
+  [Tooling changes](#24-6-tooling-changes).
+
+- And we've added a number of new docs, including a brand new
   [Mojo tutorial](/mojo/manual/get-started), new pages on
   [operators and expressions](/mojo/manual/operators),
   [error handling](/mojo/manual/errors), and
   [pointers](/mojo/manual/pointers/), and many smaller additions and
   improvements.
 
-### Language changes
+### Language changes {#24-6-language-changes}
 
-- The `inout` and `borrowed` argument conventions have been renamed to the `mut`
-  and `read` argument conventions (respectively).  These verbs reflect
-  declaratively what the callee can do to the argument value passed into the
-  caller, without tying in the requirement for the programmer to know about
-  advanced features like references.
+- Argument convention changes:
 
-- The argument convention for the `self` argument in `__init__()`,
-  `__copyinit__()`, and `__moveinit__()` methods has been changed from `inout`
-  to `out`, reflecting that a constructor method initializes its `self` value
-  without reading from it. This also enables spelling the type of an initializer
-  correctly, which was not supported before:
+  - The `inout` and `borrowed` argument conventions have been renamed to `mut`
+    (for "mutate") and `read`, respectively. These verbs reflect what the callee
+    can do to the argument value passed in by the caller, without requiring the
+    programmer to know about advanced features like references.
 
-  ```mojo
-  struct Foo:
-      fn __init__(out self): pass
+    For information on Mojo's argument conventions, see
+    [Argument conventions](/mojo/manual/values/ownership/#argument-conventions)
+    in the Mojo Manual.
 
-  fn test():
-      # This works now
-      var fnPtr : fn(out x: Foo)->None = Foo.__init__
+  - The argument convention for the `self` argument in the `__init__()`,
+    `__copyinit__()`, and `__moveinit__()` methods has been changed from `inout`
+    to `out`, reflecting that a constructor method initializes its `self` value
+    without reading from it. This also enables spelling the type of an
+    initializer correctly, which was not supported before:
 
-      var someFoo : Foo
-      fnPtr(someFoo)  # initializes someFoo.
-  ```
+    ```mojo
+    struct Foo:
+        fn __init__(out self): pass
 
-  The previous `fn __init__(inout self)` syntax is still supported in this
-  release of Mojo, but will be removed in the future.  Please migrate to the
-  new syntax.
+    fn test():
+        # This works now
+        var fnPtr : fn(out x: Foo)->None = Foo.__init__
 
-- Similarly, the spelling of "named functions results" has switched to use `out`
-  syntax instead of `-> T as name`.  Functions may have at most one named result
-  or return type specified with the usual `->` syntax.  `out` arguments may
-  occur anywhere in the argument list, but are typically last (except for
-  `__init__` methods, where they are typically first).
+        var someFoo : Foo
+        fnPtr(someFoo)  # initializes someFoo.
+    ```
 
-  ```mojo
-  # This function has type "fn() -> String"
-  fn example(out result: String):
-    result = "foo"
-  ```
+    The previous `fn __init__(inout self)` syntax is still supported in this
+    release of Mojo, but will be removed in the future.  Please migrate to the
+    new syntax.
 
-  The parser still accepts the old syntax as a synonym for this, but that will
-  eventually be deprecated and removed.
+  - Similarly, the spelling of named results has switched to use
+    `out` syntax instead of `-> T as name`. Functions may have at most one named
+    result or return type specified with the usual `->` syntax. `out` arguments
+    may occur anywhere in the argument list, but are typically last (except for
+    `__init__` methods, where they are typically first).
 
-  This was [discussed extensively in a public
-  proposal](https://github.com/modularml/mojo/issues/3623). For more
-  information, see
-  [Named results](/nightly/mojo/manual/functions#named-results) in the Mojo
-  Manual.
+    ```mojo
+    # This function has type "fn() -> String"
+    fn example(out result: String):
+      result = "foo"
+    ```
 
-- Single argument constructors now require a `@implicit` decorator to allow
-  for implicit conversions. Previously you could define an `__init__` that
-  takes a single argument:
+    The parser still accepts the old syntax as a synonym for this, but that will
+    eventually be deprecated and removed.
+
+    This was [discussed extensively in a public
+    proposal](https://github.com/modularml/mojo/issues/3623). For more
+    information, see
+    [Named results](/nightly/mojo/manual/functions#named-results) in the Mojo
+    Manual.
+
+- Single argument constructors now require the
+  [`@implicit`](/mojo/manual/decorators/implicit) decorator to allow for
+  implicit conversions. Previously you could define an `__init__` that takes a
+  single argument:
 
   ```mojo
   struct Foo:
@@ -152,85 +179,117 @@ detailed information in the following sections:
   [Constructors and implicit conversion](/mojo/manual/lifecycle/life#constructors-and-implicit-conversion)
   in the Mojo Manual.
 
-- Various improvements to origin handling and syntax have landed, including
-  support for the ternary operator and allowing multiple arguments in a `ref`
-  specifier (which are implicitly unions).  This enables expression of simple
-  algorithms cleanly:
+- Origin-related changes:
 
-  ```mojo
-  fn my_min[T: Comparable](ref a: T, ref b: T) -> ref [a, b] T:
-    return a if a < b else b
-  ```
+  - The `AnyLifetime` type (useful for declaring origin types as parameters) has
+    has been renamed to [`Origin`](/mojo/stdlib/builtin/type_aliases/Origin) and
+    the `__lifetime_of()` operator renamed to `__origin_of()`.
 
-  It is also nice that `my_min` automatically and implicitly propagates the
-  mutability of its arguments, so things like `my_min(str1, str2) += "foo"` is
-  valid.
+  - `Origin` is now a complete wrapper around the MLIR origin type.
 
-- `Origin` is now a complete wrapper around the MLIR origin type.
+    - The `Origin.type` alias has been renamed to `_mlir_origin`. In parameter
+      lists, you can now write just `Origin[..]`, instead of `Origin[..].type`.
 
-  - The `Origin.type` alias has been renamed to `_mlir_origin`. In parameter
-    lists, you can now write just `Origin[..]`, instead of `Origin[..].type`.
+    - `ImmutableOrigin` and `MutableOrigin` are now, respectively, just aliases
+      for `Origin[False]` and `Origin[True]`.
 
-  - `ImmutableOrigin` and `MutableOrigin` are now, respectively, just aliases
-    for `Origin[False]` and `Origin[True]`.
+    - `Origin` struct values are now supported in the origin specifier of a
+      `ref [..]` argument.
 
-  - `Origin` struct values are now supported in the brackets of a `ref [..]`
-    argument.
+    - Added `Origin.cast_from` for casting the mutability of an origin value.
 
-  - Added `Origin.cast_from` for casting the mutability of an origin value.
+  - `ref` arguments and results now allow for providing a memory value
+    directly in the origin specifier, rather than requiring the use of
+    `__origin_of()`.  It is still fine to use `__origin_of()` explicitly though,
+    and this is required when specifying origins for parameters (e.g. to the
+    `Pointer` type). For example, this is now valid without `__origin_of()`:
 
-- `ref` argument and result specifiers now allow providing a memory value
-  directly in the origin specifier, rather than requiring the use of
-  `__origin_of()`.  It is still fine to use `__origin_of()` explicitly though,
-  and this is required when specifying origins for parameters (e.g. to the
-  `Pointer` type). For example, this is now valid without `__origin_of()`:
+    ```mojo
+    fn return_ref(a: String) -> ref [a] String:
+        return a
+    ```
 
-  ```mojo
-  fn return_ref(a: String) -> ref [a] String:
-      return a
-  ```
+  - Various improvements to origin handling and syntax have landed, including
+    support for the ternary operator and allowing multiple arguments in a `ref`
+    specifier (which are implicitly unions).  This enables expression of simple
+    algorithms cleanly:
 
-- `ref` function arguments without an origin clause are now treated as
-  `ref [_]`, which is more syntactically convenient and consistent:
+    ```mojo
+    fn my_min[T: Comparable](ref a: T, ref b: T) -> ref [a, b] T:
+      return a if a < b else b
+    ```
 
-  ```mojo
-  fn takes_and_return_ref(ref a: String) -> ref [a] String:
-      return a
-  ```
+    It is also nice that `my_min` automatically and implicitly propagates the
+    mutability of its arguments, so things like `my_min(str1, str2) += "foo"` is
+    valid.
 
-- The `__type_of(x)` and `__origin_of(x)` operators are much more general now:
-  they allow arbitrary expressions inside of them, allow referring to dynamic
-  values in parameter contexts, and even allow referring to raising functions
-  in non-raising contexts.  These operations never evaluate their expression, so
-  any side effects that occur in the expression are never evaluated at runtime,
-  eliminating concerns about `__type_of(expensive())` being a problem.
+  - `ref` function arguments without an origin clause are now treated as
+    `ref [_]`, which is more syntactically convenient and consistent:
 
-- The destructor insertion logic in Mojo is now aware that types that take an
-  `MutableAnyOrigin` or `ImmutableAnyOrigin` as part of their signature could
-  potentially access any live value that destructor insertion is tracking,
-  eliminating a significant usability issue with unsafe APIs like
-  `UnsafePointer`.  Consider a typical example working with strings before this
-   change:
+    ```mojo
+    fn takes_and_return_ref(ref a: String) -> ref [a] String:
+        return a
+    ```
 
-  ```mojo
-  var str = String(...)
-  var ptr = str.unsafe_ptr()
-  some_low_level_api(ptr)
-  _ = str^  # OLD HACK: Explicitly keep string alive until here!
-  ```
+  - The `__type_of(x)` and `__origin_of(x)` operators are much more general now:
+    they allow arbitrary expressions inside of them, allow referring to dynamic
+    values in parameter contexts, and even allow referring to raising functions
+    in non-raising contexts. These operations never evaluate their expression,
+    so any side effects that occur in the expression are never evaluated at
+    runtime, eliminating concerns about `__type_of(expensive())` being a
+    problem.
 
-  The `_ = str^` pattern was formerly required because the Mojo compiler has no
-  idea what "ptr" might reference.  As a consequence, it had no idea that
-  `some_low_level_api()` might access `str` and therefore thought it was ok to
-  destroy the `String` before the call - this is why the explicit lifetime
-  extension was required.
+  - The destructor insertion logic in Mojo is now aware that types that take an
+    `MutableAnyOrigin` or `ImmutableAnyOrigin` as part of their signature could
+    potentially access any live value that destructor insertion is tracking,
+    eliminating a significant usability issue with unsafe APIs like
+    [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer).
+    Consider a typical example working with strings before this change:
 
-  Mojo now knows that `UnsafePointer` may access the `MutableAnyOrigin` origin,
-  and now assumes that any API that uses that origin could use live values.
-  In this case, it assumes that `some_low_level_api()` might access `str` and
-  because it might be using it, it cannot destroy `str` until after the call.
-  The consequence of this is that the old hack is no longer needed for these
-  cases!
+    ```mojo
+    var str = String(...)
+    var ptr = str.unsafe_ptr()
+    some_low_level_api(ptr)
+    _ = str^  # OLD HACK: Explicitly keep string alive until here!
+    ```
+
+    The `_ = str^` pattern was formerly required because the Mojo compiler has
+    no idea what "ptr" might reference. As a consequence, it had no idea that
+    `some_low_level_api()` might access `str` and therefore thought it was ok to
+    destroy the `String` before the call - this is why the explicit lifetime
+    extension was required.
+
+    Mojo now knows that
+    [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) may
+    access the `MutableAnyOrigin` origin, and now assumes that any API that uses
+    that origin could use live values. In this case, it assumes that
+    `some_low_level_api()` might access `str` and because it might be using it,
+    it cannot destroy `str` until after the call. The consequence of this is
+    that the old hack is no longer needed for these cases!
+
+  - Function types now accept an origin set parameter. This parameter represents
+    the origins of values captured by a parameter closure. The compiler
+    automatically tags parameter closures with the right set of origins. This
+    enables lifetimes and parameter closures to correctly compose.
+
+    ```mojo
+    fn call_it[f: fn() capturing [_] -> None]():
+        f()
+
+    fn test():
+        var msg = String("hello world")
+
+        @parameter
+        fn say_hi():
+            print(msg)
+
+        call_it[say_hi]()
+        # no longer need to write `_ = msg^`!!
+    ```
+
+    Note that this only works for higher-order functions which have explicitly
+    added `[_]` as the capture origins. By default, the compiler still assumes
+    a `capturing` closure does not reference any origins. This will soon change.
 
 - Infer-only parameters may now be explicitly bound with keywords, enabling
   some important patterns in the standard library:
@@ -241,6 +300,38 @@ detailed information in the following sections:
   # This auto-parameterizes on the origin, but constrains it to being an
   # immutable slice instead of a potentially mutable one.
   fn take_imm_slice(a: ImmStringSlice): ...
+  ```
+
+- The flag for turning on asserts has changed, e.g. to enable all checks:
+
+  ```bash
+  mojo -D ASSERT=all main.mojo
+  ```
+
+  The levels are:
+
+  - `none`: all assertions off
+  - `warn`: print assertion errors e.g. for multithreaded tests (previously `-D
+    ASSERT_WARNING`)
+  - `safe`: the default mode for standard CPU safety assertions
+  - `all`: turn on all assertions (previously `-D MOJO_ENABLE_ASSERTIONS`)
+
+  You can now also pass `Stringable` args to format a message, which will have
+  no runtime penalty or IR bloat cost when assertions are off. Previously you
+  had to:
+
+  ```mojo
+  x = -1
+  debug_assert(
+    x > 0, String.format_sequence(“expected x to be more than 0 but got: ”, x)
+  )
+  ```
+
+  Which can't be optimized away by the compiler in release builds, you can now
+  pass multiple args for a formatted message at no runtime cost:
+
+  ```mojo
+  debug_assert(x > 0, “expected x to be more than 0 but got: ”, x)
   ```
 
 - Automatic parameterization of parameters is now supported. Specifying a
@@ -255,30 +346,6 @@ detailed information in the following sections:
   fn foo[size: Int, //, value: SIMD[DType.int32, size]]():
     pass
   ```
-
-- Function types now accept an origin set parameter. This parameter represents
-  the origins of values captured by a parameter closure. The compiler
-  automatically tags parameter closures with the right set of origins. This
-  enables lifetimes and parameter closures to correctly compose.
-
-  ```mojo
-  fn call_it[f: fn() capturing [_] -> None]():
-      f()
-
-  fn test():
-      var msg = String("hello world")
-
-      @parameter
-      fn say_hi():
-          print(msg)
-
-      call_it[say_hi]()
-      # no longer need to write `_ = msg^`!!
-  ```
-
-  Note that this only works for higher-order functions which have explicitly
-  added `[_]` as the capture origins. By default, the compiler still assumes
-  a `capturing` closure does not reference any origins. This will soon change.
 
 - Mojo can now interpret simple LLVM intrinsics in parameter expressions,
   enabling things like `count_leading_zeros` to work at compile time:
@@ -295,102 +362,10 @@ detailed information in the following sections:
 
 ### Standard library changes {#24-6-standard-library-changes}
 
-- Add the `Floatable` and `FloatableRaising` traits to denote types that can
-  be converted to a `Float64` value using the builtin `float` function.
-  - Make `SIMD` and `FloatLiteral` conform to the `Floatable` trait.
-
-  ```mojo
-  fn foo[F: Floatable](v: F):
-    ...
-
-  var f = float(Int32(45))
-  ```
-
-  ([PR #3163](https://github.com/modularml/mojo/pull/3163))
-
-- Add `DLHandle.get_symbol()`, for getting a pointer to a symbol in a dynamic
-  library. This is more general purpose than the existing methods for getting
-  function pointers.
-
-- Introduce `TypedPythonObject` as a light-weight way to annotate `PythonObject`
-  values with static type information. This design will likely evolve and
-  change significantly.
-
-  - Added `TypedPythonObject["Tuple].__getitem__` for accessing the elements of
-    a Python tuple.
-
-- Added `Python.add_object()`, to add a named `PythonObject` value to a Python
-  'module' object instance.
-
-- Added `Python.unsafe_get_python_exception()`, as an efficient low-level
-  utility to get the Mojo `Error` equivalent of the current CPython error state.
-
-- Add `PythonObject.from_borrowed_ptr()`, to simplify the construction of
-  `PythonObject` values from CPython 'borrowed reference' pointers.
-
-  The existing `PythonObject.__init__(PyObjectPtr)` should continue to be used
-  for the more common case of constructing a `PythonObject` from a
-  'strong reference' pointer.
-
-- The `rebind` standard library function now works with memory-only types in
-  addition to `@register_passable("trivial")` ones, without requiring a copy.
-
-- Introduce `random.shuffle` for `List`.
-  ([PR #3327](https://github.com/modularml/mojo/pull/3327))
-
-  Example:
-
-  ```mojo
-  from random import shuffle
-
-  var l = List[Int](1, 2, 3, 4, 5)
-  shuffle(l)
-  ```
-
-- The `Dict.__getitem__` method now returns a reference instead of a copy of
-  the value (or raises).  This improves the performance of common code that
-  uses `Dict` by allowing borrows from the `Dict` elements.
-
-- `Slice.step` is now an `Optional[Int]`, matching the optionality of
-  `slice.step` in Python.
-  ([PR #3160](https://github.com/modularml/mojo/pull/3160))
-
-- `StringRef` now implements `split()` which can be used to split a
-  `StringRef` into a `List[StringRef]` by a delimiter.
-  ([PR #2705](https://github.com/modularml/mojo/pull/2705))
-
-- Support for multi-dimensional indexing for `PythonObject`
-  ([PR #3583](https://github.com/modularml/mojo/pull/3583)).
-
-- Support for multi-dimensional indexing and slicing for `PythonObject`
-  (PR [#3549](https://github.com/modularml/mojo/pull/3549),
-  PR [#3583](https://github.com/modularml/mojo/pull/3583)).
-
-    ```mojo
-    var np = Python.import_module("numpy")
-    var a = np.array(PythonObject([1,2,3,4,5,6])).reshape(2,3)
-    print((a[0, 1])) # 2
-    print((a[1][::-1])) # [6 5 4]
-   ```
-
-  Note, that the syntax, `a[1, ::-1]`, is currently not supported.
-
-- There is now a [`Byte`](/mojo/stdlib/builtin/simd/Byte) alias to better
-  express intent when working with a pack of bits.
-  ([PR #3670](https://github.com/modularml/mojo/pull/3670)).
-
-- Expanded `os.path` with new functions (by [@thatstoasty](https://github.com/thatstoasty)):
-  - `os.path.expandvars`: Expands environment variables in a path ([PR #3735](https://github.com/modularml/mojo/pull/3735)).
-  - `os.path.splitroot`: Split a path into drive, root and tail.
-  ([PR #3780](https://github.com/modularml/mojo/pull/3780)).
-
-- Added a `reserve` method and new constructor to the `String` struct to
-  allocate additional capacity.
-  ([PR #3755](https://github.com/modularml/mojo/pull/3755)).
-
-- Introduced a new `Deque` (double-ended queue) collection type, based on a
-  dynamically resizing circular buffer for efficient O(1) additions and removals
-  at both ends as well as O(1) direct access to all elements.
+- Introduced a new [`Deque`](/mojo/stdlib/collections/deque/Deque) (double-ended
+  queue) collection type, based on a dynamically resizing circular buffer for
+  efficient O(1) additions and removals at both ends as well as O(1) direct
+  access to all elements.
 
   The `Deque` supports the full Python `collections.deque` API, ensuring that all
   expected deque operations perform as in Python.
@@ -401,92 +376,15 @@ detailed information in the following sections:
   memory allocation and performance. These options allow for optimized memory usage
   and reduced buffer reallocations, providing flexibility based on application requirements.
 
-- A new `StringLiteral.get[some_stringable]()` method is available.  It
-  allows forming a runtime-constant StringLiteral from a compile-time-dynamic
-  `Stringable` value.
-
-- `Span` now implements `__reversed__`. This means that one can get a
-  reverse iterator over a `Span` using `reversed(my_span)`. Users should
-  currently prefer this method over `my_span[::-1]`.
-
-- `StringSlice` now implements `strip`, `rstrip`, and `lstrip`.
-
-- `StringRef` is now representable so `repr(StringRef("hello"))` will return
-  `StringRef('hello')`.
-
-- The `UnsafePointer` type now has an `origin` parameter that can be used when
-  the `UnsafePointer` is known to point to a value with a known origin. This
-  origin is propagated through the `ptr[]` indirection operation.
-
-- You can now index into `UnsafePointer` using SIMD scalar integral types:
-
-  ```mojo
-  p = UnsafePointer[Int].alloc(1)
-  i = UInt8(1)
-  p[i] = 42
-  print(p[i])
-  ```
-
-- `UnsafePointer` parameters (other than the type) are now keyword-only.
-
-- Added a new [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer)
-  type as a safe, single-owner, non-nullable smart pointer with similar
-  semantics to Rust's
-  [`Box<>`](https://doc.rust-lang.org/std/boxed/struct.Box.html) and C++'s
-  [`std::unique_ptr`](https://en.cppreference.com/w/cpp/memory/unique_ptr).
-  ([PR #3524](https://github.com/modularml/mojo/pull/3524))
-
-- `Arc` has been renamed to [`ArcPointer`](/mojo/stdlib/memory/arc/ArcPointer),
-  for consistency with `OwnedPointer`.
-
-- [`ArcPointer`](/mojo/stdlib/memory/arc/ArcPointer) now implements
-  [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
-  compared for pointer equivalence using `a is b`.
-
-- Added `PythonObject.__contains__`.
-  ([PR #3101](https://github.com/modularml/mojo/pull/3101))
-
-  Example usage:
-
-  ```mojo
-  x = PythonObject([1,2,3])
-  if 1 in x:
-     print("1 in x")
-
-- `Span` has moved from the `utils` module to the `memory` module.
-
-  - More things have been removed from the auto-exported set of entities in the
-  `prelude` module from the Mojo standard library:
-  - `UnsafePointer` has been removed. Please explicitly import it via
-    `from memory import UnsafePointer`.
-  - `StringRef` has been removed. Please explicitly import it via
-    `from utils import StringRef`.
-
-- The `Reference` type has been renamed to `Pointer`: a memory safe complement
-  to `UnsafePointer`.  This change is motivated by the fact that `Pointer`
-  is assignable and requires an explicit dereference with `ptr[]`.  Renaming
-  to `Pointer` clarifies that "references" means `ref` arguments and results,
-  and gives us a model that is more similar to what the C++ community would
-  expect.
-
-- A new `as_noalias_ptr` method as been added to `UnsafePointer`. This method
-  specifies to the compiler that the resultant pointer is a distinct
-  identifiable object that does not alias any other memory in the local scope.
-
-- The `AnyLifetime` type (useful for declaring origin types as parameters) has
-  been renamed to `Origin`.
-
-- Restored implicit copyability of `Tuple` and `ListLiteral`.
-
-- The aliases for C FFI have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long`
-  and so on.
-
-- The `Formatter` struct has changed to a `Writer` trait to enable buffered IO,
+- The `Formatter` struct has been replaced with a
+  [`Writer`](/mojo/stdlib/utils/write/Writer) trait to enable buffered IO,
   increasing print and file writing perf to the same speed as C. It's now more
   general purpose and can write any `Span[Byte]`. To align with this the
-  `Formattable` trait is now named `Writable`, and the `String.format_sequence`
-  static methods to initialize a new `String` have been renamed to
-  `String.write`. Here's an example of using all the changes:
+  `Formattable` trait is now named
+  [`Writable`](/mojo/stdlib/utils/write/Writable), and the
+  `String.format_sequence()` static method to initialize a new `String` has been
+  renamed to [`String.write()`](/mojo/stdlib/collections/string/String/#write).
+  Here's an example of using all of the changes:
 
   ```mojo
   from memory import Span
@@ -534,49 +432,239 @@ detailed information in the following sections:
       print(new_string)
   ```
 
+  ```output
   Point(1, 2)
   Point(3, 4)
-
-- You can now use the `+=` and `*` operators on a `StringLiteral` at compile
-  time using the `alias` keyword:
-
-  ```mojo
-  alias original = "mojo"
-  alias concat = original * 3
-  assert_equal("mojomojomojo", concat)
   ```
 
-  Or inside a `fn` that is being evaluated at compile time:
+- Python interop changes:
+
+  - Introduced
+    [`TypedPythonObject`](/mojo/stdlib/python/python_object/TypedPythonObject)
+    as a light-weight way to annotate
+    [`PythonObject`](/mojo/stdlib/python/python_object/PythonObject) values with
+    static type information. This design will likely evolve and change
+    significantly.
+
+    - Added `TypedPythonObject["Tuple].__getitem__()` for accessing the elements
+      of a Python tuple.
+
+  - Added
+    [`Python.add_object()`](/mojo/stdlib/python/python/Python#add_object), to
+    add a named `PythonObject` value to a Python 'module' object instance.
+
+  - Added
+    [`Python.unsafe_get_python_exception()`](/mojo/stdlib/python/python/Python#unsafe_get_python_exception),
+    as an efficient low-level utility to get the Mojo `Error` equivalent of the
+    current CPython error state.
+
+  - Add
+    [`PythonObject.from_borrowed_ptr()`](/mojo/stdlib/python/python_object/PythonObject#from_borrowed_ptr),
+    to simplify the construction of `PythonObject` values from CPython 'borrowed
+    reference' pointers.
+
+    The existing `PythonObject.__init__(PyObjectPtr)` should continue to be used
+    for the more common case of constructing a `PythonObject` from a
+    'strong reference' pointer.
+
+  - Support for multi-dimensional indexing and slicing for `PythonObject`
+    (PR [#3549](https://github.com/modularml/mojo/pull/3549),
+    PR [#3583](https://github.com/modularml/mojo/pull/3583)).
+
+    ```mojo
+    var np = Python.import_module("numpy")
+    var a = np.array(PythonObject([1,2,3,4,5,6])).reshape(2,3)
+    print((a[0, 1])) # 2
+    print((a[1][::-1])) # [6 5 4]
+    ```
+
+    Note that the syntax, `a[1, ::-1]`, is currently not supported.
+
+  - Added
+    [`PythonObject.__contains__()`](/mojo/stdlib/python/python_object/PythonObject#__contains__).
+    ([PR #3101](https://github.com/modularml/mojo/pull/3101))
+
+    Example usage:
+
+    ```mojo
+    x = PythonObject([1,2,3])
+    if 1 in x:
+        print("1 in x")
+    ```
+
+- Pointer related changes:
+
+  - The [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) type
+    now has an `origin` parameter that can be used when the `UnsafePointer`
+    points to a value with a known origin. This origin is propagated through the
+    `ptr[]` indirection operation. This parameter and other `UnsafePointer`
+    parameters (other than the type) are now keyword-only.
+
+  - You can now index into `UnsafePointer` using `SIMD` scalar integral types:
+
+    ```mojo
+    p = UnsafePointer[Int].alloc(1)
+    i = UInt8(1)
+    p[i] = 42
+    print(p[i])
+    ```
+
+  - Added a new [`OwnedPointer`](/mojo/stdlib/memory/owned_pointer/OwnedPointer)
+    type as a safe, single-owner, non-nullable smart pointer with similar
+    semantics to Rust's
+    [`Box<>`](https://doc.rust-lang.org/std/boxed/struct.Box.html) and C++'s
+    [`std::unique_ptr`](https://en.cppreference.com/w/cpp/memory/unique_ptr).
+    ([PR #3524](https://github.com/modularml/mojo/pull/3524))
+
+  - `Arc` has been renamed to [`ArcPointer`](/mojo/stdlib/memory/arc/ArcPointer),
+    for consistency with `OwnedPointer`.
+
+  - [`ArcPointer`](/mojo/stdlib/memory/arc/ArcPointer) now implements
+    [`Identifiable`](/mojo/stdlib/builtin/identifiable/Identifiable), and can be
+    compared for pointer equivalence using `a is b`.
+
+  - The `Reference` type has been renamed to
+    [`Pointer`](/mojo/stdlib/memory/pointer/Pointer): a memory safe complement
+    to `UnsafePointer`. This change is motivated by the fact that `Pointer` is
+    assignable and requires an explicit dereference with `ptr[]`. Renaming to
+    `Pointer` clarifies that "references" means `ref` arguments and results, and
+    gives us a model that is more similar to what the C++ community would
+    expect.
+
+    For an overview of Mojo's pointer types, see the new
+    [Intro to pointers](/mojo/manual/pointers/) page in the Mojo Manual.
+
+  - A new
+    [`as_noalias_ptr()`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer#as_noalias_ptr)
+    method as been added to `UnsafePointer`. This method specifies to the
+    compiler that the resultant pointer is a distinct identifiable object that
+    does not alias any other memory in the local scope.
+
+- Added the [`Floatable`](/mojo/stdlib/builtin/floatable/Floatable) and
+  [`FloatableRaising`](/mojo/stdlib/builtin/floatable/FloatableRaising) traits to
+  denote types that can be converted to a `Float64` value using the builtin
+  `float` function. Made `SIMD` and `FloatLiteral` conform to the `Floatable`
+  trait. ([PR #3163](https://github.com/modularml/mojo/pull/3163))
 
   ```mojo
-  fn add_literal(
-      owned original: StringLiteral, add: StringLiteral, n: Int
-  ) -> StringLiteral:
-      for _ in range(n):
-          original += add
-      return original
+  fn foo[F: Floatable](v: F):
+    ...
 
-
-  fn main():
-      alias original = "mojo"
-      alias concat = add_literal(original, "!", 4)
-      assert_equal("mojo!!!!", concat)
+  var f = float(Int32(45))
   ```
 
-  These operators can't be evaluated at runtime, as a `StringLiteral` must be
-  written into the binary during compilation.
+- The [`rebind()`](/mojo/stdlib/builtin/rebind/rebind) standard library function
+  now works with memory-only types in addition to
+  `@register_passable("trivial")` ones, without requiring a copy. For more
+  information, see
+  [The `rebind()` builtin](/mojo/manual/parameters/#the-rebind-builtin) in the
+  Mojo Manual.
+
+- Introduced the [`random.shuffle()`](/mojo/stdlib/random/random/shuffle)
+  function for randomizing the elements of a `List`.
+  ([PR #3327](https://github.com/modularml/mojo/pull/3327))
+
+  Example:
+
+  ```mojo
+  from random import shuffle
+
+  var l = List[Int](1, 2, 3, 4, 5)
+  shuffle(l)
+  ```
+
+- The [`Dict.__getitem__()`](/mojo/stdlib/collections/dict/Dict#__getitem__)
+  method now returns a reference instead of a copy of the value (or raises).
+  This improves the performance of common code that uses `Dict` by allowing
+  borrows from the `Dict` elements.
+
+- [`Slice.step`](/mojo/stdlib/builtin/builtin_slice/Slice#fields) is now an
+  `Optional[Int]`, matching the optionality of `slice.step` in Python.
+  ([PR #3160](https://github.com/modularml/mojo/pull/3160))
+
+- There is now a [`Byte`](/mojo/stdlib/builtin/simd/#aliases) alias to better
+  express intent when working with a pack of bits.
+  ([PR #3670](https://github.com/modularml/mojo/pull/3670)).
+
+- Expanded [`os.path`](/mojo/stdlib/os/path/path/) with new functions:
+  - `os.path.expandvars()`: Expands environment variables in a path ([PR #3735](https://github.com/modularml/mojo/pull/3735)).
+  - `os.path.splitroot()`: Split a path into drive, root and tail.
+  ([PR #3780](https://github.com/modularml/mojo/pull/3780)).
+
+- Added a [`reserve()`](/mojo/stdlib/collections/string/String#reserve) method
+  and new constructor to the `String` struct to allocate additional capacity.
+  ([PR #3755](https://github.com/modularml/mojo/pull/3755)).
+
+- A new
+  [`StringLiteral.get[some_stringable]()`](/mojo/stdlib/builtin/string_literal/StringLiteral#get)
+  method is available. It allows forming a runtime-constant `StringLiteral` from
+  a compile-time-dynamic `Stringable` value.
+
+- [`Span`](/mojo/stdlib/memory/span/Span) has moved from the `utils` module to
+  the `memory` module.
+
+- [`Span`](/mojo/stdlib/memory/span/Span) now implements `__reversed__()`. This
+  means that one can get a reverse iterator over a `Span` using
+  `reversed(my_span)`. Users should currently prefer this method over
+  `my_span[::-1]`.
+
+- A new [`AsBytes`](/mojo/stdlib/memory/span/AsBytes) trait has been added to
+  enable taking a `Span[Byte]` from any type that implements `as_bytes()`.
+  `String.as_bytes()` and `String.as_bytes_slice()` have been consolidated under
+  `String.as_bytes()` to return a `Span[Byte]`. If you require a copy, you can
+  convert the `Span` to a `List` with `List(my_string.as_bytes())`.
+
+- [`StringSlice`](/mojo/stdlib/utils/string_slice/StringSlice) now implements
+  `strip()`, `rstrip()`, and `lstrip()`.
+
+- [`StringRef`](/mojo/stdlib/utils/stringref/StringRef) now implements `split()`
+  which can be used to split a `StringRef` into a `List[StringRef]` by a
+  delimiter. ([PR #2705](https://github.com/modularml/mojo/pull/2705))
+
+- [`StringRef`](/mojo/stdlib/utils/stringref/StringRef) is now representable so
+  `repr(StringRef("hello"))` will return `StringRef('hello')`.
+
+- More things have been removed from the auto-exported set of entities in the
+  `prelude` module from the Mojo standard library:
+  - `UnsafePointer` has been removed. Please explicitly import it via
+    `from memory import UnsafePointer`.
+  - `StringRef` has been removed. Please explicitly import it via
+    `from utils import StringRef`.
+
+- Restored implicit copyability of [`Tuple`](/mojo/stdlib/builtin/tuple/Tuple)
+  and [`ListLiteral`](/mojo/stdlib/builtin/builtin_list/ListLiteral).
+
+- The
+  [aliases for C foreign function interface (FFI)](/mojo/stdlib/sys/ffi/#aliases)
+  have been renamed: `C_int` -> `c_int`, `C_long` -> `c_long` and so on.
+
+- `Float32` and `Float64` are now printed and converted to strings with
+  roundtrip guarantee and shortest representation:
+
+  ```plaintext
+  Value                       Old                       New
+  Float64(0.3)                0.29999999999999999       0.3
+  Float32(0.3)                0.30000001192092896       0.3
+  Float64(0.0001)             0.0001                    0.0001
+  Float32(0.0001)             9.9999997473787516e-05    0.0001
+  Float64(-0.00001)           -1.0000000000000001e-05   -1e-05
+  Float32(-0.00001)           -9.9999997473787516e-06   -1e-05
+  Float32(0.00001234)         1.2339999557298142e-05    1.234e-05
+  Float32(-0.00000123456)     -1.2345600453045336e-06   -1.23456e-06
+  Float64(1.1234567e-320)     1.1235052786429946e-320   1.1235e-320
+  Float64(1.234 * 10**16)     12340000000000000.0       1.234e+16
+  ```
 
 - The `StaticIntTuple` data structure in the `utils` package has been renamed to
-  `IndexList`. The data structure now allows one to specify the index bitwidth
-  of the elements along with whether the underlying indices are signed or
-  unsigned.
+  [`IndexList`](/mojo/stdlib/utils/index_/IndexList). The data structure now
+  allows one to specify the index bitwidth of the elements along with whether
+  the underlying indices are signed or unsigned.
 
-- A new `AsBytes` trait has been added to enable taking a `Span[Byte]` of a
-  type with `s.as_bytes()`. `String.as_bytes` and `String.as_bytes_slice` have
-  been consolidated under `s.as_bytes` to return a `Span[Byte]`, you can convert
-  it to a `List` if you require a copy with `List(s.as_bytes())`.
+- Added [`DLHandle.get_symbol()`](/mojo/stdlib/sys/ffi/DLHandle#get_symbol), for
+  getting a pointer to a symbol in a dynamic library. This is more general
+  purpose than the existing methods for getting function pointers.
 
-### Tooling changes
+### Tooling changes {#24-6-tooling-changes}
 
 - The VS Code Mojo Debugger now has a `buildArgs` JSON debug configuration
   setting that can be used in conjunction with `mojoFile` to define the build
@@ -597,11 +685,37 @@ detailed information in the following sections:
   determining a default SDK to use. The user can select the default SDK to use
   with the `Mojo: Select the default MAX SDK` command.
 
-- The VS Code extension now supports setting [data breakpoints](https://code.visualstudio.com/docs/editor/debugging#_data-breakpoints)
-  as well as [function breakpoints](https://code.visualstudio.com/docs/editor/debugging#_function-breakpoints).
+- The VS Code extension now supports setting
+  [data breakpoints](https://code.visualstudio.com/docs/editor/debugging#_data-breakpoints)
+  as well as
+  [function breakpoints](https://code.visualstudio.com/docs/editor/debugging#_function-breakpoints).
 
-- The Mojo LLDB debugger now supports symbol breakpoints, e.g. `b main` or
-  `b my_module::main`.
+- The Mojo LLDB debugger now supports symbol breakpoints, for example, `b main`
+  or `b my_module::main`.
+
+- Error messages that include type names no longer include inferred or defaulted
+  parameters when they aren't needed.  For example, previously Mojo complained
+  about things like:
+
+  ```plaintext
+  ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
+  ```
+
+  it now complains more helpfully that:
+
+  ```plaintext
+  ... cannot be converted from 'UnsafePointer[UInt]' to 'UnsafePointer[Int]'
+  ```
+
+- Tooling now prints the origins of `ref` arguments and results correctly, and
+  prints `self` instead of `self: Self` in methods.
+
+- The Mojo Language Server and generated documentation now print parametric
+  result types correctly, e.g. showing `SIMD[type, simd_width]` instead of
+  `SIMD[$0, $1]`.
+
+- Generated API documentation now shows the signatures for structs, and
+  identifies `@register_passable` and `@register_passable("trivial")` types.
 
 - The VS Code extension now allows cancelling the installation of its private
   MAX SDK.
@@ -619,59 +733,10 @@ detailed information in the following sections:
 - The VS Code extension now allows selecting a default SDK when multiple are
   available.
 
-- The flag for turning on asserts has changed, e.g. to enable all checks:
-
-  ```bash
-  mojo -D ASSERT=all main.mojo
-  ```
-
-  The levels are:
-
-  - `none`: all assertions off
-  - `warn`: print assertion errors e.g. for multithreaded tests (previously `-D
-    ASSERT_WARNING`)
-  - `safe`: the default mode for standard CPU safety assertions
-  - `all`: turn on all assertions (previously `-D MOJO_ENABLE_ASSERTIONS`)
-
-  You can now also pass `Stringable` args to format a message, which will have
-  no runtime penalty or IR bloat cost when assertions are off. Previously you
-  had to:
-
-  ```mojo
-  x = -1
-  debug_assert(
-    x > 0, String.format_sequence(“expected x to be more than 0 but got: ”, x)
-  )
-  ```
-
-  Which can't be optimized away by the compiler in release builds, you can now
-  pass multiple args for a formatted message at no runtime cost:
-
-  ```mojo
-  debug_assert(x > 0, “expected x to be more than 0 but got: ”, x)
-  ```
-
-- Float32 and Float64 are now printed and converted to strings with roundtrip
-  guarantee and shortest representation:
-
-  ```plaintext
-  Value                       Old                       New
-  Float64(0.3)                0.29999999999999999       0.3
-  Float32(0.3)                0.30000001192092896       0.3
-  Float64(0.0001)             0.0001                    0.0001
-  Float32(0.0001)             9.9999997473787516e-05    0.0001
-  Float64(-0.00001)           -1.0000000000000001e-05   -1e-05
-  Float32(-0.00001)           -9.9999997473787516e-06   -1e-05
-  Float32(0.00001234)         1.2339999557298142e-05    1.234e-05
-  Float32(-0.00000123456)     -1.2345600453045336e-06   -1.23456e-06
-  Float64(1.1234567e-320)     1.1235052786429946e-320   1.1235e-320
-  Float64(1.234 * 10**16)     12340000000000000.0       1.234e+16
-  ```
-
 ### ❌ Removed
 
-- The `UnsafePointer.bitcast` overload for `DType` has been removed.  Wrap your
-  `DType` in a `Scalar[my_dtype]` to call the only overload of `bitcast` now.
+- The `UnsafePointer.bitcast()` overload for `DType` has been removed.  Wrap your
+  `DType` in a `Scalar[my_dtype]` to call the only overload of `bitcast()` now.
 
 ### 🛠️ Fixed
 
@@ -719,30 +784,10 @@ detailed information in the following sections:
 - The variadic initializer for `SIMD` now works in parameter expressions.
 
 - The VS Code extension now downloads its private copy of the MAX SDK in a way
-  that prevents ETXTBSY errors on Linux.
+  that prevents `ETXTBSY` errors on Linux.
 
 - The VS Code extension now allows invoking a mojo formatter from SDK
   installations that contain white spaces in their path.
-
-- Error messages that include type names no longer include inferred or defaulted
-  parameters when they aren't needed.  For example, previously Mojo complained
-  about things like:
-
-  ```plaintext
-  ... cannot be converted from 'UnsafePointer[UInt, 0, _default_alignment::AnyType](), MutableAnyOrigin]' to 'UnsafePointer[Int, 0, _default_alignment[::AnyType](), MutableAnyOrigin]'
-  ```
-
-  it now complains more helpfully that:
-
-  ```plaintext
-  ... cannot be converted from 'UnsafePointer[UInt]' to 'UnsafePointer[Int]'
-  ```
-
-- Tooling now prints the origins of `ref` arguments and results correctly, and
-  prints `self` instead of `self: Self` in methods.
-
-- The LSP and generated documentation now print parametric result types
-  correctly, e.g. showing `SIMD[type, simd_width]` instead of `SIMD[$0, $1]`.
 
 ### Special thanks
 
