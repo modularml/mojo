@@ -1141,13 +1141,14 @@ struct UnsafePointer[
         This transfers the value out of `self` and into `dest` using at most one
         `__moveinit__()` call.
 
-        Safety:
-            * `self` must be non-null
-            * `self` must contain a valid, initialized instance of `T`
-            * `dst` must not be null
-            * The contents of `dst` should be uninitialized. If `dst` was
-                previously written with a valid value, that value will be be
-                overwritten and its destructor will NOT be run.
+        **Safety:**
+
+        * `self` must be non-null
+        * `self` must contain a valid, initialized instance of `T`
+        * `dst` must not be null
+        * The contents of `dst` should be uninitialized. If `dst` was
+            previously written with a valid value, that value will be be
+            overwritten and its destructor will NOT be run.
 
         Parameters:
             T: The type the pointer points to, which must be `Movable`.
