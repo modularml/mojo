@@ -430,28 +430,28 @@ fn _hex_digits_to_hex_chars(b: SIMD[DType.uint8, _]) -> __type_of(b):
 fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], decimal: Int):
     """Write a python compliant hexadecimal value into an uninitialized pointer
     location, assumed to be large enough for the value to be written.
-    """
-    # FIXME(#3889): this example should not need to be commented, docstrings issue
-    # Examples:
 
-    # ```mojo
-    # %# from memory import memset_zero
-    # %# from testing import assert_equal
-    # %# from utils import StringSlice
-    # %# from utils.write import _write_hex
-    # items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
-    # alias S = StringSlice[__origin_of(items)]
-    # ptr = items.unsafe_ptr()
-    # _write_hex[8](ptr, ord("🔥"))
-    # assert_equal(r"\U0001f525", S(ptr=ptr, length=10))
-    # memset_zero(ptr, len(items))
-    # _write_hex[4](ptr, ord("你"))
-    # assert_equal(r"\u4f60", S(ptr=ptr, length=6))
-    # memset_zero(ptr, len(items))
-    # _write_hex[2](ptr, ord("Ö"))
-    # assert_equal(r"\xd6", S(ptr=ptr, length=4))
-    # ```
-    # .
+    Examples:
+
+    ```mojo
+    %# from memory import memset_zero
+    %# from testing import assert_equal
+    %# from utils import StringSlice
+    %# from utils.write import _write_hex
+    items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
+    alias S = StringSlice[__origin_of(items)]
+    ptr = items.unsafe_ptr()
+    _write_hex[8](ptr, ord("🔥"))
+    assert_equal(r"\\U0001f525", S(ptr=ptr, length=10))
+    memset_zero(ptr, len(items))
+    _write_hex[4](ptr, ord("你"))
+    assert_equal(r"\\u4f60", S(ptr=ptr, length=6))
+    memset_zero(ptr, len(items))
+    _write_hex[2](ptr, ord("Ö"))
+    assert_equal(r"\\xd6", S(ptr=ptr, length=4))
+    ```
+    .
+    """
 
     constrained[amnt_hex_bytes in (2, 4, 8), "only 2 or 4 or 8 sequences"]()
 
