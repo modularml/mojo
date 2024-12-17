@@ -258,7 +258,7 @@ struct PythonVersion:
     """The patch version number."""
 
     @implicit
-    fn __init__(out self, version: StringSlice[is_mutable=False]):
+    fn __init__(out self, version: StringSlice[mut=False]):
         """Initialize a PythonVersion object from a version string.
 
         Args:
@@ -1069,7 +1069,7 @@ struct CPython:
     # ===-------------------------------------------------------------------===#
 
     fn PyImport_ImportModule(
-        mut self, name: StringSlice[is_mutable=False]
+        mut self, name: StringSlice[mut=False]
     ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/import.html#c.PyImport_ImportModule).
@@ -1091,7 +1091,7 @@ struct CPython:
         return r
 
     fn PyImport_AddModule(
-        mut self, name: StringSlice[is_mutable=False]
+        mut self, name: StringSlice[mut=False]
     ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/import.html#c.PyImport_AddModule).
@@ -1199,9 +1199,7 @@ struct CPython:
     # Python Evaluation
     # ===-------------------------------------------------------------------===#
 
-    fn PyRun_SimpleString(
-        mut self, strref: StringSlice[is_mutable=False]
-    ) -> Bool:
+    fn PyRun_SimpleString(mut self, strref: StringSlice[mut=False]) -> Bool:
         """Executes the given Python code.
 
         Args:
@@ -1224,7 +1222,7 @@ struct CPython:
 
     fn PyRun_String(
         mut self,
-        strref: StringSlice[is_mutable=False],
+        strref: StringSlice[mut=False],
         globals: PyObjectPtr,
         locals: PyObjectPtr,
         run_mode: Int,
@@ -1275,8 +1273,8 @@ struct CPython:
 
     fn Py_CompileString(
         mut self,
-        strref: StringSlice[is_mutable=False],
-        filename: StringSlice[is_mutable=False],
+        strref: StringSlice[mut=False],
+        filename: StringSlice[mut=False],
         compile_mode: Int,
     ) -> PyObjectPtr:
         """[Reference](
@@ -1382,7 +1380,7 @@ struct CPython:
         return r
 
     fn PyObject_GetAttrString(
-        mut self, obj: PyObjectPtr, name: StringSlice[is_mutable=False]
+        mut self, obj: PyObjectPtr, name: StringSlice[mut=False]
     ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/object.html#c.PyObject_GetAttrString).
@@ -1408,7 +1406,7 @@ struct CPython:
     fn PyObject_SetAttrString(
         mut self,
         obj: PyObjectPtr,
-        name: StringSlice[is_mutable=False],
+        name: StringSlice[mut=False],
         new_value: PyObjectPtr,
     ) -> c_int:
         """[Reference](
@@ -1732,7 +1730,7 @@ struct CPython:
     # ===-------------------------------------------------------------------===#
 
     fn PyUnicode_DecodeUTF8(
-        mut self, strref: StringSlice[is_mutable=False]
+        mut self, strref: StringSlice[mut=False]
     ) -> PyObjectPtr:
         """[Reference](
         https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_DecodeUTF8).

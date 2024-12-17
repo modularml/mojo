@@ -406,7 +406,7 @@ struct PythonObject(
         self = PythonObject(str(value))
 
     @implicit
-    fn __init__(out self, strref: StringSlice[is_mutable=False]):
+    fn __init__(out self, strref: StringSlice[mut=False]):
         """Initialize the object from a string reference.
 
         Args:
@@ -747,7 +747,7 @@ struct PythonObject(
         cpython.Py_DecRef(value.py_object)
 
     fn _call_zero_arg_method(
-        self, method_name: StringSlice[is_mutable=False]
+        self, method_name: StringSlice[mut=False]
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(0)
@@ -762,7 +762,7 @@ struct PythonObject(
         return PythonObject(result)
 
     fn _call_single_arg_method(
-        self, method_name: StringSlice[is_mutable=False], rhs: PythonObject
+        self, method_name: StringSlice[mut=False], rhs: PythonObject
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
@@ -782,7 +782,7 @@ struct PythonObject(
 
     fn _call_single_arg_inplace_method(
         mut self,
-        method_name: StringSlice[is_mutable=False],
+        method_name: StringSlice[mut=False],
         rhs: PythonObject,
     ) raises:
         var cpython = _get_global_python_itf().cpython()
