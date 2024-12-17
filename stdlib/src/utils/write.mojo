@@ -434,6 +434,7 @@ fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], decimal: Int):
     Examples:
 
     ```mojo
+    %# from memory import memset_zero
     %# from utils import StringSlice
     %# from utils.write import _write_hex
     items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
