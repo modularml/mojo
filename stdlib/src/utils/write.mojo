@@ -390,11 +390,40 @@ fn write_buffered[
 
 
 @always_inline
-fn _hex_digit_to_hex_char(b: SIMD[DType.uint8, _]) -> __type_of(b):
+fn _hex_digit_to_hex_char(b: Byte) -> __type_of(b):
+    alias values = SIMD[DType.uint8, 16](
+        Byte(ord("0")),
+        Byte(ord("1")),
+        Byte(ord("2")),
+        Byte(ord("3")),
+        Byte(ord("4")),
+        Byte(ord("5")),
+        Byte(ord("6")),
+        Byte(ord("7")),
+        Byte(ord("8")),
+        Byte(ord("9")),
+        Byte(ord("a")),
+        Byte(ord("b")),
+        Byte(ord("c")),
+        Byte(ord("d")),
+        Byte(ord("e")),
+        Byte(ord("f")),
+    )
+    return values[int(b)]
+
+
+@always_inline
+fn _hex_digits_to_hex_char(b: SIMD[DType.uint8, _]) -> __type_of(b):
     alias `0` = Byte(ord("0"))
     alias `9` = Byte(ord("9"))
     alias `a` = Byte(ord("a"))
-    return `0` + (b > 9).cast[DType.uint8]() * (`a` - `9` - 1) + b
+    alias I8 = DType.int8
+    alias U8 = DType.uint8
+    return (
+        `0`
+        + b
+        + (((b <= 9).cast[I8]() - 1) & (`a` - `9` - 1).cast[I8]()).cast[U8]()
+    )
 
 
 @always_inline
@@ -421,10 +450,10 @@ fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], decimal: Int):
         (p + 1).init_pointee_move(`U`)
 
     var idx = 0
-    var digits = SIMD[DType.uint8, amnt_hex_bytes](0)
 
     @parameter
     for i in reversed(range(amnt_hex_bytes)):
-        digits[idx] = Byte((decimal // (16**i)) % 16)
+        (p + 2 + idx).init_pointee_move(
+            _hex_digit_to_hex_char((decimal // (16**i)) % 16)
+        )
         idx += 1
-    (p + 2).store(_hex_digit_to_hex_char(digits))

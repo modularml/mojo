@@ -16,7 +16,13 @@ from testing import assert_equal
 
 from memory.memory import memset_zero
 from utils import StringSlice
-from utils.write import Writable, Writer, _write_hex
+from utils.write import (
+    Writable,
+    Writer,
+    _write_hex,
+    _hex_digit_to_hex_char,
+    _hex_digits_to_hex_char,
+)
 from utils.inline_string import _FixedString
 
 
@@ -94,6 +100,30 @@ def test_write_int_padded():
 
 
 def test_write_hex():
+    values = List[Byte](
+        ord("0"),
+        ord("1"),
+        ord("2"),
+        ord("3"),
+        ord("4"),
+        ord("5"),
+        ord("6"),
+        ord("7"),
+        ord("8"),
+        ord("9"),
+        ord("a"),
+        ord("b"),
+        ord("c"),
+        ord("d"),
+        ord("e"),
+        ord("f"),
+    )
+    idx = 0
+    for value in values:
+        assert_equal(_hex_digit_to_hex_char(idx), value[])
+        assert_equal(_hex_digits_to_hex_char(Byte(idx)), value[])
+        idx += 1
+
     items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
     alias S = StringSlice[__origin_of(items)]
     ptr = items.unsafe_ptr()
