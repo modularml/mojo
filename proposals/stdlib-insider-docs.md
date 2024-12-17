@@ -2,7 +2,7 @@
 
 Owen Hilyard, Created November 17, 2024
 
-**Status**: Initial Proposal
+**Status**: Accepted
 
 ## Motivation
 
