@@ -15,74 +15,81 @@
 # the -t flag. Remember to replace it again before pushing any code.
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from memory import UnsafePointer
 from random import seed
 from collections import List
-from collections import Dict
-from time import now
+from random import *
 
 
-def benchmark_list_hint_trivial_type_int[length: Int, iterations: Int]() -> Int:
-    var start = now()
-    var stop = now()
-    alias size = length
+# ===-----------------------------------------------------------------------===#
+# Benchmark Data
+# ===-----------------------------------------------------------------------===#
+fn make_list[
+    size: Int, DT: DType, is_trivial: Bool
+]() -> List[Scalar[DT], is_trivial]:
+    alias scalar_t = Scalar[DT]
+    var d = List[Scalar[DT], is_trivial](capacity=size)
+    rand[DT](
+        d.unsafe_ptr(),
+        size,
+        min=scalar_t.MIN.cast[DType.float64](),
+        max=scalar_t.MAX.cast[DType.float64](),
+    )
+    d.size = size
+    return d
 
-    var items = List[Int, True]()
-    for i in range(size):
-        items.append(i)
 
-    start = now()
-    for iter in range(iterations):
-        var items2 = items
-        keep(items2.data)
-    stop = now()
+# ===-----------------------------------------------------------------------===#
+# Benchmark `List[DT, True].__copyinit__`
+# ===-----------------------------------------------------------------------===#
+
+
+@parameter
+fn bench_list_copyinit[
+    size: Int, DT: DType, is_trivial: Bool
+](mut b: Bencher) raises:
+    var items = make_list[size, DT, is_trivial]()
+    var result = List[Scalar[DT], is_trivial]()
+    var res = 0
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        result = items
+        res += len(result)
+        keep(result.data)
+        keep(items.data)
+
+    b.iter[call_fn]()
+    print(res)
+    keep(bool(items))
+    keep(bool(result))
+    keep(result.data)
     keep(items.data)
-    return stop - start
-
-
-def benchmark_string_copyinit__[length: Int, iterations: Int]() -> Int:
-    var start = now()
-    var stop = now()
-
-    var x: String = ""
-    for l in range(length):
-        x += str(l)[0]
-
-    start = now()
-    for iter in range(iterations):
-        var y: String
-        String.__copyinit__(y, x)
-        keep(y._buffer.data)
-    stop = now()
-    keep(x._buffer.data)
-    return stop - start
 
 
 def main():
     seed()
 
-    alias iterations = 1 << 10
-
-    alias result_type = Dict[String, Int]
-    var results = Dict[String, result_type]()
-    results["list_hint_trivial_type"] = result_type()
-    results["string_copyinit"] = result_type()
-
+    var m = Bench(
+        BenchConfig(
+            num_repetitions=1,
+            max_runtime_secs=0.5,
+            min_runtime_secs=0.25,
+            min_warmuptime_secs=0,  # 0.25
+        )
+    )
     alias lengths = (1, 2, 4, 8, 16, 32, 128, 256, 512, 1024, 2048, 4096)
 
     @parameter
     for i in range(len(lengths)):
         alias length = lengths.get[i, Int]()
-        results["list_hint_trivial_type"][
-            str(length)
-        ] = benchmark_list_hint_trivial_type_int[length, iterations]()
-        results["string_copyinit"][str(length)] = benchmark_string_copyinit__[
-            length, iterations
-        ]()
+        m.bench_function[bench_list_copyinit[length, DType.uint8, True]](
+            BenchId("List[Scalar[DT], True].__copyinit__ [" + str(length) + "]")
+        )
+        m.bench_function[bench_list_copyinit[length, DType.uint8, False]](
+            BenchId(
+                "List[Scalar[DT], False].__copyinit__ [" + str(length) + "]"
+            )
+        )
 
-    print("iterations: ", iterations)
-    for benchmark in results:
-        print(benchmark[])
-        for result in results[benchmark[]]:
-            print("\t", result[], "\t", results[benchmark[]][result[]])
-        print()
+    m.dump_report()
