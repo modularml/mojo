@@ -108,9 +108,9 @@ struct Span[
     """
 
     # Aliases
-    alias mut = Span[T, MutableOrigin.cast_from[origin].result]
+    alias mut_self = Span[T, MutableOrigin.cast_from[origin].result]
     """The mutable version of the Span."""
-    alias immut = Span[T, ImmutableOrigin.cast_from[origin].result]
+    alias immut_self = Span[T, ImmutableOrigin.cast_from[origin].result]
     """The immutable version of the Span."""
     # Fields
     var _data: UnsafePointer[T, mut=mut, origin=origin]
@@ -123,7 +123,7 @@ struct Span[
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Self.immut, other: Self.mut):
+    fn __init__(out self: Self.immut_self, other: Self.mut_self):
         """Implicitly cast the mutable origin of self to an immutable one.
 
         Args:
@@ -411,10 +411,10 @@ struct Span[
             element[] = value
 
     @always_inline
-    fn get_immut(self) -> Self.immut:
+    fn immut(self) -> Self.immut_self:
         """Return an immutable version of this Span.
 
         Returns:
             An immutable version of the same Span.
         """
-        return rebind[Self.immut](self)
+        return rebind[Self.immut_self](self)

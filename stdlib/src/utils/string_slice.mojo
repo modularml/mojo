@@ -254,9 +254,9 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
     """
 
     # Aliases
-    alias mut = StringSlice[MutableOrigin.cast_from[origin].result]
+    alias mut_self = StringSlice[MutableOrigin.cast_from[origin].result]
     """The mutable version of the StringSlice."""
-    alias immut = StringSlice[ImmutableOrigin.cast_from[origin].result]
+    alias immut_self = StringSlice[ImmutableOrigin.cast_from[origin].result]
     """The immutable version of the StringSlice."""
     # Fields
     var _slice: Span[Byte, origin]
@@ -268,13 +268,13 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
     @doc_private
     @implicit
     @always_inline("nodebug")
-    fn __init__(out self: Self.immut, other: Self.mut):
+    fn __init__(out self: Self.immut_self, other: Self.mut_self):
         """Implicitly cast the mutable origin of self to an immutable one.
 
         Args:
             other: The StringSlice to cast.
         """
-        self = rebind[Self.immut](other)
+        self = rebind[Self.immut_self](other)
 
     @always_inline
     @implicit
@@ -632,13 +632,13 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn get_immut(self) -> Self.immut:
+    fn immut(self) -> Self.immut_self:
         """Return an immutable version of this StringSlice.
 
         Returns:
             An immutable version of the same StringSlice.
         """
-        return rebind[Self.immut](self)
+        return rebind[Self.immut_self](self)
 
     @always_inline
     fn strip(self, chars: StringSlice) -> Self:
@@ -809,7 +809,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
 
         return len(self.as_bytes())
 
-    fn get_immutable(
+    fn immutable(
         self,
     ) -> StringSlice[ImmutableOrigin.cast_from[origin].result]:
         """
