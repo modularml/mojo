@@ -20,18 +20,19 @@ from collections import InlineList
 """
 
 from sys.intrinsics import _type_is_eq
+
 from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # InlineList
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @value
 struct _InlineListIter[
     list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_origin: Origin[list_mutability].type,
+    list_origin: Origin[list_mutability],
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
@@ -53,7 +54,7 @@ struct _InlineListIter[
         return self
 
     fn __next__(
-        inout self,
+        mut self,
     ) -> Pointer[T, __origin_of(self.src[][0])]:
         @parameter
         if forward:
@@ -242,7 +243,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             count += int(rebind[C](e[]) == value)
         return count
 
-    fn append(inout self, owned value: ElementType):
+    fn append(mut self, owned value: ElementType):
         """Appends a value to the list.
 
         Args:

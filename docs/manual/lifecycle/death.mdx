@@ -105,7 +105,7 @@ the end of the code scope to destroy values):
   because the destructor call always happens before the tail call.
 
 Additionally, Mojo's ASAP destruction works great within Python-style `def`
-functions. That's because Python doesn’t really provide scopes beyond a
+functions. That's because Python doesn't really provide scopes beyond a
 function scope, so the Python garbage collector cleans up resources more often
 than a scope-based destruction policy would. However, Mojo does not use a
 garbage collector, so the ASAP destruction policy provides destruction
@@ -276,7 +276,7 @@ object.
 
 Mojo's policy here is powerful and intentionally straight-forward: fields can
 be temporarily transferred, but the "whole object" must be constructed with the
-aggregate type’s initializer and destroyed with the aggregate destructor. This
+aggregate type's initializer and destroyed with the aggregate destructor. This
 means it's impossible to create an object by initializing only its fields, and
 it's likewise impossible to destroy an object by destroying only its fields.
 
@@ -316,7 +316,7 @@ to a new instance (read more about the [move
 constructor](/mojo/manual/lifecycle/life#move-constructor)),
 while `__del__()` implements the deletion logic for its `self`. As such, they
 both need to own and transform elements of the `owned` value, and they
-definitely don’t want the original `owned` value's destructor to also run—that
+definitely don't want the original `owned` value's destructor to also run—that
 could result in a double-free error, and in the case of the `__del__()` method,
 it would become an infinite loop.
 
@@ -353,7 +353,7 @@ struct TwoStrings:
         # self.str1 has been transferred so it is also destroyed now;
         # `self.__del__()` is not called (avoiding an infinite loop).
 
-    fn dump(inout self):
+    fn dump(mut self):
         print('str1:', self.str1)
         print('str2:', self.str2)
 

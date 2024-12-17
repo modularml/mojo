@@ -15,25 +15,29 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections import InlineArray
+from sys import _libc as libc
 from sys import (
     bitwidthof,
     external_call,
-    stdout,
-    is_nvidia_gpu,
     is_amd_gpu,
     is_gpu,
-    _libc as libc,
+    is_nvidia_gpu,
+    stdout,
 )
 from sys._libc import dup, fclose, fdopen, fflush
 from sys.ffi import OpaquePointer
 
-from utils import Span, write_buffered, write_args
-from collections import InlineArray
 from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer, memcpy
 
-from utils import StringRef, StaticString, StringSlice
+from utils import (
+    StaticString,
+    StringRef,
+    write_args,
+    write_buffered,
+)
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -260,6 +264,12 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
+
+    # TODO(MSTDL-1027): Print on AMD GPUs is not implemented yet.
+    @parameter
+    if is_amd_gpu():
+        return
+
     write_buffered[buffer_size=4096](file, values, sep=sep, end=end)
 
     @parameter

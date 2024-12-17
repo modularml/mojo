@@ -11,9 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+import time
+
 from gridv2 import Grid
 from python import Python, PythonObject
-import time
 
 
 def run_display(
@@ -82,4 +83,4 @@ def run_display(
 
 def main():
     start = Grid[128, 128].random()
-    run_display(start, window_height=600, window_width=600)
+    run_display(start)

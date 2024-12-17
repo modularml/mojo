@@ -14,11 +14,10 @@
 
 from .index import Index, IndexList, product
 from .inline_string import InlineString
+from .lock import BlockingScopedLock, BlockingSpinLock, SpinWaiter
 from .loop import unroll
-from .span import AsBytes, Span
 from .static_tuple import StaticTuple
-from .stringref import StringRef
 from .string_slice import StaticString, StringSlice
+from .stringref import StringRef
 from .variant import Variant
-from .lock import SpinWaiter, BlockingSpinLock, BlockingScopedLock
-from .write import Writer, Writable, write_args, write_buffered
+from .write import Writable, Writer, write_args, write_buffered

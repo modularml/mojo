@@ -19,8 +19,9 @@ from sys import is_x86
 ```
 """
 
-from .ffi import _external_call_const, external_call, OpaquePointer
 from memory import UnsafePointer
+
+from .ffi import OpaquePointer, _external_call_const, external_call
 
 
 @always_inline("nodebug")
@@ -863,13 +864,23 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     return (major, minor, patch)
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Detect GPU on host side
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn has_amd_gpu() -> Bool:
+fn has_accelerator() -> Bool:
+    """Returns True if the host system has an accelerator and False otherwise.
+
+    Returns:
+        True if the host system has an accelerator.
+    """
+    return _accelerator_arch() != ""
+
+
+@always_inline("nodebug")
+fn has_amd_gpu_accelerator() -> Bool:
     """Returns True if the host system has an AMD GPU and False otherwise.
 
     Returns:
@@ -879,7 +890,7 @@ fn has_amd_gpu() -> Bool:
 
 
 @always_inline("nodebug")
-fn has_nvidia_gpu() -> Bool:
+fn has_nvidia_gpu_accelerator() -> Bool:
     """Returns True if the host system has an NVIDIA GPU and False otherwise.
 
     Returns:

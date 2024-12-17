@@ -20,17 +20,18 @@ from utils import IndexList
 ```
 """
 
+from collections.string import _calc_initial_buffer_size
 from sys import bitwidthof
+
 from builtin.dtype import _int_type_of_width, _uint_type_of_width
 from builtin.io import _get_dtype_printf_format, _snprintf
-from collections.string import _calc_initial_buffer_size
 
 from . import unroll
 from .static_tuple import StaticTuple
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -47,10 +48,10 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
     return a and b
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Integer and Bool Tuple Utilities:
 #   Utilities to operate on tuples of integers or tuples of bools.
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline
@@ -146,9 +147,9 @@ fn _bool_tuple_reduce[
     return c
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # IndexList:
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 fn _type_of_width[bitwidth: Int, unsigned: Bool]() -> DType:
@@ -403,7 +404,7 @@ struct IndexList[
         return int(self.data[idx])
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Int):
+    fn __setitem__[index: Int](mut self, val: Int):
         """Sets an element in the tuple at the given static index.
 
         Parameters:
@@ -415,7 +416,7 @@ struct IndexList[
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__[index: Int](inout self, val: Self._int_type):
+    fn __setitem__[index: Int](mut self, val: Self._int_type):
         """Sets an element in the tuple at the given static index.
 
         Parameters:
@@ -427,7 +428,7 @@ struct IndexList[
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: Int):
+    fn __setitem__(mut self, idx: Int, val: Int):
         """Sets an element in the tuple at the given index.
 
         Args:
@@ -453,9 +454,10 @@ struct IndexList[
     @always_inline("nodebug")
     fn canonicalize(
         self,
-    ) -> IndexList[
-        size, element_bitwidth = bitwidthof[Int](), unsigned=False
-    ] as result:
+        out result: IndexList[
+            size, element_bitwidth = bitwidthof[Int](), unsigned=False
+        ],
+    ):
         """Canonicalizes the IndexList.
 
         Returns:
@@ -721,42 +723,9 @@ struct IndexList[
         )
 
     @no_inline
-    fn __str__(self) -> String:
-        """Get the tuple as a string.
-
-        Returns:
-            A string representation.
+    fn write_to[W: Writer](self, mut writer: W):
         """
-        # Reserve space for opening and closing parentheses, plus each element
-        # and its trailing commas.
-        var buf = String._buffer_type()
-        var initial_buffer_size = 2
-        for i in range(size):
-            initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
-        buf.reserve(initial_buffer_size)
-
-        # Print an opening `(`.
-        buf.size += _snprintf["("](buf.data, 2)
-        for i in range(size):
-            # Print separators between each element.
-            if i != 0:
-                buf.size += _snprintf[", "](buf.data + buf.size, 3)
-            buf.size += _snprintf[_get_dtype_printf_format[DType.index]()](
-                buf.data + buf.size, _calc_initial_buffer_size(self[i]), self[i]
-            )
-        # Single element tuples should be printed with a trailing comma.
-        if size == 1:
-            buf.size += _snprintf[","](buf.data + buf.size, 2)
-        # Print a closing `)`.
-        buf.size += _snprintf[")"](buf.data + buf.size, 2)
-
-        buf.size += 1  # for the null terminator.
-        return buf^
-
-    @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
-        """
-        Formats this int tuple to the provided Writer.
+        Formats this IndexList value to the provided Writer.
 
         Parameters:
             W: A type conforming to the Writable trait.
@@ -765,17 +734,47 @@ struct IndexList[
             writer: The object to write to.
         """
 
-        # TODO: Optimize this to avoid the intermediate String allocation.
-        writer.write(str(self))
+        writer.write("(")
+
+        for i in range(size):
+            if i != 0:
+                writer.write(", ")
+
+            var element = self[i]
+
+            @parameter
+            if element_bitwidth == 32:
+                writer.write(Int32(element))
+            else:
+                writer.write(Int64(element))
+
+        # Single element tuples should be printed with a trailing comma.
+        @parameter
+        if size == 1:
+            writer.write(",")
+
+        writer.write(")")
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Get the tuple as a string.
+
+        Returns:
+            A string representation.
+        """
+        return String.write(self)
 
     @always_inline
     fn cast[
         type: DType
-    ](self) -> IndexList[
-        size,
-        element_bitwidth = bitwidthof[type](),
-        unsigned = _is_unsigned[type](),
-    ] as result:
+    ](
+        self,
+        out result: IndexList[
+            size,
+            element_bitwidth = bitwidthof[type](),
+            unsigned = _is_unsigned[type](),
+        ],
+    ):
         """Casts to the target DType.
 
         Parameters:
@@ -802,9 +801,12 @@ struct IndexList[
         *,
         element_bitwidth: Int = Self.element_bitwidth,
         unsigned: Bool = Self.unsigned,
-    ](self) -> IndexList[
-        size, element_bitwidth=element_bitwidth, unsigned=unsigned
-    ] as result:
+    ](
+        self,
+        out result: IndexList[
+            size, element_bitwidth=element_bitwidth, unsigned=unsigned
+        ],
+    ):
         """Casts to the target DType.
 
         Parameters:
@@ -827,18 +829,21 @@ struct IndexList[
         )
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Factory functions for creating index.
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 @always_inline
 fn Index[
     T0: Intable, //,
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0) -> IndexList[
-    1, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    out result: IndexList[
+        1, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -858,9 +863,12 @@ fn Index[
 @always_inline
 fn Index[
     *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
-](x: UInt) -> IndexList[
-    1, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: UInt,
+    out result: IndexList[
+        1, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 1-D Index from the given value.
 
     Parameters:
@@ -883,9 +891,13 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1) -> IndexList[
-    2, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    out result: IndexList[
+        2, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -907,9 +919,13 @@ fn Index[
 @always_inline
 fn Index[
     *, element_bitwidth: Int = bitwidthof[Int](), unsigned: Bool = False
-](x: UInt, y: UInt) -> IndexList[
-    2, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: UInt,
+    y: UInt,
+    out result: IndexList[
+        2, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 2-D Index from the given values.
 
     Parameters:
@@ -934,9 +950,14 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1, z: T2) -> IndexList[
-    3, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    z: T2,
+    out result: IndexList[
+        3, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 3-D Index from the given values.
 
     Parameters:
@@ -966,9 +987,15 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1, z: T2, w: T3) -> IndexList[
-    4, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    z: T2,
+    w: T3,
+    out result: IndexList[
+        4, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 4-D Index from the given values.
 
     Parameters:
@@ -1001,9 +1028,16 @@ fn Index[
     *,
     element_bitwidth: Int = bitwidthof[Int](),
     unsigned: Bool = False,
-](x: T0, y: T1, z: T2, w: T3, v: T4) -> IndexList[
-    5, element_bitwidth=element_bitwidth, unsigned=unsigned
-] as result:
+](
+    x: T0,
+    y: T1,
+    z: T2,
+    w: T3,
+    v: T4,
+    out result: IndexList[
+        5, element_bitwidth=element_bitwidth, unsigned=unsigned
+    ],
+):
     """Constructs a 5-D Index from the given values.
 
     Parameters:
@@ -1028,9 +1062,9 @@ fn Index[
     return __type_of(result)(int(x), int(y), int(z), int(w), int(v))
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utils
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline

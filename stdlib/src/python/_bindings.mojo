@@ -11,38 +11,35 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from memory import UnsafePointer
-
+from collections import Optional
+from os import abort
 from sys.ffi import c_int
 from sys.info import sizeof
 
-from os import abort
-
-from collections import Optional
-
+from memory import UnsafePointer
 from python import PythonObject, TypedPythonObject
-from python.python import _get_global_python_itf
 from python._cpython import (
+    Py_TPFLAGS_DEFAULT,
+    PyCFunction,
+    PyMethodDef,
     PyObject,
     PyObjectPtr,
-    PyCFunction,
-    PyType_Spec,
     PyType_Slot,
-    PyMethodDef,
-    Py_TPFLAGS_DEFAULT,
-    newfunc,
+    PyType_Spec,
     destructor,
+    newfunc,
 )
+from python.python import _get_global_python_itf
 
 
 trait ConvertibleFromPython(CollectionElement):
-    """Denotes a type that can attempt construction from a borrowed Python
+    """Denotes a type that can attempt construction from a read-only Python
     object.
     """
 
     @staticmethod
     fn try_from_python(obj: PythonObject) raises -> Self:
-        """Attempt to construct an instance of this object from a borrowed
+        """Attempt to construct an instance of this object from a read-only
         Python value.
 
         Args:
@@ -116,7 +113,7 @@ fn python_type_object[
         basicsize: sizeof[PyMojoObject[T]](),
         itemsize: 0,
         flags: Py_TPFLAGS_DEFAULT,
-        # Note: This pointer is only "borrowed" by PyType_FromSpec.
+        # Note: This pointer is only "read-only" by PyType_FromSpec.
         slots: slots.unsafe_ptr(),
     }
 
@@ -141,7 +138,7 @@ fn python_type_object[
 #
 # The latter is the C function signature that the CPython API expects a
 # PyObject initializer function to have. The former is an unsafe form of the
-# `fn(inout self)` signature that Mojo types with default constructors provide.
+# `fn(mut self)` signature that Mojo types with default constructors provide.
 #
 # To support CPython calling a Mojo types default constructor, we need to
 # provide a wrapper function (around the Mojo constructor) that has the
@@ -177,7 +174,7 @@ fn empty_tp_init_wrapper[
         # ------------------------------------------------
 
         # TODO(MSTDL-950): Avoid forming ref through uninit pointee.
-        T.__init__(obj_ptr[])
+        obj_ptr[] = T()
 
         return 0
     except e:
@@ -224,22 +221,22 @@ fn py_c_function_wrapper[
 
     #   > When a C function is called from Python, it borrows references to its
     #   > arguments from the caller. The caller owns a reference to the object,
-    #   > so the borrowed reference’s lifetime is guaranteed until the function
-    #   > returns. Only when such a borrowed reference must be stored or passed
+    #   > so the read-only reference’s lifetime is guaranteed until the function
+    #   > returns. Only when such a read-only reference must be stored or passed
     #   > on, it must be turned into an owned reference by calling Py_INCREF().
     #   >
     #   >  -- https://docs.python.org/3/extending/extending.html#ownership-rules
 
     # SAFETY:
     #   Here we illegally (but carefully) construct _owned_ `PythonObject`
-    #   values from the borrowed object reference arguments. We are careful
+    #   values from the read-only object reference arguments. We are careful
     #   down below to prevent the destructor for these objects from running
     #   so that we do not illegally decrement the reference count of these
     #   objects we do not own.
     #
-    #   This is valid to do, because these are passed using the `borrowed`
+    #   This is valid to do, because these are passed using the `read-only`
     #   argument convention to `user_func`, so logically they are treated
-    #   as Python borrowed references.
+    #   as Python read-only references.
     var py_self = PythonObject(py_self_ptr)
     var args = TypedPythonObject["Tuple"](
         unsafe_unchecked_from=PythonObject(args_ptr)

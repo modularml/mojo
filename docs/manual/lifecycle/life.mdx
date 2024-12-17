@@ -71,7 +71,7 @@ var mine = MyPet("Loki", 4)
 ```
 
 An instance of `MyPet` can also be
-[borrowed](/mojo/manual/values/ownership#borrowed-arguments-borrowed)
+[read](/mojo/manual/values/ownership#read-arguments-read)
 and destroyed, but it currently can't be copied or moved.
 
 We believe this is a good default starting point, because there are no built-in
@@ -99,8 +99,8 @@ example, you might want a default constructor that sets some default values and
 takes no arguments, and then additional constructors that accept more arguments.
 
 Just be aware that, in order to modify any fields, each constructor must
-declare the `self` argument with the [`inout`
-convention](/mojo/manual/values/ownership#mutable-arguments-inout). If you
+declare the `self` argument with the [`out`
+convention](/mojo/manual/values/ownership#mutable-arguments-mut). If you
 want to call one constructor from another, you simply call upon that
 constructor as you would externally (you don't need to pass `self`).
 
@@ -153,12 +153,18 @@ struct MyPet:
 Mojo supports implicit conversion from one type to another. Implicit conversion
 can happen when one of the following occurs:
 
-* You assign a value of one type to a variable with a different type.
-* You pass a value of one type to a function that requires a different type.
+- You assign a value of one type to a variable with a different type.
+- You pass a value of one type to a function that requires a different type.
+- You return a value of one type from a function that specifies a different
+  return type.
 
 In both cases, implicit conversion is supported when the target type
-defines a constructor that takes a single required, non-keyword argument of the
-source type. For example:
+defines a constructor that meets the following criteria:
+
+- Is declared with the `@implicit` decorator.
+- Has a single required, non-keyword argument of the source type.
+
+For example:
 
 ```mojo
 var a = Source()
@@ -170,7 +176,9 @@ Mojo implicitly converts the `Source` value in `a` to a `Target` value if
 
 ```mojo
 struct Target:
-  fn __init__(out self, s: Source): ...
+
+    @implicit
+    fn __init__(out self, s: Source): ...
 ```
 
 With implicit conversion, the assignment above is essentially identical to:
@@ -179,26 +187,22 @@ With implicit conversion, the assignment above is essentially identical to:
 var b = Target(a)
 ```
 
+In general, types should only support implicit conversions when the conversion
+lossless, and ideally inexpensive. For example, converting an integer to a
+floating-point number is usually lossless (except for very large positive and
+negative integers, where the conversion may be approximate), but converting a
+floating-point number to an integer is very likely to lose information. So
+Mojo supports implicit conversion from `Int` to `Float64`, but not the reverse.
+
 The constructor used for implicit conversion can take optional arguments, so
 the following constructor would also support implicit conversion from `Source`
 to `Target`:
 
 ```mojo
 struct Target:
-  fn __init__(out self, s: Source, reverse: Bool = False): ...
-```
 
-Implicit conversion also occurs if the type doesn't declare its own constructor,
-but instead uses the [`@value` decorator](#value-decorator), *and* the type
-has only one field. That's because Mojo automatically creates a member-wise
-constructor for each field, and when there is only one field, that synthesized
-constructor works exactly like a conversion constructor. For example, this
-type also can convert a `Source` value to a `Target` value:
-
-```mojo
-@value
-struct Target:
-  var s: Source
+    @implicit
+    fn __init__(out self, s: Source, reverse: Bool = False): ...
 ```
 
 Implicit conversion can fail if Mojo can't unambiguously match the conversion to
@@ -209,41 +213,39 @@ convert the values:
 
 ```mojo
 struct A:
-  fn __init__(out self, s: Source): ...
+    @implicit
+    fn __init__(out self, s: Source): ...
 
 struct B:
-  fn __init__(out self, s: Source): ...
+    @implicit
+    fn __init__(out self, s: Source): ...
 
-struct Target:
-  fn __init__(out self, a: A): ...
-  fn __init__(out self, b: B): ...
+struct OverloadedTarget:
+    @implicit
+    fn __init__(out self, a: A): ...
+    @implicit
+    fn __init__(out self, b: B): ...
 
-# Fails
-var t = Target(Source())
+var t = OverloadedTarget(Source()) # Error: ambiguous call to '__init__': each
+                                   # candidate requires 1 implicit conversion
 ```
 
-In this case, removing either one of the target type's constructors will fix the
-problem.
-
-If you want to define a single-argument constructor, but you **don't** want
-the types to implicitly convert, you can define the constructor with a
-[keyword-only argument](/mojo/manual/functions#positional-only-and-keyword-only-arguments):
+In this case, you can fix the issue by explicitly casting to one of the
+intermediate types. For example:
 
 ```mojo
-struct Target:
-  # does not support implicit conversion
-  fn __init__(out self, *, source: Source): ...
-
-# the constructor must be called with a keyword
-var t = Target(source=a)
+var t = OverloadedTarget(A(Source())) # OK
 ```
 
-:::note
+Mojo applies at most one implicit conversion to a variable. For example:
 
-In the future we intend to provide a more explicit method of declaring whether
-a constructor should support implicit conversion.
+```mojo
+var t: OverloadedTarget = Source() # Error: can't implicitly convert Source
+                                   # to Target
+```
 
-:::
+Would fail because there's no direct conversion from `Source` to
+`OverloadedTarget`.
 
 ## Copy constructor
 
@@ -287,7 +289,7 @@ mistakes when referring to the current struct name.
 Also, notice that the `existing` argument in `__copyinit__()` is immutable
 because the default [argument
 convention](/mojo/manual/values/ownership#argument-conventions) is
-`borrowed`—this is a good thing because this function should not modify the
+`read`—this is a good thing because this function should not modify the
 contents of the value being copied.
 
 :::
@@ -337,7 +339,7 @@ struct HeapArray:
             (self.data + i).destroy_pointee()
         self.data.free()
 
-    fn append(inout self, val: Int):
+    fn append(mut self, val: Int):
         # Update the array for demo purposes
         if self.size < self.cap:
             (self.data + self.size).init_pointee_copy(val)
@@ -478,7 +480,7 @@ struct HeapArray:
             (self.data + i).destroy_pointee()
         self.data.free()
 
-    fn append(inout self, val: Int):
+    fn append(mut self, val: Int):
         # Update the array for demo purposes
         if self.size < self.cap:
             (self.data + self.size).init_pointee_copy(val)
@@ -529,7 +531,7 @@ values that are expensive to copy.
 To go further and ensure your type can never be copied, you can make it
 "move-only" by implementing `__moveinit__()` and *excluding* `__copyinit__()`.
 A move-only type can be passed to other variables and passed into functions
-with any argument convention (`borrowed`, `inout`, and `owned`)—the only catch
+with any argument convention (`read`, `mut`, and `owned`)—the only catch
 is that you must use the `^` transfer sigil to end the lifetime of a
 move-only type when assigning it to a new variable or when passing it as an
 `owned` argument.
@@ -654,7 +656,7 @@ things like a single integer or floating point number. We call these types
 and destroyed without invoking any custom lifecycle methods.
 
 Trivial types are the most common types that surround us, and from a language
-perspective, Mojo doesn’t need special support for these written in a struct.
+perspective, Mojo doesn't need special support for these written in a struct.
 Usually, these values are so tiny that they should be passed around in CPU
 registers, not indirectly through memory.
 

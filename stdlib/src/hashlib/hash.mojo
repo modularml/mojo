@@ -26,13 +26,12 @@ There are a few main tools in this module:
 """
 
 import random
-
-from sys.ffi import _Global
-from sys import simdwidthof, bitwidthof
 from collections import InlineArray
+from sys import bitwidthof, sizeof, simdwidthof
+from sys.ffi import _Global
 
 from builtin.dtype import _uint_type_of_width
-from memory import memcpy, memset_zero, stack_allocation, bitcast, UnsafePointer
+from memory import UnsafePointer, bitcast, memcpy, memset_zero, stack_allocation
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
@@ -228,7 +227,7 @@ fn hash(bytes: UnsafePointer[UInt8], n: Int) -> UInt:
         hash collision statistical properties for common data structures.
     """
     alias type = DType.uint64
-    alias type_width = bitwidthof[type]() // bitwidthof[DType.int8]()
+    alias type_width = sizeof[type]()
     alias simd_width = simdwidthof[type]()
     # stride is the byte length of the whole SIMD vector
     alias stride = type_width * simd_width

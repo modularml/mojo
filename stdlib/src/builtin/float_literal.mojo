@@ -17,9 +17,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from math import Ceilable, CeilDivable, Floorable, Truncable
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # FloatLiteral
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -466,7 +466,7 @@ struct FloatLiteral(
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: FloatLiteral):
+    fn __iadd__(mut self, rhs: FloatLiteral):
         """In-place addition operator.
 
         Args:
@@ -475,7 +475,7 @@ struct FloatLiteral(
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: FloatLiteral):
+    fn __isub__(mut self, rhs: FloatLiteral):
         """In-place subtraction operator.
 
         Args:
@@ -484,7 +484,7 @@ struct FloatLiteral(
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: FloatLiteral):
+    fn __imul__(mut self, rhs: FloatLiteral):
         """In-place multiplication operator.
 
         Args:
@@ -493,7 +493,7 @@ struct FloatLiteral(
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self, rhs: FloatLiteral):
+    fn __itruediv__(mut self, rhs: FloatLiteral):
         """In-place division.
 
         Args:

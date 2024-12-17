@@ -19,17 +19,16 @@ from python import PythonObject
 ```
 """
 
-from builtin.builtin_list import _lit_mut_cast
+from collections import Dict
+from hashlib._hasher import _HashableWithHasher, _Hasher
+from sys.ffi import c_ssize_t
 from sys.intrinsics import _type_is_eq
 from memory import UnsafePointer
-from collections import Dict
-from utils import StringSlice, StringRef
 
-from hashlib._hasher import _HashableWithHasher, _Hasher
+from utils import StringSlice, StringRef
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
-from sys.ffi import c_ssize_t
 
 
 struct _PyIter(Sized):
@@ -41,9 +40,9 @@ struct _PyIter(Sized):
 
     var iterator: PythonObject
     """The iterator object that stores location."""
-    var preparedNextItem: PythonObject
+    var prepared_next_item: PythonObject
     """The next item to vend or zero if there are no items."""
-    var isDone: Bool
+    var is_done: Bool
     """Stores True if the iterator is pointing to the last item."""
 
     # ===-------------------------------------------------------------------===#
@@ -57,8 +56,8 @@ struct _PyIter(Sized):
             existing: Initialized _PyIter instance.
         """
         self.iterator = existing.iterator
-        self.preparedNextItem = existing.preparedNextItem
-        self.isDone = existing.isDone
+        self.prepared_next_item = existing.prepared_next_item
+        self.is_done = existing.is_done
 
     @implicit
     fn __init__(out self, iter: PythonObject):
@@ -69,25 +68,25 @@ struct _PyIter(Sized):
         """
         var cpython = _get_global_python_itf().cpython()
         self.iterator = iter
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
-        if maybeNextItem.is_null():
-            self.isDone = True
-            self.preparedNextItem = PythonObject(PyObjectPtr())
+        var maybe_next_item = cpython.PyIter_Next(self.iterator.py_object)
+        if maybe_next_item.is_null():
+            self.is_done = True
+            self.prepared_next_item = PythonObject(PyObjectPtr())
         else:
-            self.preparedNextItem = PythonObject(maybeNextItem)
-            self.isDone = False
+            self.prepared_next_item = PythonObject(maybe_next_item)
+            self.is_done = False
 
     fn __init__(out self):
         """Initialize an empty iterator."""
         self.iterator = PythonObject(PyObjectPtr())
-        self.isDone = True
-        self.preparedNextItem = PythonObject(PyObjectPtr())
+        self.is_done = True
+        self.prepared_next_item = PythonObject(PyObjectPtr())
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    fn __next__(inout self: _PyIter) -> PythonObject:
+    fn __next__(mut self: _PyIter) -> PythonObject:
         """Return the next item and update to point to subsequent item.
 
         Returns:
@@ -97,12 +96,12 @@ struct _PyIter(Sized):
         if not self.iterator:
             return self.iterator
         var cpython = _get_global_python_itf().cpython()
-        var current = self.preparedNextItem
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
-        if maybeNextItem.is_null():
-            self.isDone = True
+        var current = self.prepared_next_item
+        var maybe_next_item = cpython.PyIter_Next(self.iterator.py_object)
+        if maybe_next_item.is_null():
+            self.is_done = True
         else:
-            self.preparedNextItem = PythonObject(maybeNextItem)
+            self.prepared_next_item = PythonObject(maybe_next_item)
         return current
 
     @always_inline
@@ -115,7 +114,7 @@ struct _PyIter(Sized):
         Returns:
             0 if the traversal is complete and 1 otherwise.
         """
-        if self.isDone:
+        if self.is_done:
             return 0
         else:
             return 1
@@ -222,7 +221,7 @@ struct TypedPythonObject[type_hint: StringLiteral](
             raise Python.unsafe_get_python_exception(cpython)
 
         # TODO(MSTDL-911): Avoid unnecessary owned reference counts when
-        #   returning borrowed PythonObject values.
+        #   returning read-only PythonObject values.
         return PythonObject.from_borrowed_ptr(item)
 
 
@@ -252,7 +251,7 @@ struct PythonObject(
 
     fn __init__(out self):
         """Initialize the object with a `None` value."""
-        self.__init__(None)
+        self = Self(None)
 
     fn __init__(out self, *, other: Self):
         """Copy the object.
@@ -276,7 +275,7 @@ struct PythonObject(
 
     @staticmethod
     fn from_borrowed_ptr(borrowed_ptr: PyObjectPtr) -> Self:
-        """Initialize this object from a borrowed reference-counted Python
+        """Initialize this object from a read-only reference-counted Python
         object pointer.
 
         The reference count of the pointee object will be incremented, and
@@ -294,7 +293,7 @@ struct PythonObject(
         pointer returned by 'Borrowed reference'-type objects.
 
         Args:
-            borrowed_ptr: A borrowed reference counted pointer to a Python
+            borrowed_ptr: A read-only reference counted pointer to a Python
                 object.
 
         Returns:
@@ -303,7 +302,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
 
         # SAFETY:
-        #   We were passed a Python 'borrowed reference', so for it to be
+        #   We were passed a Python 'read-only reference', so for it to be
         #   safe to store this reference, we must increment the reference
         #   count to convert this to a 'strong reference'.
         cpython.Py_IncRef(borrowed_ptr)
@@ -374,7 +373,7 @@ struct PythonObject(
         self.py_object = cpython.PyLong_FromSsize_t(integer)
 
     @implicit
-    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
+    fn __init__[dt: DType](mut self, value: SIMD[dt, 1]):
         """Initialize the object with a generic scalar value. If the scalar
         value type is bool, it is converted to a boolean. Otherwise, it is
         converted to the appropriate integer or floating point type.
@@ -427,7 +426,7 @@ struct PythonObject(
         self.py_object = cpython.PyUnicode_DecodeUTF8(string.as_string_slice())
 
     @implicit
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[*Ts]):
+    fn __init__[*Ts: CollectionElement](mut self, value: ListLiteral[*Ts]):
         """Initialize the object from a list literal.
 
         Parameters:
@@ -470,7 +469,7 @@ struct PythonObject(
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
     @implicit
-    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[*Ts]):
+    fn __init__[*Ts: CollectionElement](mut self, value: Tuple[*Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:
@@ -596,19 +595,19 @@ struct PythonObject(
             raise Error("Attribute is not found.")
         return PythonObject(result)
 
-    fn __setattr__(self, name: StringLiteral, newValue: PythonObject) raises:
+    fn __setattr__(self, name: StringLiteral, new_value: PythonObject) raises:
         """Set the given value for the object attribute with the given name.
 
         Args:
             name: The name of the object attribute to set.
-            newValue: The new value to be set for that attribute.
+            new_value: The new value to be set for that attribute.
         """
-        return self._setattr(name, newValue.py_object)
+        return self._setattr(name, new_value.py_object)
 
-    fn _setattr(self, name: StringLiteral, newValue: PyObjectPtr) raises:
+    fn _setattr(self, name: StringLiteral, new_value: PyObjectPtr) raises:
         var cpython = _get_global_python_itf().cpython()
         var result = cpython.PyObject_SetAttrString(
-            self.py_object, name, newValue
+            self.py_object, name, new_value
         )
         Python.throw_python_exception_if_error_state(cpython)
         if result < 0:
@@ -715,7 +714,7 @@ struct PythonObject(
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
-    fn __setitem__(inout self, *args: PythonObject, value: PythonObject) raises:
+    fn __setitem__(mut self, *args: PythonObject, value: PythonObject) raises:
         """Set the value with the given key or keys.
 
         Args:
@@ -782,7 +781,7 @@ struct PythonObject(
         return PythonObject(result_obj)
 
     fn _call_single_arg_inplace_method(
-        inout self,
+        mut self,
         method_name: StringSlice[is_mutable=False],
         rhs: PythonObject,
     ) raises:
@@ -833,7 +832,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rmul__", lhs)
 
-    fn __imul__(inout self, rhs: PythonObject) raises:
+    fn __imul__(mut self, rhs: PythonObject) raises:
         """In-place multiplication.
 
         Calls the underlying object's `__imul__` method.
@@ -870,7 +869,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__radd__", lhs)
 
-    fn __iadd__(inout self, rhs: PythonObject) raises:
+    fn __iadd__(mut self, rhs: PythonObject) raises:
         """Immediate addition and concatenation.
 
         Args:
@@ -904,7 +903,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rsub__", lhs)
 
-    fn __isub__(inout self, rhs: PythonObject) raises:
+    fn __isub__(mut self, rhs: PythonObject) raises:
         """Immediate subtraction.
 
         Args:
@@ -941,7 +940,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rfloordiv__", lhs)
 
-    fn __ifloordiv__(inout self, rhs: PythonObject) raises:
+    fn __ifloordiv__(mut self, rhs: PythonObject) raises:
         """Immediate floor division.
 
         Args:
@@ -975,7 +974,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rtruediv__", lhs)
 
-    fn __itruediv__(inout self, rhs: PythonObject) raises:
+    fn __itruediv__(mut self, rhs: PythonObject) raises:
         """Immediate division.
 
         Args:
@@ -1009,7 +1008,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rmod__", lhs)
 
-    fn __imod__(inout self, rhs: PythonObject) raises:
+    fn __imod__(mut self, rhs: PythonObject) raises:
         """Immediate modulo.
 
         Args:
@@ -1041,7 +1040,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rxor__", lhs)
 
-    fn __ixor__(inout self, rhs: PythonObject) raises:
+    fn __ixor__(mut self, rhs: PythonObject) raises:
         """Immediate exclusive OR.
 
         Args:
@@ -1074,7 +1073,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__ror__", lhs)
 
-    fn __ior__(inout self, rhs: PythonObject) raises:
+    fn __ior__(mut self, rhs: PythonObject) raises:
         """Immediate bitwise OR.
 
         Args:
@@ -1107,7 +1106,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rand__", lhs)
 
-    fn __iand__(inout self, rhs: PythonObject) raises:
+    fn __iand__(mut self, rhs: PythonObject) raises:
         """Immediate bitwise AND.
 
         Args:
@@ -1140,7 +1139,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rrshift__", lhs)
 
-    fn __irshift__(inout self, rhs: PythonObject) raises:
+    fn __irshift__(mut self, rhs: PythonObject) raises:
         """Immediate bitwise right shift.
 
         Args:
@@ -1173,7 +1172,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rlshift__", lhs)
 
-    fn __ilshift__(inout self, rhs: PythonObject) raises:
+    fn __ilshift__(mut self, rhs: PythonObject) raises:
         """Immediate bitwise left shift.
 
         Args:
@@ -1204,7 +1203,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__rpow__", lhs)
 
-    fn __ipow__(inout self, rhs: PythonObject) raises:
+    fn __ipow__(mut self, rhs: PythonObject) raises:
         """Immediate power of.
 
         Args:
@@ -1327,6 +1326,27 @@ struct PythonObject(
         """
         return self._call_zero_arg_method("__invert__")
 
+    fn __contains__(self, rhs: PythonObject) raises -> Bool:
+        """Contains dunder.
+
+        Calls the underlying object's `__contains__` method.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            True if rhs is in self.
+        """
+        # TODO: replace/optimize with c-python function.
+        # TODO: implement __getitem__ step for cpython membership test operator.
+        var cpython = _get_global_python_itf().cpython()
+        if cpython.PyObject_HasAttrString(self.py_object, "__contains__"):
+            return self._call_single_arg_method("__contains__", rhs).__bool__()
+        for v in self:
+            if v == rhs:
+                return True
+        return False
+
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules
     fn __call__(
@@ -1418,7 +1438,7 @@ struct PythonObject(
         debug_assert(result != -1, "object is not hashable")
         return result
 
-    fn __hash__[H: _Hasher](self, inout hasher: H):
+    fn __hash__[H: _Hasher](self, mut hasher: H):
         """Updates hasher with this python object hash value.
 
         Parameters:
@@ -1486,7 +1506,7 @@ struct PythonObject(
         _ = python_str
         return mojo_str
 
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this Python object to the provided Writer.
 

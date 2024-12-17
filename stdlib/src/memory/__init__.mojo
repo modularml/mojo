@@ -10,11 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the memory package."""
+"""The memory package provides several pointer types, as well
+as utility functions for dealing with memory."""
 
 from .arc import ArcPointer
 from .memory import memcmp, memcpy, memset, memset_zero, stack_allocation
 from .owned_pointer import OwnedPointer
 from .pointer import AddressSpace, Pointer
+from .span import AsBytes, Span
 from .unsafe import bitcast, pack_bits
 from .unsafe_pointer import UnsafePointer

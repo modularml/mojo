@@ -1,24 +1,21 @@
 ---
-title: Introduction to Mojo
+title: Mojo language basics
 sidebar_position: 1
+sidebar_label: Overview
 description: Introduction to Mojo's basic language features.
 ---
 
-At this point, you should have already set up the Mojo
-SDK and run ["Hello
-world"](/mojo/manual/get-started). Now let's talk about how
-to write Mojo code.
+At this point, you should have already installed [Magic](/magic) to manage the
+virtual environment and packages for your MAX and Mojo development (or
+alternatively added the `max` package to a [conda](/magic/conda) development
+environment). It's also a good idea to go through the [Get Started with
+Mojo](/mojo/manual/get-started) tutorial to get a taste of what Mojo programming
+is like. Now let's talk about how to write Mojo code.
 
-If
-you know Python, then a lot of Mojo code will look familiar. However, Mojo
-is—first and foremost—designed for high-performance systems programming, with
-features like strong type checking, memory safety, next-generation compiler
-technologies, and more. As such, Mojo also has a lot in common with languages
-like C++ and Rust.
-
-Yet, we've designed Mojo to be flexible, so you can incrementally adopt
-systems-programming features like strong type checking as you see fit—Mojo does
-not *require* strong type checking.
+If you know Python, then a lot of Mojo code will look familiar. However, Mojo
+incorporates features like strong type checking, memory safety, next-generation
+compiler technologies, and more. As such, Mojo also has a lot in common with
+languages like C++ and Rust.
 
 On this page, we'll introduce the essential Mojo syntax, so you can start
 coding quickly and understand other Mojo code you encounter. Subsequent
@@ -95,7 +92,7 @@ passed by reference, the short answer is: `def` functions receive arguments
 
 The longer short answer is that Mojo allows you to specify for each argument
 whether it should be passed by value (as `owned`), or whether it should be
-passed by reference (as `borrowed` for an immutable reference, or as `inout`
+passed by reference (as `read` for an immutable reference, or as `mut`
 for a mutable reference).
 
 This feature is entwined with Mojo's value ownership model, which protects you
@@ -181,8 +178,9 @@ each characteristic (such as each method). Each characteristic in a trait is a
 "requirement" for the struct, and when your struct implements each requirement,
 it's said to "conform" to the trait.
 
-Currently, the only characteristics that traits can define are method signatures. Also, traits
-currently cannot implement default behaviors for methods.
+Currently, the only characteristics that traits can define are method
+signatures. Also, traits currently cannot implement default behaviors for
+methods.
 
 Using traits allows you to write generic functions that can accept any type
 that conforms to a trait, rather than accept only specific types.
@@ -355,7 +353,7 @@ from docstrings using the [`mojo doc` command](/mojo/cli/doc).
 
 ## Python integration
 
-Mojo does not yet adopt the full syntax of Python, but we've built a mechanism to import
+Mojo supports the ability to import
 Python modules as-is, so you can leverage existing Python code right away.
 
 For example, here's how you can import and use NumPy (you must have Python

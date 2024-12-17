@@ -1,5 +1,5 @@
 ---
-title: Ownership and borrowing
+title: Ownership
 sidebar_position: 3
 description: How Mojo shares references through function arguments.
 ---
@@ -65,11 +65,11 @@ An argument convention specifies whether an argument is mutable or immutable,
 and whether the function owns the value. Each convention is defined by a
 keyword at the beginning of an argument declaration:
 
-* `borrowed`: The function receives an **immutable reference**. This means the
+* `read`: The function receives an **immutable reference**. This means the
   function can read the original value (it is *not* a copy), but it cannot
   mutate (modify) it. `def` functions treat this differently, as described below.
 
-* `inout`: The function receives a **mutable reference**. This means the
+* `mut`: The function receives a **mutable reference**. This means the
   function can read and mutate the original value (it is *not* a copy).
 
 * `owned`: The function takes **ownership** of a value. This means the function
@@ -80,15 +80,22 @@ keyword at the beginning of an argument declaration:
 
 * `ref`: The function gets a reference with an parametric mutability: that is,
   the reference can be either mutable or immutable. You can think of `ref`
-  arguments as a generalization of the `borrowed` and `inout` conventions.
+  arguments as a generalization of the `read` and `mut` conventions.
   `ref` arguments are an advanced topic, and they're described in more detail in
   [Lifetimes and references](/mojo/manual/values/lifetimes).
+
+* `out`: A special convention used for the `self` argument in
+  [constructors](/mojo/manual/lifecycle/life#constructor) and for
+  [named results](/mojo/manual/functions#named-function-results). An `out`
+  argument is uninitialized at the beginning of the function, and must be
+  initialized before the function returns. Although `out` arguments show up in
+  the argument list, they're never passed in by the caller.
 
 For example, this function has one argument that's a mutable
 reference and one that's immutable:
 
 ```mojo
-fn add(inout x: Int, borrowed y: Int):
+fn add(mut x: Int, read y: Int):
     x += y
 
 fn main():
@@ -99,14 +106,14 @@ fn main():
 ```
 
 You've probably already seen some function arguments that don't declare a
-convention. by default, all arguments are `borrowed`.
+convention. by default, all arguments are `read`.
 In the following sections, we'll explain each of these argument conventions in
 more detail.
 
-## Borrowed arguments (`borrowed`)
+## Borrowed arguments (`read`)
 
-The `borrowed` convention is the default for all arguments. But `def` and `fn`
-functions treat `borrowed` arguments somewhat differently:
+The `read` convention is the default for all arguments. But `def` and `fn`
+functions treat `read` arguments somewhat differently:
 
 * In a [`def` function](/mojo/manual/functions#def-functions), if you mutate
   the value in the body of the function, the function receives a mutable copy of
@@ -119,7 +126,7 @@ functions treat `borrowed` arguments somewhat differently:
   assign it to a local variable:
 
   ```mojo
-  var my_copy = borrowed_arg
+  var my_copy = read_arg
   ```
 
 In both cases, the original value on the caller side can't be changed by the
@@ -142,19 +149,19 @@ print_list(list)
 [1, 2, 3, 4]
 ```
 
-Here the `list` argument to `print_list()` is borrowed and not mutated, so the
+Here the `list` argument to `print_list()` is read and not mutated, so the
 `print_list()` function gets an immutable reference to the original `List`, and
 doesn't do any copying.
 
 In general, passing an immutable reference is much more efficient
 when handling large or expensive-to-copy values, because the copy constructor
-and destructor are not invoked for a borrow.
+and destructor are not invoked for a `read` argument.
 
 ### Compared to C++ and Rust
 
-Mojo's borrowed argument convention is similar in some ways to passing an
+Mojo's read argument convention is similar in some ways to passing an
 argument by `const&` in C++, which also avoids a copy of the value and disables
-mutability in the callee. However, the borrowed convention differs from
+mutability in the callee. However, the read convention differs from
 `const&` in C++ in two important ways:
 
 * The Mojo compiler implements a lifetime checker that ensures that values are
@@ -168,16 +175,16 @@ mutability in the callee. However, the borrowed convention differs from
   when compared to languages like C++ and Rust, and moves this optimization from
   every call site to a declaration on the type definition.
 
-The major difference between Rust and Mojo is that Mojo does not require a
-sigil on the caller side to pass by borrow. Also, Mojo is more efficient when
-passing small values, and Rust defaults to moving values instead of passing
+The major difference between Rust and Mojo is that Mojo does not require a sigil
+on the caller side to pass by immutable reference. Also, Mojo is more efficient
+when passing small values, and Rust defaults to moving values instead of passing
 them around by borrow. These policy and syntax decisions allow Mojo to provide
 an easier-to-use programming model.
 
-## Mutable arguments (`inout`)
+## Mutable arguments (`mut`)
 
-If you'd like your function to receive a **mutable reference**, add the `inout`
-keyword in front of the argument name. You can think of `inout` like this: it
+If you'd like your function to receive a **mutable reference**, add the `mut`
+keyword in front of the argument name. You can think of `mut` like this: it
 means any changes to the value *in*side the function are visible *out*side the
 function.
 
@@ -186,7 +193,7 @@ For example, this `mutate()` function updates the original `list` value:
 ```mojo
 from collections import List
 
-def mutate(inout l: List[Int]):
+def mutate(mut l: List[Int]):
     l.append(5)
 
 var list = List(1, 2, 3, 4)
@@ -217,18 +224,18 @@ print_list(list)
 [1, 2, 3, 4, 5]
 ```
 
-Although the code using `inout` isn't that much shorter, it's more memory
+Although the code using `mut` isn't that much shorter, it's more memory
 efficient because it does not make a copy of the value.
 
-However, remember that the values passed as `inout` must already be mutable.
-For example, if you try to take a `borrowed` value and pass it to another
-function as `inout`, you'll get a compiler error because Mojo can't form a
+However, remember that the values passed as `mut` must already be mutable.
+For example, if you try to take a `read` value and pass it to another
+function as `mut`, you'll get a compiler error because Mojo can't form a
 mutable reference from an immutable reference.
 
 :::note
 
 You cannot define [default
-values](/mojo/manual/functions#optional-arguments) for `inout`
+values](/mojo/manual/functions#optional-arguments) for `mut`
 arguments.
 
 :::
@@ -236,14 +243,14 @@ arguments.
 ### Argument exclusivity
 
 Mojo enforces *argument exclusivity* for mutable references. This means that if
-a function receives a mutable reference to a value (such as an `inout` argument),
+a function receives a mutable reference to a value (such as an `mut` argument),
 it can't receive any other references to the same value—mutable or immutable.
 That is, a mutable reference can't have any other references that *alias* it.
 
 For example, consider the following code example:
 
 ```mojo
-fn append_twice(inout s: String, other: String):
+fn append_twice(mut s: String, other: String):
    # Mojo knows 's' and 'other' cannot be the same string.
    s += other
    s += other
@@ -251,8 +258,8 @@ fn append_twice(inout s: String, other: String):
 fn invalid_access():
   var my_string = str("o")
 
-  # error: passing `my_string` inout is invalid since it is also passed
-  # borrowed.
+  # error: passing `my_string` mut is invalid since it is also passed
+  # read.
   append_twice(my_string, my_string)
   print(my_string)
 ```
@@ -374,7 +381,7 @@ destroyed at the end of the function.
 ```mojo
 from collections import List
 
-def add_to_list(owned name: String, inout list: List[String]):
+def add_to_list(owned name: String, mut list: List[String]):
     list.append(name^)
     # name is uninitialized, nothing to destroy
 
@@ -429,16 +436,16 @@ function is essentially just sugaring for the `fn` function:
   [`object`](/mojo/stdlib/builtin/object/object) type (whereas as `fn`
   requires all types be explicitly declared).
 
-* A `def` function can treat a `borrowed` argument as mutable (in which case it
+* A `def` function can treat a `read` argument as mutable (in which case it
   receives a mutable copy). An `fn` function must make this copy explicitly.
 
 For example, these two functions have the exact same behavior.
 
 ```mojo
-def def_example(a: Int, inout b: Int, owned c):
+def def_example(a: Int, mut b: Int, owned c):
     pass
 
-fn fn_example(a_in: Int, inout b: Int, owned c: object):
+fn fn_example(a_in: Int, mut b: Int, owned c: object):
     var a = a_in
     pass
 ```
@@ -448,14 +455,14 @@ like `object` are cheap to copy. However, copying large types that allocate heap
 storage can be expensive. (For example, copying `List` or `Dict` types, or
 copying large numbers of strings.)
 
-### Borrowed versus owned in `def` functions
+### `read` versus `owned` in `def` functions
 
-The difference between `borrowed` and `owned` in a `def` function may be a
+The difference between `read` and `owned` in a `def` function may be a
 little subtle. In both cases, you can end up with a uniquely-owned value that's
 a copy of the original value.
 
-* The `borrowed` argument always gets an immutable reference or a local copy.
-  You can't transfer a value into a `borrowed` argument.
+* The `read` argument always gets an immutable reference or a local copy.
+  You can't transfer a value into a `read` argument.
 
 * The `owned` argument always gets a uniquely owned value, which may have been
   copied or transferred from the callee. Using `owned` arguments without the

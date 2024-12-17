@@ -14,13 +14,14 @@
 # RUN: %mojo %s
 
 from collections import Dict
+
 from python import Python, PythonObject
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from utils import StringRef
 
 
-def test_dunder_methods(inout python: Python):
+def test_dunder_methods(mut python: Python):
     var a = PythonObject(34)
     var b = PythonObject(10)
 
@@ -575,6 +576,31 @@ fn test_py_slice() raises:
         _ = with_2d[0:1][4]
 
 
+def test_contains_dunder():
+    with assert_raises(contains="'int' object is not iterable"):
+        var z = PythonObject(0)
+        _ = 5 in z
+
+    var x = PythonObject([1.1, 2.2])
+    assert_true(1.1 in x)
+    assert_false(3.3 in x)
+
+    x = PythonObject(["Hello", "World"])
+    assert_true("World" in x)
+
+    x = PythonObject((1.5, 2))
+    assert_true(1.5 in x)
+    assert_false(3.5 in x)
+
+    var y = Dict[PythonObject, PythonObject]()
+    y["A"] = "A"
+    y["B"] = 5
+    x = PythonObject(y)
+    assert_true("A" in x)
+    assert_false("C" in x)
+    assert_true("B" in x)
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -592,3 +618,4 @@ def main():
     test_getitem_raises()
     test_setitem_raises()
     test_py_slice()
+    test_contains_dunder()

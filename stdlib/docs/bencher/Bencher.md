@@ -30,7 +30,7 @@ Defines a Bencher struct which facilitates the timing of a target function.
 
 <div class="mojo-function-sig">
 
-`__init__(inout self: Self, num_iters: Int)`
+`__init__(out self: Self, num_iters: Int)`
 
 </div>
 
@@ -48,7 +48,7 @@ Constructs a Bencher object to run and time a function.
 
 <div class="mojo-function-sig">
 
-`iter[iter_fn: fn() capturing -> None](inout self: Self)`
+`iter[iter_fn: fn() capturing -> None](mut self: Self)`
 
 </div>
 
@@ -65,7 +65,7 @@ of times.
 
 <div class="mojo-function-sig">
 
-`iter[iter_fn: fn() raises capturing -> None](inout self: Self)`
+`iter[iter_fn: fn() raises capturing -> None](mut self: Self)`
 
 </div>
 
@@ -85,7 +85,7 @@ of times.
 
 <div class="mojo-function-sig">
 
-`iter_custom[iter_fn: fn(Int) capturing -> Int](inout self: Self)`
+`iter_custom[iter_fn: fn(Int) capturing -> Int](mut self: Self)`
 
 </div>
 
@@ -101,7 +101,7 @@ Times a target function with custom number of iterations.
 
 <div class="mojo-function-sig">
 
-`iter_custom[iter_fn: fn(Int) raises capturing -> Int](inout self: Self)`
+`iter_custom[iter_fn: fn(Int) raises capturing -> Int](mut self: Self)`
 
 </div>
 

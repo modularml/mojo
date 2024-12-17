@@ -19,10 +19,12 @@ from memory import Pointer
 ```
 """
 
+from sys import is_nvidia_gpu
 
-# ===----------------------------------------------------------------------===#
+
+# ===-----------------------------------------------------------------------===#
 # AddressSpace
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
@@ -36,12 +38,10 @@ struct _GPUAddressSpace(EqualityComparable):
     """Generic address space."""
     alias GLOBAL = AddressSpace(1)
     """Global address space."""
-    alias CONSTANT = AddressSpace(2)
-    """Constant address space."""
     alias SHARED = AddressSpace(3)
     """Shared address space."""
-    alias PARAM = AddressSpace(4)
-    """Param address space."""
+    alias CONSTANT = AddressSpace(4)
+    """Constant address space."""
     alias LOCAL = AddressSpace(5)
     """Local address space."""
 
@@ -274,7 +274,7 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
         return String.write(self)
 
     @always_inline("nodebug")
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats the address space to the provided Writer.
 
@@ -290,23 +290,26 @@ struct AddressSpace(EqualityComparable, Stringable, Writable):
             writer.write("AddressSpace(", self.value(), ")")
 
 
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Pointer
-# ===----------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @value
 @register_passable("trivial")
 struct Pointer[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     type: AnyType,
-    origin: Origin[is_mutable].type,
+    origin: Origin[mut],
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](CollectionElementNew, Stringable):
     """Defines a non-nullable safe pointer.
 
+    For a comparison with other pointer types, see [Intro to
+    pointers](/mojo/manual/pointers/) in the Mojo Manual.
+
     Parameters:
-        is_mutable: Whether the pointee data may be mutated through this.
+        mut: Whether the pointee data may be mutated through this.
         type: Type of the underlying data.
         origin: The origin of the pointer.
         address_space: The address space of the pointee data.
@@ -316,7 +319,7 @@ struct Pointer[
         `!lit.ref<`,
         type,
         `, `,
-        origin,
+        origin._mlir_origin,
         `, `,
         address_space._value.value,
         `>`,
@@ -341,7 +344,7 @@ struct Pointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(ref [origin, address_space._value.value]value: type) -> Self:
+    fn address_of(ref [origin, address_space]value: type) -> Self:
         """Constructs a Pointer from a reference to a value.
 
         Args:
@@ -367,7 +370,7 @@ struct Pointer[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self) -> ref [origin, address_space._value.value] type:
+    fn __getitem__(self) -> ref [origin, address_space] type:
         """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:
