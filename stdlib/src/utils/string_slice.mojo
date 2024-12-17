@@ -1047,16 +1047,13 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
                 offset += b_len
             return length != 0
 
-    fn splitlines[
-        O: ImmutableOrigin, //
-    ](self: StringSlice[O], keepends: Bool = False) -> List[StringSlice[O]]:
+    fn splitlines(
+        self: StringSlice, keepends: Bool = False
+    ) -> List[StringSlice[__type_of(self).origin]]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines:](
         https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
-
-        Parameters:
-            O: The immutable origin.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -1064,7 +1061,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-
+        alias O = __type_of(self).origin
         # highly performance sensitive code, benchmark before touching
         alias `\r` = UInt8(ord("\r"))
         alias `\n` = UInt8(ord("\n"))
@@ -1133,7 +1130,7 @@ fn _to_string_list[
 
 
 @always_inline
-fn _to_string_list[
+fn to_string_list[
     O: ImmutableOrigin, //
 ](items: List[StringSlice[O]]) -> List[String]:
     """Create a list of Strings **copying** the existing data.
@@ -1158,8 +1155,58 @@ fn _to_string_list[
 
 
 @always_inline
-fn _to_string_list[
+fn to_string_list[
+    O: MutableOrigin, //
+](items: List[StringSlice[O]]) -> List[String]:
+    """Create a list of Strings **copying** the existing data.
+
+    Parameters:
+        O: The origin of the data.
+
+    Args:
+        items: The List of string slices.
+
+    Returns:
+        The list of created strings.
+    """
+
+    fn unsafe_ptr_fn(v: StringSlice[O]) -> UnsafePointer[Byte]:
+        return v.unsafe_ptr()
+
+    fn len_fn(v: StringSlice[O]) -> Int:
+        return v.byte_length()
+
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
+
+
+@always_inline
+fn to_string_list[
     O: ImmutableOrigin, //
+](items: List[Span[Byte, O]]) -> List[String]:
+    """Create a list of Strings **copying** the existing data.
+
+    Parameters:
+        O: The origin of the data.
+
+    Args:
+        items: The List of Bytes.
+
+    Returns:
+        The list of created strings.
+    """
+
+    fn unsafe_ptr_fn(v: Span[Byte, O]) -> UnsafePointer[Byte]:
+        return v.unsafe_ptr()
+
+    fn len_fn(v: Span[Byte, O]) -> Int:
+        return len(v)
+
+    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
+
+
+@always_inline
+fn to_string_list[
+    O: MutableOrigin, //
 ](items: List[Span[Byte, O]]) -> List[String]:
     """Create a list of Strings **copying** the existing data.
 
