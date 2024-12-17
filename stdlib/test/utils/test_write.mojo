@@ -21,7 +21,7 @@ from utils.write import (
     Writer,
     _write_hex,
     _hex_digit_to_hex_char,
-    _hex_digits_to_hex_char,
+    _hex_digits_to_hex_chars,
 )
 from utils.inline_string import _FixedString
 
