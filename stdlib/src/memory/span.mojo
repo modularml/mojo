@@ -129,7 +129,7 @@ struct Span[
         Args:
             other: The Span to cast.
         """
-        self = rebind[Self.immut](other)
+        self = rebind[Self.immut_self](other)
 
     @always_inline
     fn __init__(out self, *, ptr: UnsafePointer[T], length: Int):

@@ -809,20 +809,6 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
 
         return len(self.as_bytes())
 
-    fn immutable(
-        self,
-    ) -> StringSlice[ImmutableOrigin.cast_from[origin].result]:
-        """
-        Return an immutable version of this string slice.
-
-        Returns:
-            A string slice covering the same elements, but without mutability.
-        """
-        return StringSlice[ImmutableOrigin.cast_from[origin].result](
-            ptr=self._slice.unsafe_ptr(),
-            length=len(self),
-        )
-
     fn startswith(
         self, prefix: StringSlice, start: Int = 0, end: Int = -1
     ) -> Bool:
