@@ -304,7 +304,7 @@ struct SIMD[type: DType, size: Int](
     #    Args:
     #        other: The value to copy.
     #    """
-    #    self.__copyinit__(other)
+    #    self = other
 
     @always_inline("nodebug")
     @implicit

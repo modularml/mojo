@@ -26,6 +26,10 @@ def test_basics():
 
 def test_cast():
     assert_equal(
+        str(IndexList[1](1)),
+        "(1,)",
+    )
+    assert_equal(
         str(IndexList[2](1, 2).cast[DType.int32]()),
         "(1, 2)",
     )
@@ -44,13 +48,16 @@ def test_cast():
         "(1, -2)",
     )
     assert_equal(
-        str(
-            IndexList[2, element_bitwidth=32](1, 2).cast[
-                element_bitwidth=64, unsigned=True
-            ]()
-        ),
+        str(IndexList[2, element_bitwidth=32](1, 2)),
         "(1, 2)",
     )
+    alias s = str(
+        IndexList[2, element_bitwidth=32](1, 2).cast[
+            element_bitwidth=64, unsigned=True
+        ]()
+    )
+    assert_equal(s, "(1, 2)")
+    assert_equal(StringLiteral.get[s](), "(1, 2)")
 
 
 def test_index():
