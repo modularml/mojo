@@ -153,7 +153,7 @@ fn memcmp[
 
 @always_inline
 fn _memcpy_impl(
-    dest_data: UnsafePointer[Byte, is_mutable=True, **_],
+    dest_data: UnsafePointer[Byte, mut=True, **_],
     src_data: __type_of(dest_data),
     n: Int,
 ):

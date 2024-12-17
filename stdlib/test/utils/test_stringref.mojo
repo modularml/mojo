@@ -108,26 +108,6 @@ def test_find():
     assert_equal(StringRef("").find("abc"), -1)
 
 
-def test_endswith():
-    var empty = StringRef("")
-    assert_true(empty.endswith(""))
-    assert_false(empty.endswith("a"))
-    assert_false(empty.endswith("ab"))
-
-    var a = StringRef("a")
-    assert_true(a.endswith(""))
-    assert_true(a.endswith("a"))
-    assert_false(a.endswith("ab"))
-
-    var ab = StringRef("ab")
-    assert_true(ab.endswith(""))
-    assert_false(ab.endswith("a"))
-    assert_true(ab.endswith("b"))
-    assert_true(ab.endswith("b", start=1))
-    assert_true(ab.endswith("a", end=1))
-    assert_true(ab.endswith("ab"))
-
-
 fn test_stringref_split() raises:
     # Reject empty delimiters
     with assert_raises(
@@ -195,5 +175,4 @@ def main():
     test_intable()
     test_indexing()
     test_find()
-    test_endswith()
     test_str_and_ref()
