@@ -121,7 +121,7 @@ def test_write_hex():
     idx = 0
     for value in values:
         assert_equal(_hex_digit_to_hex_char(idx), value[])
-        assert_equal(_hex_digits_to_hex_char(Byte(idx)), value[])
+        assert_equal(_hex_digits_to_hex_chars(Byte(idx)), value[])
         idx += 1
 
     items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
