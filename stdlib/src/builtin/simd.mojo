@@ -267,6 +267,7 @@ struct SIMD[type: DType, size: Int](
     alias _Mask = SIMD[DType.bool, size]
 
     alias element_type = type
+    alias type_len = type.sizeof()
     var value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
     """The underlying storage for the vector."""
 
@@ -1883,7 +1884,7 @@ struct SIMD[type: DType, size: Int](
     @staticmethod
     fn from_bytes[
         big_endian: Bool = False
-    ](bytes: Span[Byte]) raises -> Scalar[type]:
+    ](bytes: InlineArray[Byte, type.sizeof()]) raises -> Scalar[type]:
         """Converts a byte array to an integer.
 
         Args:
@@ -1895,9 +1896,6 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The integer value.
         """
-        if type.sizeof() != len(bytes):
-            raise Error("Byte array size does not match the integer size.")
-
         var ptr: UnsafePointer[Scalar[type]] = bytes.unsafe_ptr().bitcast[
             Scalar[type]
         ]()
@@ -1910,7 +1908,7 @@ struct SIMD[type: DType, size: Int](
             value = byte_swap(value)
         return value
 
-    fn as_bytes[big_endian: Bool = False](self) -> List[Byte]:
+    fn as_bytes[big_endian: Bool = False](self) -> InlineArray[Byte, Self.type_len]:
         """Convert the integer to a byte array.
 
         Parameters:
@@ -1919,7 +1917,6 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The byte array.
         """
-        alias type_len = type.sizeof()
         var value = self
 
         @parameter
@@ -1929,13 +1926,12 @@ struct SIMD[type: DType, size: Int](
             value = byte_swap(value)
 
         var ptr = UnsafePointer.address_of(value)
-        var list = List[Byte](capacity=type_len)
+        var array = InlineArray[Byte, Self.type_len]()
 
         # TODO: Maybe this can be a List.extend(ptr, count) method
-        memcpy(list.unsafe_ptr(), ptr.bitcast[Byte](), type_len)
-        list.size = type_len
+        memcpy(array.unsafe_ptr(), ptr.bitcast[Byte](), Self.type_len)
 
-        return list^
+        return array^
 
     fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[

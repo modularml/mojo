@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import KeyElement
+from collections import InlineArray, KeyElement
 
 from collections.string import (
     _calc_initial_buffer_size_int32,
@@ -1216,7 +1216,7 @@ struct Int(
     @staticmethod
     fn from_bytes[
         D: DType, big_endian: Bool = False
-    ](bytes: Span[Byte]) raises -> Self:
+    ](bytes: InlineArray[Byte, D.sizeof()]) raises -> Self:
         """Converts a byte array to an integer.
 
         Args:
@@ -1231,7 +1231,7 @@ struct Int(
         """
         return int(Scalar[D].from_bytes[big_endian](bytes))
 
-    fn as_bytes[D: DType, big_endian: Bool = False](self) -> List[Byte]:
+    fn as_bytes[D: DType, big_endian: Bool = False](self) -> InlineArray[Byte, D.sizeof()]:
         """Convert the integer to a byte array.
 
         Parameters:
