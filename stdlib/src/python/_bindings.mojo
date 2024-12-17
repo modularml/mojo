@@ -174,7 +174,7 @@ fn empty_tp_init_wrapper[
         # ------------------------------------------------
 
         # TODO(MSTDL-950): Avoid forming ref through uninit pointee.
-        T.__init__(obj_ptr[])
+        obj_ptr[] = T()
 
         return 0
     except e:

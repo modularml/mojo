@@ -252,7 +252,7 @@ struct PythonObject(
 
     fn __init__(out self):
         """Initialize the object with a `None` value."""
-        self.__init__(None)
+        self = Self(None)
 
     fn __init__(out self, *, other: Self):
         """Copy the object.
