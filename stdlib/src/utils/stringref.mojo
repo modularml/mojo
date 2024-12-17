@@ -650,46 +650,6 @@ struct StringRef(
             current_offset = loc + len(delimiter)
         return output
 
-    fn startswith(
-        self, prefix: StringRef, start: Int = 0, end: Int = -1
-    ) -> Bool:
-        """Checks if the StringRef starts with the specified prefix between start
-        and end positions. Returns True if found and False otherwise.
-
-        Args:
-          prefix: The prefix to check.
-          start: The start offset from which to check.
-          end: The end offset from which to check.
-
-        Returns:
-          True if the self[start:end] is prefixed by the input prefix.
-        """
-        if end == -1:
-            return self.find(prefix, start) == start
-        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
-            prefix
-        )
-
-    fn endswith(self, suffix: StringRef, start: Int = 0, end: Int = -1) -> Bool:
-        """Checks if the StringRef end with the specified suffix between start
-        and end positions. Returns True if found and False otherwise.
-
-        Args:
-          suffix: The suffix to check.
-          start: The start offset from which to check.
-          end: The end offset from which to check.
-
-        Returns:
-          True if the self[start:end] is suffixed by the input suffix.
-        """
-        if len(suffix) > len(self):
-            return False
-        if end == -1:
-            return self.rfind(suffix, start) + len(suffix) == len(self)
-        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
-            suffix
-        )
-
 
 # ===-----------------------------------------------------------------------===#
 # Utilities

@@ -927,7 +927,7 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         ref self,
     ) -> UnsafePointer[
         T,
-        is_mutable = Origin(__origin_of(self)).is_mutable,
+        mut = Origin(__origin_of(self)).is_mutable,
         origin = __origin_of(self),
     ]:
         """Retrieves a pointer to the underlying memory.
