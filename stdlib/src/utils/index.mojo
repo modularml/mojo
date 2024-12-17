@@ -723,42 +723,9 @@ struct IndexList[
         )
 
     @no_inline
-    fn __str__(self) -> String:
-        """Get the tuple as a string.
-
-        Returns:
-            A string representation.
-        """
-        # Reserve space for opening and closing parentheses, plus each element
-        # and its trailing commas.
-        var buf = String._buffer_type()
-        var initial_buffer_size = 2
-        for i in range(size):
-            initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
-        buf.reserve(initial_buffer_size)
-
-        # Print an opening `(`.
-        buf.size += _snprintf["("](buf.data, 2)
-        for i in range(size):
-            # Print separators between each element.
-            if i != 0:
-                buf.size += _snprintf[", "](buf.data + buf.size, 3)
-            buf.size += _snprintf[_get_dtype_printf_format[DType.index]()](
-                buf.data + buf.size, _calc_initial_buffer_size(self[i]), self[i]
-            )
-        # Single element tuples should be printed with a trailing comma.
-        if size == 1:
-            buf.size += _snprintf[","](buf.data + buf.size, 2)
-        # Print a closing `)`.
-        buf.size += _snprintf[")"](buf.data + buf.size, 2)
-
-        buf.size += 1  # for the null terminator.
-        return buf^
-
-    @no_inline
     fn write_to[W: Writer](self, mut writer: W):
         """
-        Formats this int tuple to the provided Writer.
+        Formats this IndexList value to the provided Writer.
 
         Parameters:
             W: A type conforming to the Writable trait.
@@ -767,8 +734,35 @@ struct IndexList[
             writer: The object to write to.
         """
 
-        # TODO: Optimize this to avoid the intermediate String allocation.
-        writer.write(str(self))
+        writer.write("(")
+
+        for i in range(size):
+            if i != 0:
+                writer.write(", ")
+
+            var element = self[i]
+
+            @parameter
+            if element_bitwidth == 32:
+                writer.write(Int32(element))
+            else:
+                writer.write(Int64(element))
+
+        # Single element tuples should be printed with a trailing comma.
+        @parameter
+        if size == 1:
+            writer.write(",")
+
+        writer.write(")")
+
+    @no_inline
+    fn __str__(self) -> String:
+        """Get the tuple as a string.
+
+        Returns:
+            A string representation.
+        """
+        return String.write(self)
 
     @always_inline
     fn cast[

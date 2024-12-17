@@ -52,7 +52,7 @@ from builtin.io import _snprintf
 from documentation import doc_private
 from memory import UnsafePointer, bitcast, Span
 
-from utils import IndexList, StaticTuple, StringSlice
+from utils import IndexList, StaticTuple
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.numerics import FPUtils
 from utils.numerics import isnan as _isnan
@@ -304,7 +304,7 @@ struct SIMD[type: DType, size: Int](
     #    Args:
     #        other: The value to copy.
     #    """
-    #    self.__copyinit__(other)
+    #    self = other
 
     @always_inline("nodebug")
     @implicit

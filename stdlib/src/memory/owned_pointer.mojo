@@ -10,6 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements `OwnedPointer`, a safe, single-ownership smart pointer.
+
+You can import these APIs from the `memory` package. For example:
+
+```mojo
+from memory import OwnedPointer
+```
+"""
+
 from memory import UnsafePointer, memcpy, stack_allocation
 
 
@@ -25,7 +34,7 @@ struct OwnedPointer[T: AnyType]:
     pointers](/mojo/manual/pointers/) in the Mojo Manual.
 
     Parameters:
-        T: The type to be stored in the OwnedPointer[].
+        T: The type to be stored in the `OwnedPointer`.
     """
 
     var _inner: UnsafePointer[T, address_space = AddressSpace.GENERIC]
@@ -35,13 +44,13 @@ struct OwnedPointer[T: AnyType]:
     # ===-------------------------------------------------------------------===#
 
     fn __init__[T: Movable](mut self: OwnedPointer[T], owned value: T):
-        """Construct a new OwnedPointer[] by moving the passed value into a new backing allocation.
+        """Construct a new `OwnedPointer` by moving the passed value into a new backing allocation.
 
         Parameters:
             T: The type of the data to store. It is restricted to `Movable` here to allow efficient move construction.
 
         Args:
-            value: The value to move into the OwnedPointer[].
+            value: The value to move into the `OwnedPointer`.
         """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_move(value^)
@@ -49,13 +58,14 @@ struct OwnedPointer[T: AnyType]:
     fn __init__[
         T: ExplicitlyCopyable
     ](mut self: OwnedPointer[T], *, copy_value: T):
-        """Construct a new OwnedPointer[] by explicitly copying the passed value into a new backing allocation.
+        """Construct a new `OwnedPointer` by explicitly copying the passed value into a new backing allocation.
 
         Parameters:
-            T: The type of the data to store.
+            T: The type of the data to store, which must be
+               `ExplicitlyCopyable`.
 
         Args:
-            copy_value: The value to explicitly copy into the OwnedPointer[].
+            copy_value: The value to explicitly copy into the `OwnedPointer`.
         """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_explicit_copy(copy_value)
@@ -63,14 +73,14 @@ struct OwnedPointer[T: AnyType]:
     fn __init__[
         T: Copyable, U: NoneType = None
     ](mut self: OwnedPointer[T], value: T):
-        """Construct a new OwnedPointer[] by copying the passed value into a new backing allocation.
+        """Construct a new `OwnedPointer` by copying the passed value into a new backing allocation.
 
         Parameters:
             T: The type of the data to store.
             U: A dummy type parameter, to lower the selection priority of this ctor.
 
         Args:
-            value: The value to copy into the OwnedPointer[].
+            value: The value to copy into the `OwnedPointer`.
         """
         self._inner = UnsafePointer[T].alloc(1)
         self._inner.init_pointee_copy(value)
@@ -78,18 +88,18 @@ struct OwnedPointer[T: AnyType]:
     fn __init__[
         T: ExplicitlyCopyable
     ](mut self: OwnedPointer[T], *, other: OwnedPointer[T],):
-        """Construct a new OwnedPointer[] by explicitly copying the value from another OwnedPointer[].
+        """Construct a new `OwnedPointer` by explicitly copying the value from another `OwnedPointer`.
 
         Parameters:
             T: The type of the data to store.
 
         Args:
-            other: The OwnedPointer[] to copy.
+            other: The `OwnedPointer` to copy.
         """
-        self.__init__(copy_value=other[])
+        self = OwnedPointer[T](copy_value=other[])
 
     fn __moveinit__(out self, owned existing: Self):
-        """Move this OwnedPointer[].
+        """Move this `OwnedPointer`.
 
         Args:
             existing: The value to move.
@@ -112,7 +122,7 @@ struct OwnedPointer[T: AnyType]:
         """Returns a reference to the pointers's underlying data with parametric mutability.
 
         Returns:
-            A reference to the data underlying the OwnedPointer[].
+            A reference to the data underlying the `OwnedPointer`.
         """
         # This should have a widening conversion here that allows
         # the mutable ref that is always (potentially unsafely)
@@ -126,25 +136,25 @@ struct OwnedPointer[T: AnyType]:
     # ===-------------------------------------------------------------------===#
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
-        """UNSAFE: returns the backing pointer for this OwnedPointer[].
+        """UNSAFE: returns the backing pointer for this `OwnedPointer`.
 
         Returns:
-            An UnsafePointer to the backing allocation for this OwnedPointer[].
+            An UnsafePointer to the backing allocation for this `OwnedPointer`.
         """
         return self._inner
 
     fn take[T: Movable](owned self: OwnedPointer[T]) -> T:
-        """Move the value within the OwnedPointer[] out of it, consuming the
-        OwnedPointer[] in the process.
+        """Move the value within the `OwnedPointer` out of it, consuming the
+        `OwnedPointer` in the process.
 
         Parameters:
-            T: The type of the data backing this OwnedPointer[]. `take()` only exists for T: Movable
+            T: The type of the data backing this `OwnedPointer`. `take()` only exists for `T: Movable`
                 since this consuming operation only makes sense for types that you want to avoid copying.
-                For types that are Copy or ExplicitlyCopy but are not Movable, you can copy them through
+                For types that are `Copyable` or `ExplicitlyCopyable` but are not `Movable`, you can copy them through
                 `__getitem__` as in `var v = some_ptr_var[]`.
 
         Returns:
-            The data that is (was) backing the OwnedPointer[].
+            The data that is (was) backing the `OwnedPointer`.
         """
         var r = self._inner.take_pointee()
         self._inner.free()
@@ -156,13 +166,13 @@ struct OwnedPointer[T: AnyType]:
         """Take ownership over the heap allocated pointer backing this
         `OwnedPointer`.
 
-        Safety:
+        **Safety:**
             This function is not unsafe to call, as a memory leak is not
             considered unsafe.
 
-            However, to avoid a memory leak, callers should ensure that the
-            returned pointer is eventually deinitialized and deallocated.
-            Failure to do so will leak memory.
+        However, to avoid a memory leak, callers should ensure that the
+        returned pointer is eventually deinitialized and deallocated.
+        Failure to do so will leak memory.
 
         Returns:
             The pointer owned by this instance.
