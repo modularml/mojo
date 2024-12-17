@@ -1380,7 +1380,7 @@ struct PythonObject(
             var key = cpython.PyUnicode_DecodeUTF8(
                 rebind[
                     StringSlice[
-                        _lit_mut_cast[__origin_of(entry[].key), False].result
+                        Origin[False].cast_from[__origin_of(entry[].key)].result
                     ]
                 ](entry[].key.as_string_slice())
             )
