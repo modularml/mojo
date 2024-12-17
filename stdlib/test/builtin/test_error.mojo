@@ -27,8 +27,8 @@ def test_error_raising():
 
 
 def test_from_and_to_string():
-    var myString: String = "FOO"
-    var error = Error(myString)
+    var my_string: String = "FOO"
+    var error = Error(my_string)
     assert_equal(str(error), "FOO")
 
     assert_equal(str(Error("bad")), "bad")

@@ -122,7 +122,7 @@ fn randint[
 fn rand[
     type: DType
 ](
-    ptr: UnsafePointer[Scalar[type], **_],
+    ptr: UnsafePointer[Scalar[type], mut=True, **_],
     size: Int,
     /,
     *,

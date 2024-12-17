@@ -67,6 +67,18 @@ struct Origin[is_mutable: Bool]:
     Safety:
         This is an UNSAFE operation if used to cast an immutable origin to
         a mutable origin.
+
+    Examples:
+
+    Cast a mutable origin to be immutable:
+
+    ```mojo
+    struct Container[mut: Bool, //, origin: Origin[mut]]:
+        var data: Int
+
+        fn imm_borrow(self) -> Container[ImmutableOrigin.cast_from[origin].result]:
+            # ...
+    ```
     """
 
     # ===-------------------------------------------------------------------===#

@@ -4,7 +4,7 @@ sidebar_position: 2
 description: Introduction to Mojo `fn` and `def` functions.
 ---
 
-As mentioned in [Language basics](/mojo/manual/basics), Mojo supports two
+As mentioned in the [syntax overview](/mojo/manual/basics), Mojo supports two
 types of functions: `def` and `fn` functions. You can use either declaration
 with any function, including the `main()` function, but they have different
 default behaviors, as described on this page.
@@ -552,14 +552,14 @@ Thus, you can also pass a `StringLiteral` to a function that expects a `String`.
 When resolving an overloaded function call, the Mojo compiler tries each
 candidate function and uses the one that works (if only one version works), or
 it picks the closest match (if it can determine a close match), or it reports
-that the call is ambiguous (if it can’t figure out which one to pick).
+that the call is ambiguous (if it can't figure out which one to pick).
 
 If the compiler can't figure out which function to use, you can resolve the
 ambiguity by explicitly casting your value to a supported argument type. For
-example, in the following code, we want to call the overloaded `foo()`
-function, but both implementations accept an argument that supports [implicit
-conversion](/mojo/manual/variables#implicit-type-conversion) from
-`StringLiteral`. So, the call to `foo(string)` is ambiguous and creates a
+example, in the following code, we want to call the overloaded `foo()` function,
+but both implementations accept an argument that supports [implicit
+conversion](/mojo/manual/lifecycle/life#constructors-and-implicit-conversion)
+from `StringLiteral`. So, the call to `foo(string)` is ambiguous and creates a
 compiler error. We can fix it by casting the value to the type we really want:
 
 ```mojo
@@ -596,3 +596,109 @@ different from function arguments, and used for compile-time metaprogramming),
 you can also overload functions based on parameter types.
 
 :::
+
+## Return values
+
+Return value types are declared in the signature using the
+<code><strong>-></strong> <var>type</var></code> syntax. Values are
+passed using the `return` keyword, which ends the function and returns the
+identified value (if any) to the caller.
+
+```mojo
+def get_greeting() -> String:
+    return "Hello"
+```
+
+By default, the value is returned to the caller as an owned value. As with
+arguments, a return value may be [implicitly
+converted](/mojo/manual/lifecycle/life#constructors-and-implicit-conversion) to
+the named return type. For example, the previous example calls `return` with a
+string literal, `"Hello"`, which is implicitly converted to a `String`.
+
+:::note Returning a reference
+
+A function can also return a mutable or immutable reference using a `ref` return
+value. For details, see
+[Lifetimes, origins, and references](/mojo/manual/values/lifetimes).
+
+:::
+
+### Named results
+
+Named function results allow a function to return a value that can't be moved or
+copied. Named result syntax lets you specify a named, uninitialized variable to
+return to the caller using the `out` argument convention:
+
+```mojo
+def get_name_tag(owned name: String, out name_tag: NameTag):
+    name_tag = NameTag(name^)
+```
+
+The `out` argument convention identifies an uninitialized variable that the
+function must initialize. (This is the same as the `out` convention used in
+[struct constructors](/mojo/manual/lifecycle/life#constructor).) A function can
+have only one `out` argument. The `out` argument for a named result can appear
+anywhere in the argument list, but by convention, it should be the last argument
+in the list.
+
+A function with a named result argument doesn't need to include an explicit
+`return` statement, as shown above. If the function terminates without a `return`,
+or at a `return` statement with no value, the value of the `out` argument is
+returned to the caller. If it includes a `return` statement with a value, that
+value is returned to the caller, as usual.
+
+The fact that a function uses a named result is transparent to the caller. That
+is, these two signatures are interchangeable to the caller:
+
+```mojo
+def get_name_tag(owned name: String) -> NameTag:
+    ...
+def get_name_tag(owned name: String, out name_tag: NameTag):
+    ...
+```
+
+In both cases, the call looks like this:
+
+```mojo
+tag = get_name_tag("Judith")
+```
+
+Because the return value is assigned to this special `out` variable, it doesn't
+need to be moved or copied when it's returned to the caller. This means that you
+can create a function that returns a type that can't be moved or copied, and
+which takes several steps to initialize:
+
+```mojo
+struct ImmovableObject:
+    var name: String
+
+    fn __init__(out self, owned name: String):
+        self.name = name^
+
+def create_immovable_object(owned name: String, out obj: ImmovableObject):
+    obj = ImmovableObject(name^)
+    obj.name += "!"
+    # obj is implicitly returned
+
+def main():
+    my_obj = create_immutable_object("Blob")
+```
+
+By contrast, the following function with a standard return value doesn't work:
+
+```mojo
+def create_immovable_object2(owned name: String) -> ImmovableObject:
+    obj = ImmovableObject(name^)
+    obj.name += "!"
+    return obj^ # Error: ImmovableObject is not copyable or movable
+```
+
+Because `create_immovable_object2` uses a local variable to store the object
+while it's under construction, the return call requires it to be either moved
+or copied to the callee. This isn't an issue if the newly-created value is
+returned immediately:
+
+```mojo
+def create_immovable_object3(owned name: String) -> ImmovableObject:
+    return ImmovableObject(name^) # OK
+```
