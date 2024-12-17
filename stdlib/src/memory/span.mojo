@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Implements the Span type.
+"""Implements the `Span` type.
 
 You can import these APIs from the `memory` module. For example:
 
@@ -56,8 +56,8 @@ struct _SpanIter[
     Parameters:
         mut: Whether the reference to the span is mutable.
         T: The type of the elements in the span.
-        origin: The origin of the Span.
-        forward: The iteration direction. `False` is backwards.
+        origin: The origin of the `Span`.
+        forward: The iteration direction. False is backwards.
     """
 
     var index: Int
@@ -99,7 +99,7 @@ struct Span[
     T: CollectionElement,
     origin: Origin[mut],
 ](CollectionElementNew):
-    """A non owning view of contiguous data.
+    """A non-owning view of contiguous data.
 
     Parameters:
         mut: Whether the span is mutable.
@@ -128,10 +128,10 @@ struct Span[
 
     @always_inline
     fn __init__(out self, *, other: Self):
-        """Explicitly construct a deep copy of the provided Span.
+        """Explicitly construct a copy of the provided `Span`.
 
         Args:
-            other: The Span to copy.
+            other: The `Span` to copy.
         """
         self._data = other._data
         self._len = other._len
@@ -139,7 +139,7 @@ struct Span[
     @always_inline
     @implicit
     fn __init__(out self, ref [origin]list: List[T, *_]):
-        """Construct a Span from a List.
+        """Construct a `Span` from a `List`.
 
         Args:
             list: The list to which the span refers.
@@ -151,10 +151,10 @@ struct Span[
     fn __init__[
         size: Int, //
     ](mut self, ref [origin]array: InlineArray[T, size]):
-        """Construct a Span from an InlineArray.
+        """Construct a `Span` from an `InlineArray`.
 
         Parameters:
-            size: The size of the InlineArray.
+            size: The size of the `InlineArray`.
 
         Args:
             array: The array to which the span refers.
@@ -218,19 +218,19 @@ struct Span[
 
     @always_inline
     fn __iter__(self) -> _SpanIter[T, origin]:
-        """Get an iterator over the elements of the Span.
+        """Get an iterator over the elements of the `Span`.
 
         Returns:
-            An iterator over the elements of the Span.
+            An iterator over the elements of the `Span`.
         """
         return _SpanIter(0, self)
 
     @always_inline
     fn __reversed__(self) -> _SpanIter[T, origin, forward=False]:
-        """Iterate backwards over the Span.
+        """Iterate backwards over the `Span`.
 
         Returns:
-            A reversed iterator of the Span elements.
+            A reversed iterator of the `Span` elements.
         """
         return _SpanIter[forward=False](len(self), self)
 
@@ -297,10 +297,10 @@ struct Span[
 
     fn as_ref(self) -> Pointer[T, origin]:
         """
-        Gets a Pointer to the first element of this slice.
+        Gets a `Pointer` to the first element of this span.
 
         Returns:
-            A Pointer pointing at the first element of this slice.
+            A `Pointer` pointing at the first element of this span.
         """
 
         return Pointer[T, origin].address_of(self._data[0])
@@ -316,7 +316,7 @@ struct Span[
             origin: The inferred mutable origin of the data within the Span.
 
         Args:
-            other: The Span to copy all elements from.
+            other: The `Span` to copy all elements from.
         """
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
