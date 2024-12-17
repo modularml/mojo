@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Implements the Span type.
+"""Implements the `Span` type.
 
 You can import these APIs from the `memory` module. For example:
 
@@ -46,18 +46,18 @@ trait AsBytes:
 
 @value
 struct _SpanIter[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable],
+    origin: Origin[mut],
     forward: Bool = True,
 ]:
     """Iterator for Span.
 
     Parameters:
-        is_mutable: Whether the reference to the span is mutable.
+        mut: Whether the reference to the span is mutable.
         T: The type of the elements in the span.
-        origin: The origin of the Span.
-        forward: The iteration direction. `False` is backwards.
+        origin: The origin of the `Span`.
+        forward: The iteration direction. False is backwards.
     """
 
     var index: Int
@@ -95,20 +95,20 @@ struct _SpanIter[
 @value
 @register_passable("trivial")
 struct Span[
-    is_mutable: Bool, //,
+    mut: Bool, //,
     T: CollectionElement,
-    origin: Origin[is_mutable],
+    origin: Origin[mut],
 ](CollectionElementNew):
-    """A non owning view of contiguous data.
+    """A non-owning view of contiguous data.
 
     Parameters:
-        is_mutable: Whether the span is mutable.
+        mut: Whether the span is mutable.
         T: The type of the elements in the span.
         origin: The origin of the Span.
     """
 
     # Field
-    var _data: UnsafePointer[T, is_mutable=is_mutable, origin=origin]
+    var _data: UnsafePointer[T, mut=mut, origin=origin]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
@@ -128,10 +128,10 @@ struct Span[
 
     @always_inline
     fn __init__(out self, *, other: Self):
-        """Explicitly construct a deep copy of the provided Span.
+        """Explicitly construct a copy of the provided `Span`.
 
         Args:
-            other: The Span to copy.
+            other: The `Span` to copy.
         """
         self._data = other._data
         self._len = other._len
@@ -139,7 +139,7 @@ struct Span[
     @always_inline
     @implicit
     fn __init__(out self, ref [origin]list: List[T, *_]):
-        """Construct a Span from a List.
+        """Construct a `Span` from a `List`.
 
         Args:
             list: The list to which the span refers.
@@ -151,10 +151,10 @@ struct Span[
     fn __init__[
         size: Int, //
     ](mut self, ref [origin]array: InlineArray[T, size]):
-        """Construct a Span from an InlineArray.
+        """Construct a `Span` from an `InlineArray`.
 
         Parameters:
-            size: The size of the InlineArray.
+            size: The size of the `InlineArray`.
 
         Args:
             array: The array to which the span refers.
@@ -218,19 +218,19 @@ struct Span[
 
     @always_inline
     fn __iter__(self) -> _SpanIter[T, origin]:
-        """Get an iterator over the elements of the Span.
+        """Get an iterator over the elements of the `Span`.
 
         Returns:
-            An iterator over the elements of the Span.
+            An iterator over the elements of the `Span`.
         """
         return _SpanIter(0, self)
 
     @always_inline
     fn __reversed__(self) -> _SpanIter[T, origin, forward=False]:
-        """Iterate backwards over the Span.
+        """Iterate backwards over the `Span`.
 
         Returns:
-            A reversed iterator of the Span elements.
+            A reversed iterator of the `Span` elements.
         """
         return _SpanIter[forward=False](len(self), self)
 
@@ -247,13 +247,47 @@ struct Span[
         """
         return self._len
 
+    fn __contains__[
+        type: DType, //
+    ](self: Span[Scalar[type]], value: Scalar[type]) -> Bool:
+        """Verify if a given value is present in the Span.
+
+        Parameters:
+            type: The DType of the scalars stored in the Span.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+
+        alias widths = InlineArray[Int, 6](256, 128, 64, 32, 16, 8)
+        var ptr = self.unsafe_ptr()
+        var length = len(self)
+        var processed = 0
+
+        @parameter
+        for i in range(len(widths)):
+            alias width = widths[i]
+
+            @parameter
+            if simdwidthof[type]() >= width:
+                for _ in range((length - processed) // width):
+                    if value in (ptr + processed).load[width=width]():
+                        return True
+                    processed += width
+
+        for i in range(length - processed):
+            if ptr[processed + i] == value:
+                return True
+        return False
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
 
-    fn unsafe_ptr(
-        self,
-    ) -> UnsafePointer[T, is_mutable=is_mutable, origin=origin]:
+    fn unsafe_ptr(self) -> UnsafePointer[T, mut=mut, origin=origin]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
@@ -263,10 +297,10 @@ struct Span[
 
     fn as_ref(self) -> Pointer[T, origin]:
         """
-        Gets a Pointer to the first element of this slice.
+        Gets a `Pointer` to the first element of this span.
 
         Returns:
-            A Pointer pointing at the first element of this slice.
+            A `Pointer` pointing at the first element of this span.
         """
 
         return Pointer[T, origin].address_of(self._data[0])
@@ -282,7 +316,7 @@ struct Span[
             origin: The inferred mutable origin of the data within the Span.
 
         Args:
-            other: The Span to copy all elements from.
+            other: The `Span` to copy all elements from.
         """
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):

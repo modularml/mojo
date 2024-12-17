@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements types that work with unsafe pointers.
+"""Provides utility functions for unsafe manipulation of SIMD values.
 
 You can import these APIs from the `memory` package. For example:
 
@@ -34,6 +34,23 @@ fn bitcast[
     new_width: Int = width,
 ](val: SIMD[type, width]) -> SIMD[new_type, new_width]:
     """Bitcasts a SIMD value to another SIMD value.
+
+    For a discussion of byte order, see
+    [Converting data: bitcasting and byte order](/mojo/manual/pointers/unsafe-pointers#converting-data-bitcasting-and-byte-order)
+    in the Mojo Manual.
+
+    Examples:
+
+    The following example uses `bitcast` to break a 32-bit integer into a vector
+    of four 8-bit integers:
+
+    ```mojo
+    from memory import bitcast
+
+    one = SIMD[DType.uint32, 1](4631)
+    many = bitcast[DType.uint8, 4](one)
+    print(one, many) # 4631 [23, 18, 0, 0]
+    ```
 
     Constraints:
         The bitwidth of the two types must be the same.
@@ -84,7 +101,19 @@ fn pack_bits[
     width: Int, //,
     new_type: DType = _uint(width),
 ](val: SIMD[DType.bool, width]) -> Scalar[new_type]:
-    """Packs a SIMD bool into an integer.
+    """Packs a SIMD vector of `bool` values into an integer.
+
+    Examples:
+
+    This example packs a vector of 8 `bool` values into a single 8-bit integer.
+
+    ```mojo
+    from memory import pack_bits
+
+    flags = SIMD[DType.bool, 8](1, 1, 0, 1, 0, 0, 0, 0)
+    i = pack_bits[DType.uint8](flags)
+    print(flags, i) # [True, True, False, True, False, False, False, False] 11
+    ```
 
     Constraints:
         The width of the bool vector must be the same as the bitwidth of the
