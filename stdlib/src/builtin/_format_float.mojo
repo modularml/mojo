@@ -315,30 +315,17 @@ fn _to_decimal[
     ](z_result.integer_part)
     var r = (z_result.integer_part - FP[type].big_divisor * sig)
 
-    while True:
-        if r < deltai:
-            # Exclude the right endpoint if necessary
-            if (
-                r
-                | Scalar[CarrierDType](not z_result.is_integer)
-                | Scalar[CarrierDType](1)
-            ) == 0:
-                sig -= 1
-                r = FP[type].big_divisor
-                break
-        elif r > deltai:
-            break
-        else:
-            # r == deltai, compare fractional parts
-            var x_result = _compute_mul_parity(
-                (two_fc - 1).cast[DType.uint64](), cache_index, beta
-            )
-            if not (x_result.parity | x_result.is_integer):
-                break
-        # If no break conditions were met
+    if r < deltai:
         exp = minus_k + FP[type].kappa + 1
         return _remove_trailing_zeros(sig, exp)
-
+    # compare fractional parts if r == deltai
+    if r == deltai:
+        var x_result = _compute_mul_parity(
+            (two_fc - 1).cast[DType.uint64](), cache_index, beta
+        )
+        if x_result.parity | x_result.is_integer:
+            exp = minus_k + FP[type].kappa + 1
+            return _remove_trailing_zeros(sig, exp)
     #######################################################
     # Step 3: Find the significand with the smaller divisor
     #######################################################

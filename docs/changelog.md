@@ -83,5 +83,8 @@ what we publish.
 - The command `mojo debug --vscode` now sets the current working directory
   properly.
 
+- [Issue #3796](https://github.com/modularml/mojo/issues/3796) - Compiler crash
+  handling for-else statement.
+
 - The Mojo Language Server doesn't crash anymore on empty **init**.mojo files.
   [Issue #3826](https://github.com/modularml/mojo/issues/3826).

@@ -799,7 +799,8 @@ Special thanks to our community contributors:
 [@rd4com](https://github.com/rd4com),
 [@fknfilewalker](https://github.com/fknfilewalker),
 [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse),
-[@avitkauskas](https://github.com/avitkauskas)
+[@avitkauskas](https://github.com/avitkauskas), and
+[@martinvuyk](https://github.com/martinvuyk).
 
 ## v24.5 (2024-09-13)
 
