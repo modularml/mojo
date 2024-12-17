@@ -20,7 +20,6 @@ from python import PythonObject
 """
 
 from collections import Dict
-from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_ssize_t
 from sys.intrinsics import _type_is_eq
 
@@ -235,7 +234,6 @@ struct PythonObject(
     SizedRaising,
     Stringable,
     Writable,
-    _HashableWithHasher,
 ):
     """A Python object."""
 
@@ -1421,19 +1419,7 @@ struct PythonObject(
             raise Error("object has no len()")
         return result
 
-    fn __hash__(self) -> UInt:
-        """Returns the length of the object.
-
-        Returns:
-            The length of the object.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_Length(self.py_object)
-        # TODO: make this function raise when we can raise parametrically.
-        debug_assert(result != -1, "object is not hashable")
-        return result
-
-    fn __hash__[H: _Hasher](self, mut hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         """Updates hasher with this python object hash value.
 
         Parameters:

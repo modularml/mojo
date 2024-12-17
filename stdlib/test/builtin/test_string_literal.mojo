@@ -199,10 +199,10 @@ def test_comparison_operators():
 def test_hash():
     # Test a couple basic hash behaviors.
     # `test_hash.test_hash_bytes` has more comprehensive tests.
-    assert_not_equal(0, StringLiteral.__hash__("test"))
-    assert_not_equal(StringLiteral.__hash__("a"), StringLiteral.__hash__("b"))
-    assert_equal(StringLiteral.__hash__("a"), StringLiteral.__hash__("a"))
-    assert_equal(StringLiteral.__hash__("b"), StringLiteral.__hash__("b"))
+    assert_not_equal(0, hash("test"))
+    assert_not_equal(hash("a"), hash("b"))
+    assert_equal(hash("a"), hash("a"))
+    assert_equal(hash("b"), hash("b"))
 
 
 def test_indexing():

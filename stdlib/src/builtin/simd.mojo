@@ -21,8 +21,6 @@ from collections.string import (
     _calc_format_buffer_size,
     _calc_initial_buffer_size,
 )
-from hashlib._hasher import _HashableWithHasher, _Hasher
-from hashlib.hash import _hash_simd
 from math import Ceilable, CeilDivable, Floorable, Truncable
 from math.math import _call_ptx_intrinsic
 from os import abort
@@ -242,7 +240,6 @@ struct SIMD[type: DType, size: Int](
     Floorable,
     Writable,
     Hashable,
-    _HashableWithHasher,
     Intable,
     IntLike,
     Representable,
@@ -1675,17 +1672,7 @@ struct SIMD[type: DType, size: Int](
         # TODO: see how can we implement this.
         return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
 
-    fn __hash__(self) -> UInt:
-        """Hash the value using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return _hash_simd(self)
-
-    fn __hash__[H: _Hasher](self, mut hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         """Updates hasher with this SIMD value.
 
         Parameters:

@@ -14,7 +14,7 @@
 """
 
 from collections.string import _atol, _isspace
-from hashlib._hasher import _HashableWithHasher, _Hasher
+
 from sys import simdwidthof
 from sys.ffi import c_char
 
@@ -54,7 +54,6 @@ struct StringRef(
     Sized,
     Stringable,
     Writable,
-    _HashableWithHasher,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
@@ -347,17 +346,7 @@ struct StringRef(
         """
         return len(self) != 0
 
-    fn __hash__(self) -> UInt:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.data, self.length)
-
-    fn __hash__[H: _Hasher](self, mut hasher: H):
+    fn __hash__[H: Hasher](self, mut hasher: H):
         """Updates hasher with the underlying bytes.
 
         Parameters:

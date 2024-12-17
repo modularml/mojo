@@ -27,7 +27,8 @@ from collections.string import (
     isupper,
     ord,
 )
-from hashlib.hash import Hashable, hash
+from hashlib.hash import hash
+from hashlib.hasher import Hashable, Hasher
 
 from builtin.anytype import AnyType, UnknownDestructibility
 from builtin.bool import Bool, Boolable, ImplicitlyBoolable, all, any, bool
@@ -133,6 +134,7 @@ from builtin.value import (
     RepresentableCollectionElement,
     StringableCollectionElement,
 )
+
 from documentation import doc_private
 from memory import AddressSpace, Pointer
 
