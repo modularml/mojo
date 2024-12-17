@@ -665,7 +665,7 @@ In the case of `str()`, it requires a type to conform to either the `Stringable`
 or `StringableRaising` trait. Each trait requires a conforming type to implement
 a `__str__()` method that returns a `String` representation. The only difference
 between the two traits is that `Stringable` requires that the method *cannot*
-raise and error, whereas `StringableRaising` indicates that the method *might*
+raise an error, whereas `StringableRaising` indicates that the method *might*
 raise an error. (To learn more, read [The `Stringable`, `Representable`, and
 `Writable`
 traits](/mojo/manual/traits#the-stringable-representable-and-writable-traits).)
