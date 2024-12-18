@@ -217,7 +217,7 @@ fn _quicksort[
     # Work with an immutable span so we don't run into exclusivity problems with
     # the List[Span].
     var imm_span = span.immut()
-    alias ImmSpan = span.immut_self
+    alias ImmSpan = span.ImmutSelf
 
     var stack = List[ImmSpan](capacity=_estimate_initial_height(size))
     stack.append(imm_span)
