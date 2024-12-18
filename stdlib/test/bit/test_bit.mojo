@@ -13,8 +13,8 @@
 # RUN: %bare-mojo %s
 
 from bit import (
-    bit_ceil,
-    bit_floor,
+    next_power_of_two,
+    prev_power_of_two,
     bit_not,
     bit_reverse,
     bit_width,
@@ -365,17 +365,17 @@ def test_bit_width_simd():
     assert_equal(bit_width(var4), SIMD[int64_t, simd_width](27, 0, 22, 60))
 
 
-def test_bit_ceil():
-    assert_equal(bit_ceil(-(2**59)), 1)
-    assert_equal(bit_ceil(-2), 1)
-    assert_equal(bit_ceil(1), 1)
-    assert_equal(bit_ceil(2), 2)
-    assert_equal(bit_ceil(4), 4)
-    assert_equal(bit_ceil(5), 8)
-    assert_equal(bit_ceil(2**59 - 3), 2**59)
+def test_next_power_of_two():
+    assert_equal(next_power_of_two(-(2**59)), 1)
+    assert_equal(next_power_of_two(-2), 1)
+    assert_equal(next_power_of_two(1), 1)
+    assert_equal(next_power_of_two(2), 2)
+    assert_equal(next_power_of_two(4), 4)
+    assert_equal(next_power_of_two(5), 8)
+    assert_equal(next_power_of_two(2**59 - 3), 2**59)
 
 
-def test_bit_ceil_simd():
+def test_next_power_of_two_simd():
     alias simd_width = 4
     alias int8_t = DType.int8
     alias int16_t = DType.int16
@@ -383,16 +383,20 @@ def test_bit_ceil_simd():
     alias int64_t = DType.int64
 
     alias var1 = SIMD[int8_t, simd_width](-114, 0, 2**7 - 3, 2**6)
-    assert_equal(bit_ceil(var1), SIMD[int8_t, simd_width](1, 1, 2**7, 2**6))
+    assert_equal(
+        next_power_of_two(var1), SIMD[int8_t, simd_width](1, 1, 2**7, 2**6)
+    )
 
     alias var2 = SIMD[int16_t, simd_width](-11444, 0, 2**12 - 3, 2**13)
     assert_equal(
-        bit_ceil(var2), SIMD[int16_t, simd_width](1, 1, 2**12, 2**13)
+        next_power_of_two(var2),
+        SIMD[int16_t, simd_width](1, 1, 2**12, 2**13),
     )
 
     alias var3 = SIMD[int32_t, simd_width](-111444, 0, 2**14 - 3, 2**29)
     assert_equal(
-        bit_ceil(var3), SIMD[int32_t, simd_width](1, 1, 2**14, 2**29)
+        next_power_of_two(var3),
+        SIMD[int32_t, simd_width](1, 1, 2**14, 2**29),
     )
 
     # TODO: use this line after #2882 is fixed
@@ -401,22 +405,22 @@ def test_bit_ceil_simd():
         -111444444, 1, 2**22 - 3, 576460752303423488
     )
     assert_equal(
-        bit_ceil(var4),
+        next_power_of_two(var4),
         SIMD[int64_t, simd_width](1, 1, 2**22, 2**59),
     )
 
 
-def test_bit_floor():
-    assert_equal(bit_floor(-(2**59)), 0)
-    assert_equal(bit_floor(-2), 0)
-    assert_equal(bit_floor(1), 1)
-    assert_equal(bit_floor(2), 2)
-    assert_equal(bit_floor(4), 4)
-    assert_equal(bit_floor(5), 4)
-    assert_equal(bit_floor(2**59), 2**59)
+def test_prev_power_of_two():
+    assert_equal(prev_power_of_two(-(2**59)), 0)
+    assert_equal(prev_power_of_two(-2), 0)
+    assert_equal(prev_power_of_two(1), 1)
+    assert_equal(prev_power_of_two(2), 2)
+    assert_equal(prev_power_of_two(4), 4)
+    assert_equal(prev_power_of_two(5), 4)
+    assert_equal(prev_power_of_two(2**59), 2**59)
 
 
-def test_bit_floor_simd():
+def test_prev_power_of_two_simd():
     alias simd_width = 4
     alias int8_t = DType.int8
     alias int16_t = DType.int16
@@ -425,17 +429,19 @@ def test_bit_floor_simd():
 
     alias var1 = SIMD[int8_t, simd_width](-114, 0, 2**5 + 3, 2**6)
     assert_equal(
-        bit_floor(var1), SIMD[int8_t, simd_width](0, 0, 2**5, 2**6)
+        prev_power_of_two(var1), SIMD[int8_t, simd_width](0, 0, 2**5, 2**6)
     )
 
     alias var2 = SIMD[int16_t, simd_width](-11444, 0, 2**12 + 3, 2**13)
     assert_equal(
-        bit_floor(var2), SIMD[int16_t, simd_width](0, 0, 2**12, 2**13)
+        prev_power_of_two(var2),
+        SIMD[int16_t, simd_width](0, 0, 2**12, 2**13),
     )
 
     alias var3 = SIMD[int32_t, simd_width](-111444, 0, 2**14 + 3, 2**29)
     assert_equal(
-        bit_floor(var3), SIMD[int32_t, simd_width](0, 0, 2**14, 2**29)
+        prev_power_of_two(var3),
+        SIMD[int32_t, simd_width](0, 0, 2**14, 2**29),
     )
 
     # TODO: use this line after #2882 is fixed
@@ -444,7 +450,7 @@ def test_bit_floor_simd():
         -111444444, 1, 2**22 + 3, 576460752303423488
     )
     assert_equal(
-        bit_floor(var4),
+        prev_power_of_two(var4),
         SIMD[int64_t, simd_width](0, 1, 2**22, 2**59),
     )
 
@@ -526,10 +532,10 @@ def test_log2_floor():
 def main():
     test_rotate_bits_int()
     test_rotate_bits_simd()
-    test_bit_ceil()
-    test_bit_ceil_simd()
-    test_bit_floor()
-    test_bit_floor_simd()
+    test_next_power_of_two()
+    test_next_power_of_two_simd()
+    test_prev_power_of_two()
+    test_prev_power_of_two_simd()
     test_bit_width()
     test_bit_width_simd()
     test_is_power_of_two()

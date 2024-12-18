@@ -23,7 +23,7 @@ from collections import Deque
 
 from collections import Optional
 
-from bit import bit_ceil
+from bit import next_power_of_two
 from memory import UnsafePointer
 
 # ===-----------------------------------------------------------------------===#
@@ -105,18 +105,18 @@ struct Deque[ElementType: CollectionElement](
         if capacity <= 0:
             deque_capacity = self.default_capacity
         else:
-            deque_capacity = bit_ceil(capacity)
+            deque_capacity = next_power_of_two(capacity)
 
         if min_capacity <= 0:
             min_deque_capacity = self.default_capacity
         else:
-            min_deque_capacity = bit_ceil(min_capacity)
+            min_deque_capacity = next_power_of_two(min_capacity)
 
         if maxlen <= 0:
             max_deque_len = -1
         else:
             max_deque_len = maxlen
-            max_deque_capacity = bit_ceil(maxlen)
+            max_deque_capacity = next_power_of_two(maxlen)
             if max_deque_capacity == maxlen:
                 max_deque_capacity <<= 1
             deque_capacity = min(deque_capacity, max_deque_capacity)
@@ -937,7 +937,7 @@ struct Deque[ElementType: CollectionElement](
             n_total: The total number of elements the new buffer should support.
             n_retain: The number of existing elements to keep in the deque.
         """
-        new_capacity = bit_ceil(n_total)
+        new_capacity = next_power_of_two(n_total)
         if new_capacity == n_total:
             new_capacity <<= 1
 

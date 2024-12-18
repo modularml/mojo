@@ -21,7 +21,7 @@ from random import *
 from sys import sizeof
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from bit import bit_ceil
+from bit import next_power_of_two
 
 
 # ===-----------------------------------------------------------------------===#
