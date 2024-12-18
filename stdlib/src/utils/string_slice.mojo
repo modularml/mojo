@@ -427,17 +427,16 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             If the `StringSlice` is equal to the input in length and contents.
         """
-        if not self and not rhs:
-            return True
-        if len(self) != len(rhs):
+
+        var s_len = self.byte_length()
+        var s_ptr = self.unsafe_ptr()
+        var rhs_ptr = rhs.unsafe_ptr()
+        if s_len != rhs.byte_length():
             return False
         # same pointer and length, so equal
-        if self._slice.unsafe_ptr() == rhs._slice.unsafe_ptr():
+        elif s_len == 0 or s_ptr == rhs_ptr:
             return True
-        for i in range(len(self)):
-            if self._slice[i] != rhs._slice.unsafe_ptr()[i]:
-                return False
-        return True
+        return memcmp(s_ptr, rhs_ptr, s_len) == 0
 
     @always_inline
     fn __eq__(self, rhs: String) -> Bool:
