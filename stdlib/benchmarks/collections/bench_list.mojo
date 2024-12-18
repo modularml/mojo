@@ -68,14 +68,12 @@ fn bench_list_copyinit[
 
 
 def main():
-    seed()
-
     var m = Bench(
         BenchConfig(
             num_repetitions=1,
             max_runtime_secs=0.5,
             min_runtime_secs=0.25,
-            min_warmuptime_secs=0,  # 0.25
+            min_warmuptime_secs=0,  #FIXME: adjust the values
         )
     )
     alias lengths = (1, 2, 4, 8, 16, 32, 128, 256, 512, 1024, 2048, 4096)
