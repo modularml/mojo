@@ -208,6 +208,20 @@ def test_reversed():
         i += 1
 
 
+def test_count():
+    var str = String("Hello world").as_bytes()
+
+    assert_equal(12, str.count("".as_bytes()))
+    assert_equal(1, str.count("Hell".as_bytes()))
+    assert_equal(3, str.count("l".as_bytes()))
+    assert_equal(1, str.count("ll".as_bytes()))
+    assert_equal(1, str.count("ld".as_bytes()))
+    assert_equal(0, str.count("universe".as_bytes()))
+
+    assert_equal("aaaaa".as_bytes().count("a".as_bytes()), 5)
+    assert_equal("aaaaaa".as_bytes().count("aa".as_bytes()), 3)
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -221,3 +235,4 @@ def main():
     test_fill()
     test_ref()
     test_reversed()
+    test_count()
