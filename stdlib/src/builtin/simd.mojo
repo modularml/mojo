@@ -338,6 +338,18 @@ struct SIMD[type: DType, size: Int](
     fn __init__(out self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
 
+        @parameter
+        if type is not DType.index:
+            alias max_unsigned_value = 2 ** bitwidthof[type]()
+            debug_assert[assert_mode="safe", cpu_only=True](
+                UInt(value) < UInt(max_unsigned_value),
+                "Overflow on ",
+                type,
+                " construction. Maximum unsigned value for this DType is ",
+                UInt(max_unsigned_value) - 1,
+                ". Construct a `SIMD[DType.index, _]` if you are sure.",
+            )
+
         var t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](value)
@@ -2280,7 +2292,7 @@ struct SIMD[type: DType, size: Int](
             "llvm.vector.extract",
             SIMD[type, output_width],
             has_side_effect=False,
-        ](self, Int64(offset))
+        ](self, Scalar[DType.index](offset).cast[DType.uint64]())
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
