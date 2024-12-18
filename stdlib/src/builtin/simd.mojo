@@ -1884,7 +1884,7 @@ struct SIMD[type: DType, size: Int](
     @staticmethod
     fn from_bytes[
         big_endian: Bool = False
-    ](bytes: InlineArray[Byte, type.sizeof()]) raises -> Scalar[type]:
+    ](bytes: InlineArray[Byte, Self.type_len]) raises -> Scalar[type]:
         """Converts a byte array to an integer.
 
         Args:
@@ -1908,7 +1908,9 @@ struct SIMD[type: DType, size: Int](
             value = byte_swap(value)
         return value
 
-    fn as_bytes[big_endian: Bool = False](self) -> InlineArray[Byte, Self.type_len]:
+    fn as_bytes[
+        big_endian: Bool = False
+    ](self) -> InlineArray[Byte, Self.type_len]:
         """Convert the integer to a byte array.
 
         Parameters:
@@ -1926,7 +1928,7 @@ struct SIMD[type: DType, size: Int](
             value = byte_swap(value)
 
         var ptr = UnsafePointer.address_of(value)
-        var array = InlineArray[Byte, Self.type_len]()
+        var array = InlineArray[Byte, Self.type_len](fill=0)
 
         # TODO: Maybe this can be a List.extend(ptr, count) method
         memcpy(array.unsafe_ptr(), ptr.bitcast[Byte](), Self.type_len)
