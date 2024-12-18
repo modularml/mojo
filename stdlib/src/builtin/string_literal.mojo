@@ -54,12 +54,9 @@ struct StringLiteral(
     and this does not include the null terminator.
     """
 
-    alias is_mutable = False
-    """The mutability of the origin."""
-    alias origin = rebind[Origin[Self.is_mutable]](StaticConstantOrigin)
-    """The origin of the data."""
-    alias type = __mlir_type.`!kgen.string`
     # Fields
+    alias type = __mlir_type.`!kgen.string`
+
     var value: Self.type
     """The underlying storage for the string literal."""
 

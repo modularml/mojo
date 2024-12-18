@@ -905,12 +905,9 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         return _FormatCurlyEntry.format(self, args)
 
     # FIXME(#3526): this should return unicode codepoint offsets
-    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
-
-        Parameters:
-            T: The Stringlike type.
 
         Args:
             substr: The substring to find.
@@ -942,12 +939,9 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         return int(loc) - int(self.unsafe_ptr())
 
     # FIXME(#3526): this should return unicode codepoint offsets
-    fn rfind[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
-
-        Parameters:
-            T: The Stringlike type.
 
         Args:
             substr: The substring to find.
