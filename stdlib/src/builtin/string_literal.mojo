@@ -24,7 +24,7 @@ from memory import UnsafePointer, memcpy, Span
 from utils import StaticString, StringRef, StringSlice, Writable, Writer
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import _StringSliceIter, _to_string_list
+from utils.string_slice import Stringlike, _StringSliceIter, _to_string_list
 
 # ===-----------------------------------------------------------------------===#
 # StringLiteral
@@ -34,9 +34,9 @@ from utils.string_slice import _StringSliceIter, _to_string_list
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct StringLiteral(
+    Stringlike,
     Boolable,
     Comparable,
-    CollectionElementNew,
     Writable,
     IntableRaising,
     KeyElement,
@@ -593,7 +593,7 @@ struct StringLiteral(
 
         writer.write(self.as_string_slice())
 
-    fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
+    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -604,9 +604,9 @@ struct StringLiteral(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).find(substr, start=start)
+        return self.as_string_slice().find(substr, start=start)
 
-    fn rfind(self, substr: StringLiteral, start: Int = 0) -> Int:
+    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -617,7 +617,7 @@ struct StringLiteral(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).rfind(substr, start=start)
+        return self.as_string_slice().rfind(substr, start=start)
 
     fn replace(self, old: StringLiteral, new: StringLiteral) -> StringLiteral:
         """Return a copy of the string with all occurrences of substring `old`

@@ -235,11 +235,10 @@ struct _StringSliceIter[
 @value
 @register_passable("trivial")
 struct StringSlice[mut: Bool, //, origin: Origin[mut]](
+    Stringlike,
     Stringable,
     Sized,
     Writable,
-    CollectionElement,
-    CollectionElementNew,
     Hashable,
 ):
     """A non-owning view to encoded string data.
@@ -905,7 +904,8 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(ref self, substr: StringSlice, start: Int = 0) -> Int:
+    # FIXME(#3526): this should return unicode codepoint offsets
+    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
 
@@ -916,7 +916,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
+        if substr.byte_length() == 0:
             return 0
 
         if self.byte_length() < substr.byte_length() + start:
@@ -938,6 +938,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
 
         return int(loc) - int(self.unsafe_ptr())
 
+    # FIXME(#3526): this should return unicode codepoint offsets
     fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
@@ -949,10 +950,10 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return len(self)
+        if substr.byte_length() == 0:
+            return self.byte_length()
 
-        if len(self) < len(substr) + start:
+        if self.byte_length() < substr.byte_length() + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
@@ -961,9 +962,9 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
 
         var loc = _memrmem(
             haystack_str.unsafe_ptr(),
-            len(haystack_str),
+            haystack_str.byte_length(),
             substr.unsafe_ptr(),
-            len(substr),
+            substr.byte_length(),
         )
 
         if not loc:
@@ -1109,6 +1110,77 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
 # ===-----------------------------------------------------------------------===#
 # Utils
 # ===-----------------------------------------------------------------------===#
+
+
+trait StringLike(CollectionElement, CollectionElementNew):
+    """Trait intended to be used as a generic entrypoint for all String-like
+    types."""
+    ...
+
+trait StringOwnerLike(StringLike):
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        ...
+
+trait StringSliceLike(StringLike):
+    alias mut: Bool
+    """The mutability of the origin."""
+    alias origin: Origin[mut]
+    """The origin of the data."""
+
+    fn as_bytes(self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of the bytes.
+
+        Returns:
+            A contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+    fn as_string_slice(self) -> StringSlice[origin]:
+        """Returns a string slice of the data.
+
+        Returns:
+            A string slice pointing to the data.
+        """
+        ...
+
+trait StringLiteralLike(StringLike):
+    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
+        """Returns a contiguous slice of the bytes.
+
+        Returns:
+            A contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+    fn as_string_slice(self) -> StringSlice[StaticConstantOrigin]:
+        """Returns a string slice of the data.
+
+        Returns:
+            A string slice pointing to the data.
+        """
+        ...
 
 
 fn _to_string_list[

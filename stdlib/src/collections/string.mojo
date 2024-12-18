@@ -44,6 +44,7 @@ from utils._unicode import (
 )
 from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
 from utils.string_slice import (
+    Stringlike,
     _shift_unicode_to_utf8,
     _StringSliceIter,
     _to_string_list,
@@ -742,6 +743,7 @@ fn isprintable(c: UInt8) -> Bool:
 
 @value
 struct String(
+    Stringlike,
     Sized,
     Stringable,
     AsBytes,
@@ -752,7 +754,6 @@ struct String(
     Boolable,
     Writable,
     Writer,
-    CollectionElementNew,
     FloatableRaising,
     _HashableWithHasher,
 ):
@@ -1595,8 +1596,7 @@ struct String(
         return String(buf^)
 
     fn unsafe_ptr(
-        ref self,
-    ) -> UnsafePointer[
+        ref self    ) -> UnsafePointer[
         Byte,
         mut = Origin(__origin_of(self)).is_mutable,
         origin = __origin_of(self),
@@ -1712,7 +1712,7 @@ struct String(
         """
         return substr.as_string_slice() in self.as_string_slice()
 
-    fn find(self, substr: String, start: Int = 0) -> Int:
+    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -1723,10 +1723,9 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
+        return self.as_string_slice().find(substr, start)
 
-        return self.as_string_slice().find(substr.as_string_slice(), start)
-
-    fn rfind(self, substr: String, start: Int = 0) -> Int:
+    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
@@ -1737,10 +1736,7 @@ struct String(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-
-        return self.as_string_slice().rfind(
-            substr.as_string_slice(), start=start
-        )
+        return self.as_string_slice().rfind(substr, start=start)
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given String is a
