@@ -382,3 +382,99 @@ fn write_buffered[
         var buffer = _WriteBufferStack[buffer_size](writer^)
         write_args(buffer, args, sep=sep, end=end)
         buffer.flush()
+
+
+# ===-----------------------------------------------------------------------===#
+# Utils
+# ===-----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _hex_digit_to_hex_char(b: Byte) -> Byte:
+    alias values = SIMD[DType.uint8, 16](
+        Byte(ord("0")),
+        Byte(ord("1")),
+        Byte(ord("2")),
+        Byte(ord("3")),
+        Byte(ord("4")),
+        Byte(ord("5")),
+        Byte(ord("6")),
+        Byte(ord("7")),
+        Byte(ord("8")),
+        Byte(ord("9")),
+        Byte(ord("a")),
+        Byte(ord("b")),
+        Byte(ord("c")),
+        Byte(ord("d")),
+        Byte(ord("e")),
+        Byte(ord("f")),
+    )
+    return values[int(b)]
+
+
+@always_inline
+fn _hex_digits_to_hex_chars(b: SIMD[DType.uint8, _]) -> __type_of(b):
+    alias `0` = Byte(ord("0"))
+    alias `9` = Byte(ord("9"))
+    alias `a` = Byte(ord("a"))
+    alias I8 = DType.int8
+    alias U8 = DType.uint8
+    return (
+        `0`
+        + b
+        + (((b <= 9).cast[I8]() - 1) & (`a` - `9` - 1).cast[I8]()).cast[U8]()
+    )
+
+
+@always_inline
+fn _write_hex[amnt_hex_bytes: Int](p: UnsafePointer[Byte], decimal: Int):
+    """Write a python compliant hexadecimal value into an uninitialized pointer
+    location, assumed to be large enough for the value to be written.
+
+    Examples:
+
+    ```mojo
+    %# from memory import memset_zero
+    %# from testing import assert_equal
+    %# from utils import StringSlice
+    %# from utils.write import _write_hex
+    items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
+    alias S = StringSlice[__origin_of(items)]
+    ptr = items.unsafe_ptr()
+    _write_hex[8](ptr, ord("🔥"))
+    assert_equal(r"\\U0001f525", S(ptr=ptr, length=10))
+    memset_zero(ptr, len(items))
+    _write_hex[4](ptr, ord("你"))
+    assert_equal(r"\\u4f60", S(ptr=ptr, length=6))
+    memset_zero(ptr, len(items))
+    _write_hex[2](ptr, ord("Ö"))
+    assert_equal(r"\\xd6", S(ptr=ptr, length=4))
+    ```
+    .
+    """
+
+    constrained[amnt_hex_bytes in (2, 4, 8), "only 2 or 4 or 8 sequences"]()
+
+    alias `\\` = Byte(ord("\\"))
+    alias `x` = Byte(ord("x"))
+    alias `u` = Byte(ord("u"))
+    alias `U` = Byte(ord("U"))
+
+    p.init_pointee_move(`\\`)
+
+    @parameter
+    if amnt_hex_bytes == 2:
+        (p + 1).init_pointee_move(`x`)
+    elif amnt_hex_bytes == 4:
+        (p + 1).init_pointee_move(`u`)
+    else:
+        (p + 1).init_pointee_move(`U`)
+
+    var idx = 0
+
+    @parameter
+    for i in reversed(range(amnt_hex_bytes)):
+        (p + 2 + idx).init_pointee_move(
+            _hex_digit_to_hex_char((decimal // (16**i)) % 16)
+        )
+        idx += 1
