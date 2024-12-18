@@ -784,68 +784,25 @@ struct String(
 
     @always_inline
     @implicit
-    fn __init__(out self, owned impl: List[UInt8, *_]):
-        """Construct a string from a buffer of bytes without copying the
-        allocated data.
-
-        The buffer must be terminated with a null byte:
-
-        ```mojo
-        var buf = List[UInt8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
+    fn __init__(out self, owned impl: List[Byte, *_]):
+        """Construct a string from a buffer of null-terminated bytes, copying
+        the allocated data. Use the transfer operator `^` to avoid the copy.
 
         Args:
-            impl: The buffer.
+            impl: The null-terminated buffer.
+
+        Examples:
+
+        ```mojo
+        print(String(List[Byte](ord('h'), ord('i'), 0))) # hi
+        ```
+        .
         """
         debug_assert(
             len(impl) > 0 and impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        # We make a backup because steal_data() will clear size and capacity.
-        var size = impl.size
-        debug_assert(
-            impl[size - 1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        var capacity = impl.capacity
-        self._buffer = Self._buffer_type(
-            ptr=impl.steal_data(), length=size, capacity=capacity
-        )
-
-    @always_inline
-    @implicit
-    fn __init__(out self, impl: Self._buffer_type):
-        """Construct a string from a buffer of bytes, copying the allocated
-        data. Use the transfer operator ^ to avoid the copy.
-
-        The buffer must be terminated with a null byte:
-
-        ```mojo
-        var buf = List[UInt8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
-
-        Args:
-            impl: The buffer.
-        """
-        debug_assert(
-            len(impl) > 0 and impl[-1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        # We make a backup because steal_data() will clear size and capacity.
-        var size = impl.size
-        debug_assert(
-            impl[size - 1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        self._buffer = impl
+        self._buffer = rebind[Self._buffer_type](impl)
 
     @always_inline
     fn __init__(out self):
