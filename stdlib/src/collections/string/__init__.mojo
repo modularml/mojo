@@ -10,14 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the utils package."""
+"""Implements the string package."""
 
-from .index import Index, IndexList, product
-from collections.string.inline_string import InlineString
-from .lock import BlockingScopedLock, BlockingSpinLock, SpinWaiter
-from .loop import unroll
-from .static_tuple import StaticTuple
-from collections.string.string_slice import StaticString, StringSlice
-from .stringref import StringRef
-from .variant import Variant
-from .write import Writable, Writer, write_args, write_buffered
+from .string import (
+    String,
+    ascii,
+    atof,
+    atol,
+    chr,
+    isdigit,
+    islower,
+    isprintable,
+    isupper,
+    ord,
+)
+from .string_slice import StringSlice, StaticString

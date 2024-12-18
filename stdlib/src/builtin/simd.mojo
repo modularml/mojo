@@ -17,7 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 import math
 from collections import InlineArray
-from collections.string import (
+from collections.string import StringSlice
+from collections.string.string import (
     _calc_format_buffer_size,
     _calc_initial_buffer_size,
 )

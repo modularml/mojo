@@ -17,8 +17,8 @@ from os import abort
 
 from testing import assert_equal, assert_true
 
-from utils import InlineString
-from utils.inline_string import _FixedString
+from collections.string import InlineString
+from collections.string.inline_string import _FixedString
 
 
 def main():

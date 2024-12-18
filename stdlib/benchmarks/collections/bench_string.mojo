@@ -22,7 +22,7 @@ from random import random_si64, seed
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 
-from utils._utf8_validation import _is_valid_utf8
+from collections.string._utf8_validation import _is_valid_utf8
 
 
 # ===-----------------------------------------------------------------------===#

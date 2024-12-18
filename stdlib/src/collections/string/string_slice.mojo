@@ -12,27 +12,25 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the StringSlice type.
 
-You can import these APIs from the `utils.string_slice` module.
+You can import these APIs from the `collections.string.string_slice` module.
 
 Examples:
 
 ```mojo
-from utils import StringSlice
+from collections.string import StringSlice
 ```
 """
 
-from collections import List, Optional
-from collections.string import _atof, _atol, _isspace
-from sys import bitwidthof, simdwidthof
-from sys.intrinsics import unlikely, likely
-
 from bit import count_leading_zeros
+from collections import List, Optional
+from collections.string.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from collections.string._utf8_validation import _is_valid_utf8
+from collections.string.string import _atof, _atol, _isspace
 from memory import UnsafePointer, memcmp, memcpy, Span
 from memory.memory import _memcmp_impl_unconstrained
-
-from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-
-from ._utf8_validation import _is_valid_utf8
+from sys import bitwidthof, simdwidthof
+from sys.intrinsics import unlikely, likely
+from utils.stringref import StringRef, _memmem
 
 alias StaticString = StringSlice[StaticConstantOrigin]
 """An immutable static string slice."""
@@ -926,7 +924,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         # is positive, and offset from the end if `start` is negative.
         var haystack_str = self._from_start(start)
 
-        var loc = stringref._memmem(
+        var loc = _memmem(
             haystack_str.unsafe_ptr(),
             haystack_str.byte_length(),
             substr.unsafe_ptr(),

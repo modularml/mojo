@@ -10,10 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements basic object methods for working with strings.
-
-These are Mojo built-ins, so you don't need to import them.
-"""
+"""Implements basic object methods for working with strings."""
 
 from collections import KeyElement, List, Optional
 from collections._index_normalization import normalize_index
@@ -30,20 +27,20 @@ from utils import (
     IndexList,
     StaticString,
     StringRef,
-    StringSlice,
     Variant,
     Writable,
     Writer,
     write_args,
 )
-from utils._unicode import (
+from collections.string._unicode import (
     is_lowercase,
     is_uppercase,
     to_lowercase,
     to_uppercase,
 )
-from utils.format import _CurlyEntryFormattable, _FormatCurlyEntry
-from utils.string_slice import (
+from collections.string.format import _CurlyEntryFormattable, _FormatCurlyEntry
+from collections.string.string_slice import (
+    StringSlice,
     _shift_unicode_to_utf8,
     _StringSliceIter,
     _to_string_list,

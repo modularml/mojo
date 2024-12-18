@@ -14,10 +14,12 @@
 
 from testing import assert_equal, assert_false, assert_true
 
+from collections.string.string_slice import (
+    StringSlice,
+    _count_utf8_continuation_bytes,
+)
+from collections.string._utf8_validation import _is_valid_utf8
 from memory import Span
-from utils import StringSlice
-from utils._utf8_validation import _is_valid_utf8
-from utils.string_slice import _count_utf8_continuation_bytes
 
 
 fn test_string_literal_byte_span() raises:

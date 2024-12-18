@@ -10,10 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+
 from bit import count_leading_zeros
 from memory import UnsafePointer, memcpy
-
-from ._unicode_lookups import *
+from collections.string._unicode_lookups import *
 
 
 fn _uppercase_mapping_index(rune: Int) -> Int:

@@ -13,8 +13,8 @@
 """Implements Formatting utilities."""
 
 from collections import Optional
-
 from memory import UnsafePointer
+from utils import Variant
 
 # TODO: _FormatCurlyEntry and _FormatSpec should be public in the future for
 # people who want to write their own templating engines. This is not yet done
