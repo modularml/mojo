@@ -13,8 +13,8 @@
 """Implements the bit package."""
 
 from .bit import (
-    bit_ceil,
-    bit_floor,
+    next_power_of_two,
+    prev_power_of_two,
     bit_not,
     bit_reverse,
     bit_width,

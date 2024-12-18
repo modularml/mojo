@@ -412,13 +412,14 @@ fn is_power_of_two[
 
 
 # ===-----------------------------------------------------------------------===#
-# bit_ceil
+# next_power_of_two
 # ===-----------------------------------------------------------------------===#
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_ceil
+# reference: https://doc.rust-lang.org/std/primitive.usize.html#method.next_power_of_two
 
 
 @always_inline
-fn bit_ceil(val: Int) -> Int:
+fn next_power_of_two(val: Int) -> Int:
     """Computes the smallest power of 2 that is greater than or equal to the
     input value. Any integral value less than or equal to 1 will be ceiled to 1.
 
@@ -438,7 +439,7 @@ fn bit_ceil(val: Int) -> Int:
 
 
 @always_inline
-fn bit_ceil[
+fn next_power_of_two[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
     """Computes the smallest power of 2 that is greater than or equal to the
@@ -468,13 +469,13 @@ fn bit_ceil[
 
 
 # ===-----------------------------------------------------------------------===#
-# bit_floor
+# prev_power_of_two
 # ===-----------------------------------------------------------------------===#
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_floor
 
 
 @always_inline
-fn bit_floor(val: Int) -> Int:
+fn prev_power_of_two(val: Int) -> Int:
     """Computes the largest power of 2 that is less than or equal to the input
     value. Any integral value less than or equal to 0 will be floored to 0.
 
@@ -491,7 +492,7 @@ fn bit_floor(val: Int) -> Int:
 
 
 @always_inline
-fn bit_floor[
+fn prev_power_of_two[
     type: DType, width: Int, //
 ](val: SIMD[type, width]) -> SIMD[type, width]:
     """Computes the largest power of 2 that is less than or equal to the input

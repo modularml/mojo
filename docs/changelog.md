@@ -62,6 +62,9 @@ what we publish.
         var ptr2 = list2.unsafe_ptr()
     ```
 
+- `bit_ceil` has been renamed to `next_power_of_two`, and `bit_floor` to
+  `prev_power_of_two`. This is to improve readability and clarity in their use.
+
 ### Tooling changes
 
 - mblack (aka `mojo format`) no longer formats non-mojo files. This prevents
