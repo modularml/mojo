@@ -23,10 +23,9 @@ from collections import Dict
 from hashlib._hasher import _HashableWithHasher, _Hasher
 from sys.ffi import c_ssize_t
 from sys.intrinsics import _type_is_eq
-
 from memory import UnsafePointer
 
-from utils import StringRef
+from utils import StringSlice, StringRef
 
 from ._cpython import CPython, PyObjectPtr
 from .python import Python, _get_global_python_itf
@@ -407,7 +406,7 @@ struct PythonObject(
         self = PythonObject(str(value))
 
     @implicit
-    fn __init__(out self, strref: StringRef):
+    fn __init__(out self, strref: StringSlice[mut=False]):
         """Initialize the object from a string reference.
 
         Args:
@@ -748,7 +747,7 @@ struct PythonObject(
         cpython.Py_DecRef(value.py_object)
 
     fn _call_zero_arg_method(
-        self, method_name: StringRef
+        self, method_name: StringSlice[mut=False]
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(0)
@@ -763,7 +762,7 @@ struct PythonObject(
         return PythonObject(result)
 
     fn _call_single_arg_method(
-        self, method_name: StringRef, rhs: PythonObject
+        self, method_name: StringSlice[mut=False], rhs: PythonObject
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
@@ -782,7 +781,9 @@ struct PythonObject(
         return PythonObject(result_obj)
 
     fn _call_single_arg_inplace_method(
-        mut self, method_name: StringRef, rhs: PythonObject
+        mut self,
+        method_name: StringSlice[mut=False],
+        rhs: PythonObject,
     ) raises:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
@@ -1377,7 +1378,11 @@ struct PythonObject(
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
             var key = cpython.PyUnicode_DecodeUTF8(
-                entry[].key.as_string_slice()
+                rebind[
+                    StringSlice[
+                        Origin[False].cast_from[__origin_of(entry[].key)].result
+                    ]
+                ](entry[].key.as_string_slice())
             )
             var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object

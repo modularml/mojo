@@ -19,14 +19,14 @@ from python import Python
 ```
 """
 
-from collections import Dict
+from collections import Dict, Optional
 from os import abort, getenv
 from sys import external_call, sizeof
 from sys.ffi import _Global
 
 from memory import UnsafePointer
 
-from utils import StringRef
+from utils import StringSlice, StaticString
 
 from ._cpython import (
     CPython,
@@ -99,7 +99,7 @@ struct Python:
         """
         self.impl = existing.impl
 
-    fn eval(mut self, code: StringRef) -> Bool:
+    fn eval(mut self, code: StringSlice[mut=False]) -> Bool:
         """Executes the given Python code.
 
         Args:
@@ -114,7 +114,9 @@ struct Python:
 
     @staticmethod
     fn evaluate(
-        expr: StringRef, file: Bool = False, name: StringRef = "__main__"
+        expr: StringSlice[mut=False],
+        file: Bool = False,
+        name: StaticString = "__main__",
     ) raises -> PythonObject:
         """Executes the given Python code.
 
@@ -202,7 +204,9 @@ struct Python:
 
     # TODO(MSTDL-880): Change this to return `TypedPythonObject["Module"]`
     @staticmethod
-    fn import_module(module: StringRef) raises -> PythonObject:
+    fn import_module(
+        module: StringSlice[mut=False],
+    ) raises -> PythonObject:
         """Imports a Python module.
 
         This provides you with a module object you can use just like you would
@@ -366,7 +370,9 @@ struct Python:
         return PythonObject([])
 
     @no_inline
-    fn __str__(mut self, str_obj: PythonObject) -> StringRef:
+    fn __str__(
+        mut self, str_obj: PythonObject
+    ) -> StringSlice[MutableAnyOrigin]:
         """Return a string representing the given Python object.
 
         Args:
