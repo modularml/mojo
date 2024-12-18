@@ -549,8 +549,9 @@ fn _parse_variable_name[
 
 
 fn expandvars[PathLike: os.PathLike, //](path: PathLike) -> String:
-    """Replaces `${var}` or `$var` in the path with values from the current environment variables.
-    Malformed variable names and references to non-existing variables are left unchanged.
+    """Replaces `${var}` or `$var` in the path with values from the current
+    environment variables. Malformed variable names and references to
+    non-existing variables are left unchanged.
 
     Parameters:
         PathLike: The type conforming to the os.PathLike trait.
@@ -562,7 +563,7 @@ fn expandvars[PathLike: os.PathLike, //](path: PathLike) -> String:
         The expanded path.
     """
     var path_str = path.__fspath__()
-    var bytes = path_str.as_bytes().get_immutable()
+    var bytes = path_str.as_bytes().immut()
     var buf = String()
 
     # Byte scanning should be fine, ${} is ASCII.

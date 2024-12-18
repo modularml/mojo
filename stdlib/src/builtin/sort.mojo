@@ -216,8 +216,8 @@ fn _quicksort[
 
     # Work with an immutable span so we don't run into exclusivity problems with
     # the List[Span].
-    var imm_span = span.get_immutable()
-    alias ImmSpan = __type_of(imm_span)
+    var imm_span = span.immut()
+    alias ImmSpan = span.ImmutSelf
 
     var stack = List[ImmSpan](capacity=_estimate_initial_height(size))
     stack.append(imm_span)
@@ -342,9 +342,7 @@ fn _stable_sort_impl[
         while j + merge_size < size:
             var span1 = span[j : j + merge_size]
             var span2 = span[j + merge_size : min(size, j + 2 * merge_size)]
-            _merge[cmp_fn](
-                span1.get_immutable(), span2.get_immutable(), temp_buff
-            )
+            _merge[cmp_fn](span1.immut(), span2, temp_buff)
             for i in range(merge_size + len(span2)):
                 span[j + i] = temp_buff[i]
             j += 2 * merge_size

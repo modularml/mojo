@@ -107,13 +107,29 @@ struct Span[
         origin: The origin of the Span.
     """
 
-    # Field
+    # Aliases
+    alias MutSelf = Span[T, MutableOrigin.cast_from[origin].result]
+    """The mutable version of the Span."""
+    alias ImmutSelf = Span[T, ImmutableOrigin.cast_from[origin].result]
+    """The immutable version of the Span."""
+    # Fields
     var _data: UnsafePointer[T, mut=mut, origin=origin]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
     # Life cycle methods
     # ===------------------------------------------------------------------===#
+
+    @doc_private
+    @implicit
+    @always_inline("nodebug")
+    fn __init__(out self: Self.ImmutSelf, other: Self.MutSelf):
+        """Implicitly cast the mutable origin of self to an immutable one.
+
+        Args:
+            other: The Span to cast.
+        """
+        self = rebind[Self.ImmutSelf](other)
 
     @always_inline
     fn __init__(out self, *, ptr: UnsafePointer[T], length: Int):
@@ -394,15 +410,11 @@ struct Span[
         for element in self:
             element[] = value
 
-    fn get_immutable(
-        self,
-    ) -> Span[T, ImmutableOrigin.cast_from[origin].result]:
-        """
-        Return an immutable version of this span.
+    @always_inline
+    fn immut(self) -> Self.ImmutSelf:
+        """Return an immutable version of this Span.
 
         Returns:
-            A span covering the same elements, but without mutability.
+            An immutable version of the same Span.
         """
-        return Span[T, ImmutableOrigin.cast_from[origin].result](
-            ptr=self._data, length=self._len
-        )
+        return rebind[Self.ImmutSelf](self)
