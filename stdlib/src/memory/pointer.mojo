@@ -342,6 +342,18 @@ struct Pointer[
         """
         self._value = _mlir_value
 
+    # FIXME(#3617)
+    # @always_inline("nodebug")
+    # fn __init__(
+    #     inout self, *, ref [origin, address_space._value.value]to: type
+    # ):
+    #     """Create a pointer with the input value.
+
+    #     Args:
+    #         to: The value to construct a pointer to.
+    #     """
+    #     self = Self(_mlir_value=__get_mvalue_as_litref(to))
+
     @staticmethod
     @always_inline("nodebug")
     fn address_of(ref [origin, address_space]value: type) -> Self:
