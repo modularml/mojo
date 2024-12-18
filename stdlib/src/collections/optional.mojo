@@ -130,7 +130,7 @@ struct Optional[T: CollectionElement](
         Args:
             other: The Optional to copy.
         """
-        self.__copyinit__(other)
+        self = other
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
