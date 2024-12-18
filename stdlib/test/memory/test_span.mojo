@@ -208,6 +208,46 @@ def test_reversed():
         i += 1
 
 
+def test_apply():
+    fn _twice[D: DType, w: Int](x: SIMD[D, w]) -> SIMD[D, w]:
+        return x * 2
+
+    fn _where[D: DType, w: Int](x: SIMD[D, w]) -> SIMD[DType.bool, w]:
+        return x % 2 == 0
+
+    def _test[D: DType]():
+        items = List[Scalar[D]](
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+        )
+        twice = items
+        span = Span(twice)
+        span.apply[func = _twice[D]]()
+        for i in range(len(items)):
+            assert_true(span[i] == items[i] * 2)
+
+        # twice only even numbers
+        twice = items
+        span = Span(twice)
+        span.apply[func = _twice[D], where = _where[D]]()
+        for i in range(len(items)):
+            if items[i] % 2 == 0:
+                assert_true(span[i] == items[i] * 2)
+            else:
+                assert_true(span[i] == items[i])
+
+    _test[DType.uint8]()
+    _test[DType.uint16]()
+    _test[DType.uint32]()
+    _test[DType.uint64]()
+    _test[DType.int8]()
+    _test[DType.int16]()
+    _test[DType.int32]()
+    _test[DType.int64]()
+    _test[DType.float16]()
+    _test[DType.float32]()
+    _test[DType.float64]()
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -221,3 +261,4 @@ def main():
     test_fill()
     test_ref()
     test_reversed()
+    test_apply()
