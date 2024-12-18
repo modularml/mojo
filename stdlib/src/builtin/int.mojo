@@ -15,7 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import KeyElement
+from collections import InlineArray, KeyElement
+
 from collections.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -26,7 +27,7 @@ from math import Ceilable, CeilDivable, Floorable, Truncable
 from sys import bitwidthof
 
 from builtin.io import _snprintf
-from memory import UnsafePointer
+from memory import Span, UnsafePointer
 from python import Python, PythonObject
 from python._cpython import Py_ssize_t
 
@@ -1211,6 +1212,37 @@ struct Int(
                 writer.write(" ")
 
         writer.write(self)
+
+    @staticmethod
+    fn from_bytes[
+        D: DType, big_endian: Bool = False
+    ](bytes: InlineArray[Byte, D.sizeof()]) raises -> Self:
+        """Converts a byte array to an integer.
+
+        Args:
+            bytes: The byte array to convert.
+
+        Parameters:
+            D: The type of the integer.
+            big_endian: Whether the byte array is big-endian.
+
+        Returns:
+            The integer value.
+        """
+        return int(Scalar[D].from_bytes[big_endian](bytes))
+
+    fn as_bytes[D: DType, big_endian: Bool = False](self) -> InlineArray[Byte, D.sizeof()]:
+        """Convert the integer to a byte array.
+
+        Parameters:
+            D: The type of the integer.
+            big_endian: Whether the byte array should be big-endian.
+
+        Returns:
+            The byte array.
+        """
+        var value = Scalar[D](self)
+        return value.as_bytes[big_endian]()
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

@@ -1818,6 +1818,50 @@ def test_float_conversion():
     assert_almost_equal(float(UInt64(36)), 36.0)
 
 
+def test_from_bytes_as_bytes():
+    alias TwoBytes = InlineArray[Byte, DType.int16.sizeof()]
+    alias TwoUBytes = InlineArray[Byte, DType.uint16.sizeof()]
+    alias FourBytes = InlineArray[Byte, DType.int32.sizeof()]
+
+    assert_equal(Int16.from_bytes[big_endian=True](TwoBytes(0, 16)), 16)
+    assert_equal(Int16.from_bytes[big_endian=False](TwoBytes(0, 16)), 4096)
+    assert_equal(Int16.from_bytes[big_endian=True](TwoBytes(252, 0)), -1024)
+    assert_equal(UInt16.from_bytes[big_endian=True](TwoUBytes(252, 0)), 64512)
+    assert_equal(Int16.from_bytes[big_endian=False](TwoBytes(252, 0)), 252)
+    assert_equal(Int32.from_bytes[big_endian=True](FourBytes(0, 0, 0, 1)), 1)
+    assert_equal(
+        Int32.from_bytes[big_endian=False](FourBytes(0, 0, 0, 1)),
+        16777216,
+    )
+    assert_equal(
+        Int32.from_bytes[big_endian=True](FourBytes(1, 0, 0, 0)),
+        16777216,
+    )
+    assert_equal(
+        Int32.from_bytes[big_endian=True](FourBytes(1, 0, 0, 1)),
+        16777217,
+    )
+    assert_equal(
+        Int32.from_bytes[big_endian=False](FourBytes(1, 0, 0, 1)),
+        16777217,
+    )
+    assert_equal(
+        Int32.from_bytes[big_endian=True](FourBytes(255, 0, 0, 0)),
+        -16777216,
+    )
+    for x_ref in List[Int16](10, 100, -12, 0, 1, -1, 1000, -1000):
+        x = x_ref[]
+
+        @parameter
+        for b in range(2):
+            assert_equal(
+                Int16.from_bytes[big_endian=b](
+                    Int16(x).as_bytes[big_endian=b]()
+                ),
+                x,
+            )
+
+
 def test_reversed():
     fn test[D: DType]() raises:
         assert_equal(SIMD[D, 4](1, 2, 3, 4).reversed(), SIMD[D, 4](4, 3, 2, 1))
@@ -1847,6 +1891,7 @@ def main():
     test_extract()
     test_floor()
     test_floordiv()
+    test_from_bytes_as_bytes()
     test_iadd()
     test_indexing()
     test_insert()

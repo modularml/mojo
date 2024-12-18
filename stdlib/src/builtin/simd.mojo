@@ -33,6 +33,7 @@ from sys import (
     bitwidthof,
     has_neon,
     is_amd_gpu,
+    is_big_endian,
     is_gpu,
     is_nvidia_gpu,
     is_x86,
@@ -44,13 +45,13 @@ from sys import (
 from sys._assembly import inlined_assembly
 from sys.info import _current_arch, _is_sm_8x, _is_sm_9x
 
-from bit import pop_count
+from bit import pop_count, byte_swap
 from builtin._format_float import _write_float
 from builtin.dtype import _uint_type_of_width
 from builtin.format_int import _try_write_int
 from builtin.io import _snprintf
 from documentation import doc_private
-from memory import UnsafePointer, bitcast, Span
+from memory import UnsafePointer, bitcast, memcpy, Span
 
 from utils import IndexList, StaticTuple
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -266,6 +267,7 @@ struct SIMD[type: DType, size: Int](
     alias _Mask = SIMD[DType.bool, size]
 
     alias element_type = type
+    alias type_len = type.sizeof()
     var value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
     """The underlying storage for the vector."""
 
@@ -1878,6 +1880,60 @@ struct SIMD[type: DType, size: Int](
         ]()
 
         return bitcast[_integral_type_of[type](), size](self).cast[int_dtype]()
+
+    @staticmethod
+    fn from_bytes[
+        big_endian: Bool = False
+    ](bytes: InlineArray[Byte, Self.type_len]) raises -> Scalar[type]:
+        """Converts a byte array to an integer.
+
+        Args:
+            bytes: The byte array to convert.
+
+        Parameters:
+            big_endian: Whether the byte array is big-endian.
+
+        Returns:
+            The integer value.
+        """
+        var ptr: UnsafePointer[Scalar[type]] = bytes.unsafe_ptr().bitcast[
+            Scalar[type]
+        ]()
+        var value = ptr[]
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+        return value
+
+    fn as_bytes[
+        big_endian: Bool = False
+    ](self) -> InlineArray[Byte, Self.type_len]:
+        """Convert the integer to a byte array.
+
+        Parameters:
+            big_endian: Whether the byte array should be big-endian.
+
+        Returns:
+            The byte array.
+        """
+        var value = self
+
+        @parameter
+        if is_big_endian() and not big_endian:
+            value = byte_swap(value)
+        elif not is_big_endian() and big_endian:
+            value = byte_swap(value)
+
+        var ptr = UnsafePointer.address_of(value)
+        var array = InlineArray[Byte, Self.type_len](fill=0)
+
+        # TODO: Maybe this can be a List.extend(ptr, count) method
+        memcpy(array.unsafe_ptr(), ptr.bitcast[Byte](), Self.type_len)
+
+        return array^
 
     fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[
