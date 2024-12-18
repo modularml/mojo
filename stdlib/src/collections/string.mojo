@@ -473,7 +473,7 @@ fn _atof_error(str_ref: StringSlice) -> Error:
 
 
 fn _atof(str_ref: StringSlice) raises -> Float64:
-    """Implementation of `atof` for StringRef inputs.
+    """Implementation of `atof` for StringSlice inputs.
 
     Please see its docstring for details.
     """
@@ -505,10 +505,11 @@ fn _atof(str_ref: StringSlice) raises -> Float64:
     elif buff[start] == ord_minus:
         start += 1
         sign = -1
+    alias S = StringSlice[__type_of(str_ref).origin]
     if (str_len - start) >= 3:
-        if StringRef(buff + start, 3) == "nan":
+        if S(ptr=buff + start, length=3) == "nan":
             return FloatLiteral.nan
-        if StringRef(buff + start, 3) == "inf":
+        elif S(ptr=buff + start, length=3) == "inf":
             return FloatLiteral.infinity * sign
     # read before dot
     for pos in range(start, str_len):
@@ -1109,7 +1110,9 @@ struct String(
         start, end, step = span.indices(self.byte_length())
         var r = range(start, end, step)
         if step == 1:
-            return StringRef(self._buffer.data + start, len(r))
+            return StringSlice[__origin_of(self)](
+                ptr=self._buffer.data + start, length=len(r)
+            )
 
         var buffer = Self._buffer_type()
         var result_len = len(r)
