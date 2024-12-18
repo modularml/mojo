@@ -762,12 +762,9 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
         return self._slice
 
     @always_inline
-    fn unsafe_ptr[
-        is_mutable: Bool = Self.is_mutable,
-        origin: Origin[is_mutable] = Origin[is_mutable]
-        .cast_from[origin]
-        .result,
-    ](self,) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
+    fn unsafe_ptr(
+        self,
+    ) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
         """Gets a pointer to the first element of this string slice.
 
         Returns:
@@ -1107,49 +1104,73 @@ struct StringSlice[is_mutable: Bool, //, origin: Origin[is_mutable]](
 # ===-----------------------------------------------------------------------===#
 
 
-trait Stringlike(CollectionElement, CollectionElementNew):
+trait StringLike(CollectionElement, CollectionElementNew):
     """Trait intended to be used as a generic entrypoint for all String-like
     types."""
+    ...
 
-    alias is_mutable: Bool
-    """The mutability of the origin."""
-    alias origin: Origin[is_mutable]
-    """The origin of the data."""
-
-    fn byte_length(self) -> Int:
-        """Get the string length in bytes.
+trait StringOwnerLike(StringLike):
+    fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
-            The length of this string in bytes.
+            A contiguous slice pointing to the bytes owned by this string.
 
         Notes:
-            This does not include the trailing null terminator in the count.
+            This does not include the trailing null terminator.
         """
         ...
 
-    fn unsafe_ptr(
-        self,
-    ) -> UnsafePointer[Byte, is_mutable=is_mutable, origin=origin]:
-        """Get raw pointer to the underlying data.
+    fn as_string_slice(ref self) -> StringSlice[__origin_of(self)]:
+        """Returns a string slice of the data owned by this string.
 
         Returns:
-            The raw pointer to the data.
+            A string slice pointing to the data owned by this string.
         """
         ...
 
-    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
-        """Finds the offset of the first occurrence of `substr` starting at
-        `start`. If not found, returns -1.
+trait StringSliceLike(StringLike):
+    alias mut: Bool
+    """The mutability of the origin."""
+    alias origin: Origin[mut]
+    """The origin of the data."""
 
-        Parameters:
-            T: The type of the substring.
-
-        Args:
-            substr: The substring to find.
-            start: The offset from which to find.
+    fn as_bytes(self) -> Span[Byte, origin]:
+        """Returns a contiguous slice of the bytes.
 
         Returns:
-            The offset of `substr` relative to the beginning of the string.
+            A contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+    fn as_string_slice(self) -> StringSlice[origin]:
+        """Returns a string slice of the data.
+
+        Returns:
+            A string slice pointing to the data.
+        """
+        ...
+
+trait StringLiteralLike(StringLike):
+    fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
+        """Returns a contiguous slice of the bytes.
+
+        Returns:
+            A contiguous slice pointing to the bytes.
+
+        Notes:
+            This does not include the trailing null terminator.
+        """
+        ...
+
+    fn as_string_slice(self) -> StringSlice[StaticConstantOrigin]:
+        """Returns a string slice of the data.
+
+        Returns:
+            A string slice pointing to the data.
         """
         ...
 

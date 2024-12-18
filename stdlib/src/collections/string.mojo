@@ -759,12 +759,8 @@ struct String(
 ):
     """Represents a mutable string."""
 
-    alias is_mutable = Origin(__origin_of(Self())).is_mutable
-    """The mutability of the origin."""
-    alias origin = __origin_of(Self())
-    """The origin of the data."""
-    alias _buffer_type = List[UInt8, hint_trivial_type=True]
     # Fields
+    alias _buffer_type = List[UInt8, hint_trivial_type=True]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -1600,10 +1596,10 @@ struct String(
         return String(buf^)
 
     fn unsafe_ptr(
-        self,
-    ) -> UnsafePointer[
-        Byte, is_mutable = Self.is_mutable, origin = Self.origin
-    ]:
+        ref self    ) -> UnsafePointer[
+        Byte,
+        is_mutable = Origin(__origin_of(self)).is_mutable,
+        origin = __origin_of(self)    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
@@ -1715,12 +1711,9 @@ struct String(
         """
         return substr.as_string_slice() in self.as_string_slice()
 
-    fn find[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
-
-        Parameters:
-            T: The Stringlike type.
 
         Args:
           substr: The substring to find.
@@ -1731,12 +1724,9 @@ struct String(
         """
         return self.as_string_slice().find(substr, start)
 
-    fn rfind[T: Stringlike, //](self, substr: T, start: Int = 0) -> Int:
+    fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
-
-        Parameters:
-            T: The Stringlike type.
 
         Args:
           substr: The substring to find.
