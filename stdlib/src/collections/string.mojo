@@ -132,14 +132,10 @@ fn chr(c: Int) -> String:
 
     Examples:
     ```mojo
-    print(chr(97)) # "a"
-    print(chr(8364)) # "€"
+    print(chr(97), chr(8364)) # "a €"
     ```
     .
     """
-
-    if c < 0b1000_0000:  # 1 byte ASCII char
-        return String(String._buffer_type(c, 0))
 
     var num_bytes = _unicode_codepoint_utf8_byte_length(c)
     var p = UnsafePointer[UInt8].alloc(num_bytes + 1)
