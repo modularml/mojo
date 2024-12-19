@@ -480,11 +480,12 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     fn _realloc(mut self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
-        _move_pointee_into_many_elements[hint_trivial_type](
-            dest=new_data,
-            src=self.data,
-            size=self.size,
-        )
+        @parameter
+        if hint_trivial_type:
+            memcpy(new_data, self.data, len(self))
+        else:
+            for i in range(len(self)):
+                (self.data + i).move_pointee_into(new_data + i)
 
         if self.data:
             self.data.free()
@@ -722,22 +723,23 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
         Raises:
             ValueError: If the value is not found in the list.
         """
-        var start_normalized = start
 
+        var s_len = len(self)
+        var start_normalized = start
         var stop_normalized: Int
         if stop is None:
             # Default end
-            stop_normalized = len(self)
+            stop_normalized = s_len
         else:
             stop_normalized = stop.value()
 
         if start_normalized < 0:
-            start_normalized += len(self)
+            start_normalized += s_len
         if stop_normalized < 0:
-            stop_normalized += len(self)
+            stop_normalized += s_len
 
-        start_normalized = _clip(start_normalized, 0, len(self))
-        stop_normalized = _clip(stop_normalized, 0, len(self))
+        start_normalized = max(0, min(start_normalized, s_len))
+        stop_normalized = max(0, min(stop_normalized, s_len))
 
         for i in range(start_normalized, stop_normalized):
             if self[i] == value:
@@ -936,22 +938,3 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
             The pointer to the underlying memory.
         """
         return self.data
-
-
-fn _clip(value: Int, start: Int, end: Int) -> Int:
-    return max(start, min(value, end))
-
-
-fn _move_pointee_into_many_elements[
-    T: CollectionElement, //, hint_trivial_type: Bool
-](dest: UnsafePointer[T], src: UnsafePointer[T], size: Int):
-    @parameter
-    if hint_trivial_type:
-        memcpy(
-            dest=dest.bitcast[Int8](),
-            src=src.bitcast[Int8](),
-            count=size * sizeof[T](),
-        )
-    else:
-        for i in range(size):
-            (src + i).move_pointee_into(dest + i)
