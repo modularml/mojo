@@ -488,6 +488,88 @@ def test_splitlines():
         _assert_equal(s.splitlines(keepends=True), items)
 
 
+def test_split():
+    alias L = List[StringSlice[StaticConstantOrigin]]
+    # Should add all whitespace-like chars as one
+    # test all unicode separators
+    # 0 is to build a String with null terminator
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as StringLiteral once unicode
+    # escape secuences are accepted
+    univ_sep_var = (
+        " "
+        + "\t"
+        + "\n"
+        + "\r"
+        + "\v"
+        + "\f"
+        + "\x1c"
+        + "\x1d"
+        + "\x1e"
+        + String(next_line)
+        + String(unicode_line_sep)
+        + String(unicode_paragraph_sep)
+    )
+    s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
+    assert_equal(s.split(), L("hello", "world"))
+
+    # should split into empty strings between separators
+    assert_equal("1,,,3".split(","), L("1", "", "", "3"))
+    assert_equal(",,,".split(","), L("", "", "", ""))
+    assert_equal(" a b ".split(" "), L("", "a", "b", ""))
+    assert_equal("abababaaba".split("aba"), L("", "b", "", ""))
+    assert_true(len("".split()) == 0)
+    assert_true(len(" ".split()) == 0)
+    assert_true(len("".split(" ")) == 1)
+    assert_true(len(",".split(",")) == 2)
+    assert_true(len(" ".split(" ")) == 2)
+    assert_true(len("".split("")) == 2)
+    assert_true(len("  ".split(" ")) == 3)
+    assert_true(len("   ".split(" ")) == 4)
+
+    # should split into maxsplit + 1 items
+    assert_equal("1,2,3".split(",", 0), L("1,2,3"))
+    assert_equal("1,2,3".split(",", 1), L("1", "2,3"))
+
+    # Split in middle
+    assert_equal("faang".split("n"), L("faa", "g"))
+
+    # No match from the delimiter
+    assert_equal("hello world".split("x"), L("hello world"))
+
+    # Multiple character delimiter
+    assert_equal("hello".split("ll"), L("he", "o"))
+
+    res = L("", "bb", "", "", "", "bbb", "")
+    assert_equal("abbaaaabbba".split("a"), res)
+    assert_equal("abbaaaabbba".split("a", 8), res)
+    s1 = st("abbaaaabbba").split("a", 5)
+    assert_equal(s1, L("", "bb", "", "", "", "bbba"))
+    assert_equal("aaa".split("a", 0), L("aaa"))
+    assert_equal("a".split("a"), L("", ""))
+    assert_equal("1,2,3".split("3", 0), L("1,2,3"))
+    assert_equal("1,2,3".split("3", 1), L("1,2,", ""))
+    assert_equal("1,2,3,3".split("3", 2), L("1,2,", ",", ""))
+    assert_equal("1,2,3,3,3".split("3", 2), L("1,2,", ",", ",3"))
+
+    assert_equal("Hello 🔥!".split(), L("Hello", "🔥!"))
+
+    s2 = "Лорем ипсум долор сит амет".split(" ")
+    assert_equal(s2, L("Лорем", "ипсум", "долор", "сит", "амет"))
+    s3 = "Лорем ипсум долор сит амет".split("м")
+    assert_equal(s3, L("Лоре", " ипсу", " долор сит а", "ет"))
+
+    assert_equal("123".split(""), L("", "1", "2", "3", ""))
+    assert_equal("".join("123".split("")), "123")
+    assert_equal(",1,2,3,".split(","), "123".split(""))
+    assert_equal(",".join("123".split("")), ",1,2,3,")
+
+
 def test_rstrip():
     # with default rstrip chars
     var empty_string = "".as_string_slice()
@@ -642,6 +724,7 @@ def main():
     test_combination_10_good_10_bad_utf8_sequences()
     test_count_utf8_continuation_bytes()
     test_splitlines()
+    test_split()
     test_rstrip()
     test_lstrip()
     test_strip()
