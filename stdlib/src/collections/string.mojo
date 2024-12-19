@@ -396,7 +396,7 @@ fn _str_to_base_error(base: Int, str_slice: StringSlice) -> String:
     )
 
 
-fn _identify_base(str_slice: StringSlice[_], start: Int) -> Tuple[Int, Int]:
+fn _identify_base(str_slice: StringSlice, start: Int) -> Tuple[Int, Int]:
     var length = str_slice.byte_length()
     # just 1 digit, assume base 10
     if start == (length - 1):
@@ -468,11 +468,11 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     return _atol(str.as_string_slice(), base)
 
 
-fn _atof_error(str_ref: StringSlice[_]) -> Error:
+fn _atof_error(str_ref: StringSlice) -> Error:
     return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
-fn _atof(str_ref: StringSlice[_]) raises -> Float64:
+fn _atof(str_ref: StringSlice) raises -> Float64:
     """Implementation of `atof` for StringRef inputs.
 
     Please see its docstring for details.
@@ -1594,13 +1594,19 @@ struct String(
         buf.append(0)
         return String(buf^)
 
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(
+        ref self,
+    ) -> UnsafePointer[
+        Byte,
+        mut = Origin(__origin_of(self)).is_mutable,
+        origin = __origin_of(self),
+    ]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data
+        return self._buffer.unsafe_ptr()
 
     fn unsafe_cstr_ptr(self) -> UnsafePointer[c_char]:
         """Retrieves a C-string-compatible pointer to the underlying memory.
@@ -1962,7 +1968,8 @@ struct String(
 
     fn strip(self) -> StringSlice[__origin_of(self)]:
         """Return a copy of the string with leading and trailing whitespaces
-        removed.
+        removed. This only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading or trailing whitespaces.
@@ -1982,7 +1989,9 @@ struct String(
         return self.as_string_slice().rstrip(chars)
 
     fn rstrip(self) -> StringSlice[__origin_of(self)]:
-        """Return a copy of the string with trailing whitespaces removed.
+        """Return a copy of the string with trailing whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no trailing whitespaces.
@@ -2002,7 +2011,9 @@ struct String(
         return self.as_string_slice().lstrip(chars)
 
     fn lstrip(self) -> StringSlice[__origin_of(self)]:
-        """Return a copy of the string with leading whitespaces removed.
+        """Return a copy of the string with leading whitespaces removed. This
+        only takes ASCII whitespace into account:
+        `" \\t\\n\\v\\f\\r\\x1c\\x1d\\x1e"`.
 
         Returns:
             A copy of the string with no leading whitespaces.
