@@ -415,13 +415,13 @@ fn _hex_digits_to_hex_chars(ptr: UnsafePointer[Byte], decimal: Scalar):
     alias S = StringSlice[__origin_of(items)]
     ptr = items.unsafe_ptr()
     _hex_digits_to_hex_chars(ptr, UInt32(ord("🔥")))
-    assert_equal("0001f525", S(ptr=ptr, length=10))
+    assert_equal("0001f525", S(ptr=ptr, length=8))
     memset_zero(ptr, len(items))
     _hex_digits_to_hex_chars(ptr, UInt16(ord("你")))
-    assert_equal("4f60", S(ptr=ptr, length=6))
+    assert_equal("4f60", S(ptr=ptr, length=4))
     memset_zero(ptr, len(items))
     _hex_digits_to_hex_chars(ptr, UInt8(ord("Ö")))
-    assert_equal("xd6", S(ptr=ptr, length=4))
+    assert_equal("xd6", S(ptr=ptr, length=2))
     ```
     .
     """
