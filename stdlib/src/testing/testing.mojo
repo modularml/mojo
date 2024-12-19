@@ -34,6 +34,7 @@ from collections import Optional
 from math import isclose
 
 from builtin._location import __call_location, _SourceLocation
+from utils import StringSlice
 
 # ===----------------------------------------------------------------------=== #
 # Assertions
@@ -234,6 +235,28 @@ fn assert_equal[
             msg=msg,
             loc=location.or_else(__call_location()),
         )
+
+
+fn assert_equal[
+    O1: ImmutableOrigin, O2: ImmutableOrigin
+](lhs: List[StringSlice[O1]], rhs: List[StringSlice[O2]]) raises:
+    """Asserts that two lists are equal.
+
+    Parameters:
+        O1: The origin of lhs.
+        O2: The origin of rhs.
+
+    Args:
+        lhs: The left-hand side list.
+        rhs: The right-hand side list.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+
+    assert_equal(len(lhs), len(rhs))
+    for i in range(len(lhs)):
+        assert_equal(lhs[i], rhs[i])
 
 
 @always_inline
