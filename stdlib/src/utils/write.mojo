@@ -421,7 +421,7 @@ fn _hex_digits_to_hex_chars(ptr: UnsafePointer[Byte], decimal: Scalar):
     assert_equal("4f60", S(ptr=ptr, length=4))
     memset_zero(ptr, len(items))
     _hex_digits_to_hex_chars(ptr, UInt8(ord("Ö")))
-    assert_equal("xd6", S(ptr=ptr, length=2))
+    assert_equal("d6", S(ptr=ptr, length=2))
     ```
     .
     """
