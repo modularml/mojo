@@ -343,7 +343,7 @@ fn join(path: String, *paths: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
+fn split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     """
     Split a given pathname into two components: head and tail. This is useful
     for separating the directory path from the filename. If the input path ends
@@ -361,8 +361,8 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     Returns:
         A tuple containing two strings: (head, tail).
     """
-    fspath = path.__fspath__()
-    i = fspath.rfind(os.sep) + 1
+    var fspath = path.__fspath__()
+    var i = fspath.rfind(os.sep) + 1
     head, tail = fspath[:i], fspath[i:]
     if head and head != str(os.sep) * len(head):
         head = str(head.rstrip(sep))

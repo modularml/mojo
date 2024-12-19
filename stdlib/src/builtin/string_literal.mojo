@@ -604,7 +604,7 @@ struct StringLiteral(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).find(substr, start=start)
+        return self.as_string_slice().find(substr.as_string_slice(), start)
 
     fn rfind(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -617,7 +617,7 @@ struct StringLiteral(
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        return StringRef(self).rfind(substr, start=start)
+        return self.as_string_slice().rfind(substr.as_string_slice(), start)
 
     fn replace(self, old: StringLiteral, new: StringLiteral) -> StringLiteral:
         """Return a copy of the string with all occurrences of substring `old`

@@ -15,27 +15,18 @@
 
 from collections.string import _atol, _isspace
 from hashlib._hasher import _HashableWithHasher, _Hasher
-from sys import simdwidthof
-from sys.ffi import c_char
-
-from bit import count_trailing_zeros
-from builtin.dtype import _uint_type_of_width
-from memory import UnsafePointer, memcmp, pack_bits, Span
+from memory import UnsafePointer, Span
 from memory.memory import _memcmp_impl_unconstrained
 
 from utils import StringSlice
+from sys.ffi import c_char
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
-fn _align_down(value: Int, alignment: Int) -> Int:
-    return value._positive_div(alignment) * alignment
-
-
-# ===-----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------===#
 # StringRef
 # ===-----------------------------------------------------------------------===#
 
@@ -262,7 +253,9 @@ struct StringRef(
         Returns:
           True if the string contains the substring.
         """
-        return self.find(substr) != -1
+        alias S = StringSlice[StaticConstantOrigin]
+        var s_slice = S(unsafe_from_utf8_strref=self)
+        return s_slice.find(S(unsafe_from_utf8_strref=substr)) != -1
 
     @always_inline
     fn __ne__(self, rhs: StringRef) -> Bool:
@@ -479,7 +472,10 @@ struct StringRef(
         var offset = 0
 
         while True:
-            var pos = self.find(substr, offset)
+            alias S = StringSlice[StaticConstantOrigin]
+            var pos = S(unsafe_from_utf8_strref=self).find(
+                S(unsafe_from_utf8_strref=substr), offset
+            )
             if pos == -1:
                 break
             res += 1
@@ -487,74 +483,6 @@ struct StringRef(
             offset = pos + len(substr)
 
         return res
-
-    # TODO: remove this method later on when nothing depends on it anymore.
-    # It has already been copied to `StringSlice`.
-    fn find(self, substr: StringRef, start: Int = 0) -> Int:
-        """Finds the offset of the first occurrence of `substr` starting at
-        `start`. If not found, returns -1.
-
-        Args:
-          substr: The substring to find.
-          start: The offset from which to find.
-
-        Returns:
-          The offset of `substr` relative to the beginning of the string.
-        """
-        if not substr:
-            return 0
-
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = _memmem(
-            haystack_str.unsafe_ptr(),
-            len(haystack_str),
-            substr.unsafe_ptr(),
-            len(substr),
-        )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
-
-    fn rfind(self, substr: StringRef, start: Int = 0) -> Int:
-        """Finds the offset of the last occurrence of `substr` starting at
-        `start`. If not found, returns -1.
-
-        Args:
-          substr: The substring to find.
-          start: The offset from which to find.
-
-        Returns:
-          The offset of `substr` relative to the beginning of the string.
-        """
-        if not substr:
-            return len(self)
-
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = _memrmem(
-            haystack_str.unsafe_ptr(),
-            len(haystack_str),
-            substr.unsafe_ptr(),
-            len(substr),
-        )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
 
     fn _from_start(self, start: Int) -> StringRef:
         """Gets the StringRef pointing to the substring after the specified slice start position.
@@ -634,8 +562,11 @@ struct StringRef(
         var ptr = self.unsafe_ptr()
 
         var current_offset = 0
+        alias S = StringSlice[StaticConstantOrigin]
+        var self_slice = S(unsafe_from_utf8_strref=self)
+        var delim_slice = S(unsafe_from_utf8_strref=delimiter)
         while True:
-            var loc = self.find(delimiter, current_offset)
+            var loc = self_slice.find(delim_slice, current_offset)
             # delimiter not found, so add the search slice from where we're currently at
             if loc == -1:
                 output.append(
@@ -649,123 +580,3 @@ struct StringRef(
             # Advance our search offset past the delimiter
             current_offset = loc + len(delimiter)
         return output
-
-
-# ===-----------------------------------------------------------------------===#
-# Utilities
-# ===-----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _memchr[
-    type: DType
-](
-    source: UnsafePointer[Scalar[type]], char: Scalar[type], len: Int
-) -> UnsafePointer[Scalar[type]]:
-    if not len:
-        return UnsafePointer[Scalar[type]]()
-    alias bool_mask_width = simdwidthof[DType.bool]()
-    var first_needle = SIMD[type, bool_mask_width](char)
-    var vectorized_end = _align_down(len, bool_mask_width)
-
-    for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = source.load[width=bool_mask_width](i) == first_needle
-        var mask = pack_bits(bool_mask)
-        if mask:
-            return source + int(i + count_trailing_zeros(mask))
-
-    for i in range(vectorized_end, len):
-        if source[i] == char:
-            return source + i
-    return UnsafePointer[Scalar[type]]()
-
-
-@always_inline
-fn _memmem[
-    type: DType
-](
-    haystack: UnsafePointer[Scalar[type]],
-    haystack_len: Int,
-    needle: UnsafePointer[Scalar[type]],
-    needle_len: Int,
-) -> UnsafePointer[Scalar[type]]:
-    if not needle_len:
-        return haystack
-    if needle_len > haystack_len:
-        return UnsafePointer[Scalar[type]]()
-    if needle_len == 1:
-        return _memchr[type](haystack, needle[0], haystack_len)
-
-    alias bool_mask_width = simdwidthof[DType.bool]()
-    var vectorized_end = _align_down(
-        haystack_len - needle_len + 1, bool_mask_width
-    )
-
-    var first_needle = SIMD[type, bool_mask_width](needle[0])
-    var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
-
-    for i in range(0, vectorized_end, bool_mask_width):
-        var first_block = haystack.load[width=bool_mask_width](i)
-        var last_block = haystack.load[width=bool_mask_width](
-            i + needle_len - 1
-        )
-
-        var eq_first = first_needle == first_block
-        var eq_last = last_needle == last_block
-
-        var bool_mask = eq_first & eq_last
-        var mask = pack_bits(bool_mask)
-
-        while mask:
-            var offset = int(i + count_trailing_zeros(mask))
-            if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
-                return haystack + offset
-            mask = mask & (mask - 1)
-
-    # remaining partial block compare using byte-by-byte
-    #
-    for i in range(vectorized_end, haystack_len - needle_len + 1):
-        if haystack[i] != needle[0]:
-            continue
-
-        if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
-            return haystack + i
-
-    return UnsafePointer[Scalar[type]]()
-
-
-@always_inline
-fn _memrchr[
-    type: DType
-](
-    source: UnsafePointer[Scalar[type]], char: Scalar[type], len: Int
-) -> UnsafePointer[Scalar[type]]:
-    if not len:
-        return UnsafePointer[Scalar[type]]()
-    for i in reversed(range(len)):
-        if source[i] == char:
-            return source + i
-    return UnsafePointer[Scalar[type]]()
-
-
-@always_inline
-fn _memrmem[
-    type: DType
-](
-    haystack: UnsafePointer[Scalar[type]],
-    haystack_len: Int,
-    needle: UnsafePointer[Scalar[type]],
-    needle_len: Int,
-) -> UnsafePointer[Scalar[type]]:
-    if not needle_len:
-        return haystack
-    if needle_len > haystack_len:
-        return UnsafePointer[Scalar[type]]()
-    if needle_len == 1:
-        return _memrchr[type](haystack, needle[0], haystack_len)
-    for i in reversed(range(haystack_len - needle_len + 1)):
-        if haystack[i] != needle[0]:
-            continue
-        if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
-            return haystack + i
-    return UnsafePointer[Scalar[type]]()

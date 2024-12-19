@@ -129,43 +129,6 @@ fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     return count_leading_zeros(~(b & UInt8(0b1111_0000)))
 
 
-@always_inline
-fn _memrchr[
-    type: DType
-](
-    source: UnsafePointer[Scalar[type]], char: Scalar[type], len: Int
-) -> UnsafePointer[Scalar[type]]:
-    if not len:
-        return UnsafePointer[Scalar[type]]()
-    for i in reversed(range(len)):
-        if source[i] == char:
-            return source + i
-    return UnsafePointer[Scalar[type]]()
-
-
-@always_inline
-fn _memrmem[
-    type: DType
-](
-    haystack: UnsafePointer[Scalar[type]],
-    haystack_len: Int,
-    needle: UnsafePointer[Scalar[type]],
-    needle_len: Int,
-) -> UnsafePointer[Scalar[type]]:
-    if not needle_len:
-        return haystack
-    if needle_len > haystack_len:
-        return UnsafePointer[Scalar[type]]()
-    if needle_len == 1:
-        return _memrchr[type](haystack, needle[0], haystack_len)
-    for i in reversed(range(haystack_len - needle_len + 1)):
-        if haystack[i] != needle[0]:
-            continue
-        if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
-            return haystack + i
-    return UnsafePointer[Scalar[type]]()
-
-
 @value
 struct _StringSliceIter[
     mut: Bool, //,
@@ -916,27 +879,12 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return 0
-
-        if self.byte_length() < substr.byte_length() + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = stringref._memmem(
-            haystack_str.unsafe_ptr(),
-            haystack_str.byte_length(),
-            substr.unsafe_ptr(),
-            substr.byte_length(),
+        # FIXME(#3526): this should return unicode codepoint offsets
+        return (
+            self.as_bytes()
+            .get_immutable()
+            .find(substr.as_bytes().get_immutable(), start)
         )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
 
     fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -949,27 +897,12 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return len(self)
-
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._from_start(start)
-
-        var loc = _memrmem(
-            haystack_str.unsafe_ptr(),
-            len(haystack_str),
-            substr.unsafe_ptr(),
-            len(substr),
+        # FIXME(#3526): this should return unicode codepoint offsets
+        return (
+            self.as_bytes()
+            .get_immutable()
+            .rfind(substr.as_bytes().get_immutable(), start)
         )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.unsafe_ptr())
 
     fn isspace(self) -> Bool:
         """Determines whether every character in the given StringSlice is a
