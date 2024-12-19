@@ -454,7 +454,7 @@ struct StringLiteral(
         Returns:
             A reversed iterator of references to the string unicode characters.
         """
-        return _StringSliceIter[StaticConstantOrigin, forward=False](
+        return _StringSliceIter[StaticConstantOrigin, False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -542,7 +542,7 @@ struct StringLiteral(
 
     @always_inline
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous Span of the bytes owned by this string.
+        """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.

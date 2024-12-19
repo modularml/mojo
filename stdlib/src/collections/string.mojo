@@ -1797,7 +1797,7 @@ struct String(
         ```
         .
         """
-        return self.as_string_slice().split(self, sep)
+        return self.as_string_slice().split(sep)
 
     @always_inline
     fn split(
@@ -1819,7 +1819,7 @@ struct String(
         ```
         .
         """
-        return self.as_string_slice().split(self, maxsplit=maxsplit)
+        return self.as_string_slice().split(maxsplit=maxsplit)
 
     @always_inline
     fn split(
