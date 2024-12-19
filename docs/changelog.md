@@ -67,7 +67,6 @@ what we publish.
   now vectorized. PR [#3548](https://github.com/modularml/mojo/pull/3548) by
   [@martinvuyk](https://github.com/martinvuyk).
 
-
 ### Tooling changes
 
 - mblack (aka `mojo format`) no longer formats non-mojo files. This prevents
