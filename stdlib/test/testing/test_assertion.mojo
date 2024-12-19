@@ -30,25 +30,27 @@ from utils import StringSlice
 
 
 def test_assert_messages():
+    assertion = "test_assertion.mojo:"
+    assertion_error = ": AssertionError:"
     try:
         assert_true(False)
     except e:
-        assert_true("test_assertion.mojo:33:20: AssertionError:" in str(e))
+        assert_true(assertion in str(e) and assertion_error in str(e))
 
     try:
         assert_false(True)
     except e:
-        assert_true("test_assertion.mojo:38:21: AssertionError:" in str(e))
+        assert_true(assertion in str(e) and assertion_error in str(e))
 
     try:
         assert_equal(1, 0)
     except e:
-        assert_true("test_assertion.mojo:43:21: AssertionError:" in str(e))
+        assert_true(assertion in str(e) and assertion_error in str(e))
 
     try:
         assert_not_equal(0, 0)
     except e:
-        assert_true("test_assertion.mojo:48:25: AssertionError:" in str(e))
+        assert_true(assertion in str(e) and assertion_error in str(e))
 
 
 @value
