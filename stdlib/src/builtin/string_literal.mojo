@@ -528,7 +528,7 @@ struct StringLiteral(
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, StaticConstantOrigin]:
-        """Returns a contiguous Span of the bytes owned by this string.
+        """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
@@ -691,7 +691,7 @@ struct StringLiteral(
         return result
 
     @always_inline
-    fn split(self, sep: StringSlice, maxsplit: Int) -> List[String]:
+    fn split(self, sep: StringSlice, maxsplit: Int) -> List[StaticString]:
         """Split the string by a separator.
 
         Args:
@@ -712,10 +712,10 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=True](self, sep, maxsplit)
+        return self.as_string_slice().split(sep, maxsplit)
 
     @always_inline
-    fn split(self, sep: StringSlice) -> List[String]:
+    fn split(self, sep: StringSlice) -> List[StaticString]:
         """Split the string by a separator.
 
         Args:
@@ -737,10 +737,10 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=False](self, sep, -1)
+        return self.as_string_slice().split(sep)
 
     @always_inline
-    fn split(self, *, maxsplit: Int) -> List[String]:
+    fn split(self, *, maxsplit: Int) -> List[StaticString]:
         """Split the string by every Whitespace separator.
 
         Args:
@@ -757,10 +757,10 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=True](self, None, maxsplit)
+        return self.as_string_slice().split(maxsplit=maxsplit)
 
     @always_inline
-    fn split(self, sep: NoneType = None) -> List[String]:
+    fn split(self, sep: NoneType = None) -> List[StaticString]:
         """Split the string by every Whitespace separator.
 
         Args:
@@ -784,7 +784,7 @@ struct StringLiteral(
         ```
         .
         """
-        return _split[has_maxsplit=False](self, None, -1)
+        return self.as_string_slice().split()
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string literal at line boundaries. This corresponds to Python's

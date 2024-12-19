@@ -27,14 +27,16 @@ from sys.info import simdwidthof
 
 
 trait AsBytes:
-    """The `AsBytes` trait denotes a type that can be returned as a byte span.
+    """
+    The `AsBytes` trait denotes a type that can be returned as a immutable byte
+    span.
     """
 
     fn as_bytes(ref self) -> Span[Byte, __origin_of(self)]:
-        """Returns a contiguous slice of bytes.
+        """Returns a contiguous slice of the bytes owned by this string.
 
         Returns:
-            A contiguous slice pointing to bytes.
+            A contiguous slice pointing to the bytes owned by this string.
 
         Notes:
             This does not include the trailing null terminator.

@@ -64,7 +64,6 @@ fn _count_utf8_continuation_bytes(span: Span[Byte]) -> Int:
     return amnt
 
 
-@always_inline
 fn _unicode_codepoint_utf8_byte_length(c: Int) -> Int:
     debug_assert(
         0 <= c <= 0x10FFFF, "Value: ", c, " is not a valid Unicode code point"
@@ -113,7 +112,6 @@ fn _shift_unicode_to_utf8(ptr: UnsafePointer[UInt8], c: Int, num_bytes: Int):
         ptr[i] = ((c >> shift) & 0b0011_1111) | 0b1000_0000
 
 
-@always_inline("nodebug")
 fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
 
@@ -756,10 +754,10 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
 
     @always_inline
     fn as_bytes(self) -> Span[Byte, origin]:
-        """Returns a contiguous slice of bytes.
+        """Get the sequence of encoded bytes of the underlying string.
 
         Returns:
-            A contiguous slice pointing to bytes.
+            A slice containing the underlying sequence of encoded bytes.
 
         Notes:
             This does not include the trailing null terminator.
@@ -909,7 +907,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         """
         return _FormatCurlyEntry.format(self, args)
 
-    fn find(self, substr: StringSlice, start: Int = 0) -> Int:
+    fn find(ref self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns `-1`.
 
@@ -920,28 +918,27 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             The offset of `substr` relative to the beginning of the string.
         """
-
-        var sub = substr.unsafe_ptr()
-        var sub_len = substr.byte_length()
-        if sub_len == 0:
+        if not substr:
             return 0
 
-        var s_span = self.as_bytes()
-        if len(s_span) < sub_len + start:
+        if self.byte_length() < substr.byte_length() + start:
             return -1
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        var haystack = self._from_start(start).as_bytes()
+        var haystack_str = self._from_start(start)
 
         var loc = stringref._memmem(
-            haystack.unsafe_ptr(), len(haystack), sub, sub_len
+            haystack_str.unsafe_ptr(),
+            haystack_str.byte_length(),
+            substr.unsafe_ptr(),
+            substr.byte_length(),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(s_span.unsafe_ptr())
+        return int(loc) - int(self.unsafe_ptr())
 
     fn rfind(self, substr: StringSlice, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -1017,15 +1014,8 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
             return self.byte_length() != 0
 
     @always_inline
-    fn split[
-        O: ImmutableOrigin, //
-    ](self: StringSlice[O], sep: StringSlice, maxsplit: Int) -> List[
-        StringSlice[O]
-    ]:
+    fn split(self, sep: StringSlice, maxsplit: Int) -> List[Self]:
         """Split the string by a separator.
-
-        Parameters:
-            O: The immutable origin.
 
         Args:
             sep: The string to split on.
@@ -1048,13 +1038,8 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         return _split[has_maxsplit=True](self, sep, maxsplit)
 
     @always_inline
-    fn split[
-        O: ImmutableOrigin, //
-    ](self: StringSlice[O], sep: StringSlice) -> List[StringSlice[O]]:
+    fn split(self, sep: StringSlice) -> List[Self]:
         """Split the string by a separator.
-
-        Parameters:
-            O: The immutable origin.
 
         Args:
             sep: The string to split on.
@@ -1078,13 +1063,8 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         return _split[has_maxsplit=False](self, sep, -1)
 
     @always_inline
-    fn split[
-        O: ImmutableOrigin
-    ](self: StringSlice[O], *, maxsplit: Int) -> List[StringSlice[O]]:
+    fn split(self, *, maxsplit: Int) -> List[Self]:
         """Split the string by every Whitespace separator.
-
-        Parameters:
-            O: The immutable origin.
 
         Args:
             maxsplit: The maximum amount of items to split from String.
@@ -1103,13 +1083,8 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         return _split[has_maxsplit=True](self, None, maxsplit)
 
     @always_inline
-    fn split[
-        O: ImmutableOrigin
-    ](self: StringSlice[O], sep: NoneType = None) -> List[StringSlice[O]]:
+    fn split(self, sep: NoneType = None) -> List[Self]:
         """Split the string by every Whitespace separator.
-
-        Parameters:
-            O: The immutable origin.
 
         Args:
             sep: None.
@@ -1236,15 +1211,15 @@ fn _to_string_list[
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
-    var i_len = len(items)
-    var i_ptr = items.unsafe_ptr()
-    var out_ptr = UnsafePointer[String].alloc(i_len)
+    i_len = len(items)
+    i_ptr = items.unsafe_ptr()
+    out_ptr = UnsafePointer[String].alloc(i_len)
 
     for i in range(i_len):
-        var og_len = len_fn(i_ptr[i])
-        var f_len = og_len + 1  # null terminator
-        var p = UnsafePointer[Byte].alloc(f_len)
-        var og_ptr = unsafe_ptr_fn(i_ptr[i])
+        og_len = len_fn(i_ptr[i])
+        f_len = og_len + 1  # null terminator
+        p = UnsafePointer[Byte].alloc(f_len)
+        og_ptr = unsafe_ptr_fn(i_ptr[i])
         memcpy(p, og_ptr, og_len)
         p[og_len] = 0  # null terminator
         buf = String._buffer_type(ptr=p, length=f_len, capacity=f_len)
@@ -1340,61 +1315,7 @@ fn _is_newline_char[
     return False
 
 
-@always_inline
 fn _split[
-    has_maxsplit: Bool
-](src_str: String, sep: NoneType, maxsplit: Int) -> List[String]:
-    return _to_string_list(
-        _split_impl[has_maxsplit](src_str.as_string_slice(), maxsplit)
-    )
-
-
-@always_inline
-fn _split[
-    has_maxsplit: Bool
-](src_str: String, sep: StringSlice, maxsplit: Int) -> List[String]:
-    return _to_string_list(
-        _split_impl[has_maxsplit](src_str.as_string_slice(), sep, maxsplit)
-    )
-
-
-@always_inline
-fn _split[
-    has_maxsplit: Bool
-](src_str: StringLiteral, sep: NoneType, maxsplit: Int) -> List[String]:
-    return _to_string_list(
-        _split_impl[has_maxsplit](src_str.as_string_slice(), maxsplit)
-    )
-
-
-@always_inline
-fn _split[
-    has_maxsplit: Bool
-](src_str: StringLiteral, sep: StringSlice, maxsplit: Int) -> List[String]:
-    return _to_string_list(
-        _split_impl[has_maxsplit](src_str.as_string_slice(), sep, maxsplit)
-    )
-
-
-@always_inline
-fn _split[
-    has_maxsplit: Bool
-](src_str: StringSlice, sep: NoneType, maxsplit: Int) -> List[
-    __type_of(src_str)
-]:
-    return _split_impl[has_maxsplit](src_str, maxsplit)
-
-
-@always_inline
-fn _split[
-    has_maxsplit: Bool
-](src_str: StringSlice, sep: StringSlice, maxsplit: Int) -> List[
-    __type_of(src_str)
-]:
-    return _split_impl[has_maxsplit](src_str, sep, maxsplit)
-
-
-fn _split_impl[
     has_maxsplit: Bool
 ](
     src_str: StringSlice,
@@ -1448,9 +1369,14 @@ fn _split_impl[
         lhs = rhs + sep_len
 
 
-fn _split_impl[
+fn _split[
     has_maxsplit: Bool
-](src_str: StringSlice, maxsplit: Int, out output: List[__type_of(src_str)]):
+](
+    src_str: StringSlice,
+    sep: NoneType,
+    maxsplit: Int,
+    out output: List[__type_of(src_str)],
+):
     alias S = __type_of(src_str)
     alias O = __type_of(src_str).origin
     alias prealloc = 32  # guessing, Python's implementation uses 12

@@ -1747,7 +1747,9 @@ struct String(
         return self.as_string_slice().isspace()
 
     @always_inline
-    fn split(self, sep: StringSlice, maxsplit: Int) -> List[String]:
+    fn split(
+        ref self, sep: StringSlice, maxsplit: Int
+    ) -> List[StringSlice[__origin_of(self)]]:
         """Split the string by a separator.
 
         Args:
@@ -1768,10 +1770,12 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=True](self, sep, maxsplit)
+        return self.as_string_slice().split(sep, maxsplit)
 
     @always_inline
-    fn split(self, sep: StringSlice) -> List[String]:
+    fn split(
+        ref self, sep: StringSlice
+    ) -> List[StringSlice[__origin_of(self)]]:
         """Split the string by a separator.
 
         Args:
@@ -1793,10 +1797,12 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=False](self, sep, -1)
+        return self.as_string_slice().split(self, sep)
 
     @always_inline
-    fn split(self, *, maxsplit: Int) -> List[String]:
+    fn split(
+        ref self, *, maxsplit: Int
+    ) -> List[StringSlice[__origin_of(self)]]:
         """Split the string by every Whitespace separator.
 
         Args:
@@ -1813,10 +1819,12 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=True](self, None, maxsplit)
+        return self.as_string_slice().split(self, maxsplit=maxsplit)
 
     @always_inline
-    fn split(self, sep: NoneType = None) -> List[String]:
+    fn split(
+        ref self, sep: NoneType = None
+    ) -> List[StringSlice[__origin_of(self)]]:
         """Split the string by every Whitespace separator.
 
         Args:
@@ -1840,7 +1848,7 @@ struct String(
         ```
         .
         """
-        return _split[has_maxsplit=False](self, None, -1)
+        return self.as_string_slice().split()
 
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries. This corresponds to Python's
