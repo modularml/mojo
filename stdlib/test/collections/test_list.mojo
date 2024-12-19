@@ -39,7 +39,7 @@ def test_list():
         list.append(i)
 
     assert_equal(5, len(list))
-    assert_equal(5 * sizeof[Int](), list.byte_length())
+    assert_equal(5 * sizeof[Int](), list.bytecount())
     assert_equal(0, list[0])
     assert_equal(1, list[1])
     assert_equal(2, list[2])
