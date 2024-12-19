@@ -75,6 +75,7 @@ what we publish.
 
 - `StringRef` is being deprecated. Use `StringSlice` instead.
   - removed `StringRef.startswith()` and `StringRef.endswith()`
+  - removed `StringRef.strip()`
 
 ### 🛠️ Fixed
 

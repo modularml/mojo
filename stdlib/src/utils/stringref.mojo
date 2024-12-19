@@ -597,24 +597,6 @@ struct StringRef(
 
         return StringRef(data, length)
 
-    fn strip(self) -> StringRef:
-        """Gets a StringRef with leading and trailing whitespaces removed.
-        This only takes C spaces into account: " \\t\\n\\v\\f\\r".
-
-        For example, `"  mojo  "` returns `"mojo"`.
-
-        Returns:
-            A StringRef with leading and trailing whitespaces removed.
-        """
-        var start: Int = 0
-        var end: Int = len(self)
-        var ptr = self.unsafe_ptr()
-        while start < end and _isspace(ptr[start]):
-            start += 1
-        while end > start and _isspace(ptr[end - 1]):
-            end -= 1
-        return StringRef(ptr + start, end - start)
-
     fn split(self, delimiter: StringRef) raises -> List[StringRef]:
         """Split the StringRef by a delimiter.
 

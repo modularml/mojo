@@ -17,6 +17,14 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from utils import StringRef
 
 
+def test_stringref_from_pointer():
+    var a = StringRef("AAA")
+    var b = StringRef(ptr=a.data)
+    assert_equal(3, len(a))
+    assert_equal(3, len(b))
+    assert_equal(a, b)
+
+
 def test_strref_from_start():
     var str = StringRef("Hello")
 
@@ -169,6 +177,7 @@ def test_str_and_ref():
 
 
 def main():
+    test_stringref_from_pointer()
     test_strref_from_start()
     test_stringref_split()
     test_comparison_operators()
