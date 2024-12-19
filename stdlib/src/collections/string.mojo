@@ -887,24 +887,19 @@ struct String(
     fn __init__(out self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
-        This will allocate a new string that copies the string contents from
-        the provided string slice `str_slice`.
-
         Args:
             str_slice: The string slice from which to construct this string.
+
+        Notes:
+            This will allocate a new string that copies the string contents from
+            the provided string slice.
         """
 
-        # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes())
-        var buffer = Self._buffer_type()
-        # +1 for null terminator, initialized to 0
-        buffer.resize(length + 1, 0)
-        memcpy(
-            dest=buffer.data,
-            src=str_slice.as_bytes().unsafe_ptr(),
-            count=length,
-        )
-        self = Self(buffer^)
+        var length = str_slice.byte_length()
+        var ptr = UnsafePointer[Byte].alloc(length + 1)  # null terminator
+        memcpy(ptr, str_slice.unsafe_ptr(), length)
+        ptr[length] = 0
+        self = String(ptr=ptr, length=length + 1)
 
     @always_inline
     @implicit
