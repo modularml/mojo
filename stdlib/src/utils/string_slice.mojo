@@ -1047,9 +1047,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
                 offset += b_len
             return length != 0
 
-    fn splitlines(
-        self: StringSlice, keepends: Bool = False
-    ) -> List[StringSlice[__type_of(self).origin]]:
+    fn splitlines(self, keepends: Bool = False) -> List[Self]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines:](
         https://docs.python.org/3/library/stdtypes.html#str.splitlines)
@@ -1061,12 +1059,11 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        alias O = __type_of(self).origin
         # highly performance sensitive code, benchmark before touching
         alias `\r` = UInt8(ord("\r"))
         alias `\n` = UInt8(ord("\n"))
 
-        output = List[StringSlice[O]](capacity=128)  # guessing
+        output = List[Self](capacity=128)  # guessing
         var ptr = self.unsafe_ptr()
         var length = self.byte_length()
         var offset = 0
@@ -1096,7 +1093,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
                 eol_start += char_len
 
             var str_len = eol_start - offset + int(keepends) * eol_length
-            var s = StringSlice[O](ptr=ptr + offset, length=str_len)
+            var s = Self(ptr=ptr + offset, length=str_len)
             output.append(s)
             offset = eol_start + eol_length
 
@@ -1131,11 +1128,12 @@ fn _to_string_list[
 
 @always_inline
 fn to_string_list[
-    O: ImmutableOrigin, //
+    mut: Bool, O: Origin[mut], //
 ](items: List[StringSlice[O]]) -> List[String]:
     """Create a list of Strings **copying** the existing data.
 
     Parameters:
+        mut: The mutability of the origin.
         O: The origin of the data.
 
     Args:
@@ -1156,61 +1154,12 @@ fn to_string_list[
 
 @always_inline
 fn to_string_list[
-    O: MutableOrigin, //
-](items: List[StringSlice[O]]) -> List[String]:
-    """Create a list of Strings **copying** the existing data.
-
-    Parameters:
-        O: The origin of the data.
-
-    Args:
-        items: The List of string slices.
-
-    Returns:
-        The list of created strings.
-    """
-
-    fn unsafe_ptr_fn(v: StringSlice[O]) -> UnsafePointer[Byte]:
-        return v.unsafe_ptr()
-
-    fn len_fn(v: StringSlice[O]) -> Int:
-        return v.byte_length()
-
-    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
-
-
-@always_inline
-fn to_string_list[
-    O: ImmutableOrigin, //
+    mut: Bool, O: Origin[mut], //
 ](items: List[Span[Byte, O]]) -> List[String]:
     """Create a list of Strings **copying** the existing data.
 
     Parameters:
-        O: The origin of the data.
-
-    Args:
-        items: The List of Bytes.
-
-    Returns:
-        The list of created strings.
-    """
-
-    fn unsafe_ptr_fn(v: Span[Byte, O]) -> UnsafePointer[Byte]:
-        return v.unsafe_ptr()
-
-    fn len_fn(v: Span[Byte, O]) -> Int:
-        return len(v)
-
-    return _to_string_list[items.T, len_fn, unsafe_ptr_fn](items)
-
-
-@always_inline
-fn to_string_list[
-    O: MutableOrigin, //
-](items: List[Span[Byte, O]]) -> List[String]:
-    """Create a list of Strings **copying** the existing data.
-
-    Parameters:
+        mut: The mutability of the origin.
         O: The origin of the data.
 
     Args:
