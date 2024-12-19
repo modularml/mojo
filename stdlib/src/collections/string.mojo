@@ -1882,10 +1882,12 @@ struct String(
 
         return output
 
-    fn splitlines(self, keepends: Bool = False) -> List[String]:
+    fn splitlines(
+        ref self, keepends: Bool = False
+    ) -> List[StringSlice[__origin_of(self)]]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines:](
-            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
@@ -1894,7 +1896,7 @@ struct String(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return _to_string_list(self.as_string_slice().splitlines(keepends))
+        return self.as_string_slice().splitlines(keepends)
 
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`
