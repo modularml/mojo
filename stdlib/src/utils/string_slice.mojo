@@ -1110,18 +1110,18 @@ fn _to_string_list[
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
-    i_len = len(items)
-    i_ptr = items.unsafe_ptr()
-    out_ptr = UnsafePointer[String].alloc(i_len)
+    var i_len = len(items)
+    var i_ptr = items.unsafe_ptr()
+    var out_ptr = UnsafePointer[String].alloc(i_len)
 
     for i in range(i_len):
-        og_len = len_fn(i_ptr[i])
-        f_len = og_len + 1  # null terminator
-        p = UnsafePointer[Byte].alloc(f_len)
-        og_ptr = unsafe_ptr_fn(i_ptr[i])
+        var og_len = len_fn(i_ptr[i])
+        var f_len = og_len + 1  # null terminator
+        var p = UnsafePointer[Byte].alloc(f_len)
+        var og_ptr = unsafe_ptr_fn(i_ptr[i])
         memcpy(p, og_ptr, og_len)
         p[og_len] = 0  # null terminator
-        buf = String._buffer_type(ptr=p, length=f_len, capacity=f_len)
+        var buf = String._buffer_type(ptr=p, length=f_len, capacity=f_len)
         (out_ptr + i).init_pointee_move(String(buf^))
     return List[String](ptr=out_ptr, length=i_len, capacity=i_len)
 
