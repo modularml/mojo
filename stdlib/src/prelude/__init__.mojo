@@ -20,6 +20,7 @@ from collections.string import (
     ascii,
     atof,
     atol,
+    stol,
     chr,
     isdigit,
     islower,
