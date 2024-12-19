@@ -469,11 +469,11 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    fn bytecount(self) -> Int:
-        """Gets the bytecount of the List.
+    fn byte_length(self) -> Int:
+        """Gets the byte length of the List.
 
         Returns:
-            The bytecount of the List.
+            The byte length of the List.
         """
         return len(self) * sizeof[T]()
 
