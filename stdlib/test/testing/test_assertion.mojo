@@ -26,6 +26,7 @@ from testing import (
 )
 
 from utils.numerics import inf, nan
+from utils import StringSlice
 
 
 def test_assert_messages():
@@ -237,6 +238,39 @@ def test_assert_custom_location():
         assert_true("always_false" in str(e))
 
 
+def test_assert_equal_stringslice():
+    str1 = "This is Mojo"
+    str2 = String("This is Mojo")
+    str3 = "This is mojo"
+
+    fn _build(
+        value: StringLiteral, start: Int, end: Int
+    ) -> StringSlice[StaticConstantOrigin]:
+        return StringSlice[StaticConstantOrigin](
+            ptr=value.unsafe_ptr() + start, length=end - start
+        )
+
+    fn _build(
+        read value: String, start: Int, end: Int
+    ) -> StringSlice[__origin_of(value)]:
+        return StringSlice[__origin_of(value)](
+            ptr=value.unsafe_ptr() + start, length=end - start
+        )
+
+    l1 = List(_build(str1, 0, 4), _build(str1, 5, 7), _build(str1, 8, 12))
+    l2 = List(_build(str2, 0, 4), _build(str2, 5, 7), _build(str2, 8, 12))
+    l3 = List(_build(str3, 0, 4), _build(str3, 5, 7), _build(str3, 8, 12))
+    assert_equal(l1, l1)
+    assert_equal(l2, l2)
+    assert_equal(l1, l2)
+
+    with assert_raises():
+        assert_equal(l1, l3)
+
+    with assert_raises():
+        assert_equal(l2, l3)
+
+
 def main():
     test_assert_equal_is_generic()
     test_assert_not_equal_is_generic()
@@ -248,3 +282,4 @@ def main():
     test_assert_is()
     test_assert_is_not()
     test_assert_custom_location()
+    test_assert_equal_stringslice()
