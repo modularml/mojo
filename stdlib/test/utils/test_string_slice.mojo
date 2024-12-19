@@ -489,19 +489,7 @@ def test_splitlines():
 
 
 def test_split():
-    alias S = StringSlice[StaticConstantOrigin]
-
-    fn st(value: StringLiteral) -> StringSlice[ImmutableAnyOrigin]:
-        return rebind[StringSlice[ImmutableAnyOrigin]](StringSlice(value))
-
-    # FIXME: remove once StringSlice conforms to TestableCollectionElement
-    fn _assert_equal[
-        O: ImmutableOrigin
-    ](l1: List[StringSlice[O]], l2: List[S]) raises:
-        assert_equal(len(l1), len(l2))
-        for i in range(len(l1)):
-            assert_equal(str(l1[i]), str(l2[i]))
-
+    alias L = List[StringSlice[StaticConstantOrigin]]
     # Should add all whitespace-like chars as one
     # test all unicode separators
     # 0 is to build a String with null terminator
@@ -514,75 +502,72 @@ def test_split():
     # TODO add line and paragraph separator as StringLiteral once unicode
     # escape secuences are accepted
     univ_sep_var = (
-        String(" ")
-        + String("\t")
-        + String("\n")
-        + String("\r")
-        + String("\v")
-        + String("\f")
-        + String("\x1c")
-        + String("\x1d")
-        + String("\x1e")
-        + String(next_line).as_string_slice()
-        + String(unicode_line_sep).as_string_slice()
-        + String(unicode_paragraph_sep).as_string_slice()
+        " "
+        + "\t"
+        + "\n"
+        + "\r"
+        + "\v"
+        + "\f"
+        + "\x1c"
+        + "\x1d"
+        + "\x1e"
+        + String(next_line)
+        + String(unicode_line_sep)
+        + String(unicode_paragraph_sep)
     )
     s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
-    sl = rebind[S](s.as_string_slice())
-    _assert_equal(sl.split(), List[S]("hello", "world"))
+    assert_equal(s.split(), L("hello", "world"))
 
     # should split into empty strings between separators
-    _assert_equal(st("1,,,3").split(","), List[S]("1", "", "", "3"))
-    _assert_equal(st(",,,").split(","), List[S]("", "", "", ""))
-    _assert_equal(st(" a b ").split(" "), List[S]("", "a", "b", ""))
-    _assert_equal(st("abababaaba").split("aba"), List[S]("", "b", "", ""))
-    assert_true(len(st("").split()) == 0)
-    assert_true(len(st(" ").split()) == 0)
-    assert_true(len(st("").split(" ")) == 1)
-    assert_true(len(st(",").split(",")) == 2)
-    assert_true(len(st(" ").split(" ")) == 2)
-    assert_true(len(st("").split("")) == 2)
-    assert_true(len(st("  ").split(" ")) == 3)
-    assert_true(len(st("   ").split(" ")) == 4)
+    assert_equal("1,,,3".split(","), L("1", "", "", "3"))
+    assert_equal(",,,".split(","), L("", "", "", ""))
+    assert_equal(" a b ".split(" "), L("", "a", "b", ""))
+    assert_equal("abababaaba".split("aba"), L("", "b", "", ""))
+    assert_true(len("".split()) == 0)
+    assert_true(len(" ".split()) == 0)
+    assert_true(len("".split(" ")) == 1)
+    assert_true(len(",".split(",")) == 2)
+    assert_true(len(" ".split(" ")) == 2)
+    assert_true(len("".split("")) == 2)
+    assert_true(len("  ".split(" ")) == 3)
+    assert_true(len("   ".split(" ")) == 4)
 
     # should split into maxsplit + 1 items
-    _assert_equal(st("1,2,3").split(",", 0), List[S]("1,2,3"))
-    _assert_equal(st("1,2,3").split(",", 1), List[S]("1", "2,3"))
+    assert_equal("1,2,3".split(",", 0), L("1,2,3"))
+    assert_equal("1,2,3".split(",", 1), L("1", "2,3"))
 
     # Split in middle
-    _assert_equal(st("faang").split(st("n")), List[S]("faa", "g"))
+    assert_equal("faang".split("n"), L("faa", "g"))
 
     # No match from the delimiter
-    _assert_equal(st("hello world").split(st("x")), List[S]("hello world"))
+    assert_equal("hello world".split("x"), L("hello world"))
 
     # Multiple character delimiter
-    _assert_equal(st("hello").split(st("ll")), List[S]("he", "o"))
+    assert_equal("hello".split("ll"), L("he", "o"))
 
-    res = List[S]("", "bb", "", "", "", "bbb", "")
-    _assert_equal(st("abbaaaabbba").split("a"), res)
-    _assert_equal(st("abbaaaabbba").split("a", 8), res)
+    res = L("", "bb", "", "", "", "bbb", "")
+    assert_equal("abbaaaabbba".split("a"), res)
+    assert_equal("abbaaaabbba".split("a", 8), res)
     s1 = st("abbaaaabbba").split("a", 5)
-    _assert_equal(s1, List[S]("", "bb", "", "", "", "bbba"))
-    _assert_equal(st("aaa").split("a", 0), List[S]("aaa"))
-    _assert_equal(st("a").split("a"), List[S]("", ""))
-    _assert_equal(st("1,2,3").split("3", 0), List[S]("1,2,3"))
-    _assert_equal(st("1,2,3").split("3", 1), List[S]("1,2,", ""))
-    _assert_equal(st("1,2,3,3").split("3", 2), List[S]("1,2,", ",", ""))
-    _assert_equal(st("1,2,3,3,3").split("3", 2), List[S]("1,2,", ",", ",3"))
+    assert_equal(s1, L("", "bb", "", "", "", "bbba"))
+    assert_equal("aaa".split("a", 0), L("aaa"))
+    assert_equal("a".split("a"), L("", ""))
+    assert_equal("1,2,3".split("3", 0), L("1,2,3"))
+    assert_equal("1,2,3".split("3", 1), L("1,2,", ""))
+    assert_equal("1,2,3,3".split("3", 2), L("1,2,", ",", ""))
+    assert_equal("1,2,3,3,3".split("3", 2), L("1,2,", ",", ",3"))
 
-    _assert_equal(st("Hello 🔥!").split(), List[S]("Hello", "🔥!"))
+    assert_equal("Hello 🔥!".split(), L("Hello", "🔥!"))
 
-    s2 = st("Лорем ипсум долор сит амет").split(" ")
-    _assert_equal(s2, List[S]("Лорем", "ипсум", "долор", "сит", "амет"))
-    s3 = st("Лорем ипсум долор сит амет").split("м")
-    _assert_equal(s3, List[S]("Лоре", " ипсу", " долор сит а", "ет"))
+    s2 = "Лорем ипсум долор сит амет".split(" ")
+    assert_equal(s2, L("Лорем", "ипсум", "долор", "сит", "амет"))
+    s3 = "Лорем ипсум долор сит амет".split("м")
+    assert_equal(s3, L("Лоре", " ипсу", " долор сит а", "ет"))
 
-    _assert_equal(st("123").split(""), List[S]("", "1", "2", "3", ""))
-    assert_equal("".join(st("123").split("")), "123")
-    _assert_equal(
-        st(",1,2,3,").split(","), rebind[List[S]](st("123").split(""))
-    )
-    assert_equal(",".join(st("123").split("")), ",1,2,3,")
+    assert_equal("123".split(""), L("", "1", "2", "3", ""))
+    assert_equal("".join("123".split("")), "123")
+    assert_equal(",1,2,3,".split(","), "123".split(""))
+    assert_equal(",".join("123".split("")), ",1,2,3,")
 
 
 def test_rstrip():
