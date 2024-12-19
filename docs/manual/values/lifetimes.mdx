@@ -85,18 +85,16 @@ struct ParametricRef[
     pass
 ```
 
-Note that `Origin` isn't an origin **value**, it's a helper for specifying a
-origin **type**. Origin types carry the mutability of a reference as a
-boolean parameter value, indicating whether the origin is mutable, immutable,
-or even with mutability depending on a parameter specified by the enclosing API.
+Origin types carry the mutability of a reference as a boolean parameter value,
+indicating whether the origin is mutable, immutable, or even with mutability
+depending on a parameter specified by the enclosing API.
 
 The `is_mutable` parameter here is an [infer-only
-parameter](/mojo/manual/parameters/#infer-only-parameters). It can't be passed
-as a positional parameter—it's either inferred from context or specified by
-keyword. The `origin` value is often inferred, as well. For example, the
-following code creates a [`Pointer`](/mojo/stdlib/memory/pointer/Pointer) to an
-existing value, but doesn't need to specify an origin—the `origin` is inferred
-from the variable passed in to the `address_of()` method.
+parameter](/mojo/manual/parameters/#infer-only-parameters). The `origin` value
+is often inferred, as well. For example, the following code creates a
+[`Pointer`](/mojo/stdlib/memory/pointer/Pointer) to an existing value, but
+doesn't need to specify an origin—the `origin` is inferred from the variable
+passed in to the `address_of()` method.
 
 ```mojo
 from memory import Pointer
@@ -474,8 +472,5 @@ that's a union of both origins.
 
 ```mojo
 def pick_one(cond: Bool, ref a: String, ref b: String) -> ref [a, b] String:
-    if cond:
-        return a
-    else:
-        return b
+    return a if cond else b
 ```

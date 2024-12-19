@@ -156,6 +156,15 @@ def test_bool():
     assert_true(not s[0:0])
 
 
+def test_contains():
+    items = List[Byte](1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+    span = Span(items)
+    assert_true(0 not in span)
+    assert_true(16 not in span)
+    for item in items:
+        assert_true(item[] in span)
+
+
 def test_equality():
     var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
     var l2 = List[String]("a", "b", "c", "d", "e", "f", "g")
@@ -208,6 +217,7 @@ def main():
     test_span_slice()
     test_equality()
     test_bool()
+    test_contains()
     test_fill()
     test_ref()
     test_reversed()

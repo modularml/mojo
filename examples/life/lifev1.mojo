@@ -59,7 +59,7 @@ def run_display(
         # Draw each live cell in the grid
         for row in range(grid.rows):
             for col in range(grid.cols):
-                if grid.data[row][col]:
+                if grid[row, col]:
                     x = col * cell_width + border_size
                     y = row * cell_height + border_size
                     width = cell_width - border_size
