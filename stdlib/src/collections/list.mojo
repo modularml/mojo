@@ -470,10 +470,10 @@ struct List[T: CollectionElement, hint_trivial_type: Bool = False](
     # ===-------------------------------------------------------------------===#
 
     fn byte_length(self) -> Int:
-        """Gets the byte length of the List.
+        """Gets the byte length of the List (`len(self) * sizeof[T]()`).
 
         Returns:
-            The byte length of the List.
+            The byte length of the List (`len(self) * sizeof[T]()`).
         """
         return len(self) * sizeof[T]()
 
