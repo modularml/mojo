@@ -410,7 +410,7 @@ fn _hex_digits_to_hex_chars(ptr: UnsafePointer[Byte], decimal: Scalar):
     %# from memory import memset_zero
     %# from testing import assert_equal
     %# from utils import StringSlice
-    %# from utils.write import _write_hex
+    %# from utils.write import _hex_digits_to_hex_chars
     items = List[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0)
     alias S = StringSlice[__origin_of(items)]
     ptr = items.unsafe_ptr()
