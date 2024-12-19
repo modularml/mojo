@@ -743,10 +743,10 @@ struct StringLiteral(
         """
         return str(self).split(sep, maxsplit)
 
-    fn splitlines(self, keepends: Bool = False) -> List[String]:
-        """Split the string literal at line boundaries. This corresponds to Python's
-        [universal newlines:](
-            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+    fn splitlines(self, keepends: Bool = False) -> List[StaticString]:
+        """Split the string literal at line boundaries. This corresponds to
+        Python's [universal newlines:](
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Args:
@@ -755,7 +755,7 @@ struct StringLiteral(
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-        return _to_string_list(self.as_string_slice().splitlines(keepends))
+        return self.as_string_slice().splitlines(keepends)
 
     fn count(self, substr: String) -> Int:
         """Return the number of non-overlapping occurrences of substring

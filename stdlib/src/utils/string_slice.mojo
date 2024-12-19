@@ -1047,16 +1047,11 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
                 offset += b_len
             return length != 0
 
-    fn splitlines[
-        O: ImmutableOrigin, //
-    ](self: StringSlice[O], keepends: Bool = False) -> List[StringSlice[O]]:
+    fn splitlines(self, keepends: Bool = False) -> List[Self]:
         """Split the string at line boundaries. This corresponds to Python's
         [universal newlines:](
         https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `"\\r\\n"` and `"\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
-
-        Parameters:
-            O: The immutable origin.
 
         Args:
             keepends: If True, line breaks are kept in the resulting strings.
@@ -1064,12 +1059,11 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
         Returns:
             A List of Strings containing the input split by line boundaries.
         """
-
         # highly performance sensitive code, benchmark before touching
         alias `\r` = UInt8(ord("\r"))
         alias `\n` = UInt8(ord("\n"))
 
-        output = List[StringSlice[O]](capacity=128)  # guessing
+        output = List[Self](capacity=128)  # guessing
         var ptr = self.unsafe_ptr()
         var length = self.byte_length()
         var offset = 0
@@ -1099,7 +1093,7 @@ struct StringSlice[mut: Bool, //, origin: Origin[mut]](
                 eol_start += char_len
 
             var str_len = eol_start - offset + int(keepends) * eol_length
-            var s = StringSlice[O](ptr=ptr + offset, length=str_len)
+            var s = Self(ptr=ptr + offset, length=str_len)
             output.append(s)
             offset = eol_start + eol_length
 
@@ -1116,29 +1110,30 @@ fn _to_string_list[
     len_fn: fn (T) -> Int,
     unsafe_ptr_fn: fn (T) -> UnsafePointer[Byte],
 ](items: List[T]) -> List[String]:
-    i_len = len(items)
-    i_ptr = items.unsafe_ptr()
-    out_ptr = UnsafePointer[String].alloc(i_len)
+    var i_len = len(items)
+    var i_ptr = items.unsafe_ptr()
+    var out_ptr = UnsafePointer[String].alloc(i_len)
 
     for i in range(i_len):
-        og_len = len_fn(i_ptr[i])
-        f_len = og_len + 1  # null terminator
-        p = UnsafePointer[Byte].alloc(f_len)
-        og_ptr = unsafe_ptr_fn(i_ptr[i])
+        var og_len = len_fn(i_ptr[i])
+        var f_len = og_len + 1  # null terminator
+        var p = UnsafePointer[Byte].alloc(f_len)
+        var og_ptr = unsafe_ptr_fn(i_ptr[i])
         memcpy(p, og_ptr, og_len)
         p[og_len] = 0  # null terminator
-        buf = String._buffer_type(ptr=p, length=f_len, capacity=f_len)
+        var buf = String._buffer_type(ptr=p, length=f_len, capacity=f_len)
         (out_ptr + i).init_pointee_move(String(buf^))
     return List[String](ptr=out_ptr, length=i_len, capacity=i_len)
 
 
 @always_inline
-fn _to_string_list[
-    O: ImmutableOrigin, //
+fn to_string_list[
+    mut: Bool, O: Origin[mut], //
 ](items: List[StringSlice[O]]) -> List[String]:
     """Create a list of Strings **copying** the existing data.
 
     Parameters:
+        mut: The mutability of the origin.
         O: The origin of the data.
 
     Args:
@@ -1158,12 +1153,13 @@ fn _to_string_list[
 
 
 @always_inline
-fn _to_string_list[
-    O: ImmutableOrigin, //
+fn to_string_list[
+    mut: Bool, O: Origin[mut], //
 ](items: List[Span[Byte, O]]) -> List[String]:
     """Create a list of Strings **copying** the existing data.
 
     Parameters:
+        mut: The mutability of the origin.
         O: The origin of the data.
 
     Args:
