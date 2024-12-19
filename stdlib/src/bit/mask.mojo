@@ -92,7 +92,7 @@ struct BitMask:
             A bitmask filled with `1` if the value is `True`, filled with `0`
             otherwise.
         """
-        return Self.is_false[D](~value)
+        return (-(value.cast[DType.int8]())).cast[D]()
 
     @always_inline
     @staticmethod
@@ -112,7 +112,7 @@ struct BitMask:
             A bitmask filled with `1` if the value is `False`, filled with `0`
             otherwise.
         """
-        return (value.cast[DType.int8]() - 1).cast[D]()
+        return Self.is_true[D](~value)
 
     @always_inline
     @staticmethod
