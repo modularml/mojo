@@ -495,6 +495,23 @@ struct UnsafePointer[
             "both volatile and invariant cannot be set at the same time",
         ]()
 
+        # bool load unpacks bits differently depending on the width.
+        # This causes issues when doing stores and loads of different widths.
+        # Cast between uint8 to keep a consistent representation in memory.
+        # TODO: decide how/whether to pack SIMD[bool] bits in memory
+        @parameter
+        if type == DType.bool:
+            return (
+                self.bitcast[UInt8]()
+                .load[
+                    width=width,
+                    alignment=alignment,
+                    volatile=volatile,
+                    invariant=invariant,
+                ]()
+                .cast[type]()
+            )
+
         @parameter
         if is_nvidia_gpu() and sizeof[type]() == 1 and alignment == 1:
             # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
@@ -801,6 +818,17 @@ struct UnsafePointer[
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
+
+        # bool store packs bits differently depending on the width.
+        # This causes issues when doing stores and loads of different widths.
+        # Cast between uint8 to keep a consistent representation in memory.
+        # TODO: decide how/whether to pack SIMD[bool] bits in memory
+        @parameter
+        if type == DType.bool:
+            self.bitcast[UInt8]()._store[
+                alignment=alignment, volatile=volatile
+            ](val.cast[DType.uint8]())
+            return
 
         @parameter
         if volatile:

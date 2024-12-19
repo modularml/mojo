@@ -316,12 +316,34 @@ def test_volatile_load_and_store_simd():
     for i in range(0, 16, 4):
         var vec = ptr.load[width=4, volatile=True](i)
         assert_equal(vec, SIMD[DType.int8, 4](i, i + 1, i + 2, i + 3))
+    ptr.free()
 
     var ptr2 = UnsafePointer[Int8].alloc(16)
     for i in range(0, 16, 4):
         ptr2.store[volatile=True](i, SIMD[DType.int8, 4](i))
     for i in range(16):
         assert_equal(ptr2[i], i // 4 * 4)
+    ptr2.free()
+
+    # test for bool store/load consistency with different widths
+    var ptr3 = UnsafePointer[Scalar[DType.bool]].alloc(4)
+    ptr3.store[volatile=True](SIMD[DType.bool, 2](True, False))
+    ptr3[2] = False
+    ptr3[3] = True
+    assert_equal(
+        ptr3.load[width=4, volatile=True](),
+        SIMD[DType.bool, 4](True, False, False, True),
+    )
+    ptr3.free()
+
+    var ptr4 = UnsafePointer[Scalar[DType.bool]].alloc(4)
+    ptr4.store[volatile=True](SIMD[DType.bool, 4](True, False, False, True))
+    assert_equal(
+        ptr3.load[width=2, volatile=True](), SIMD[DType.bool, 2](True, False)
+    )
+    assert_equal(ptr4[2], False)
+    assert_equal(ptr4[3], True)
+    ptr4.free()
 
 
 def main():
