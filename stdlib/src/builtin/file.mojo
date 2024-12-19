@@ -85,7 +85,7 @@ struct FileHandle:
           path: The file path.
           mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
-        self.__init__(path.as_string_slice(), mode.as_string_slice())
+        self = Self(path.as_string_slice(), mode.as_string_slice())
 
     fn __init__(out self, path: StringSlice, mode: StringSlice) raises:
         """Construct the FileHandle using the file path and string.
