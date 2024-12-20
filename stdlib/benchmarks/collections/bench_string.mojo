@@ -23,6 +23,7 @@ from random import random_si64, seed
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 
 from utils._utf8_validation import _is_valid_utf8
+from utils import StringSlice
 
 
 # ===-----------------------------------------------------------------------===#
@@ -111,7 +112,7 @@ fn bench_string_split[
     @always_inline
     @parameter
     fn call_fn() raises:
-        var res: List[String]
+        var res: List[StringSlice[__origin_of(items)]]
 
         @parameter
         if sequence:
