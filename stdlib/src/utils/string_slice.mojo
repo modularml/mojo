@@ -1358,11 +1358,11 @@ fn _split[
         # FIXME(#3526): use str_span and sep_span
         rhs = src_str.find(sep, lhs)
         # if not found go to the end
-        rhs += int(rhs == -1) * (str_byte_len + 1)
+        rhs += -int(rhs == -1) & (str_byte_len + 1)
 
         @parameter
         if has_maxsplit:
-            rhs += int(items == maxsplit) * (str_byte_len - rhs)
+            rhs += -int(items == maxsplit) & (str_byte_len - rhs)
             items += 1
 
         output.append(S(ptr=ptr + lhs, length=rhs - lhs))
@@ -1415,7 +1415,7 @@ fn _split[
 
         @parameter
         if has_maxsplit:
-            rhs += int(items == maxsplit) * (str_byte_len - rhs)
+            rhs += -int(items == maxsplit) & (str_byte_len - rhs)
             items += 1
 
         output.append(S(ptr=ptr + lhs, length=rhs - lhs))

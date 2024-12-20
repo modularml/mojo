@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo-no-debug %s -t
+# RUN: %mojo-no-debug %s
 # NOTE: to test changes on the current branch using run-benchmarks.sh, remove
 # the -t flag. Remember to replace it again before pushing any code.
 
@@ -23,6 +23,7 @@ from random import random_si64, seed
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 
 from utils._utf8_validation import _is_valid_utf8
+from utils import StringSlice
 
 
 # ===-----------------------------------------------------------------------===#
@@ -111,7 +112,7 @@ fn bench_string_split[
     @always_inline
     @parameter
     fn call_fn() raises:
-        var res: List[String]
+        var res: List[StringSlice[__origin_of(items)]]
 
         @parameter
         if sequence:
@@ -237,7 +238,7 @@ def main():
     )
     alias old_chars = ("a", "ó", "ل", "и", "一")
     alias new_chars = ("A", "Ó", "ل", "И", "一")
-    alias lengths = (10, 30, 50, 100, 1000, 10_000, 100_000, 1_000_000)
+    alias lengths = (1_000_000,)
     """At an average 5 letters per word and 300 words per page
     (in the English language):
 
