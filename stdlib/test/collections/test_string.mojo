@@ -326,6 +326,7 @@ def test_ord():
 
 
 def test_chr():
+    assert_equal("\0", chr(0))
     assert_equal("A", chr(65))
     assert_equal("a", chr(97))
     assert_equal("!", chr(33))
