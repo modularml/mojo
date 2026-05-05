@@ -26,6 +26,7 @@ from std.collections.string.string_span import (
     _to_string_list,
     _unsafe_strlen,
 )
+from std.collections.string._unicode import _decode_codepoints
 from std.builtin.builtin_slice import ContiguousSlice
 from std.hashlib.hasher import Hasher
 from std.reflection import call_location
@@ -402,6 +403,149 @@ struct String(
             dest=self.unsafe_ptr_mut(),
             src=unsafe_from_utf8.unsafe_ptr(),
             count=length,
+        )
+
+    def __init__[
+        dtype: DType,
+        //,
+    ](
+        out self,
+        *,
+        from_codepoints: Span[mut=False, Scalar[dtype], ...],
+        errors: type_of("strict") = "strict",
+    ) raises:
+        """Construct a new `String` from a buffer containing Unicode codepoints.
+
+        Parameters:
+            dtype: The dtype of the buffer.
+
+        Args:
+            from_codepoints: A span of bytes containing Unicode codepoints.
+            errors: The action to take when encountering a decoding error.
+
+        Raises:
+            An exception is raised if the provided buffer byte values do not
+            form valid Unicode codepoints.
+
+        Notes:
+            This constructor interprets the data as raw codepoints, i.e. a
+            buffer of bytes is considered ISO-8859-1 aka. Latin-1, and a buffer
+            of UInt16 is considered Unicode Basic Multilingual Plane (BMP).
+        """
+        var result = _decode_codepoints[strict=True](
+            from_codepoints=from_codepoints
+        )
+        # NOTE: the decoder should've already raised/replaced when invalid data
+        # was encountered
+        debug_assert(
+            _is_valid_utf8(result.as_bytes()),
+            "Buffer is not valid Unicode.",
+        )
+
+        self = result^
+
+    def __init__[
+        dtype: DType,
+        //,
+        *,
+        replace: Codepoint = Codepoint.ord("�"),
+    ](
+        out self,
+        *,
+        from_codepoints: Span[mut=False, Scalar[dtype], ...],
+        errors: type_of("replace"),
+    ):
+        """Construct a new `String` from a buffer containing Unicode codepoints.
+
+        Parameters:
+            dtype: The dtype of the buffer.
+            replace: What codepoint to replace the invalid codepoints with.
+
+        Args:
+            from_codepoints: A span of bytes containing Unicode codepoints.
+            errors: The action to take when encountering a decoding error.
+
+        Notes:
+            This constructor replaces invalid data with the specified codepoint.
+            This constructor interprets the data as raw codepoints, i.e. a
+            buffer of bytes is considered ISO-8859-1 aka. Latin-1, and a buffer
+            of UInt16 is considered Unicode Basic Multilingual Plane (BMP).
+        """
+        try:
+            var result = _decode_codepoints[strict=False, replace=replace](
+                from_codepoints=from_codepoints
+            )
+            # NOTE: the decoder should've already raised/replaced when invalid
+            # data was encountered
+            debug_assert(
+                _is_valid_utf8(result.as_bytes()),
+                "Buffer is not valid Unicode.",
+            )
+            self = result^
+        except:
+            abort("This should never happen")
+
+    def __init__[
+        dtype: DType, //
+    ](
+        out self,
+        *,
+        from_utf32: Span[mut=False, Scalar[dtype], ...],
+        errors: type_of("strict") = "strict",
+    ) raises:
+        """Construct a new `String` from a buffer containing UTF-32 encoded
+        data.
+
+        Parameters:
+            dtype: The dtype of the buffer.
+
+        Args:
+            from_utf32: A span of bytes containing UTF-32 encoded data.
+            errors: The action to take when encountering a decoding error.
+
+        Raises:
+            An exception is raised if the provided buffer byte values do not
+            form valid UTF-32 encoded codepoints.
+        """
+        comptime assert bit_width_of[dtype]() >= 32, (
+            "Decoding UTF-32 from a buffer of UInt8/UInt16 is ambiguous "
+            "bitcast it to UInt32 or use the codepoints decoder if they "
+            "are independent codepoints"
+        )
+        self = Self(from_codepoints=from_utf32)
+
+    def __init__[
+        dtype: DType,
+        //,
+        *,
+        replace: Codepoint = Codepoint.ord("�"),
+    ](
+        out self,
+        *,
+        from_utf32: Span[mut=False, Scalar[dtype], ...],
+        errors: type_of("replace"),
+    ):
+        """Construct a new `String` from a buffer containing UTF-32 encoded
+        data.
+
+        Parameters:
+            dtype: The dtype of the buffer.
+            replace: What codepoint to replace the invalid codepoints with.
+
+        Args:
+            from_utf32: A span of bytes containing UTF-32 encoded data.
+            errors: The action to take when encountering a decoding error.
+
+        Notes:
+            This constructor replaces invalid data with the specified codepoint.
+        """
+        comptime assert bit_width_of[dtype]() >= 32, (
+            "Decoding UTF-32 from a buffer of UInt8/UInt16 is ambiguous "
+            "bitcast it to UInt32 or use the codepoints decoder if they "
+            "are independent codepoints"
+        )
+        self = Self.__init__[replace=replace](
+            from_codepoints=from_utf32, errors="replace"
         )
 
     @stable(since="1.0")

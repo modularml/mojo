@@ -24,6 +24,10 @@ from std.collections.string._unicode_lookups import (
 
 from std.builtin.globals import global_constant
 from std.collections import Span
+from std.sys.intrinsics import unlikely
+from std.sys.info import bit_width_of
+
+comptime BIGGEST_UNICODE_CODEPOINT = UInt32(0x10FFFF)
 
 
 def _uppercase_mapping_index(rune: Codepoint) -> Int:
@@ -238,3 +242,71 @@ def to_uppercase(s: StringSlice[mut=False, _]) -> String:
 @always_inline
 def _estimate_needed_size(byte_len: Int) -> Int:
     return 3 * (byte_len >> 1) + 1
+
+
+@always_inline
+def _is_unicode_scalar_value(codepoint: Scalar) -> Bool:
+    """Returns True if `codepoint` is a valid Unicode scalar value.
+
+    Args:
+        codepoint: The codepoint integer value to check.
+
+    Returns:
+        True if `codepoint` is a valid Unicode scalar value; False otherwise.
+    """
+
+    comptime if bit_width_of[codepoint.dtype]() <= 8:
+        return True
+    comptime S = type_of(codepoint)
+    var is_not_unpaired_surrogate = not (S(0xD800) <= codepoint <= S(0xDFFF))
+
+    comptime if bit_width_of[codepoint.dtype]() == 16:
+        return is_not_unpaired_surrogate
+
+    return is_not_unpaired_surrogate and (
+        codepoint <= S(BIGGEST_UNICODE_CODEPOINT)
+    )
+
+
+def _decode_codepoints[
+    dtype: DType,
+    //,
+    strict: Bool = True,
+    replace: Codepoint = Codepoint.ord("�"),
+](*, from_codepoints: Span[mut=False, Scalar[dtype], ...]) raises -> String:
+    comptime assert dtype.is_integral(), "The dtype must be integral"
+    comptime replace_str = String(replace)
+    comptime replace_len = UInt(replace_str.byte_length())
+    # TODO: this could use reduce_sum with a function that calculates the utf8
+    # length from the utf32 codepoints. Performance needs to be measured
+    var length = 4 * UInt(len(from_codepoints))
+    var result = String(capacity_bytes=Int(length))
+    var codepoints_ptr = from_codepoints.unsafe_ptr()
+    var c_idx = UInt(0)
+    var utf8_offset = UInt(0)
+
+    while c_idx < UInt(len(from_codepoints)):
+        var utf8_ptr = result.unsafe_ptr_mut().unsafe_offset(Int(utf8_offset))
+        var c_og = codepoints_ptr[unsafe_offset=c_idx]
+
+        comptime if bit_width_of[dtype]() >= 16:
+            if unlikely(not _is_unicode_scalar_value(c_og)):
+                comptime if strict:
+                    raise Error("Invalid unicode codepoint at index: ", c_idx)
+                else:
+                    result += replace_str
+                    utf8_offset += replace_len
+                    c_idx += 1
+                    continue
+
+        var c = c_og.cast[DType.uint32]()
+        var codepoint = Codepoint(unsafe_unchecked_codepoint=c)
+        var num_bytes = codepoint.unsafe_write_utf8[
+            optimize_ascii=True, branchless=False
+        ](utf8_ptr)
+
+        utf8_offset += UInt(num_bytes)
+        c_idx += 1
+
+    result._set_byte_length(Int(utf8_offset))
+    return result^

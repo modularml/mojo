@@ -136,6 +136,12 @@ This version is still a work in progress.
 
 ## Library changes
 
+- `String` can now decode UTF-32 input using the `String(from_utf32=...)`
+  constructor. It can also decode shorter unicode codepoint encodings like
+  ISO-8859-1 (aka. Latin-1) by using the `String(from_codepoints=...)`
+  constructor. PR [#5258](https://github.com/modular/modular/pull/5258) by
+  [@martinvuyk](https://github.com/martinvuyk).
+
 - `Coord` has a new `replace[at](value)` method that returns a `Coord` with
   the element at `at` swapped for `value`, keeping the other elements' types. A
   statically known element (`ComptimeInt`) has no runtime storage to assign
