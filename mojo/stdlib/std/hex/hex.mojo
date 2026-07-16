@@ -10,6 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Provides functions for hex encoding/decoding.
+
+You can import these APIs from the `hex` package. For example:
+
+```mojo
+from std.hex import hex_encode, hex_decode
+```
+"""
 
 comptime _HEX_CHARS: StaticString = "0123456789abcdef"
 

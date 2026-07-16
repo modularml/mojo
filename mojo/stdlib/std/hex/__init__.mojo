@@ -10,5 +10,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Binary data encoding: hexadecimal encode/decode functions.
+
+The `hex` package provides functions for encoding and decoding binary data
+using hexadecimal (base16) notation. Hexadecimal encoding represents each byte
+as two ASCII characters drawn from the digits 0-9 and the letters a-f, making
+binary data directly readable and unambiguous at the cost of doubling its size.
+Because the mapping is byte-aligned and requires no padding,
+easy to inspect by eye, and trivially reversible.
+
+Use this package for rendering hashes, checksums, and cryptographic digests as
+text, inspecting or logging raw bytes in a human-readable form, parsing hex
+literals from configuration files or wire formats, or converting between binary
+and text representations where clarity matters more than compactness.
+"""
 
 from .hex import hex_encode, hex_decode
