@@ -13,13 +13,22 @@
 
 from std.hex import hex_encode, hex_decode
 
-from std.testing import assert_equal
+from std.testing import assert_equal, assert_raises
 from std.testing import TestSuite
 
 
 def test_hex_encode() raises:
-    var random_bytes = [0x01, 0x23, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xFF]
-    assert_equal(hex_encode(random_bytes), "012356789abcdeff")
+    var random_bytes: List[Byte] = [
+        0x01,
+        0x23,
+        0x56,
+        0x78,
+        0x9A,
+        0xBC,
+        0xDE,
+        0xFF,
+    ]
+    assert_equal(hex_encode(random_bytes[:]), "012356789abcdeff")
 
 
 def test_hex_decode() raises:
@@ -45,24 +54,24 @@ def test_hex_decode() raises:
         0xDE,
         0xFF,
     ]
-    assert_equal(hex_decode("012356789abcdeff"), random_bytes_fixed)
+    assert_equal(hex_decode[8]("012356789abcdeff"), random_bytes_fixed)
 
 
 def test_ivalid_hex_decode() raises:
     with assert_raises():
-        _ = hex.decode("abc")
+        _ = hex_decode("abc")
 
     with assert_raises():
-        _ = hex.decode[4]("00ff")  # too short
+        _ = hex_decode[4]("00ff")  # too short
 
     with assert_raises():
-        _ = hex.decode[4]("00ffff0011")  # too long
+        _ = hex_decode[4]("00ffff0011")  # too long
 
     with assert_raises():
-        _ = hex.decode[4]("0g")  # invalid character
+        _ = hex_decode("0g")  # invalid character
 
     with assert_raises():
-        _ = hex.decode[4]("0Ƹ")  # invalid character
+        _ = hex_decode("0Ƹ")  # invalid character
 
 
 def main() raises:

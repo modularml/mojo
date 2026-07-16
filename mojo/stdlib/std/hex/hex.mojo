@@ -74,7 +74,7 @@ def hex_decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
         If the operation fails.
     """
 
-    var result = List[UInt8](capacity=str.byte_length() // 2)
+    var result = List[Byte](length=str.byte_length() // 2, fill=0)
     hex_decode(str, result)
     return result^
 
@@ -82,7 +82,7 @@ def hex_decode(str: StringSlice[mut=False, _]) raises -> List[Byte]:
 @always_inline
 def hex_decode[
     LEN: Int
-](str: StringSlice[mut=False, _]) raises -> InlineArray[UInt8, LEN]:
+](str: StringSlice[mut=False, _]) raises -> InlineArray[Byte, LEN]:
     """Performs hex decoding on the input string.
 
     Parameters:
@@ -98,7 +98,7 @@ def hex_decode[
         If the operation fails.
     """
 
-    var result = InlineArray[UInt8, LEN](uninitialized=True)
+    var result = InlineArray[Byte, LEN](uninitialized=True)
     hex_decode(str, result)
     return result^
 
