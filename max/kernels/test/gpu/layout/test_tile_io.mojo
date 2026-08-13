@@ -37,7 +37,9 @@ Coverage:
   half-precision matmul prologue shape.
 - GENERIC -> SHARED (async cp.async, swizzled) -> GENERIC (swizzled)
   (exercises the swizzled write path of GenericToSharedAsyncTileCopier
-  against the existing swizzled SharedToGeneric reader).
+  against the existing swizzled SharedToGeneric reader). The bf16 case
+  has multiple 8-element SIMD vectors per thread to verify every logical
+  vector is copied exactly once.
 - GENERIC -> SHARED (async cp.async, masked=True with full src) ->
   GENERIC (smoke-tests the masked write path of
   GenericToSharedAsyncTileCopier; runtime-shape zero-fill verification
@@ -265,6 +267,11 @@ def async_generic_to_shared_to_generic_16b_kernel(
 comptime _BF16_ROWS = 4
 comptime _BF16_COLS = 8
 comptime _BF16_NUM_ELEMENTS = _BF16_ROWS * _BF16_COLS
+comptime _BF16_SWIZZLED_ROWS = 2
+comptime _BF16_SWIZZLED_COLS = 16
+comptime _BF16_SWIZZLED_NUM_ELEMENTS = (
+    _BF16_SWIZZLED_ROWS * _BF16_SWIZZLED_COLS
+)
 
 
 def async_generic_to_shared_to_generic_16b_bf16_kernel(
@@ -294,6 +301,42 @@ def async_generic_to_shared_to_generic_16b_bf16_kernel(
     async_copy_wait_all()
     barrier()
     SharedToGenericTileCopier[thread_layout]().copy(dst, smem)
+
+
+def access_size_swizzled_vectorized_async_bf16_kernel(
+    src_ptr: MutPointer[BFloat16, MutAnyOrigin],
+    dst_ptr: MutPointer[BFloat16, MutAnyOrigin],
+):
+    """Roundtrip multiple swizzled 8-element bf16 vectors per thread."""
+    comptime thread_layout = row_major(Idx[2], Idx[1])
+    comptime simd_size = 8
+    comptime swizzle = make_swizzle[
+        num_rows=_BF16_SWIZZLED_ROWS,
+        row_size=_BF16_SWIZZLED_COLS,
+        access_size=simd_size,
+    ]()
+
+    var src = TileTensor(
+        src_ptr, row_major[_BF16_SWIZZLED_ROWS, _BF16_SWIZZLED_COLS]()
+    )
+    var dst = TileTensor(
+        dst_ptr, row_major[_BF16_SWIZZLED_ROWS, _BF16_SWIZZLED_COLS]()
+    )
+    var smem = stack_allocation[dtype=DType.bfloat16, address_space=.SHARED](
+        row_major[_BF16_SWIZZLED_ROWS, _BF16_SWIZZLED_COLS]()
+    )
+
+    GenericToSharedAsyncTileCopier[thread_layout, swizzle=swizzle]().copy(
+        smem.vectorize[1, simd_size](),
+        src.vectorize[1, simd_size](),
+    )
+    async_copy_commit_group()
+    async_copy_wait_all()
+    barrier()
+    SharedToGenericTileCopier[thread_layout, swizzle=swizzle]().copy(
+        dst.vectorize[1, simd_size](),
+        smem.vectorize[1, simd_size](),
+    )
 
 
 def masked_async_generic_to_shared_to_generic_kernel(
@@ -412,6 +455,7 @@ def _run_roundtrip[
     var src_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
     var dst_dev = ctx.enqueue_create_buffer[.float32](_NUM_ELEMENTS)
     ctx.enqueue_copy(src_dev, src_host)
+    dst_dev.enqueue_fill(Float32(0))
 
     ctx.enqueue_function[kernel_fn](
         src_dev, dst_dev, grid_dim=(1), block_dim=(_BLOCK_DIM)
@@ -480,6 +524,7 @@ def test_async_generic_to_shared_to_generic_16b_bf16(
     var src_dev = ctx.enqueue_create_buffer[.bfloat16](_BF16_NUM_ELEMENTS)
     var dst_dev = ctx.enqueue_create_buffer[.bfloat16](_BF16_NUM_ELEMENTS)
     ctx.enqueue_copy(src_dev, src_host)
+    dst_dev.enqueue_fill(BFloat16(0))
 
     ctx.enqueue_function[async_generic_to_shared_to_generic_16b_bf16_kernel](
         src_dev, dst_dev, grid_dim=(1), block_dim=(_BF16_ROWS)
@@ -515,6 +560,41 @@ def test_access_size_swizzled_vectorized_async(ctx: DeviceContext) raises:
     )
 
 
+def test_access_size_swizzled_vectorized_async_bf16(
+    ctx: DeviceContext,
+) raises:
+    var name = "test_access_size_swizzled_vectorized_async_bf16"
+    print("==", name)
+
+    var src_host = ctx.enqueue_create_host_buffer[.bfloat16](
+        _BF16_SWIZZLED_NUM_ELEMENTS
+    )
+    for i in range(_BF16_SWIZZLED_NUM_ELEMENTS):
+        src_host[i] = BFloat16(i + 1)
+
+    var src_dev = ctx.enqueue_create_buffer[.bfloat16](
+        _BF16_SWIZZLED_NUM_ELEMENTS
+    )
+    var dst_dev = ctx.enqueue_create_buffer[.bfloat16](
+        _BF16_SWIZZLED_NUM_ELEMENTS
+    )
+    ctx.enqueue_copy(src_dev, src_host)
+    dst_dev.enqueue_fill(BFloat16(0))
+
+    ctx.enqueue_function[
+        access_size_swizzled_vectorized_async_bf16_kernel
+    ](src_dev, dst_dev, grid_dim=(1), block_dim=(_BF16_SWIZZLED_ROWS))
+
+    var dst_host = ctx.enqueue_create_host_buffer[.bfloat16](
+        _BF16_SWIZZLED_NUM_ELEMENTS
+    )
+    ctx.enqueue_copy(dst_host, dst_dev)
+    ctx.synchronize()
+
+    for i in range(_BF16_SWIZZLED_NUM_ELEMENTS):
+        assert_equal(dst_host[i], src_host[i])
+
+
 def main() raises:
     with DeviceContext() as ctx:
         test_generic_to_shared_to_generic(ctx)
@@ -528,3 +608,4 @@ def main() raises:
         test_swizzled_async_generic_to_shared_to_generic(ctx)
         test_masked_async_generic_to_shared_to_generic(ctx)
         test_access_size_swizzled_vectorized_async(ctx)
+        test_access_size_swizzled_vectorized_async_bf16(ctx)

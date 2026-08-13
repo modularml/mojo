@@ -260,14 +260,14 @@ struct SharedToGenericTileCopier[
                 src_fragments._distance(src)
             )
             comptime num_stores_per_thread = (
-                src_fragments.LayoutType.static_product // simd_size
+                src_fragments.LayoutType.static_product
             )
 
             comptime for i in range(num_stores_per_thread):
                 var src_idx = src_fragments.layout[
                     linear_idx_type=src.linear_idx_type
-                ](Idx[i * simd_size])
-                var dst_idx = dst_fragments.layout(Idx[i * simd_size])
+                ](Idx[i])
+                var dst_idx = dst_fragments.layout(Idx[i])
                 var src_idx_base = umod(
                     src_idx,
                     Scalar[src.linear_idx_type](swizzle_fn.size()),
