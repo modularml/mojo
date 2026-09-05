@@ -13,10 +13,10 @@ functional changes) should contain tests.
 
 | Directory                     | Purpose                                               | Primary Tool           |
 |-------------------------------|-------------------------------------------------------|------------------------|
-| `KGEN/test/mojo-parser/`      | Front-end unit tests (lexing, parsing, type-checking) | `%parse-mojo-isolated` |
-| `KGEN/test/mojo-integration/` | Full compiler tests (elaboration, codegen, execution) | `%mojo`, `kgen`        |
-| `KGEN/test/kgen/transforms/`  | Individual optimization pass tests                    | `kgen-opt`             |
-| `KGEN/test/test-packages/`    | Standard library stubs for isolated tests             | N/A                    |
+| `Mojo/test/mojo-parser/`      | Front-end unit tests (lexing, parsing, type-checking) | `%parse-mojo-isolated` |
+| `Mojo/test/mojo-integration/` | Full compiler tests (elaboration, codegen, execution) | `%mojo`, `kgen`        |
+| `Mojo/test/kgen/transforms/`  | Individual optimization pass tests                    | `kgen-opt`             |
+| `Mojo/test/test-packages/`    | Standard library stubs for isolated tests             | N/A                    |
 
 ## Running Tests
 
