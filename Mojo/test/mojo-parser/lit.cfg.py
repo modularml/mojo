@@ -53,5 +53,5 @@ config.substitutions.append(
 
 
 config.environment["MODULAR_HOME"] = os.path.join(
-    "KGEN", "test", "mojo-parser"
+    "Mojo", "test", "mojo-parser"
 )
