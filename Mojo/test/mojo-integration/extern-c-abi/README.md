@@ -161,7 +161,7 @@ Compile all C source files into a static library:
 
 ```bash
 # Navigate to this directory
-cd KGEN/test/mojo-integration/extern-c-abi/
+cd Mojo/test/mojo-integration/extern-c-abi/
 
 # Compile all C files to object files
 clang -c -O0 -g c_abi_test_int_structs.c \
