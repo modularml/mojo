@@ -54,8 +54,8 @@ Key source files:
 
 | File                                           | Role                                                                                                        |
 |------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
-| `KGEN/tools/mojo-lsp-server/MojoServer.cpp`    | Bulk of the implementation: `Context`, `LSPParserListener`, `SymbolIndex`, parse flow, all feature handlers |
-| `KGEN/tools/mojo-lsp-server/MojoDocument.h`    | Document model headers, feature API                                                                         |
+| `Mojo/tools/mojo-lsp-server/MojoServer.cpp`    | Bulk of the implementation: `Context`, `LSPParserListener`, `SymbolIndex`, parse flow, all feature handlers |
+| `Mojo/tools/mojo-lsp-server/MojoDocument.h`    | Document model headers, feature API                                                                         |
 | `Mojo/include/Mojo/MojoTooling/ParserDriver.h` | `MojoParserContext` — the tooling-facing parser driver                                                      |
 | `Mojo/include/Mojo/MojoParser/EntryPoint.h`    | `ParserConfig` and the `ParserListener` interface                                                           |
 
@@ -68,7 +68,7 @@ LSP holds one per open document and drives it.
 It is constructed inside `MojoDocument::Context`, which also wires the LSP's
 listener into the `ParserConfig`:
 
-```728:749:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```728:749:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 struct MojoDocument::Context {
   Context(MojoDocument &mainDoc)
       : mlirContext(MLIRContext::Threading::DISABLED),
@@ -171,7 +171,7 @@ feature requests are enqueued *behind* it in FIFO order, so they transparently
 see the freshly built index. The document parse entry point itself is one call
 into the tooling driver, followed by semantic checking and docstring handling:
 
-```1940:1951:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```1940:1951:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 size_t MojoTextDocument::parseDocumentImpl() {
   KGEN::CompilerTimeTraceScope traceScope("parseTextDocument");
 
@@ -314,7 +314,7 @@ This is the structural-facts sink of the generalized parse: the
 > exceptions that *do* re-invoke the parser (`codeComplete`, `signatureHelp`)
 > are the specialized parses below.
 
-Files: `KGEN/tools/mojo-lsp-server/MojoServer.cpp` (`LSPParserListener`,
+Files: `Mojo/tools/mojo-lsp-server/MojoServer.cpp` (`LSPParserListener`,
 `SymbolIndex`, `Symbol`, `SymbolRef`), `Mojo/lib/MojoParser/SharedState.cpp`
 (the `notifyListenerOnXxx` methods).
 
@@ -343,7 +343,7 @@ static bool isListenerInterestedInLoc(ParserListener *listener, SMLoc loc) {
 `LSPParserListener::isInterestedInLoc` accepts only main-file locations, so the
 parser skips even materializing callback arguments for library code:
 
-```568:571:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```568:571:Mojo/tools/mojo-lsp-server/MojoServer.cpp
   bool isInterestedInLoc(SMLoc parserLoc) override {
     return mainDoc.containsLocation(mainDoc.translateParserLoc(parserLoc));
   }
@@ -362,7 +362,7 @@ two reference hooks funnel through `registerRef`:
 | `onAliasDecl`, `onFunctionDecl`, `onStructDecl`, `onStructFieldDecl`, `onTraitDecl`, `onVariableDecl`, `onParameterDecl`, `onArgumentDecl` (carries `argName`), `onModuleDecl` (skips main file's own module) | `registerSymbol` |
 | `onRef` (resolved reference), `onModuleImport` (module name in `from M import …`)                                                                                                                             | `registerRef`    |
 
-```604:611:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```604:611:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 void LSPParserListener::addSymbolDecl(ASTDecl *decl, SMLoc loc,
                                       std::optional<StringRef> identifier) {
   MojoASTDeclRef declRef(decl);
@@ -421,7 +421,7 @@ Two consequences:
 
 Range helper (half-open span over the identifier text):
 
-```71:75:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```71:75:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 static SMRange getRangeForText(SMLoc loc, StringRef text) {
   if (!loc.isValid())
     return {};
@@ -435,7 +435,7 @@ static SMRange getRangeForText(SMLoc loc, StringRef text) {
 interval map only if the range is in the main file and the decl is not a
 module/package:
 
-```360:383:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```360:383:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 Symbol *SymbolIndex::registerSymbol(MojoASTDeclRef declRef,
                                     std::optional<StringRef> identifier,
                                     SMLoc identifierLoc) {
@@ -458,7 +458,7 @@ existing `Symbol` if the decl was already declared; otherwise register one on
 the fly. This is how a main-file reference to a **stdlib/imported decl** (whose
 declaration lives outside the main file) still gets a `Symbol`:
 
-```393:419:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```393:419:Mojo/tools/mojo-lsp-server/MojoServer.cpp
   SmallVector<Symbol *> symbols;
   for (MojoASTDeclRef ref : declRefs) {
     if (Symbol *symbol = findSymbol(ref)) {
@@ -484,7 +484,7 @@ intervals, so an overlapping new range is dropped. It also ignores the phantom
 
 #### Storage and interaction shape
 
-```281:293:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```281:293:Mojo/tools/mojo-lsp-server/MojoServer.cpp
   using MapT = llvm::IntervalMap<
       SMLoc, SymbolRef *,
       llvm::IntervalMapImpl::NodeSizer<SMLoc, Symbol *>::LeafSize,
@@ -514,7 +514,7 @@ The second sink of the generalized parse is the diagnostic stream. Diagnostics
 do **not** flow through the `ParserListener`; the parser emits them through
 LLVM's `SourceMgr` diagnostic handler, which the LSP installs around the parse:
 
-```808:822:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```808:822:Mojo/tools/mojo-lsp-server/MojoServer.cpp
         auto handlerFn = [](const llvm::SMDiagnostic &diag, void *ctx) {
           auto &handlerCtx = *static_cast<DiagHandlerContext *>(ctx);
 
@@ -567,7 +567,7 @@ runs a few early compiler passes. **The only thing it feeds back to the LSP is
 diagnostics** — and it does so by reusing Sink 2 (the same `SourceMgr` diag
 handler), not a new channel. No structural info escapes it.
 
-```926:952:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```926:952:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 void MojoDocument::checkModuleSemantics(MojoASTDeclRef decl) {
   ...
   // Don't check the semantics of the module if there were parser errors.
@@ -694,7 +694,7 @@ up by `parseCompletionImpl` in `Mojo/lib/MojoTooling/CodeComplete.cpp`:
 
 Files: `Mojo/lib/MojoTooling/CodeComplete.cpp`,
 `MojoTextDocument::onCodeCompletionSyncImpl` in
-`KGEN/tools/mojo-lsp-server/MojoServer.cpp`.
+`Mojo/tools/mojo-lsp-server/MojoServer.cpp`.
 
 Key idea: **completion is not a special parse mode.** It is the same
 `parseFileForLSP` parse, run with a different `ParserListener`
@@ -707,7 +707,7 @@ completion-agnostic; the listener decides what to harvest at the cursor.
 and calls the **static** `MojoParserContext::codeComplete` with a **fresh
 `MLIRContext`**:
 
-```1993:2002:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```1993:2002:Mojo/tools/mojo-lsp-server/MojoServer.cpp
   llvm::SourceMgr &sourceMgr = getSourceMgr();
   const llvm::MemoryBuffer *buffer =
       sourceMgr.getMemoryBuffer(sourceMgr.getMainFileID());
@@ -805,7 +805,7 @@ pull each candidate module's doc string.
 Files: `Mojo/lib/MojoTooling/CodeComplete.cpp`,
 `MojoTextDocument::onSignatureHelpSyncImpl` /
 `MojoDocument::onSignatureHelpSync` in
-`KGEN/tools/mojo-lsp-server/MojoServer.cpp`.
+`Mojo/tools/mojo-lsp-server/MojoServer.cpp`.
 
 `signatureHelp` is the **twin of `codeComplete`** — same throwaway-context,
 `parseFileForLSP`-based, diagnostics-suppressed parse dispatched through the
@@ -898,7 +898,7 @@ per request, cursor-as-`isInterestedInLoc`-filter) is shared with
 
 Files: `Mojo/lib/MojoTooling/ParserDriverREPL.cpp`,
 `MojoDocStrings::addDocString` / `processDocStrings` in
-`KGEN/tools/mojo-lsp-server/MojoServer.cpp`.
+`Mojo/tools/mojo-lsp-server/MojoServer.cpp`.
 
 A Mojo docstring can embed ` ```mojo ` code blocks. To offer
 diagnostics/hover/completion inside them, the LSP parses each block via
@@ -965,7 +965,7 @@ detected and re-injected as `__mojo_repl_context__` fields for the next block,
 emulating REPL state. The REPL module decls accumulate in the persistent
 context.
 
-```1872:1876:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```1872:1876:Mojo/tools/mojo-lsp-server/MojoServer.cpp
     auto [moduleDecl, exprFnDecl] = ctx.parseREPLExpression(
         listener, bufferId, contents, "__mojo_repl_lsp_main",
         persistentVariables, prevDecl,
@@ -1076,7 +1076,7 @@ axes.
 Each document's `Context` builds a fresh `MLIRContext` **with threading
 disabled** and its own `MojoParserContext` / `SourceMgr` / `SymbolIndex`:
 
-```728:740:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```728:740:Mojo/tools/mojo-lsp-server/MojoServer.cpp
 struct MojoDocument::Context {
   Context(MojoDocument &mainDoc)
       : mlirContext(MLIRContext::Threading::DISABLED),
@@ -1095,7 +1095,7 @@ Every operation touching a document's parse state (the parse itself *and* every
 feature query) is dispatched via `startTask`, which chains tasks so they run
 one-at-a-time, lock-free:
 
-```329:339:KGEN/tools/mojo-lsp-server/MojoDocument.h
+```329:339:Mojo/tools/mojo-lsp-server/MojoDocument.h
   template <typename FnT>
   void startTask(FnT &&fn) {
     auto [previous, current] = enqueueNewTask();
@@ -1131,7 +1131,7 @@ The server never mutates a live parse in place. On every (debounced) edit,
 `addDocumentImmediate` invalidates the existing document and replaces it with a
 brand-new one, whose chain restarts at index 0:
 
-```2386:2400:KGEN/tools/mojo-lsp-server/MojoServer.cpp
+```2386:2400:Mojo/tools/mojo-lsp-server/MojoServer.cpp
     // If a document already exists, invalidate that version.
     MLRT::CPUDevice &cpuDevice = *ctx->get<MLRT::CPUDevice>();
     if (it->second) {
