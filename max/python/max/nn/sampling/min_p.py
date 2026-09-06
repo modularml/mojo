@@ -47,7 +47,7 @@ class MinPSampler(Module):
         self, input: TensorValue, min_p: TensorValueLike = 0.0
     ) -> TensorValue:
         batch_size = input.shape[0]
-        # Handle top_p parameter - can be scalar or tensor
+        # Handle min_p parameter - can be scalar or tensor
         if isinstance(min_p, float | int):
             if float(min_p) < 0.0 or float(min_p) > 1.0:
                 raise ValueError(f"expected min_p to be in [0, 1], got {min_p}")
