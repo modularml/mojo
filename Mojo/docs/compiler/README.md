@@ -23,8 +23,8 @@ some of the commands. For details, see
     - `compiler/manual/` -- intro docs, written assuming no prior Mojo compiler
       knowledge; for newcomers to the compiler team, or folks making drive-by
       contributions.
-    - `compiler/overviews/` -- subsystem and cross-cutting behavior overviews, for
-      those more familiar with the compiler.
+    - `compiler/overviews/` -- subsystem and cross-cutting behavior overviews, 
+      for those more familiar with the compiler.
     - `compiler/arcana/` -- more detailed docs, diving deep into nuanced behavior;
       useful for someone trying to debug the compiler, this has the vital hidden
       clues.
