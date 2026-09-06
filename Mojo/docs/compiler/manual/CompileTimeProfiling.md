@@ -15,7 +15,7 @@ act on.
 
 See them and their full help text with `mojo build --help-hidden` or
 `mojo run --help-hidden`. Their definitions live in
-`KGEN/tools/mojo/Common/CompilationOptions.td`.
+`Mojo/tools/mojo/Common/CompilationOptions.td`.
 
 Four things to know before reading any report they produce:
 
@@ -194,7 +194,7 @@ them; they matter when checking its output or writing another consumer.
 ### The MLIR root is the whole compile
 
 It spans parsing, the passes, and code generation, because the `MLIRPassTiming`
-object lives for all of `build()` in `KGEN/tools/mojo/Build/mojo-build.cpp`. On
+object lives for all of `build()` in `Mojo/tools/mojo/Build/mojo-build.cpp`. On
 one gemma-4 compile the root read 272.34s against 272.56s of wall clock. Take
 the compile total from the root; never add sections to it.
 
