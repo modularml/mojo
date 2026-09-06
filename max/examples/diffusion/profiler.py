@@ -279,6 +279,7 @@ class ExecuteProfiler(AbstractContextManager["ExecuteProfiler"]):
                 ("scheduler_step", "scheduler_step"),
                 ("preprocess_latents", "preprocess_latents"),
                 ("prepare_image_latents", "prepare_image_latents"),
+                ("_prepare_i2v_condition", "prepare_i2v_condition"),
             ]
         else:
             specs = [
@@ -344,7 +345,12 @@ class ExecuteProfiler(AbstractContextManager["ExecuteProfiler"]):
         if not isinstance(comps, dict):
             return
 
-        for name in comps:
+        # Also wrap transformer_2 if present (MoE dual transformer)
+        extra_names = []
+        if hasattr(target, "transformer_2") and getattr(target, "transformer_2", None) is not None:
+            extra_names.append("transformer_2")
+
+        for name in list(comps) + extra_names:
             if name in ("scheduler", "tokenizer"):
                 continue
             if not hasattr(target, name):
