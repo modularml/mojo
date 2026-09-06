@@ -226,11 +226,11 @@ aggressively reduce and simplify your test case.
 
 For example, try taking out the standard library and builtins by passing
 `kgen-translate %s --mojo-disable-builtins -import-mojo`. This might require
-some effort, because things like `Optional`, `List`, and even `Int` won’t be
-available. Look at `KGEN/test/test-packages/std/builtin/stubs.mojo` for
+some effort, because things like `Optional`, `List`, and even `Int` won't be
+available. Look at `Mojo/test/test-packages/std/builtin/stubs.mojo` for
 inspiration on how to nicely fake those.
 
-For an example, see `KGEN/test/mojo-parser/trait_metatype_roundtrip.mojo`.
+For an example, see `Mojo/test/mojo-parser/trait_metatype_roundtrip.mojo`.
 
 Caveat: The Mojo compiler hard-codes `AnyType`, so if you make your own trait
 named `AnyType` it might not work as expected. Also, Mojo secretly automatically
