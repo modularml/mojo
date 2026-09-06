@@ -28,7 +28,7 @@ For example, this will open the debugger for the `traits_with_builtin.mojo`
 test:
 
 ```bash
-bd //Mojo/tools/kgen-translate -- -import-mojo KGEN/test/mojo-parser/traits_with_builtin.mojo
+bd //Mojo/tools/kgen-translate -- -import-mojo Mojo/test/mojo-parser/traits_with_builtin.mojo
 ```
 
 Generally, test files contain a `# RUN:` line which contains the command to add
@@ -41,7 +41,7 @@ after `vscode-debug`, like:
 To make it work in vscode, put `--vscode` after the `bd`. For example:
 
 ```python
-bd --vscode //Mojo/tools/kgen-translate -- -import-mojo KGEN/test/mojo-parser/traits_with_builtin.mojo
+bd --vscode //Mojo/tools/kgen-translate -- -import-mojo Mojo/test/mojo-parser/traits_with_builtin.mojo
 ```
 
 ## Printing
@@ -106,7 +106,7 @@ information:
 
 ```cpp
 if (auto fileLineColLoc = dyn_cast<mlir::FileLineColLoc>(mlirLoc)) {
-  // Prints: /Users/verdagon/modular/KGEN/test/mojo-parser/traits_without_builtin.mojo:24:33
+  // Prints: /Users/verdagon/modular/Mojo/test/mojo-parser/traits_without_builtin.mojo:24:33
   llvm::outs() << fileLineColLoc.getFilename().str() << ":"
       << fileLineColLoc.getLine() << ":"
       << fileLineColLoc.getColumn() << "\n";
