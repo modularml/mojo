@@ -96,6 +96,51 @@ def vectorized_load_store_kernel(
     tensor.store[width=4](coord[1, 0], val)
 
 
+def atomic_add_kernel(
+    tensor: TileTensor[
+        mut=True,
+        DType.int32,
+        _4x4,
+        MutAnyOrigin,
+        address_space=AddressSpace.GLOBAL,
+    ],
+) raises:
+    """Perform an atomic add through TileTensor to test lowering."""
+    tensor.atomic_add(coord[0, 0], Scalar[DType.int32](1))
+
+
+def atomic_max_kernel(
+    tensor: TileTensor[
+        mut=True,
+        DType.int32,
+        _4x4,
+        MutAnyOrigin,
+        address_space=AddressSpace.GLOBAL,
+    ],
+) raises:
+    """Perform an atomic max through TileTensor to test lowering."""
+    tensor.atomic_max(coord[0, 0], Scalar[DType.int32](0))
+
+
+def atomic_compare_exchange_kernel(
+    tensor: TileTensor[
+        mut=True,
+        DType.int32,
+        _4x4,
+        MutAnyOrigin,
+        address_space=AddressSpace.GLOBAL,
+    ],
+) raises:
+    """Perform an atomic compare-exchange through TileTensor to test lowering.
+    """
+    var expected = Scalar[DType.int32](0)
+    _ = tensor.atomic_compare_exchange(
+        coord[0, 0],
+        expected,
+        Scalar[DType.int32](1),
+    )
+
+
 # ===-----------------------------------------------------------------------===#
 # Tests
 # ===-----------------------------------------------------------------------===#
@@ -147,6 +192,37 @@ def test_tile_tensor_vectorized_load_store() raises:
     assert_true(
         ".v4." in asm,
         "expected .v4. for vectorized TileTensor load/store",
+    )
+
+
+def test_tile_tensor_atomic_add() raises:
+    """TileTensor atomic add emits an atomic add instruction."""
+    var asm = _compile_code[atomic_add_kernel, target=_SM80]()
+    assert_true(
+        "atom.acquire.sys.global.add" in asm,
+        "expected atom.acquire.sys.global.add for TileTensor atomic_add",
+    )
+
+
+def test_tile_tensor_atomic_max() raises:
+    """TileTensor atomic max emits an atomic max instruction."""
+    var asm = _compile_code[atomic_max_kernel, target=_SM80]()
+    assert_true(
+        "atom.acquire.sys.global.max" in asm,
+        "expected atom.acquire.sys.global.max for TileTensor atomic_max",
+    )
+
+
+def test_tile_tensor_atomic_compare_exchange() raises:
+    """TileTensor atomic compare_exchange emits a compare-and-swap instruction.
+    """
+    var asm = _compile_code[atomic_compare_exchange_kernel, target=_SM80]()
+    assert_true(
+        "atom.acquire.sys.global" in asm and ("cas" in asm or "cmpxchg" in asm),
+        (
+            "expected an atomic compare-exchange instruction for TileTensor"
+            " atomic_compare_exchange"
+        ),
     )
 
 
