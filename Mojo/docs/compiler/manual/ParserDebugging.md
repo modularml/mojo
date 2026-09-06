@@ -167,11 +167,9 @@ by giving your breakpoint itself a condition:
 
 ![ExpressionBreakpoint.jpg](mdnb-data/manual-parser-debugging/ExpressionBreakpoint.jpg)
 
-In Mojo/include/Mojo/Support/Debugging.h there are two helpful methods:
+In Mojo/include/Mojo/Support/Debugging.h there is a helpful function:
 
-- `waitForDebuggerToAttach` will make the current debugging session pause, like
-  a breakpoint.
-- `attachToNewRemoteDebugSession` will start a new debugging session, if there’s
+- `attachToNewRemoteDebugSession` will start a new debugging session if there’s
   a VS Code window open and the Mojo extension is installed.
 
 ## Waiter Breakpoints
