@@ -19,7 +19,7 @@ from max.gpu.primitives.id import lane_id, warp_id
 from max.gpu.primitives.warp import shuffle_up
 
 from std.math import abs
-from std.atomic import Atomic
+from std.atomic import Atomic, Ordering
 from std.utils import StaticTuple
 
 # ========================== CONFIGURATION ==========================
@@ -123,7 +123,10 @@ def inter_block_scan(
             prev_block_partial_sum_s[0] = 0.0
         else:
             # Wait for previous block to pass partial sum
-            while Atomic.load(flags + Int(bid - 1)) == 0:
+            while (
+                Atomic.load[ordering=Ordering.ACQUIRE](flags + Int(bid - 1))
+                == 0
+            ):
                 pass
 
             # Read previous block's partial sum
@@ -133,7 +136,9 @@ def inter_block_scan(
         partial_sums[Int(bid)] = prev_block_partial_sum_s[0] + val
 
         # Set this block's flag
-        _ = Atomic.fetch_add(flags + Int(bid), UInt32(1))
+        _ = Atomic.fetch_add[ordering=Ordering.RELEASE](
+            flags + Int(bid), UInt32(1)
+        )
 
     barrier()
     return prev_block_partial_sum_s[0]

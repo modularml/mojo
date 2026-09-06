@@ -19,7 +19,7 @@ from max.gpu.primitives.id import lane_id, warp_id
 from max.gpu.primitives.warp import shuffle_up
 
 from std.math import abs
-from std.atomic import Atomic
+from std.atomic import Atomic, Ordering
 
 # ========================== CONFIGURATION ==========================
 comptime BLOCK_DIM = 256
@@ -110,7 +110,10 @@ def test_interblock_scan(
         var bid = UInt32(block_idx.x)
         if bid > 0:
             # Wait for previous block to pass partial sum
-            while Atomic.load(flags + Int(bid - 1)) == 0:
+            while (
+                Atomic.load[ordering=Ordering.ACQUIRE](flags + Int(bid - 1))
+                == 0
+            ):
                 pass
 
             # Read previous block's partial sum
@@ -122,7 +125,9 @@ def test_interblock_scan(
         partial_sums[Int(bid)] = prev_block_sum_ptr[0] + result
 
         # Set this block's flag
-        _ = Atomic.fetch_add(flags + Int(bid), UInt32(1))
+        _ = Atomic.fetch_add[ordering=Ordering.RELEASE](
+            flags + Int(bid), UInt32(1)
+        )
 
     barrier()
 
