@@ -1,0 +1,21 @@
+load("//bazel:api.bzl", "modular_py_library")
+
+package(default_visibility = ["//max:consumers"])
+
+modular_py_library(
+    name = "bert_mlm",
+    srcs = glob(["**/*.py"]),
+    ignore_extra_deps = [
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+    ],
+    deps = [
+        "//max/python/max/pipelines/architectures/bert",
+        "//max/python/max/graph",
+        # Hooks added for convenience for when we want to print the model layers
+        "//max/python/max/nn/hooks",
+        "//max/python/max/pipelines/context",
+        "//max/python/max/pipelines/lib",
+        "//max/python/max/pipelines/modeling",
+    ],
+)
