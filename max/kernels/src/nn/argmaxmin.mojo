@@ -63,7 +63,7 @@ def _argn[
 
     comptime for subaxis in range(rank):
         var output_subaxis = output.dim(subaxis)
-        var input_subaxis = output.dim(subaxis)
+        var input_subaxis = input.dim(subaxis)
         if subaxis == canonical_axis:
             if output_subaxis != 1:
                 raise Error("expected axis to have size 1 in output")
