@@ -280,8 +280,9 @@ Here's what happens when you instantiate a `Graph`:
 
 As you can see, the `__call__()` method doesn't perform a forward pass on
 tensors. It only records the operations into a graph. To perform a forward
-pass, you must first load the `Graph` instance into an inference session, which
-compiles the graph with hardware-specific optimizations.
+pass, you must first compile the `Graph` instance with an inference session,
+which applies hardware-specific optimizations, and then initialize the compiled
+artifact with your weights.
 
 :::note
 

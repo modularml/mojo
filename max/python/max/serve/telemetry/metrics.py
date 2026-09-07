@@ -308,6 +308,45 @@ SERVE_METRICS: dict[str, SupportedInstruments] = {
             "the DI dispatch latency breakdown."
         ),
     ),  # type: ignore
+    "maxserve.di.early_sync_time": _meter.create_histogram(
+        "maxserve.di.early_sync_time",
+        unit="ms",
+        description=(
+            "Duration of the early-sync guard's blocking commit of the "
+            "previous batch's structured-output FSM state, when it fired "
+            "(see '_should_early_sync_prev_batch')."
+        ),
+    ),  # type: ignore
+    "maxserve.di.ce_preempted_tg_iteration_count": _meter.create_counter(
+        "maxserve.di.ce_preempted_tg_iteration_count",
+        description=(
+            "Counter: incremented once per scheduling iteration in which a "
+            "CE batch was admitted while TG requests were pending, so those "
+            "TG requests got zero progress this iteration -- how often this "
+            "preemption pattern occurs."
+        ),
+    ),  # type: ignore
+    "maxserve.di.ce_preempted_tg_pending_count": _meter.create_histogram(
+        "maxserve.di.ce_preempted_tg_pending_count",
+        description=(
+            "Histogram: the number of TG requests pending at the moment of "
+            "one such preemption (paired with "
+            "'maxserve.di.ce_preempted_tg_iteration_count', which counts how "
+            "often it happens; this measures how large each occurrence is)."
+        ),
+    ),  # type: ignore
+    "maxserve.di.handoff_to_first_token_time": _meter.create_histogram(
+        "maxserve.di.handoff_to_first_token_time",
+        unit="ms",
+        description=(
+            "Wall-clock time from a prefill-to-decode handoff landing (its "
+            "token discarded, re-queued as a one-token chunked-CE "
+            "continuation) to decode's own re-forward actually sending "
+            "token 1 to the API process. A TTFT contribution specific to "
+            "the handoff path; the ordinary path's token already arrives "
+            "with the 'PrefillResponse', so it has no equivalent wait."
+        ),
+    ),  # type: ignore
     "maxserve.cache.num_used_blocks": _meter.create_gauge(
         "maxserve.cache.num_used_blocks",
         unit="blocks",
@@ -634,6 +673,18 @@ SERVE_METRICS: dict[str, SupportedInstruments] = {
             "Count of structured-output requests rejected at admission "
             "(HTTP 400) because the active grammar backend could not compile "
             "the schema, split by the 'kind' tag (tool_grammar, json_schema)."
+        ),
+    ),  # type: ignore
+    "maxserve.structured_output.grammar_build_time": _meter.create_histogram(
+        "maxserve.structured_output.grammar_build_time",
+        unit="ms",
+        description=(
+            "Wall-clock time of an off-thread grammar-matcher build in "
+            "AsyncGrammarGate, from the start of the backend's compile/create "
+            "call to its completion. For a DI handoff, this build overlaps "
+            "prefill's round trip when submitted at admission time; a build "
+            "that outlasts that round trip can still gate the handoff's "
+            "chunked-CE continuation."
         ),
     ),  # type: ignore
     "maxserve.response_format.conformance_errors": _meter.create_counter(
@@ -1154,6 +1205,54 @@ class _AsyncMetrics:
             ),
         )
 
+    def di_early_sync_time(self, ms: float) -> None:
+        """Duration of the early-sync guard's blocking commit of the
+        previous batch's structured-output FSM state, when it fired (see
+        ``_should_early_sync_prev_batch``)."""
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.di.early_sync_time", ms, self.extra_attributes
+            ),
+        )
+
+    def di_ce_preempted_tg_iteration_count(self) -> None:
+        """Counter: how often a CE batch admits work while TG requests are
+        pending, giving those TG requests zero progress that iteration."""
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.di.ce_preempted_tg_iteration_count",
+                1,
+                self.extra_attributes,
+            ),
+        )
+
+    def di_ce_preempted_tg_pending_count(self, count: int) -> None:
+        """Histogram: how large each such preemption was -- the number of TG
+        requests pending at the moment (paired with
+        ``di_ce_preempted_tg_iteration_count``, which counts how often)."""
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.di.ce_preempted_tg_pending_count",
+                count,
+                self.extra_attributes,
+            ),
+        )
+
+    def di_handoff_to_first_token_time(self, ms: float) -> None:
+        """Wall-clock time from a prefill-to-decode handoff landing (its
+        token discarded, re-queued as a one-token chunked-CE continuation)
+        to decode's own re-forward actually sending token 1 to the API
+        process. A TTFT contribution specific to the handoff path; the
+        ordinary path's token already arrives with the ``PrefillResponse``,
+        so it has no equivalent wait."""
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.di.handoff_to_first_token_time",
+                ms,
+                self.extra_attributes,
+            ),
+        )
+
     def cache_num_used_blocks(self, num_used_blocks: int) -> None:
         self.client.send_measurement(
             MaxMeasurement(
@@ -1634,6 +1733,16 @@ class _AsyncMetrics:
                 "maxserve.structured_output.grammar_rejections",
                 1,
                 {**self.extra_attributes, "kind": kind},
+            ),
+        )
+
+    def structured_output_grammar_build_time(self, ms: float) -> None:
+        """Wall-clock time of an off-thread grammar-matcher build."""
+        self.client.send_measurement(
+            MaxMeasurement(
+                "maxserve.structured_output.grammar_build_time",
+                ms,
+                self.extra_attributes,
             ),
         )
 

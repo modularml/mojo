@@ -112,6 +112,8 @@ def extend_path(path: str, key: Any) -> str:
 
     .. code-block:: python
 
+        from max.experimental import tree_utils as tree
+
         assert tree.extend_path("blocks.3", "bias") == "blocks.3.bias"
         assert tree.extend_path("", "blocks") == "blocks"
         assert tree.extend_path("blocks.3", "") == "blocks.3"

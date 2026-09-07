@@ -226,7 +226,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         """Returns True if current thread is in the SFB TMA load warp (warp 6).
 
         Only meaningful when `has_sfb` (i.e. MMA_N < 64). Callers gate this
-        behind `@parameter if Self.MMA_N < 64` so the check is unreachable on
+        behind `comptime if Self.MMA_N < 64` so the check is unreachable on
         the no-SFB path, where the same threads host the scheduler warp.
         """
         return (
@@ -240,7 +240,7 @@ struct WarpRole1D1D[has_sfb: Bool = False, num_epi_warps: Int = 4](
         """Returns True if current thread is in an SFB TMEM load warp (warps 7-10).
 
         Only meaningful when `has_sfb` (i.e. MMA_N < 64); callers gate the
-        check with `@parameter if Self.MMA_N < 64`.
+        check with `comptime if Self.MMA_N < 64`.
         """
         return (
             thread_idx.x >= Self.SFB_LOAD_WARP_START

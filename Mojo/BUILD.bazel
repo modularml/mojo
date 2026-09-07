@@ -33,6 +33,7 @@ package_group(
         "//GraphCompiler/...",
         "//Kernels/...",
         "//Mojo/...",
+        "//Mojo/docs/site/...",
         "//bazel/...",
         "//docs/...",
         "//max/python/max/_core/internal/...",
@@ -40,7 +41,6 @@ package_group(
         "//oss/modular/bazel/...",
         "//oss/modular/docs/...",
         "//oss/modular/max/python/max/_core/internal/...",  # Only when testing internally
-        "//oss/modular/mojo/docs/...",
         "//plugins/...",
         "//utils/...",
     ],
@@ -64,7 +64,7 @@ pkg_files(
         ":LITDialect.doc",
         ":POPDialect.doc",
     ],
-    prefix = "KGEN/docs",
+    prefix = "Mojo/docs/compiler",
 )
 
 td_library(
@@ -748,6 +748,27 @@ gentbl_cc_library(
 )
 
 gentbl_cc_library(
+    name = "POPInterfacesIncGen",
+    includes = ["include"],
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "include/Mojo/POPDialect/POPInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/Mojo/POPDialect/POPInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/Mojo/POPDialect/POPInterfaces.td",
+    deps = [
+        ":POPDialectIncGen",
+        ":POPDialectTdFiles",
+    ],
+)
+
+gentbl_cc_library(
     name = "POPDialectBytecodeIncGen",
     includes = ["include"],
     tbl_outs = [
@@ -802,6 +823,7 @@ modular_cc_library(
         ":POPDialectBytecodeIncGen",
         ":POPDialectIncGen",
         ":POPEnumsIncGen",
+        ":POPInterfacesIncGen",
         ":TargetTraits",
         ":ToolCommon.headers",
         "//Support:ADT",
@@ -931,6 +953,12 @@ modular_shared_library(
         # processes too. internal_deps: the OSS build drops it, so OSS mojo
         # keeps the inert weak default and never compiles the loader.
         "//Support:ProfilerHostGlue",
+        # Same wiring for the external profiler annotation sink: attaches the
+        # dlopen loader for libmax_profiler_shim.so so the
+        # ExternalProfilerAnnotationBridge entry points annotate external
+        # profiler traces (NVTX/roctx). OSS builds drop it and keep the inert
+        # weak default.
+        "//Support:ExternalProfilerAnnotationHostGlue",
     ] + select({
         # Under --config=hal-device-context we don't link the full DeviceContext,
         # but we need CompilationDevice and the HAL-only CompilerDeviceArch.
@@ -950,10 +978,10 @@ modular_shared_library(
     output_name = "KGENCompilerRTShared",
     visibility = [
         "//Mojo:consumers",
+        "//Mojo/stdlib/std:__pkg__",
         "//Mojo/test/internal/profiling:__pkg__",
         "//Mojo/test/tracy:__pkg__",
         "//mojo/stdlib/std:__pkg__",
-        "//oss/modular/mojo/stdlib/std:__pkg__",
     ],
     deps = [
         "//AsyncRT:Runtime",

@@ -17,6 +17,7 @@ from .config import (
     RejectionSamplingStrategy,
     SpeculativeConfig,
     SpeculativeMethod,
+    VerifyWidthRange,
 )
 from .ragged_token_merger import RaggedTokenMerger, ragged_token_merger
 
@@ -26,5 +27,6 @@ __all__ = [
     "RejectionSamplingStrategy",
     "SpeculativeConfig",
     "SpeculativeMethod",
+    "VerifyWidthRange",
     "ragged_token_merger",
 ]

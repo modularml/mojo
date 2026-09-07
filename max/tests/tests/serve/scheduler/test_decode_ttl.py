@@ -46,6 +46,8 @@ def _make_self(
         transfer_engine=MagicMock(),
         response_queue=MagicMock(),
         dispatcher=MagicMock(),
+        batch_constructor=MagicMock(),
+        _handoff_landed_at={},
     )
     # Bind the real instance method so the cancel-to-prefill path runs.
     self_obj._send_cancel_to_prefill = (

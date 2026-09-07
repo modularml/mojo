@@ -14,10 +14,6 @@ modular_py_library(
         # Diffusers config files are loaded, but the package itself is not imported
         requirement("diffusers"),
     ],
-    ignore_unresolved_imports = [
-        # Lazy imports in _parse_dkv_cache_hint; kv_cache already depends on pipelines
-        "max.pipelines.kv_cache.connectors.dkv.connector.DKVExternalBlockMetadata",
-    ],
     test_docstring_examples = True,
     deps = [
         "//max/python/max:_core",

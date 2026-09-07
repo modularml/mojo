@@ -288,7 +288,7 @@ latter should return the “index” type, which corresponds to a size_t. These
 should all get `fold()`ers for when the parameter value is actually a known
 constant integer value. Note that we should not add support for dynamic SIMD
 length or dynamic SIMD datatypes. See
-[this for rationale](https://github.com/modularml/modular/blob/main/KGEN/docs/manual/Rationale.md#support-for-dynamic-shapes-in-zapbuffer-et-al).
+[this for rationale](https://github.com/modularml/modular/blob/main/Mojo/docs/compiler/manual/Rationale.md#support-for-dynamic-shapes-in-zapbuffer-et-al).
 
 ### ✅ Generator interface declarations and instances
 
@@ -341,9 +341,9 @@ generators.
     constraints <in(vecLen, 2,4,8,16,32), notequals(type, bf16)>
     ```
 
-    on kernels in the main design doc. Eventually expression syntax in general
-    can [move to infix syntax](https://github.com/modularml/modular/issues/1395)
-    (e.g.: `constraints <vecLen` ∈ `{2,4,8,16,32}, type != bf16>`).
+   on kernels in the main design doc. Eventually expression syntax in general
+   can [move to infix syntax](https://github.com/modularml/modular/issues/1395)
+   (e.g.: `constraints <vecLen` ∈ `{2,4,8,16,32}, type != bf16>`).
 
 2. ✅[Issue #1396](https://github.com/modularml/modular/issues/1396) When we
    have an IR representation for constraints, the elaborator needs to start

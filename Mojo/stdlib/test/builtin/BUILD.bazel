@@ -1,0 +1,156 @@
+load("//bazel:api.bzl", "lit_tests", "mojo_filecheck_test", "mojo_test")
+
+package(default_visibility = ["//visibility:private"])
+
+_DATA = [
+    "test_file_dummy_input.txt",
+]
+
+_NO_ASAN = [
+    "test_simd.mojo",  # Takes too long to compile with ASAN
+    # 25 `compile_info[...]` calls, every one of them retargeting to NVPTX or
+    # AMDGPU. Under asan on aarch64 the comptime compiler invocations blow past
+    # the remote-executor timeout, the same way `test_compile_atomic.mojo` does.
+    # Tracked in MOCO-3794.
+    "test_range_codegen.mojo",
+]
+
+_PLATFORM_CONSTRAINTS = {
+    src: select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    })
+    for src in _NO_ASAN
+}
+
+_FILECHECK_TESTS = [
+    "test_debug_assert.mojo",
+    "test_debug_assert_compile_time.mojo",
+    "test_debug_assert_default_error.mojo",
+    "test_debug_assert_location.mojo",
+    "test_debug_assert_mode_all.mojo",
+    "test_debug_assert_mode_all_error.mojo",
+    "test_debug_assert_mode_none.mojo",
+    "test_debug_assert_no_message.mojo",
+    "test_debug_assert_warning.mojo",
+    "test_range_len_overflow_abort.mojo",
+]
+
+_LIT_TESTS = [
+    "test_bool_indexer_compile_fail.mojo",
+    "test_debug_assert_no_message_codegen.mojo",
+    "test_default_equatable_compile_fail.mojo",
+    "test_default_hashable_compile_fail.mojo",
+    "test_default_writable_compile_fail.mojo",
+    "test_format_compile_fail.mojo",
+    "test_format_float_lut_optimization.mojo",
+    "test_global_constant_compile_fail.mojo",
+    "test_issue_3908.mojo",
+    "test_print_long_string.mojo",
+    "test_print_stderr.mojo",
+    "test_simd_pow_compile_fail.mojo",
+    "test_stdin.mojo",
+]
+
+_MOJO_COMPILE_OPTS = {
+    "test_debug_assert_mode_none.mojo": [
+        "-D",
+        "ASSERT=none",
+    ],
+    "test_debug_assert_warning.mojo": [
+        "-D",
+        "ASSERT=warn",
+    ],
+}
+
+_DISABLED_ASSERTIONS = [
+    "test_debug_assert_mode_none.mojo",  # NOTE: only here because ASSERT cannot be passed more than once
+    "test_debug_assert_warning.mojo",  # NOTE: only here because ASSERT cannot be passed more than once
+]
+
+_EXPECT_CRASH = [
+    "test_debug_assert_default_error.mojo",
+    "test_debug_assert_mode_all_error.mojo",
+    "test_debug_assert_location.mojo",
+    "test_debug_assert_no_message.mojo",
+    "test_range_len_overflow_abort.mojo",
+]
+
+# Codegen budgets have to read the assembly a release build emits, so this test
+# opts out of the debug info and the assertions the rest of the package compiles
+# with — both of which land instructions in the loops it measures.
+_CODEGEN_TESTS = [
+    "test_range_codegen.mojo",
+]
+
+_EXTRA_DEPS = {
+    "test_device_passable.mojo": ["//max:max_mojo"],
+}
+
+[
+    mojo_filecheck_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ] + _MOJO_COMPILE_OPTS.get(src, []),
+        enable_assertions = src not in _DISABLED_ASSERTIONS,
+        expect_crash = src in _EXPECT_CRASH,
+        target_compatible_with = _PLATFORM_CONSTRAINTS.get(src, []),
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in _FILECHECK_TESTS
+]
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        copts = [
+            "--debug-level",
+            "full",
+        ],
+        data = _DATA + [src],  # NOTE: some tests attempt to read their source files
+        target_compatible_with = _PLATFORM_CONSTRAINTS.get(src, []),
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ] + _EXTRA_DEPS.get(src, []),
+    )
+    for src in glob(
+        ["*.mojo"],
+        exclude = _FILECHECK_TESTS + _LIT_TESTS + _CODEGEN_TESTS,
+    )
+]
+
+[
+    mojo_test(
+        name = src + ".test",
+        srcs = [src],
+        enable_assertions = False,
+        target_compatible_with = _PLATFORM_CONSTRAINTS.get(src, []),
+        deps = [
+            "@mojo//:std",
+            "@mojo//:test_utils",
+        ],
+    )
+    for src in _CODEGEN_TESTS
+]
+
+lit_tests(
+    name = "lit_tests",
+    size = "large",
+    srcs = _LIT_TESTS,
+    mojo_deps = [
+        "@mojo//:std",
+    ],
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+)

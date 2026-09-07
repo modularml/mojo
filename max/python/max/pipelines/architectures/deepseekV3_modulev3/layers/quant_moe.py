@@ -46,6 +46,7 @@ from .quant_ops import (
     EPDispatchPayload,
     ep_requires_dispatch_scales,
     moe_requires_scales_offsets,
+    routed_weight_dtype,
 )
 from .quant_tensor import FP8BlockTensor, NVFP4Tensor, QuantAwareTensor
 
@@ -155,10 +156,16 @@ class QuantizedMoE(Module[..., Tensor]):
         self.shared_experts: QuantizedMLP | None = None
         if has_shared_experts:
             assert shared_experts_dim > 0
+            shared_experts_quant_config: QuantConfig | None = None
+            if quant_config is not None:
+                if quant_config.shared_experts_use_quant(
+                    routed_weight_dtype(quant_config)
+                ):
+                    shared_experts_quant_config = quant_config
             self.shared_experts = QuantizedMLP(
                 hidden_dim=hidden_dim,
                 feed_forward_length=shared_experts_dim,
-                quant_config=quant_config,
+                quant_config=shared_experts_quant_config,
             )
 
         self.experts = ModuleList(
@@ -687,6 +694,10 @@ class ExpertParallelMoE(QuantizedMoE):
             )
 
         # Optional (unfused) shared-expert add, then cast back to input dtype.
+        # TODO(kathywu): the replicated shared expert recomputes the same
+        # MLP on every device. Tensor-parallelize it (as ``TensorParallelMoE``
+        # does) once the mixed-precision EP path has a numerical regression
+        # test.
         shared_shards: list[TensorValue] | None = None
         if self.shared_experts is not None and not config.fused_shared_expert:
             shared_shards = [
@@ -699,7 +710,13 @@ class ExpertParallelMoE(QuantizedMoE):
         outputs: list[TensorValue] = []
         for i in range(self.mesh.num_devices):
             out = combine_results[i]
-            if shared_shards is not None:
+            # Under allreduce every device holds a partial sum over its own
+            # experts, which the layer reduces afterwards; the replicated
+            # shared expert therefore contributes on exactly one device. (The
+            # fused path splits its tokens across ranks for the same reason.)
+            if shared_shards is not None and not (
+                config.use_allreduce and i != 0
+            ):
                 out = out + shared_shards[i]
             outputs.append(out.cast(x_shards[i].dtype))
         return Tensor.from_shard_values(outputs, mapping=placement)

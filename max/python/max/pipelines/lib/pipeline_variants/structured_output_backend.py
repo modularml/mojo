@@ -611,8 +611,24 @@ class XgrammarBackend(GrammarBackend[Any]):
         bitmask: npt.NDArray[np.int32],
         index: int,
     ) -> None:
-        """Fill ``bitmask`` row ``index`` with the matcher's allowed tokens."""
+        """Fill ``bitmask`` row ``index`` with the matcher's allowed tokens.
+
+        Once ``matcher`` is stopped, xgrammar's own fill raises a fatal C++
+        check rather than returning a mask -- unlike llguidance, which
+        computes a real EOS-only mask in that state. ``stop_token_ids`` is a
+        plain property, safe to read even after termination, so the row is
+        built by hand here instead: only the stop tokens stay allowed,
+        giving xgrammar the same forced termination llguidance already
+        provides rather than leaving the row unconstrained.
+        """
         assert isinstance(matcher, XgrammarMatcher)
+        if matcher.is_stopped():
+            bitmask[index, :] = 0
+            for stop_id in matcher._matcher.stop_token_ids:
+                bitmask[index, stop_id // 32] |= np.int32(1) << np.int32(
+                    stop_id % 32
+                )
+            return
         matcher._matcher.fill_next_token_bitmask(bitmask, index)
 
 

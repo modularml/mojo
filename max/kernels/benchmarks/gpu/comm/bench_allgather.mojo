@@ -233,9 +233,11 @@ def bench_allgather[
                     row_major(lengths[i]),
                 ).as_immut()
 
-            var device_out = Array[OutTileType, ngpus](uninitialized=True)
-            comptime for src_idx in range(ngpus):
-                device_out[src_idx] = tt_out[ctx_idx * ngpus + src_idx]
+            var device_out = Array[OutTileType, ngpus](
+                fill_with_unrolled=lambda [
+                    src_idx: Int
+                ]() -> OutTileType: tt_out[ctx_idx * ngpus + src_idx]
+            )
 
             allgather(
                 tt_in,

@@ -82,6 +82,16 @@ def modular_py_library(
         # private and excluded files before they are imported.
         # Sharding is implemented in sybil_collect, per example group;
         # pytest_runner forwards bazel's shard env vars to it.
+        # docstring_example_deps put their sources in this test's runfiles.
+        # A dep nested under this package's directory would be collected a
+        # second time by the directory recursion above (its examples already
+        # run in its own package's test), so exclude it from collection
+        # while retaining it in runfiles for imports.
+        nested_dep_packages = [
+            Label(dep).package
+            for dep in docstring_example_deps
+            if Label(dep).package.startswith(native.package_name() + "/")
+        ]
         modular_py_test(
             name = name + ".docstring_examples",
             timeout = "long",
@@ -103,7 +113,7 @@ def modular_py_library(
                 "consider_namespace_packages=true",
                 # Surface the slowest examples so cost creep stays visible.
                 "--durations=20",
-            ],
+            ] + ["--ignore=" + pkg for pkg in nested_dep_packages],
             deps = [
                 ":" + name,
                 "//max/tests/docstring_examples:sybil_collect",

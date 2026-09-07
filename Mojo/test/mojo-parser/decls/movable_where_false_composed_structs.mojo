@@ -19,7 +19,7 @@
 # sides had already declared they don't need the trait. See MOCO-4135.
 #
 # Root cause was two distinct bugs, both in
-# KGEN/lib/LITDialect/LITUtils.cpp:
+# Mojo/lib/LITDialect/LITUtils.cpp:
 #   1. The single-assumption `LIT::isPropositionImplied` overload was
 #      missing an "assumption trivially false implies anything" case -- this
 #      alone fixes the self-conformance case below.

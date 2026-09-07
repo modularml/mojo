@@ -158,7 +158,7 @@ def testWithRaising(a: ExampleCM) raises:
     # CHECK-NEXT:   [[ERROR:%.*]] = lit.ref.immut %__inner_error__
     # CHECK-NEXT:   [[EXIT_RESULT:%.*]] = lit.call {{.*}}__exit__{{.*}}([[IMMREF]], [[ERROR]])
     # CHECK-NEXT:   [[SUCCESS_SB:%.*]] = lit.call {{.*}}__mlir_bool__{{.*}}([[EXIT_RESULT]])
-    # CHECK-NEXT:   hlcf.if [[SUCCESS_SB]] {
+    # CHECK-NEXT:   hlcf.elif [[SUCCESS_SB]] {
     # CHECK-NEXT:     hlcf.yield
     # CHECK-NEXT:   } else {
     # CHECK-NEXT:     lit.call {{.*}}Error::@"__init__{{.*}}"{{.*}}(%__inner_error__, %__with_error__){{.*}}*, "move"
@@ -173,7 +173,7 @@ def testWithRaising(a: ExampleCM) raises:
     # CHECK-NEXT: %__finally_error__ = lit.var.decl
     # CHECK-NEXT: lit.try
     # CHECK-NEXT:   %[[EXC:.*]] = lit.ref.load %__with_exc__
-    # CHECK-NEXT:   hlcf.if %[[EXC]]
+    # CHECK-NEXT:   hlcf.elif %[[EXC]]
     # CHECK-NEXT:   [[IMMREF:%.*]] = lit.ref.immut %$CONTEXTMGR
     # CHECK-NEXT:   call {{.*}}__exit__{{.*}}([[IMMREF]])
 

@@ -158,26 +158,12 @@ class LagunaTopKRouter(MoEGate):
         )
         return topk_idx, topk_weight
 
-    @property
-    def sharding_strategy(self) -> ShardingStrategy | None:
-        """Gets the sharding strategy for the module."""
-        return self._sharding_strategy
-
-    @sharding_strategy.setter
-    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
-        """Sets the sharding strategy for the module."""
-        if strategy.is_replicate:
-            self._sharding_strategy = strategy
-            self.gate_score.sharding_strategy = ShardingStrategy.replicate(
-                strategy.num_devices
-            )
-            self.e_score_correction_bias.sharding_strategy = (
-                ShardingStrategy.replicate(strategy.num_devices)
-            )
-        else:
-            raise ValueError(
-                "Only replicate sharding strategy is supported for MoEGate."
-            )
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        """Replicates the correction bias alongside the base gate weights."""
+        super()._set_sharding_strategy(strategy)
+        self.e_score_correction_bias.sharding_strategy = (
+            ShardingStrategy.replicate(strategy.num_devices)
+        )
 
     def shard(self, devices: Iterable[DeviceRef]) -> Sequence[LagunaTopKRouter]:
         """Creates sharded views of this gate across multiple devices.

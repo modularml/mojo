@@ -1171,6 +1171,7 @@ def test_publish_completed_batch_metrics_ce() -> None:
     mock_metrics.batch_terminated_reqs.assert_called_once_with(
         3, batch_type="CE"
     )
+    mock_metrics.di_early_sync_time.assert_not_called()
 
 
 def test_publish_completed_batch_metrics_tg_spec_decode() -> None:
@@ -1208,6 +1209,15 @@ def test_publish_completed_batch_metrics_zero_duration_skipped() -> None:
     mock_metrics.batch_prompt_throughput.assert_not_called()
     mock_metrics.batch_generation_throughput.assert_not_called()
     mock_metrics.batch_terminated_reqs.assert_not_called()
+
+
+def test_publish_completed_batch_metrics_emits_early_sync_time() -> None:
+    """When the early-sync guard fired for the completed batch, its
+    duration is published as a di_* metric."""
+    stats = _make_completed_stats(early_sync_duration_s=0.012)
+    with patch("max.serve.scheduler.utils.METRICS") as mock_metrics:
+        publish_completed_batch_metrics(stats, 3)
+    mock_metrics.di_early_sync_time.assert_called_once_with(12.0)
 
 
 def test_log_metrics_overlap_coalesces_completed_batch_into_transaction() -> (

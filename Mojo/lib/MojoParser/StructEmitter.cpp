@@ -728,7 +728,7 @@ FnOp StructEmitter::synthesizeEmptyDtor(ConstraintAttr conformanceConstraint) {
   assumptions.append(constraints);
   for (StructFieldOp fieldOp : structDeclOp.getFieldDecls()) {
     ASTType fieldType = fieldOp.getType();
-    TriState confResult =
+    TriBool confResult =
         fieldType
             .conformsToBuiltinTrait("Deinitable", structDecl.getLoc(), shared,
                                     assumptions)

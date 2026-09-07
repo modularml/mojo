@@ -72,15 +72,15 @@ class LayerNorm(Module[[Tensor], Tensor]):
 
     .. code-block:: python
 
-        from max.driver import Accelerator
+        from max.driver import CPU
         from max.dtype import DType
         from max.experimental.nn.norm import LayerNorm
-        from max.experimental.tensor import Tensor
+        from max.experimental.tensor import Tensor, default_device
 
-        device = Accelerator()
-        norm = LayerNorm(2048).to(device)
-        x = Tensor.ones([2, 4, 2048], dtype=DType.float32, device=device)
-        y = norm(x)
+        with default_device(CPU()):
+            norm = LayerNorm(2048)
+            x = Tensor.ones([2, 4, 2048], dtype=DType.float32)
+            y = norm(x)
 
     .. invisible-code-block: python
 

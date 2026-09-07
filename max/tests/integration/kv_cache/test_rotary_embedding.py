@@ -38,12 +38,11 @@ from max.nn.kernels import (
     rope_split_store_ragged,
 )
 from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
 from test_common.modular_graph_test import (
     are_all_tensor_values,
     modular_graph_test,
 )
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 MAX_SEQ_LEN = 2**14
 ACCURACY_RTOL = 1e-2
@@ -594,13 +593,6 @@ def test_kv_cache_ragged_rope(
             device=DeviceRef.CPU(),
         )
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     mrope_section = [16, 24, 24]
 
     def construct() -> Graph:
@@ -663,16 +655,6 @@ def test_kv_cache_ragged_rope(
 
     g = construct()
 
-    batch = [
-        create_text_context(np.empty(prompt_lens[i], dtype=np.int64))
-        for i in range(batch_size)
-    ]
-
-    for context in batch:
-        kv_manager.claim(context)
-        assert isinstance(kv_manager, PagedKVCacheManager)
-        kv_manager.alloc(context)
-
     input_row_offsets = Buffer(
         DType.uint32,
         [batch_size + 1],
@@ -683,7 +665,9 @@ def test_kv_cache_ragged_rope(
         running_sum += prompt_lens[i]
     input_row_offsets[batch_size] = running_sum
 
-    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
 
     # Build provided_inputs with correct indices based on use_position_ids
     offset = 1 if use_position_ids else 0
@@ -768,13 +752,6 @@ def test_rope_split_store_ragged(
             device=DeviceRef.CPU(),
         )
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     def construct() -> Graph:
         input_types = [
             qkv_type,
@@ -836,16 +813,6 @@ def test_rope_split_store_ragged(
 
     g = construct()
 
-    batch = [
-        create_text_context(np.empty(prompt_lens[i], dtype=np.int64))
-        for i in range(batch_size)
-    ]
-
-    for context in batch:
-        kv_manager.claim(context)
-        assert isinstance(kv_manager, PagedKVCacheManager)
-        kv_manager.alloc(context)
-
     input_row_offsets = Buffer(
         DType.uint32,
         [batch_size + 1],
@@ -856,7 +823,9 @@ def test_rope_split_store_ragged(
         running_sum += prompt_lens[i]
     input_row_offsets[batch_size] = running_sum
 
-    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
 
     offset = 1 if use_position_ids else 0
     assert kv_runtime_inputs.attention_dispatch_metadata is not None

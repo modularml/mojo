@@ -40,11 +40,22 @@
 #      zero, the loop accepts over zero mass) -- must emit an ALL-ZERO
 #      distribution row. Its token is bound only by the ALWAYS contract:
 #      the loop's fallback token for such rows is arbitrary.
-#   4. Emit-inertness: a second in-process launch with `emit_dist=False` and
-#      identical seeds must sample the identical tokens (the production
-#      sampler runs the same kernel without the distribution). Zero-dist
-#      rows are exempt: their token is a tie the two launch shapes may
-#      break differently.
+#   4. Cross-path nucleus agreement: a second in-process launch with
+#      `emit_dist=False` must sample a token the emitted distribution
+#      gives POSITIVE mass. `emit_dist` is a comptime dispatch switch,
+#      not a flag on one kernel -- True selects the cluster kernel
+#      (`topk_topp_sampling_emit_dist_cluster_*`, what speculative
+#      decoding's draft proposal runs), False the single-block one
+#      (`topk_topp_sampling_from_prob_*`, what the main token sampler
+#      runs). They are separate implementations whose rejection loops
+#      walk candidates in different orders, so one seed need not reach
+#      the same id in both, and comparing ids only measures that. What
+#      must agree is the NUCLEUS: truncation is a property of the
+#      logits and the sampling params, not of the decomposition. This
+#      is also the only contract that constrains the single-block
+#      path's truncation at all, since that path emits no distribution
+#      of its own to check. Zero-dist rows are exempt: their token is
+#      unconstrained (see contract 3).
 
 from std.math import exp
 from std.random import random_ui64, seed as set_seed
@@ -65,7 +76,12 @@ from _fuzz import (
     value_dist_name,
 )
 
-comptime in_type = DType.float32
+# Speculative decoding exercises this kernel at BOTH precisions: float32
+# under `draft_proposal: argmax` and bfloat16 under `draft_proposal:
+# sampled`, which switches `sampling_logits_dtype` for the whole sampling
+# path. The dtype specializes the kernel, so it is a build-time axis.
+comptime in_bf16 = get_defined_int["ttsd_bf16", 0]() == 1
+comptime in_type = DType.bfloat16 if in_bf16 else DType.float32
 comptime out_idx_type = DType.int64
 comptime fuzz_seed = get_defined_int["fuzz_seed", 12345]()
 comptime budget = get_defined_int["budget", 16]()
@@ -121,10 +137,15 @@ def gen_specs(n: Int) -> List[CaseSpec]:
         var rows = boundary_int(1, 192, 8)
         var d_roll = Int(random_ui64(0, 9))
         var d: Int
-        if d_roll < 6:
+        if d_roll < 5:
             d = boundary_int(2, 8192, 8)
-        elif d_roll < 9:
+        elif d_roll < 7:
             d = boundary_int(8192, 65536, 8192)
+        elif d_roll < 9:
+            # Where production vocabularies actually sit -- MiniMax-M3 is
+            # 200064, Llama-3 128256, Qwen 152064. Without this band the
+            # generator jumps 65536 -> 221185 and never samples a real one.
+            d = boundary_int(65536, 221184, 8192)
         else:
             # Past the cluster shared-memory budget: single-block fallback.
             d = boundary_int(221185, 262144, 8192)
@@ -435,8 +456,9 @@ def run_one_case(ctx: DeviceContext, spec: CaseSpec, check: Bool) raises:
                 r,
             )
 
-        # Emit-inertness: the same seeds without the distribution must sample
-        # the same tokens.
+        # Cross-path nucleus agreement: the single-block path (what
+        # `emit_dist=False` dispatches to) must draw inside the nucleus the
+        # cluster path emitted. See contract 4.
         var tokens2_dev = ctx.enqueue_create_buffer[out_idx_type](rows)
         topk_topp_sampling_from_prob[from_logits=True](
             ctx,
@@ -464,21 +486,26 @@ def run_one_case(ctx: DeviceContext, spec: CaseSpec, check: Bool) raises:
         ctx.enqueue_copy(tokens2_host, tokens2_dev)
         ctx.synchronize()
         for r in range(rows):
-            # A zero emitted row means the token was unconstrained (NaN
-            # weights or zero mass; see _check_row), and the two launch
-            # shapes may break that tie differently.
+            # A zero emitted row carries no nucleus to be inside of: the
+            # row is degenerate and its token is unconstrained (NaN weights
+            # or zero mass; see _check_row).
             if dist_host[r * d + Int(tokens_host[r])] == 0:
                 continue
-            if tokens_host[r] != tokens2_host[r]:
+            var tb = Int(tokens2_host[r])
+            if dist_host[r * d + tb] <= 0:
                 print(
                     "FUZZ_CONTRACT_FAIL row=",
                     r,
-                    "token_with_dist=",
+                    "single_block_token=",
+                    tb,
+                    "its_emitted_mass=",
+                    Float64(dist_host[r * d + tb]),
+                    "cluster_token=",
                     Int(tokens_host[r]),
-                    "token_without=",
-                    Int(tokens2_host[r]),
                 )
-                raise Error("emit_dist changed which token was sampled")
+                raise Error(
+                    "emit_dist=False sampled outside the emitted nucleus"
+                )
         _ = tokens2_dev
 
     _ = in_dev

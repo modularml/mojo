@@ -104,6 +104,10 @@ static bool requiresDocString(FnOp op) {
   if (op.getNoDocRequired())
     return false;
 
+  // An inherited trait default is a clone of the declaring trait's method.
+  if (op.getInheritedFrom())
+    return false;
+
   Operation *parent = op->getParentOp();
   if (isa<FileModuleOp>(parent))
     return true;

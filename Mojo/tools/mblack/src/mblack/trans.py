@@ -1124,7 +1124,7 @@ class BaseStringSplitter(StringTransformer):
 
         # A `where (cond, "msg")` clause's message must remain a bare string
         # literal at parse time. Wrapping it in an extra atom (`("msg")`)
-        # invalidates the source. See KGEN/lib/MojoParser/Signatures.cpp
+        # invalidates the source. See Mojo/lib/MojoParser/Signatures.cpp
         # around the "message in a 'where' clause must be a string literal"
         # diagnostic and KGEN/test/mojo-parser/decls/where_message_parse_errors.mojo.
         if _is_where_clause_tuple_element(LL[0]):
@@ -1912,13 +1912,9 @@ class StringParenWrapper(BaseStringSplitter, CustomSplitMapMixin):
             None, otherwise.
         """
         # If this line is part of an assert or comptime_assert statement and the first leaf
-        # contains the "assert" or "__comptime_assert" or "comptime" keyword...
+        # contains the "assert" or "comptime" keyword...
         is_assert_stmt = (
             parent_type(LL[0]) == syms.assert_stmt and LL[0].value == "assert"
-        )
-        is_old_comptime_assert = (
-            parent_type(LL[0]) == syms.old_comptime_assert_stmt
-            and LL[0].value == "__comptime_assert"
         )
         # New "comptime assert" syntax: first leaf is "comptime", second is "assert"
         is_new_comptime_assert = (
@@ -1927,7 +1923,7 @@ class StringParenWrapper(BaseStringSplitter, CustomSplitMapMixin):
             and len(LL) > 1
             and LL[1].value == "assert"
         )
-        if is_assert_stmt or is_old_comptime_assert or is_new_comptime_assert:
+        if is_assert_stmt or is_new_comptime_assert:
             is_valid_index = is_valid_index_factory(LL)
 
             for i, leaf in enumerate(LL):

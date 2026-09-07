@@ -48,7 +48,9 @@ from max.gpu.host.nvidia.tma import TensorMapSwizzle
 from std.memory import bitcast
 from layout import (
     ComptimeInt,
+    DefaultEngine,
     RowMajorLayout,
+    TensorEngine,
     TileTensor,
     row_major,
     stack_allocation as tt_stack_allocation,
@@ -142,6 +144,7 @@ struct MLA_SM100_Decode_Sparse_KV_FP8[
     # Number of q positions folded into the BM tile (the MTP step width);
     # meaningful only when fold_shared_index=True, else 1.
     q_len_fold: Int = 1,
+    Engine: TensorEngine = DefaultEngine[element_width=1],
 ](TrivialRegisterPassable):
     comptime kv_type = Self.KVLUTType.dtype
     # KV type is FP8 for both nope and rope (all-FP8 KV variant).
@@ -372,7 +375,10 @@ struct MLA_SM100_Decode_Sparse_KV_FP8[
             UnsafePointer[Float32, origin=MutAnyOrigin]
         ],
         scalar_args: TileTensor[
-            .int64, RowMajorLayout[ComptimeInt[3]], MutAnyOrigin
+            .int64,
+            RowMajorLayout[ComptimeInt[3]],
+            MutAnyOrigin,
+            Engine=Self.Engine,
         ],
     ):
         # SlidingWindowCausalMask is supported ONLY by the native FP8 backend

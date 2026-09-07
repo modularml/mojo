@@ -21,17 +21,13 @@ def test_partial_load_store() raises:
     # The total amount of data to allocate
     comptime total_buffer_size: Int = 32
 
-    var read_data = Array[Int, total_buffer_size](uninitialized=True)
-    var write_data = Array[Int, total_buffer_size](uninitialized=True)
+    var read_data = Array[Int, total_buffer_size](
+        fill_with=lambda (idx: Int) -> Int: idx
+    )
+    var write_data = Array[Int, total_buffer_size](fill=0)
 
     var read_ptr = read_data.unsafe_ptr()
     var write_ptr = write_data.unsafe_ptr()
-
-    for idx in range(total_buffer_size):
-        # Fill read with 0->31
-        read_ptr[idx] = Int(idx)
-        # Fill write with 0
-        write_ptr[idx] = 0
 
     # Test partial load:
     var partial_load_data = partial_simd_load[4](

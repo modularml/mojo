@@ -25,7 +25,7 @@ All builds use the `./bazelw` wrapper from the repository root:
 
 # Build specific targets
 ./bazelw build //max/kernels/...
-./bazelw build //mojo/stdlib/...
+./bazelw build //Mojo/stdlib/...
 
 # Run tests
 ./bazelw test //...
@@ -59,7 +59,7 @@ pixi run hello             # Run hello.mojo
 # Common Pixi tasks available in different directories:
 # - /mojo/: build, tests, examples, benchmarks
 # - /max/examples/*/: main, test, hello, dev-server, format
-# - /mojo/examples/*/: main, test, hello, dev-server, format
+# - /Mojo/examples/*/: main, test, hello, dev-server, format
 
 # List available tasks
 pixi task list
@@ -213,11 +213,11 @@ Many benchmarks and tests use compile-time defines:
 
 Currently accepting contributions for:
 
-- Mojo standard library (`/mojo/stdlib/`)
+- Mojo standard library (`/Mojo/stdlib/`)
 - MAX accelerator library (`/max/kernels/`)
 - MAX API and models (`/max/`)
-- Code examples (`/max/examples/`, `/mojo/examples/`)
-- Mojo documentation (`/mojo/docs/`)
+- Code examples (`/max/examples/`, `/Mojo/examples/`)
+- Mojo documentation (`/Mojo/docs/site/`)
 
 Each area has its own guidelines in the nearest `CONTRIBUTING.md`; the root
 `CONTRIBUTING.md` is the full contributor guide. Other areas are not open for

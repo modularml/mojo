@@ -43,6 +43,7 @@ in-graph H2D moves 8x less data than a bool representation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -75,7 +76,7 @@ class StructuredOutputOverlapState:
         device: Device,
         cpu: CPU,
         max_batch_size: int,
-        num_positions: int,
+        num_positions: int | Sequence[int],
         vocab_size: int,
     ) -> None:
         """Allocates the flag and pinned/device buffers.
@@ -87,15 +88,24 @@ class StructuredOutputOverlapState:
                 async callbacks will dispatch onto.
             max_batch_size: Maximum batch capacity. Matches the
                 model's ``total_max_batch``.
-            num_positions: Per-batch positions per iteration. For
-                Eagle spec-decode this is ``num_speculative_tokens + 1``.
+            num_positions: Per-batch positions per iteration, which for
+                Eagle/MTP spec-decode is ``verified drafts + 1``.
             vocab_size: Tokenizer vocabulary size.
 
         Raises:
             ValueError: If any dimension is non-positive.
             RuntimeError: If ``device`` is not a CUDA accelerator.
         """
-        if max_batch_size <= 0 or num_positions <= 0 or vocab_size <= 0:
+        widths = (
+            (num_positions,)
+            if isinstance(num_positions, int)
+            else tuple(sorted(set(num_positions)))
+        )
+        if (
+            max_batch_size <= 0
+            or vocab_size <= 0
+            or any(w <= 0 for w in widths)
+        ):
             raise ValueError(
                 "max_batch_size, num_positions, and vocab_size must all be "
                 f"positive; got ({max_batch_size}, {num_positions}, "
@@ -108,8 +118,10 @@ class StructuredOutputOverlapState:
         """The host CPU device whose AsyncRT worker pool will execute callbacks dispatched via :meth:`enqueue_async_callback`."""
         self.max_batch_size: int = max_batch_size
         """Configured batch capacity."""
-        self.num_positions: int = num_positions
-        """Per-batch positions written per iteration (typically ``num_speculative_tokens + 1`` for spec-decode)."""
+        self.supported_num_positions: tuple[int, ...] = widths
+        """Every per-iteration width this state can bind, ascending."""
+        self.num_positions: int = widths[-1]
+        """Deepest per-batch position count (typically ``num_speculative_tokens + 1`` for spec-decode)."""
         self.vocab_size: int = vocab_size
         """Tokenizer vocabulary width."""
         # The bitmask is stored packed: 1 bit per token, 32 tokens per int32
@@ -139,19 +151,17 @@ class StructuredOutputOverlapState:
         payload_np[0] = self.bitmask_flag._unsafe_ptr
         payload_np[1] = 1
 
-        shape = (max_batch_size, num_positions, self.packed_vocab_size)
-        self.pinned_bitmask: DevicePinnedBuffer = DevicePinnedBuffer(
-            dtype=DType.int32,
-            shape=shape,
-            device=device,
-        )
-        """Single persistent packed ``int32[max_batch_size, num_positions, packed_vocab_size]`` pinned buffer (1 bit per token, 32 tokens per word). The AsyncRT worker writes into this buffer's pinned host backing store and the in-graph wait gates the captured H2D on the worker's release-store of the flag, so writer and reader cannot race even though they share storage."""
-        self.device_bitmask_scratch: Buffer = Buffer(
-            dtype=DType.int32,
-            shape=shape,
-            device=device,
-        )
-        """A device-resident packed ``int32`` buffer with the same shape as :attr:`pinned_bitmask`. Destination of the in-graph H2D; the acceptance sampler unpacks and applies it in one fused pass (``apply_packed_bitmask``), so no bool tensor is ever materialized. A single scratch is safe because the model stream is FIFO: sampler reads serialise with the next-iter H2D write."""
+        # One buffer pair per width. Sharing a single deepest buffer is what
+        # would force a single verify width.
+        self._buffers: dict[int, tuple[DevicePinnedBuffer, Buffer]] = {}
+        for width in widths:
+            shape = (max_batch_size, width, self.packed_vocab_size)
+            self._buffers[width] = (
+                DevicePinnedBuffer(
+                    dtype=DType.int32, shape=shape, device=device
+                ),
+                Buffer(dtype=DType.int32, shape=shape, device=device),
+            )
 
         # Cache of (batch_size, num_positions) -> view of pinned_bitmask
         # / device_bitmask_scratch. Populated lazily by
@@ -186,6 +196,33 @@ class StructuredOutputOverlapState:
             self.packed_vocab_size,
         )
 
+    def pinned_for(self, num_positions: int) -> DevicePinnedBuffer:
+        """Returns the pinned buffer the given width binds.
+
+        The async bitmask callback writes the *next* step's rows, so it must
+        target the width that step will bind rather than the deepest one.
+
+        Raises:
+            ValueError: If ``num_positions`` has no allocated buffer pair.
+        """
+        pair = self._buffers.get(num_positions)
+        if pair is None:
+            raise ValueError(
+                f"pinned_for num_positions={num_positions} has no allocated "
+                f"buffer; supported widths are {self.supported_num_positions}."
+            )
+        return pair[0]
+
+    @property
+    def pinned_bitmask(self) -> DevicePinnedBuffer:
+        """Persistent packed ``int32[max_batch_size, num_positions, packed_vocab_size]`` pinned buffer at the deepest width (1 bit per token, 32 tokens per word)."""
+        return self._buffers[self.num_positions][0]
+
+    @property
+    def device_bitmask_scratch(self) -> Buffer:
+        """Device-resident packed ``int32`` buffer matching :attr:`pinned_bitmask`."""
+        return self._buffers[self.num_positions][1]
+
     def get_input_views(
         self, batch_size: int, num_positions: int
     ) -> tuple[Buffer, Buffer]:
@@ -210,44 +247,40 @@ class StructuredOutputOverlapState:
 
         Args:
             batch_size: Runtime batch size for this iteration.
-            num_positions: Per-batch positions (``num_speculative_tokens + 1``).
-                Must equal :attr:`num_positions` -- both
-                ``pinned_bitmask`` and ``device_bitmask_scratch`` are
-                laid out as ``(max_batch_size, self.num_positions,
-                vocab_size)``, so a contiguous prefix view with a
-                smaller second dim would alias an interleaved subset
-                of rows instead of the desired ``[:batch_size,
-                :num_positions, :]`` rectangle.
+            num_positions: Per-batch positions (``verified drafts + 1``).
+                Must be one of :attr:`supported_num_positions`. Each width owns
+                its own buffer pair, since the width is the middle axis and a
+                contiguous prefix view with a smaller second dim would alias an
+                interleaved subset of rows instead of the desired
+                ``[:batch_size, :num_positions, :]`` array.
 
         Returns:
             ``(pinned_view, device_scratch_view)`` tuple.
+
+        Raises:
+            ValueError: If ``num_positions`` has no allocated buffer pair.
         """
-        if num_positions != self.num_positions:
+        pair = self._buffers.get(num_positions)
+        if pair is None:
             raise ValueError(
-                f"get_input_views num_positions={num_positions} must equal "
-                f"state.num_positions={self.num_positions}; the underlying "
-                "buffers are laid out as (max_batch_size, num_positions, "
-                "vocab_size) so a smaller second dim would alias an "
-                "interleaved subset of rows."
+                f"get_input_views num_positions={num_positions} has no "
+                f"allocated buffer; supported widths are "
+                f"{self.supported_num_positions}."
             )
         key = (batch_size, num_positions)
         cached = self._input_view_cache.get(key)
         if cached is not None:
             return cached
+        pinned, scratch = pair
         num_elements = batch_size * num_positions * self.packed_vocab_size
-        pinned_flat = self.pinned_bitmask.view(
-            self.pinned_bitmask.dtype, (self.pinned_bitmask.num_elements,)
-        )
+        pinned_flat = pinned.view(pinned.dtype, (pinned.num_elements,))
         pinned_view = pinned_flat[:num_elements].view(
-            self.pinned_bitmask.dtype,
+            pinned.dtype,
             (batch_size, num_positions, self.packed_vocab_size),
         )
-        scratch_flat = self.device_bitmask_scratch.view(
-            self.device_bitmask_scratch.dtype,
-            (self.device_bitmask_scratch.num_elements,),
-        )
+        scratch_flat = scratch.view(scratch.dtype, (scratch.num_elements,))
         scratch_view = scratch_flat[:num_elements].view(
-            self.device_bitmask_scratch.dtype,
+            scratch.dtype,
             (batch_size, num_positions, self.packed_vocab_size),
         )
         self._input_view_cache[key] = (pinned_view, scratch_view)
@@ -272,12 +305,12 @@ class StructuredOutputOverlapState:
 
         Args:
             bitmask: A packed ``int32`` numpy array shaped
-                ``(batch, self.num_positions, self.packed_vocab_size)`` with
-                ``1 <= batch <= max_batch_size``. The trailing
-                ``num_positions`` and ``packed_vocab_size`` axes must match
-                state exactly so the in-graph wait reads consistent
-                rows regardless of which slot was used at warmup
-                capture. The graph only reads the leading ``batch``
+                ``(batch, num_positions, self.packed_vocab_size)`` with
+                ``1 <= batch <= max_batch_size`` and ``num_positions`` one of
+                :attr:`supported_num_positions`, which selects the buffer
+                written. The trailing axes must match that buffer exactly so
+                the in-graph wait reads consistent rows regardless of which
+                slot was used at warmup capture. The graph only reads the leading ``batch``
                 rows (via the symbolic ``batch_size`` graph input), so
                 rows past ``batch`` are left untouched.
 
@@ -300,15 +333,15 @@ class StructuredOutputOverlapState:
                 f"prime() batch dim {batch} out of bounds "
                 f"[1, {self.max_batch_size}]"
             )
-        # Strict equality keeps the contract consistent with
-        # ``get_input_views``: every iteration writes (and the captured
-        # graph reads) the same ``self.num_positions`` rows, so a
-        # shorter prefix would leave a stale tail under the
-        # ``num_bitmask_positions`` slot the graph binds to.
-        if num_positions != self.num_positions:
+        # The width selects the buffer rather than being checked against a
+        # single one: each supported width owns a pair, and a step primes the
+        # width its captured graph binds. Writing a short prefix of a wider
+        # buffer would leave a stale tail under the ``num_bitmask_positions``
+        # slot, which is why the width must match a buffer exactly.
+        if num_positions not in self._buffers:
             raise ValueError(
-                f"prime() num_positions {num_positions} must equal "
-                f"state.num_positions={self.num_positions}"
+                f"prime() num_positions {num_positions} has no allocated "
+                f"buffer; supported widths are {self.supported_num_positions}"
             )
         if packed_vocab != self.packed_vocab_size:
             raise ValueError(
@@ -316,7 +349,7 @@ class StructuredOutputOverlapState:
                 f"state packed_vocab_size {self.packed_vocab_size}"
             )
 
-        pinned_view = self.pinned_bitmask.to_numpy()
+        pinned_view = self._buffers[num_positions][0].to_numpy()
         # DevicePinnedBuffer.to_numpy() returns a writable view that
         # aliases the pinned host backing store. Copy in place so the
         # caller's source array can be freed.

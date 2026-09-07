@@ -258,7 +258,7 @@ def main() raises:
 # COM: lazily conforms to a trait whose return type contains an alias parameter.
 # S8: lit.struct.decl @"def[width: Int]() thin -> V[Int(42), width]_PtrWrapper"
 # S8: lit.fn @"__call__$def{{.*}} -> V{{.*}}"
-# S8: kgen.rebind %{{.*}} : {{.*}}{:scalar<index> 42}{{.*}} to {{.*}}_dtype{{.*}}
+# S8: kgen.rebind %{{.*}} : {{.*}}{:scalar<index> 42}{{.*}} to {{.*}}*"Closure_Syn#0"{{.*}}
 # S8-NEXT: lit.return
 # S8: kgen.conformance @"def[dtype: Int, //, width: Int]() -> V[dtype, width]{1}" {
 # S8-NEXT: kgen.witness "__call__{{.*}}" : !lit.generator

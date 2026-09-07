@@ -297,6 +297,7 @@ class RustTierConnector(KVConnector):
         leaves: Mapping[str, KVCacheGroupId],
         leaf_cache_sizes: Mapping[str, int],
         replica_kv_memory: Sequence[Mapping[str, KVCacheMemory]],
+        page_size: int,
         host_offload_num_huge_blocks: int,
         host_offload_huge_page_bytes: int,
         host_offload_cache_ratios: Mapping[str, int],
@@ -356,7 +357,12 @@ class RustTierConnector(KVConnector):
                 "no disk tier the host tier is the last level."
             )
 
+        # Convert the KVCacheGroupId to an int for the Rust connector.
+        group_ids = [
+            group_id.blocks_in_window(page_size) for group_id in leaves.values()
+        ]
         self._rust = TierConnector(
+            group_ids,
             bytes_per_leaf,
             host_offload_num_huge_blocks,
             cache_ratios,
@@ -469,6 +475,7 @@ class RustTierConnector(KVConnector):
             leaves=leaves,
             leaf_cache_sizes=leaf_cache_sizes,
             replica_kv_memory=replica_kv_memory,
+            page_size=params.page_size,
             host_offload_num_huge_blocks=num_huge_blocks,
             host_offload_huge_page_bytes=huge_page_bytes,
             host_offload_cache_ratios=cache_ratios,
@@ -490,7 +497,10 @@ class RustTierConnector(KVConnector):
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
+        # ``hint`` is ignored: every tier this connector owns is host-local, so
+        # a hint naming the instances that hold a prefix has nothing to route.
         if block_ids.keys() != self._leaves.keys():
             raise ValueError(
                 f"RustTierConnector.load block_ids keys {sorted(block_ids)} do not "

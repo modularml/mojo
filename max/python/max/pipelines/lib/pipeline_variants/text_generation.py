@@ -53,10 +53,7 @@ from max.pipelines.context import (
 from max.pipelines.context.exceptions import (  # noqa: F401 (for docstring)
     InputError,
 )
-from max.pipelines.kv_cache import (
-    PagedKVCacheManagerInterface,
-    load_kv_manager,
-)
+from max.pipelines.kv_cache import PagedKVCacheManagerInterface, load_kv_manager
 from max.pipelines.lib.vision_encoder_cache import (
     SupportsPooledVisionMetrics,
     SupportsVisionEncoding,
@@ -74,10 +71,7 @@ from max.pipelines.modeling.types import (
 from max.profiler import Tracer, traced
 from max.support.algorithm import flatten2d
 
-from .utils import (
-    StructuredOutputHelper,
-    update_context_and_prepare_responses,
-)
+from .utils import StructuredOutputHelper, update_context_and_prepare_responses
 
 if TYPE_CHECKING:
     from ..config import MAXModelConfig, PipelineConfig
@@ -246,6 +240,8 @@ class TextGenerationPipeline(
             max_seq_len=self._pipeline_model.max_seq_len,
             session=session,
             available_cache_memory=available_cache_memory,
+            is_di_enabled=pipeline_config.runtime.is_disaggregated,
+            model_name=pipeline_config.model.model_name,
         )
 
         self._encoder_cache: VisionEncoderCache[TextAndVisionContext] | None = (

@@ -668,11 +668,15 @@ struct Matmul2dFp4[
 
         # A frag: base map. B frag: transpose_right map (n, k) w/ k contiguous.
         var a_rc = Array[_, 8](
-            fill_with=lambda (i: Int) -> IndexList[2]: a_frag_coord(lane, i)
+            fill_with_unrolled=lambda [i: Int]() -> IndexList[2]: a_frag_coord(
+                lane, i
+            )
         )
         # C store: UNCHANGED base bc map (transpose_right permutes only B).
         var c_rc = Array[_, 16](
-            fill_with=lambda (i: Int) -> IndexList[2]: bc_frag_coord(lane, i)
+            fill_with_unrolled=lambda [i: Int]() -> IndexList[2]: bc_frag_coord(
+                lane, i
+            )
         )
 
         # This lane's fragment (n, k) base for the transpose_right B map. The 16
@@ -842,14 +846,20 @@ struct Matmul2dFp4[
         var b_view = TileTensor(b_sm, Layout(Coord(BN, BK), Coord(BK, Idx[1])))
 
         var a_rc = Array[_, 8](
-            fill_with=lambda (i: Int) -> IndexList[2]: a_frag_coord(lane, i)
+            fill_with_unrolled=lambda [i: Int]() -> IndexList[2]: a_frag_coord(
+                lane, i
+            )
         )
         # B fragment (n, k) local coords under transpose_right; k contiguous.
         var b_nk = Array[_, 16](
-            fill_with=lambda (i: Int) -> IndexList[2]: bt_frag_coord(lane, i)
+            fill_with_unrolled=lambda [i: Int]() -> IndexList[2]: bt_frag_coord(
+                lane, i
+            )
         )
         var c_rc = Array[_, 16](
-            fill_with=lambda (i: Int) -> IndexList[2]: bc_frag_coord(lane, i)
+            fill_with_unrolled=lambda [i: Int]() -> IndexList[2]: bc_frag_coord(
+                lane, i
+            )
         )
 
         # The FP4 decode / A-gather owner: all packed/scale/A/SMEM addressing

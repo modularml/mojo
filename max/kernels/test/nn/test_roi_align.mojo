@@ -23,16 +23,14 @@ def test_roi_align_avg[scale_type: DType]() raises:
     comptime out_layout = row_major[1, 5, 5, 1]()
     comptime roi_layout = row_major[1, 5]()
 
-    var input_stack = Array[Float32, in_layout.product()](uninitialized=True)
+    var input_stack = Array[Float32, in_layout.product()](
+        fill_with=lambda (idx: Int) -> Float32: Float32(idx)
+    )
     var input = TileTensor(input_stack, in_layout)
-    var output_stack = Array[Float32, out_layout.product()](uninitialized=True)
+    var output_stack = Array[Float32, out_layout.product()](fill={})
     var output = TileTensor(output_stack, out_layout)
-    var rois_stack = Array[Float32, roi_layout.product()](uninitialized=True)
+    var rois_stack = Array[Float32, roi_layout.product()](fill={})
     var rois = TileTensor(rois_stack, roi_layout)
-
-    for i in range(10):
-        for j in range(10):
-            input[0, i, j, 0] = Float32(i * 10 + j)
 
     rois[0, 0] = 0
     rois[0, 1] = 0
@@ -88,16 +86,14 @@ def test_roi_align_max() raises:
     comptime out_layout = row_major[1, 5, 5, 1]()
     comptime roi_layout = row_major[1, 5]()
 
-    var input_stack = Array[Float32, in_layout.product()](uninitialized=True)
+    var input_stack = Array[Float32, in_layout.product()](
+        fill_with=lambda (idx: Int) -> Float32: Float32(idx)
+    )
     var input = TileTensor(input_stack, in_layout)
-    var output_stack = Array[Float32, out_layout.product()](uninitialized=True)
+    var output_stack = Array[Float32, out_layout.product()](fill={})
     var output = TileTensor(output_stack, out_layout)
-    var rois_stack = Array[Float32, roi_layout.product()](uninitialized=True)
+    var rois_stack = Array[Float32, roi_layout.product()](fill={})
     var rois = TileTensor(rois_stack, roi_layout)
-
-    for i in range(10):
-        for j in range(10):
-            input[0, i, j, 0] = Float32(i * 10 + j)
 
     rois[0, 0] = 0
     rois[0, 1] = 0
@@ -153,16 +149,14 @@ def test_roi_align_KERN_692() raises:
     comptime out_layout = row_major[1, 3, 3, 1]()
     comptime roi_layout = row_major[1, 5]()
 
-    var input_stack = Array[Float32, in_layout.product()](uninitialized=True)
+    var input_stack = Array[Float32, in_layout.product()](
+        fill_with=lambda (idx: Int) -> Float32: Float32(idx + 1)
+    )
     var input = TileTensor(input_stack, in_layout)
-    var output_stack = Array[Float32, out_layout.product()](uninitialized=True)
+    var output_stack = Array[Float32, out_layout.product()](fill={})
     var output = TileTensor(output_stack, out_layout)
-    var rois_stack = Array[Float32, roi_layout.product()](uninitialized=True)
+    var rois_stack = Array[Float32, roi_layout.product()](fill={})
     var rois = TileTensor(rois_stack, roi_layout)
-
-    for i in range(6):
-        for j in range(6):
-            input[0, i, j, 0] = Float32(i * 6 + j + 1)
 
     rois[0, 0] = 0
     rois[0, 1] = -2

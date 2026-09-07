@@ -14,6 +14,7 @@ lit_tests(
             # requires-network lit_tests sweep.
             "test_mx_ep_wait_scale_fusion.mojo",
             "test_mxfp4_fused_silu_scale_fusion.mojo",
+            "test_mxfp6_fused_silu_scale_fusion.mojo",
             "test_mxfp8_fused_silu_scale_fusion.mojo",
             "test_mxfp6_fused_silu.mojo",
             "test_mxfp6_send_buf.mojo",
@@ -116,6 +117,20 @@ mojo_test(
     name = "test_mxfp6_fused_silu.mojo.test",
     size = "large",
     srcs = ["test_mxfp6_fused_silu.mojo"],
+    tags = ["gpu"],
+    target_compatible_with = ["//:mi355_gpu"],
+    deps = [
+        "//max:layout",
+        "//max:linalg",
+        "//max:shmem",
+        "@mojo//:std",
+    ],
+)
+
+mojo_test(
+    name = "test_mxfp6_fused_silu_scale_fusion.mojo.test",
+    size = "large",
+    srcs = ["test_mxfp6_fused_silu_scale_fusion.mojo"],
     tags = ["gpu"],
     target_compatible_with = ["//:mi355_gpu"],
     deps = [

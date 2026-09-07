@@ -35,7 +35,8 @@ def test_graph_capture() -> None:
         graph.output(vector1 + vector2)
 
     session = engine.InferenceSession(devices=[device])
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
     model._export_mef("graph.mef")
 
     path = os.environ["GRAPH_EXECUTOR"]

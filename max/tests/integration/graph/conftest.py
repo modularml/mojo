@@ -58,6 +58,16 @@ def session() -> InferenceSession:
 
 
 @pytest.fixture
+def adv_fusion_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enables the new MAP-dialect fusion system for the graph this test compiles.
+
+    ``MAX_GC_USE_ADV_FUSION`` is presence-only (the value is ignored); "1"
+    matches the convention used by every RUN line in the MLIR test suite.
+    """
+    monkeypatch.setenv("MAX_GC_USE_ADV_FUSION", "1")
+
+
+@pytest.fixture
 def graph_testdata() -> Path:
     """Returns the path to the Modular .derived directory."""
     path = os.getenv("GRAPH_TESTDATA")

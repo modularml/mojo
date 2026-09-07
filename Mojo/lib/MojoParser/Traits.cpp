@@ -225,8 +225,10 @@ static LogicalResult signatureResolveDefaultTraitFnStubs(
         !isTriviallyTrueConstraint(conformanceConstraint))
       ov.additionalAssumptions.push_back(conformanceConstraint);
 
-    auto [_, decl] =
+    auto wrapperResult =
         ov.filterOverloadSetForValueType(wrapperSignature, nullptr);
+    ASTDecl *decl =
+        wrapperResult.isYes() ? wrapperResult.getYes().decl : nullptr;
     if (decl) {
       // Since we are not using the default implementation, set the ASTDecl
       // which were inserted for referencing default method to be fully
@@ -618,20 +620,20 @@ LIT::verifyAndBuildConformance(ASTDecl &structDecl, TraitSymbolAttr parent,
         return diag->attachNote(op->getLoc());
       return diag->attachNote(*traitFnDecl);
     };
-    bool inconclusive = false;
-    auto [result, selectedStructMethod] = ov.filterOverloadSetForValueType(
-        traitSignature, emitError, &inconclusive);
+    auto calleeResult =
+        ov.filterOverloadSetForValueType(traitSignature, emitError);
 
-    if (!result) {
+    if (!calleeResult.isYes()) {
       // When a candidate was undecidable rather than simply mismatched, point
       // at the requirement: the reader has to weigh the candidate's `where`
       // clause against what the conformance demands, and needs both in view.
       // A plain signature mismatch is already self-explanatory, and the note
       // would drag the requirement's synthesized signature along with it.
-      if (inconclusive)
+      if (calleeResult.isUnknown())
         diag->attachNote(*traitFnDecl) << "required by trait method here";
       return failure();
     }
+    auto [result, selectedStructMethod] = calleeResult.getYes();
 
     // Check for API author error: stable struct implementing stable trait
     // must use stable methods for stable trait methods.
@@ -646,9 +648,6 @@ LIT::verifyAndBuildConformance(ASTDecl &structDecl, TraitSymbolAttr parent,
 
   auto checkAlias = [&](StringAttr name, ASTDecl *traitAliasDecl,
                         AliasDeclOp traitAlias) -> LogicalResult {
-    if (traitAlias.getInheritedFrom())
-      return success();
-
     if (failed(shared.declResolver->resolveSignature(*traitAliasDecl,
                                                      structDecl.getLoc()))) {
       hadErrors = true;
@@ -837,9 +836,6 @@ LIT::verifyAndBuildConformance(ASTDecl &structDecl, TraitSymbolAttr parent,
       for (ASTDecl *decl : decls) {
         // Skip any children that aren't methods or aliases.
         if (auto traitFn = dyn_cast_or_null<FnOp>(decl->getIfOperation())) {
-          // Skip inherited methods, they're checked at a different time.
-          if (traitFn.getInheritedFrom())
-            continue;
           if (failed(checkMethod(name, decl, traitFn.getSymNameAttr(),
                                  traitFn.getFullSignature()))) {
             allMatchFound = false;
@@ -917,16 +913,14 @@ static TraitType getDeclProvidedTrait(ASTDecl *decl) {
 /// a conformance-contributing extension of `self` is erroneous, signaling the
 /// caller that the result is unstable and must not be cached.
 ///
-/// When `details` is non-null, its `constraints` are populated with the
-/// conditional-conformance constraints behind each failing/unproven required
-/// symbol. Requesting `details` disables the loop's short-circuit so every
-/// failing symbol is reported.
-static TriState
-doesNominalTypeConformToUncached(ASTDecl *self, TraitType trait,
-                                 ASTType concreteType,
-                                 ArrayRef<ConstraintAttr> callerAssumptions,
-                                 bool *sawErroneousExtension = nullptr,
-                                 ConstraintFailure *details = nullptr);
+/// When `details` is non-null, it is populated with the
+/// conditional-conformance constraints behind the verdict: those refuted, or
+/// if none was, those left unproven.
+static TriBool doesNominalTypeConformToUncached(
+    ASTDecl *self, TraitType trait, ASTType concreteType,
+    ArrayRef<ConstraintAttr> callerAssumptions,
+    bool *sawErroneousExtension = nullptr,
+    SmallVectorImpl<ConstraintAttr> *details = nullptr);
 
 /// Given a decl for a struct or trait type, check if this type conforms to the
 /// specified trait type. If concreteType is provided, it is used to extract
@@ -937,17 +931,18 @@ doesNominalTypeConformToUncached(ASTDecl *self, TraitType trait,
 /// - `no` if the type definitely does not conform
 /// - `unknown` if conformance depends on constraints that cannot be evaluated
 ///   statically
-TriState
-ASTDecl::doesNominalTypeConformTo(TraitType trait, ASTType concreteType,
-                                  ArrayRef<ConstraintAttr> callerAssumptions,
-                                  ConstraintFailure *details) {
-  TriState result = TriState::no();
+static TriBool
+doesNominalTypeConformToCached(ASTDecl *self, TraitType trait,
+                               ASTType concreteType,
+                               ArrayRef<ConstraintAttr> callerAssumptions,
+                               SmallVectorImpl<ConstraintAttr> *details) {
+  TriBool result = TriBool::no();
   if (!callerAssumptions.empty()) {
     // Only the assumption-free queries are context-independent enough to
     // memoize; where-clause assumptions make the result caller-dependent, so
     // those bypass the cache entirely.
     result = doesNominalTypeConformToUncached(
-        this, trait, concreteType, callerAssumptions,
+        self, trait, concreteType, callerAssumptions,
         /*sawErroneousExtension=*/nullptr, details);
   } else {
     // Never consult or populate the cache for an erroneous decl: its
@@ -959,16 +954,18 @@ ASTDecl::doesNominalTypeConformTo(TraitType trait, ASTType concreteType,
     // stores only happen at >= signature, so they can have no entry yet and the
     // lookup would always miss.
     const bool mayBeCached =
-        resolvedness >= DeclResolvedness::signature && !isErroneous();
+        self->resolvedness >= DeclResolvedness::signature &&
+        !self->isErroneous();
     // If user requested failure details, we use the cached only if the verdict
     // was true.
     if (mayBeCached) {
       std::optional<bool> conforms =
-          shared.getCachedNominalConformance(this, trait, concreteType);
+          self->getShared().getCachedNominalConformance(self, trait,
+                                                        concreteType);
       if (conforms.has_value() && (!details || *conforms)) {
         if (details)
           details->clear();
-        return TriState::fromBool(*conforms);
+        return TriBool::fromBool(*conforms);
       }
     }
 
@@ -980,7 +977,7 @@ ASTDecl::doesNominalTypeConformTo(TraitType trait, ASTType concreteType,
     // catches the one exception -- an erroneous contributing extension whose
     // contribution may still change.
     bool sawErroneousExtension = false;
-    result = doesNominalTypeConformToUncached(this, trait, concreteType,
+    result = doesNominalTypeConformToUncached(self, trait, concreteType,
                                               callerAssumptions,
                                               &sawErroneousExtension, details);
 
@@ -992,19 +989,36 @@ ASTDecl::doesNominalTypeConformTo(TraitType trait, ASTType concreteType,
     // NB: re-read resolvedness/isErroneous here rather than reuse `mayBeCached`
     // -- the uncached call above resolves the signature, so a first query can
     // still populate the cache even though `mayBeCached` was false.
-    if (result.isDefinite() && resolvedness >= DeclResolvedness::signature &&
-        !isErroneous() && !sawErroneousExtension)
-      shared.cacheNominalConformance(this, trait, concreteType,
-                                     result.isTrue());
+    if (result.isDefinite() &&
+        self->resolvedness >= DeclResolvedness::signature &&
+        !self->isErroneous() && !sawErroneousExtension)
+      self->getShared().cacheNominalConformance(self, trait, concreteType,
+                                                result.isTrue());
   }
 
   return result;
 }
 
-static TriState doesNominalTypeConformToUncached(
+TriBool
+ASTDecl::doesNominalTypeConformTo(TraitType trait, ASTType concreteType,
+                                  ArrayRef<ConstraintAttr> callerAssumptions) {
+  return doesNominalTypeConformToCached(this, trait, concreteType,
+                                        callerAssumptions, /*details=*/nullptr);
+}
+
+ConstraintResult ASTDecl::doesNominalTypeConformToWithDetails(
+    TraitType trait, ASTType concreteType,
+    ArrayRef<ConstraintAttr> callerAssumptions) {
+  SmallVector<ConstraintAttr, 2> details;
+  TriBool result = doesNominalTypeConformToCached(this, trait, concreteType,
+                                                  callerAssumptions, &details);
+  return makeConstraintResult(result, std::move(details));
+}
+
+static TriBool doesNominalTypeConformToUncached(
     ASTDecl *self, TraitType trait, ASTType concreteType,
     ArrayRef<ConstraintAttr> callerAssumptions, bool *sawErroneousExtension,
-    ConstraintFailure *details) {
+    SmallVectorImpl<ConstraintAttr> *details) {
   SharedState &shared = self->getShared();
 
   // Clear so an early return leaves no stale constraints behind.
@@ -1014,7 +1028,7 @@ static TriState doesNominalTypeConformToUncached(
   // We only need trait symbol to verify trait conformance, not the resolved
   // witness table.
   if (failed(shared.declResolver->resolveSignature(*self, self->getLoc())))
-    return TriState::no(); // Error emitted.
+    return TriBool::no(); // Error emitted.
 
   // `where` clauses with messages only live on struct conformance lists, so
   // only a struct can supply diagnostic witnesses.
@@ -1046,7 +1060,7 @@ static TriState doesNominalTypeConformToUncached(
   TraitType providedCanonTrait = TraitType::get(
       self->getContext(), providedSymbols, declProvidedTrait.getConstraints());
   if (providedCanonTrait == trait)
-    return TriState::yes();
+    return TriBool::yes();
 
   ArrayRef<TraitSymbolAttr> providedSymbolsArr =
       providedCanonTrait.getSymbols();
@@ -1133,12 +1147,13 @@ static TriState doesNominalTypeConformToUncached(
       });
   SmallVector<TypedAttr> scratch;
 
-  // With `details`, bucket every failed/unproven provider constraint (no
-  // short-circuit) and dedupe on (loc, proposition) so derived/ancestor copies
-  // of the same `where` clause emit once. Cold path.
+  // With `details`, collect every provider constraint behind the verdict and
+  // dedupe on (loc, proposition) so derived/ancestor copies of the same
+  // `where` clause emit once. Cold path.
   const bool collectAll = details != nullptr;
   DenseSet<std::pair<LocationAttr, Attribute>> seenConstraints;
-  auto recordFailure = [&](TraitSymbolAttr required, TriState kind) {
+  TriBool result = TriBool::yes();
+  auto recordFailure = [&](TraitSymbolAttr required, TriBool kind) {
     if (!collectAll)
       return;
     assert(kind.isFalse() || kind.isUnknown());
@@ -1147,17 +1162,24 @@ static TriState doesNominalTypeConformToUncached(
     // conditionally); the primary "does not conform" diagnostic covers that.
     if (!constraint || isTriviallyTrueConstraint(constraint))
       return;
+    // Update the details based on the new failure kind.
+    if (kind.isFalse() && !result.isFalse()) {
+      // If the result is not false, we're seeing false for the first time.
+      // Clear the details since it currently contains unproven constraints,
+      // which no longer matter.
+      details->clear();
+      seenConstraints.clear();
+    } else if (result.isFalse() && kind.isUnknown()) {
+      // If the result is already false and we're only seeing unknown, ignore.
+      return;
+    }
     if (!seenConstraints
              .insert({constraint.getLoc(), constraint.getProposition()})
              .second)
       return;
-    if (kind.isFalse())
-      details->failedConstraints.push_back(constraint);
-    else
-      details->unprovenConstraints.push_back(constraint);
+    details->push_back(constraint);
   };
 
-  TriState result = TriState::yes();
   for (auto [i, required] : llvm::enumerate(trait.getSymbols())) {
     // Assume each requirement's own condition while checking it. Remember that
     // an empty constraints array means every requirement is unconditional.
@@ -1173,19 +1195,18 @@ static TriState doesNominalTypeConformToUncached(
     }
 
     auto it = providedConditions.find(required);
-    TriState provided =
-        it == providedConditions.end() ? TriState::no()
-        : (!it->second || isTriviallyTrueProposition(it->second))
-            ? TriState::yes()
-            : isPropositionImplied(it->second, assumptions);
+    TriBool provided = it == providedConditions.end() ? TriBool::no()
+                       : (!it->second || isTriviallyTrueProposition(it->second))
+                           ? TriBool::yes()
+                           : isPropositionImplied(it->second, assumptions);
 
     if (provided.isTrue())
       continue; // Symbol is definitely provided.
 
     if (provided.isUnknown()) {
       // Symbol is conditionally provided but its constraint is unproven.
-      recordFailure(required, TriState::unknown());
-      result &= TriState::unknown();
+      recordFailure(required, TriBool::unknown());
+      result &= TriBool::unknown();
       continue;
     }
 
@@ -1205,17 +1226,23 @@ static TriState doesNominalTypeConformToUncached(
                 assumptions)
                 .isTrue())
           continue;
-        recordFailure(required, TriState::unknown());
-        result &= TriState::unknown();
+        recordFailure(required, TriBool::unknown());
+        result &= TriBool::unknown();
+        // Not a pure short-circuit: a later refuted symbol can still fold this
+        // to `no`. Bailing here trades that refinement away for the early exit,
+        // which is safe only because `unknown` is the conservative answer.
+        // TODO: fold both paths the same way and delete this exit.
         if (!collectAll)
-          return TriState::unknown();
+          return TriBool::unknown();
         continue;
       }
     }
-    recordFailure(required, TriState::no());
-    result &= TriState::no();
+    recordFailure(required, TriBool::no());
+    result &= TriBool::no();
+    // `no` is a definitive answer, so early exiting here is safe.
+    // Collecting details keeps going only to name every failing symbol.
     if (!collectAll)
-      return TriState::no();
+      return TriBool::no();
   }
 
   // All required symbols are present (proven `yes`), or `result` already folded
@@ -1281,7 +1308,7 @@ ConstraintAttr LIT::fuseConstraints(SharedState &shared,
   // struct conformance lists, and conformance diagnostics read them off the
   // source struct, never a fused meta-type bound. Revisit if traits ever gain
   // `where` clauses with user messages (see the "Failure messages" section of
-  // oss/modular/mojo/proposals/where_clauses.md).
+  // Mojo/proposals/where_clauses.md).
   SmallVector<TypedAttr> props;
   SmallVector<Location> locs;
   props.reserve(constraints.size());
@@ -1419,15 +1446,12 @@ LIT::getTraitBoundFromAssumptions(TypedAttr typeAttr, SharedState &shared,
 ///        !lit.ref<:trait<@Movable> MTT>, mut *[0,0]> owned_in_mem) -> none>>
 /// Resolving the *(0,0) into the Movable type, as well as the first param type.
 static FnTypeGeneratorType
-createRequirementSignature(FnOp traitFn, ASTType newSelfType,
+createRequirementSignature(FnTypeGeneratorType signature, ASTType newSelfType,
                            ParameterEvaluator *traitAliasReplacer,
                            DeclResolver &declResolver) {
   // Get the selfType as a TypedAttr since we'll be using it as a parameter
   // value below.
   TypedAttr newSelfValue = PValue(newSelfType).get();
-
-  // Start with the full signature for the trait requirement.
-  FnTypeGeneratorType signature = traitFn.getFullSignature();
 
   if (auto paramType = sugarDynCast<ParamType>(newSelfType.extractMetaType())) {
     auto simpleTraitType =
@@ -1491,9 +1515,10 @@ createRequirementSignature(FnOp traitFn, ASTType newSelfType,
   return signature;
 }
 
-FnTypeGeneratorType LIT::specializeSignature(FnOp traitFn, ASTType newSelfType,
-                                             DeclResolver &declResolver) {
-  return createRequirementSignature(traitFn, newSelfType, nullptr,
+FnTypeGeneratorType
+LIT::specializeSignature(FnTypeGeneratorType traitFnSignature,
+                         ASTType newSelfType, DeclResolver &declResolver) {
+  return createRequirementSignature(traitFnSignature, newSelfType, nullptr,
                                     declResolver);
 }
 
@@ -1564,8 +1589,8 @@ FailureOr<TypedAttr> LIT::getUniqueWitnessForTypeIfConforms(
     // name.
     if (failed(shared.declResolver->resolveSignature(entry, errorLoc)))
       return failure();
-    resultType =
-        createRequirementSignature(fnDecl, type, nullptr, *shared.declResolver);
+    resultType = createRequirementSignature(fnDecl.getFullSignature(), type,
+                                            nullptr, *shared.declResolver);
     // Use the mangled name from the trait declaration for function witnesses.
     witnessName = *fnDecl.getSymName();
   } else {
@@ -1621,22 +1646,20 @@ PValue IREmitter::emitMetaTypeToTraitConversion(ASTExprAnd<CValue> value,
   // Check that the struct or super trait implements the trait.
   // Assumptions needed: e.g. `where AllWritable[*Ts]` proves
   // Tuple[*Ts]: Writable.
-  ConstraintFailure details;
-  TriState verdict = type.doesConformTo(
-      trait, shared, ASTDecl::getAssumptionsFromScope(&getDeclScope()),
-      &details);
-  if (verdict.isFalse()) {
+  auto conformance = type.doesConformToWithDetails(
+      trait, shared, ASTDecl::getAssumptionsFromScope(&getDeclScope()));
+  if (conformance.isNo()) {
     MojoInflightDiag diag = emitError(value.expr->getLoc(), "cannot bind type ")
                             << type << " to trait " << ASTType(trait)
                             << value.expr->getRange();
-    details.attachNotes(diag);
+    attachConstraintNotes(diag, conformance);
     return {};
   }
 
   // If conformance is unprovable (but not contradicted) and a deferral context
   // is installed, record the conformance obligation as deferred, and emit a
   // downcast into the target trait type.
-  if (verdict.isUnknown() && deferredTypingContext) {
+  if (conformance.isUnknown() && deferredTypingContext) {
     // A parameter's trait bound is always unconditional.
     assert(!trait.hasConstraints() &&
            "deferred conformance bound should always bean unconditional trait");

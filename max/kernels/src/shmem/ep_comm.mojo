@@ -5733,6 +5733,7 @@ def fused_silu_mxfp6_kernel[
     scales_tensor: TileTensor[scales_dtype, scales_layout, MutUntrackedOrigin],
     input_tensor: TileTensor[input_dtype, input_layout, ImmUntrackedOrigin],
     row_offsets: TileTensor[.uint32, offsets_layout, ImmUntrackedOrigin],
+    max_padded_M: Int32 = 0,
     alpha: Float32 = 0.0,
     limit: Float32 = 0.0,
 ):
@@ -5761,11 +5762,7 @@ def fused_silu_mxfp6_kernel[
         input_tensor.flat_rank >= 2
     ), "input_tensor must be at least 2D"
     comptime assert row_offsets.flat_rank == 1, "row_offsets must be 1D"
-    comptime assert not fuse_a_scale_preshuffle, (
-        "MXFP6 has no A-scale slot-layout producer: the FP6 grouped matmul"
-        " runs the standalone preshuffle, so writing scales in slot layout"
-        " here would be read back as row-major"
-    )
+    var _max_padded_M = Int(max_padded_M)
 
     comptime input_dim = input_tensor.static_shape[1]
     comptime output_dim = output_tensor.static_shape[1]
@@ -5791,6 +5788,8 @@ def fused_silu_mxfp6_kernel[
     with PDL():
         var num_tokens = row_offsets[row_offsets.static_shape[0] - 1]
         var num_elem = num_tokens * UInt32(hidden_size)
+
+        var expert_slot = 0
 
         for i in range(
             gid,
@@ -5845,7 +5844,38 @@ def fused_silu_mxfp6_kernel[
                     packed.slice[8, offset=chunk * 8](),
                 )
 
-            scales_tensor.store(
-                (m, k // blk),
-                rebind[Scalar[scales_dtype]](e8m0_scale),
-            )
+            comptime if fuse_a_scale_preshuffle:
+                comptime assert size_of[scales_dtype]() == 1, (
+                    "fused scale_4d store assumes a 1-byte E8M0 scale: the"
+                    " byte offset is used directly as a scales_dtype element"
+                    " index"
+                )
+                comptime K_SCALES = hidden_size // blk
+                comptime n_active = row_offsets.static_shape[0] - 1
+                while expert_slot < n_active - 1 and Int(
+                    row_offsets[Coord(expert_slot + 1)]
+                ) <= Int(m):
+                    expert_slot += 1
+                var local_row = Int(m) - Int(row_offsets[Coord(expert_slot)])
+                debug_assert(
+                    _max_padded_M > 0,
+                    "MXFP6 fused scale store requires _max_padded_M > 0",
+                )
+                debug_assert(
+                    local_row < _max_padded_M,
+                    (
+                        "MXFP6 fused scale store: local_row exceeds the"
+                        " per-expert slot capacity (_max_padded_M)"
+                    ),
+                )
+                var dst_off = Shuffler[1].scale_4d_slot_byte_off[
+                    K_SCALES=K_SCALES
+                ](expert_slot, local_row, k // blk, _max_padded_M)
+                scales_tensor._storage[dst_off] = rebind[Scalar[scales_dtype]](
+                    e8m0_scale
+                )
+            else:
+                scales_tensor.store(
+                    (m, k // blk),
+                    rebind[Scalar[scales_dtype]](e8m0_scale),
+                )

@@ -31,6 +31,8 @@ vLLM Interface:
     - pad_slot_id: int - for identifying padded entries
 """
 
+from std.bit import next_power_of_two
+from std.algorithm import vectorize
 from std.math import ceildiv
 
 
@@ -49,6 +51,11 @@ from nn.activations import silu
 # ============================================================================
 
 comptime PAD_SLOT_ID: Int32 = -1
+
+# Lane count of a tap vector holding a WIDTH-tap filter. WIDTH dispatches in
+# {1, 2, 3, 4} and 3 is not a valid SIMD width, so round up and zero the
+# padding lane; a padded dot product still sums to the WIDTH-tap result.
+comptime _TAP_LANES[WIDTH: Int] = Int(next_power_of_two(WIDTH))
 
 
 # ============================================================================
@@ -95,12 +102,13 @@ def _channel_weights[
         weight_dtype, weight_LT, MutUntrackedOrigin, Engine=weight_engine
     ],
     d: Int,
-) -> Array[Scalar[weight_dtype], WIDTH]:
-    """Load channel `d`'s `WIDTH` conv weights into a register buffer.
+) -> SIMD[weight_dtype, _TAP_LANES[WIDTH]]:
+    """Load channel `d`'s `WIDTH` conv weights into a register vector.
 
     Factored out of the fwd / update GPU kernels, which each preloaded the
-    per-channel weights into a fixed 8-wide SIMD. The width is now the exact
-    comptime `WIDTH` (no magic 8), so the buffer holds exactly the taps used.
+    per-channel weights into a fixed 8-wide SIMD. The vector is now the
+    padded `WIDTH` (no magic 8), so it holds the taps used plus at most one
+    power-of-two rounding lane.
 
     Parameters:
         weight_dtype: The weight element type.
@@ -113,15 +121,14 @@ def _channel_weights[
         d: The channel index.
 
     Returns:
-        A `WIDTH`-element `Array` of channel `d`'s weights, tap `w_idx` at index
-        `w_idx`.
+        Channel `d`'s weights, tap `w_idx` in lane `w_idx`, with the padding
+        lanes zeroed so a padded dot product still sums to the `WIDTH`-tap
+        result.
     """
-    # WIDTH dispatches in {1, 2, 3, 4}; 3 is not a valid SIMD width, and every
-    # consumer indexes the taps one lane at a time, so hold them in an Array.
-    var weights = Array[Scalar[weight_dtype], WIDTH](fill=0)
+    var weights = SIMD[weight_dtype, _TAP_LANES[WIDTH]](0)
     comptime for w_idx in range(WIDTH):
         weights[w_idx] = weight.load[width=1, alignment=1](Coord(d, w_idx))
-    return weights^
+    return weights
 
 
 # ============================================================================
@@ -1164,6 +1171,14 @@ def causal_conv1d_varlen_fwd_gpu[
             conv_states.raw_store(state_offset, val)
 
 
+# Outputs per steady-state trip of the seq-parallel prefill kernel below.
+# The register sliding window reduces each output to one global load; the
+# UNROLL-wide trip keeps that many independent loads in flight so the walk
+# runs at bandwidth instead of at HBM-latency rate. 16 was measured on B200
+# at the Inkling prefill shapes; other parts are untuned.
+comptime _CONV1D_SEQPARALLEL_UNROLL: Int = 16
+
+
 def causal_conv1d_varlen_fwd_seqparallel_gpu[
     x_dtype: DType,
     weight_dtype: DType,
@@ -1268,7 +1283,8 @@ def causal_conv1d_varlen_fwd_seqparallel_gpu[
     kernel above unmodified. Per
     `Kernels/claude_kb` patterns/kv-buffer-pipeline-style host-vs-device
     tiling notes: `num_tiles_ub` is a safe host-side upper bound
-    (`ceildiv(total_seqlen, TILE_SEQ) + batch`) that avoids a host-side
+    (`ceildiv(total_seqlen, TILE_SEQ)`; grid-z indexes each sequence's LOCAL
+    tile and no sequence exceeds total_seqlen) that avoids a host-side
     max-reduction over ragged per-sequence lengths; blocks whose z-index
     exceeds a given sequence's actual tile count early-return.
 
@@ -1326,60 +1342,83 @@ def causal_conv1d_varlen_fwd_seqparallel_gpu[
         bias_val = Scalar[output_dtype](bias.raw_load(d))
 
     # Load weights into registers
-    var weights = SIMD[weight_dtype, 8](0)  # Initialize with zeros
-    for w_idx in range(WIDTH):
-        var weight_offset = (
-            UInt32(d) * weight_dim_stride + UInt32(w_idx) * weight_width_stride
-        )
-        weights[w_idx] = weight.raw_load(weight_offset)
+    var weights = _channel_weights[weight_dtype, WIDTH](weight, d)
 
     comptime WIDTH_MINUS_1 = WIDTH - 1
+    comptime UNROLL = _CONV1D_SEQPARALLEL_UNROLL
+    comptime TAP_LANES = _TAP_LANES[WIDTH]
+    var tap_weights = weights.cast[x_dtype]()
 
-    # Process this tile's slice of the sequence
-    for l in range(tile_start, tile_end):
-        var conv_sum = bias_val
-
-        # Gather inputs and compute convolution
-        comptime for w_idx in range(WIDTH):
-            var input_l = l - (WIDTH_MINUS_1 - w_idx)
-            var input_val: Scalar[x_dtype] = 0
-
-            if input_l >= 0:
-                var x_offset = (
-                    UInt32(d) * x_dim_stride
-                    + UInt32((seq_start + input_l)) * x_seqlen_stride
-                )
-                input_val = x.raw_load(x_offset)
-            elif use_initial_state and has_conv_states != 0:
-                var state_idx = WIDTH_MINUS_1 + input_l
-                if state_idx >= 0:
-                    var state_offset = (
+    # Register sliding window over the WIDTH-1 inputs preceding the current
+    # position, so the steady state costs one global load per output instead
+    # of WIDTH. The window is preloaded once per tile: positions inside the
+    # sequence come from global read-only x (tiles may overlap reads, never
+    # writes), and negative positions fall back to the continuing sequence's
+    # initial state (state slot WIDTH_MINUS_1 + pos of its pool entry).
+    var win = Array[Scalar[x_dtype], WIDTH_MINUS_1](fill=0)
+    comptime for i in range(WIDTH_MINUS_1):
+        var pos = tile_start - WIDTH_MINUS_1 + i
+        var v: Scalar[x_dtype] = 0
+        if pos >= 0:
+            v = x.raw_load(
+                UInt32(d) * x_dim_stride
+                + UInt32((seq_start + pos)) * x_seqlen_stride
+            )
+        elif use_initial_state and has_conv_states != 0:
+            var state_idx = WIDTH_MINUS_1 + pos
+            if state_idx >= 0:
+                v = Scalar[x_dtype](
+                    conv_states.raw_load(
                         UInt32(cache_idx) * conv_states_batch_stride
                         + UInt32(d) * conv_states_dim_stride
                         + UInt32(state_idx) * conv_states_width_stride
                     )
-                    input_val = Scalar[x_dtype](
-                        conv_states.raw_load(state_offset)
-                    )
+                )
+        win[i] = v
 
-            conv_sum += Scalar[output_dtype](
-                input_val * Scalar[x_dtype](weights[w_idx])
+    # One U-output trip. The steady state calls this with U=UNROLL so the U
+    # loads share no dependencies and can all be in flight; the tile remainder
+    # reuses it with U=1.
+    def _emit_chunk[U: Int](tile_off: Int) {mut win, imm}:
+        var l0 = tile_start + tile_off
+        # Carried window followed by this trip's loads, so `taps[j]` is
+        # position `l0 - WIDTH_MINUS_1 + j` throughout and output `u` folds
+        # `taps[u ..< u + WIDTH]` against the taps.
+        var taps = Array[Scalar[x_dtype], WIDTH_MINUS_1 + U](fill=0)
+        comptime for i in range(WIDTH_MINUS_1):
+            taps[i] = win[i]
+        comptime for u in range(U):
+            taps[WIDTH_MINUS_1 + u] = x.raw_load(
+                UInt32(d) * x_dim_stride
+                + UInt32((seq_start + l0 + u)) * x_seqlen_stride
             )
 
-        # Apply activation
-        var out_val = conv_sum
-        if silu_activation != 0:
-            comptime if output_dtype.is_floating_point():
-                out_val = silu(out_val)
-            else:
-                out_val = silu(out_val.cast[.float32]()).cast[output_dtype]()
+        comptime for u in range(U):
+            var window = SIMD[x_dtype, TAP_LANES](0)
+            comptime for w in range(WIDTH):
+                window[w] = taps[u + w]
+            var conv_sum = (
+                bias_val
+                + (window * tap_weights).reduce_add().cast[output_dtype]()
+            )
 
-        # Store output
-        var out_offset = (
-            UInt32(d) * out_dim_stride
-            + UInt32((seq_start + l)) * out_seqlen_stride
-        )
-        output.raw_store(out_offset, out_val)
+            # Apply activation
+            var out_val = _apply_silu[output_dtype](
+                conv_sum, silu_activation != 0
+            )
+
+            # Store output
+            var out_offset = (
+                UInt32(d) * out_dim_stride
+                + UInt32((seq_start + l0 + u)) * out_seqlen_stride
+            )
+            output.raw_store(out_offset, out_val)
+
+        # Carry the last WIDTH-1 taps into the next trip.
+        comptime for i in range(WIDTH_MINUS_1):
+            win[i] = taps[U + i]
+
+    vectorize[UNROLL](tile_end - tile_start, _emit_chunk)
 
     # Update conv_states exactly once, from the tail tile of this sequence.
     if has_conv_states != 0 and tile_end == seqlen:

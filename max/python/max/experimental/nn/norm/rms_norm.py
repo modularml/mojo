@@ -41,15 +41,15 @@ class RMSNorm(Module[[Tensor], Tensor]):
 
     .. code-block:: python
 
-        from max.driver import Accelerator
+        from max.driver import CPU
         from max.dtype import DType
         from max.experimental.nn.norm import RMSNorm
-        from max.experimental.tensor import Tensor
+        from max.experimental.tensor import Tensor, default_device
 
-        device = Accelerator()
-        norm = RMSNorm(2048, eps=1e-6).to(device)
-        x = Tensor.ones([2, 4, 2048], dtype=DType.float32, device=device)
-        y = norm(x)
+        with default_device(CPU()):
+            norm = RMSNorm(2048, eps=1e-6)
+            x = Tensor.ones([2, 4, 2048], dtype=DType.float32)
+            y = norm(x)
 
     .. invisible-code-block: python
 

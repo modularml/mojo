@@ -20,12 +20,31 @@ modular_py_library(
         "functional/**/*.py",
         "sharding/**/*.py",
     ]),
+    # The examples run eagerly through max._interpreter, whose fast path
+    # needs the optional Mojo-built _interpreter_ops kernels; without them
+    # every eager op falls back to a full graph compile and the test times
+    # out. The library itself must not depend on them (they are optional at
+    # runtime), so they join the test's runfiles only.
+    docstring_example_deps = [
+        "//max/python/max/_interpreter_ops",
+        # Some examples in this package import max.experimental.nn; the
+        # library must not depend on it (nn depends on this package), so
+        # it joins the test's runfiles only. The macro excludes nested
+        # package deps from collection, so nn's examples run only in
+        # nn's own docstring test.
+        "//max/python/max/experimental/nn",
+    ],
+    # 150+ examples, each compiling interpreter kernels on the fly; CI
+    # clamps every test to 800s and the slowest shard ran ~730s on
+    # CPU-only CI with 6 shards, so shard to stay well under it.
+    docstring_example_shard_count = 8,
     # engine is used via engine.api.InferenceSession in realization_context.py
     # interpreter is used via lazy import in realization_context.py
     ignore_extra_deps = [
         "//max/python/max/engine",
         "//max/python/max:interpreter",
     ],
+    test_docstring_examples = True,
     deps = [
         "//max/python/max:_core",
         "//max/python/max:_mlir_context",

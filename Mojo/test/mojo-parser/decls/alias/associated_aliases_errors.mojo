@@ -102,12 +102,12 @@ struct ZBool:
 
 
 trait TraitWithTypeAlias:
-    # expected-note @below {{parent trait's member defined here}}
+    # expected-note @below {{the other trait's member defined here}}
     comptime T: ZBool
 
 
 trait TraitWithSameTypeAlias(TraitWithTypeAlias):
-    # expected-error @below {{invalid redefinition of 'T': cannot convert 'ZInt' to parent trait's member's type 'ZBool'}}
+    # expected-error @below {{invalid redefinition of 'T': cannot convert 'ZInt' to the other trait's member's type 'ZBool'}}
     comptime T: ZInt
 
 
@@ -137,3 +137,16 @@ trait TraitWithTooManyAliases(SuperTrait):
     comptime T: ZBool
     # expected-error @below {{invalid redefinition of 'T'}}
     comptime T: ZInt
+
+
+# // -----
+
+trait TraitWithComptime:
+    # expected-note @+1 {{conflicting comptime alias declared here}}
+    comptime MyType = Int
+
+
+trait ChildOverridesComptimeWithFn(TraitWithComptime):
+    # expected-error @+1 {{invalid redefinition of 'MyType'}}
+    def MyType(self):
+        pass

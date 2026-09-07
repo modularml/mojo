@@ -608,7 +608,7 @@ bool LIT::isNeverCallableSynthesizedCandidate(ASTDecl *candidate) {
 /// list, e.g. when calling a static method that doesn't need a self value, and
 /// by pre-emitting PValues when not in an parameter context. The actual
 /// emission needs to use the updated argument list.
-PValue OverloadSet::filterOverloadSet(
+CalleeResult OverloadSet::filterOverloadSet(
     CallOperands &operands, bool emitDiagnosticOnFailure, IREmitter &emitter,
     bool disableMaterialization,
     OperandsNeedingOriginsList *forwardedNeedingOrigins) const {
@@ -686,7 +686,7 @@ PValue OverloadSet::filterOverloadSet(
   // If all of the candidates are wrong, diagnose this as a failure.
   if (allInvalid) {
     if (!emitDiagnosticOnFailure || isErroneous())
-      return {};
+      return CalleeResult::no();
 
     // Candidates that are compiler-synthesized functions with a never-
     // satisfiable where clause (e.g. the move-init synthesized for a
@@ -704,7 +704,7 @@ PValue OverloadSet::filterOverloadSet(
     if (fnDecls.empty() || realCandidates.empty()) {
       auto diag = getShared().emitError(getExprLoc()) << getExpr()->getRange();
       diag << "invalid call to '" << baseName << "': no candidates found";
-      return {};
+      return CalleeResult::no();
     }
 
     // Otherwise, there is one or more candidate, and they all failed.  Emit the
@@ -749,7 +749,7 @@ PValue OverloadSet::filterOverloadSet(
            << " with itself, you can remove the constructor call"
            << operands[0].expr->getRange()
            << FixIt::remove(callNode.callee->getRange());
-      return {};
+      return CalleeResult::no();
     }
 
     // Diagnose implicit conversions with a custom message.
@@ -768,7 +768,7 @@ PValue OverloadSet::filterOverloadSet(
              << " value to " << initResType << getExpr()->getRange();
       }
 
-      return {};
+      return CalleeResult::no();
     }
 
     if (realCandidates.size() == 1)
@@ -798,7 +798,7 @@ PValue OverloadSet::filterOverloadSet(
     if (realCandidates.size() == 1) {
       diag << ": " << realCandidates[0].second->takeDiag();
       diag.attachNote(*realCandidates[0].first) << "function declared here";
-      return {};
+      return CalleeResult::no();
     }
 
     // Add a note for what is wrong with each candidate.
@@ -807,7 +807,7 @@ PValue OverloadSet::filterOverloadSet(
           << "candidate not viable: " << eval->takeDiag();
     }
 
-    return {};
+    return CalleeResult::no();
   }
 
   // Ok, we have at least one valid candidate, so filter for the best matches.
@@ -844,7 +844,9 @@ PValue OverloadSet::filterOverloadSet(
                                         /*deferralAttempted=*/context !=
                                             nullptr);
       }
-      return {};
+      // The return below is not a rejection: these candidates could not
+      // be ruled out, only left undecided.
+      return CalleeResult::unknown();
     }
   }
 
@@ -895,7 +897,7 @@ PValue OverloadSet::filterOverloadSet(
         // loop because there is a forward progress guarantee here.
         if (failed(emitOperandsNeedingOriginsToMemory(
                 bestFitness.getOperandsNeedingOrigins(), operands, emitter)))
-          return {};
+          return CalleeResult::no();
 
         // Now that we mutated the operand list by introducing some new memory
         // types to provide origins, try again.  This will re-evaluate parameter
@@ -917,8 +919,11 @@ PValue OverloadSet::filterOverloadSet(
       }
     }
 
-    // Otherwise, we're done!
-    return boundFunction;
+    // Otherwise, we're done! A null callee means binding failed; an error was
+    // already emitted.
+    if (!boundFunction)
+      return CalleeResult::no();
+    return CalleeResult::yes(std::move(boundFunction));
   }
 
   // Otherwise, we have multiple viable candidates that are ambiguous because
@@ -935,12 +940,12 @@ PValue OverloadSet::filterOverloadSet(
     for (auto &[candidate, eval] : evaluations)
       diag.attachNote(*candidate) << "candidate declared here";
   }
-  return {};
+  return CalleeResult::no();
 }
 
-std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
-    ASTType functionType, function_ref<MojoInflightDiag &(SMLoc)> emitError,
-    bool *hasInconclusiveCandidates) const {
+CalleeAndDeclResult OverloadSet::filterOverloadSetForValueType(
+    ASTType functionType,
+    function_ref<MojoInflightDiag &(SMLoc)> emitError) const {
 
   // If the target type is something weird then don't filter.  Let the error be
   // reported another way.
@@ -953,7 +958,7 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
       for (ASTDecl *candidate : fnDecls)
         diag.attachNote(*candidate) << "candidate declared here";
     }
-    return {};
+    return CalleeAndDeclResult::no();
   }
 
   // We do parameter inference to support cases like:
@@ -995,22 +1000,17 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     unprovableConstraints.clear();
     // Pass our assumptions along: dropping the candidate's generator body
     // constraints to reach `functionType` may depend on them.
-    ConversionFailure failure;
-    TriState verdict = IREmitter::classifyImplicitConversion(
+    auto conversion = IREmitter::classifyImplicitConversionWithDetails(
         {UnboundAttr::get(boundCandidateType), getExpr()}, functionType,
-        getDeclScope(), additionalAssumptions, /*deferralCtx=*/nullptr,
-        &failure);
-    if (verdict.isTrue())
+        getDeclScope(), additionalAssumptions, /*deferralCtx=*/nullptr);
+    if (conversion.isYes())
       return Candidacy::kValid;
-    if (verdict.isFalse())
+    if (conversion.isNo())
       return Candidacy::kInvalid;
 
-    // Undecided: Only an unsatisfied constraint names anything this diagnostic
-    // can use.
-    if (auto *unsatisfied =
-            failure.getReasonIf<ConversionFailure::UnsatisfiedConstraints>())
-      llvm::append_range(unprovableConstraints,
-                         unsatisfied->constraints.unprovenConstraints);
+    // Undecided: Record the constraints it could not discharge.
+    llvm::append_range(unprovableConstraints,
+                       std::move(conversion).getUnknown());
     return Candidacy::kInconclusive;
   };
 
@@ -1057,10 +1057,8 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
   // out, so nothing else may be selected over it: committing to another
   // candidate would silently discard a potential match.
   if (!inconclusiveEvaluations.empty()) {
-    if (hasInconclusiveCandidates)
-      *hasInconclusiveCandidates = true;
     if (!emitError || isErroneous())
-      return {};
+      return CalleeAndDeclResult::unknown();
 
     // A valid candidate is still worth reporting: it is the one the user
     // probably meant, and the note says why it cannot be selected yet.
@@ -1074,7 +1072,7 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     explainInconclusiveCandidates(getShared(), getExpr(), baseName,
                                   /*isCall=*/false, inconclusiveEvaluations,
                                   diag);
-    return {};
+    return CalleeAndDeclResult::unknown();
   }
 
   // Notify the listener of the updated decl references for the call now that
@@ -1094,12 +1092,12 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     PValue result = emitter.emitPValue({callee, getExpr()},
                                        EC_OverloadResolution, functionType);
     assert(result && "Conversion should always succeed");
-    return {result, selectedMethod};
+    return CalleeAndDeclResult::yes({result, selectedMethod});
   }
 
   // If we aren't to emit a diagnostic, just return the failure.
   if (!emitError)
-    return {};
+    return CalleeAndDeclResult::no();
 
   MojoInflightDiag &diag = emitError(getExprLoc());
 
@@ -1142,7 +1140,7 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     if (!hadCandidate)
       diag << ASTType(candidateType);
   }
-  return {};
+  return CalleeAndDeclResult::no();
 }
 
 /// Perform substitutions of the specified bindings into the symbol, returning
@@ -1313,9 +1311,12 @@ PValue OverloadSet::lookupAndResolve(
   // Filter the overload set with the actual operands list.  If this
   // fails, report an error (if we have an error handler) and reset to a
   // null state so the client can check this.
-  return ovSet.filterOverloadSet(
+  auto calleeResult = ovSet.filterOverloadSet(
       callOperands,
       /*emitDiagnosticOnFailure=*/shouldPrintOverloadErrors, emitter);
+  if (!calleeResult.isYes())
+    return {};
+  return calleeResult.getYes();
 }
 
 /// Try to resolve the overload set to a single function candidate, using the
@@ -1337,8 +1338,10 @@ PValue OverloadSet::getDirectSymbol(
     auto emitError = [&](SMLoc loc) -> MojoInflightDiag & {
       return diag.emplace(getShared().emitError(loc));
     };
-    auto [result, _] = filterOverloadSetForValueType(expectedType, emitError);
-    return result;
+    auto result = filterOverloadSetForValueType(expectedType, emitError);
+    if (!result.isYes())
+      return {};
+    return result.getYes().callee;
   }
 
   // If the overload set has parameter bindings, try to resolve the candidates
@@ -1515,14 +1518,14 @@ CValue OverloadSet::emitCall(CallOperands &&operands, IREmitter &emitter) {
 
   // Check the direct callees to see if they can be unambiguously resolved
   // with the bindings list and specified arguments.
-  PValue callee = filterOverloadSet(operands,
-                                    /*emitDiagnosticOnFailure=*/true, emitter);
-  if (!callee) {
+  auto calleeResult =
+      filterOverloadSet(operands, /*emitDiagnosticOnFailure=*/true, emitter);
+  if (!calleeResult.isYes()) {
     operands.dest.resetForError(emitter);
     return {};
   }
 
-  return emitter.emitCallUnchecked(callee, std::move(operands));
+  return emitter.emitCallUnchecked(calleeResult.getYes(), std::move(operands));
 }
 
 CValue IREmitter::emitIndirectCall(CValue callee, CallOperands &&operands) {
@@ -1817,7 +1820,7 @@ CValue IREmitter::emitConstructorCall(ASTType type,
 /// If there were erroneous declarations, an error has been raised about a
 /// constructor that likely would have applied, which should be considered in
 /// any error reporting. This does not generate any IR.
-FailureOr<PValue> OverloadSet::canConstructType(
+FailureOr<CalleeResult> OverloadSet::canConstructType(
     ASTType requiredType, CallOperands &operands, ASTDecl &declScope,
     OperandsNeedingOriginsList *forwardedNeedingOrigins) {
   // Check to see if we can do an implicit conversion by invoking a `__init__`
@@ -1829,7 +1832,8 @@ FailureOr<PValue> OverloadSet::canConstructType(
 
   // If there are no viable candidates for the construction, we fail.
   if (!callee)
-    return callee.isErroneous() ? FailureOr<PValue>(failure()) : PValue();
+    return callee.isErroneous() ? FailureOr<CalleeResult>(failure())
+                                : CalleeResult::no();
 
   // Install the Self type parameters on the callee directly, since they cannot
   // be inferred from the result.
@@ -1843,21 +1847,21 @@ FailureOr<PValue> OverloadSet::canConstructType(
 
   // If we have at least one candidate, we check to see if any of them can
   // work. This needs to call filterOverloadSet manually because we might not
-  PValue result = callee.filterOverloadSet(
+  CalleeResult result = callee.filterOverloadSet(
       operands,
       /*emitDiagnosticOnFailure=*/false, paramEmitter,
       /*disableMaterialization=*/true, forwardedNeedingOrigins);
 
   if (callee.isErroneous())
-    return FailureOr<PValue>(failure());
-  if (!result)
+    return FailureOr<CalleeResult>(failure());
+  if (!result.isYes())
     return result;
 
   // If we found an unambiguous initializer to build this value, make sure that
   // it returns the right thing we were expecting.  It is possible that
   // conditional conformances constrain the result type more than we were
   // expecting.
-  auto resultTy = FnOrFnLiteralTypeGeneratorType::get(result.get().getType())
+  auto resultTy = FnOrFnLiteralTypeGeneratorType::get(result.getYes().getType())
                       .getUserResultType();
   auto &shared = paramEmitter.shared;
   if (!requiredType.isEqualCanon(resultTy)) {
@@ -1865,7 +1869,7 @@ FailureOr<PValue> OverloadSet::canConstructType(
     // declaration, this is a form of conditional conformance.
     // TODO(requires / cond conformance): replace this with a better mechanism.
     if (!ASTType(requiredType).isEqualAllowingUnbound(resultTy, shared))
-      return failure();
+      return FailureOr<CalleeResult>(failure());
   }
 
   return result;

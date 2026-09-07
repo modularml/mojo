@@ -1043,7 +1043,7 @@ LogicalResult CastOp::canonicalize(CastOp op, PatternRewriter &b) {
     // bits T3 keeps, or a float T2 rounded (`fast` accepts double rounding).
     if ((inType->isIntLike() && outWidth > inWidth) ||
         (!inType->isIntLike() && intermediateWidth <= inWidth &&
-         !op.getFastAttr())) {
+         !FastmathFlagsInterface(op).isFast())) {
       return b.notifyMatchFailure(loc,
                                   "intermediate truncation affects result");
     }

@@ -172,6 +172,24 @@ def test_profile_scope_nests() -> None:
     assert 'profile_scope<"outer",' in asm
 
 
+def test_profile_scope_color() -> None:
+    """A colored scope stores its color in the ProfileScopeLocationAttr."""
+    input_type = TensorType(
+        dtype=DType.float32, shape=[4], device=DeviceRef.CPU()
+    )
+    with Graph("profile_scope_color", input_types=[input_type]) as graph:
+        with graph.profile_scope("outer", color="orange"):
+            with graph.profile_scope("inner"):
+                y = ops.add(graph.inputs[0], graph.inputs[0])
+        graph.output(y)
+
+    asm = graph._mlir_op.get_asm(enable_debug_info=True)
+    # The colored scope carries the color field; the uncolored sibling does not.
+    assert 'loc(#mogg.profile_scope<"inner",' in asm
+    assert 'color = "orange"' in asm
+    assert 'profile_scope<"outer", loc(unknown), color = "orange">' in asm
+
+
 def test_profile_scope_skips_constants_and_weights() -> None:
     """Constants and weights created inside a profile_scope carry no label."""
     weight = Weight(

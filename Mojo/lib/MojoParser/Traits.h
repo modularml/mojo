@@ -77,7 +77,8 @@ ConstraintAttr fuseConstraints(SharedState &shared,
 /// a trait type or a struct meta type.
 Type mergeTwoMetaTypeBounds(SharedState &shared, ASTType typeA, ASTType typeB);
 
-FnTypeGeneratorType specializeSignature(FnOp traitFn, ASTType newSelfType,
+FnTypeGeneratorType specializeSignature(FnTypeGeneratorType traitFnSignature,
+                                        ASTType newSelfType,
                                         DeclResolver &declResolver);
 
 /// Emit a GetWitnessAttr that fetches a unique trait requirement if a type

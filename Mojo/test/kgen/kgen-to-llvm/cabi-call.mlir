@@ -4,9 +4,9 @@
 // callees.
 //
 // TRANSFORM UNDER TEST:
-//   KGEN/lib/KGENToLLVM/LowerKGENToLLVM.cpp  — ConvertKGENCall
-//   KGEN/lib/KGENToLLVM/LowerKGENClosuresToLLVM.cpp  — CallIndirectOpConversion
-//   KGEN/lib/KGENToLLVM/CABICallHelpers.cpp  — CABICallHelper
+//   Mojo/lib/KGENToLLVM/LowerKGENToLLVM.cpp  — ConvertKGENCall
+//   Mojo/lib/KGENToLLVM/LowerKGENClosuresToLLVM.cpp  — CallIndirectOpConversion
+//   Mojo/lib/KGENToLLVM/CABICallHelpers.cpp  — CABICallHelper
 //
 // Focus: interaction between TailKind and the sret return convention.
 //

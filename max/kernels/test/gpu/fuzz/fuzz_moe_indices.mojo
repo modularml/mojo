@@ -32,7 +32,7 @@ from nn.moe import moe_create_indices
 from _fuzz import boundary_int, collect_args, flag, flag_int
 
 comptime num_experts = get_defined_int["num_experts", 256]()
-comptime expected_count = get_defined_int["expected_count", 8192]()
+comptime max_tokens = get_defined_int["max_tokens", 8192]()
 comptime fuzz_seed = get_defined_int["fuzz_seed", 12345]()
 comptime budget = get_defined_int["budget", 16]()
 
@@ -56,7 +56,7 @@ def gen_specs(n: Int) -> List[CaseSpec]:
             # Sparse-activation regime: many inactive experts.
             num_tokens = boundary_int(1, num_experts, 1)
         else:
-            num_tokens = boundary_int(1, 4096, expected_count)
+            num_tokens = boundary_int(1, 4096, max_tokens)
         specs.append(CaseSpec(num_tokens))
     return specs^
 
@@ -94,7 +94,7 @@ def run_one_case(ctx: DeviceContext, spec: CaseSpec) raises:
     random(topk_host_t, min=0, max=UInt32(num_experts))
     ctx.enqueue_copy(topk_dev, topk_host)
 
-    moe_create_indices["gpu", expected_count=expected_count](
+    moe_create_indices["gpu"](
         token_expert_order,
         expert_start_indices,
         restore_token_order,

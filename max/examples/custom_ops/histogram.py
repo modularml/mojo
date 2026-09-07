@@ -58,7 +58,8 @@ if __name__ == "__main__":
     session = InferenceSession(devices=[device])
 
     # Compile the graph.
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     # Fill an input with random values.
     x_values = np.random.randint(0, 256, size=n, dtype=np.uint8)

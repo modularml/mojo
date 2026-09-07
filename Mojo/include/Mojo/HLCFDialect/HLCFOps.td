@@ -162,7 +162,7 @@ def HLCF_ForOp : HLCFParentOp<"for"> {
     ` ``[` custom<ForBoundsWithOptionalType>($lowerBound, type($lowerBound),
                                             $upperBound, type($upperBound),
                                             $step, type($step))
-    $cmpPredicateType $indVarComputeType `]` ``
+    enum($cmpPredicateType) enum($indVarComputeType) `]` ``
     custom<Loop>($iterArgs, type($iterArgs), type($results), $body) attr-dict
   }];
 
@@ -618,35 +618,26 @@ def HLCF_ForYieldOp : HLCFTerminatorOp<"for.yield", [
 def HLCF_ElifYieldOp : HLCFTerminatorOp<"elif.yield", [
     ParentOneOf<["ElifOp"]>,
     DeclareOpInterfaceMethods<InterpreterOpInterface>]> {
-  let summary = "yield operation for the condition of elif operations";
+  let summary = "yield operation for additional conditions of elif operations";
   let description = [{
-    The `hlcf.elif.yield` operation is a control-flow terminator that
-    transfers control-flow either to the subsequent region or to the else block
-    of the parent `hlcf.elif`.
+    The `hlcf.elif.yield` operation is a control-flow terminator used only in
+    the *additional* condition regions of a parent `hlcf.elif` (the regions in
+    `$elifRegions`). It transfers control either to the paired `then` region
+    when the condition is true, or to the next condition region / the `else`
+    region when false.
 
     This op takes at least one `!kgen.scalar<bool>` value which is the
-    condition, but can take
-    an arbitrary number of other values.  These values are passed into the
-    "then" or "else" block, enabling mem2reg promotion of values stored in the
-    condition block.
+    condition, but can take an arbitrary number of other values. These values
+    are passed into the "then" or subsequent/"else" block, enabling mem2reg
+    promotion of values stored in the condition block.
 
     Example:
 
     ```mlir
-    %0 = hlcf.elif -> index {
-      hlcf.elif.yield %cond
-    } then {
+    %0 = hlcf.elif %cond0 -> index {
       hlcf.yield %arg0 : index
     } else {
-      hlcf.yield %arg0 : index
-    }
-    ```
-
-    Example passing values between blocks:
-
-    ```mlir
-    %0 = hlcf.elif -> index {
-      hlcf.elif.yield %cond, %x: i32
+      hlcf.elif.yield %cond1, %x : i32
     } then (%xThen: i32) {
       hlcf.yield %arg0 : index
     } else (%xElse: i32) {
@@ -666,51 +657,68 @@ def HLCF_ElifYieldOp : HLCFTerminatorOp<"elif.yield", [
 def HLCF_ElifOp : HLCFParentOp<"elif"> {
   let summary = "elif operation";
   let description = [{
-    The `hlcf.elif` operation defines N scoped control-flow regions.
-    Control-flow transfers from the operation to the beginning of the first
-    region whose condition is true, or the else block if none are true.
+    The `hlcf.elif` operation is a multi-arm conditional. The first condition
+    is an SSA operand; its matching `then` is `$thenRegion`. Additional arms
+    are written as `else { cond } then { then }` pairs in `$elifRegions`, where
+    each condition region is terminated by `hlcf.elif.yield`. The final
+    `$elseRegion` runs when every condition is false.
 
-    This operation is a chain of paired regions. The even indexed regions
-    represent condition regions and contain a boolean valued expression
-    terminated by a `hlcf.elif.yield` operation that will transfer control
-    either to the subsequent region (if true) or the subsequent even indexed
-    on false.
+    All `then` / `else` regions are terminated by `hlcf.yield`, whose operand
+    types must match the results of the parent `hlcf.elif`.
 
-    The odd indexed regions represent value regions. These regions are
-    terminated by a `hlcf.yield` operation whose result type matches that of
-    the parent elif operation. The `hlcf.yield` operations transfer control
-    to after the `hlcf.elif` operation.
-
-    Example:
+    Example (single if/else):
 
     ```mlir
-    %0 = hlcf.elif -> index {
-      hlcf.elif.yield %arg1 : i1
-    } then {
+    %0 = hlcf.elif %cond -> index {
       hlcf.yield %arg0 : index
     } else {
-      hlcf.yield %arg0 : index
+      hlcf.yield %arg1 : index
     }
     ```
 
-    Example:
+    Example (if / elif / else):
 
     ```mlir
-    %0 = hlcf.elif -> index {
-      hlcf.elif.yield %arg0 : i1
-    } then (%arg1 : index) {
+    %0 = hlcf.elif %cond0 -> index {
+      hlcf.yield %arg0 : index
+    } else {
+      hlcf.elif.yield %cond1
+    } then {
       hlcf.yield %arg1 : index
-    } else (%arg1 : index) {
-      hlcf.yield %arg1 : index
+    } else {
+      hlcf.yield %arg2 : index
     }
     ```
   }];
+  let arguments = (ins HLCF_BoolScalar:$cond);
   let results = (outs Variadic<AnyType>:$results);
-  let regions = (region SizedRegion<1>:$elseRegion,
+  let regions = (region SizedRegion<1>:$thenRegion,
+                        SizedRegion<1>:$elseRegion,
                         VariadicRegion<SizedRegion<1>>:$elifRegions);
 
   let assemblyFormat = [{
-    (`->` type($results)^)? custom<Elif>($elifRegions, $elseRegion) attr-dict
+    $cond (`->` type($results)^)?
+    custom<Elif>($thenRegion, $elifRegions, $elseRegion) attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$cond), [{
+      build($_builder, $_state, TypeRange(), cond, /*nElifRegions=*/0);
+    }]>,
+    OpBuilder<(ins "TypeRange":$results, "Value":$cond), [{
+      build($_builder, $_state, results, cond, /*nElifRegions=*/0);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Return OpBuilder's pointing the end of the then/else block.
+    OpBuilder getThenBodyBuilder();
+    OpBuilder getElseBodyBuilder();
+
+    /// Get 'then' block.
+    Block& getThenBlock();
+    /// Get 'else' block.
+    Block& getElseBlock();
   }];
 
   let hasVerifier = 1;

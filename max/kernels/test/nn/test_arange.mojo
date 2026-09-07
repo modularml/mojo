@@ -62,7 +62,7 @@ def test_arange[
         print("Memory is larger than static limit, test failed")
         return
 
-    var memory4 = Array[Scalar[dtype], max_output_size](uninitialized=True)
+    var memory4 = Array[Scalar[dtype], max_output_size](fill={})
     var out_tensor = TileTensor(memory4, row_major(Coord(outshape)))
 
     @always_inline

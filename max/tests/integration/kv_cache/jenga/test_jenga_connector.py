@@ -44,6 +44,7 @@ from max.pipelines.request.base import RequestID
 FULL = "full"
 VALUES = "values"
 SCALES = "scales"
+SLIDING = "sliding"
 
 
 class FakeTransfer:
@@ -71,9 +72,15 @@ class FakeConnector:
     name = "FakeConnector"
 
     def __init__(
-        self, leaves: Sequence[str], asynchronous: bool = True
+        self,
+        leaves: Mapping[str, KVCacheGroupId] | Sequence[str],
+        asynchronous: bool = True,
     ) -> None:
-        self.leaves = {leaf: KVCacheGroupId.full() for leaf in leaves}
+        self.leaves = (
+            dict(leaves)
+            if isinstance(leaves, Mapping)
+            else {leaf: KVCacheGroupId.full() for leaf in leaves}
+        )
         self.held: set[bytes] = set()
         self.asynchronous = asynchronous
         self.loads: list[tuple[dict[str, list[int]], list[bytes], int]] = []
@@ -85,6 +92,7 @@ class FakeConnector:
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         served = 0
         for block_hash in block_hashes:
@@ -98,9 +106,19 @@ class FakeConnector:
                 served,
             )
         )
-        transfer = FakeTransfer(
-            {leaf: list(ids)[:served] for leaf, ids in block_ids.items()}
-        )
+        loaded_blocks = {}
+        for leaf_id, ids in block_ids.items():
+            group_id = self.leaves[leaf_id]
+            window_blocks = (
+                group_id.blocks_in_window(page_size=1)
+                if group_id.is_sliding_window()
+                else served
+            )
+            null_padding = max(0, served - window_blocks)
+            loaded_blocks[leaf_id] = [0] * null_padding + list(ids)[
+                : served - null_padding
+            ]
+        transfer = FakeTransfer(loaded_blocks)
         if not self.asynchronous or served == 0:
             transfer.done = True
         self.transfers.append(transfer)
@@ -178,9 +196,11 @@ def make_manager(
     connector: KVConnector | None,
     leaves: Sequence[str] = (FULL,),
     num_huge_blocks: int = 16,
+    leaf_infos: Mapping[str, KVLeafInfo] | None = None,
 ) -> JengaBlockManager:
     return JengaBlockManager(
-        {leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves},
+        leaf_infos
+        or {leaf: KVLeafInfo(1, KVCacheGroupId.full()) for leaf in leaves},
         num_huge_blocks=num_huge_blocks,
         block_size=1,
         enable_prefix_caching=True,
@@ -266,25 +286,6 @@ def test_multi_leaf_sends_distinct_per_leaf_block_ids() -> None:
     assert block_ids[VALUES] != block_ids[SCALES], (
         "leaves shared a page index; they have separate bid spaces"
     )
-
-
-def test_connector_rejects_sliding_window_groups() -> None:
-    """The full-attention-only guard fires before anything is wired up."""
-    with pytest.raises(ValueError, match="full-attention groups only"):
-        JengaBlockManager(
-            {
-                FULL: KVLeafInfo(1, KVCacheGroupId.full()),
-                "swa": KVLeafInfo(1, KVCacheGroupId("sliding_window", 4)),
-            },
-            num_huge_blocks=8,
-            block_size=1,
-            enable_prefix_caching=True,
-            num_replicas=1,
-            max_num_input_tokens=None,
-            num_draft_tokens=0,
-            num_draft_tokens_per_step=0,
-            connector=FakeConnector([FULL, "swa"]),
-        )
 
 
 def test_device_hit_and_onload_splice_into_one_run() -> None:
@@ -437,3 +438,48 @@ def test_alloc_drains_landed_transfers_so_pins_do_not_accumulate() -> None:
     assert len(pool.free_huge_blocks) == free_huge, (
         "huge blocks never came back: pinned pages kept them out of the pool"
     )
+
+
+def test_swa_connector_onload_null_pads_and_skips_prefix_cache_commit() -> None:
+    groups = {
+        FULL: KVCacheGroupId.full(),
+        SLIDING: KVCacheGroupId("sliding_window", 4),
+    }
+    connector = FakeConnector(groups, asynchronous=False)
+    manager = make_manager(
+        connector,
+        leaf_infos={
+            FULL: KVLeafInfo(1, groups[FULL]),
+            SLIDING: KVLeafInfo(1, groups[SLIDING]),
+        },
+    )
+
+    first = make_ctx([1, 2, 3, 4, 5, 6])
+    manager.claim(first)
+    manager.alloc(first)
+    first.update(9)
+    manager.step(first)
+    manager.offload(0)
+    _, offloaded = connector.offloads[-1]
+    manager.release(first)
+    manager.reset_prefix_cache()
+    connector.held = set(offloaded)
+
+    replay = make_ctx([1, 2, 3, 4, 5, 6])
+    manager.claim(replay)
+    manager.alloc(replay)
+
+    block_ids, asked, served = connector.loads[-1]
+    assert asked == list(offloaded[:-1])
+    assert served == len(asked)
+    assert len(block_ids[SLIDING]) == groups[SLIDING].blocks_in_window(1)
+
+    pool = manager.pools[0]
+    sliding_blocks = manager.get_req_blocks_per_leaf(replay)[SLIDING]
+    null_count = len(asked) - groups[SLIDING].blocks_in_window(1)
+    assert sliding_blocks[:null_count] == [0] * null_count
+    assert len(pool.prefix_caches[SLIDING]) == len(asked) - null_count
+    assert all(
+        not block.is_null for block in pool.prefix_caches[SLIDING].values()
+    )
+    assert len(pool.prefix_caches[FULL]) == len(asked)

@@ -335,9 +335,8 @@ private:
                                        Location from, bool addWaiter);
 
   /// Instantiate a generator reference by retrieving the concrete
-  /// implementations of a reference. If this function returns `advance` but
-  /// `inputParamKey` is not populated, then the callee is a direct function
-  /// reference.
+  /// implementations of a reference. `inputParamKey` is populated only for a
+  /// callee named by its generator, not one named by its concrete name.
   std::pair<ElaborationState, ImplNode *> instantiateGeneratorReference(
       ImplNode *parent, Operation *user, SymbolConstantAttr calleeSymbol,
       ParameterExprArrayAttr &inputParamKey, GeneratorOpInterface &gen,

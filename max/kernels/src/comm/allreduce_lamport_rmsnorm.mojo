@@ -109,7 +109,7 @@ def _allreduce_lamport_rmsnorm_kernel[
     var my_region = rank_sigs[my_rank][].lamport_region_ptr[dtype]()
     comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var peer_regions = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: rank_sigs[
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: rank_sigs[
             circular_add[ngpus](my_rank, i)
         ][].lamport_region_ptr[dtype]()
     )

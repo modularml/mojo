@@ -22,9 +22,7 @@ def test_maybe_partial_load() raises:
     comptime simd_size = 4
     comptime size = simd_size + 1
 
-    var a = Array[Float32, size](uninitialized=True)
-    for i in range(size):
-        a[i] = 1.0
+    var a = Array[Float32, size](fill=1.0)
 
     var vec = _simd_load_maybe_partial[simd_size, False](a.unsafe_ptr(), 0)
     assert_equal(vec, SIMD[.float32, simd_size](1.0))
@@ -44,7 +42,7 @@ def test_accumulate[
     #     [ 1.0, 1.0 ],
     #     [ 2.0, 2.0 ],
     #     [ 3.0, 3.0 ]]
-    var a = Array[Scalar[type], 2 * num_rows * length](uninitialized=True)
+    var a = Array[Scalar[type], 2 * num_rows * length](fill={})
     var a_base_ptr: MutPointer[Scalar[type], origin_of(a)] = a.unsafe_ptr()
     for i in range(2 * num_rows):
         var a_ptr = a_base_ptr + i * length
@@ -56,7 +54,7 @@ def test_accumulate[
     #     [4 x 2.0, 4 x 2.0, 4 x 3.0, 4 x 3.0]]
     comptime b_size = 2 * num_cols * simd_size * length
     comptime kernel_width = num_cols * simd_size
-    var b = Array[Scalar[type], b_size](uninitialized=True)
+    var b = Array[Scalar[type], b_size](fill={})
     var b_base_ptr: MutPointer[Scalar[type], origin_of(b)] = b.unsafe_ptr()
 
     for i in range(2 * length):
@@ -137,7 +135,7 @@ def test_accumulate_with_offsets[
     #     [ 1.0, 1.0 ],
     #     [ 2.0, 2.0 ],
     #     [ 3.0, 3.0 ]]
-    var a = Array[Scalar[type], 2 * num_rows * length](uninitialized=True)
+    var a = Array[Scalar[type], 2 * num_rows * length](fill={})
     var a_base_ptr: MutPointer[Scalar[type], origin_of(a)] = a.unsafe_ptr()
     for i in range(2 * num_rows):
         var a_ptr = a_base_ptr + i * length
@@ -149,7 +147,7 @@ def test_accumulate_with_offsets[
     #     [4 x 2.0, 4 x 2.0, 4 x 3.0, 4 x 3.0]]
     comptime b_size = 2 * num_cols * simd_size * length
     comptime kernel_width = num_cols * simd_size
-    var b = Array[Scalar[type], b_size](uninitialized=True)
+    var b = Array[Scalar[type], b_size](fill={})
     var b_base_ptr: MutPointer[Scalar[type], origin_of(b)] = b.unsafe_ptr()
 
     for i in range(2 * length):
@@ -158,10 +156,10 @@ def test_accumulate_with_offsets[
         comptime for j in range(num_cols):
             (b_ptr + j * simd_size).store(SIMD[type, simd_size](i))
 
-    var a_base_stack = Array[Int32, num_rows](uninitialized=True)
+    var a_base_stack = Array[Int32, num_rows](
+        fill_with=lambda (i: Int) -> Int32: Int32(i * length)
+    )
     var a_base_offsets = TileTensor(a_base_stack, row_major[num_rows]())
-    a_base_offsets[0] = 0
-    a_base_offsets[1] = Int32(length)
 
     var acc = _Accumulator[type, num_rows, num_cols, simd_size]()
     acc.init(0)
@@ -251,7 +249,7 @@ def test_load_store[
     comptime one_vec = SIMD[type, simd_size](1.0)
     comptime residual_vec = SIMD[type, simd_size](-1.0, 0.0, 0.0, 0.0)
 
-    var a = Array[Scalar[type], num_rows * row_size](uninitialized=True)
+    var a = Array[Scalar[type], num_rows * row_size](fill={})
     var a_ptr: MutPointer[Scalar[type], origin_of(a)] = a.unsafe_ptr()
 
     # A: [[ 4x0.0, 4x1.0, -1.0],

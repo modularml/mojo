@@ -21,7 +21,7 @@
 # type.  `ParamMatcher::matchParams` previously had no case for `bind_params`,
 # so the two structurally-identical types failed to match and inference
 # reported a bogus "depends on an unresolved parameter" error.  See the
-# `BindParamsAttr` case added to `KGEN/lib/MojoParser/ParamMatcher.cpp`.
+# `BindParamsAttr` case added to `Mojo/lib/MojoParser/ParamMatcher.cpp`.
 
 # RUN: %parse-mojo-isolated %s | FileCheck %s
 

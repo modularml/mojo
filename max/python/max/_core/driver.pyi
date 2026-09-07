@@ -35,9 +35,7 @@ class Device:
 
     This is the base class for :class:`CPU` and :class:`Accelerator`.
     Do not instantiate this class directly; use :class:`CPU` for host
-    devices, :class:`Accelerator` for any hardware accelerator (GPU
-    by default), or :class:`NPU` to explicitly select the NPU
-    dispatch path. :class:`NPU` is a subclass of :class:`Accelerator`.
+    devices and :class:`Accelerator` for any hardware accelerator.
 
     .. code-block:: python
 
@@ -45,7 +43,6 @@ class Device:
 
         cpu = driver.CPU()
         gpu = driver.Accelerator()
-        npu = driver.NPU()
     """
 
     def can_access(self, other: Device) -> bool:
@@ -321,18 +318,11 @@ class Accelerator(Device):
         """
         Creates an accelerator device with the specified ID and memory limit.
 
-        Represents any hardware accelerator (GPU or NPU) attached to the
-        host. Constructing ``Accelerator()`` directly produces a GPU-labeled
-        device, which is the dispatch path the graph compiler uses for
-        CUDA, HIP, Metal and any other GPU-class backend. Use the
-        :class:`NPU` subclass to explicitly select the NPU dispatch path
-        instead.
-
-        :class:`NPU` is a subclass of ``Accelerator``, so any
-        ``isinstance(device, Accelerator)`` check is satisfied by both GPU
-        and NPU devices. Treat ``Accelerator`` as "any non-CPU device"
-        when writing isinstance checks; use the concrete subclass when
-        you specifically need the GPU or NPU dispatch path.
+        Represents any hardware accelerator attached to the host: the
+        graph compiler reaches CUDA, HIP, Metal and plugin-provided
+        backends alike through this one device class. Use
+        ``isinstance(device, Accelerator)`` to mean "any non-CPU device",
+        and :attr:`api` to tell the concrete backends apart.
 
         Repeated instantiations with a previously-used device-id will still
         refer to the first such instance that was created. This is especially
@@ -350,8 +340,6 @@ class Accelerator(Device):
           device = driver.Accelerator(id=1)  # Second GPU
           # Get device id
           device_id = device.id
-          # NPU is also an Accelerator
-          isinstance(driver.NPU(), driver.Accelerator)  # True
 
         Args:
             id (int, optional): The device ID to use. Defaults to -1, which selects
@@ -359,37 +347,6 @@ class Accelerator(Device):
 
         Returns:
             Accelerator: A new Accelerator device object.
-        """
-
-class NPU(Accelerator):
-    def __init__(self, id: int = -1) -> None:
-        """
-        Creates an NPU accelerator device.
-
-        ``NPU`` is a subclass of :class:`Accelerator`: an NPU **is an**
-        accelerator, and ``isinstance(device, Accelerator)`` returns
-        ``True`` for any ``NPU`` instance. The reason to construct an
-        ``NPU`` instead of a bare ``Accelerator`` is to select the NPU
-        dispatch path: the graph compiler stamps an ``"npu"`` device
-        label, emits ``target="npu"`` Mojo kernels, and routes through
-        the NPU plugin hook rather than the default GPU dispatch path.
-
-        On platforms without an NPU backend the device will still be
-        created, but downstream graph compilation will fail with an
-        unsupported target error.
-
-        .. code-block:: python
-
-            from max import driver
-            device = driver.NPU()
-            device = driver.NPU(id=0)
-
-        Args:
-            id (int, optional): The device ID to use. Defaults to -1, which
-                selects the first available NPU.
-
-        Returns:
-            NPU: A new NPU device object.
         """
 
 class CPU(Device):

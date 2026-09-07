@@ -28,7 +28,7 @@ from max.graph import (
 )
 from max.nn.kernels import moe_sink_gate_router
 from max.nn.layer import LayerList
-from max.nn.moe import MoE, MoEGate, MoEQuantized
+from max.nn.moe import MoEGate, MoEQuantized
 from max.nn.quant_config import fp4_packed_k
 from typing_extensions import Self
 
@@ -118,12 +118,9 @@ class InklingGate(MoEGate):
             )
         )
 
-    @property
-    def sharding_strategy(self) -> ShardingStrategy | None:
-        return self._sharding_strategy
-
-    @sharding_strategy.setter
-    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        # Deliberately no super() call: this gate skips MoEGate's gate_score
+        # Linear, which the base implementation would try to shard.
         if not strategy.is_replicate:
             raise ValueError(
                 "Only replicate sharding strategy is supported for InklingGate."
@@ -283,23 +280,14 @@ class InklingMoE(MoEQuantized):
             }
         return axes
 
-    @property
-    def sharding_strategy(self) -> ShardingStrategy | None:
-        return self._sharding_strategy
-
-    @sharding_strategy.setter
-    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
         """Splits the expert intermediate: an equal split of ``w13``'s
         interleaved output axis keeps each rank's gate/up rows paired."""
         if not strategy.is_tensor_parallel:
             raise ValueError(
                 "Only tensor parallel sharding is supported for InklingMoE."
             )
-        # Class-dict lookup: attribute access would run the getter, not
-        # yield the property.
-        base_property: property = MoE.__dict__["sharding_strategy"]
-        assert base_property.fset is not None
-        base_property.fset(self, strategy)
+        super()._set_sharding_strategy(strategy)
         for name, axis in self._routed_weight_axes().items():
             weight: Weight = getattr(self, name)
             weight.sharding_strategy = (

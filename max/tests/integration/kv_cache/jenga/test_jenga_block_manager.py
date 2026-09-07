@@ -23,6 +23,7 @@ from max.nn.kv_cache.metrics import KVCacheMetrics
 from max.pipelines.context import TextContext, TokenBuffer
 from max.pipelines.kv_cache import InsufficientBlocksError
 from max.pipelines.kv_cache.kv_connector import BlockCount
+from max.pipelines.kv_cache.paged_kv_cache.block_manager import PrefixCacheHits
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
     JengaBlockManager,
     KVLeafInfo,
@@ -1114,6 +1115,87 @@ def test_two_windows_converge_on_prefix_cache_hit() -> None:
         NEAR: [0, 0, 0, 16, 17, 22, 43, 44, 45, 46, 47, 48],
         FAR: [0, 0, 27, 28, 29, 49, 50, 51, 52, 53, 54, 55],
     }
+
+
+# ===--------------------------------------------------------------------=== #
+# get_req_blocks
+# ===--------------------------------------------------------------------=== #
+
+
+def test_get_req_blocks_returns_first_leaf_blocks() -> None:
+    bm = make_manager(
+        {FULL: full(ratio=1), SLIDING: sliding(ratio=1, window=10)},
+        block_size=1,
+    )
+    ctx = make_ctx(num_tokens=3)
+    bm.claim(ctx)
+    bm.alloc(ctx)
+
+    per_leaf = bm.get_req_blocks_per_leaf(ctx)
+    assert bm.get_req_blocks(ctx) == next(iter(per_leaf.values()))
+
+
+def test_get_req_blocks_empty_when_claimed_not_allocated() -> None:
+    bm = make_manager({FULL: full(ratio=1)}, block_size=1)
+    ctx = make_ctx(num_tokens=3)
+    bm.claim(ctx)
+
+    assert bm.get_req_blocks(ctx) == []
+    assert not bm.get_req_blocks(ctx)
+
+
+# ===--------------------------------------------------------------------=== #
+# get_prefix_cache_hit_counts
+# ===--------------------------------------------------------------------=== #
+
+
+def test_get_prefix_cache_hit_counts_reports_device_hits() -> None:
+    bm = make_manager(
+        {FULL: full(ratio=1)},
+        block_size=1,
+        enable_prefix_caching=True,
+    )
+    ctx_a = make_ctx(num_tokens=5)
+    bm.claim(ctx_a)
+    bm.alloc(ctx_a)
+    ctx_a.update(42)
+    bm.step(ctx_a)
+    bm.release(ctx_a)
+
+    ctx_b = make_ctx(num_tokens=5)
+    hits = bm.get_prefix_cache_hit_counts(ctx_b)
+
+    assert len(hits) == 1
+    assert hits[0].device_blocks > 0
+    assert hits[0].host_blocks == 0
+    assert hits[0].disk_blocks == 0
+
+    assert bm.get_prefix_cache_hit_counts(
+        make_ctx_with_tokens([100, 101, 102, 103, 104])
+    ) == [PrefixCacheHits()]
+
+
+def test_get_prefix_cache_hit_counts_is_per_replica() -> None:
+    bm = make_manager(
+        {FULL: full(ratio=1)},
+        block_size=1,
+        num_huge_blocks=8,
+        num_replicas=2,
+        enable_prefix_caching=True,
+    )
+    ctx_a = make_ctx(num_tokens=4)
+    bm.claim(ctx_a, replica_idx=0)
+    bm.alloc(ctx_a)
+    ctx_a.update(42)
+    bm.step(ctx_a)
+    bm.release(ctx_a)
+
+    ctx_b = make_ctx(num_tokens=4)
+    hits = bm.get_prefix_cache_hit_counts(ctx_b)
+
+    assert len(hits) == 2
+    assert hits[0].device_blocks > 0
+    assert hits[1].device_blocks == 0
 
 
 # ===--------------------------------------------------------------------=== #

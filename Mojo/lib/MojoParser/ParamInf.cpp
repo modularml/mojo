@@ -63,11 +63,11 @@ static Type inferInitializerType(ASTDecl &declScope, InitializerUValue &init,
   // We expect the initializer to return the constructed type.
   // Infer the parameters of this overload candidate against the computed
   // result type of the initializer.
-  FailureOr<PValue> initFn =
+  FailureOr<CalleeResult> initFn =
       OverloadSet::canConstructType(inferredType, operands, declScope);
-  if (failed(initFn) || !initFn.value())
+  if (failed(initFn) || !initFn->isYes())
     return {};
-  return FnOrFnLiteralTypeGeneratorType::get(initFn.value().getType())
+  return FnOrFnLiteralTypeGeneratorType::get(initFn->getYes().getType())
       .getUserResultType();
 }
 
@@ -190,16 +190,16 @@ ParamInf::inferCValue(ASTExprAnd<AnyValue> operand, size_t argIdx,
     if (allowImplicitConversions) {
       CallOperands callOperands(CallSyntax::kImplicitConvert, operand.expr,
                                 EC_OverloadResolution, {operand});
-      FailureOr<PValue> pValue = OverloadSet::canConstructType(
+      FailureOr<CalleeResult> pValue = OverloadSet::canConstructType(
           expectedType.getWithUnknownParametersReplaced(getShared()),
           callOperands, getDeclScope(), forwardedNeedingOrigins);
 
       // If we found one, we succeed if the returned type is compatible with the
       // expected type.  Infer the parameters of this overload candidate against
       // the computed result type of the initializer.
-      if (succeeded(pValue) && pValue.value()) {
+      if (succeeded(pValue) && pValue->isYes()) {
         auto sig =
-            FnOrFnLiteralTypeGeneratorType::get(pValue.value().getType());
+            FnOrFnLiteralTypeGeneratorType::get(pValue->getYes().getType());
         if (succeeded(
                 matcher.matchTypes(sig.getUserResultType(), expectedType))) {
           ++numImplicitConversions;
@@ -251,11 +251,11 @@ ParamInf::inferCValue(ASTExprAnd<AnyValue> operand, size_t argIdx,
       return getMojoDiag(loc);
     };
 
-    auto [argVal, _] =
+    auto argValResult =
         orValue->filterOverloadSetForValueType(expectedType, emitError);
-    if (!argVal)
+    if (!argValResult.isYes())
       return failure();
-    return SmartVariant<CValue, ASTType>(CValue(argVal));
+    return SmartVariant<CValue, ASTType>(CValue(argValResult.getYes().callee));
   }
 
   // FIXME: This emits an error unconditionally (not to getDiags) on failure.
@@ -372,18 +372,19 @@ ParamInf::inferFromRVType(ASTExprAnd<AnyValue> operand, size_t argIdx,
   // conversions using the normal type machinery.  This will handle things like
   // function pointer conversions that the code below doesn't.
   if (!paramFinder.hasReferences(expectedType)) {
-    ConversionFailure conversionFailure;
-    if (IREmitter::canImplicitlyConvertToType(
-            {argVal, operand.expr}, expectedType, getDeclScope(),
-            /*additionalAssumptions=*/{}, /*deferralCtx=*/nullptr,
-            &conversionFailure)) {
+    auto conversion = IREmitter::classifyImplicitConversionWithDetails(
+        {argVal, operand.expr}, expectedType, getDeclScope(),
+        /*additionalAssumptions=*/{}, /*deferralCtx=*/nullptr);
+    if (conversion.isYes())
       return success();
-    }
 
     // Restore the original failure so the diagnostic stays simple.
     ParamMatcher::FailableScope::restore(savedFailureInfo, matcher);
     auto &diag = emitWrongTypeDiag(expectedType);
-    std::move(conversionFailure).addExplanation(diag);
+    if (conversion.isNo())
+      std::move(conversion).getNo().addExplanation(diag);
+    else
+      attachConstraintNotes(diag, conversion.getUnknown(), "unproven");
     matcher.failureReason->addExplanation(diag);
     return failure();
   }
@@ -422,16 +423,16 @@ ParamInf::inferFromRVType(ASTExprAnd<AnyValue> operand, size_t argIdx,
                                 EC_TypeParamValue, {{argVal, operand.expr}});
       auto nonParamType =
           expectedType.getWithUnknownParametersReplaced(getShared());
-      FailureOr<PValue> pValue = OverloadSet::canConstructType(
+      FailureOr<CalleeResult> pValue = OverloadSet::canConstructType(
           nonParamType, ctorOperands, getDeclScope(), needingOrigins);
-      if (failed(pValue) || !pValue.value())
+      if (failed(pValue) || !pValue->isYes())
         return {};
 
       // If we found one, we succeed if the returned type is compatible with the
       // expected type.  Infer the parameters of this overload candidate against
       // the computed result type of the initializer.
       auto initSig =
-          FnOrFnLiteralTypeGeneratorType::get(pValue.value().getType());
+          FnOrFnLiteralTypeGeneratorType::get(pValue->getYes().getType());
       return initSig.getUserResultType();
     };
 
@@ -2290,11 +2291,11 @@ VerifiedParamBindings CallParamInf::inferForCall() {
         // Make sure the value is compatible with the expected trait, this
         // produces better error messages.  It would be great to sink this
         // into matchType at some point!
-        ConversionFailure conversionFailure;
-        if (!IREmitter::canImplicitlyConvertToType(
-                {eltTypeValue, operand.expr}, elementType,
-                emitter.getDeclScope(), /*additionalAssumptions=*/{},
-                /*deferralCtx=*/nullptr, &conversionFailure)) {
+        auto conversion = IREmitter::classifyImplicitConversionWithDetails(
+            {eltTypeValue, operand.expr}, elementType, emitter.getDeclScope(),
+            /*additionalAssumptions=*/{},
+            /*deferralCtx=*/nullptr);
+        if (!conversion.isYes()) {
           // Packs cannot be constrained by concrete types so elementType is
           // always a trait and reporting non-conformance instead of a type
           // mismatch is safe. This path is only reachable for packs (isPack
@@ -2306,7 +2307,10 @@ VerifiedParamBindings CallParamInf::inferForCall() {
                << elementType
                << "; either prove the conformance with 'conforms_to'"
                   ", or add conformance";
-          std::move(conversionFailure).addExplanation(diag);
+          if (conversion.isNo())
+            std::move(conversion).getNo().addExplanation(diag);
+          else
+            attachConstraintNotes(diag, conversion.getUnknown(), "unproven");
           return {};
         }
 

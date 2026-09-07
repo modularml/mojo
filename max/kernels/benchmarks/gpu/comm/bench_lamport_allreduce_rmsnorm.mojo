@@ -154,14 +154,14 @@ def _verify_results[
         dtype, type_of(row_major(0)), MutAnyOrigin
     ]
     var v_layout = row_major(length)
-    var v_in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    for g in range(ngpus):
-        v_in_tensors[g] = InTensorType(
+    var v_in_tensors = Array[_, ngpus](
+        fill_with=lambda (g: Int) -> InTensorType: InTensorType(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                 cb_inputs[g].offset_ptr(0)
             ),
             v_layout,
         )
+    )
     var v_ar_out = OutTensorType(
         rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
             v_ar_out_dev.unsafe_ptr()
@@ -347,45 +347,48 @@ def bench_fused_lamport_allreduce_rmsnorm[
     comptime OutTensorType = TileTensor[
         dtype, type_of(row_major(0)), MutAnyOrigin
     ]
-    var in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    var ar_out_tensors = Array[OutTensorType, ngpus](uninitialized=True)
-    for i in range(ngpus):
-        in_tensors[i] = InTensorType(
+    var in_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> InTensorType: InTensorType(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                 cb_inputs[i].unsafe_ptr()
             ),
             row_major(length),
         )
-        ar_out_tensors[i] = OutTensorType(
+    )
+    var ar_out_tensors = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> OutTensorType: OutTensorType(
             rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
                 ar_out_dev[i].unsafe_ptr()
             ),
             row_major(length),
         )
+    )
 
     # Pre-capture pointers for the per-iter closures (CacheBustingBuffer uses
     # `offset_ptr(cache_iter)` to rotate through allocations).
-    var ar_out_ptrs = Array[MutPointer[Scalar[dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+    comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
+    var ar_out_ptrs = Array[_, ngpus](
+        fill_with=lambda (i: Int) {ref} -> PtrType: ar_out_dev[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
-    var unfused_out_ptrs = Array[
-        MutPointer[Scalar[dtype], MutAnyOrigin], ngpus
-    ](uninitialized=True)
-    var fused_out_ptrs = Array[MutPointer[Scalar[dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+    var unfused_out_ptrs = Array[_, ngpus](
+        fill_with=lambda (i: Int) {ref} -> PtrType: unfused_out_dev[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
+    )
+    var fused_out_ptrs = Array[_, ngpus](
+        fill_with=lambda (i: Int) {ref} -> PtrType: fused_out_dev[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
     # Gamma pointers stored as Mut for convenience; rebind to Immut at the
     # call site (only the kernel arg slot needs Immut).
-    var gamma_ptrs = Array[MutPointer[Scalar[dtype], MutAnyOrigin], ngpus](
-        uninitialized=True
+    var gamma_ptrs = Array[_, ngpus](
+        fill_with=lambda (i: Int) {ref} -> PtrType: gamma_dev[i]
+        .unsafe_ptr()
+        .as_unsafe_any_origin()
     )
-    for i in range(ngpus):
-        ar_out_ptrs[i] = ar_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
-        unfused_out_ptrs[i] = (
-            unfused_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
-        )
-        fused_out_ptrs[i] = fused_out_dev[i].unsafe_ptr().as_unsafe_any_origin()
-        gamma_ptrs[i] = gamma_dev[i].unsafe_ptr().as_unsafe_any_origin()
 
     # ---- Benchmark naming + throughput accounting. ----
     var total_bytes = ngpus * length * size_of[dtype]()

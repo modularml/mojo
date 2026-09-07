@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from max.pipelines.context import TextContext, TextGenerationOutput
 from max.pipelines.kv_cache import (
+    JengaKVCacheManager,
     KVTransferEngine,
     KVTransferEngineMetadata,
     PagedKVCacheManagerInterface,
@@ -100,6 +101,10 @@ class PrefillScheduler(Scheduler):
         kv_cache: PagedKVCacheManagerInterface,
         dispatcher: PrefillDispatcherServer,
     ) -> None:
+        # TODO(SERVOPT-1590): remove once Jenga supports DI.
+        assert not isinstance(kv_cache, JengaKVCacheManager), (
+            "Jenga KV cache is incompatible with Disaggregated Inference"
+        )
         self.pipeline = pipeline
         self.scheduler_config = scheduler_config
         self.kv_cache = kv_cache

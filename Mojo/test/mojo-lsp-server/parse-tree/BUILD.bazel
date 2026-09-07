@@ -18,7 +18,7 @@
 #   Single file (fast, for debugging a failure -- sets up
 #   MODULAR_MOJO_MAX_IMPORT_PATH automatically):
 #     br //Mojo/test/mojo-lsp-server/parse-tree:lsp-smoke-one -- \
-#         oss/modular/mojo/stdlib/std/sys/info.mojo
+#         Mojo/stdlib/std/sys/info.mojo
 
 load("@mojo//:mojo.bzl", "ALL_MOJOPKGS")
 load("//bazel:api.bzl", "modular_py_binary", "modular_py_library", "modular_py_test")
@@ -47,7 +47,7 @@ _SANITIZER_INCOMPATIBLE = select({
 })
 
 # Emergency escape hatch: files that crash/hang the parse and block the build.
-# Paths are relative to the stdlib root (oss/modular/mojo/stdlib/std). This
+# Paths are relative to the stdlib root (Mojo/stdlib/std). This
 # should normally be empty -- only add files that genuinely crash, not files
 # that merely emit diagnostics. To re-enable: remove from this list.
 _NO_RUN_LIST = [
@@ -96,7 +96,7 @@ modular_py_test(
 # Convenience runner for a single file, e.g. to debug a `lsp-parse-smoke-stdlib`
 # failure without hand-wiring MODULAR_MOJO_MAX_IMPORT_PATH:
 #   br //Mojo/test/mojo-lsp-server/parse-tree:lsp-smoke-one -- \
-#       oss/modular/mojo/stdlib/std/sys/info.mojo
+#       Mojo/stdlib/std/sys/info.mojo
 modular_py_binary(
     name = "lsp-smoke-one",
     srcs = ["lsp_smoke_one_main.py"],
@@ -144,7 +144,7 @@ modular_py_binary(
 # import-path resolution for doubly-nested Mojo packages; as of 2026-07-09
 # that's confirmed false. Their imports are flat names (`import
 # extensibility`, not `graph_compiler.extensibility`), `resolveModulePath`
-# (KGEN/lib/MojoParser/SharedState.cpp) resolves by flat name against each
+# (Mojo/lib/MojoParser/SharedState.cpp) resolves by flat name against each
 # import-path directory with nothing nesting-specific about it, and
 # `//:install` ships their `.mojoc`s flat, same as every other kernel
 # package -- confirmed by direct `kgen -lsp` runs. The actual cause of the

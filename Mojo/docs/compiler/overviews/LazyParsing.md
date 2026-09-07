@@ -457,8 +457,8 @@ globals work.
 
 One idea is that top-level could *should be treated the same* as any other body
 of code in the program. The semantics of a self-contained program should be the
-same if the top-level code is wrapped inside an `fn main()`. What differs is how
-declarations in top-level code are represented in the generated IR: using
+same if the top-level code is wrapped inside an `def main()`. What differs is
+how declarations in top-level code are represented in the generated IR: using
 symbols instead of stack-allocated variables or parameters. For example, Mojo
 could support the following:
 

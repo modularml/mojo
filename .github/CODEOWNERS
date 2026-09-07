@@ -15,19 +15,31 @@
 /AI_TOOL_POLICY.md @modular/mojo-docs
 /max/CONTRIBUTING.md @modular/mojo-docs
 /max/docs/development.md @modular/mojo-docs @modular/max-serve
-/Mojo/ @modular/compiler
-/Mojo/**/Compiler @modular/compiler
-/Mojo/**/ExecutionEngine @modular/compiler
-/Mojo/**/MojoJupyter @modular/compiler
-/Mojo/**/MojoLLDB @modular/compiler
-/Mojo/**/MojoTooling @modular/compiler
-/Mojo/**/ToolCommon @modular/compiler
+/Mojo/CLAUDE.md @modular/stdlib
+/Mojo/CONTRIBUTING.md @modular/stdlib
+/Mojo/README.md @modular/stdlib
+/Mojo/docs/site/ @modular/mojo-docs
+/Mojo/docs/compiler/ @modular/compiler
+/Mojo/docs/stdlib/ @modular/stdlib
+/Mojo/docs/contributing/ @alisterburt @JoeLoser @dgurchenkov
+/Mojo/docs/contributing/stdlib/ @modular/stdlib
+/Mojo/docs/contributing/compiler/ @modular/compiler
+/Mojo/examples/ @modular/mojo-docs
+/Mojo/include/ @modular/compiler
+/Mojo/integration-test/ @modular/stdlib
+/Mojo/lib/ @modular/compiler
+/Mojo/proposals/ @modular/stdlib
+/Mojo/python/ @modular/stdlib
+/Mojo/stdlib/ @modular/stdlib
+/Mojo/stdlib/std/runtime @modular/compiler
+/Mojo/test/ @modular/compiler
 /Mojo/test/mojo-debug/ @modular/compiler
 /Mojo/test/mojo-jupyter/ @modular/compiler
 /Mojo/test/mojo-lsp-server/ @modular/compiler
 /Mojo/test/mojo-lsp-server-node/ @modular/compiler
 /Mojo/test/mojo-repl/ @modular/compiler
 /Mojo/test/mojo-tool/ @modular/compiler
+/Mojo/tools/ @modular/compiler
 /Mojo/tools/mblack/ @modular/compiler
 /Mojo/tools/mojo/ @modular/compiler
 /Mojo/tools/mojo/Build/ @modular/compiler
@@ -41,9 +53,15 @@
 /Mojo/tools/mojo-lsp-server/ @modular/compiler
 /Mojo/tools/mojo-lsp-test-client/ @modular/compiler
 /Mojo/tools/mojo-repl-entry-point/ @modular/compiler
+/Mojo/unittests @modular/compiler
 /Mojo/unittests/mojo-debug/ @modular/compiler
-/Mojo/unittests/mojo-lsp-server/ @modular/compiler
 /Mojo/utils/ @modular/compiler
+/Mojo/**/Compiler @modular/compiler
+/Mojo/**/ExecutionEngine @modular/compiler
+/Mojo/**/MojoJupyter @modular/compiler
+/Mojo/**/MojoLLDB @modular/compiler
+/Mojo/**/MojoTooling @modular/compiler
+/Mojo/**/ToolCommon @modular/compiler
 /max/mojo/max/__init__.mojo @modular/stdlib @modular/genai @modular/driver
 /max/mojo/max/_category_.json @modular/mojo-docs
 /max/mojo/max/algorithm/ @modular/stdlib @modular/genai
@@ -151,11 +169,6 @@
 /.github/ @modular/sdlc
 /utils @modular/max-sdk
 /utils/local_transformers_setup/ @modular/max-serve
-/mojo @modular/stdlib
-/mojo/docs @modular/mojo-docs
-/mojo/examples @modular/mojo-docs
-/mojo/stdlib/std/runtime @modular/compiler
-/mojo/docs/cheatsheet-tooling/ @modular/mojo-docs
 /Support/ @modular/compiler
 /Support/**/Compiler/ @modular/compiler
 /Support/**/DebugInfoDialect @modular/compiler

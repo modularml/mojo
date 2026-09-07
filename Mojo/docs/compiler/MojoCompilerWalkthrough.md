@@ -11,7 +11,7 @@ A comprehensive guide for compiler engineers new to the KGEN/Mojo codebase.
 5. [Phase 3: Pre-Elaboration Optimization](#phase-3-pre-elaboration-optimization)
 6. [Phase 4: Elaboration (Monomorphization)](#phase-4-elaboration-monomorphization)
 7. [Phase 5: Post-Elaboration Lowering & Optimization](#phase-5-post-elaboration-lowering--optimization)
-8. [Phase 6: Lowering to LLVM](#phase-6-lowering-to-llvm)
+8. [Phase 6: Lowering to LLVM](#phase-6-lowering-to-llvm)`
 9. [Mojo Packages and Precompiled Files](#mojo-packages-and-precompiled-files)
 10. [Debug Information](#debug-information)
     - [Parametric Debug Info](#parametric-debug-info)
@@ -139,7 +139,7 @@ kgen --mlir-print-ir-before-all -elaborate main.mojo 2>&1 | grep 'IR Dump Before
 
 ### Location in Codebase
 
-- `KGEN/lib/MojoParser/` - Parser implementation
+- `Mojo/lib/MojoParser/` - Parser implementation
 - `Mojo/include/Mojo/MojoParser/` - Parser headers
 
 ### Three-Phase Parsing
@@ -246,7 +246,7 @@ dialect.
 
 ### Location in Codebase
 
-- `KGEN/lib/LowerLIT/`
+- `Mojo/lib/LowerLIT/`
 
 ### The LIT Dialect
 
@@ -426,10 +426,10 @@ instructions:
 
 ### Location in Codebase
 
-- `KGEN/lib/Elaborator/Elaborator.cpp`
-- `KGEN/lib/Elaborator/IREvaluator.cpp`
-- `KGEN/lib/Elaborator/ParametricElaborator.cpp` (new)
-- `KGEN/lib/Elaborator/ParametricIREvaluator.cpp` (new)
+- `Mojo/lib/Elaborator/Elaborator.cpp`
+- `Mojo/lib/Elaborator/IREvaluator.cpp`
+- `Mojo/lib/Elaborator/ParametricElaborator.cpp` (new)
+- `Mojo/lib/Elaborator/ParametricIREvaluator.cpp` (new)
 
 ### What Elaboration Does
 
@@ -540,8 +540,8 @@ IR is ready for aggressive optimization.
 
 ### Location in Codebase
 
-- `KGEN/lib/KGENToLLVM/`
-- `KGEN/lib/Compiler/ObjectCompiler/KGENToLLVMPipeline.cpp`
+- `Mojo/lib/KGENToLLVM/`
+- `Mojo/lib/Compiler/ObjectCompiler/KGENToLLVMPipeline.cpp`
 
 ### KGEN to LLVM Type Mapping
 
@@ -601,10 +601,10 @@ sort of cache file.
 
 ### Location in Codebase
 
-- `KGEN/tools/mojo/Precompile/` - Precompile command implementation
-- `KGEN/lib/MojoParser/SharedState.cpp` - Import logic for both source and
+- `Mojo/tools/mojo/Precompile/` - Precompile command implementation
+- `Mojo/lib/MojoParser/SharedState.cpp` - Import logic for both source and
   binary packages
-- `KGEN/lib/MojoParser/EntryPoint.cpp` - Package parsing entry points
+- `Mojo/lib/MojoParser/EntryPoint.cpp` - Package parsing entry points
 
 ### Package Creation Flow
 
@@ -1350,18 +1350,18 @@ kgen --mlir-print-ir-after-all -elaborate main.mojo 2> ir-dump.mlir
 
 ### Testing
 
-The compiler tests live in `KGEN/test/` and use LLVM's **lit** test framework
+The compiler tests live in `Mojo/test/` and use LLVM's **lit** test framework
 with **FileCheck**:
 
 ```bash
-# Run all KGEN tests
+# Run all Mojo tests
 bt //Mojo/test/...
 
 # Run a specific test file
 bt //Mojo/test/mojo-integration:my_test.mojo
 
 # Or just use the file name
-bt KGEN/test/mojo-integration/my_test.mojo
+bt Mojo/test/mojo-integration/my_test.mojo
 ```
 
 Test files use FileCheck directives to verify output:
@@ -1379,25 +1379,25 @@ def foo():
 
 | Directory                                   | Contents                                          |
 |---------------------------------------------|---------------------------------------------------|
-| `KGEN/lib/MojoParser/`                      | Parser and type checker                           |
-| `KGEN/lib/LITDialect/`                      | LIT dialect implementation                        |
-| `KGEN/lib/KGENDialect/`                     | KGEN dialect implementation                       |
-| `KGEN/lib/POPDialect/`                      | POP dialect implementation                        |
-| `KGEN/lib/HLCFDialect/`                     | HLCF dialect implementation                       |
-| `KGEN/lib/CODialect/`                       | Coroutine dialect implementation                  |
-| `KGEN/lib/Elaborator/`                      | Elaboration/monomorphization                      |
-| `KGEN/lib/Interpreter/`                     | Compile-time interpreter (bytecode, memory model) |
-| `KGEN/lib/LowerLIT/`                        | LIT lowering passes                               |
-| `KGEN/lib/KGENToLLVM/`                      | LLVM lowering passes                              |
-| `KGEN/lib/Transforms/`                      | Optimization passes                               |
-| `KGEN/lib/MOGGPreElab/`                     | GPU kernel annotation passes                      |
-| `KGEN/lib/Compiler/Pipeline/`               | Pass pipeline construction                        |
-| `KGEN/tools/mojo/Precompile/`               | Precompile command implementation                 |
+| `Mojo/lib/MojoParser/`                      | Parser and type checker                           |
+| `Mojo/lib/LITDialect/`                      | LIT dialect implementation                        |
+| `Mojo/lib/KGENDialect/`                     | KGEN dialect implementation                       |
+| `Mojo/lib/POPDialect/`                      | POP dialect implementation                        |
+| `Mojo/lib/HLCFDialect/`                     | HLCF dialect implementation                       |
+| `Mojo/lib/CODialect/`                       | Coroutine dialect implementation                  |
+| `Mojo/lib/Elaborator/`                      | Elaboration/monomorphization                      |
+| `Mojo/lib/Interpreter/`                     | Compile-time interpreter (bytecode, memory model) |
+| `Mojo/lib/LowerLIT/`                        | LIT lowering passes                               |
+| `Mojo/lib/KGENToLLVM/`                      | LLVM lowering passes                              |
+| `Mojo/lib/Transforms/`                      | Optimization passes                               |
+| `Mojo/lib/MOGGPreElab/`                     | GPU kernel annotation passes                      |
+| `Mojo/lib/Compiler/Pipeline/`               | Pass pipeline construction                        |
+| `Mojo/tools/mojo/Precompile/`               | Precompile command implementation                 |
 | `Support/lib/DebugInfoDialect/`             | Debug info dialect implementation                 |
 | `Support/include/Support/DebugInfoDialect/` | Debug info dialect headers and TableGen           |
 | `Mojo/include/Mojo/*/`                      | Headers and TableGen definitions                  |
-| `KGEN/test/`                                | Compiler tests (lit + FileCheck)                  |
-| `KGEN/docs/`                                | Documentation                                     |
+| `Mojo/test/`                                | Compiler tests (lit + FileCheck)                  |
+| `Mojo/docs/site/`                           | Documentation                                     |
 
 ---
 

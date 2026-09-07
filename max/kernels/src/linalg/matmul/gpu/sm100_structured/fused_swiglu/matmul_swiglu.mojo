@@ -26,8 +26,10 @@ from max.gpu.host.info import B200
 from max.gpu.primitives.grid_controls import pdl_launch_attributes, PDLLevel
 from layout import (
     Coord,
+    DefaultEngine,
     Idx,
     RowMajorLayout,
+    TensorEngine,
     TensorLayout,
     TileTensor,
     row_major as tt_row_major,
@@ -52,13 +54,19 @@ def _blackwell_matmul_swiglu[
     config: FusedSwiGLUMatmulConfig[_, _, _, transpose_b],
     pdl_level: PDLLevel = PDLLevel(),
     BiasLayoutType: TensorLayout = RowMajorLayout[Int64],
+    BiasEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     c_out: TileTensor[...],
     a_device: TileTensor,
     b_device: TileTensor,
     ctx: DeviceContext,
     bias_tensor: OptionalReg[
-        TileTensor[config.c_type, BiasLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            config.c_type,
+            BiasLayoutType,
+            ImmutAnyOrigin,
+            Engine=BiasEngine,
+        ]
     ] = None,
 ) raises:
     """Launch fused GEMM+SwiGLU kernel on SM100.

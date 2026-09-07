@@ -662,7 +662,16 @@ def batched_matmul_kernel_gpu[
             Optional[matmul_elementwise_epilogue_type](
                 elementwise_epilogue_fn_wrapper
             ) if elementwise_lambda_fn else None,
-        ].run(c, a, b)
+        ].run[
+            type_of(c).LayoutType,
+            type_of(a).LayoutType,
+            type_of(b).LayoutType,
+            type_of(c).Engine,
+            type_of(a).Engine,
+            type_of(b).Engine,
+        ](
+            c, a, b
+        )
 
 
 @always_inline

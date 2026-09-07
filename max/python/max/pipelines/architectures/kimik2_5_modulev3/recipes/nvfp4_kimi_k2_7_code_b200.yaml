@@ -1,0 +1,31 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2026, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+# Kimi K2.7-Code NVFP4 (TP attention + EP MoE).
+model:
+  model_path: nvidia/Kimi-K2.7-Code-NVFP4
+  device_specs: [0, 1, 2, 3, 4, 5, 6, 7]
+  data_parallel_degree: 1
+  max_length: 262144
+  trust_remote_code: true
+  kv_cache:
+    kv_cache_format: float8_e4m3fn
+    device_memory_utilization: 0.75
+
+sampling:
+  enable_structured_output: true
+
+runtime:
+  ep_size: 8
+  ep_use_allreduce: true
+  max_batch_input_tokens: 4096
+  prefer_module_v3: true

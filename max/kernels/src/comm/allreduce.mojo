@@ -756,7 +756,7 @@ def _allreduce_2stage_kernel[
         # Skip Signal header.
         comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
         var tmps = Array[_, ngpus](
-            fill_with=lambda (i: Int) -> PtrType: (
+            fill_with_unrolled=lambda [i: Int]() -> PtrType: (
                 rank_sigs[circular_add[ngpus](_my_rank, i)].address_space_cast[
                     .GENERIC
                 ]()
@@ -804,7 +804,7 @@ def _allreduce_2stage_kernel[
         comptime SlicedLayout = type_of(row_major(n_elements))
         # Round-robin access pattern to balance NVLink traffic across GPUs.
         var sliced_tiles = Array[_, num_tensors](
-            fill_with=lambda (i: Int) -> SlicedTile: SlicedTile(
+            fill_with_unrolled=lambda [i: Int]() -> SlicedTile: SlicedTile(
                 src_tensors[
                     0 if num_tensors
                     == 1 else circular_add[num_tensors](_my_rank, i)
@@ -980,7 +980,7 @@ def _allreduce_1stage_kernel[
     # It's safe to prefetch the input pointers
     comptime TileType = TileTensor[dtype, in_layout, ImmutAnyOrigin]
     var ptrs = Array[_, num_tensors](
-        fill_with=lambda (i: Int) -> TileType: src_tensors[
+        fill_with_unrolled=lambda [i: Int]() -> TileType: src_tensors[
             0 if num_tensors == 1 else circular_add[num_tensors](_my_rank, i)
         ]
     )
@@ -1153,7 +1153,7 @@ def _allreduce_lamport_kernel[
     # the same way the existing kernels do).
     comptime PtrType = MutPointer[Scalar[dtype], MutAnyOrigin]
     var peer_regions = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: rank_sigs[
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: rank_sigs[
             circular_add[ngpus](_my_rank, i)
         ][].lamport_region_ptr[dtype]()
     )

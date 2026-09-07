@@ -1516,7 +1516,7 @@ def block_scaled_grouped_matmul_amd_preb[
                 128,
                 256,
                 64,
-                False,
+                True,
                 cluster_drain_sched=True,
                 scale_group=4,
                 b_addr_split=True,
@@ -1546,8 +1546,7 @@ def block_scaled_grouped_matmul_amd_preb[
             # 6.9%-23.3% win over the prior tile here.
             return run_kernel[64, 64, 256, 16, False]()
         else:
-            # Direct dispatch beats the prior persistent-grid tile here.
-            return run_kernel[128, 128, 256, 64, False, waves_per_eu=2]()
+            return run_kernel[128, 128, 256, 64, True, waves_per_eu=2]()
 
     comptime if LB == 24 and N == 4096 and K_LOGICAL == 7168:  # gate+up
         if etm <= 20:

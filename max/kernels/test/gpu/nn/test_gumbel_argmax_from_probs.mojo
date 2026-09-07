@@ -24,11 +24,16 @@ does not matter, and equal seeds draw with equal noise.
 """
 
 from max.gpu.host import DeviceContext
+from max.gpu.primitives.grid_controls import (
+    PDLLevel,
+    pdl_launch_attributes,
+)
 from layout import TileTensor, row_major
 from std.math import sqrt
+from std.sys.info import has_amd_gpu_accelerator
 from std.testing import assert_equal, assert_true
 
-from nn.topk import gumbel_sampling_fused_gpu
+from nn.topk import _gumbel_argmax_fused_kernel, gumbel_sampling_fused_gpu
 
 
 def _draw(
@@ -200,6 +205,118 @@ def test_empty_batch(ctx: DeviceContext) raises:
     _ = out_dev^
 
 
+def test_amd_split_matches_single(ctx: DeviceContext, rows: Int, d: Int) raises:
+    comptime hw_info = ctx.default_device_info
+    comptime block_size = hw_info.max_thread_block_size
+    var blocks_per_row = Int32(hw_info.sm_count // rows)
+    assert_true(blocks_per_row > 1, "test shape must select multiple blocks")
+
+    var probs_host = ctx.enqueue_create_host_buffer[.float32](rows * d)
+    var seeds_host = ctx.enqueue_create_host_buffer[.uint64](rows)
+    for row in range(rows):
+        seeds_host[row] = UInt64(0xC001D00D + row * 104729)
+        for col in range(d):
+            var key = (row * 8191 + col * 65537) % 1009
+            var probability = Float32(key + 1) / 1009.0
+            if key % 17 == 0:
+                probability = 0.0
+            elif key % 13 < 2:
+                probability = 0.25
+            probs_host[row * d + col] = probability
+
+    var probs_dev = ctx.enqueue_create_buffer[.float32](rows * d)
+    var seeds_dev = ctx.enqueue_create_buffer[.uint64](rows)
+    var single_out_dev = ctx.enqueue_create_buffer[.int64](rows)
+    var split_out_dev = ctx.enqueue_create_buffer[.int64](rows)
+    var partials_dev = ctx.enqueue_create_buffer[.uint8](
+        rows * Int(blocks_per_row) * 16
+    )
+    var counters_dev = ctx.enqueue_create_buffer[.int32](rows)
+    ctx.enqueue_copy(probs_dev, probs_host)
+    ctx.enqueue_copy(seeds_dev, seeds_host)
+    ctx.enqueue_memset(counters_dev, Int32(0))
+
+    var probs = (
+        TileTensor(probs_dev, row_major(rows, d))
+        .as_unsafe_any_origin()
+        .as_immut()
+    )
+    var seeds = (
+        TileTensor(seeds_dev, row_major(rows)).as_unsafe_any_origin().as_immut()
+    )
+    var single_out = TileTensor(single_out_dev, row_major(rows))
+    var split_out = TileTensor(split_out_dev, row_major(rows))
+    var no_temperature: Optional[UnsafePointer[Float32, ImmutAnyOrigin]] = None
+    var no_partials: Optional[UnsafePointer[UInt8, MutAnyOrigin]] = None
+    var no_counters: Optional[UnsafePointer[Int32, MutAnyOrigin]] = None
+    var partials = Optional[UnsafePointer[UInt8, MutAnyOrigin]](
+        partials_dev.unsafe_ptr().unsafe_origin_cast[MutAnyOrigin]()
+    )
+    var counters = Optional[UnsafePointer[Int32, MutAnyOrigin]](
+        counters_dev.unsafe_ptr().unsafe_origin_cast[MutAnyOrigin]()
+    )
+
+    comptime single_kernel = _gumbel_argmax_fused_kernel[
+        DType.float32,
+        DType.int64,
+        probs.LayoutType,
+        single_out.LayoutType,
+        from_probs=True,
+        multi_block=False,
+        InputEngine=probs.Engine,
+        OutIdxEngine=single_out.Engine,
+    ]
+    comptime split_kernel = _gumbel_argmax_fused_kernel[
+        DType.float32,
+        DType.int64,
+        probs.LayoutType,
+        split_out.LayoutType,
+        from_probs=True,
+        multi_block=True,
+        InputEngine=probs.Engine,
+        OutIdxEngine=split_out.Engine,
+    ]
+    ctx.enqueue_function[single_kernel](
+        probs,
+        single_out,
+        no_temperature,
+        Optional(seeds.ptr),
+        Int32(1),
+        no_partials,
+        no_counters,
+        grid_dim=rows,
+        block_dim=block_size,
+        attributes=pdl_launch_attributes(PDLLevel.ON),
+    )
+    ctx.enqueue_function[split_kernel](
+        probs,
+        split_out,
+        no_temperature,
+        Optional(seeds.ptr),
+        blocks_per_row,
+        partials,
+        counters,
+        grid_dim=rows * Int(blocks_per_row),
+        block_dim=block_size,
+        attributes=pdl_launch_attributes(PDLLevel.ON),
+    )
+
+    with single_out_dev.map_to_host() as single_host, split_out_dev.map_to_host() as split_host:
+        for row in range(rows):
+            assert_equal(
+                split_host[row],
+                single_host[row],
+                String(t"rows={rows}, d={d}, row={row}"),
+            )
+
+    _ = probs_dev^
+    _ = seeds_dev^
+    _ = single_out_dev^
+    _ = split_out_dev^
+    _ = partials_dev^
+    _ = counters_dev^
+
+
 def main() raises:
     with DeviceContext() as ctx:
         test_empty_batch(ctx)
@@ -209,3 +326,8 @@ def main() raises:
         # Real Llama-3.1-8B vocabulary width.
         test_zero_mass_never_wins(ctx, d=128256)
         test_equal_seeds_share_noise(ctx)
+        comptime if has_amd_gpu_accelerator():
+            test_amd_split_matches_single(ctx, rows=32, d=200064)
+            test_amd_split_matches_single(ctx, rows=32, d=200065)
+            test_amd_split_matches_single(ctx, rows=96, d=200064)
+            test_amd_split_matches_single(ctx, rows=96, d=200065)

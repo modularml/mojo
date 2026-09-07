@@ -1938,18 +1938,19 @@ AnyValue emitGetterSetterAccess(const ExprNode *node, ASTExprAnd<CValue> base,
   // might even have computed contextual parameters.
 
   // Resolve the getter to discover the element type.
-  PValue getter =
+  auto getter =
       getterSet.filterOverloadSet(operands,
                                   /*emitDiagnosticOnFailure*/ true, emitter);
-  if (!getter) // Error already emitted.
+  if (!getter.isYes()) // Error already emitted.
     return {};
 
   // ElementType is the result of the getter, processing by-ref results and
   // ignoring the variant for raising functions.
-  ASTType elementType = getter.getType().getSignatureUserResultType();
+  ASTType elementType = getter.getYes().getType().getSignatureUserResultType();
 
   // Also look through ref results.
-  if (FnOrFnLiteralTypeGeneratorType::get(getter.getType()).isRefResult())
+  if (FnOrFnLiteralTypeGeneratorType::get(getter.getYes().getType())
+          .isRefResult())
     elementType = sugarCast<RefType>(elementType).getElementType();
 
   // Ok, now that we know the elementType, we can look up any setter that we
@@ -1994,7 +1995,7 @@ AnyValue emitGetterSetterAccess(const ExprNode *node, ASTExprAnd<CValue> base,
 
   // Otherwise, this expression may be used as an LValue so form it.
   DLValue result(RCRef<SubscriptDLValue>::create(
-      getter, setterValueName, std::move(operands), elementType));
+      getter.getYes(), setterValueName, std::move(operands), elementType));
   return emitter.emitResult(result, node, dest);
 }
 
@@ -3796,18 +3797,17 @@ AnyValue BinOpNode::emitAssign(ExprDest &dest, IREmitter &emitter) const {
 ///
 /// Unlike general assignment, walrus does not use speculative bidirectional
 /// type inference: the LHS is emitted directly as an LValue, then the RHS is
-/// stored into it. It yields a borrowed version of the LHS after the store.
+/// stored into it. It yields the RHS, whichever kind of LValue the target is.
 AnyValue BinOpNode::emitWalrus(ExprDest &dest, IREmitter &emitter) const {
   LValue lhsLV = emitter.emitExprLValue(lhs, EC_Assignment);
   if (!lhsLV)
     return {};
 
-  // Mutable memory LValue: store into it, then yield an immutable borrow.
-  if (MLValue mlValue = lhsLV.getIfMLValue()) {
+  // Mutable memory LValue: store into it, then yield the stored value.
+  if (lhsLV.getIfMLValue()) {
     ExprDest assignDest(lhsLV, EC_Assignment);
-    if (!emitter.emitExpr(rhs, assignDest))
-      return {};
-    return emitter.emitResult(MBValue(mlValue), this, dest);
+    auto resultValue = emitter.emitExpr(rhs, assignDest);
+    return emitter.emitResult(resultValue, this, dest);
   }
 
   // Otherwise must be a DLValue.
@@ -3818,8 +3818,8 @@ AnyValue BinOpNode::emitWalrus(ExprDest &dest, IREmitter &emitter) const {
     return {};
   }
 
-  // Computed LValue (e.g. subscript / attribute): we need to pass it into the
-  // setter but also need to return it.
+  // Computed LValue (e.g. subscript / attribute): the setter takes the
+  // right-hand side, which is also what the walrus yields.
   auto rhsRValue =
       emitter.emitExprRValue(rhs, EC_Assignment, lhsLV.getRValueType());
   if (!rhsRValue)
@@ -3830,8 +3830,7 @@ AnyValue BinOpNode::emitWalrus(ExprDest &dest, IREmitter &emitter) const {
   if (rhsRValue.getIfSRValue())
     rhsRValue = emitter.emitMRValue({rhsRValue, rhs}, EC_Assignment);
 
-  // We will ultimately return the RValue, but we can't have the setter consume
-  // it if it takes a 'var' argument.  Decay to a BValue before passing on.
+  // A setter taking a 'var' argument would consume the value we return.
   BValue bValue = emitter.emitBValue({rhsRValue, rhs}, EC_Assignment);
   if (!bValue)
     return {};
@@ -3883,6 +3882,12 @@ ExprNode::ELVIITResult BinOpNode::emitLValueIfImplicitlyTyped(
 }
 
 AnyValue BinOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
+  if (kind == kAsPat) {
+    emitter.emitError(getLoc(), "'as' patterns are only valid in a 'case' "
+                                "clause");
+    return {};
+  }
+
   // Handle weird binary operators specially if we have them.
   if (kind == kBoolAnd || kind == kBoolOr) // `x and y`, `x or y`
     return emitAndOr(dest, emitter);
@@ -4023,8 +4028,8 @@ AnyValue BinOpNode::emitAndOr(ExprDest &dest, IREmitter &emitter) const {
   if (!lhsI1SRValue)
     return {};
 
-  auto ifOp = HLCF::IfOp::create(*emitter.builder, ifLoc,
-                                 TypeRange{lhsV.getType()}, lhsI1SRValue);
+  auto ifOp = HLCF::ElifOp::create(*emitter.builder, ifLoc,
+                                   TypeRange{lhsV.getType()}, lhsI1SRValue);
   emitter.builder->createBlock(&ifOp.getThenRegion());
   emitter.builder->createBlock(&ifOp.getElseRegion());
 
@@ -4142,11 +4147,11 @@ AnyValue BinOpNode::emitAndOr(ExprDest &dest, IREmitter &emitter) const {
   (void)emitter.emitResult(rhsV, rhs, trueDest);
   HLCF::YieldOp::create(*emitter.builder, ifLoc);
 
-  // MemoryOnly results don't need the 'if' result.  There is no way to remove
-  // results after creating it, so we create a new IfOp and move IR over.
+  // MemoryOnly results don't need the 'elif' result.  There is no way to remove
+  // results after creating it, so we create a new ElifOp and move IR over.
   emitter.builder->setInsertionPointAfter(ifOp);
   auto newIfOp =
-      HLCF::IfOp::create(*emitter.builder, ifLoc, TypeRange{}, lhsI1SRValue);
+      HLCF::ElifOp::create(*emitter.builder, ifLoc, TypeRange{}, lhsI1SRValue);
   deadCodeCheck();
   newIfOp.getThenRegion().takeBody(ifOp.getThenRegion());
   newIfOp.getElseRegion().takeBody(ifOp.getElseRegion());
@@ -4412,7 +4417,7 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     return false;
   };
 
-  // Handles the "both sides are MValues" case for an if-like op (HLCF::IfOp
+  // Handles the "both sides are MValues" case for an if-like op (HLCF::ElifOp
   // or ParamIfOp). `yieldValue(v)` emits the branch terminator that yields
   // the converted SSA value.
   auto handleTwoMValuesForIfOp =
@@ -4453,7 +4458,7 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     // Ok, at this point we are committed. Emit a conversion to the common
     // type in each branch and produce the result as the right MValue type.
     // ifLikeOp->getRegion(0) is the then-region, getRegion(1) the else-region
-    // for both HLCF::IfOp and ParamIfOp.
+    // for both HLCF::ElifOp and ParamIfOp.
     auto emitBranch = [&](Region &region, const ExprNode *expr, Value value) {
       emitter.builder->setInsertionPointToEnd(&region.front());
       auto conv =
@@ -4485,7 +4490,7 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     return emitter.emitResult(result, this, dest);
   };
 
-  // Handles the register-passable case for an if-like op (HLCF::IfOp or
+  // Handles the register-passable case for an if-like op (HLCF::ElifOp or
   // ParamIfOp). Emits SRValue conversions in each branch, yields them, and
   // fixes up the op result type. Returns {} if not register-passable.
   auto handleRegPassableForIfOp =
@@ -4600,7 +4605,7 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
   }
 
   // If the condition is a comptime PValue, emit kgen.param.if instead of
-  // hlcf.if. During elaboration, processParamIfOp selects and inlines only
+  // hlcf.elif. During elaboration, processParamIfOp selects and inlines only
   // the live branch, preventing dead-branch ops (e.g. `comptime assert False`)
   // from ever being elaborated.
   if (PValue condPVal = condRVal.getIfPValue()) {
@@ -4616,7 +4621,7 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     // Create with a placeholder result (the condition's i1 type); the real
     // result type is fixed after emitting both branches. For the memory-only
     // path the op is recreated without a result at the end (same pattern as
-    // the hlcf.if memory-only path below).
+    // the hlcf.elif memory-only path below).
     auto paramIfOp =
         ParamIfOp::create(*emitter.builder, ifLoc,
                           TypeRange{condPVal.get().getType()}, condPVal.get());
@@ -4683,9 +4688,9 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     return {};
 
   // At this point since we don't know the type of trueExpr / falseExpr, use a
-  // dummy type for the 'if' result.  We'll fix it later.
-  auto ifOp = HLCF::IfOp::create(*emitter.builder, ifLoc,
-                                 TypeRange{condValue.getType()}, condValue);
+  // dummy type for the 'elif' result.  We'll fix it later.
+  auto ifOp = HLCF::ElifOp::create(*emitter.builder, ifLoc,
+                                   TypeRange{condValue.getType()}, condValue);
 
   // Emit the trueVal and falseVal's, coercing any UValue to the other operand
   // type if present, but otherwise not diagnosing conflicts or merging types
@@ -4745,8 +4750,8 @@ AnyValue IfElseOpNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
       ifOp, trueVal, falseVal,
       [&] { HLCF::YieldOp::create(*emitter.builder, ifLoc); },
       [&]() -> Operation * {
-        return HLCF::IfOp::create(*emitter.builder, ifLoc, TypeRange{},
-                                  condValue);
+        return HLCF::ElifOp::create(*emitter.builder, ifLoc, TypeRange{},
+                                    condValue);
       });
 }
 
@@ -4777,17 +4782,18 @@ RValue ChainedCmpOpNode::emitNextCmp(IREmitter &emitter, size_t opIdx,
   if (!prevCmpI1Value)
     return {};
   SRValue prevCmpI1SRValue;
-  HLCF::IfOp ifOp;
+  HLCF::ElifOp ifOp;
   if (emitter.builder) {
     prevCmpI1SRValue =
         emitter.emitSRValue({prevCmpI1Value, this}, EC_BoolCondition);
     if (!prevCmpI1SRValue)
       return {};
     // In the dynamic case we need to build the RHS evaluation in the Then
-    // region of an IfOp.  But if we end up having all parameters, it will not
+    // region of an ElifOp.  But if we end up having all parameters, it will not
     // have been necessary.
-    ifOp = HLCF::IfOp::create(*emitter.builder, ifLocation,
-                              prevCmpVal.getType().mlirType, prevCmpI1SRValue);
+    ifOp =
+        HLCF::ElifOp::create(*emitter.builder, ifLocation,
+                             prevCmpVal.getType().mlirType, prevCmpI1SRValue);
     emitter.builder->createBlock(&ifOp.getThenRegion());
   }
   AnyValue newRHS = emitter.emitExpr(exprs[opIdx + 1], EC_OperatorOperandValue);
@@ -4829,7 +4835,7 @@ RValue ChainedCmpOpNode::emitNextCmp(IREmitter &emitter, size_t opIdx,
     return ret;
   }
 
-  // We need to return the result of the IfOp as a RValue.
+  // We need to return the result of the ElifOp as a RValue.
   // More concretely, it will be an SRValue or, for exotic memory-only bool
   // equivalents, one of the pointer type RValues.
   // But for simplicity, let's only support return values that can fit in an
@@ -4961,8 +4967,8 @@ AnyValue FunctionTypeNode::emitIR(ExprDest &dest, IREmitter &emitter) const {
     ASTDecl *moduleDecl =
         emitter.getDeclScope().getNearestDeclOfType<FileModuleOp>();
     if (argList.isExperimentalParamTrait) {
-      TraitType traitType =
-          emitter.bindParamsToClosureTraitFromSig(this, signature);
+      TraitType traitType = emitter.shared.declResolver->getCanonicalTrait(
+          emitter.bindParamsToClosureTraitFromSig(signature));
       return emitter.emitResult(ASTType(traitType), this, dest);
     }
     ASTDecl *trait = emitter.shared.getOrCreateClosureTrait(
@@ -5523,7 +5529,6 @@ AnyValue MagicFunctionNode::emitStructFieldRef(ExprDest &dest,
 
 LogicalResult TupleNode::emitDestructuringPValue(PValue toUnpack,
                                                  IREmitter &emitter) const {
-
   auto getTupleItem = [&](Type eltType, unsigned index) {
     // Get the item from the tuple into the corresponding LValue.
     ExprDest eltDest(eltType, EC_TupleElement);

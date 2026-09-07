@@ -16,14 +16,14 @@ waiting-on-review:
 
 mojo-proposal:
   - changed-files:
-      - any-glob-to-any-file: "mojo/proposals/*"
+      - any-glob-to-any-file: "Mojo/proposals/*"
 
 mojo-stdlib:
   - changed-files:
-      - any-glob-to-any-file: "mojo/stdlib/**"
+      - any-glob-to-any-file: "Mojo/stdlib/**"
 
 mojo-docs:
   - changed-files:
       - any-glob-to-any-file:
-          - "mojo/docs/**"
-          - "mojo/examples/**"
+          - "Mojo/docs/site/**"
+          - "Mojo/examples/**"

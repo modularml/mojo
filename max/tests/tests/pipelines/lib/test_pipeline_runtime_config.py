@@ -14,6 +14,7 @@
 
 import pytest
 from max.pipelines.lib.pipeline_runtime_config import PipelineRuntimeConfig
+from max.pipelines.modeling.config_enums import PipelineRole
 from pydantic import ValidationError
 
 
@@ -40,6 +41,19 @@ def test_vision_cache_utilization_accepts_in_range_values(
         ).vision_cache_utilization
         == utilization
     )
+
+
+@pytest.mark.parametrize(
+    ("pipeline_role", "expected"),
+    [
+        ("prefill_and_decode", False),
+        ("prefill_only", True),
+        ("decode_only", True),
+    ],
+)
+def test_is_disaggregated(pipeline_role: PipelineRole, expected: bool) -> None:
+    runtime = PipelineRuntimeConfig(pipeline_role=pipeline_role)
+    assert runtime.is_disaggregated is expected
 
 
 @pytest.mark.parametrize("utilization", [-0.01, -1, 1.01, 2, 100])

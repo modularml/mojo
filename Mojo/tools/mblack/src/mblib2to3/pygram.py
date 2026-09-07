@@ -76,7 +76,6 @@ class _python_symbols(Symbols):
     compound_stmt: int
     comptime_assert_stmt_body: int
     comptime_stmt: int
-    old_comptime_assert_stmt: int
     convention: int
     continue_stmt: int
     decorated: int

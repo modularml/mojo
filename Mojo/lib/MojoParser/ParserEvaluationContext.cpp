@@ -129,8 +129,8 @@ FailureOr<TypedAttr> ParserEvaluationContext::evaluateContextSpecific(
     auto sourceType = ASTType(isRefinedTrait.getSourceType());
     if (auto targetTrait =
             sugarDynCast<TraitType>(ASTType(isRefinedTrait.getTargetType()))) {
-      TriState foldResult = sourceType.doesConformTo(targetTrait, shared,
-                                                     /*callerAssumptions=*/{});
+      TriBool foldResult = sourceType.doesConformTo(targetTrait, shared,
+                                                    /*callerAssumptions=*/{});
       if (foldResult.isUnknown())
         return failure(); // un-foldable
 

@@ -910,6 +910,7 @@ def run_mamba2_ssd_inplace_vs_functional[
                 qsl_gtt.LayoutType,
                 his_gtt.LayoutType,
                 slot_gtt.LayoutType,
+                x_gtt.Engine,
                 DSTATE_SPLIT,
             ]
         ]()

@@ -1,0 +1,58 @@
+load("//bazel:api.bzl", "modular_py_test", "mojo_shared_library")
+
+package(default_visibility = ["//visibility:private"])
+
+# Mojo extension module loaded by both the correctness test and the bench
+# driver. Sanitizers are excluded for parity with the other Python extension
+# modules in the tree (mojo_shared_library builds with the host toolchain).
+mojo_shared_library(
+    name = "mojo_module",
+    testonly = True,
+    srcs = ["mojo_module.mojo"],
+    # `mojo_shared_library` defaults to `enable_assertions = True`, which
+    # injects `-D ASSERT=all` and turns on every `debug_assert` in the
+    # compiled `.so` (notably the GIL-held check in
+    # `PythonObject.__del__`). That is not the configuration users will
+    # ship, so a microbenchmark of FFI overhead has to opt out — otherwise
+    # the numbers reflect assert traffic rather than the dispatch chain.
+    enable_assertions = False,
+    shared_lib_name = "mojo_module.so",
+    target_compatible_with = select({
+        "//:asan": ["@platforms//:incompatible"],
+        "//:tsan": ["@platforms//:incompatible"],
+        "//:ubsan": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@mojo//:std",
+    ],
+)
+
+# Correctness smoke. Picked up by `//...` so the bench surface cannot bitrot.
+modular_py_test(
+    name = "test_module",
+    srcs = ["test_module.py"],
+    data = [":mojo_module"],
+)
+
+# Bench driver. Tagged `manual` so `//...` skips it, and `stdlib-benchmark`
+# so it can be selected ad-hoc alongside the rest of the benchmark suite via
+# a tag filter. Run with:
+#
+#   ./bazelw test \
+#     //Mojo/stdlib/benchmarks/python/bench_bindings:bench_bindings \
+#     --test_output=all
+#
+# Run pinned to a single core for stable numbers:
+#
+#   taskset -c 2 ./bazelw test ... --test_output=all
+modular_py_test(
+    name = "bench_bindings",
+    srcs = ["bench.py"],
+    data = [":mojo_module"],
+    main = "bench.py",
+    tags = [
+        "manual",
+        "stdlib-benchmark",
+    ],
+)

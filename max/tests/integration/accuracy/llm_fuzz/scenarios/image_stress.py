@@ -38,7 +38,8 @@ hangs with it, or reports a timeout indistinguishable from ordinary
 slowness. The stress phases therefore run under a background liveness
 probe on a separate connection pool, which tracks the longest interval in
 which the server completed no trivial request at all. That gap is the
-signal MXSERV-395 would have tripped.
+signal MXSERV-395 would have tripped, and it is what decides the verdict --
+see ``failure_verdict`` for why the request tally cannot.
 """
 
 from __future__ import annotations
@@ -66,10 +67,14 @@ from scenarios._image_stress_common import (
     PAYLOAD_OVERHEAD_TOKENS,
     PRODUCTION_BATCH_SIZES,
     TYPICAL_SIDE,
+    BatchTally,
     LivenessProbe,
+    failure_verdict,
+    post_once,
+    post_stress_liveness,
     probe_result,
     served_context_window,
-    stall_threshold,
+    single_response_verdict,
     unique_parts,
 )
 
@@ -103,16 +108,16 @@ class ImageStress(BaseScenario):
         results.append(await self._single_max_image(client, model))
         results.append(await self._max_image_count(client, model))
         results.append(await self._over_max_image_count(client, model))
-        results.append(await self._chunk_boundary_straddle(client, model))
-        results.append(await self._skewed_aspect_ratios(client, model))
+        results.append(await self._chunk_boundary_straddle(client, config))
+        results.append(await self._skewed_aspect_ratios(client, config))
         results.append(await self._max_total_image_tokens(client, config))
         results.append(await self._over_budget_request(client, model))
 
         # Concurrency axes: the MXSERV-395 shape.
         results.extend(await self._concurrent_uncached_batches(client, config))
-        results.append(await self._mixed_cache_hit_miss(client, config))
+        results.extend(await self._mixed_cache_hit_miss(client, config))
 
-        results.append(await self._post_stress_liveness(client))
+        results.append(await post_stress_liveness(client, self.name))
         return results
 
     # ------------------------------------------------------------------
@@ -131,12 +136,16 @@ class ImageStress(BaseScenario):
             model,
             [image_part(MAX_IMAGE_SIDE, MAX_IMAGE_SIDE, "max-single", "high")],
         )
-        resp = await client.post_json(payload, timeout=HEAVY_TIMEOUT_SEC)
-        return self._classify(
+        resp, dropped = await post_once(
+            client, payload, timeout=HEAVY_TIMEOUT_SEC
+        )
+        return single_response_verdict(
+            self.name,
             "single_max_image",
             resp,
             expect_reject=False,
             context=f"1 image, {MAX_IMAGE_TOKENS} tokens (3584x3584, detail=high)",
+            dropped_first=dropped,
         )
 
     async def _max_image_count(
@@ -144,14 +153,16 @@ class ImageStress(BaseScenario):
     ) -> ScenarioResult:
         """200 images -- the vendor per-request ceiling, exactly at the limit."""
         parts = unique_parts(IMAGE_MAX_COUNT, "count-200", side=224)
-        resp = await client.post_json(
-            image_payload(model, parts), timeout=HEAVY_TIMEOUT_SEC
+        resp, dropped = await post_once(
+            client, image_payload(model, parts), timeout=HEAVY_TIMEOUT_SEC
         )
-        return self._classify(
+        return single_response_verdict(
+            self.name,
             "max_image_count",
             resp,
             expect_reject=False,
             context=f"{IMAGE_MAX_COUNT} images at the vendor limit",
+            dropped_first=dropped,
         )
 
     async def _over_max_image_count(
@@ -159,18 +170,20 @@ class ImageStress(BaseScenario):
     ) -> ScenarioResult:
         """201 images -- one past the limit. Must be a clean 4xx."""
         parts = unique_parts(IMAGE_MAX_COUNT + 1, "count-201", side=224)
-        resp = await client.post_json(
-            image_payload(model, parts), timeout=HEAVY_TIMEOUT_SEC
+        resp, dropped = await post_once(
+            client, image_payload(model, parts), timeout=HEAVY_TIMEOUT_SEC
         )
-        return self._classify(
+        return single_response_verdict(
+            self.name,
             "over_max_image_count",
             resp,
             expect_reject=True,
             context=f"{IMAGE_MAX_COUNT + 1} images, one past the vendor limit",
+            dropped_first=dropped,
         )
 
     async def _chunk_boundary_straddle(
-        self, client: FuzzClient, model: str
+        self, client: FuzzClient, config: RunConfig
     ) -> ScenarioResult:
         """Requests landing just under, at, and just over the chunk budget.
 
@@ -183,13 +196,14 @@ class ImageStress(BaseScenario):
         per_image = estimate_tokens(TYPICAL_SIDE, TYPICAL_SIDE)
         at_budget = max(1, VISION_CHUNK_TOKENS // per_image)
         payloads = [
-            image_payload(model, unique_parts(n, f"chunk-{n}"))
+            image_payload(config.model, unique_parts(n, f"chunk-{n}"))
             for n in (at_budget - 1, at_budget, at_budget + 1, at_budget * 2)
         ]
         responses = await client.concurrent_requests(payloads, max_concurrent=2)
         return self._classify_many(
             "chunk_boundary_straddle",
             responses,
+            config,
             context=(
                 f"~{per_image} tokens/image, straddling the "
                 f"{VISION_CHUNK_TOKENS}-token chunk budget "
@@ -199,7 +213,7 @@ class ImageStress(BaseScenario):
         )
 
     async def _skewed_aspect_ratios(
-        self, client: FuzzClient, model: str
+        self, client: FuzzClient, config: RunConfig
     ) -> ScenarioResult:
         """Extreme aspect ratios and short-side edges.
 
@@ -217,7 +231,7 @@ class ImageStress(BaseScenario):
             (1021, 733, "non-multiple-of-28"),
         ]
         payloads = [
-            image_payload(model, [image_part(w, h, tag, detail="high")])
+            image_payload(config.model, [image_part(w, h, tag, detail="high")])
             for w, h, tag in cases
         ]
         responses = await client.concurrent_requests(
@@ -226,6 +240,7 @@ class ImageStress(BaseScenario):
         return self._classify_many(
             "skewed_aspect_ratios",
             responses,
+            config,
             context=", ".join(f"{w}x{h}" for w, h, _ in cases),
         )
 
@@ -263,13 +278,17 @@ class ImageStress(BaseScenario):
             )
             for i in range(count)
         ]
-        resp = await client.post_json(
-            image_payload(config.model, parts), timeout=HEAVY_TIMEOUT_SEC
+        resp, dropped = await post_once(
+            client,
+            image_payload(config.model, parts),
+            timeout=HEAVY_TIMEOUT_SEC,
         )
-        return self._classify(
+        return single_response_verdict(
+            self.name,
             "max_total_image_tokens",
             resp,
             expect_reject=False,
+            dropped_first=dropped,
             context=(
                 f"{count} max-size images, ~{count * MAX_IMAGE_TOKENS} tokens "
                 f"-- the most the {source} window of {window} allows"
@@ -291,13 +310,15 @@ class ImageStress(BaseScenario):
             image_part(MAX_IMAGE_SIDE, MAX_IMAGE_SIDE, f"over-{i}", "high")
             for i in range(IMAGE_MAX_COUNT)
         ]
-        resp = await client.post_json(
-            image_payload(model, parts), timeout=HEAVY_TIMEOUT_SEC
+        resp, dropped = await post_once(
+            client, image_payload(model, parts), timeout=HEAVY_TIMEOUT_SEC
         )
-        return self._classify(
+        return single_response_verdict(
+            self.name,
             "over_budget_request",
             resp,
             expect_reject=True,
+            dropped_first=dropped,
             context=(
                 f"{IMAGE_MAX_COUNT} max-size images, "
                 f"~{IMAGE_MAX_COUNT * MAX_IMAGE_TOKENS} tokens -- "
@@ -339,6 +360,8 @@ class ImageStress(BaseScenario):
             self._classify_many(
                 "concurrent_uncached_batches",
                 responses,
+                config,
+                probe=probe,
                 context=(
                     f"{len(payloads)} requests at concurrency {concurrency} "
                     f"({nodes} node(s) x {CONCURRENCY_PER_NODE}), batch sizes "
@@ -354,7 +377,7 @@ class ImageStress(BaseScenario):
 
     async def _mixed_cache_hit_miss(
         self, client: FuzzClient, config: RunConfig
-    ) -> ScenarioResult:
+    ) -> list[ScenarioResult]:
         """Interleaves repeated and unique images at concurrency.
 
         A hit and a miss for the same size take different paths through the
@@ -380,152 +403,60 @@ class ImageStress(BaseScenario):
                 payloads, max_concurrent=concurrency
             )
 
-        result = self._classify_many(
-            "mixed_cache_hit_miss",
-            responses,
-            context=(
-                f"{len(payloads)} requests at concurrency {concurrency}, "
-                f"alternating cached and uncached images; {probe.summary()}"
-            ),
-        )
-        # A stall during the mixed phase is the same signal as during the
-        # uncached phase; fold it into this verdict rather than emitting a
-        # second row.
-        if (
-            result.verdict == Verdict.PASS
-            and probe.max_gap_sec > stall_threshold(config)
-        ):
-            return self.make_result(
-                self.name,
+        return [
+            self._classify_many(
                 "mixed_cache_hit_miss",
-                Verdict.FAIL,
-                detail=f"requests completed but {probe.summary()}",
-            )
-        return result
+                responses,
+                config,
+                probe=probe,
+                context=(
+                    f"{len(payloads)} requests at concurrency {concurrency}, "
+                    f"alternating cached and uncached images"
+                ),
+            ),
+            probe_result(
+                self.name, "mixed_cache_hit_miss_liveness", probe, config
+            ),
+        ]
 
-    async def _post_stress_liveness(self, client: FuzzClient) -> ScenarioResult:
-        """Final forward-progress check once all stress traffic has drained."""
-        resp = await client.health_check()
-        if resp.error == "TIMEOUT":
-            return self.make_result(
-                self.name,
-                "post_stress_liveness",
-                Verdict.FAIL,
-                detail="health probe timed out -- engine wedged after image stress",
-            )
-        if resp.status != 200:
-            return self.make_result(
-                self.name,
-                "post_stress_liveness",
-                Verdict.FAIL,
-                status_code=resp.status,
-                detail=f"health probe failed: status={resp.status} error={resp.error!r}",
-            )
-        return self.make_result(
-            self.name, "post_stress_liveness", Verdict.PASS, status_code=200
-        )
-
-    # ------------------------------------------------------------------
-    # Verdict helpers
-    # ------------------------------------------------------------------
-
-    def _classify(
+    def _classify_many(
         self,
         test: str,
-        resp: Any,
+        responses: list[Any],
+        config: RunConfig,
         *,
-        expect_reject: bool,
         context: str,
+        probe: LivenessProbe | None = None,
     ) -> ScenarioResult:
-        """Grades one response against the vendor limits.
+        """Grades a batch: the probe decides the hang, the tally the rest.
 
-        A timeout or 5xx is always a failure: those are the hang and the OOM.
-        Everything else depends on whether the request was legal.
+        Phases that run without a probe still get a verdict, from the rate
+        alone -- see ``BatchTally.mass_failure`` for what a small batch of
+        four or five requests does with a single failure.
         """
-        if resp.error == "TIMEOUT":
-            return self.make_result(
-                self.name,
-                test,
-                Verdict.FAIL,
-                detail=f"timeout -- no response ({context})",
+        tally = BatchTally().add(responses)
+        failed = failure_verdict(
+            self.name, test, tally, config, context=context, probe=probe
+        )
+        if failed is not None:
+            return failed
+        if tally.client_errors or tally.other:
+            reason = (
+                "valid image requests rejected"
+                if tally.client_errors
+                else "responses outside any expected status"
             )
-        if resp.status >= 500 or resp.status == 0:
-            return self.make_result(
-                self.name,
-                test,
-                Verdict.FAIL,
-                status_code=resp.status,
-                detail=f"server error {resp.status} ({context}): {resp.body[:200]!r}",
-            )
-        if expect_reject:
-            if 400 <= resp.status < 500:
-                return self.make_result(
-                    self.name,
-                    test,
-                    Verdict.PASS,
-                    status_code=resp.status,
-                    detail=f"cleanly rejected ({context})",
-                )
             return self.make_result(
                 self.name,
                 test,
                 Verdict.INTERESTING,
-                status_code=resp.status,
-                detail=f"accepted a request that exceeds the limits ({context})",
-            )
-        if resp.status == 200:
-            return self.make_result(
-                self.name,
-                test,
-                Verdict.PASS,
-                status_code=resp.status,
-                detail=context,
+                detail=f"{tally.summary()} -- {reason} ({context})",
             )
         return self.make_result(
             self.name,
             test,
-            Verdict.INTERESTING,
-            status_code=resp.status,
-            detail=f"rejected a request within the limits ({context}): {resp.body[:200]!r}",
-        )
-
-    def _classify_many(
-        self, test: str, responses: list[Any], *, context: str
-    ) -> ScenarioResult:
-        """Grades a batch. Any timeout or 5xx fails the whole batch."""
-        total = len(responses)
-        # A timeout and a dropped connection both surface as status 0, so these
-        # buckets are kept disjoint -- counting `status == 0` as a server error
-        # as well would report every timeout twice and make the tally read as
-        # though two separate things went wrong.
-        timeouts = sum(1 for r in responses if r.error == "TIMEOUT")
-        server_errors = sum(1 for r in responses if r.status >= 500)
-        dropped = sum(
-            1 for r in responses if r.status == 0 and r.error != "TIMEOUT"
-        )
-        client_errors = sum(1 for r in responses if 400 <= r.status < 500)
-        ok = sum(1 for r in responses if r.status == 200)
-        tally = (
-            f"{ok}/{total} ok, {client_errors} 4xx, {server_errors} 5xx, "
-            f"{timeouts} timeouts, {dropped} dropped"
-        )
-
-        if timeouts or server_errors or dropped:
-            return self.make_result(
-                self.name,
-                test,
-                Verdict.FAIL,
-                detail=f"{tally} -- hang or crash ({context})",
-            )
-        if client_errors:
-            return self.make_result(
-                self.name,
-                test,
-                Verdict.INTERESTING,
-                detail=f"{tally} -- valid image requests rejected ({context})",
-            )
-        return self.make_result(
-            self.name, test, Verdict.PASS, detail=f"{tally} ({context})"
+            Verdict.PASS,
+            detail=f"{tally.summary()} ({context})",
         )
 
 
@@ -554,9 +485,7 @@ class ImageStressSoak(BaseScenario):
         concurrency = nodes * CONCURRENCY_PER_NODE
         deadline = time.monotonic() + config.endurance_duration_sec
         sent = 0
-        timeouts = 0
-        server_errors = 0
-        dropped = 0
+        tally = BatchTally()
 
         async with LivenessProbe(config) as probe:
             while time.monotonic() < deadline:
@@ -576,34 +505,30 @@ class ImageStressSoak(BaseScenario):
                     payloads, max_concurrent=concurrency
                 )
                 sent += len(responses)
-                timeouts += sum(1 for r in responses if r.error == "TIMEOUT")
-                server_errors += sum(1 for r in responses if r.status >= 500)
-                dropped += sum(
-                    1
-                    for r in responses
-                    if r.status == 0 and r.error != "TIMEOUT"
-                )
+                tally.add(responses)
 
         duration = config.endurance_duration_sec
         elapsed = (
             f"{duration / 60:.0f}min" if duration >= 60 else f"{duration:.0f}s"
         )
-        tally = (
-            f"{sent} requests over {elapsed} at concurrency "
-            f"{concurrency}, {server_errors} 5xx, {timeouts} timeouts, "
-            f"{dropped} dropped"
-        )
-        verdict = (
-            Verdict.FAIL
-            if (timeouts or server_errors or dropped)
-            else Verdict.PASS
+        context = f"{sent} requests over {elapsed} at concurrency {concurrency}"
+        # The soak is long enough to collect incidental failures, so the probe
+        # decides whether the pod wedged -- see ``failure_verdict``.
+        failed = failure_verdict(
+            self.name,
+            "image_soak",
+            tally,
+            config,
+            context=context,
+            probe=probe,
         )
         return [
-            self.make_result(
+            failed
+            or self.make_result(
                 self.name,
                 "image_soak",
-                verdict,
-                detail=f"{tally} -- {probe.summary()}",
+                Verdict.PASS,
+                detail=f"{tally.summary()} -- {context} -- {probe.summary()}",
             ),
             probe_result(self.name, "image_soak_liveness", probe, config),
         ]

@@ -12,6 +12,9 @@ _EXTRA_CONSTRAINTS = {
     "test_mha_prefill_v2_paged.mojo": ["//:mi355_gpu"],
     "test_mha_prefill_v2_gqa.mojo": ["//:mi355_gpu"],
     "test_mha_prefill_v2_rescale.mojo": ["//:mi355_gpu"],
+    "test_mha_prefill_v2_lazy_rescale_crossrow_canary.mojo": [
+        "//:mi355_gpu",
+    ],
     "test_mha_i2i_repro.mojo": ["//:mi355_gpu"],
     "test_mha_i2i_random_ref.mojo": ["//:mi355_gpu"],
     "test_mla_prefill_v2.mojo": ["//:mi355_gpu"],

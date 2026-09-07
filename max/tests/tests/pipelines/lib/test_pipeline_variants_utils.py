@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Sequence
 from typing import Any
 
 import max.pipelines.lib.pipeline_variants.structured_output_backend as _sob
@@ -22,6 +24,8 @@ import numpy.typing as npt
 import pytest
 from max import _xgrammar as xgrammar
 from max.pipelines.context import (
+    FUTURE_TOKEN,
+    EOSTracker,
     GenerationStatus,
     GrammarMatcher,
     StructuredOutputRegionDelimiters,
@@ -31,8 +35,10 @@ from max.pipelines.context import (
 from max.pipelines.context.exceptions import InputError
 from max.pipelines.lib.pipeline_variants.structured_output_backend import (
     GrammarBackend,
+    XgrammarBackend,
 )
 from max.pipelines.lib.pipeline_variants.utils import (
+    CommittedSpanSnapshot,
     StructuredOutputHelper,
     build_response,
     update_spec_decode_context_and_prepare_responses,
@@ -650,6 +656,54 @@ class TestAdvanceFsmAndComputeBitmasks:
         # Unconstrained rows: callback resets every row to all-valid (-1).
         assert (bitmask_out == -1).all()
 
+    def test_snapshot_count_mismatch_degrades_not_raises(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A short snapshot list must not raise mid-Part-1.
+
+        Defensive only: _build_bitmask_callback captures from the same batch it
+        passes, so the async caller cannot produce a mismatch today.
+
+        The caller already set fsm_advanced_by_callback, so this batch's later
+        sync will not advance these matchers: any row Part 1 does not reach
+        stays permanently behind its request's tokens.
+        """
+        helper = StructuredOutputHelper(
+            enabled=True, vocab_size=16, backend=_NoopBackend()
+        )
+
+        matcher_a = _RecordingMatcher()
+        matcher_b = _RecordingMatcher()
+        row_a = self._decoding_ctx()
+        row_b = self._decoding_ctx()
+        for ctx, matcher in ((row_a, matcher_a), (row_b, matcher_b)):
+            ctx.set_matcher(matcher)
+            ctx.grammar_enforced = True
+
+        producing_batch = [row_a, row_b]
+
+        accepted = np.zeros((2, 1), dtype=np.int64)
+        num_accepted = np.zeros((2,), dtype=np.int64)
+        bonus = np.full((2,), 5, dtype=np.int64)
+        next_draft = np.zeros((2, 1), dtype=np.int64)
+        bitmask_out = self._empty_bitmask(len(producing_batch), num_positions=2)
+
+        with caplog.at_level(logging.ERROR, logger="max.pipelines"):
+            helper.advance_fsm_and_compute_bitmasks(
+                context_batch=producing_batch,
+                accepted_draft_tokens=accepted,
+                num_accepted=num_accepted,
+                bonus_tokens=bonus,
+                next_draft_tokens=next_draft,
+                bitmask_out=bitmask_out,
+                committed_span_snapshots=CommittedSpanSnapshot.capture([row_a]),
+            )
+
+        assert "committed-span snapshots" in caplog.text
+        # Both matchers advanced: the fallback read covered the whole batch.
+        assert matcher_a.consumed == [[5]]
+        assert matcher_b.consumed == [[5]]
+
 
 class _RaisingBackend(GrammarBackend[Any]):
     """GrammarBackend stub whose compiles always raise, to exercise the
@@ -731,7 +785,11 @@ class TestDeadMatcherLeavesSlotUnconstrained:
         """Control: a stopped *accepting* matcher is a satisfied grammar.
 
         Its EOS-only mask is correct and must still constrain the row -- the
-        guard keys on the error state, not on being stopped.
+        guard keys on the error state, not on being stopped. A backend that
+        can't safely compute that mask for a stopped matcher (xgrammar)
+        guards this itself; see
+        ``test_fill_slot_after_stop_token_accepted_does_not_crash`` in
+        ``test_structured_output_backend.py``.
         """
         backend = _FillCountingBackend()
         helper = StructuredOutputHelper(
@@ -1009,3 +1067,359 @@ class TestCommittedInteriorEosTerminates:
         )
         # The truncated post-sequence token never reaches the matcher.
         assert [8] not in matcher.consumed, matcher.consumed
+
+
+class TestSpecDecodeEosOutranksLengthCap:
+    """A commit that both ends the sequence and fills the cap reports EOS.
+
+    ``TextContext.update`` gives EOS precedence over the length cap with an
+    ``if``/``elif``. The speculative commit loop applied the cap
+    unconditionally afterwards, so a request whose EOS landed exactly on its
+    last allowed position was reported ``MAXIMUM_LENGTH``. That misreports a
+    completed request as truncated, and only ever on the speculative path --
+    which is precisely the stop-vs-length signal used to compare speculative
+    decoding against plain decode.
+    """
+
+    @staticmethod
+    def _run_one_step(bonus_token: int) -> TextContext:
+        prompt_len = 10
+        max_gen_tokens = 4  # one full accept chunk: 3 drafts + bonus
+        max_length = prompt_len + max_gen_tokens
+
+        ctx = create_text_context(prompt_len=prompt_len, max_length=max_length)
+        ctx.eos_tracker.eos_token_ids = {1}
+        ctx.update_with_future_token()
+
+        update_spec_decode_context_and_prepare_responses(
+            draft_tokens=np.array([[101, 102, 103]], dtype=np.int32),
+            next_draft_tokens=np.array([[201, 202, 203]], dtype=np.int32),
+            num_accepted_draft_tokens=np.array([3], dtype=np.int32),
+            next_tokens=np.array([bonus_token], dtype=np.int32),
+            context_batch=[ctx],
+            max_seq_len=10_000,
+        )
+        assert ctx.tokens.current_position == max_length, (
+            "test must land the final commit exactly on the cap"
+        )
+        return ctx
+
+    def test_eos_on_the_final_allowed_position_reports_eos(self) -> None:
+        ctx = self._run_one_step(bonus_token=1)
+        assert ctx.status == GenerationStatus.END_OF_SEQUENCE, (
+            "a sequence that ended on EOS must not be reported as truncated "
+            "just because the EOS filled the last allowed position"
+        )
+
+    def test_non_eos_on_the_final_allowed_position_reports_max_length(
+        self,
+    ) -> None:
+        ctx = self._run_one_step(bonus_token=999)
+        assert ctx.status == GenerationStatus.MAXIMUM_LENGTH
+
+
+class TestSpeculativeBitmaskWindowWidth:
+    """``StructuredOutputHelper._speculatively_fill_bitmask_window`` must accept
+    a window wider than the drafts justify.
+
+    ``num_positions`` is the graph's static bitmask width
+    (``num_speculative_tokens + 1``) and cannot shrink per step, but the
+    realized draft width can: at the prefill->decode boundary the batch
+    verifies zero drafts, so ``compute_speculative_bitmasks`` hands this helper
+    a full-width window and an empty draft row. The window arrives
+    pre-initialized to ``-1`` (unconstrained), so slots the drafts never reach
+    are already correct. Only a window too *narrow* for the drafts is a caller
+    bug.
+    """
+
+    @staticmethod
+    def _run(
+        drafts: list[int], num_positions: int
+    ) -> tuple[TextContext, npt.NDArray[np.int32]]:
+        helper = StructuredOutputHelper(
+            enabled=True, vocab_size=32, backend=_FillRecordingBackend()
+        )
+        ctx = create_text_context(prompt_len=4, max_length=128)
+        ctx.update(new_token=99)
+        ctx.set_matcher(_RecordingMatcher())
+        ctx.grammar_enforced = True
+
+        window = np.full((num_positions, 1), -1, dtype=np.int32)
+        helper._speculatively_fill_bitmask_window(
+            ctx,
+            drafts=np.array(drafts, dtype=np.int64),
+            bitmask_window=window,
+        )
+        return ctx, window
+
+    @staticmethod
+    def _constrained(window: npt.NDArray[np.int32]) -> list[bool]:
+        """Per-slot: True where the backend wrote (0), False where still -1."""
+        return [bool((row == 0).all()) for row in window]
+
+    def test_zero_drafts_constrain_only_the_first_slot(self) -> None:
+        """Prefill->decode boundary: zero realized drafts, static 4-slot
+        window. Slot 0 still carries the current matcher state; the rest keep
+        their unconstrained reset."""
+        _, window = self._run(drafts=[], num_positions=4)
+
+        assert self._constrained(window) == [True, False, False, False]
+
+    def test_partial_drafts_leave_the_unreached_tail_alone(self) -> None:
+        """Two realized drafts in a static 4-slot window constrain slots 0..2;
+        slot 3 has no draft to advance into."""
+        ctx, window = self._run(drafts=[3, 4], num_positions=4)
+
+        assert self._constrained(window) == [True, True, True, False]
+        # The walk runs on a deep copy and unwinds, so the request's own
+        # matcher and enforcement state are untouched.
+        assert isinstance(ctx.matcher, _RecordingMatcher)
+        assert ctx.matcher.consumed == []
+        assert ctx.grammar_enforced
+
+    def test_exact_width_constrains_every_slot(self) -> None:
+        """Regression guard: the steady-state case where the drafts exactly
+        fill the window is unchanged."""
+        _, window = self._run(drafts=[3, 4, 5], num_positions=4)
+
+        assert self._constrained(window) == [True, True, True, True]
+
+    def test_more_drafts_than_the_window_holds_raises(self) -> None:
+        """A window too narrow for the drafts is a real caller bug -- silently
+        truncating would drop constraints the sampler needs."""
+        with pytest.raises(ValueError, match="bitmask window"):
+            self._run(drafts=[3, 4, 5, 6], num_positions=4)
+
+
+def _xgrammar_backend() -> XgrammarBackend:
+    """A real xgrammar backend over a tiny RAW vocab.
+
+    Built directly rather than through from_tokenizer_delegate: the FSM-position
+    assertions below need a vocab small enough to compare whole bitmasks.
+    """
+    vocab = [chr(c) for c in range(32, 127)] + ["<eos>"]
+    tokenizer_info = xgrammar.TokenizerInfo(
+        vocab,
+        vocab_type=xgrammar.VocabType.RAW,
+        stop_token_ids=[len(vocab) - 1],
+    )
+    return XgrammarBackend(xgrammar.GrammarCompiler(tokenizer_info))
+
+
+# Token ids in _xgrammar_backend's RAW vocab (chr(32 + id)).
+_OBJ_OPEN = ord("{") - 32
+_QUOTE = ord('"') - 32
+_A = ord("a") - 32
+_B = ord("b") - 32
+_VOCAB_SIZE = 96
+
+# The only string this schema admits is {"ab":<int>}, so every prefix has a
+# distinct allowed-token set -- which is what makes "the matcher advanced
+# exactly this far" an assertable value rather than a guess.
+_SINGLE_KEY_SCHEMA = {
+    "type": "object",
+    "properties": {"ab": {"type": "integer"}},
+    "required": ["ab"],
+    "additionalProperties": False,
+}
+
+
+class TestCommittedSpanSnapshot:
+    """CommittedSpanSnapshot + Part 1's use of it.
+
+    advance_fsm_and_compute_bitmasks runs on an AsyncRT worker while the
+    main thread realizes the same batch's committed tokens into ctx.tokens
+    and appends the next FUTURE_TOKEN placeholder. Reading the token buffer
+    on the worker cannot distinguish "history before the committed span" from
+    "history including it": both end in a placeholder. The snapshot is taken on
+    the main thread at enqueue time, so the FSM advance must be unaffected by
+    any of those mutations.
+    """
+
+    @staticmethod
+    def _matcher(backend: XgrammarBackend, prefix: list[int]) -> GrammarMatcher:
+        matcher = backend.create_matcher(
+            backend.compile_json_schema(_SINGLE_KEY_SCHEMA)
+        )
+        assert matcher.try_consume_tokens(prefix) == len(prefix)
+        return matcher
+
+    @classmethod
+    def _mask(
+        cls, backend: XgrammarBackend, matcher: GrammarMatcher | None
+    ) -> npt.NDArray[np.int32]:
+        assert matcher is not None
+        mask = backend.allocate_token_bitmask(1, _VOCAB_SIZE)
+        backend.fill_next_token_bitmask(matcher, mask, 0)
+        return mask
+
+    @classmethod
+    def _enqueue_state_ctx(
+        cls, backend: XgrammarBackend, eos_sequence: list[int]
+    ) -> TextContext:
+        """A constrained row in the state it holds when the callback is enqueued.
+
+        One realized generated token (the opening brace, already consumed by
+        the matcher) followed by the unrealized placeholder the previous step
+        appended.
+        """
+        ctx = create_text_context(prompt_len=4, max_length=128)
+        # Built, not assigned into: EOSTracker derives its stop-sequence
+        # lookback in model_post_init, and first_eos_offset needs that lookback
+        # to see the pre-span history at all.
+        ctx.eos_tracker = EOSTracker(eos_sequences=[eos_sequence])
+        ctx.set_matcher(cls._matcher(backend, [_OBJ_OPEN]))
+        ctx.grammar_enforced = True
+        ctx.update_with_future_token()
+        ctx.realize_future_token(_OBJ_OPEN)
+        ctx.update_with_future_token()
+        assert ctx.tokens.generated.tolist() == [_OBJ_OPEN, FUTURE_TOKEN]
+        return ctx
+
+    @staticmethod
+    def _advance(
+        helper: StructuredOutputHelper,
+        ctx: TextContext,
+        committed: list[int],
+        snapshots: Sequence[CommittedSpanSnapshot],
+    ) -> npt.NDArray[np.int32]:
+        """Run the callback body over a one-row batch; returns the bitmask."""
+        *accepted, bonus = committed
+        bitmask_out = np.zeros((1, 2, 3), dtype=np.int32)
+        helper.advance_fsm_and_compute_bitmasks(
+            context_batch=[ctx],
+            accepted_draft_tokens=np.array([accepted], dtype=np.int64),
+            num_accepted=np.array([len(accepted)], dtype=np.int64),
+            bonus_tokens=np.array([bonus], dtype=np.int64),
+            next_draft_tokens=np.zeros((1, 1), dtype=np.int64),
+            bitmask_out=bitmask_out,
+            output_context_batch=[ctx],
+            committed_span_snapshots=snapshots,
+        )
+        return bitmask_out
+
+    def test_capture_drops_placeholders_and_copies(self) -> None:
+        """The snapshot is the realized prefix, and later realization of the
+        placeholder must not reach back into it -- realize_future_token
+        overwrites the context's token array in place."""
+        backend = _xgrammar_backend()
+        ctx = self._enqueue_state_ctx(backend, [_OBJ_OPEN, _QUOTE, _A])
+
+        (snapshot,) = CommittedSpanSnapshot.capture([ctx])
+        assert snapshot.prior_generated.tolist() == [_OBJ_OPEN]
+
+        ctx.realize_future_token(_QUOTE)
+        assert snapshot.prior_generated.tolist() == [_OBJ_OPEN]
+
+    @pytest.mark.parametrize(
+        ("eos_sequences", "keep"),
+        [
+            ([], 0),
+            ([[_A]], 0),
+            ([[_A, _B]], 1),
+            ([[_A, _B], [_A, _B, _QUOTE]], 2),
+        ],
+    )
+    def test_capture_is_bounded_by_eos_lookback(
+        self, eos_sequences: list[list[int]], keep: int
+    ) -> None:
+        """A long context must not cost a whole-history copy per row.
+
+        first_eos_offset reads only the last eos_sequence_lookback
+        pre-span tokens, so that is all the snapshot needs to carry -- nothing
+        at all for a request whose stop sequences are single tokens.
+        """
+        ctx = create_text_context(prompt_len=4, max_length=256)
+        ctx.eos_tracker = EOSTracker(eos_sequences=eos_sequences)
+        realized = list(range(50))
+        for token in realized:
+            ctx.update_with_future_token()
+            ctx.realize_future_token(token)
+        ctx.update_with_future_token()
+        assert ctx.tokens.generated_length == len(realized) + 1
+
+        (snapshot,) = CommittedSpanSnapshot.capture([ctx])
+
+        # The tail immediately preceding the span: realized tokens only, with
+        # the trailing placeholder excluded.
+        expected = realized[len(realized) - keep :] if keep else []
+        assert snapshot.prior_generated.tolist() == expected
+
+    @pytest.mark.parametrize("mutate", ["none", "realize", "realize_and_fill"])
+    def test_fsm_advance_is_independent_of_main_thread_mutation(
+        self, mutate: str
+    ) -> None:
+        """Regression: the same execute() that enqueues the callback goes on to
+        realize the committed span and append the next placeholder. Whatever it
+        has done by the time the worker runs, the FSM advance must land where
+        the enqueue-time history says it should."""
+        backend = _xgrammar_backend()
+        helper = StructuredOutputHelper(
+            enabled=True, vocab_size=_VOCAB_SIZE, backend=backend
+        )
+        # Stop sequence {"a straddles the span boundary: it starts at the token
+        # already in the buffer and completes at committed[1].
+        ctx = self._enqueue_state_ctx(backend, [_OBJ_OPEN, _QUOTE, _A])
+        committed = [_QUOTE, _A, _B]
+
+        snapshots = CommittedSpanSnapshot.capture([ctx])
+
+        if mutate != "none":
+            ctx.realize_future_token(committed[0])
+        if mutate == "realize_and_fill":
+            for token in committed[1:]:
+                ctx.advance_token_buffer(token)
+            ctx.update_with_future_token()
+
+        bitmask_out = self._advance(helper, ctx, committed, snapshots)
+
+        # Generation ends inside the span, so enforcement is off and the
+        # matcher stopped one token in: it consumed committed[0] and nothing
+        # after it.
+        assert not ctx.grammar_enforced
+        expected = self._mask(
+            backend, self._matcher(backend, [_OBJ_OPEN, _QUOTE])
+        )
+        over_advanced = self._mask(
+            backend, self._matcher(backend, [_OBJ_OPEN, _QUOTE, _A])
+        )
+        assert (self._mask(backend, ctx.matcher) == expected).all()
+        assert not (expected == over_advanced).all()
+        # Enforcement is off, so Part 2 leaves the row unconstrained.
+        assert (bitmask_out == -1).all()
+
+    @pytest.mark.parametrize("eos_offset", [0, 1])
+    def test_eos_offset_index_comes_from_snapshot_history(
+        self, eos_offset: int
+    ) -> None:
+        """The index enforcement is cleared at is decided by the snapshot, not
+        by whether a placeholder happens to be sitting at the end of the buffer.
+
+        Both stop sequences below start at the token already in the buffer, so
+        only the pre-span history distinguishes "ends at committed[0]" from
+        "ends at committed[1]".
+        """
+        backend = _xgrammar_backend()
+        helper = StructuredOutputHelper(
+            enabled=True, vocab_size=_VOCAB_SIZE, backend=backend
+        )
+        committed = [_QUOTE, _A, _B]
+        eos_sequence = [_OBJ_OPEN, *committed[: eos_offset + 1]]
+        ctx = self._enqueue_state_ctx(backend, eos_sequence)
+
+        snapshots = CommittedSpanSnapshot.capture([ctx])
+
+        # Main thread, mid-flight: span realized, next placeholder appended.
+        ctx.realize_future_token(committed[0])
+        for token in committed[1:]:
+            ctx.advance_token_buffer(token)
+        ctx.update_with_future_token()
+
+        self._advance(helper, ctx, committed, snapshots)
+
+        assert not ctx.grammar_enforced
+        expected = self._mask(
+            backend,
+            self._matcher(backend, [_OBJ_OPEN, *committed[:eos_offset]]),
+        )
+        assert (self._mask(backend, ctx.matcher) == expected).all()

@@ -21,7 +21,7 @@ captured graph; ``replay`` copies inputs into the captured buffers and replays.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any, cast
 from unittest.mock import MagicMock
@@ -68,18 +68,6 @@ class EagleDummyModel(DummyModel):
     def capture(self, graph_key: int, *buffers: Buffer) -> list[Buffer]:
         self.capture_calls.append((graph_key, list(buffers)))
         return [self.output_buffer, self.output_buffer, self.output_buffer]
-
-
-class FoldSamplerDummyModel(DummyModel):
-    """DummyModel that returns [logits, sampled_tokens] for the folded path."""
-
-    def __init__(self, output_buffer: Buffer, sampled_buffer: Buffer) -> None:
-        super().__init__(output_buffer)
-        self.sampled_buffer = sampled_buffer
-
-    def capture(self, graph_key: int, *buffers: Buffer) -> list[Buffer]:
-        self.capture_calls.append((graph_key, list(buffers)))
-        return [self.output_buffer, self.sampled_buffer]
 
 
 class CapturePipelineModel(MockPipelineModel):
@@ -138,7 +126,8 @@ def _make_runner(
     num_speculative_tokens: int = 0,
     kv_params: MagicMock | None = None,
     warmup_model_inputs: Any = None,
-    fold_sampler_into_graph: bool = False,
+    verify_widths: Sequence[int] | None = None,
+    width_lookup: Sequence[int] | None = None,
 ) -> ServeGraphCaptureRunner:
     return ServeGraphCaptureRunner(
         model=cast(Model, model),
@@ -147,7 +136,8 @@ def _make_runner(
         max_cache_length_upper_bound=10,
         max_batch_size=max_batch_size,
         num_speculative_tokens=num_speculative_tokens,
-        fold_sampler_into_graph=fold_sampler_into_graph,
+        verify_widths=verify_widths,
+        width_lookup=width_lookup,
     )
 
 
@@ -338,7 +328,9 @@ def test_align_q_mismatch_raises() -> None:
     runner._recorded_cache_lengths = [10]
     runner._records = {_bc(1, 1, 10): _gk(num_partitions=10, q_max_seq_len=1)}
 
-    with pytest.raises(RuntimeError, match=r"q_max_seq_len=2 != 1"):
+    with pytest.raises(
+        RuntimeError, match=r"verify width 1, which is not captured"
+    ):
         runner.align(_bc(1, 2, 5))
 
 
@@ -431,97 +423,3 @@ def test_warmup_dedups_shared_keys() -> None:
         key == _gk(num_partitions=3, q_max_seq_len=1)
         for key in runner._records.values()
     )
-
-
-# ---------------------------------------------------------------------------
-# fold_sampler_into_graph
-# ---------------------------------------------------------------------------
-
-
-def _fold_warmup_ctx(inputs: MockModelInputs) -> Any:
-    @contextmanager
-    def _ctx(
-        batch_size: int, batch_characteristics: BatchCharacteristics
-    ) -> Iterator[MockModelInputs]:
-        yield inputs
-
-    return _ctx
-
-
-def test_warmup_folded_sampler_peels_sampled_tokens() -> None:
-    """With the fold on, the trailing capture buffer becomes sampled_tokens."""
-    logits = Buffer.zeros((4,), dtype=DType.float32)
-    sampled = Buffer.zeros((1,), dtype=DType.int64)
-    model = FoldSamplerDummyModel(logits, sampled)
-    inputs = MockModelInputs(active_batch_size=1, eos_prob=0.0)
-
-    kv_params = _mock_kv_params(probe_lengths=[1])
-    runner = ServeGraphCaptureRunner(
-        model=cast(Model, model),
-        kv_params=kv_params,
-        warmup_model_inputs=_fold_warmup_ctx(inputs),
-        max_cache_length_upper_bound=10,
-        max_batch_size=1,
-        fold_sampler_into_graph=True,
-    )
-    runner.warmup_pre_ready()
-
-    assert runner.graph_entries
-    for _inputs, outputs in runner.graph_entries.values():
-        assert isinstance(outputs, ModelOutputs)
-        # The first buffer maps onto logits; the trailing buffer is peeled off
-        # into sampled_tokens rather than mis-mapped onto next_token_logits.
-        assert outputs.next_token_logits is None
-        assert outputs.sampled_tokens is not None
-
-
-def test_warmup_fold_flag_with_single_output_model_keeps_logits() -> None:
-    """Fold flag ON with an architecture that emits no folded output.
-
-    Regression test: warmup used to unconditionally pop the trailing capture
-    buffer whenever the fold flag was set, peeling the lone logits buffer off
-    a single-output (non-folding) architecture such as Llama and crashing
-    with ``TypeError: ModelOutputs.__init__() missing 1 required positional
-    argument: 'logits'``.
-    """
-    model = DummyModel(Buffer.zeros((4,), dtype=DType.float32))
-    inputs = MockModelInputs(active_batch_size=1, eos_prob=0.0)
-
-    kv_params = _mock_kv_params(probe_lengths=[1])
-    runner = ServeGraphCaptureRunner(
-        model=cast(Model, model),
-        kv_params=kv_params,
-        warmup_model_inputs=_fold_warmup_ctx(inputs),
-        max_cache_length_upper_bound=10,
-        max_batch_size=1,
-        fold_sampler_into_graph=True,
-    )
-    runner.warmup_pre_ready()
-
-    assert runner.graph_entries
-    for _inputs, outputs in runner.graph_entries.values():
-        assert isinstance(outputs, ModelOutputs)
-        # The single capture buffer maps onto logits; nothing is peeled.
-        assert outputs.sampled_tokens is None
-
-
-def test_warmup_without_fold_leaves_sampled_tokens_none() -> None:
-    """Without the fold, a single-output capture leaves sampled_tokens None."""
-    model = DummyModel(Buffer.zeros((4,), dtype=DType.float32))
-    inputs = MockModelInputs(active_batch_size=1, eos_prob=0.0)
-
-    kv_params = _mock_kv_params(probe_lengths=[1])
-    runner = ServeGraphCaptureRunner(
-        model=cast(Model, model),
-        kv_params=kv_params,
-        warmup_model_inputs=_fold_warmup_ctx(inputs),
-        max_cache_length_upper_bound=10,
-        max_batch_size=1,
-        fold_sampler_into_graph=False,
-    )
-    runner.warmup_pre_ready()
-
-    assert runner.graph_entries
-    for _inputs, outputs in runner.graph_entries.values():
-        assert isinstance(outputs, ModelOutputs)
-        assert outputs.sampled_tokens is None

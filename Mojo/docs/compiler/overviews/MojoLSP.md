@@ -59,13 +59,13 @@ bazel test //Mojo/test/mojo-lsp-server
 #### C++ unit tests
 
 These tests are written in C++ using GTest and live in
-`KGEN/unittests/mojo-lsp-server`. You can read more about GTests in this
+`Mojo/unittests/mojo-lsp-server`. You can read more about GTests in this
 [primer](https://github.com/google/googletest/blob/main/docs/primer.md).
 
-Our tests live in `KGEN/unittests/mojo-lsp-server/` and are specified using the
+Our tests live in `Mojo/unittests/mojo-lsp-server/` and are specified using the
 C++ GTest framework.
 
-You can read `KGEN/unittests/mojo-lsp-server/SampleTest.cpp` for a sample
+You can read `Mojo/unittests/mojo-lsp-server/SampleTest.cpp` for a sample
 test with some useful explanatory comments.
 
 ##### Inspecting the LSP traffic

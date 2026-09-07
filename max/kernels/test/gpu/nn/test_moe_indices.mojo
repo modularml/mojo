@@ -13,11 +13,12 @@
 
 
 from max.gpu.host import DeviceContext, HostBuffer
+from std.collections import Set
 from std.math import align_up
 from layout import Idx, TileTensor, row_major
 from layout._fillers import random
 from nn.moe import moe_create_indices
-from std.testing import assert_equal
+from std.testing import assert_equal, assert_true
 
 
 def get_expert_dictionary(
@@ -70,6 +71,7 @@ def check_expert_stats(
     expert_usage_stats: HostBuffer[.uint32],
     topk_ids: HostBuffer[.uint32],
     num_tokens: Int,
+    num_experts: Int,
 ) raises:
     """
     Checks if the most frequent expert is accurate, and if the number of experts is correct.
@@ -85,6 +87,11 @@ def check_expert_stats(
 
     assert_equal(
         expert_usage_stats[0], mx_value, "most frequent expert is incorrect"
+    )
+    assert_equal(
+        expert_usage_stats[1],
+        UInt32(num_experts),
+        "expert count is incorrect",
     )
 
 
@@ -114,6 +121,48 @@ def check_expert_indices(
             )
 
 
+def check_total_token_count(
+    expert_start_indices: HostBuffer[.uint32],
+    num_experts: Int,
+    num_tokens: Int,
+) raises:
+    """
+    Checks that the final CSR boundary accounts for every token.
+    """
+
+    assert_equal(
+        Int(expert_start_indices[num_experts]),
+        num_tokens,
+        "expert_start_indices[num_experts] does not cover every token",
+    )
+
+
+def check_expert_ids_permutation(
+    expert_ids: HostBuffer[.int32],
+    num_experts: Int,
+) raises:
+    """
+    Checks that expert_ids holds every expert in [0, num_experts) exactly
+    once, regardless of which order a kernel assigns them to slots.
+    """
+
+    var seen = Set[Int]()
+    for i in range(num_experts):
+        var expert_id = Int(expert_ids[i])
+        assert_true(
+            expert_id >= 0 and expert_id < num_experts,
+            "expert_ids["
+            + String(i)
+            + "] is out of range: "
+            + String(expert_id),
+        )
+        assert_true(
+            not (expert_id in seen),
+            "expert id appears more than once: " + String(expert_id),
+        )
+        seen.add(expert_id)
+
+
 def check_restore_token_order(
     restore_token_order: HostBuffer[.uint32],
     token_expert_order: HostBuffer[.uint32],
@@ -140,15 +189,15 @@ def check_scales_offset[
 ) raises:
     """Validates scales_offset values against expert_start_indices.
 
-    For each active expert i (in processing order), scales_offset[i] should
+    For each expert i (in ascending expert id), scales_offset[i] should
     equal the difference between the cumulative aligned block count and the
     cumulative actual block count up to that expert.
     """
-    var num_active_experts = Int(expert_usage_stats[1])
+    var num_experts = Int(expert_usage_stats[1])
     var cumulative_actual: UInt32 = 0
     var cumulative_aligned: UInt32 = 0
 
-    for i in range(num_active_experts):
+    for i in range(num_experts):
         var expected = cumulative_aligned // UInt32(
             scale_alignment
         ) - cumulative_actual // UInt32(scale_alignment)
@@ -162,10 +211,20 @@ def check_scales_offset[
         cumulative_aligned += align_up(token_count, UInt32(scale_alignment))
 
 
+def fill_skewed(top_k_buffer_host: HostBuffer[.uint32], num_tokens: Int):
+    """
+    Routes every token to expert 0, the extreme case of a skewed expert
+    distribution the uniform random fill never produces.
+    """
+
+    for i in range(num_tokens):
+        top_k_buffer_host[i] = 0
+
+
 def test_moe_create_indices[
-    expected_count: Int = 8192,
     num_experts: Int = 256,
     test_scales_offset: Bool = False,
+    skewed: Bool = False,
 ](token_expert_order_length: Int, ctx: DeviceContext) raises:
     var token_expert_order_buffer_host = ctx.enqueue_create_host_buffer[
         DType.uint32
@@ -238,8 +297,12 @@ def test_moe_create_indices[
 
     ctx.synchronize()
 
-    # Fill top_k_host with random expert IDs
-    random(top_k_host, min=0, max=UInt32(num_experts))
+    # Fill top_k_host with random expert IDs, or route every token to one
+    # expert to exercise a skewed (non-uniform) distribution.
+    comptime if skewed:
+        fill_skewed(top_k_buffer_host, token_expert_order_length)
+    else:
+        random(top_k_host, min=0, max=UInt32(num_experts))
     ctx.enqueue_copy(top_k_buffer_device, top_k_buffer_host)
 
     var scales_offset_buffer_host = ctx.enqueue_create_host_buffer[
@@ -248,7 +311,7 @@ def test_moe_create_indices[
     var scales_offset_buffer = ctx.enqueue_create_buffer[.uint32](num_experts)
 
     comptime if test_scales_offset:
-        moe_create_indices["gpu", expected_count=expected_count](
+        moe_create_indices["gpu"](
             token_expert_order,
             expert_start_indices,
             restore_token_order,
@@ -259,7 +322,7 @@ def test_moe_create_indices[
             scales_offset_p=scales_offset_buffer.unsafe_ptr().as_unsafe_any_origin(),
         )
     else:
-        moe_create_indices["gpu", expected_count=expected_count](
+        moe_create_indices["gpu"](
             token_expert_order,
             expert_start_indices,
             restore_token_order,
@@ -299,6 +362,7 @@ def test_moe_create_indices[
         expert_usage_stats_buffer_host,
         top_k_buffer_host,
         token_expert_order_length,
+        num_experts,
     )
     check_expert_indices(
         expert_start_indices_buffer_host,
@@ -308,6 +372,12 @@ def test_moe_create_indices[
         top_k_buffer_host,
         token_expert_order_length,
     )
+    check_total_token_count(
+        expert_start_indices_buffer_host,
+        num_experts,
+        token_expert_order_length,
+    )
+    check_expert_ids_permutation(expert_ids_buffer_host, num_experts)
 
     check_restore_token_order(
         restore_token_order_buffer_host,
@@ -323,15 +393,26 @@ def main() raises:
         test_moe_create_indices(11, ctx)
         test_moe_create_indices(1, ctx)
         test_moe_create_indices(20660, ctx)
-        test_moe_create_indices[expected_count=256, num_experts=256](
-            100_000, ctx
-        )
+        test_moe_create_indices(100_000, ctx)
 
         test_moe_create_indices[test_scales_offset=True](197, ctx)
         test_moe_create_indices[test_scales_offset=True](2500, ctx)
         test_moe_create_indices[test_scales_offset=True](11, ctx)
         test_moe_create_indices[test_scales_offset=True](1, ctx)
         test_moe_create_indices[test_scales_offset=True](20660, ctx)
-        test_moe_create_indices[
-            expected_count=256, num_experts=256, test_scales_offset=True
-        ](100_000, ctx)
+        test_moe_create_indices[test_scales_offset=True](100_000, ctx)
+
+        # The kernel walks the experts in chunks of one block width (512),
+        # carrying the running offsets across chunks: one exact chunk, a
+        # partial second chunk, and a third chunk holding a single expert.
+        test_moe_create_indices[num_experts=512](100, ctx)
+        test_moe_create_indices[num_experts=513](2500, ctx)
+        test_moe_create_indices[num_experts=1025](2500, ctx)
+        test_moe_create_indices[num_experts=513, test_scales_offset=True](
+            2500, ctx
+        )
+
+        # Skewed distribution: every token on expert 0, so one group holds
+        # them all and the rest are empty.
+        test_moe_create_indices[skewed=True](1024, ctx)
+        test_moe_create_indices[num_experts=513, skewed=True](100_000, ctx)

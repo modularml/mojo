@@ -50,7 +50,7 @@ Run a single Mojo file with the locally built compiler:
 Build and run the standard library tests with a locally built compiler:
 
 ```sh
-./bazelw test --config=build-mojo //mojo/stdlib/...
+./bazelw test --config=build-mojo //Mojo/stdlib/...
 ```
 
 If you set the build configuration in `local.bazelrc` and define the aliases,
@@ -59,7 +59,7 @@ those three commands become:
 ```sh
 bb //Mojo:mojo
 br //Mojo:mojo -- run main.mojo
-bt //mojo/stdlib/...
+bt //Mojo/stdlib/...
 ```
 
 > [!NOTE]
@@ -74,7 +74,7 @@ bt //mojo/stdlib/...
 Mojo includes several low-level tools that let you examine the intermediate
 output the Mojo compiler generates, including `kgen` and `kgen-translate`.
 
-To run these commands in the open source repo, add the `-I mojo/stdlib` flag to
+To run these commands in the open source repo, add the `-I Mojo/stdlib` flag to
 include the Mojo standard library. For example, the
 [Passes and Intermediate Representations](manual/PassesAndIR.md) doc shows this
 instruction for generating the `lit` dialect from a Mojo file:
@@ -86,7 +86,7 @@ br //Mojo/tools/kgen-translate -- -import-mojo main.mojo
 The open source equivalent is:
 
 ```sh
-./bazelw run //Mojo/tools/kgen-translate -- -import-mojo -I mojo/stdlib main.mojo
+./bazelw run //Mojo/tools/kgen-translate -- -import-mojo -I Mojo/stdlib main.mojo
 ```
 
 This command doesn't build the standard library, so build it first as described

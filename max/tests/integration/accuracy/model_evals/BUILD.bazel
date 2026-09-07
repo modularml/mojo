@@ -185,6 +185,69 @@ modular_py_binary(
     main = "collect_scores.py",
 )
 
+# Normalization for the OpenRouter AutoExacto harnesses. A library, not a
+# binary: the shell runners execute it with the third-party harness venv's
+# interpreter (see the stdlib-only note in the module), and a file may belong to
+# only one rule.
+modular_py_library(
+    name = "exacto_report",
+    testonly = True,
+    srcs = ["exacto_report.py"],
+    imports = ["."],
+)
+
+# One-command GPQA-Diamond run at OpenRouter AutoExacto parity. A shell runner
+# because openbench is a third-party harness with its own pinned dependency
+# tree, the same reason omnidocbench_eval_local is one.
+#   ./bazelw run //max/tests/integration/accuracy/model_evals:exacto_gpqa_local -- \
+#     --url http://localhost:8000 --limit 4 --epochs 1
+sh_binary(
+    name = "exacto_gpqa_local",
+    testonly = True,
+    srcs = ["run_exacto_gpqa_local.sh"],
+    data = [":exacto_report"],
+    tags = ["manual"],
+)
+
+# One-command tau2-bench airline run, the agentic half of the AutoExacto gate.
+#   ./bazelw run //max/tests/integration/accuracy/model_evals:exacto_taubench_local -- \
+#     --num-tasks 2 --max-concurrency 2
+sh_binary(
+    name = "exacto_taubench_local",
+    testonly = True,
+    srcs = ["run_exacto_taubench_local.sh"],
+    data = [":exacto_report"],
+    tags = ["manual"],
+)
+
+# Job-summary renderer for the AutoExacto gate. Stdlib-only: the CI summary
+# step runs it with a bare python3, no bazel.
+modular_py_binary(
+    name = "exacto_summary",
+    testonly = True,
+    srcs = ["exacto_summary.py"],
+    imports = ["."],
+    main = "exacto_summary.py",
+)
+
+modular_py_test(
+    name = "test_exacto_summary",
+    size = "small",
+    srcs = ["test_exacto_summary.py"],
+    deps = [
+        ":exacto_summary",
+    ],
+)
+
+modular_py_test(
+    name = "test_exacto_report",
+    size = "small",
+    srcs = ["test_exacto_report.py"],
+    deps = [
+        ":exacto_report",
+    ],
+)
+
 modular_py_test(
     name = "test_collect_scores",
     size = "small",
@@ -200,5 +263,42 @@ modular_py_test(
     srcs = ["test_eval_common.py"],
     deps = [
         ":eval_common",
+    ],
+)
+
+# Logit-shift GPQA stop/accuracy gate. Stdlib + click only.
+# gpqa_logit_gate.py lives only on the binary so find_duplicate_srcs
+# does not flag it against the library.
+modular_py_library(
+    name = "gpqa_logit_gate_lib",
+    testonly = True,
+    srcs = [
+        "calibration/__init__.py",
+        "calibration/gpqa_gate.py",
+    ],
+    data = ["calibration/data/gpqa_gate_hist.json"],
+    imports = ["."],
+)
+
+modular_py_binary(
+    name = "gpqa_logit_gate",
+    testonly = True,
+    srcs = ["calibration/gpqa_logit_gate.py"],
+    imports = ["."],
+    main = "calibration/gpqa_logit_gate.py",
+    tags = ["manual"],
+    deps = [
+        ":gpqa_logit_gate_lib",
+        requirement("click"),
+    ],
+)
+
+modular_py_test(
+    name = "test_gpqa_logit_gate",
+    size = "medium",
+    srcs = ["calibration/test_gpqa_logit_gate.py"],
+    deps = [
+        ":gpqa_logit_gate",
+        ":gpqa_logit_gate_lib",
     ],
 )

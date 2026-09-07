@@ -415,6 +415,11 @@ class NemotronOpenCodeBenchmarkDataset(HuggingFaceBenchmarkDataset):
                     # ``ignore_eos=True`` to match sharegpt / arxiv: decode the
                     # full target length instead of letting an early EOS skew
                     # throughput vs. instruct-coder baselines.
+                    #
+                    # Note: This plus the reference-length ``output_len`` stops
+                    # generation mid-argument, so tool-call conformance errors
+                    # are expected here. Removing both restrictions showed
+                    # no tool call errors for Kimi K2.7.
                     ignore_eos=True,
                     tools=(
                         [_anthropic_tool_to_openai(t) for t in tools_raw]

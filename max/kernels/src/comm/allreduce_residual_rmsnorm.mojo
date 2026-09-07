@@ -218,7 +218,9 @@ def _allreduce_rmsnorm_fp8_kernel_warp_tiling[
     # Round-robin access pattern for NVLink load-balancing.
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
     var ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: src_ptrs[(_my_rank + i) % ngpus]
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: src_ptrs[
+            (_my_rank + i) % ngpus
+        ]
     )
 
     # Row loop: each block processes _rows with stride = grid_dim.
@@ -468,14 +470,14 @@ def _allreduce_rmsnorm_fp8_kernel_2stage[
     # +1 advances by sizeof(Signal) bytes (see local scratch note above).
     comptime Fp8PtrType = MutPointer[Scalar[out_dtype], MutAnyOrigin]
     var fp8_ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> Fp8PtrType: (
+        fill_with_unrolled=lambda [i: Int]() -> Fp8PtrType: (
             rank_sigs[i].address_space_cast[.GENERIC]() + 1
         ).bitcast[Scalar[out_dtype]]()
     )
 
     comptime ScalePtrType = MutPointer[Scalar[scales_dtype], MutAnyOrigin]
     var scale_ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> ScalePtrType: (
+        fill_with_unrolled=lambda [i: Int]() -> ScalePtrType: (
             (rank_sigs[i].address_space_cast[.GENERIC]() + 1).bitcast[
                 Scalar[out_dtype]
             ]()
@@ -495,7 +497,9 @@ def _allreduce_rmsnorm_fp8_kernel_2stage[
     # Round-robin P2P input pointers for NVLink load-balancing.
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
     var ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: src_ptrs[(_my_rank + i) % ngpus]
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: src_ptrs[
+            (_my_rank + i) % ngpus
+        ]
     )
 
     # Preload gamma weights into registers BEFORE start barrier.

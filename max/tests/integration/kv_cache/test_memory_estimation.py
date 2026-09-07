@@ -22,7 +22,6 @@ from max.nn.kv_cache import (
     MLAKVCacheParams,
     compute_num_device_blocks,
     estimated_memory_size,
-    host_bytes_per_block,
 )
 from max.pipelines.kv_cache.config import KVConnectorConfig
 
@@ -331,7 +330,13 @@ def _create_mla_params(tp: int, is_mla: bool = True) -> KVCacheParams:
 
 
 def test_host_blocks_mla_tp_scaling() -> None:
-    """With TP MLA, host block count should be independent of TP degree."""
+    """With TP MLA, host block count should be independent of TP degree.
+
+    ``replicates_kv_across_tp`` is what the host row width keys off (via
+    ``KVCacheMemory.replicated``), so it must be set exactly when the per-device
+    ``bytes_per_block`` grew by the TP degree. See
+    ``test_rust_tier_host_row.py`` for the row width itself.
+    """
     params_tp1 = _create_mla_params(tp=1)
     params_tp8 = _create_mla_params(tp=8)
 
@@ -340,13 +345,9 @@ def test_host_blocks_mla_tp_scaling() -> None:
     # TP=8 MLA replicates KV on every device.
     assert params_tp8.replicates_kv_across_tp
 
-    # bytes_per_block grows with TP (each device holds full KV), but the fix
-    # divides it back out for the host where only one copy is needed.
+    # bytes_per_block grows with TP (each device holds full KV); the host stores
+    # one copy, which is what keeps the host block count TP-independent.
     assert params_tp8.bytes_per_block == params_tp1.bytes_per_block * 8
-
-    # The host pool divides a fixed byte budget by this, so holding it flat
-    # across TP is what keeps the host block count TP-independent.
-    assert host_bytes_per_block(params_tp8) == host_bytes_per_block(params_tp1)
 
 
 def test_host_blocks_non_mla_tp_no_scaling() -> None:
@@ -358,5 +359,5 @@ def test_host_blocks_non_mla_tp_no_scaling() -> None:
     assert not params_tp8.replicates_kv_across_tp
 
     # Non-MLA shards KV across TP, so bytes_per_block is already constant
-    # regardless of TP and needs no host-side adjustment.
-    assert host_bytes_per_block(params_tp1) == host_bytes_per_block(params_tp8)
+    # regardless of TP and the host stores every shard.
+    assert params_tp1.bytes_per_block == params_tp8.bytes_per_block

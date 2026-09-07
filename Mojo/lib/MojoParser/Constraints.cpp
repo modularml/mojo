@@ -31,16 +31,32 @@ using namespace M;
 using namespace M::KGEN;
 using namespace M::KGEN::LIT;
 
-void ConstraintFailure::attachNotes(MojoInflightDiag &diag) const {
-  auto emitNote = [&](ConstraintAttr constraint, StringRef kind) {
+ConstraintResult
+LIT::makeConstraintResult(TriBool verdict,
+                          SmallVector<ConstraintAttr, 2> constraints) {
+  if (verdict.isTrue())
+    return ConstraintResult::yes();
+  if (verdict.isFalse())
+    return ConstraintResult::no(std::move(constraints));
+  return ConstraintResult::unknown(std::move(constraints));
+}
+
+void LIT::attachConstraintNotes(MojoInflightDiag &diag,
+                                ArrayRef<ConstraintAttr> constraints,
+                                StringRef kind) {
+  for (ConstraintAttr constraint : constraints) {
     diag.attachNote(constraint.getLoc()) << kind << " constraint";
     if (StringAttr message = constraint.getMessage())
       diag << ": " << message.getValue();
-  };
-  for (ConstraintAttr failed : failedConstraints)
-    emitNote(failed, "failed");
-  for (ConstraintAttr unproven : unprovenConstraints)
-    emitNote(unproven, "unproven");
+  }
+}
+
+void LIT::attachConstraintNotes(MojoInflightDiag &diag,
+                                const ConstraintResult &result) {
+  if (result.isNo())
+    attachConstraintNotes(diag, result.getNo(), "failed");
+  else if (result.isUnknown())
+    attachConstraintNotes(diag, result.getUnknown(), "unproven");
 }
 
 /// Emit a note explaining why a constraint is inconclusive. The incoming
@@ -74,7 +90,7 @@ void LIT::emitConstraintInconclusive(DeclResolver &resolver,
   });
 }
 
-TriState LIT::canDischargeConstraintsInScope(
+TriBool LIT::canDischargeConstraintsInScope(
     ASTDecl &declScope, PogListAttr paramListAttr,
     ArrayRef<ConstraintAttr> constraints,
     ArrayRef<ConstraintAttr> origConstraints,
@@ -84,7 +100,7 @@ TriState LIT::canDischargeConstraintsInScope(
     ArrayRef<ConstraintAttr> additionalAssumptions,
     llvm::BitVector *provenConstraints) {
   if (constraints.empty())
-    return TriState::yes();
+    return TriBool::yes();
 
   SmallVector<ConstraintAttr> assumptions;
   declScope.getKnownAssumptionsIncludingParents(assumptions);
@@ -110,8 +126,7 @@ TriState LIT::canDischargeConstraintsInScope(
 
     // If assumptions imply the constraint, skip it; if they contradict it,
     // treat it as violated.
-    TriState result =
-        isPropositionImplied(canonProp, overallAssumptionOperands);
+    TriBool result = isPropositionImplied(canonProp, overallAssumptionOperands);
     if (result.isTrue()) {
       if (provenConstraints)
         provenConstraints->set(idx);
@@ -149,7 +164,7 @@ TriState LIT::canDischargeConstraintsInScope(
         diag << ": " << message.getValue();
     }
 
-    return TriState::no();
+    return TriBool::no();
   }
 
   if (!localUnprovableConstraints.empty()) {
@@ -157,10 +172,10 @@ TriState LIT::canDischargeConstraintsInScope(
     if (unprovableConstraints)
       unprovableConstraints->append(localUnprovableConstraints.begin(),
                                     localUnprovableConstraints.end());
-    return TriState::unknown();
+    return TriBool::unknown();
   }
 
-  return TriState::yes();
+  return TriBool::yes();
 }
 
 /// Rewrite cond(a, b, a) patterns to and(a, b) for constraint propositions.

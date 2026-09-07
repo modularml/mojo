@@ -63,16 +63,17 @@ from .type import (
 from .value import BufferValue, TensorValue, TensorValueLike, Value, _ChainValue
 from .weight import Weight
 
-# Read from the max-debug.source-tracebacks config key (covers the
-# MODULAR_DEBUG=source-tracebacks env var, modular.cfg, and the
-# Graph.debug.source_tracebacks Python setter via Config overrides).
-_SOURCE_TRACEBACKS_ENABLED = _InferenceSession.debug.source_tracebacks
 CURRENT_GRAPH: ContextVar[Graph] = ContextVar("CURRENT_GRAPH")
-# Stack of active Graph.profile_scope() names, outermost first. A tuple
-# (not a list) so entering/exiting a scope is a ContextVar set()/reset()
-# rather than a mutation shared across contexts.
-_CURRENT_PROFILE_SCOPES: ContextVar[tuple[str, ...]] = ContextVar(
-    "_CURRENT_PROFILE_SCOPES", default=()
+# Stack of active Graph.profile_scope() scopes, outermost first. Each entry is
+# a (name, color) tuple; color is None when unset. A tuple (not a list) so
+# entering/exiting a scope is a ContextVar set()/reset() rather than a
+# mutation shared across contexts.
+# NOTE: this is a single module-level ContextVar, not scoped per Graph.
+# Building a nested Graph while a sibling graph's profile_scope is active will
+# inherit that scope's label; this is not currently supported and should be
+# avoided.
+_CURRENT_PROFILE_SCOPES: ContextVar[tuple[tuple[str, str | None], ...]] = (
+    ContextVar("_CURRENT_PROFILE_SCOPES", default=())
 )
 _KERNEL_LIBRARY_PATHS_ATTR_NAME = "_kernel_library_paths"
 _DEVICE_INFO_MAPPING_ATTR_NAME = "mo.device_info_mapping"
@@ -384,7 +385,11 @@ def _location(
     if not mlir.Context.current:
         raise RuntimeError("Can't create location: No MLIR context active")
 
-    if not _SOURCE_TRACEBACKS_ENABLED:
+    # Read the live config value rather than caching at import time: the
+    # flag can be flipped after import via Graph.debug.source_tracebacks,
+    # InferenceSession.debug.sensible_mode, or MODULAR_DEBUG, and each
+    # graph op must honor the setting at the moment it is created.
+    if not _InferenceSession.debug.source_tracebacks:
         location: mlir.Location = mlir.Location.unknown()
     else:
         # Extract the stack into summaries
@@ -405,9 +410,9 @@ def _location(
         # in nesting order. This runs regardless of source-traceback capture:
         # profile_scope labels are a distinct, always-on mechanism riding the
         # same Location, not a feature of the debug traceback.
-        for name in _CURRENT_PROFILE_SCOPES.get():
+        for name, color in _CURRENT_PROFILE_SCOPES.get():
             location = _graph.profile_scope_location(
-                mlir.Context.current, name, location, None
+                mlir.Context.current, name, location, color
             )
 
     return location
@@ -1027,7 +1032,9 @@ class Graph:
         return self._always_ready_chain
 
     @contextlib.contextmanager
-    def profile_scope(self, name: str) -> Generator[None]:
+    def profile_scope(
+        self, name: str, color: str | None = None
+    ) -> Generator[None]:
         """Labels every op created within this block for profiling.
 
         Ops created while the scope is active carry ``name`` in their MLIR
@@ -1037,19 +1044,32 @@ class Graph:
         ops with both names, outermost scope first (for example
         ``kernel_name [draft_forward/target_forward]``).
 
+        ``color`` is only used by the optional in-region range bracketing
+        mechanism (``max-debug.profile-scope-tracing``); it never appears on
+        the per-kernel trace name, regardless of what was given.
+
         .. code-block:: python
 
             from max.graph import Graph
             with Graph("main") as graph:
-                with graph.profile_scope("draft_forward"):
+                with graph.profile_scope("draft_forward", color="orange"):
                     ...  # ops here trace as "kernel_name [draft_forward]"
 
         Args:
             name: The scope label to attach to every op created inside this
                 block.
+            color: Optional NVTX color name for the in-region range bracketing
+                mechanism. Has no effect on the per-kernel trace name. Invalid
+                values are silently ignored by the backend.
+
+        Note:
+            Scopes are tracked in a single module-level ContextVar. Do not
+            construct a second nested :class:`Graph` while a sibling graph's
+            ``profile_scope`` is still active; labels would leak between the
+            two graphs.
         """
         current = _CURRENT_PROFILE_SCOPES.get()
-        token = _CURRENT_PROFILE_SCOPES.set((*current, name))
+        token = _CURRENT_PROFILE_SCOPES.set((*current, (name, color)))
         try:
             yield
         finally:

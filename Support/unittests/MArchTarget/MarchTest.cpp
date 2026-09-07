@@ -59,6 +59,71 @@ TEST(ArchTarget, getMArchTargetInfo) {
   EXPECT_EQ(info->triple.str(), "aarch64-unknown-linux-gnu");
 }
 
+// A host CPU LLVM cannot identify must not take the whole target down with it.
+// getHostCPUName() answers "generic" for such a part, and Clang rejects that
+// name on x86_64 -- so a part newer than the pinned LLVM's CPU tables otherwise
+// fails outright. Driving the fallback directly covers that without the
+// hardware.
+TEST(ArchTarget, UnrecognizedCpuFallsBackToBaseline) {
+  llvm::InitializeAllTargets();
+  llvm::InitializeAllTargetMCs();
+  llvm::InitializeAllAsmParsers();
+  llvm::InitializeAllAsmPrinters();
+
+  MLIRContext ctx{MLIRContext::Threading::DISABLED};
+  ctx.loadDialect<MDialect>();
+
+  // Each pair is a (triple, CPU name) that Clang rejects: the literal
+  // getHostCPUName() answer for an unidentified x86_64 part, and a name that
+  // can never become valid, which keeps the AArch64 side covered no matter how
+  // LLVM's CPU tables move.
+  const std::pair<StringRef, StringRef> rejected[] = {
+      {"x86_64-unknown-linux-gnu", "generic"},
+      {"aarch64-unknown-linux-gnu", "not-a-real-cpu"},
+  };
+
+  for (auto [triple, name] : rejected) {
+    // The name really is one the target refuses, so the fallback below is doing
+    // work rather than passing a valid name through.
+    ASSERT_TRUE(M::getFeatures(triple, name).isError())
+        << triple << " unexpectedly accepts '" << name << "'";
+
+    ErrorOr<M::ResolvedCpu> resolvedOr = M::resolveCpu(triple, name);
+    ASSERT_FALSE(resolvedOr.isError())
+        << triple << ": " << resolvedOr.getError();
+    M::ResolvedCpu resolved = resolvedOr.takeValue();
+    EXPECT_TRUE(resolved.name.empty()) << triple << " kept the rejected name";
+
+    // The baseline the fallback picked must still yield a usable target.
+    ErrorOr<TargetInfoAttr> targetOr = M::getTargetInfoFor(
+        &ctx, triple, resolved.name,
+        encodeFeatures(TargetInfo({}, {}, std::move(resolved.features))),
+        /*tuneCpu=*/"", /*acceleratorArch=*/"", llvm::Reloc::Static);
+    ASSERT_FALSE(targetOr.isError()) << triple << ": " << targetOr.getError();
+  }
+}
+
+// The fallback must fire only for a name the target rejects; a CPU LLVM knows
+// keeps its name, and with it the model-specific features.
+TEST(ArchTarget, RecognizedCpuKeepsItsName) {
+  ErrorOr<M::ResolvedCpu> resolvedOr =
+      M::resolveCpu("aarch64-unknown-linux-gnu", "neoverse-n1");
+  ASSERT_FALSE(resolvedOr.isError()) << resolvedOr.getError();
+  EXPECT_EQ(resolvedOr->name, "neoverse-n1");
+}
+
+// The host must always describe itself, whatever LLVM makes of its CPU, and the
+// name it reports must be one the target accepts -- the features are resolved
+// for that name, and it is handed on to whoever builds the target machine. On a
+// host LLVM cannot identify this is what fails without the fallback.
+TEST(ArchTarget, HostTargetInfoIsAlwaysConstructible) {
+  ErrorOr<TargetInfo> infoOr = M::getHostTargetInfo();
+  ASSERT_FALSE(infoOr.isError()) << infoOr.getError();
+  EXPECT_FALSE(M::getFeatures(infoOr->triple.str(), infoOr->arch).isError())
+      << "host reports CPU '" << infoOr->arch
+      << "' that its own target rejects";
+}
+
 // getTargetInfoFor must expand the explicit --target-features delta against
 // the CPU model defaults so that hasFeature() reflects what LLVM will actually
 // compile for. znver4 enables avx512f by default; omitting -avx512f from the

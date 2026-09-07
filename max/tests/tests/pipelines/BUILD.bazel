@@ -8,7 +8,10 @@ package(default_visibility = [
 
 modular_py_test(
     name = "pipelines",
-    srcs = glob(["*.py"]),
+    srcs = glob(
+        ["*.py"],
+        exclude = ["test_tokenizer_context_forwarding.py"],
+    ),
     data = glob(["testdata/*"]),
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//:incompatible"],
@@ -22,6 +25,7 @@ modular_py_test(
         "//max/python/max/graph",
         "//max/python/max/pipelines/architectures",
         "//max/python/max/pipelines/architectures/deepseekV3_modulev3",
+        "//max/python/max/pipelines/architectures/eagle_common",
         "//max/python/max/pipelines/architectures/flux2",
         "//max/python/max/pipelines/architectures/gemma3multimodal",
         "//max/python/max/pipelines/architectures/gemma3multimodal_modulev3",
@@ -36,5 +40,41 @@ modular_py_test(
         requirement("safetensors"),
         requirement("torch"),
         requirement("transformers"),
+    ],
+)
+
+# Parses tokenizer sources with `ast` instead of importing them, so the test
+# itself stays fast, but it still needs each architecture's sources in the
+# runfiles and a bazel glob cannot reach across package boundaries. Hence the
+# explicit deps: this list and the expected set in
+# test_discovery_finds_the_known_tokenizers are the two places an added
+# architecture has to be registered, and the guard test fails loudly if one of
+# them drops out of discovery.
+modular_py_test(
+    name = "test_tokenizer_context_forwarding",
+    srcs = ["test_tokenizer_context_forwarding.py"],
+    # Depended on for their source text in the runfiles, never imported, so
+    # pydeps sees every one of them as unused.
+    ignore_extra_deps = [
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/idefics3",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/kimik2_5_modulev3",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
+        "//max/python/max/pipelines/architectures/qwen3vl_moe",
+        "//max/python/max/pipelines/lib",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),  # FIXME: MOCO-2411
+    deps = [
+        "//max/python/max/pipelines/architectures/gemma4",
+        "//max/python/max/pipelines/architectures/idefics3",
+        "//max/python/max/pipelines/architectures/kimik2_5",
+        "//max/python/max/pipelines/architectures/kimik2_5_modulev3",
+        "//max/python/max/pipelines/architectures/qwen2_5vl",
+        "//max/python/max/pipelines/architectures/qwen3vl_moe",
+        "//max/python/max/pipelines/lib",
     ],
 )

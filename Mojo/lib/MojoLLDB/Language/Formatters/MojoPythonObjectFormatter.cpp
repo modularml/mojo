@@ -19,6 +19,20 @@
 using namespace lldb_private;
 using namespace M::KGEN::Mojo;
 
+namespace {
+// Upstream LLDB changed Process::ReadPointerFromMemory to return
+// llvm::Expected<addr_t> and drop the Status& out-param. Preserve the previous
+// behavior of yielding LLDB_INVALID_ADDRESS on a failed read.
+lldb::addr_t readPointer(Process &process, lldb::addr_t addr) {
+  llvm::Expected<lldb::addr_t> valOrErr = process.ReadPointerFromMemory(addr);
+  if (!valOrErr) {
+    llvm::consumeError(valOrErr.takeError());
+    return LLDB_INVALID_ADDRESS;
+  }
+  return *valOrErr;
+}
+} // namespace
+
 bool M::KGEN::Mojo::mojoPythonObjectSummaryProvider(
     ValueObject &valobj, Stream &stream, const TypeSummaryOptions &options) {
   // PythonObject is a register-passable wrapper around a PyObject*. In the
@@ -73,8 +87,8 @@ bool M::KGEN::Mojo::mojoPythonObjectSummaryProvider(
     return fallback();
 
   // Dereference the slot to get the actual PyObject*.
-  const lldb::addr_t objAddr = process->ReadPointerFromMemory(slotAddr, err);
-  if (err.Fail() || objAddr == 0 || objAddr == LLDB_INVALID_ADDRESS)
+  const lldb::addr_t objAddr = readPointer(*process, slotAddr);
+  if (objAddr == 0 || objAddr == LLDB_INVALID_ADDRESS)
     return fallback();
   fallbackAddr = objAddr;
 
@@ -100,14 +114,13 @@ bool M::KGEN::Mojo::mojoPythonObjectSummaryProvider(
   // (release: ob_refcnt, ob_type; debug: _ob_next, _ob_prev, ob_refcnt,
   // ob_type), so its offset is `headerSize - pointerSize`.
   auto layoutHolds = [&](uint64_t headerSize) {
-    Status e;
     const uint64_t tOff = headerSize - pointerSize;
-    lldb::addr_t typePtr = process->ReadPointerFromMemory(objAddr + tOff, e);
-    if (e.Fail() || typePtr == 0 || typePtr == LLDB_INVALID_ADDRESS)
+    lldb::addr_t typePtr = readPointer(*process, objAddr + tOff);
+    if (typePtr == 0 || typePtr == LLDB_INVALID_ADDRESS)
       return false;
     for (int i = 0; i < 8; ++i) {
-      lldb::addr_t next = process->ReadPointerFromMemory(typePtr + tOff, e);
-      if (e.Fail() || next == 0 || next == LLDB_INVALID_ADDRESS)
+      lldb::addr_t next = readPointer(*process, typePtr + tOff);
+      if (next == 0 || next == LLDB_INVALID_ADDRESS)
         return false;
       if (next == typePtr)
         return true;
@@ -124,16 +137,16 @@ bool M::KGEN::Mojo::mojoPythonObjectSummaryProvider(
   }
 
   const lldb::addr_t typePtr =
-      process->ReadPointerFromMemory(objAddr + headerSize - pointerSize, err);
-  if (err.Fail() || typePtr == 0 || typePtr == LLDB_INVALID_ADDRESS)
+      readPointer(*process, objAddr + headerSize - pointerSize);
+  if (typePtr == 0 || typePtr == LLDB_INVALID_ADDRESS)
     return fallback();
 
   // PyTypeObject has the same header as PyObject plus PyVarObject's ob_size,
   // then tp_name. So tp_name lives at `headerSize + pointerSize` from the
   // type object base (skipping header + ob_size).
   const lldb::addr_t namePtr =
-      process->ReadPointerFromMemory(typePtr + headerSize + pointerSize, err);
-  if (err.Fail() || namePtr == 0 || namePtr == LLDB_INVALID_ADDRESS)
+      readPointer(*process, typePtr + headerSize + pointerSize);
+  if (namePtr == 0 || namePtr == LLDB_INVALID_ADDRESS)
     return fallback();
 
   static const size_t maxTypeName = 256;

@@ -79,7 +79,31 @@ ErrorOr<TargetInfo> getMArchTargetInfo(StringRef targetTriple, StringRef march,
                                        StringRef mcpu, StringRef mtune);
 
 /// Returns the CPU features for a given target triple and CPU.
+///
+/// A CPU the target does not accept is an error, which is the answer a name the
+/// user picked deserves: substituting the baseline would compile something
+/// other than what was asked for. Use `resolveCpu` for a name that was detected
+/// rather than chosen.
 ErrorOr<std::vector<std::string>> getFeatures(StringRef triple, StringRef cpu);
+
+/// A CPU name the target accepts, and the features it implies.
+struct ResolvedCpu {
+  /// Empty when the requested CPU was rejected and the triple's baseline was
+  /// used instead.
+  std::string name;
+  std::vector<std::string> features;
+};
+
+/// Returns a CPU the target accepts for `triple`, falling back to the triple's
+/// baseline when it does not accept `cpu`.
+///
+/// For a CPU name that was detected rather than chosen: `getHostCPUName()`
+/// answers "generic" for a part LLVM cannot identify, and that name is not
+/// universally valid, so an unidentified host would otherwise fail target
+/// creation outright rather than compile for the architecture baseline.
+/// Returning the name with the features keeps the two in step -- a caller
+/// cannot record a CPU that the features did not come from.
+ErrorOr<ResolvedCpu> resolveCpu(StringRef triple, StringRef cpu);
 
 } // namespace M
 

@@ -550,7 +550,7 @@ SpecialMemberInfo TypeDeclInfo::getDestructorForType(Type type, FnOp fnContext,
   // constraint of Deinitable (if any).
   //
   // Returns nullopt if the trait isn't in the composition at all.
-  auto isTypeDeinitable = [&](StructInfo info, Type structType) -> TriState {
+  auto isTypeDeinitable = [&](StructInfo info, Type structType) -> TriBool {
     TraitType canonTrait = info.decl.getCanonicalTrait();
     ArrayRef<TraitSymbolAttr> symbols = canonTrait.getSymbols();
     ArrayRef<ConstraintAttr> constraints = canonTrait.getConstraints();
@@ -558,7 +558,7 @@ SpecialMemberInfo TypeDeclInfo::getDestructorForType(Type type, FnOp fnContext,
       if (symbol.getSymbol().getLeafReference() != "Deinitable")
         continue;
       if (i >= constraints.size())
-        return TriState::yes(); // Unconditional conformance.
+        return TriBool::yes(); // Unconditional conformance.
 
       auto actualStructType = sugarCast<LIT::StructType>(structType);
       ParameterEvaluator evaluator(info.decl.getParams(),
@@ -578,7 +578,7 @@ SpecialMemberInfo TypeDeclInfo::getDestructorForType(Type type, FnOp fnContext,
 
       return isPropositionImplied(conformanceCondition, overallAssumption);
     }
-    return TriState::no();
+    return TriBool::no();
   };
 
   auto getDestructor = [&](StructInfo info) -> SpecialMemberInfo {
@@ -586,7 +586,7 @@ SpecialMemberInfo TypeDeclInfo::getDestructorForType(Type type, FnOp fnContext,
     // Determine conformance to Deinitable via the declared trait bound
     // of the struct type. This info is always available (in both LSP & normal
     // compile).
-    TriState isDeinitable = isTypeDeinitable(info, type);
+    TriBool isDeinitable = isTypeDeinitable(info, type);
 
     // - If the conformance condition is provably False, the type is NOT
     // Deinitable.
@@ -3040,9 +3040,15 @@ void UninitializedValueScan::scanBlock(Block &block) {
     case OverallOpValueEffect::ifLikeOp:
       checkIfLikeOp(op);
       break;
-    case OverallOpValueEffect::elifOp:
-      checkElIfOp(cast<HLCF::ElifOp>(op));
+    case OverallOpValueEffect::elifOp: {
+      auto elifOp = cast<HLCF::ElifOp>(op);
+      // A single if/else shaped elif has the same region layout as IfOp.
+      if (elifOp.getElifRegions().empty())
+        checkIfLikeOp(op);
+      else
+        checkElIfOp(elifOp);
       break;
+    }
     case OverallOpValueEffect::loopOp:
       checkLoopOp(op);
       break;
@@ -3161,11 +3167,11 @@ void UninitializedValueScan::checkLocalControlFlowOp(Operation &op) {
   liveness.markReachable(false);
 }
 
-/// This is HLCF::IfOp or ParamIfOp, which are all if-like.
+/// This is HLCF::IfOp, ParamIfOp, or a simple (no extra arms) HLCF::ElifOp.
 void UninitializedValueScan::checkIfLikeOp(Operation &op) {
   // 'if' operations treat the condition as a use but have live outs that are
   // the intersection of the live values produced by the then/else branches.
-  assert((isa<HLCF::IfOp, ParamIfOp>(op)));
+  assert((isa<HLCF::IfOp, ParamIfOp, HLCF::ElifOp>(op)));
   assert(op.getNumRegions() == 2 && op.getRegion(0).hasOneBlock() &&
          op.getRegion(1).hasOneBlock() &&
          "if-like op should have two single-block regions");
@@ -3179,19 +3185,20 @@ void UninitializedValueScan::checkIfLikeOp(Operation &op) {
 
 // This is used for the HLCF::ElifOp.
 void UninitializedValueScan::checkElIfOp(HLCF::ElifOp op) {
-  // ElIf contains pairs of regions in the elifRegions list, which correspond
-  // to a 'condition' and a 'if true' block for each condition.  The live-out
-  // set is the intersection of all of the live-out sets for each condition.
-  MutableArrayRef<Region> ifRegions = op.getElifRegions();
-  assert((ifRegions.size() % 2) == 0 && "Must have pairs of regions");
-
-  // The ultimate live-out set is the intersection of each of the "then" blocks,
-  // along with the live-out set of the ultimate else.  Start assuming this set
-  // isn't reachable.
+  // Region layout: thenRegion, elseRegion, then additional (cond, then) pairs
+  // in elifRegions. Live-out is the intersection of all then arms and else.
   auto thenLiveOutValues =
       TrackedAndInteriorLiveness::getEmptyWithMatchingSize(liveness);
-  TrackedAndInteriorLiveness scratchSet(0, 0); // 0,0 because always overwritten
+  TrackedAndInteriorLiveness scratchSet(0, 0); // always overwritten below
 
+  // First then uses the live-in set of the elif (cond is an SSA operand).
+  scratchSet = liveness;
+  scanBlock(op.getThenRegion().front());
+  thenLiveOutValues.mergeWith(liveness, valueSet.domInfo);
+  std::swap(liveness, scratchSet);
+
+  MutableArrayRef<Region> ifRegions = op.getElifRegions();
+  assert((ifRegions.size() % 2) == 0 && "Must have pairs of regions");
   for (size_t nextElIfRegion = 0, e = ifRegions.size(); nextElIfRegion != e;
        nextElIfRegion += 2) {
     // Check the next condition accumulating into liveness.
@@ -3199,8 +3206,7 @@ void UninitializedValueScan::checkElIfOp(HLCF::ElifOp op) {
     // Save the live set after the condition but before the 'then' block.
     scratchSet = liveness;
 
-    // Scan the "then" block for this condition, the result is the exit set for
-    // this case.
+    // Scan the "then" block for this condition.
     scanBlock(ifRegions[nextElIfRegion + 1].front());
     thenLiveOutValues.mergeWith(liveness, valueSet.domInfo);
 
@@ -4335,9 +4341,16 @@ void DestructorInsertion::scanBlock(Block &block) {
     case OverallOpValueEffect::ifLikeOp:
       checkIfLikeOp(op, opEffects.results);
       break;
-    case OverallOpValueEffect::elifOp:
-      checkElIfOp(cast<HLCF::ElifOp>(op), opEffects.results);
+    case OverallOpValueEffect::elifOp: {
+      auto elifOp = cast<HLCF::ElifOp>(op);
+      // A single if/else shaped elif has the same region layout as IfOp; reuse
+      // the proven if-like destructor logic (important inside loops).
+      if (elifOp.getElifRegions().empty())
+        checkIfLikeOp(op, opEffects.results);
+      else
+        checkElIfOp(elifOp, opEffects.results);
       break;
+    }
     case OverallOpValueEffect::loopOp:
       checkLoopOp(op);
       break;
@@ -4353,7 +4366,8 @@ void DestructorInsertion::scanBlock(Block &block) {
     DestructorInserter dtorInserter(builder, valueSet, diagsToEmit);
 
     assert((opEffects.results.size() == op.getNumResults() ||
-            overall == OverallOpValueEffect::ifLikeOp) &&
+            overall == OverallOpValueEffect::ifLikeOp ||
+            overall == OverallOpValueEffect::elifOp) &&
            "OperationEffects::analyze returned wrong # effects");
 
     for (auto [result, effect] :
@@ -4612,63 +4626,73 @@ void DestructorInsertion::checkIfLikeOp(
 // This is used for the HLCF::ElifOp.
 void DestructorInsertion::checkElIfOp(
     HLCF::ElifOp op, SmallVector<ResultEffect> &resultEffects) {
-  assert(resultEffects.empty() && "Need to handle these like if-like ops");
+  // Handle owned register results of the elif the same way as if-like ops.
+  if (!resultEffects.empty()) {
+    ImplicitLocOpBuilder builder(op.getLoc(), op->getBlock(),
+                                 std::next(Block::iterator(op)));
+    DestructorInserter dtorInserter(builder, valueSet, diagsToEmit);
+    for (auto [result, effect] : llvm::zip(op.getResults(), resultEffects)) {
+      switch (effect) {
+      case ResultEffect::ignore:
+        continue;
+      case ResultEffect::regDefine:
+        checkDef(result, *op, /*isDeref=*/false, dtorInserter);
+        break;
+      default:
+        llvm_unreachable("unknown result effect for 'elif'");
+      }
+    }
+    resultEffects.clear();
+  }
 
-  // ElIf contains pairs of regions in the elifRegions list, which correspond
-  // to a 'condition' and a 'if true' block for each condition.  The live-out
-  // set is the intersection of all of the live-out sets for each condition.
+  // Region layout: thenRegion, elseRegion, then additional (cond, then) pairs.
+  // Backward pass: else, then each additional pair, then the first thenRegion.
   MutableArrayRef<Region> ifRegions = op.getElifRegions();
   assert((ifRegions.size() % 2) == 0 && "Must have pairs of regions");
 
-  // Destructor insertion is a backward pass, so we process the else to see the
-  // consumed set coming in, then process each if/then pair as merging with its
-  // consume set.
   BitVector thenExitConsumedValues = consumedValues;
   Block *elseBlock = &op.getElseRegion().front();
   scanBlock(*elseBlock);
 
-  // For each `if cond: then else: ..` block, we have a consumed value set for
-  // the else, which we have to unify with this then block before we can
-  // continue up the if/else chain.
   for (size_t i = ifRegions.size(); i != 0; i -= 2) {
     Block &condBlock = ifRegions[i - 2].front();
     Block &thenBlock = ifRegions[i - 1].front();
 
-    // Process the 'then' block with the consume set from after the 'if' chain.
     BitVector elseConsumeSet = std::move(consumedValues);
     consumedValues = thenExitConsumedValues;
     scanBlock(thenBlock);
 
-    // We now have the consume set from the 'then' and else'.  Merge these
-    // two sets, and if they differ, insert destructor calls.
     BitVector merged = unifyConsumedSets(consumedValues, elseConsumeSet);
-    if (!merged.empty()) { // In the common case, they are identical.
-      // 'consumedValues' is the current set for the 'then' block, so insert
-      // those dtors if needed.
+    if (!merged.empty()) {
       destroyValuesAtEntryIfNeeded(consumedValues, thenBlock, merged,
                                    op.getLoc());
-
-      // Insert destructors in the 'else' block.
       destroyValuesAtEntryIfNeeded(elseConsumeSet, *elseBlock, merged,
                                    op.getLoc());
-
-      // The upward consume set is the union of both sides.
       consumedValues = std::move(merged);
     }
 
-    // After the 'then' and 'else' blocks are unified, we need to scan the
-    // 'cond' block to see which one was picked.  The condition block contains
-    // an arbitrary expression which can be the last use of various values, so
-    // it gets destructors inserted as well.
     scanBlock(condBlock);
-
-    // For the next 'if cond: then' block, this condition is the effective else
-    // block.
+    // For the next arm up the chain, this condition is the effective else.
     elseBlock = &condBlock;
   }
 
-  // At the end, the upwardly demanded set for the whole statement is what the
-  // statement demands.
+  // Finally unify the first thenRegion with the remaining "else" path. The
+  // first condition is an SSA operand (no cond region to scan).
+  {
+    Block &thenBlock = op.getThenRegion().front();
+    BitVector elseConsumeSet = std::move(consumedValues);
+    consumedValues = thenExitConsumedValues;
+    scanBlock(thenBlock);
+
+    BitVector merged = unifyConsumedSets(consumedValues, elseConsumeSet);
+    if (!merged.empty()) {
+      destroyValuesAtEntryIfNeeded(consumedValues, thenBlock, merged,
+                                   op.getLoc());
+      destroyValuesAtEntryIfNeeded(elseConsumeSet, *elseBlock, merged,
+                                   op.getLoc());
+      consumedValues = std::move(merged);
+    }
+  }
 }
 
 /// Given two consume sets that correspond to an 'if-like' construct which
@@ -4775,7 +4799,7 @@ BitVector DestructorInsertion::unifyConsumedSets(const BitVector &set1,
 /// For a loop, we know the consume sets for any break statements, but need
 /// to iterate the loop to find the right continue sets to use.
 ///
-/// In terms of form, both standard for and @parameter for loops will have their
+/// In terms of form, both standard for and comptime for loops will have their
 /// 'else' block removed (merged into their body).
 void DestructorInsertion::checkLoopOp(Operation &loopOp) {
   // True if this is a parameter for, false if this is an infinite HLCF::LoopOp.
@@ -4786,7 +4810,7 @@ void DestructorInsertion::checkLoopOp(Operation &loopOp) {
 
   auto loopBodySets = DestructorInsertion::copy(*this);
   // Any 'break's within the loop will produce the consume set for the
-  // statement immediately after the loop.  However, @parameter for statements
+  // statement immediately after the loop.  However, comptime for statements
   // may have an 'else' block that break statements skip over. Save the exit
   // set for break statements.
   BitVector breakSet(consumedValues);

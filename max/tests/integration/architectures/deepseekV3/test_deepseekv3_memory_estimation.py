@@ -37,6 +37,7 @@ def _make_planner() -> DeepseekV3MemoryPlanner:
 
 
 NUM_RANKS = 8
+GRAPH_CAPTURE_HEADROOM_BYTES_PER_DEVICE = 8 * 1024**3
 
 
 def mock_pipeline_config(
@@ -59,6 +60,7 @@ def mock_pipeline_config(
     pipeline_config.runtime.max_batch_total_tokens = None
     pipeline_config.runtime.ep_size = NUM_RANKS
     pipeline_config.runtime.max_batch_input_tokens = MAX_SEND_TOKENS_PER_RANK
+    pipeline_config.runtime.device_graph_capture = False
     pipeline_config.runtime.ep_use_allreduce = False
     pipeline_config.speculative = None
 
@@ -135,6 +137,25 @@ def test_deepseekv3_memory_estimation_exact() -> None:
         pipeline_config, huggingface_config
     )
     assert mem == 4399759360
+
+
+def test_deepseekv3_memory_estimation_adds_graph_capture_headroom() -> None:
+    planner = _make_planner()
+    huggingface_config = mock_huggingface_config()
+    assert huggingface_config is not None
+
+    pipeline_config = mock_pipeline_config("decode_only")
+    baseline = planner.estimate_activation_memory(
+        pipeline_config, huggingface_config
+    )
+
+    pipeline_config.runtime.device_graph_capture = True
+    with_headroom = planner.estimate_activation_memory(
+        pipeline_config, huggingface_config
+    )
+
+    expected_headroom = GRAPH_CAPTURE_HEADROOM_BYTES_PER_DEVICE * NUM_RANKS
+    assert with_headroom == baseline + expected_headroom
 
 
 def mock_weights_pipeline_config(

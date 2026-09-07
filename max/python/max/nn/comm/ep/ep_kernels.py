@@ -1197,13 +1197,13 @@ def fused_silu_quantized(
         out_type: Output dtype.
         input_scales: Optional input scales tensor. Needed by NVFP4.
         scales_offsets: Optional scales offsets tensor. Needed by NVFP4.
-        max_padded_M: When > 0 (MXFP4 EP down-proj fusion), the
-            kernel writes the E8M0 activation scale directly into the
-            grouped-matmul per-expert slot layout.  Must equal
+        max_padded_M: When > 0 (MXFP4, MXFP6, and MXFP8 EP down-proj
+            fusion), the kernel writes the E8M0 activation scale directly
+            into the grouped-matmul per-expert slot layout.  Must equal
             ``align_up(max_recv_tokens_per_expert, 32)``.  The output
             scales tensor will have shape
             ``[n_local_experts * max_padded_M, K_SCALES]`` instead of
-            ``[max_recv_tokens, K_SCALES]``.  Valid for MXFP4 and MXFP8.
+            ``[max_recv_tokens, K_SCALES]``.
         clamp_activation: When True (MXFP4 and MXFP8), apply the OAI-clamped SwiGLU
             activation ``(clamp(up, -L, L) + 1) * min(gate, L) *
             sigmoid(alpha * min(gate, L))`` instead of plain ``SiLU(gate) *
@@ -1290,9 +1290,11 @@ def fused_silu_quantized(
             ops.constant(swiglu_limit, DType.float32, device=DeviceRef.CPU())
         )
         if max_padded_M > 0:
-            raise ValueError(
-                "MXFP6 has no A-scale slot-layout producer, so the down-proj "
-                "scale fold cannot be enabled for it"
+            n_local_experts = row_offsets.shape[0] - 1
+            raw_hidden = input.shape[1] // 2
+            out_scales_type = quant_config.quantized_scales_type(
+                Shape([n_local_experts * max_padded_M, raw_hidden]),
+                input.device,
             )
     elif quant_config.is_mxfp8:
         # Must precede the generic float8 branch: MXFP8's out_type IS
@@ -1326,6 +1328,9 @@ def fused_silu_quantized(
         parameters["FP6_FORMAT"] = (
             1 if quant_config.mxfp6_format == "e3m2" else 0
         )
+        if max_padded_M > 0:
+            parameters["fuse_a_scale_preshuffle"] = True
+            parameters["max_padded_M"] = max_padded_M
     elif quant_config.is_mxfp4 or quant_config.is_mxfp8:
         # Clamp flag applies even with the scale fold off.
         parameters["clamp_activation"] = clamp_activation

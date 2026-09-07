@@ -39,6 +39,7 @@ from max.pipelines.lib import (
     max_tokens_to_generate,
 )
 from max.pipelines.lib.tokenizer import (
+    encode_dkv_cache_hint,
     resolve_single_special_token,
     run_with_default_executor,
 )
@@ -562,6 +563,7 @@ class KimiK2_5VLTokenizer(TextAndVisionTokenizer):
             log_probabilities_echo=request.echo,
             sampling_params=request.sampling_params,
             target_endpoint=request.target_endpoint,
+            dkv_cache_hint=encode_dkv_cache_hint(request.dkv_cache_hint),
             grid_thws=grid_thws,
             position_ids=position_ids,
             image_token_indices=image_token_indices,

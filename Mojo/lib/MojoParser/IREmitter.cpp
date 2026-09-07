@@ -24,6 +24,7 @@
 #include "ParserEvaluationContext.h"
 #include "Traits.h"
 
+#include "Mojo/HLCFDialect/HLCFOps.h"
 #include "Mojo/KGENDialect/KGENOps.h"
 #include "Mojo/KGENDialect/KGENUtils.h"
 #include "Mojo/LITDialect/LITOps.h"
@@ -1490,6 +1491,115 @@ RValue IREmitter::emitExprScalarBool(const ExprNode *condExpr,
   return emitScalarBool({emitExprCValue(condExpr, context), condExpr}, context);
 }
 
+Operation *IREmitter::emitIfThen(Location loc, Value cond,
+                                 TypeRange resultTypes,
+                                 llvm::function_ref<LogicalResult()> emitThen,
+                                 llvm::function_ref<LogicalResult()> emitElse) {
+  assert(builder && "emitIfThen requires a dynamic builder");
+  OpBuilder &b = *builder;
+
+  HLCF::ElifOp elifOp = HLCF::ElifOp::create(b, loc, resultTypes, cond);
+
+  auto &thenBlock = elifOp.getThenRegion().emplaceBlock();
+  b.setInsertionPointToStart(&thenBlock);
+  if (failed(emitThen()))
+    return nullptr;
+
+  auto &elseBlock = elifOp.getElseRegion().emplaceBlock();
+  b.setInsertionPointToStart(&elseBlock);
+  if (failed(emitElse()))
+    return nullptr;
+
+  b.setInsertionPointAfter(elifOp);
+  return elifOp;
+}
+
+CValue IREmitter::emitAndMatchPredicates(
+    ASTExprAnd<CValue> lhs, llvm::function_ref<ASTExprAnd<CValue>()> emitRhs,
+    bool evaluateRhsEvenIfLhsFalse) {
+  auto asBoolAttr = sugarDynCastIfPresent<SIMDAttr>(lhs.ir.getIfPValue());
+  if (asBoolAttr && asBoolAttr.getAsBool())
+    return emitRhs().ir;
+  if (asBoolAttr && !asBoolAttr.getAsBool()) {
+    // Always emit the rhs when requested (e.g. case guards), even if the
+    // conjunction can never succeed, so diagnostics still fire.
+    if (evaluateRhsEvenIfLhsFalse && !emitRhs().ir)
+      return {};
+    return lhs.ir;
+  }
+
+  if (!builder)
+    return emitErrorForDynamicValueInParameter(lhs.expr);
+
+  Location loc = lhs.expr->getLocation(*this);
+  SRValue lhsSR = emitSRValue(lhs, EC_BoolCondition);
+  if (!lhsSR)
+    return {};
+
+  auto boolType = SIMDType::getScalarBoolType(getContext());
+  Operation *elifOp = emitIfThen(
+      loc, lhsSR, TypeRange{boolType},
+      [&]() -> LogicalResult {
+        ASTExprAnd<CValue> rhs = emitRhs();
+        if (!rhs.ir)
+          return failure();
+        SRValue rhsSR = emitSRValue(rhs, EC_BoolCondition);
+        if (!rhsSR)
+          return failure();
+        HLCF::YieldOp::create(*builder, loc, rhsSR);
+        return success();
+      },
+      [&]() -> LogicalResult {
+        Value falseVal = ParamConstantOp::create(
+            *builder, loc, SIMDAttr::getScalarBool(getContext(), false));
+        HLCF::YieldOp::create(*builder, loc, falseVal);
+        return success();
+      });
+  if (!elifOp)
+    return {};
+  return SRValue(elifOp->getResult(0));
+}
+
+CValue IREmitter::emitOrMatchPredicates(
+    ASTExprAnd<CValue> lhs, llvm::function_ref<ASTExprAnd<CValue>()> emitRhs) {
+  auto asBoolAttr = sugarDynCastIfPresent<SIMDAttr>(lhs.ir.getIfPValue());
+  if (asBoolAttr && asBoolAttr.getAsBool())
+    return lhs.ir;
+  if (asBoolAttr && !asBoolAttr.getAsBool())
+    return emitRhs().ir;
+
+  if (!builder)
+    return emitErrorForDynamicValueInParameter(lhs.expr);
+
+  Location loc = lhs.expr->getLocation(*this);
+  SRValue lhsSR = emitSRValue(lhs, EC_BoolCondition);
+  if (!lhsSR)
+    return {};
+
+  auto boolType = SIMDType::getScalarBoolType(getContext());
+  Operation *elifOp = emitIfThen(
+      loc, lhsSR, TypeRange{boolType},
+      [&]() -> LogicalResult {
+        Value trueVal = ParamConstantOp::create(
+            *builder, loc, SIMDAttr::getScalarBool(getContext(), true));
+        HLCF::YieldOp::create(*builder, loc, trueVal);
+        return success();
+      },
+      [&]() -> LogicalResult {
+        ASTExprAnd<CValue> rhs = emitRhs();
+        if (!rhs.ir)
+          return failure();
+        SRValue rhsSR = emitSRValue(rhs, EC_BoolCondition);
+        if (!rhsSR)
+          return failure();
+        HLCF::YieldOp::create(*builder, loc, rhsSR);
+        return success();
+      });
+  if (!elifOp)
+    return {};
+  return SRValue(elifOp->getResult(0));
+}
+
 CValue IREmitter::emitIndex(ASTExprAnd<AnyValue> value, ExprContext context) {
   // If the value is already of index type, just use it.
   if (CValue cvalue = value.ir.getIfCValue())
@@ -1873,7 +1983,7 @@ ASTDecl *IREmitter::createParametricClosureTrait(SharedState &shared) {
   MLIRContext *ctx = b.getContext();
 
   // A illegal name to avoid collisions.
-  StringRef name = "##__mojo_closure__##";
+  StringRef name = UNI_CLOSURE_TRAIT_NAME;
   auto closureTrait =
       TraitDeclOp::create(b, mlir::UnknownLoc::get(ctx), // synthetic trait
                           StringAttr::get(ctx, name));
@@ -1981,8 +2091,8 @@ struct SelfPrependShifter : IndexParameterReplacer<SelfPrependShifter> {
 };
 } // namespace
 
-TraitType IREmitter::bindParamsToClosureTraitFromSig(const ExprNode *expr,
-                                                     FnTypeGeneratorType sig) {
+TraitSymbolAttr
+IREmitter::bindParamsToClosureTraitFromSig(FnTypeGeneratorType sig) {
   MLIRContext *ctx = shared.getContext();
   ASTDecl *closureTraitDecl = shared.getUniversalParametricClosureTrait();
 
@@ -2050,9 +2160,7 @@ TraitType IREmitter::bindParamsToClosureTraitFromSig(const ExprNode *expr,
   llvm::append_range(pogArgs, sig.getArgListAttrs().getPogs());
 
   auto traitDeclOp = cast<TraitDeclOp>(closureTraitDecl->getIfOperation());
-  TraitSymbolAttr boundClosure = traitDeclOp.bindReference(
-      {paramDeclList, argTypeList, resultType, metadata,
-       PogListAttr::get(ctx, pogParams), PogListAttr::get(ctx, pogArgs)});
-
-  return shared.declResolver->getCanonicalTrait(boundClosure);
+  return traitDeclOp.bindReference({paramDeclList, argTypeList, resultType,
+                                    metadata, PogListAttr::get(ctx, pogParams),
+                                    PogListAttr::get(ctx, pogArgs)});
 }

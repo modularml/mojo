@@ -387,12 +387,13 @@ def UpdateMaterialization : Pass<"update-materialization"> {
 //===----------------------------------------------------------------------===//
 
 def SetFastMathFlags : Pass<"set-fastmath"> {
-  let summary = "Apply the `-fp-mode` fast-math policy to `pop.mul`/`add`/`sub`.";
+  let summary = "Apply the `-fp-mode` fast-math policy to POP operations.";
   let description = [{
     Implements the `-fp-mode` compiler option. The FP arithmetic ops
     (`pop.mul`/`add`/`sub`) enable FP contraction by default (their `contract`
     flag lets `a + b*c` fuse into an FMA). When `contract` is false the flag is
-    cleared so no value-changing contraction happens.
+    cleared on every operation taking fastmath flags, so no value-changing
+    contraction happens.
   }];
 
   let options = [

@@ -20,8 +20,7 @@ from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.attention import MHAMaskVariant
 from max.nn.kernels import flare_mla_prefill_ragged
 from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
 def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
@@ -59,12 +58,6 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
     )
     input_row_offsets_type = TensorType(
         DType.uint32, ["input_row_offsets_len"], DeviceRef.GPU()
-    )
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
     )
 
     def construct() -> Graph:
@@ -117,13 +110,6 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
         return g
 
     g = construct()
-    # Create contexts
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
 
     input_row_offsets = Buffer(
         DType.uint32,
@@ -136,7 +122,9 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
     input_row_offsets[batch_size] = running_sum
     input_row_offsets = input_row_offsets.to(device)
 
-    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf([batch])
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
     model = session.load(g)
 
     input_tensor = Buffer.zeros(
@@ -154,7 +142,7 @@ def test_kv_cache_paged_mla_prefill(gpu_session: InferenceSession) -> None:
         input_row_offsets.to(device),
         k_buffer_tensor.to(device),
         v_buffer_tensor.to(device),
-        *(kv_runtime_inputs.inputs[0].flatten()),
+        *kv_runtime_inputs.flatten(),
     )[0]
     assert isinstance(result, Buffer)
 

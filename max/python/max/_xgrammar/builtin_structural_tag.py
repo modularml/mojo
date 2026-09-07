@@ -651,6 +651,8 @@ def get_kimi_structural_tag(
                             JSONSchemaFormat(
                                 json_schema=parameters,
                                 reject_unsupported=True,
+                                max_whitespace_cnt=1,
+                                strict_mode=False,
                             ),
                         ]
                     ),
@@ -687,6 +689,8 @@ def get_kimi_structural_tag(
                             JSONSchemaFormat(
                                 json_schema=_get_function_parameters(function),
                                 reject_unsupported=True,
+                                max_whitespace_cnt=1,
+                                strict_mode=False,
                             ),
                         ]
                     ),
@@ -711,6 +715,8 @@ def get_kimi_structural_tag(
                             JSONSchemaFormat(
                                 json_schema=parameters,
                                 reject_unsupported=True,
+                                max_whitespace_cnt=1,
+                                strict_mode=False,
                             ),
                         ]
                     ),
@@ -1426,6 +1432,9 @@ def get_minimax_structural_tag(
     JSON_CONFIG: dict[str, Any] = {
         "style": XML_STYLE,
         "reject_unsupported": True,
+        "max_whitespace_cnt": 1,
+        "strict_mode": False,
+        "require_object_root": True,
     }
 
     tools = tools or []
@@ -2173,6 +2182,9 @@ def get_minimax_m3_structural_tag(
                 style="minimax_m3_xml",
                 xml_tag_prefix=TAG_PREFIX,
                 reject_unsupported=True,
+                max_whitespace_cnt=1,
+                strict_mode=False,
+                require_object_root=True,
             ),
             end=INVOKE_END,
         )

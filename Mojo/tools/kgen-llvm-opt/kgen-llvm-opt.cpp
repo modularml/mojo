@@ -43,6 +43,7 @@
 #include "llvm/LinkAllPasses.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Plugins/PassPlugin.h"
 #include "llvm/Remarks/HotnessThresholdParser.h"
 #include "llvm/Support/CodeGen.h"
@@ -457,6 +458,10 @@ int main(int argc, char **argv) {
   FunctionAnalysisManager fam;
   CGSCCAnalysisManager cgam;
   ModuleAnalysisManager mam;
+
+  StandardInstrumentations standardInstrumentations(module->getContext(),
+                                                    /*DebugLogging=*/false);
+  standardInstrumentations.registerCallbacks(pic, &mam);
 
   fam.registerPass([&] { return std::move(aa); });
   fam.registerPass([&] { return TargetLibraryAnalysis(tlii); });

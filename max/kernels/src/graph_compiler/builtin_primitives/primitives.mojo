@@ -2524,40 +2524,55 @@ def mogg_tensor_create_broadcast[
 def mogg_tensor_create_reshape[
     dtype: DType,
     in_rank: Int,
+    out_rank: Int,
     //,
     output_static_shape: IntTuple,
 ](
     input: ManagedTensorSlice[dtype=dtype, rank=in_rank, ...],
+    output_shape: IndexList[out_rank],
 ) -> ManagedTensorSlice[
     io_spec=input.io_spec,
     static_spec=input.static_spec.with_row_major_int_tuple_layout[
-        len(output_static_shape),
+        out_rank,
         output_static_shape,
     ](),
 ]:
     """Backing primitive for `mogg._tensor.create.reshape`: a zero-copy view
-    of `input` reinterpreted under `output_static_shape` -- valid only
-    because `input` is contiguous, so de-linearizing/re-linearizing through
-    one shared flat index produces row-major strides for the new shape.
-    Preserves whatever static shape information is known at compile time,
-    mirroring `StaticReshape.update_input_view`.
+    of `input` reinterpreted under `output_shape` -- valid only because
+    `input` is contiguous, so de-linearizing/re-linearizing through one
+    shared flat index produces row-major strides for the new shape.
+    `output_static_shape` still types the return value's static layout with
+    whatever dims ARE known at compile time (mirroring
+    `StaticReshape.update_input_view`), but `output_shape` -- not a cast of
+    `output_static_shape` -- is what this op actually reshapes into: unlike
+    broadcast/transpose, this op's own stride is a row-major
+    de-linearization of the *output* shape's own values, with no input
+    stride to fall back on, so any dim not statically known has to be an
+    honest runtime value here or every row past the first comes out wrong.
+
+    `out_rank` is inferred from `output_shape` itself, not from
+    `len(output_static_shape)` -- both name the same rank, but a
+    comptime-parameter argument type can't depend on another comptime
+    parameter's own derived value at inference time the way it can on a
+    plain `Int`.
 
     Parameters:
         dtype: The element type of `input`.
         in_rank: The rank of `input`.
-        output_static_shape: The view's shape (reshape shapes are always
-            statically known by Mojo emission time; see
-            `mo.static.reshape`'s own docstring).
+        out_rank: The rank of the reshaped view (and of `output_static_shape`).
+        output_static_shape: The view's shape, where known at compile time
+            (a `dyn` placeholder elsewhere); see the op's own MOGG tablegen
+            doc for why a dynamic dim can't just be read off this alone.
 
     Args:
         input: The tensor to reshape.
+        output_shape: The view's shape at runtime -- authoritative for every
+            dim, not just the ones `output_static_shape` doesn't know.
     """
-    comptime out_rank = len(output_static_shape)
-    var new_shape = IndexList[out_rank]()
-    comptime for i in range(out_rank):
-        new_shape[i] = Int(output_static_shape[i])
-
-    var view = reshape(input.to_tile_tensor[DType.int64](), new_shape)
+    comptime assert out_rank == len(
+        output_static_shape
+    ), "out_rank must match output_static_shape's own rank"
+    var view = reshape(input.to_tile_tensor[DType.int64](), output_shape)
     return {
         view._storage,
         rebind[IndexList[out_rank]](

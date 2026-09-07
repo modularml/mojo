@@ -13,9 +13,8 @@
 
 """Distributed KV cache connector via dKV service."""
 
-from .connector import DKVConnector, DKVExternalBlockMetadata
+from .connector import DKVConnector
 
 __all__ = [
     "DKVConnector",
-    "DKVExternalBlockMetadata",
 ]

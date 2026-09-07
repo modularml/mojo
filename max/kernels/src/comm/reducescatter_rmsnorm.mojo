@@ -161,7 +161,9 @@ def _reducescatter_rmsnorm_kernel[
     # non-multimem).
     comptime PtrType = ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]
     var ptrs = Array[_, ngpus](
-        fill_with=lambda (i: Int) -> PtrType: src_ptrs[(my_rank + i) % ngpus]
+        fill_with_unrolled=lambda [i: Int]() -> PtrType: src_ptrs[
+            (my_rank + i) % ngpus
+        ]
     )
 
     # Gamma is a model weight, not predecessor output, so it can be loaded ahead

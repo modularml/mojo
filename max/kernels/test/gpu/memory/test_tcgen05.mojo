@@ -43,9 +43,9 @@ def tcgen05_st_ld_roundtrip_kernel[
 
     var tmem_addr = ptr_tmem_addr[0]
 
-    var data_st = Array[Float32, width](uninitialized=True)
-    for n in range(N):
-        data_st[n] = Float32(thread_idx.x * N + n)
+    var data_st = Array[_, width](
+        fill_with=lambda (n: Int) -> Float32: Float32(thread_idx.x * N + n)
+    )
 
     tcgen05_st[
         datapaths=16,

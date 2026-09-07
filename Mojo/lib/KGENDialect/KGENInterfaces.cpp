@@ -15,6 +15,7 @@
 #include "Mojo/KGENDialect/KGENAttrs.h"
 #include "Mojo/KGENDialect/KGENOps.h"
 #include "Mojo/KGENDialect/KGENParameters.h"
+#include "Mojo/KGENDialect/ParameterEvaluator.h"
 #include "Support/Compiler/OperationUtils.h"
 
 using namespace M;
@@ -46,15 +47,17 @@ LogicalResult impl::verifyGeneratorUser(GeneratorUserOpInterface op) {
   return success();
 }
 
-Operation *impl::lookupConformance(Operation *op, TraitSymbolAttr traitSymbol) {
+Operation *impl::lookupConformance(Operation *op, ParameterEvaluator &evaluator,
+                                   TraitSymbolAttr traitSymbol) {
   assert(op->getRegions().size() == 1 && "expected an one-region ops");
   for (ConformanceOp conformance : op->getRegion(0).getOps<ConformanceOp>()) {
-    if (conformance.getTraitSymbol() == traitSymbol)
+    if (evaluator.replace(conformance.getTraitSymbol()) == traitSymbol)
       return conformance;
   }
   return nullptr;
 }
-Operation *lookupConformance(Operation *op, TraitSymbolAttr traitSymbol);
+Operation *lookupConformance(Operation *op, ParameterEvaluator &evaluator,
+                             TraitSymbolAttr traitSymbol);
 
 //===----------------------------------------------------------------------===//
 // ODS-Generated Definitions

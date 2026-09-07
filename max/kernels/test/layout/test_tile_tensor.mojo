@@ -340,11 +340,8 @@ def test_fill_large() raises:
 def test_slice() raises:
     """Test tensor slicing functionality."""
     # Test 2D slice (most common case)
-    var data_2d = Array[Int32, 16](uninitialized=True)
-
     # Initialize with values 0-15 in row-major order
-    for i in range(16):
-        data_2d[i] = Int32(i)
+    var data_2d = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 4x4 tensor:
     # [0  1  2  3]
@@ -390,10 +387,7 @@ def test_slice() raises:
 def test_slice_3d() raises:
     """Test 3D tensor slicing."""
     # Create a 4x4x4 tensor
-    var data_3d = Array[Int32, 64](uninitialized=True)
-
-    for i in range(64):
-        data_3d[i] = Int32(i)
+    var data_3d = Array[Int32, 64](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor_3d = TileTensor(data_3d, row_major[4, 4, 4]())
 
@@ -457,9 +451,7 @@ def test_slice_3d() raises:
 
 def test_slice_dynamic() raises:
     """Test slice with runtime (start, end) tuples."""
-    var data_2d = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data_2d[i] = Int32(i)
+    var data_2d = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # 4x4 row-major:
     # [0  1  2  3]
@@ -499,11 +491,8 @@ def test_slice_dynamic() raises:
 def test_vectorize() raises:
     """Test tensor vectorization functionality."""
     # Create a 16x16 tensor with row-major layout
-    var data = Array[Int32, 256](uninitialized=True)
-
     # Initialize with sequential values
-    for i in range(256):
-        data[i] = Int32(i)
+    var data = Array[Int32, 256](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[16, 16]())
 
@@ -539,10 +528,7 @@ def test_vectorize() raises:
 
 def test_vectorize_non_square() raises:
     """Test vectorization with non-square vector shapes."""
-    var data = Array[Int32, 64](uninitialized=True)
-
-    for i in range(64):
-        data[i] = Int32(i)
+    var data = Array[Int32, 64](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 8x8 tensor
     var tensor = TileTensor(data, row_major[8, 8]())
@@ -567,10 +553,7 @@ def test_vectorize_non_square() raises:
 
 def test_vectorize_1d() raises:
     """Test vectorization of 1D tensor."""
-    var data = Array[Int32, 16](uninitialized=True)
-
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 16-element 1D tensor
     var tensor = TileTensor(data, row_major[16]())
@@ -593,9 +576,7 @@ def test_vectorize_1d() raises:
 
 def test_vectorize_runtime_dims() raises:
     """Test vectorize works when tensor has runtime dimensions."""
-    var data = Array[Int32, 64](uninitialized=True)
-    for i in range(64):
-        data[i] = Int32(i)
+    var data = Array[Int32, 64](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 8x8 tensor with runtime first dimension, static second.
     var tensor = TileTensor(data, row_major(Int(8), Idx[8]))
@@ -621,9 +602,7 @@ def test_vectorize_runtime_dims() raises:
 
 def test_vectorize_fully_runtime_dims() raises:
     """Test vectorize with all dimensions runtime."""
-    var data = Array[Int32, 256](uninitialized=True)
-    for i in range(256):
-        data[i] = Int32(i)
+    var data = Array[Int32, 256](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Both dims runtime.
     var tensor = TileTensor(data, row_major(Int(16), Int(16)))
@@ -758,11 +737,8 @@ def test_to_layout_tensor_3d_dynamic() raises:
 
 def test_coalesce_2d() raises:
     """Test coalescing a 2D tensor to rank-1."""
-    var data = Array[Int32, 16](uninitialized=True)
-
     # Initialize with sequential values
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 4x4 tensor
     var tensor = TileTensor(data, row_major[4, 4]())
@@ -783,10 +759,7 @@ def test_coalesce_2d() raises:
 
 def test_coalesce_3d() raises:
     """Test coalescing a 3D tensor to rank-1."""
-    var data = Array[Int32, 24](uninitialized=True)
-
-    for i in range(24):
-        data[i] = Int32(i)
+    var data = Array[Int32, 24](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 2x3x4 tensor
     var tensor = TileTensor(data, row_major[2, 3, 4]())
@@ -807,10 +780,7 @@ def test_coalesce_3d() raises:
 
 def test_coalesce_1d() raises:
     """Test coalescing a 1D tensor (should be no-op effectively)."""
-    var data = Array[Int32, 8](uninitialized=True)
-
-    for i in range(8):
-        data[i] = Int32(i)
+    var data = Array[Int32, 8](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 8-element 1D tensor
     var tensor = TileTensor(data, row_major[8]())
@@ -829,10 +799,7 @@ def test_coalesce_1d() raises:
 
 def test_coalesce_element_size() raises:
     """Test that coalesce properly tracks element_size."""
-    var data = Array[Int32, 16](uninitialized=True)
-
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # Create 4x4 tensor
     var tensor = TileTensor(data, row_major[4, 4]())
@@ -993,9 +960,7 @@ def test_linear_idx_type_recomputed_after_vectorize() raises:
 
 def test_transpose_2d() raises:
     """Test transpose on a 2D tensor swaps rows and columns."""
-    var data = Array[Int32, 12](uninitialized=True)
-    for i in range(12):
-        data[i] = Int32(i)
+    var data = Array[Int32, 12](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # 3x4 row-major:
     # [0  1  2  3]
@@ -1024,7 +989,7 @@ def test_transpose_2d() raises:
 
 def test_transpose_is_view() raises:
     """Test that transpose creates a view sharing memory with the original."""
-    var data = Array[Int32, 6](uninitialized=True)
+    var data = Array[Int32, 6](fill={})
     var tensor = TileTensor(data, row_major[2, 3]()).fill(0)
 
     var trans = tensor.transpose()
@@ -1040,9 +1005,7 @@ def test_transpose_is_view() raises:
 
 def test_transpose_square() raises:
     """Test transpose on a square tensor."""
-    var data = Array[Int32, 9](uninitialized=True)
-    for i in range(9):
-        data[i] = Int32(i)
+    var data = Array[Int32, 9](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # 3x3 row-major:
     # [0 1 2]
@@ -1068,9 +1031,9 @@ def test_transpose_square() raises:
 
 def test_transpose_1d() raises:
     """Test transpose on a 1D tensor (identity operation)."""
-    var data = Array[Int32, 4](uninitialized=True)
-    for i in range(4):
-        data[i] = Int32(i * 10)
+    var data = Array[Int32, 4](
+        fill_with=lambda (i: Int) -> Int32: Int32(i * 10)
+    )
 
     var tensor = TileTensor(data, row_major[4]())
     var trans = tensor.transpose()
@@ -1084,7 +1047,7 @@ def test_transpose_1d() raises:
 
 def test_transpose_preserves_element_count() raises:
     """Test that transpose preserves the total number of elements."""
-    var data = Array[Int32, 20](uninitialized=True)
+    var data = Array[Int32, 20](fill={})
     var tensor = TileTensor(data, row_major[4, 5]()).fill(1)
     var trans = tensor.transpose()
 
@@ -1096,10 +1059,7 @@ def test_select_4d_to_2d() raises:
     """Test selecting from a 4D tensor to a 2D tensor (CuTE-style)."""
     # 4D tensor: (batch=2, N=3, heads=4, head_dim=2)
     comptime total = 2 * 3 * 4 * 2
-    var data = Array[Int32, total](uninitialized=True)
-
-    for i in range(total):
-        data[i] = Int32(i)
+    var data = Array[Int32, total](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[2, 3, 4, 2]())
 
@@ -1126,7 +1086,7 @@ def test_select_4d_to_2d() raises:
 
 def test_select_preserves_comptime_dims() raises:
     """Test that select preserves compile-time shape and stride info."""
-    var data = Array[Int32, 48](uninitialized=True)
+    var data = Array[Int32, 48](fill={})
     var tensor = TileTensor(data, row_major[2, 3, 4, 2]())
 
     _ = tensor.slice(Idx[0], All, Idx[1], All)
@@ -1147,10 +1107,7 @@ def test_select_preserves_comptime_dims() raises:
 
 def test_select_3d_to_1d() raises:
     """Test selecting from a 3D tensor to a 1D tensor."""
-    var data = Array[Int32, 24](uninitialized=True)
-
-    for i in range(24):
-        data[i] = Int32(i)
+    var data = Array[Int32, 24](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     # (2, 3, 4) tensor
     var tensor = TileTensor(data, row_major[2, 3, 4]())
@@ -1167,10 +1124,7 @@ def test_select_3d_to_1d() raises:
 
 def test_select_keep_all() raises:
     """Test selecting with all dimensions kept (identity)."""
-    var data = Array[Int32, 12](uninitialized=True)
-
-    for i in range(12):
-        data[i] = Int32(i)
+    var data = Array[Int32, 12](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[3, 4]())
     var selected = tensor.slice(All, All)
@@ -1223,9 +1177,9 @@ def test_write_to_3d() raises:
 def test_copy_from_roundtrip_scalar() raises:
     """Roundtrip `TileTensor.copy_from` with element_size == 1 restores original
     data."""
-    var src_data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        src_data[i] = Int32(i + 1)
+    var src_data = Array[Int32, 16](
+        fill_with=lambda (i: Int) -> Int32: Int32(i + 1)
+    )
 
     var mid_data = Array[Int32, 16](fill=0)
     var dst_data = Array[Int32, 16](fill=0)
@@ -1247,9 +1201,9 @@ def test_copy_from_roundtrip_vectorized() raises:
     Regression test for the element_size-vs-scalar-count bug: previously
     this would only touch 1/element_size of the underlying scalars.
     """
-    var src_data = Array[Float32, 16](uninitialized=True)
-    for i in range(16):
-        src_data[i] = Float32(i + 1)
+    var src_data = Array[Float32, 16](
+        fill_with=lambda (i: Int) -> Float32: Float32(i + 1)
+    )
 
     var mid_data = Array[Float32, 16](fill=0)
     var dst_data = Array[Float32, 16](fill=0)
@@ -1273,9 +1227,9 @@ def test_copy_from_roundtrip_tile_by_tile() raises:
     equal the full-tensor strides) and verifies a full tile-by-tile
     round-trip restores every element of the original tensor.
     """
-    var src_data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        src_data[i] = Int32(i + 1)
+    var src_data = Array[Int32, 16](
+        fill_with=lambda (i: Int) -> Int32: Int32(i + 1)
+    )
 
     var mid_data = Array[Int32, 16](fill=0)
     var dst_data = Array[Int32, 16](fill=0)
@@ -1302,9 +1256,9 @@ def test_copy_from_roundtrip_tile_by_tile() raises:
 
 def test_copy_from_respects_non_contiguous_layout() raises:
     """Copy into a padded layout without touching padding slots."""
-    var src_data = Array[Int32, 6](uninitialized=True)
-    for i in range(6):
-        src_data[i] = Int32(i + 1)
+    var src_data = Array[Int32, 6](
+        fill_with=lambda (i: Int) -> Int32: Int32(i + 1)
+    )
 
     var dst_data = Array[Int32, 8](fill=-1)
 
@@ -1346,9 +1300,9 @@ def test_copy_from_converts_dtype() raises:
 
 def test_copy_from_contiguous_converts_dtype() raises:
     """Copy contiguous data between different dtypes."""
-    var src_data = Array[Float32, 16](uninitialized=True)
-    for i in range(16):
-        src_data[i] = Float32(i + 1)
+    var src_data = Array[Float32, 16](
+        fill_with=lambda (i: Int) -> Float32: Float32(i + 1)
+    )
 
     var dst_data = Array[BFloat16, 16](fill=0)
 
@@ -1363,9 +1317,9 @@ def test_copy_from_contiguous_converts_dtype() raises:
 
 def test_copy_from_vectorized_converts_dtype() raises:
     """Copy vectorized elements between different dtypes."""
-    var src_data = Array[Float32, 16](uninitialized=True)
-    for i in range(16):
-        src_data[i] = Float32(i + 1)
+    var src_data = Array[Float32, 16](
+        fill_with=lambda (i: Int) -> Float32: Float32(i + 1)
+    )
 
     var dst_data = Array[BFloat16, 16](fill=0)
 
@@ -1379,9 +1333,7 @@ def test_copy_from_vectorized_converts_dtype() raises:
 
 
 def test_split_static_axis0() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[4, 4]())
     var tiles = tensor.as_immut().split[2]()
@@ -1393,9 +1345,7 @@ def test_split_static_axis0() raises:
 
 
 def test_split_static_axis1() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[4, 4]())
     var tiles = tensor.as_immut().split[2, axis=1]()
@@ -1407,9 +1357,7 @@ def test_split_static_axis1() raises:
 
 
 def test_split_static_count_one() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[4, 4]())
     var tiles = tensor.as_immut().split[1]()
@@ -1420,9 +1368,7 @@ def test_split_static_count_one() raises:
 
 
 def test_split_static_vectorized() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[4, 4]()).vectorize[1, 2]()
     var tiles = tensor.as_immut().split[2]()
@@ -1434,9 +1380,7 @@ def test_split_static_vectorized() raises:
 
 
 def test_split_static_after_tile_non_contiguous() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[4, 4]())
     var tile = tensor.as_immut().tile[4, 2]((Idx[0], Idx[1]))
@@ -1449,9 +1393,7 @@ def test_split_static_after_tile_non_contiguous() raises:
 
 
 def test_tile_after_split_static_non_contiguous() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[4, 4]())
     var splits = tensor.as_immut().split[2, axis=1]()
@@ -1464,9 +1406,7 @@ def test_tile_after_split_static_non_contiguous() raises:
 
 
 def test_split_dynamic_axis0_without_alignment() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[8, 2]())
     var split0 = tensor.as_immut().split[axis=0](4, 0)
@@ -1486,9 +1426,7 @@ def test_split_dynamic_axis0_without_alignment() raises:
 
 
 def test_split_dynamic_non_divisible_without_alignment() raises:
-    var data = Array[Int32, 10](uninitialized=True)
-    for i in range(10):
-        data[i] = Int32(i)
+    var data = Array[Int32, 10](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[5, 2]())
     var split0 = tensor.as_immut().split[axis=0](2, 0)
@@ -1504,9 +1442,7 @@ def test_split_dynamic_non_divisible_without_alignment() raises:
 
 
 def test_split_dynamic_axis1_with_alignment() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[2, 8]())
     var split0 = tensor.as_immut().split[1, split_alignment=3](3, 0)
@@ -1526,9 +1462,7 @@ def test_split_dynamic_axis1_with_alignment() raises:
 
 
 def test_split_dynamic_alignment_trailing_zero_partition() raises:
-    var data = Array[Int32, 16](uninitialized=True)
-    for i in range(16):
-        data[i] = Int32(i)
+    var data = Array[Int32, 16](fill_with=lambda (i: Int) -> Int32: Int32(i))
 
     var tensor = TileTensor(data, row_major[2, 8]())
     var split0 = tensor.as_immut().split[1, split_alignment=4](3, 0)

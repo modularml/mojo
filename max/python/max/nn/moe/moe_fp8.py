@@ -62,15 +62,6 @@ class MoEQuantized(MoE):
         if self._uses_nvidia_block_scaled_ep_layout:
             return NvMxf4f8Strategy(self.quant_config, self.dtype)
         elif self.quant_config.is_mxfp6:
-            # Deliberately not a subclass of Mxfp4Strategy: the
-            # `isinstance(strategy, Mxfp4Strategy)` branches below select the
-            # A-scale slot folds, which have no FP6 producer -- writing scales
-            # in the grouped matmul's slot layout is unimplemented in
-            # `fused_silu_mxfp6_kernel` (it asserts on
-            # `fuse_a_scale_preshuffle`). The fused *activation* kernel does
-            # exist for FP6 (`ep.fused_silu.mxfp6`), so MXFP6 is admitted to
-            # that branch explicitly with the fold inputs at 0; it is the
-            # isinstance checks for the folds it must stay out of.
             if not self.quant_config.block_scaled_preshuffled_b:
                 raise ValueError(
                     "MXFP6 MoE requires preshuffled B weights: the 24-byte FP6 "
@@ -396,7 +387,7 @@ class MoEQuantized(MoE):
             if (
                 self._ep_batch_manager
                 and self.use_swigluoai
-                and isinstance(strategy, BlockScaledStrategy)
+                and isinstance(strategy, (BlockScaledStrategy, Mxfp6Strategy))
                 and self.quant_config is not None
                 and self.quant_config.block_scaled_preshuffled_b
             )
@@ -484,20 +475,7 @@ class MoEQuantized(MoE):
             # Whichever producer wrote the down A-scale in slot layout (up-fold or
             # local SwiGLU down-fold; the other is 0), the reader stride MUST match
             # that constant, not the runtime per-expert max, or it reads wrong scales.
-            #
-            # MXFP6 takes this branch for `decode_grid_m_cap` alone, with the
-            # A-scale fold left off: it has no fused A-scale slot producer, so
-            # `Mxfp6Strategy.grouped_matmul` rejects `a_scales_preshuffled`. When
-            # this branch checked only `BlockScaledStrategy`, MXFP6 fell through
-            # to the uncapped call below and its down projection lost the decode
-            # band -- dispatching BK=256 where the gate+up projection (which does
-            # pass the cap) dispatched BK=512, and measuring 450us/call against
-            # MXFP8's 22.7us at the same N=6144, K=3072 shape.
-            down_slot_stride = (
-                0
-                if isinstance(strategy, Mxfp6Strategy)
-                else (mxfp4_ep_max_padded_m or mxfp4_down_slot_stride)
-            )
+            down_slot_stride = mxfp4_ep_max_padded_m or mxfp4_down_slot_stride
             return strategy.grouped_matmul(
                 self.down_proj,
                 down_scales,

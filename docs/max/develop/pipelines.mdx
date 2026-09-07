@@ -322,14 +322,16 @@ config = PipelineConfig.from_args(
 tokenizer, pipeline = PIPELINE_REGISTRY.retrieve(config)
 
 # Or get a factory for deferred compilation
-tokenizer, pipeline_factory = PIPELINE_REGISTRY.retrieve_factory(config)
-pipeline = pipeline_factory()  # Compile when ready
+retrieved = PIPELINE_REGISTRY.retrieve_factory(config)
+pipeline = retrieved.factory()  # Compile when ready
 ```
 
 In this example, `retrieve()` returns a ready-to-use pipeline, while
-`retrieve_factory()` returns a callable that performs compilation when invoked.
-The factory pattern is useful when you need to pass the pipeline across process
-boundaries, since it avoids serializing the compiled model.
+`retrieve_factory()` returns a `RetrievedPipeline` with the tokenizer, a
+factory that performs compilation when invoked, and the memory plan the
+pipeline was sized against. The factory pattern is useful when you need to
+pass the pipeline across process boundaries, since it avoids serializing the
+compiled model.
 
 ### Supported architecture
 
@@ -469,27 +471,28 @@ pipeline):
 
 #### Delegating input preparation to a batch processor
 
-You can move the batching logic into a
+Every token-generation model needs a batch processor: a
 [`BatchProcessor`](/api/python/generated/max.pipelines.lib.interfaces.BatchProcessor)
-instead of overriding `prepare_initial_token_inputs()` on the model, and
-register it through the `batching` field of
-[`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture).
-At registration, MAX sets the processor as the model's `batch_processor_cls`,
-and the base `PipelineModel.prepare_initial_token_inputs()` delegates to it. For
-ragged batches, subclass
+subclass that builds the tensors for each scheduled batch and parses the model's
+outputs. Register it through the `batching` field of
+[`SupportedArchitecture`](/api/python/generated/max.pipelines.lib.registry.SupportedArchitecture):
+at registration, MAX sets the processor as the model's `batch_processor_cls`,
+and the base `PipelineModel.prepare_initial_token_inputs()` delegates to it. If
+neither the field nor the model class's own `batch_processor_cls` provides a
+processor, preparing the first batch raises `NotImplementedError`. For ragged
+batches, subclass
 [`RaggedBatchProcessor`](/api/python/generated/max.pipelines.lib.interfaces.RaggedBatchProcessor),
 which receives a
 [`BatchProcessorRuntime`](/api/python/generated/max.pipelines.lib.interfaces.BatchProcessorRuntime)
 describing the active devices and KV cache.
 
-Use a batch processor when several architectures share the same batching logic,
-or when you want that logic isolated from the model's graph construction. For
-example, one Llama 3 batch processor backs Llama 3, OLMo, Granite, Qwen 2, and
-Phi-3; see the
+Reuse an existing processor when your model's batching matches a family that MAX
+already supports. One Llama 3 batch processor backs Llama 3, OLMo, Granite, Qwen
+2, and Phi-3, and Qwen 3.5 subclasses it to adjust specific steps; see the
 [`llama3` architecture](https://github.com/modular/modular/tree/main/max/python/max/pipelines/architectures/llama3)
-for a reference implementation. Override `prepare_initial_token_inputs()` on the
-model instead when the batching is specific to one architecture and tightly
-coupled to how it builds inputs.
+for a reference implementation. Create a `batch_processor.py` with your own
+`BatchProcessor` subclass only when your model needs batching logic that no
+existing processor covers.
 
 #### Linking to the architecture config
 

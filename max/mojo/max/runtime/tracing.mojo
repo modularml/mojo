@@ -313,10 +313,12 @@ def _is_mojo_profiling_disabled[level: TraceLevel]() -> Bool:
 def _get_enabled_tracing_systems[level: TraceLevel]() -> List[String]:
     """Returns a list of enabled tracing system names.
 
-    The MAX profiler is deliberately absent: it does not participate in the
-    one-system-at-a-time accounting this list backs, recording additively
-    alongside every system here except "Op Logging", whose branch
-    short-circuits `__enter__` before the profiler branch is reached.
+    The MAX profiler and the external profiler annotation bridge are
+    deliberately absent: neither participates in the one-system-at-a-time
+    accounting this list backs, both recording additively alongside every
+    system here except "Op Logging", whose branch short-circuits
+    `__enter__` before their
+    branches are reached.
 
     Returns:
         A list of strings naming the tracing systems that are enabled.
@@ -467,6 +469,16 @@ struct Trace[
     open range. Keep profiler-visible scopes on one thread and uncopied.
     """
 
+    var _tool_pushed: Bool
+    """True iff `__enter__` pushed an external profiler annotation range;
+    `__exit__` pops it.
+
+    External profiler annotations mark an external profiler's trace (e.g.
+    an attached system profiler) rather than MAX's own. The vendor
+    annotation APIs pair push/pop on a per-thread stack, so the same
+    single-thread and no-copy caveats as `_range_opened` apply.
+    """
+
     # This constructor is intentionally hidden because Variant is too flexible
     # about what it allows and we want to ensure that only StaticString or
     # String are used.
@@ -514,6 +526,9 @@ struct Trace[
         self._tracy_ctx = 0
         # Set in __enter__ iff a MAX profiler range was opened.
         self._range_opened = False
+        # Set in __enter__ iff an external profiler annotation range was
+        # pushed.
+        self._tool_pushed = False
 
         comptime if _is_gpu_profiler_enabled[Self.category, Self.level]():
             self._name_value = _name_value^
@@ -667,6 +682,44 @@ struct Trace[
                     )
                 self._range_opened = True
 
+        # Annotate an external profiler's trace through the
+        # external profiler annotation bridge. Like the MAX profiler branch
+        # above this is runtime-gated (the push reports whether anything was
+        # emitted) and additive: the backends below still record their own
+        # span. Compiled out when this build already emits vendor
+        # annotations directly through the GPU profiler branch below, so
+        # those builds never double-annotate.
+        # Annotations carry the span name only; detail strings are not
+        # forwarded.
+        comptime if Self.level <= TraceLevel.OP and not _is_gpu_profiler_enabled[
+            Self.category, Self.level
+        ]():
+            var tool_color = UInt32(
+                Int(self.color.value())
+            ) if self.color else 0
+            if self._name_value.isa[StaticString]():
+                self._tool_pushed = (
+                    external_call[
+                        "KGEN_CompilerRT_ExternalProfilerAnnotationPush", Int
+                    ](
+                        self._name_value[StaticString].as_bytes().unsafe_ptr(),
+                        self._name_value[StaticString].byte_length(),
+                        tool_color,
+                    )
+                    != 0
+                )
+            else:
+                self._tool_pushed = (
+                    external_call[
+                        "KGEN_CompilerRT_ExternalProfilerAnnotationPush", Int
+                    ](
+                        self._name_value[String].as_bytes().unsafe_ptr(),
+                        self._name_value[String].byte_length(),
+                        tool_color,
+                    )
+                    != 0
+                )
+
         # Start a Tracy zone if the bridge is available.
         if _is_tracy_enabled():
             var name_str = self.name()
@@ -776,6 +829,14 @@ struct Trace[
         if self._range_opened:
             external_call["KGEN_CompilerRT_RangeEnd", NoneType]()
 
+        # Pop the external profiler annotation range pushed in __enter__
+        # (pop-iff-pushed: popping without a matching push would close an
+        # unrelated outer range on this thread's vendor annotation stack).
+        if self._tool_pushed:
+            external_call[
+                "KGEN_CompilerRT_ExternalProfilerAnnotationPop", NoneType
+            ]()
+
         # End Tracy zone early to guarantee pairing even on early returns.
         if self._tracy_ctx != 0:
             external_call["KGEN_CompilerRT_TracyZoneEnd", NoneType](
@@ -807,7 +868,8 @@ struct Trace[
 
         This creates a point event in the trace timeline rather than a range.
         Not recorded by the MAX profiler, whose range API has no point-event
-        equivalent.
+        equivalent; forwarded to the external profiler annotation bridge when
+        enabled.
 
         Raises:
             If the operation fails.
@@ -821,6 +883,24 @@ struct Trace[
                     message += String("/", self.detail)
 
             _mark_gpu(message=message)
+        elif Self.level <= TraceLevel.OP:
+            # Forward to the external profiler annotation bridge in builds
+            # without the direct GPU-profiler marker above. The enabled
+            # probe keeps the message materialization off the disabled path.
+            if (
+                external_call[
+                    "KGEN_CompilerRT_ExternalProfilerAnnotationIsEnabled", Int
+                ]()
+                != 0
+            ):
+                var message = self.name()
+                external_call[
+                    "KGEN_CompilerRT_ExternalProfilerAnnotationMark", NoneType
+                ](
+                    message.as_bytes().unsafe_ptr(),
+                    message.byte_length(),
+                    UInt32(Int(self.color.value())) if self.color else 0,
+                )
 
     @always_inline
     def name(self) -> String:

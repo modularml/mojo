@@ -55,6 +55,9 @@ def slice_dim_as_view[
         stride_types=DynamicCoord[.int64, tensor.rank].element_types,
     ],
     tensor.origin,
+    Engine=tensor.Engine.OffsetResultType[
+        TypeList.of[Scalar[tensor.linear_idx_type]]()
+    ],
     address_space=tensor.address_space,
 ]:
     """Returns a view of `tensor` sliced along a single dimension.
@@ -81,10 +84,6 @@ def slice_dim_as_view[
 
     var new_offset = clamped_start * old_stride
 
-    # The data does not change however we will be addressing a different
-    # offset of the data.
-    var new_data = tensor.ptr + new_offset
-
     # Stride == number of elements to the next index in this dimension.
     # So to step we can just increase the stride.
     new_stride[dim] = old_stride * step
@@ -93,7 +92,11 @@ def slice_dim_as_view[
     # stop.
     new_shape[dim] = len(range(clamped_start, clamped_stop, step))
 
-    # Create the new view
+    # The data does not change however we will be addressing a different
+    # offset of the data.
+    var new_data = tensor._offset_storage(
+        Scalar[tensor.linear_idx_type](new_offset)
+    )
     return {
         new_data,
         Layout(
@@ -126,6 +129,9 @@ def slice_as_view[
         stride_types=DynamicCoord[.int64, tensor.rank].element_types,
     ],
     tensor.origin,
+    Engine=tensor.Engine.OffsetResultType[
+        TypeList.of[Scalar[tensor.linear_idx_type]]()
+    ],
     address_space=tensor.address_space,
 ]:
     """Returns a view of `tensor` sliced along every dimension.
@@ -148,8 +154,9 @@ def slice_as_view[
     var new_stride = IndexList[tensor.rank]()
 
     # The data does not change however we will be addressing a different
-    # offset of the data.
-    var new_data = tensor.ptr
+    # offset of the data; accumulate that offset and apply it once at the
+    # end.
+    var total_offset = Scalar[tensor.linear_idx_type](0)
 
     comptime for i in range(tensor.rank):
         var start = Int(starts[i])
@@ -162,8 +169,7 @@ def slice_as_view[
         start = _normalize_and_clamp_dim(start, step, dim_i)
         stop = _normalize_and_clamp_dim(stop, step, dim_i)
 
-        var new_offset = start * stride_i
-        new_data = new_data + new_offset
+        total_offset += Scalar[tensor.linear_idx_type](start * stride_i)
 
         # Stride == number of elements to the next index in this dimension.
         # So to step we can just increase the stride.
@@ -173,7 +179,7 @@ def slice_as_view[
         # stop.
         new_shape[i] = len(range(start, stop, step))
 
-    # Create the new view
+    var new_data = tensor._offset_storage(total_offset)
     return {
         new_data,
         Layout(

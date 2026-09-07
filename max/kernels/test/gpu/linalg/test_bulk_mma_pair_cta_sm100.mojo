@@ -610,10 +610,11 @@ def bulk_mma_pair_cta_ts_kernel[
         # Compute the M-part of the offset once (invariant across K).
         var m_offset = (a_row % 8) * sw_K + (a_row // 8) * (8 * sw_K)
 
-        var a_data = Array[Float32, BK](uninitialized=True)
-        comptime for j in range(BK):
+        def a_data_at[j: Int]() {imm} -> Float32:
             var base = m_offset + (j % sw_K) + (j // sw_K) * outer_k_stride
-            a_data[j] = a_smem[sw(base)].cast[.float32]()
+            return a_smem[sw(base)].cast[.float32]()
+
+        var a_data = Array[_, BK](fill_with_unrolled=a_data_at)
 
         TMemTile[ab_type, 32, BK](tmem_addr).store_async(a_data)
         tcgen05_store_wait()

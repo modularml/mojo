@@ -29,7 +29,7 @@ namespace M::KGEN::Mojo {
 bool dumpMojoString(ValueObject &context, const MojoStringHeader &header,
                     Stream &stream, const TypeSummaryOptions &options) {
   // Top bit of `capacity` ⇒ small/inline form. See
-  // `oss/modular/mojo/stdlib/std/collections/string/string.mojo` for the
+  // `Mojo/stdlib/std/collections/string/string.mojo` for the
   // layout (fields `_ptr_or_data`, `_len_or_data`, `_capacity_or_data`;
   // inline flag = `1 << (Int.BITWIDTH - 1)`).
   if (static_cast<int64_t>(header.capacity) < 0) {

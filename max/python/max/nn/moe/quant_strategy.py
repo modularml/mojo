@@ -649,12 +649,10 @@ class Mxfp6Strategy:
         decode_grid_m_rows: int = 0,
     ) -> TensorValue:
         """Runs the grouped MXFP6 matmul with per-expert scales."""
-        if a_scales_preshuffled:
-            # No FP6 producer writes A-scales in slot layout, so honouring the
-            # flag would mean skipping the only preshuffle there is.
+        if a_scales_preshuffled and a_scales_max_padded_m <= 0:
             raise ValueError(
-                "MXFP6 has no fused A-scale slot producer; "
-                "a_scales_preshuffled must be False"
+                "a_scales_max_padded_m must be > 0 when a_scales_preshuffled"
+                " is set for MXFP6"
             )
 
         (
@@ -677,6 +675,8 @@ class Mxfp6Strategy:
             estimated_total_m=estimated_total_m,
             decode_grid_m_cap=decode_grid_m_cap,
             decode_grid_m_rows=decode_grid_m_rows,
+            a_scales_preshuffled=a_scales_preshuffled,
+            a_scales_max_padded_m=a_scales_max_padded_m,
         )
 
     def prepare_weight_scales(
@@ -706,18 +706,14 @@ class Mxfp6Strategy:
         per MoE layer per device (456 of each at dp=2/ep=8) and an extra
         ``mo.quantize.dynamic.block.scaled.mxfp6``.
 
-        ``max_padded_M`` is still refused: writing the A-scale in the grouped
-        matmul's slot layout is unimplemented in the FP6 kernel (both the kernel
-        body and its registration assert on ``fuse_a_scale_preshuffle``), so the
-        standalone preshuffle still runs for both projections.
+        ``max_padded_M`` > 0 enables the down-proj A-scale fold: the kernel
+        writes the E8M0 scale straight into the grouped matmul's per-expert
+        slot, dropping the standalone preshuffle. The slot layout is shared
+        across MX formats (``scale_4d_slot_byte_off`` keys on ``K_SCALES`` and
+        ``MXFP6_SF_VECTOR_SIZE`` is 32 like FP4/FP8), so the reader is
+        unchanged. The up-proj fold stays MXFP4-only -- its producer is the EP
+        dispatch path, which has no FP6 slot writer.
         """
-        if max_padded_M:
-            raise ValueError(
-                "MXFP6 cannot write slot-layout A-scales yet: "
-                "fused_silu_mxfp6_kernel asserts on fuse_a_scale_preshuffle. "
-                "max_padded_M must be 0"
-            )
-
         _, _, expert_start_indices, _, _ = expert_inputs
         return fused_silu_quantized(
             gate_up_projs,

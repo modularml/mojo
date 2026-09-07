@@ -100,7 +100,11 @@ def _get_mlp(
     mlp = QuantizedMLP(
         hidden_dim=config.hidden_size,
         feed_forward_length=config.intermediate_size,
-        quant_config=config.quant_config,
+        quant_config=(
+            None
+            if layer_idx in config.dense_mlp_layers_without_quant
+            else config.quant_config
+        ),
     )
     if mode == ParallelismMode.TP_TP or (
         config.ep_config is not None and config.ep_config.use_allreduce

@@ -4109,7 +4109,12 @@ struct MLA_SM100_Decode_Common[
             # (finite) on every iteration. First-iter `mi=-inf` gives
             # `diff = -inf - finite = -inf`, exp2(-inf)=0 (finite), no NaN.
             var scale_for_old_max: Scalar[Self.AccumType]
-            if _vote_nvidia_helper(diff < rescale_threshold) != 0:
+            # Per-lane predicate, not a warp vote: under `fold_q`, `row =
+            # lane_id & 0x3F` packs `q_len_fold` distinct (never-committed
+            # draft included) query tokens into one warp, so an OR here
+            # would leak a sibling token's rescale trajectory into this
+            # one's.
+            if diff < rescale_threshold:
                 scale_for_old_max = rebind[Scalar[Self.AccumType]](exp2(diff))
             else:
                 scale_for_old_max = 1.0
@@ -4565,9 +4570,9 @@ struct MLA_SM100_Decode_Common[
                                 type_of(float2_register[j])
                             ](element * SIMD[Self.AccumType, 2](scale_value))
                         var _o_st_corr = Array[_, Self.config.BN_QK](
-                            fill_with=lambda (_i: Int) -> Scalar[
+                            fill_with_unrolled=lambda [i: Int]() -> Scalar[
                                 Self.AccumType
-                            ]: o_row_subtile.raw_load(_i)
+                            ]: o_row_subtile.raw_load(i)
                         )
                         tcgen05_st[
                             datapaths=32,

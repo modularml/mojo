@@ -554,3 +554,52 @@ def test_in_graph_h2d_is_gated_by_wait_host_value(
         "(compiler reorder, lost chain dependency, or parallel "
         "execution in the captured cuGraph)."
     )
+
+
+# ------------------------- several verify widths -------------------------- #
+
+_WIDTHS = (1, 2, 4)
+
+
+@pytest.fixture
+def multi_width_state(
+    accelerator: Accelerator, cpu: CPU
+) -> StructuredOutputOverlapState:
+    """A state serving several verify widths, as a width schedule asks for."""
+    if accelerator.api not in ("cuda", "hip"):
+        pytest.skip(
+            "StructuredOutputOverlapState requires a CUDA/HIP accelerator"
+        )
+    return StructuredOutputOverlapState(
+        device=accelerator,
+        cpu=cpu,
+        max_batch_size=_MAX_BATCH,
+        num_positions=_WIDTHS,
+        vocab_size=_VOCAB,
+    )
+
+
+def test_priming_one_width_does_not_disturb_another(
+    multi_width_state: StructuredOutputOverlapState,
+) -> None:
+    """Widths are independent buffers, so one width cannot corrupt another.
+
+    This is the property the single shared buffer could not provide, and the
+    reason a single shared buffer could not serve several widths.
+    """
+    packed = multi_width_state.packed_vocab_size
+    narrow, wide = _WIDTHS[0], _WIDTHS[-1]
+
+    multi_width_state.prime(
+        np.full((_MAX_BATCH, wide, packed), -1, dtype=np.int32)
+    )
+    multi_width_state.prime(
+        np.zeros((_MAX_BATCH, narrow, packed), dtype=np.int32)
+    )
+
+    wide_rows = multi_width_state.pinned_for(wide).to_numpy()
+    assert (wide_rows[:_MAX_BATCH, :wide, :] == -1).all(), (
+        "priming the narrow width overwrote the wide width's rows"
+    )
+    narrow_rows = multi_width_state.pinned_for(narrow).to_numpy()
+    assert (narrow_rows[:_MAX_BATCH, :narrow, :] == 0).all()

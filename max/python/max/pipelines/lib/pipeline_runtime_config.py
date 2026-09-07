@@ -259,16 +259,16 @@ class PipelineRuntimeConfig(ConfigFileModel):
         ),
     )
 
-    fold_sampler_into_graph: bool = Field(
-        default=True,
+    experimental_device_graph_synthesis: bool = Field(
+        default=False,
         description=(
-            "Fold greedy token selection (argmax) into the captured forward "
-            "graph so a single device-graph replay materializes the sampled "
-            "token, avoiding a separate sampler submission and its blocking "
-            "readback. Only takes effect for all-greedy decode batches on "
-            "architectures that emit the folded token output (Nemotron-H); "
-            "any non-greedy request falls back to the separate sampler. "
-            "Default on."
+            "Compile model graphs with device-graph synthesis: the compiled "
+            "model constructs a device graph directly and executes it on "
+            "model forward passes. This is an experimental alternative to the "
+            "capture/replay workflow. Honored only by "
+            "architectures that opt in, and mutually exclusive with "
+            "``device_graph_capture``. "
+            "Use ``--experimental-device-graph-synthesis`` to enable."
         ),
     )
 
@@ -277,21 +277,6 @@ class PipelineRuntimeConfig(ConfigFileModel):
         description=(
             "Skip validation of user provided flags against the architecture's "
             "required arguments."
-        ),
-    )
-
-    max_pending_futures: int = Field(
-        default=1,
-        description=(
-            "Maximum number of unrealized future-token placeholders a request "
-            "may hold at once. The default of 1 is the classic overlap-"
-            "scheduler depth: one forward in flight per request. A value of 2 "
-            "enables experimental schedule-ahead decoding in the overlap "
-            "pipeline: two forwards stay in flight and each step's outputs "
-            "are consumed one step late, for pure-greedy token-generation "
-            "batches only (other batches drain to the classic depth). Not "
-            "supported with speculative decoding; prefill-only workers pin "
-            "to 1."
         ),
     )
 
@@ -544,3 +529,8 @@ class PipelineRuntimeConfig(ConfigFileModel):
     """The section name to use when loading this config from a MAXConfig file.
     This is used to differentiate between different config sections in a single
     MAXConfig file."""
+
+    @property
+    def is_disaggregated(self) -> bool:
+        """Whether this worker is part of a disaggregated prefill/decode deployment."""
+        return self.pipeline_role in ("prefill_only", "decode_only")

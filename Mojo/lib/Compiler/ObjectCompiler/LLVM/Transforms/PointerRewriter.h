@@ -26,8 +26,8 @@ class TypedPointerType;
 namespace M::KGEN {
 
 /// Pass to rewrite opaque pointers to typed pointers that constructs a map
-/// between opaque pointer and it's intended type.
-class PointerRewriter : public llvm::OptionalPassInfoMixin<PointerRewriter> {
+/// between opaque pointer and its intended type.
+class PointerRewriter : public llvm::RequiredPassInfoMixin<PointerRewriter> {
 public:
   using PointerTypeMap =
       llvm::DenseMap<const llvm::Value *, llvm::TypedPointerType *>;
