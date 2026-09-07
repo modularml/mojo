@@ -194,12 +194,13 @@ def scatter_nd[
     # input_strides
     # e.g., for a shape of 2, 3, 4, 5
     #       input_strides --> [3*4*5, 4*5, 5, 1]
-    var input_strides = Array[Int64, data_rank](uninitialized=True)
-    for i in range(data_rank):
+    def input_strides_at(i: Int) {imm} -> Int64:
         var total_stride = 1
         for j in range(i + 1, data_rank):
             total_stride *= data_shape[j]
-        input_strides[i] = total_stride
+        return Int64(total_stride)
+
+    var input_strides = Array[_, data_rank](fill_with=input_strides_at)
 
     for i in range(last_shape_of_indices):
         ptr[i] = input_strides[i]

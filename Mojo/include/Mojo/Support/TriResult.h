@@ -11,7 +11,7 @@
 // limitations under the License.
 //===----------------------------------------------------------------------===//
 //
-// This file defines TriResult, a three-valued result type modeled on TriState
+// This file defines TriResult, a three-valued result type modeled on TriBool
 // where each state can carry its own payload. It is intended for APIs that
 // answer yes / no / unknown, where each state may carry a payload.
 //
@@ -31,12 +31,12 @@ namespace M::KGEN {
 /// payload; a `void` payload means the state carries nothing, and only the
 /// requested payloads occupy storage.
 ///
-/// This mirrors `TriState` but allows per-state payloads, similar to how
+/// This mirrors `TriBool` but allows per-state payloads, similar to how
 /// `FailureOr<T>` carries a value on success. `TriResult<T>` (a single
 /// template argument) is the common case of a payload on `yes` only.
 ///
-/// A payload is the whole point: use `TriState` when no state carries one.
-/// There is deliberately no conversion between the two, and no TriState
+/// A payload is the whole point: use `TriBool` when no state carries one.
+/// There is deliberately no conversion between the two, and no TriBool
 /// algebra here: Combining two answers has to decide what happens to their
 /// payloads, which is the caller's call, not this type's.
 template <typename Yes = void, typename No = void, typename Unknown = void>

@@ -418,7 +418,7 @@ class TensorType(_TensorTypeBase[mo.TensorType]):
             The tensor type represented by the MLIR Type value.
         """
         device_ref = DeviceRef.from_mlir(type.device_ref)
-        self = cls(type.dtype, Shape.from_mlir(type.shape_attr), device_ref)
+        self = cls(type.dtype, Shape.from_mlir(type.shape), device_ref)
         for name, attr in type.metadata.value:
             if name == "layout":
                 assert isinstance(attr, mo.LayoutAttr)
@@ -463,7 +463,7 @@ class BufferType(_TensorTypeBase[mo.BufferType]):
             The buffer type represented by the MLIR Type value.
         """
         device_ref = DeviceRef.from_mlir(type.device_ref)
-        return cls(type.dtype, Shape.from_mlir(type.shape_attr), device_ref)
+        return cls(type.dtype, Shape.from_mlir(type.shape), device_ref)
 
     def to_mlir(self) -> mo.BufferType:
         """Converts to an ``mlir.Type`` instance.

@@ -13,6 +13,7 @@
 """Provides top-K selection kernels using warp- and block-level reductions for CPU and GPU."""
 
 from std.builtin.debug_assert import ASSERT_MODE
+from std.atomic import Atomic, Ordering, fence
 from std.math import align_up, ceildiv, exp, iota
 from std.math.uutils import ufloordiv, udivmod
 from std.memory import ThinAllocation, alloc, dealloc
@@ -36,7 +37,11 @@ from max.gpu.primitives.grid_controls import PDL, pdl_launch_attributes
 from max.gpu.host import DeviceContext, DeviceBuffer
 from max.gpu.host.info import is_cpu
 from max.gpu.memory import external_memory
-from std.sys.info import has_apple_gpu_accelerator, is_apple_gpu
+from std.sys.info import (
+    has_amd_gpu_accelerator,
+    has_apple_gpu_accelerator,
+    is_apple_gpu,
+)
 from std.random import Random
 from layout import (
     Coord,
@@ -257,6 +262,7 @@ def _top_k_cpu[
     out_idx_type: DType,
     largest: Bool,
     KLayoutType: TensorLayout = RowMajorLayout[Int64],
+    KEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     input: TileTensor[mut=False, dtype, ...],
     max_k: Int,
@@ -266,7 +272,9 @@ def _top_k_cpu[
     parallelism_grain_size: Int,  # impl detail, exposed for testing
     sorted: Bool,
     ctx: Optional[DeviceContext] = None,
-    k: Optional[TileTensor[.int64, KLayoutType, ImmutAnyOrigin]] = None,
+    k: Optional[
+        TileTensor[.int64, KLayoutType, ImmutAnyOrigin, Engine=KEngine]
+    ] = None,
 ):
     comptime assert (
         input.rank == out_vals.rank
@@ -384,18 +392,46 @@ def fused_token_sampling_cpu[
     TemperatureLayoutType: TensorLayout = RowMajorLayout[Int64],
     TopPLayoutType: TensorLayout = RowMajorLayout[Int64],
     SeedLayoutType: TensorLayout = RowMajorLayout[Int64],
+    KEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPEngine: TensorEngine = DefaultEngine[element_width=1],
+    SeedEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     max_k: Int,
     input: TileTensor[mut=False, dtype, ...],
     out_idxs: TileTensor[mut=True, out_idx_type, ...],
-    k: Optional[TileTensor[.int64, KLayoutType, ImmutAnyOrigin]] = None,
+    k: Optional[
+        TileTensor[
+            .int64,
+            KLayoutType,
+            ImmutAnyOrigin,
+            Engine=KEngine,
+        ]
+    ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
     top_p: Optional[
-        TileTensor[.float32, TopPLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TopPLayoutType,
+            ImmutAnyOrigin,
+            Engine=TopPEngine,
+        ]
     ] = None,
-    seed: Optional[TileTensor[.uint64, SeedLayoutType, ImmutAnyOrigin]] = None,
+    seed: Optional[
+        TileTensor[
+            .uint64,
+            SeedLayoutType,
+            ImmutAnyOrigin,
+            Engine=SeedEngine,
+        ]
+    ] = None,
 ) raises:
     """
     Generalized implementation of the Top K algorithm with sampling.
@@ -409,6 +445,10 @@ def fused_token_sampling_cpu[
         TemperatureLayoutType: Layout type of the temperature buffer.
         TopPLayoutType: Layout type of the top_p buffer.
         SeedLayoutType: Layout type of the seed buffer.
+        KEngine: Engine policy of the k buffer.
+        TemperatureEngine: Engine policy of the temperature buffer.
+        TopPEngine: Engine policy of the top_p buffer.
+        SeedEngine: Engine policy of the seed buffer.
 
     Args:
         max_k: Largest number of top elements.
@@ -478,19 +518,47 @@ def _top_k_sampling[
     TemperatureLayoutType: TensorLayout = RowMajorLayout[Int64],
     TopPLayoutType: TensorLayout = RowMajorLayout[Int64],
     SeedLayoutType: TensorLayout = RowMajorLayout[Int64],
+    KEngine: TensorEngine = DefaultEngine[element_width=1],
+    TemperatureEngine: TensorEngine = DefaultEngine[element_width=1],
+    TopPEngine: TensorEngine = DefaultEngine[element_width=1],
+    SeedEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
     max_k: Int,
     input: TileTensor[mut=False, dtype, ...],
     out_vals: TileTensor[mut=True, dtype, ...],
     out_idxs: TileTensor[mut=True, .int64, ...],
-    k: Optional[TileTensor[.int64, KLayoutType, ImmutAnyOrigin]] = None,
+    k: Optional[
+        TileTensor[
+            .int64,
+            KLayoutType,
+            ImmutAnyOrigin,
+            Engine=KEngine,
+        ]
+    ] = None,
     temperature: Optional[
-        TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TemperatureLayoutType,
+            ImmutAnyOrigin,
+            Engine=TemperatureEngine,
+        ]
     ] = None,
     top_p: Optional[
-        TileTensor[.float32, TopPLayoutType, ImmutAnyOrigin]
+        TileTensor[
+            .float32,
+            TopPLayoutType,
+            ImmutAnyOrigin,
+            Engine=TopPEngine,
+        ]
     ] = None,
-    seed: Optional[TileTensor[.uint64, SeedLayoutType, ImmutAnyOrigin]] = None,
+    seed: Optional[
+        TileTensor[
+            .uint64,
+            SeedLayoutType,
+            ImmutAnyOrigin,
+            Engine=SeedEngine,
+        ]
+    ] = None,
 ) raises:
     """
     Generalized implementation of the Top K algorithm with sampling.
@@ -503,6 +571,10 @@ def _top_k_sampling[
         TemperatureLayoutType: Layout type of the temperature buffer.
         TopPLayoutType: Layout type of the top_p buffer.
         SeedLayoutType: Layout type of the seed buffer.
+        KEngine: Engine policy of the k buffer.
+        TemperatureEngine: Engine policy of the temperature buffer.
+        TopPEngine: Engine policy of the top_p buffer.
+        SeedEngine: Engine policy of the seed buffer.
 
     Args:
         max_k: Largest number of top elements.
@@ -2280,14 +2352,19 @@ def apply_gumbel_noise_kernel[
 # to the lowest index in both paths via `TopK_2.insert`'s strict `>` and the
 # block reduce keeping the first maximum).
 
+comptime _GUMBEL_PARTIAL_BYTES = 16
 
-@__name(t"gumbel_argmax_fused_{dtype}_{out_idx_type}_{from_probs}")
+
+@__name(
+    t"gumbel_argmax_fused_{dtype}_{out_idx_type}_{from_probs}_{multi_block}"
+)
 def _gumbel_argmax_fused_kernel[
     dtype: DType,
     out_idx_type: DType,
     InputLayoutType: TensorLayout,
     OutIdxLayoutType: TensorLayout,
     from_probs: Bool = False,
+    multi_block: Bool = False,
     InputEngine: TensorEngine = DefaultEngine[element_width=1],
     OutIdxEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
@@ -2303,8 +2380,11 @@ def _gumbel_argmax_fused_kernel[
     ],
     temperature: Optional[UnsafePointer[Float32, ImmutAnyOrigin]],
     seed: Optional[UnsafePointer[UInt64, ImmutAnyOrigin]],
+    blocks_per_row: Int32 = Int32(1),
+    partials: Optional[UnsafePointer[UInt8, MutAnyOrigin]] = None,
+    counters: Optional[UnsafePointer[Int32, MutAnyOrigin]] = None,
 ):
-    """Fused Gumbel-noise + argmax. One block per batch row.
+    """Fused Gumbel-noise + argmax.
 
     Each thread grid-strides over the vocab dimension, applies Gumbel(0,1)
     noise to its logits using the same RNG sequence as
@@ -2325,6 +2405,7 @@ def _gumbel_argmax_fused_kernel[
         InputLayoutType: Layout of the `[batch, vocab]` input.
         OutIdxLayoutType: Layout of the `[batch, 1]` output indices.
         from_probs: Treat the input as unnormalized probabilities.
+        multi_block: Split each input row across multiple blocks.
         InputEngine: Engine of the `[batch, vocab]` input.
         OutIdxEngine: Engine of the `[batch, 1]` output indices.
 
@@ -2333,6 +2414,9 @@ def _gumbel_argmax_fused_kernel[
         out_idxs: Output sampled indices `[batch, 1]`.
         temperature: Optional per-row temperature scaling `[batch]`.
         seed: Optional per-row random seeds `[batch]`.
+        blocks_per_row: Number of blocks assigned to each row.
+        partials: Cross-block partial score and index storage.
+        counters: Zero-initialized per-row arrival counters.
     """
     # `_block_reduce_topk` caps its shared storage at WARP_SIZE on Apple while
     # this kernel launches `max_thread_block_size` threads, so the reduction
@@ -2341,6 +2425,9 @@ def _gumbel_argmax_fused_kernel[
     comptime assert (
         not from_probs or not is_apple_gpu()
     ), "from_probs is not supported on Apple GPUs"
+    comptime assert not multi_block or (
+        has_amd_gpu_accelerator() and from_probs and dtype == DType.float32
+    ), "multi-block Gumbel requires AMD FP32 from-probs"
 
     comptime EPS = Float32(1e-20)
     comptime LOG2 = Float32(0.6931471806)
@@ -2354,7 +2441,12 @@ def _gumbel_argmax_fused_kernel[
     var N = Int(input.dim(1))
     var tid = thread_idx.x
     var block_size = block_dim.x
-    var batch_id = block_idx.x
+    var blocks_per_row_int = Int(blocks_per_row)
+    var batch_id = Int(block_idx.x)
+    var block_in_row = 0
+    comptime if multi_block:
+        batch_id = Int(block_idx.x) // blocks_per_row_int
+        block_in_row = Int(block_idx.x) % blocks_per_row_int
 
     var temp_val = Float32(1.0)
     if temperature:
@@ -2368,6 +2460,13 @@ def _gumbel_argmax_fused_kernel[
     var ld_ptr = input.ptr + batch_id * N
     comptime align = align_of[SIMD[dtype, simd_width]]()
 
+    var chunk_begin = 0
+    var chunk_end = N // simd_width
+    comptime if multi_block:
+        var chunks_per_block = ceildiv(chunk_end, blocks_per_row_int)
+        chunk_begin = block_in_row * chunks_per_block
+        chunk_end = min(chunk_begin + chunks_per_block, chunk_end)
+
     # Per-thread running argmax over the (noised) logits.
     var partial = TopK_2[dtype, True]()
 
@@ -2375,7 +2474,7 @@ def _gumbel_argmax_fused_kernel[
         # Main region: process vocab in `simd_width`-sized chunks. The RNG is
         # seeded per chunk index `i` exactly as `apply_gumbel_noise_kernel`, so
         # the noise added to each element is bit-identical.
-        for i in range(tid, N // simd_width, block_size):
+        for i in range(chunk_begin + tid, chunk_end, block_size):
             var rng_state = Random(
                 seed=seed_val * UInt64(N) + UInt64(i),
             )
@@ -2408,7 +2507,7 @@ def _gumbel_argmax_fused_kernel[
 
         # Tail region: elements not covered by a full `simd_width` chunk. Uses
         # the same per-thread seed as `apply_gumbel_noise_kernel`.
-        if N % simd_width != 0:
+        if N % simd_width != 0 and block_in_row == blocks_per_row_int - 1:
             var N_res = N % simd_width
             var rng_state = Random(
                 seed=seed_val * UInt64(N) + UInt64(N - N_res) + UInt64(tid),
@@ -2431,8 +2530,49 @@ def _gumbel_argmax_fused_kernel[
         # Block-level argmax reduction over per-thread winners.
         var total = _block_reduce_topk[ascending=True](partial)
 
-        if tid == 0:
-            out_idxs.ptr[batch_id] = Int(total.p).cast[out_idx_type]()
+        comptime if multi_block:
+            var is_last = unsafe_stack_allocation[
+                1, Bool, address_space=.SHARED
+            ]()
+            if tid == 0:
+                var slot = batch_id * blocks_per_row_int + block_in_row
+                var slot_ptr = (
+                    partials.unsafe_value() + slot * _GUMBEL_PARTIAL_BYTES
+                )
+                slot_ptr.bitcast[Float32]()[0] = total.u.cast[.float32]()
+                (slot_ptr + 8).bitcast[Int64]()[0] = Int64(total.p)
+                var previous = Atomic[Int32].fetch_add[
+                    ordering=Ordering.RELEASE
+                ](counters.unsafe_value() + batch_id, Int32(1))
+                is_last[0] = Int(previous) + 1 == blocks_per_row_int
+            barrier()
+
+            if tid == 0 and is_last[0]:
+                # This acquire pairs with the release increments that publish
+                # each partial.
+                fence[Ordering.ACQUIRE]()
+                var row_base = batch_id * blocks_per_row_int
+                var first = (
+                    partials.unsafe_value() + row_base * _GUMBEL_PARTIAL_BYTES
+                )
+                var best_value = first.bitcast[Float32]()[0]
+                var best_index = (first + 8).bitcast[Int64]()[0]
+                for block in range(1, blocks_per_row_int):
+                    var slot_ptr = (
+                        partials.unsafe_value()
+                        + (row_base + block) * _GUMBEL_PARTIAL_BYTES
+                    )
+                    var value = slot_ptr.bitcast[Float32]()[0]
+                    var index = (slot_ptr + 8).bitcast[Int64]()[0]
+                    if value > best_value or (
+                        value == best_value and index < best_index
+                    ):
+                        best_value = value
+                        best_index = index
+                out_idxs.ptr[batch_id] = best_index.cast[out_idx_type]()
+        else:
+            if tid == 0:
+                out_idxs.ptr[batch_id] = Int(total.p).cast[out_idx_type]()
 
 
 @always_inline
@@ -2505,16 +2645,6 @@ def gumbel_sampling_fused_gpu[
         comptime hw_info = ctx.default_device_info
         comptime block_size = hw_info.max_thread_block_size
 
-        comptime kernel = _gumbel_argmax_fused_kernel[
-            dtype,
-            out_idx_type,
-            input.LayoutType,
-            out_idxs.LayoutType,
-            from_probs=from_probs,
-            InputEngine=input.Engine,
-            OutIdxEngine=out_idxs.Engine,
-        ]
-
         var temperature_ptr: Optional[
             UnsafePointer[Float32, ImmutAnyOrigin]
         ] = None
@@ -2524,11 +2654,68 @@ def gumbel_sampling_fused_gpu[
         if seed:
             seed_ptr = seed.value().ptr
 
+        comptime split_capable = (
+            has_amd_gpu_accelerator() and from_probs and dtype == DType.float32
+        )
+        comptime if split_capable:
+            var vocab = Int(input.dim(1))
+            var blocks_per_row = hw_info.sm_count // batch_size
+            if vocab >= 32768 and blocks_per_row > 1:
+                var partials_buf = ctx.enqueue_create_buffer[.uint8](
+                    batch_size * blocks_per_row * _GUMBEL_PARTIAL_BYTES
+                )
+                var counters_buf = ctx.enqueue_create_buffer[.int32](batch_size)
+                ctx.enqueue_memset(counters_buf, Int32(0))
+                var partials_ptr = Optional[UnsafePointer[UInt8, MutAnyOrigin]](
+                    partials_buf.unsafe_ptr().unsafe_origin_cast[MutAnyOrigin]()
+                )
+                var counters_ptr = Optional[UnsafePointer[Int32, MutAnyOrigin]](
+                    counters_buf.unsafe_ptr().unsafe_origin_cast[MutAnyOrigin]()
+                )
+                comptime split_kernel = _gumbel_argmax_fused_kernel[
+                    dtype,
+                    out_idx_type,
+                    input.LayoutType,
+                    out_idxs.LayoutType,
+                    from_probs=from_probs,
+                    multi_block=True,
+                    InputEngine=input.Engine,
+                    OutIdxEngine=out_idxs.Engine,
+                ]
+                ctx.enqueue_function[split_kernel](
+                    input.as_immut(),
+                    out_idxs,
+                    temperature_ptr,
+                    seed_ptr,
+                    Int32(blocks_per_row),
+                    partials_ptr,
+                    counters_ptr,
+                    grid_dim=batch_size * blocks_per_row,
+                    block_dim=block_size,
+                    attributes=pdl_launch_attributes(PDLLevel.ON),
+                )
+                _ = partials_buf^
+                _ = counters_buf^
+                return
+
+        comptime kernel = _gumbel_argmax_fused_kernel[
+            dtype,
+            out_idx_type,
+            input.LayoutType,
+            out_idxs.LayoutType,
+            from_probs=from_probs,
+            multi_block=False,
+            InputEngine=input.Engine,
+            OutIdxEngine=out_idxs.Engine,
+        ]
         ctx.enqueue_function[kernel](
             input.as_immut(),
             out_idxs,
             temperature_ptr,
             seed_ptr,
+            Int32(1),
+            Optional[UnsafePointer[UInt8, MutAnyOrigin]](None),
+            Optional[UnsafePointer[Int32, MutAnyOrigin]](None),
             grid_dim=batch_size,
             block_dim=block_size,
             attributes=pdl_launch_attributes(PDLLevel.ON),

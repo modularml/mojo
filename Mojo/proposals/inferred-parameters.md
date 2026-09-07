@@ -20,7 +20,9 @@ Mojo is a parametric language and also supports this feature in a variety of use
 cases that make code significantly less verbose:
 
 ```python
-fn infer_me[dt: DType, size: Int](x: SIMD[dt, size]): pass
+def infer_me[dt: DType, size: Int](x: SIMD[dt, size]):
+    pass
+
 
 infer_me(Int32())
 # Equivalent to
@@ -32,9 +34,9 @@ parameterization, dependent types are very common throughout the language.
 Consider:
 
 ```python
-fn higher_order_func[dt: DType, unary: fn(Scalar[dt]) -> Scalar[dt]](): pass
+def higher_order_func[dt: DType, unary: def(Scalar[dt]) -> Scalar[dt]](): pass
 
-fn scalar_param[dt: DType, x: Scalar[dt]](): pass
+def scalar_param[dt: DType, x: Scalar[dt]](): pass
 ```
 
 Language users commonly encounter cases where dependent types could infer their
@@ -72,7 +74,7 @@ must precede all non-inferred parameters in the parameter list, and they
 parameters. This allows us to express:
 
 ```python
-fn scalar_param[inferred dt: DType, x: Scalar[dt]](): pass
+def scalar_param[inferred dt: DType, x: Scalar[dt]](): pass
 
 scalar_param[Int32()]() # 'dt' is skipped and 'Int32()' is bound to 'x'
 ```
@@ -118,7 +120,8 @@ allowing forward references to parameters within the same list. The above
 example would be expressed as:
 
 ```python
-fn scalar_param[x: Scalar[dt], dt: DType](): pass
+def scalar_param[x: Scalar[dt], dt: DType]():
+    pass
 ```
 
 Where any parameter is inferable from any previous parameter. The benefits of
@@ -141,7 +144,7 @@ only in syntax. Instead of annotating each parameter as `inferred`, they are
 separated from the rest using a new undecided sigil (`%%%` is a placeholder):
 
 ```python
-fn scalar_param[dt: DType, %%%, x: Scalar[dt]](): pass
+def scalar_param[dt: DType, %%%, x: Scalar[dt]](): pass
 ```
 
 The benefit of this approach is this matches the [Python
@@ -165,7 +168,7 @@ at the end of the parameter list, and subsequent parameters would be allowed to
 be non-lexical:
 
 ```python
-fn scalar_param[x: Scalar[dt], %%%, dt: DType](): pass
+def scalar_param[x: Scalar[dt], %%%, dt: DType](): pass
 ```
 
 The benefit of this approach is that the parameters appear in the same position
@@ -179,7 +182,7 @@ enable right-to-left inference of the parameter “segments”. The above would 
 expressed as:
 
 ```python
-fn scalar_param[dt: DType][x: Scalar[dt]](): pass
+def scalar_param[dt: DType][x: Scalar[dt]](): pass
 ```
 
 The callsite would look like

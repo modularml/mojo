@@ -66,7 +66,11 @@ from _fuzz import (
     value_dist_name,
 )
 
-comptime in_type = DType.float32
+# The rejection sampler's target-side mask runs at float32 under
+# `draft_proposal: argmax` and bfloat16 under `sampled`. The dtype
+# specializes the kernel, so it is a build-time axis.
+comptime in_bf16 = get_defined_int["ttmp_bf16", 0]() == 1
+comptime in_type = DType.bfloat16 if in_bf16 else DType.float32
 comptime fuzz_seed = get_defined_int["fuzz_seed", 12345]()
 comptime budget = get_defined_int["budget", 16]()
 

@@ -64,8 +64,7 @@ def parameter_for[a: Int](var value: MyType):
     # CHECK-NEXT: kgen.param.for [[iter:.*]]:  !IterRange in :!IterRange apply
     # CHECK-NEXT: has_next {{.*}}paramfor_has_next
     # CHECK-NEXT: get_next_iter :{{.*}}paramfor_next_iter{{.*}}<:!AnyType_Copyable_Deinitable_Iterator_Movable !IterRange>
-    @parameter
-    for i in IterRange(a):
+    comptime for i in IterRange(a):
         # CHECK: [[IMM:%.*]] = lit.ref.immut %value
         # CHECK: use{{.*}}[muttoimm [[LT]]]([[IMM]])
         use(value)

@@ -37,6 +37,8 @@ from .model_config import DeepseekV3Config
 
 logger = logging.getLogger("max.pipelines")
 
+_GRAPH_CAPTURE_HEADROOM_BYTES_PER_DEVICE = 8 * 1024**3
+
 
 def _get_mtp_draft_ep_dispatch_dtype(
     pipeline_config: PipelineConfig,
@@ -325,6 +327,17 @@ class DeepseekV3MemoryPlanner(PagedMemoryPlanner):
         # memories, because the MLA and MoE layers are executed sequentially.
         activation_memory = max(mla_activation_memory, moe_activation_memory)
         activation_memory += ep_buffer_memory
+
+        if pipeline_config.runtime.device_graph_capture:
+            graph_capture_headroom = (
+                _GRAPH_CAPTURE_HEADROOM_BYTES_PER_DEVICE
+                * len(pipeline_config.model.device_specs)
+            )
+            activation_memory += graph_capture_headroom
+            logger.info(
+                "Added graph capture headroom to activation memory: %s",
+                to_human_readable_bytes(graph_capture_headroom),
+            )
 
         if activation_memory != 0:
             logger.info(

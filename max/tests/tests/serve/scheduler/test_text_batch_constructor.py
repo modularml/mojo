@@ -13,7 +13,7 @@
 
 import time
 from collections.abc import Mapping, Sequence
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -290,6 +290,36 @@ def test_text_batch_constructor__batch_construction_no_requests(
     inputs = batch_constructor.construct_batch()
     assert len(inputs.batches) == 1
     assert len(inputs.batches[0]) == 0
+
+
+def test_text_batch_constructor__structured_output_enabled_mirrors_bitmask_constraints(
+    pipeline: Mock,
+) -> None:
+    """``structured_output_enabled`` forwards
+    ``PipelineConfig.needs_bitmask_constraints`` -- on for either
+    ``--enable-structured-output`` or a grammar-capable tool parser with
+    ``--enable-tool-call-constrained-decode`` -- and stays off if the
+    pipeline exposes no ``pipeline_config`` at all."""
+    batch_constructor = TextBatchConstructor(
+        scheduler_config=TokenGenerationSchedulerConfig(
+            max_batch_size=5,
+            max_batch_total_tokens=None,
+            enable_in_flight_batching=False,
+            enable_chunked_prefill=False,
+            target_tokens_per_batch_ce=30,
+        ),
+        pipeline=pipeline,
+        kv_cache=Mock(),
+    )
+
+    pipeline.pipeline_config = Mock(needs_bitmask_constraints=True)
+    assert batch_constructor.structured_output_enabled is True
+
+    pipeline.pipeline_config.needs_bitmask_constraints = False
+    assert batch_constructor.structured_output_enabled is False
+
+    del pipeline.pipeline_config
+    assert batch_constructor.structured_output_enabled is False
 
 
 def test_text_batch_constructor__batch_construction_no_room_in_cache(
@@ -1649,6 +1679,63 @@ def test_batch_scheduling_strategy__decode_first_idle_replica_does_not_starve_si
     # replica 0's idleness being mistaken for a TG override.
     assert len(inputs.batches[1]) == 1
     assert inputs.batches[1][0].tokens.generated_length == 0
+
+
+def test_ce_preempts_pending_tg_emits_iteration_stealing_metric() -> None:
+    """A CE batch that admits work while TG requests are pending on the
+    same replica steals the whole iteration from TG (the CE case's TG
+    fallback only runs when CE admits nothing). Verify the
+    iteration-stealing counter and gauge fire in that case.
+    """
+    from max.serve.scheduler.batch_constructor.text_batch_constructor import (
+        BatchSchedulingStrategy,
+    )
+
+    pipeline = Mock(spec=["release"])
+    pipeline.release = Mock()
+    kv_cache = create_mock_kv_cache()
+
+    scheduler_config = TokenGenerationSchedulerConfig(
+        max_batch_size=10,
+        target_tokens_per_batch_ce=100,
+        data_parallel_degree=1,
+        enable_in_flight_batching=False,
+    )
+
+    batch_constructor = TextBatchConstructor(
+        scheduler_config=scheduler_config,
+        pipeline=pipeline,
+        kv_cache=kv_cache,
+        batch_scheduling_strategy=BatchSchedulingStrategy.PREFILL_FIRST,
+    )
+
+    # One TG request already in flight, plus a fresh CE request --
+    # PREFILL_FIRST forces CE priority for the whole replica, so CE wins
+    # this iteration and the TG request gets skipped entirely.
+    ctx_tg = TextContext(
+        request_id=RequestID(),
+        tokens=TokenBuffer(np.ones(10, dtype=np.int64)),
+        max_length=100,
+    )
+    ctx_tg.update(ARBITRARY_TOKEN_ID)
+    batch_constructor.enqueue_new_request(ctx_tg, replica_idx=0)
+
+    ctx_ce = TextContext(
+        request_id=RequestID(),
+        tokens=TokenBuffer(np.ones(10, dtype=np.int64)),
+        max_length=100,
+    )
+    batch_constructor.enqueue_new_request(ctx_ce, replica_idx=0)
+
+    with patch(
+        "max.serve.scheduler.batch_constructor.text_batch_constructor.METRICS"
+    ) as mock_metrics:
+        inputs = batch_constructor.construct_batch()
+
+    assert len(inputs.batches[0]) == 1
+    assert inputs.batches[0][0].tokens.generated_length == 0
+    mock_metrics.di_ce_preempted_tg_iteration_count.assert_called_once()
+    mock_metrics.di_ce_preempted_tg_pending_count.assert_called_once_with(1)
 
 
 def test_batch_scheduling_strategy__balanced_majority_ce() -> None:

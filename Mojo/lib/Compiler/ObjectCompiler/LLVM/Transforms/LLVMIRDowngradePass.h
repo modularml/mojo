@@ -35,7 +35,7 @@ namespace M::KGEN {
 /// - Transforms llvm.lifetime related intrinsics
 ///
 class LLVMIRDowngradePass
-    : public llvm::OptionalPassInfoMixin<LLVMIRDowngradePass> {
+    : public llvm::RequiredPassInfoMixin<LLVMIRDowngradePass> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &AM);
 };

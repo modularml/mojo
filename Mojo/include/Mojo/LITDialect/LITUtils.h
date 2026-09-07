@@ -23,7 +23,7 @@
 #include "Mojo/KGENDialect/ParameterEvaluator.h"
 #include "Mojo/LITDialect/LITAttrs.h"
 #include "Mojo/LITDialect/LITOps.h"
-#include "Mojo/Support/TriState.h"
+#include "Mojo/Support/TriBool.h"
 #include "Support/LLVMCompilerForwardDecls.h"
 #include "mlir/IR/AttrTypeSubElements.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -367,7 +367,7 @@ private:
 /// An internally inconsistent assumption proves the proposition vacuously.
 /// Top-level `eq` facts in the assumption are closed under symmetry and
 /// transitivity via union-find, so e.g. `(A == C) ∧ (B == C)` proves `A == B`.
-TriState isPropositionImplied(TypedAttr proposition, TypedAttr assumption);
+TriBool isPropositionImplied(TypedAttr proposition, TypedAttr assumption);
 
 /// Returns true if `assumption` implies `proposition`.
 inline bool isImplicationProven(TypedAttr proposition, TypedAttr assumption) {
@@ -379,14 +379,14 @@ inline bool isImplicationProven(TypedAttr proposition, TypedAttr assumption) {
 /// The assumptions are interpreted as a conjunction; an empty list therefore
 /// represents `True`. Returns `yes` if the conjunction proves the goal, `no` if
 /// it disproves the goal, and `unknown` when neither relation is provable.
-TriState isPropositionImplied(TypedAttr proposition,
-                              ArrayRef<TypedAttr> assumptions);
+TriBool isPropositionImplied(TypedAttr proposition,
+                             ArrayRef<TypedAttr> assumptions);
 
 /// Similar to isPropositionImplied but rebinds propositions using the
 /// evaluator prior to checking the constraint.
-TriState isPropositionImplied(ConstraintAttr proposition,
-                              ArrayRef<ConstraintAttr> assumptions,
-                              ParameterEvaluator &evaluator);
+TriBool isPropositionImplied(ConstraintAttr proposition,
+                             ArrayRef<ConstraintAttr> assumptions,
+                             ParameterEvaluator &evaluator);
 
 /// Given a type expression and a set of assumptions, compute the effective
 /// trait bound implied by any `conforms_to(type, Trait)` constraints. Returns a

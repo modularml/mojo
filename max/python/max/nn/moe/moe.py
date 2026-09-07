@@ -179,6 +179,15 @@ class MoEGate(Module):
     @sharding_strategy.setter
     def sharding_strategy(self, strategy: ShardingStrategy) -> None:
         """Set the sharding strategy for the module."""
+        self._set_sharding_strategy(strategy)
+
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        """Applies ``strategy`` to this gate's weights.
+
+        Subclasses that add per-weight strategies override this and call
+        ``super()._set_sharding_strategy(strategy)``; a property setter cannot
+        be extended through ``super()``.
+        """
         if strategy.is_replicate:
             self._sharding_strategy = strategy
             self.gate_score.sharding_strategy = ShardingStrategy.replicate(
@@ -462,6 +471,15 @@ class MoE(Module, Shardable):
     @sharding_strategy.setter
     def sharding_strategy(self, strategy: ShardingStrategy) -> None:
         """Set the sharding strategy for the module."""
+        self._set_sharding_strategy(strategy)
+
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        """Applies ``strategy`` to the gate, shared experts, and experts.
+
+        Subclasses that add per-weight strategies override this and call
+        ``super()._set_sharding_strategy(strategy)``; a property setter cannot
+        be extended through ``super()``.
+        """
         if strategy.is_tensor_parallel:
             self._sharding_strategy = strategy
             self.gate.sharding_strategy = ShardingStrategy.replicate(

@@ -207,21 +207,39 @@ PYCHECK
 detect_model() {
   if [[ -n "$model" ]]; then return; fi
   echo "[exacto] auto-detecting served model from $url/v1/models"
-  # Copy the id verbatim: MAX serve matches the OpenAI `model` field by exact
-  # string equality against /v1/models, so a reconstructed name 400s every
-  # request and the run reports 0.0 rather than failing loudly.
-  model="$(curl -sf -H "Authorization: Bearer ${api_key:-dummy}" \
+  local ids count
+  ids="$(curl -sf -m 30 -H "Authorization: Bearer ${api_key:-dummy}" \
     "$url/v1/models" | vpy -c '
 import json, sys
 data = json.load(sys.stdin).get("data") or []
-if not data:
-    sys.exit("no models returned")
-print(data[0]["id"])
-')"
-  if [[ -z "$model" ]]; then
-    echo "ERROR: could not auto-detect a model from $url/v1/models; pass --model" >&2
+print("\n".join(str(m.get("id")) for m in data if m.get("id")))
+' 2>/dev/null || true)"
+  count="$(printf '%s' "$ids" | grep -c . || true)"
+  if [[ "${count:-0}" -eq 0 ]]; then
+    cat >&2 <<MSG
+ERROR: could not auto-detect a model from $url/v1/models.
+
+       The list came back empty, which has two usual causes: the credential
+       is missing or rejected (the endpoint 401s and the list reads empty),
+       or this is a mach engine behind the Mammoth orchestrator, which never
+       populates the list. Either way, pass --model with the served name.
+MSG
     exit 1
   fi
+  if [[ "$count" -gt 1 ]]; then
+    # A multi-model gateway lists everything it fronts, in no useful order.
+    # Guessing the first entry once picked an image-generation model and the
+    # whole run 404'd, so refuse and make the caller choose.
+    {
+      echo "ERROR: $url/v1/models lists $count models, so there is nothing to"
+      echo "       auto-detect. Pass --model with one of:"
+      printf '%s\n' "$ids" | sed 's/^/         /'
+    } >&2
+    exit 1
+  fi
+  # Copy the id verbatim: MAX serve matches the OpenAI `model` field by exact
+  # string equality, so a reconstructed name 400s every request.
+  model="$ids"
   echo "[exacto] model: $model"
 }
 
@@ -277,8 +295,35 @@ with open(out, "w") as f:
 PYMETA
 }
 
+# One request before provisioning a dataset and 198 questions' worth of work.
+# Without this, a wrong model name or a dead endpoint only shows up as a run
+# that scores nothing, after several minutes of setup.
+preflight_endpoint() {
+  local resp code payload
+  resp="$(curl -s -m 120 -w '\n%{http_code}' \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ${api_key:-dummy}" \
+    -d "{\"model\": \"$model\", \"max_tokens\": 8, \"messages\": [{\"role\": \"user\", \"content\": \"Reply with OK.\"}]}" \
+    "$url/v1/chat/completions" || true)"
+  code="${resp##*$'\n'}"
+  payload="${resp%$'\n'*}"
+  if [[ "$code" != "200" ]]; then
+    cat >&2 <<MSG
+ERROR: the endpoint rejected a basic chat completion (HTTP ${code:-no response})
+       for model '$model'.
+
+       Nothing would be measured, so this stops before provisioning the
+       harness. Check the URL, the exact model id and the credential.
+       Response: $(printf '%s' "$payload" | tr -d '\n' | head -c 300)
+MSG
+    exit 1
+  fi
+  echo "[exacto] endpoint preflight: chat completion OK for '$model'"
+}
+
 ensure_venv
 detect_model
+preflight_endpoint
 
 mkdir -p "$out_dir"
 # openbench resolves --logfile under a `logs/` directory relative to its cwd,

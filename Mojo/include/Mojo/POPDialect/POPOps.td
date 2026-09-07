@@ -565,7 +565,7 @@ def POP_CmpOp : POPOp<"cmp", [Pure, SameTypeOperands, InferTypeOpAdaptor,
   let results = (outs BoolSIMD:$result);
 
   let assemblyFormat = [{
-    $pred `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+    enum($pred) `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
   }];
 }
 
@@ -986,7 +986,7 @@ def POP_LoadOp : POPOp<"load", [
     custom<I1Flag>($isVolatile, "\"volatile\"")
     custom<I1Flag>($isInvariant, "\"invariant\"")
     custom<I1Flag>($isNonTemporal, "\"nontemporal\"")
-    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $ordering^)?
+    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($ordering)^)?
     $ptr
     (`align` `<` custom<IndexParamValue>($alignment)^ `>`)? attr-dict `:`
     qualified(type($ptr))
@@ -1066,7 +1066,7 @@ def POP_StoreOp : POPOp<"store", [PointerElementType<"ptr", "arg">,
   let assemblyFormat = [{
     custom<I1Flag>($isVolatile, "\"volatile\"")
     custom<I1Flag>($isNonTemporal, "\"nontemporal\"")
-    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $ordering^)?
+    (`atomic` (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($ordering)^)?
     $arg `,` $ptr
     (`align` `<` custom<IndexParamValue>($alignment)^ `>`)?
     attr-dict `:` qualified(type($ptr))
@@ -2216,8 +2216,8 @@ def POP_AtomicCmpXchgOp : POPOp<"atomic.cmpxchg", [
   let assemblyFormat = [{
     (`weak` $weak^)?
     $ptr `,` $cmp `,` $val
-    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $success_ordering
-    $failure_ordering (`align` custom<IndexParamValue>($alignment)^ )?
+    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($success_ordering)
+    enum($failure_ordering) (`align` custom<IndexParamValue>($alignment)^ )?
     attr-dict `:` qualified(type($ptr))
   }];
 }
@@ -2269,8 +2269,8 @@ def POP_AtomicRMWOp : POPOp<"atomic.rmw", [
   let results = (outs UnboundOrArithmeticScalar:$result);
 
   let assemblyFormat = [{
-    $bin_op `(` $ptr `,` $val `)`
-    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? $ordering
+    enum($bin_op) `(` $ptr `,` $val `)`
+    (`syncscope` `(` custom<StringParam>($syncscope)^ `)`)? enum($ordering)
     attr-dict `:` qualified(type($ptr))
   }];
 }
@@ -2301,7 +2301,7 @@ def POP_FenceOp : POPOp<"fence"> {
                        OptionalAttr<StrAttr>:$syncscope);
 
   let assemblyFormat = [{
-    (`syncscope` `(` $syncscope^ `)`)? $ordering attr-dict
+    (`syncscope` `(` $syncscope^ `)`)? enum($ordering) attr-dict
   }];
   let hasVerifier = 1;
 }

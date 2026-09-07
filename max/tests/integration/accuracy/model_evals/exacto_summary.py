@@ -27,9 +27,6 @@ import json
 import os
 from typing import Any, TextIO
 
-#: Full airline task count, for spotting a subset run.
-TAU2_FULL_TASKS = 50
-
 #: ``(dataset key, display name, metric, score.json path arg)``.
 DATASETS = [
     ("gpqa_diamond", "GPQA-Diamond", "accuracy (MCQ)", "gpqa"),
@@ -65,9 +62,12 @@ def notes(score: dict[str, Any], dataset: str) -> str:
     if score.get("limit"):
         flags.append("partial (question subset)")
     if dataset == "taubench_airline":
+        # The runner counts the split, so this needs no knowledge of the
+        # dataset size and stays right if upstream changes it.
         tasks = score.get("num_tasks")
-        if isinstance(tasks, int) and tasks != TAU2_FULL_TASKS:
-            flags.append(f"partial ({tasks}/{TAU2_FULL_TASKS} tasks)")
+        full = score.get("full_task_count")
+        if isinstance(tasks, int) and isinstance(full, int) and tasks != full:
+            flags.append(f"partial ({tasks}/{full} tasks)")
         # The reference simulator is recorded by the runner rather than named
         # here, so this needs no edit when OpenRouter changes theirs.
         reference_sim = score.get("reference_user_llm")

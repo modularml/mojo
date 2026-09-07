@@ -22,6 +22,7 @@ from std.python.numpy import copy_to_numpy_tensor, from_numpy_tensor
 from .coord import DynamicCoord
 from .tile_layout import RowMajorLayout, TensorLayout, row_major
 from .tile_tensor import TileTensor
+from .tensor_engine import TensorEngine
 
 
 comptime _NumPyLayout[rank: Int] = RowMajorLayout[
@@ -78,9 +79,18 @@ def from_numpy[
 
 
 def _is_row_major_contiguous[
-    dtype: DType, LayoutType: TensorLayout, origin: Origin
-](tensor: TileTensor[dtype, LayoutType, origin]) -> Bool:
+    dtype: DType,
+    LayoutType: TensorLayout,
+    origin: Origin,
+    Engine: TensorEngine,
+](tensor: TileTensor[dtype, LayoutType, origin, Engine=Engine]) -> Bool:
     """Reports whether the tensor covers its buffer in C order without gaps.
+
+    Parameters:
+        dtype: The element dtype of the tensor.
+        LayoutType: The layout of the tensor.
+        origin: The origin of the tensor.
+        Engine: The engine of the tensor.
 
     Args:
         tensor: The tensor to inspect.
@@ -100,8 +110,13 @@ def _is_row_major_contiguous[
 
 
 def to_numpy[
-    dtype: DType, LayoutType: TensorLayout, origin: Origin
-](tensor: TileTensor[dtype, LayoutType, origin]) raises -> PythonObject:
+    dtype: DType,
+    LayoutType: TensorLayout,
+    origin: Origin,
+    Engine: TensorEngine,
+](
+    tensor: TileTensor[dtype, LayoutType, origin, Engine=Engine]
+) raises -> PythonObject:
     """Copies a `TileTensor` into a new NumPy array of the same shape.
 
     Tensors whose layout is row-major and gap-free are copied with a single
@@ -124,6 +139,7 @@ def to_numpy[
         dtype: The element dtype of the tensor.
         LayoutType: The layout of the tensor.
         origin: The origin of the tensor.
+        Engine: The engine of the tensor.
 
     Args:
         tensor: The tensor to copy.
@@ -163,7 +179,7 @@ def to_numpy[
     var read_coord = DynamicCoord[.int, LayoutType.rank]()
 
     for _ in range(n):
-        gathered.append(tensor[read_coord])
+        gathered.append(Scalar[dtype](tensor.load[width=1](read_coord)))
         var carry = True
 
         comptime for i in reversed(range(LayoutType.rank)):

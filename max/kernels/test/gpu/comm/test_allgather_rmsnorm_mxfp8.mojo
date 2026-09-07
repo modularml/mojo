@@ -106,11 +106,12 @@ def _run_case[
         uninitialized=True
     )
 
-    var gamma_host = List(length=num_cols, fill=Scalar[in_dtype](0))
-    for c in range(num_cols):
-        gamma_host[c] = (Float64(c + num_cols) / Float64(num_cols)).cast[
-            in_dtype
-        ]()
+    var gamma_host = List(
+        length=num_cols,
+        fill_with=lambda (c: Int) -> Scalar[in_dtype]: (
+            Float64(c + num_cols) / Float64(num_cols)
+        ).cast[in_dtype](),
+    )
 
     for i in range(ngpus):
         var shard_rows = config.rank_units(i)
@@ -200,14 +201,14 @@ def _run_case[
         in_dtype, type_of(row_major(Coord(Index(0)))), ImmutAnyOrigin
     ]
 
-    var in_shards = Array[ShardType, ngpus](uninitialized=True)
-    comptime for i in range(ngpus):
-        in_shards[i] = ShardType(
+    var in_shards = Array[_, ngpus](
+        fill_with=lambda (i: Int) -> ShardType: ShardType(
             rebind[ImmPointer[Scalar[in_dtype], ImmutAnyOrigin]](
                 shard_dev[i].unsafe_ptr()
             ),
             row_major(Coord(Index(config.rank_units(i), num_cols))),
         )
+    )
 
     # --- Arm A: the shipping two-kernel chain. ---
     group_start()

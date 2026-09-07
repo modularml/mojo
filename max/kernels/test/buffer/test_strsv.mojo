@@ -23,9 +23,7 @@ def strsv[
     var x_ptr = x_ptr_in
     var L_ptr = L_ptr_in
     var n: Int = size
-    var x_solved_storage = Array[Float32, simd_width * simd_width](
-        uninitialized=True
-    )
+    var x_solved_storage = Array[Float32, simd_width * simd_width](fill={})
     var x_solved_ptr = x_solved_storage.unsafe_ptr()
     var x_solved = x_solved_ptr
 
@@ -96,9 +94,9 @@ def test_strsv() raises:
     print("== test_strsv")
 
     comptime size: Int = 64
-    var l_stack = Array[Float32, size * size](uninitialized=True)
-    var x0_stack = Array[Float32, size](uninitialized=True)
-    var x1_stack = Array[Float32, size](uninitialized=True)
+    var l_stack = Array[Float32, size * size](fill={})
+    var x0_stack = Array[Float32, size](fill={})
+    var x1_stack = Array[Float32, size](fill={})
 
     var L = l_stack.unsafe_ptr()
     var x0_ptr = x0_stack.unsafe_ptr()

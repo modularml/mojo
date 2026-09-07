@@ -65,6 +65,7 @@ from .topk_fi import (
     ValueCount,
     device_sampling_from_prob,
     _block_reduce_value_count,
+    _topp_budget,
 )
 
 # The largest cluster that these kernels use. All CTAs of a cluster must run
@@ -219,8 +220,13 @@ def _cluster_cutoff_search[
         var lo_bits = max(low, Float32(0)).to_bits[.uint32]()
         var hi_bits = max(high, Float32(0)).to_bits[.uint32]()
         var span = hi_bits - lo_bits
-        var pivot_0 = bitcast[.float32](lo_bits + span // 3)
-        var pivot_1 = bitcast[.float32](lo_bits + 2 * (span // 3))
+        # A span below three bits can round both pivots down to `low` and
+        # stall the search.
+        var third = span // 3
+        var off_0 = max(third, UInt32(1))
+        var off_1 = max(2 * third, off_0 + 1)
+        var pivot_0 = bitcast[.float32](lo_bits + off_0)
+        var pivot_1 = bitcast[.float32](lo_bits + off_1)
 
         # Accumulate thread-local counts/masses across the slice. The
         # accumulators stay scalar on purpose: at block_size 1024 only 64
@@ -445,7 +451,7 @@ def TopKTopPMaskedProbsClusterKernel[
     )
     var z = totals[0]
     var total_count = Int32(totals[1])
-    var p_eff = p * z
+    var p_eff = _topp_budget(p, z)
 
     var cut = Float32(0)
     var mass_s = z
@@ -654,6 +660,7 @@ def topk_topp_masked_probs_cluster[
                 top_p_val,
                 temperature_ptr,
                 Int32(d),
+                Optional[UnsafePointer[Int32, MutAnyOrigin]](None),
                 grid_dim=batch_size,
                 block_dim=block_size,
                 attributes=pdl_launch_attributes(PDLLevel.ON),
@@ -1151,7 +1158,7 @@ def TopKTopPSamplingEmitDistClusterKernel[
 
     # Top-p budget in the unnormalized domain. Identical on every CTA because
     # z came out of the rank-ordered cluster fold.
-    var p_eff = p * z
+    var p_eff = _topp_budget(p, z)
 
     # The loop reads staged elements that other threads of this block wrote;
     # it never touches a peer CTA's slice, so a block barrier is enough.
@@ -1546,6 +1553,7 @@ def topk_topp_sampling_from_prob_cluster[
                 rng_offset,
                 temperature_ptr,
                 min_p_ptr,
+                Optional[UnsafePointer[Int32, MutAnyOrigin]](None),
                 grid_dim=batch_size,
                 block_dim=block_size,
                 attributes=pdl_launch_attributes(PDLLevel.ON),

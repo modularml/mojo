@@ -26,7 +26,7 @@ namespace M::KGEN {
 
 /// Pass to set some function attributes that are needed for compilation.
 class SetFunctionAttributes
-    : public llvm::OptionalPassInfoMixin<SetFunctionAttributes> {
+    : public llvm::RequiredPassInfoMixin<SetFunctionAttributes> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &M,
                               llvm::ModuleAnalysisManager &MAM);

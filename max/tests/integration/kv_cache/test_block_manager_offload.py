@@ -58,6 +58,8 @@ class RecordingConnector:
     def __init__(self) -> None:
         self.offloads: list[tuple[list[int], list[bytes]]] = []
         self.touches: list[tuple[list[bytes], int]] = []
+        # The ``hint`` each ``load`` was given, in call order.
+        self.load_hints: list[bytes | None] = []
         # Ordered log of ``load``/``touch`` call names, so a test can assert the
         # load-path anchor touch fires AFTER the load (CLIN-1533).
         self.calls: list[str] = []
@@ -100,8 +102,10 @@ class RecordingConnector:
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         self.calls.append("load")
+        self.load_hints.append(hint)
         bids = list(block_ids["full"])
         num_loaded = min(len(block_hashes), self.num_blocks_to_load)
         return CompletedTransfer(
@@ -320,15 +324,22 @@ def _commit(bm: BlockManager, hash_to_bid: dict[bytes, int]) -> None:
 
 
 def _make_ctx(
-    bm: BlockManager, request_id: RequestID, replica_idx: int = 0
+    bm: BlockManager,
+    request_id: RequestID,
+    replica_idx: int = 0,
+    dkv_cache_hint: bytes | None = None,
 ) -> TextContext:
     """Minimal ctx stub, claimed so it reads a replica's pool.
 
-    ``get_full_blocks_from_prefix_cache`` reads only ``ctx.request_id`` on this
-    path (no tokens/salt/images), so a ``SimpleNamespace`` suffices; the claim
-    is what pins which replica the request resolves against.
+    ``get_full_blocks_from_prefix_cache`` reads only ``ctx.request_id`` and
+    ``ctx.dkv_cache_hint`` on this path (no tokens/salt/images), so a
+    ``SimpleNamespace`` suffices; the claim is what pins which replica the
+    request resolves against.
     """
-    ctx = cast(TextContext, SimpleNamespace(request_id=request_id))
+    ctx = cast(
+        TextContext,
+        SimpleNamespace(request_id=request_id, dkv_cache_hint=dkv_cache_hint),
+    )
     bm.claim(ctx, replica_idx)
     return ctx
 
@@ -684,6 +695,39 @@ def test_cross_replica_copy_disabled_count_is_local_only() -> None:
         )
         == 2
     )
+
+
+def test_load_receives_the_requests_cache_hint() -> None:
+    """The request's ``dkv_cache_hint`` reaches ``connector.load`` unchanged.
+
+    The manager never reads the hint; it only has to carry it, because the
+    routing it drives is parsed on the connector's Rust side (CLIN-1630).
+    """
+    connector = _ExternalTierConnector()
+    connector.num_blocks_to_load = 2
+    bm, _ = _make_block_manager(connector=connector)
+    rid = RequestID("req-hinted")
+    bm.req_to_hashes[rid] = [_b(111), _b(222)]
+    hint = b'{"version":2,"instances":[{"instance_name":"dkv-peer"}]}'
+
+    bm.get_full_blocks_from_prefix_cache(
+        _make_ctx(bm, rid, dkv_cache_hint=hint)
+    )
+
+    assert connector.load_hints == [hint]
+
+
+def test_load_receives_no_hint_for_an_unhinted_request() -> None:
+    """An unhinted request loads with ``hint=None``, today's behavior."""
+    connector = _ExternalTierConnector()
+    connector.num_blocks_to_load = 1
+    bm, _ = _make_block_manager(connector=connector)
+    rid = RequestID("req-unhinted")
+    bm.req_to_hashes[rid] = [_b(111)]
+
+    bm.get_full_blocks_from_prefix_cache(_make_ctx(bm, rid))
+
+    assert connector.load_hints == [None]
 
 
 def test_touch_anchor_fires_after_load_on_host_only_hit() -> None:

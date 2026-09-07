@@ -1,0 +1,12 @@
+{
+  "target": "msa_decode",
+  "spec": {
+    "batch": 4,
+    "cl_seed": 974442879,
+    "topk": 8
+  },
+  "verdict": "PASS",
+  "oracle": "determinism",
+  "detail": "Run-to-run bit-stability of the M3 block-sparse decode under its default launch: eight launches into eight distinct output buffers, all enqueued before one synchronize so they stay concurrent. Anchors that the split-K combine stays order-independent; a drift here would move a request's logits between the draft's proposal and the target's verify.",
+  "findings": []
+}

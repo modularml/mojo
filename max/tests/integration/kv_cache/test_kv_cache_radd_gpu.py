@@ -21,8 +21,7 @@ from max.graph import DeviceRef, Graph, TensorType, TensorValue
 from max.graph.buffer_utils import cast_tensor_to
 from max.nn.kernels import kv_cache_ragged_radd
 from max.nn.kv_cache import KVCacheParams, MHAKVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 
 @dataclass(frozen=True)
@@ -87,13 +86,6 @@ def test_kv_cache_radd_basic() -> None:
         devices=[DeviceRef.GPU()],
     )
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     # Calculate total length and offsets
     total_length = sum(prompt_lens)
     a_length = sum(prompt_lens[batch_size - num_active_loras :])
@@ -127,15 +119,9 @@ def test_kv_cache_radd_basic() -> None:
     # Compile and init the model
     model = session.load(graph)
 
-    # Create contexts and claim seq_ids in cache
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
-    kv_inputs = kv_manager.runtime_inputs([batch]).flatten()
+    kv_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    ).flatten()
 
     a_np = np.ones(
         (a_length, kv_params.n_kv_heads * kv_params.head_dim * 2),

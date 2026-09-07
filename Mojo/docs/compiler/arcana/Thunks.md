@@ -447,7 +447,7 @@ def read_ship[X: int, Y: Bool](s: Ship[X, Y]):
     pass
 
 def test_1():
-    alias my_func_alias: fn[Y: Bool](Ship[42, Y]) -> None =
+    alias my_func_alias: def[Y: Bool](Ship[42, Y]) -> None =
         read_ship[42]
 ```
 
@@ -456,14 +456,14 @@ not its remaining input-parameters like `read_ship[42, True]`.
 
 `read_ship[42]` still has one input-parameter unbound; its type is
 
-`fn[Y: Bool](Ship[42, Y]) -> None`.
+`def[Y: Bool](Ship[42, Y]) -> None`.
 
 This is sometimes called "partial function application", since we’re kind of
 _half_ calling ("apply"ing) a function.
 
 Anyway, as it turns out, this does **not** require a thunk. The compiler is
 smart enough to treat that the same way as a normal mention of
-`fn other_func[Y: Bool](s: Bar[Y])` that doesn’t have any partial application
+`def other_func[Y: Bool](s: Bar[Y])` that doesn’t have any partial application
 going on.
 
 However, those "remaining unbound input-parameters" (`[Y: Bool]`) do cause some
@@ -486,7 +486,7 @@ def read_ship[X: int, Y: Bool](imm s: Ship[X, Y]):
     pass
 
 def test_1():
-    alias my_func_alias: fn[Y: Bool](mut Ship[42, Y]) -> None =
+    alias my_func_alias: def[Y: Bool](mut Ship[42, Y]) -> None =
         read_ship[42]
 ```
 
@@ -501,12 +501,12 @@ def read_ship[X: int, Y: Bool](imm s: Ship[X, Y]):
     pass
 
 def test_1():
-    alias my_func_alias: fn[Y: Bool](mut Ship[42, Y]) -> None =
+    alias my_func_alias: def[Y: Bool](mut Ship[42, Y]) -> None =
         generic_ship_func_wrapper[?, read_ship[42]] # <-- `?`, unbound
 
 def generic_ship_func_wrapper[
     Y: Bool,
-    callee: fn[Y: Bool](imm Ship)->None
+    callee: def[Y: Bool](imm Ship)->None
 ](mut s: Ship[ZC, Y]):
     callee[Y](s) # implicit cast to imm
 ```
@@ -528,7 +528,7 @@ def read_ship[X: int, Y: Bool](imm s: Ship[X, Y]):
 
 def foo():
     alias Z: int = 42
-    alias my_func_alias: fn[Y: Bool](mut Ship[Z, Y]) -> None =
+    alias my_func_alias: def[Y: Bool](mut Ship[Z, Y]) -> None =
         read_ship[Z]
 ```
 
@@ -543,13 +543,13 @@ def read_ship[X: int, Y: Bool](imm s: Ship[X, Y]):
 
 def foo():
     alias Z: int = 42
-    alias my_func_alias: fn[Y: Bool](mut Ship[Z, Y]) -> None =
+    alias my_func_alias: def[Y: Bool](mut Ship[Z, Y]) -> None =
         ship_func_thunk[Z, ?, read_ship[Z]] # <-- `?` means unbound
 
 def ship_func_thunk[
     Z: int,
     Y: Bool,
-    callee: fn[Y: Bool](imm Ship[Z])->None
+    callee: def[Y: Bool](imm Ship[Z])->None
 ](mut s: Ship[Z, Y]):
     callee[Y](s) # implicit cast to imm
 ```

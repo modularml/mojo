@@ -145,7 +145,7 @@ public:
                  ASTDecl *targetParent = nullptr);
 
   Value emitClosure(ASTDecl &moduleDecl, ASTDecl &nestedFnDecl,
-                    ArrayRef<Capture> captures, TraitDeclOp trait,
+                    ArrayRef<Capture> captures, ASTDecl &traitDecl,
                     Location location, bool isCopyable,
                     FnTypeGeneratorType closureSig,
                     ArrayRef<ParamDeclRefAttr> paramCaptures);
@@ -224,31 +224,42 @@ public:
 
   /// One parent trait that a synthesized closure conforms to, named by symbol.
   struct ClosureParent {
-    ClosureParent(TraitSymbolAttr symbol, StringRef traitFnName,
-                  ClosureMethod closureMethod)
-        : symbol(symbol), traitFnName(traitFnName),
-          closureMethod(closureMethod) {}
+    /// Resolves \p symbol's requirement up front; \p traitFnName is
+    /// empty for marker traits, which have none.
+    ClosureParent(SharedState &shared, TraitSymbolAttr symbol,
+                  StringRef traitFnName, ClosureMethod closureMethod);
+
+    ClosureParent(TraitSymbolAttr symbol, FnTypeGeneratorType traitFnSig,
+                  StringAttr witnessName, ClosureMethod closureMethod)
+        : symbol(symbol), closureMethod(closureMethod),
+          witnessName(witnessName), signature(traitFnSig) {}
 
     TraitSymbolAttr getSymbol() const { return symbol; }
+    StringAttr getWitnessName() const { return witnessName; }
+
     SymbolRefAttr getSymbolRef() const { return symbol.getSymbol(); }
     StringAttr getFlattenedName() const { return symbol.getFlattenedName(); }
-    StringRef getDefiningOpName() const { return traitFnName; }
+
     bool isEmpty() const { return closureMethod == ClosureMethod::NONE; }
     ClosureMethod getClosureMethod() const { return closureMethod; }
 
     TraitDeclOp getTrait(SharedState &shared) const;
 
-    /// TODO: remove this, for parametric closure trait, we won't have a FnOp as
-    /// the witness.
-    FnOp getDefiningOp(SharedState &shared) const;
+    FnTypeGeneratorType getSignature() const { return signature; }
+
+    InlineLevel getInlineLevel() const { return inlineLevel; }
 
   private:
     /// Symbol of the parent trait; its declaration is looked up from this.
     TraitSymbolAttr symbol;
-    /// Source name of the method this parent contributes, empty for markers.
-    StringRef traitFnName;
     /// closure method tag corresponding to the method this parent represents.
     ClosureMethod closureMethod;
+    /// The name used for building conformance table.
+    StringAttr witnessName;
+    /// The requirement function signature, null for marker trait.
+    FnTypeGeneratorType signature;
+    /// The requirement's inline level, which the synthesized witness inherits.
+    InlineLevel inlineLevel = InlineLevel::Automatic;
   };
 
   /// This is `isEqualCanon` with one relaxation: parameters
@@ -292,7 +303,8 @@ private:
                       SmallVector<Type> &&deviceCaptureFieldTypes,
                       bool capturesEncodable, ASTDecl &nestedFnDecl);
 
-  /// Given a trait function, specialize it and add it to the struct.
+  /// Given the signature of a trait function, specialize it and add it to the
+  /// struct as \p fnName.
   /// Returns
   /// (a) the new FnOp,
   /// (b) the parameters of the function minus the origins and remapped to
@@ -302,11 +314,11 @@ private:
   /// \p selfTypeOverride replaces the struct's own `Self` in the specialized
   /// signature; an extension's methods are written on the anchor it extends,
   /// not on the (stateless) extension struct.
-  std::tuple<FnOp, ArrayRef<ParamDeclAttr>, Type>
-  pushBackTraitFunctionImpl(FnOp traitFnOp, ASTDecl &structDecl,
-                            bool synthetic = true, StringAttr customName = {},
-                            bool redirectWitnessToImplParam = true,
-                            ASTType selfTypeOverride = {});
+  std::tuple<FnOp, ArrayRef<ParamDeclAttr>, Type> pushBackTraitFunctionImpl(
+      FnTypeGeneratorType traitFnSignature, ASTDecl &structDecl, bool synthetic,
+      StringAttr fnName, SpecialFunctionKind specialFnID,
+      InlineLevel inlineLevel, bool redirectWitnessToImplParam = true,
+      ASTType selfTypeOverride = {});
   struct DevicePassablePopulators {
     llvm::function_ref<FailureOr<SymbolConstantAttr>(FnOp)> isConvertible;
     llvm::function_ref<FailureOr<SymbolConstantAttr>(FnOp)> isEncodable;

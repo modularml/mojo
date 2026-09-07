@@ -414,25 +414,25 @@ struct FastMathFlag(Equatable, ImplicitlyCopyable, RegisterPassable):
 
     def _mlir_attr(self) -> __mlir_type.`!kgen.deferred`:
         if self == FastMathFlag.NONE:
-            return __mlir_attr.`#pop<fmf none>`
+            return __mlir_attr.`#pop.fmf<none>`
         if self == FastMathFlag.NNAN:
-            return __mlir_attr.`#pop<fmf nnan>`
+            return __mlir_attr.`#pop.fmf<nnan>`
         if self == FastMathFlag.NINF:
-            return __mlir_attr.`#pop<fmf ninf>`
+            return __mlir_attr.`#pop.fmf<ninf>`
         if self == FastMathFlag.NSZ:
-            return __mlir_attr.`#pop<fmf nsz>`
+            return __mlir_attr.`#pop.fmf<nsz>`
         if self == FastMathFlag.ARCP:
-            return __mlir_attr.`#pop<fmf arcp>`
+            return __mlir_attr.`#pop.fmf<arcp>`
         if self == FastMathFlag.CONTRACT:
-            return __mlir_attr.`#pop<fmf contract>`
+            return __mlir_attr.`#pop.fmf<contract>`
         if self == FastMathFlag.AFN:
-            return __mlir_attr.`#pop<fmf afn>`
+            return __mlir_attr.`#pop.fmf<afn>`
         if self == FastMathFlag.REASSOC:
-            return __mlir_attr.`#pop<fmf reassoc>`
+            return __mlir_attr.`#pop.fmf<reassoc>`
         if self == FastMathFlag.FAST:
-            return __mlir_attr.`#pop<fmf fast>`
+            return __mlir_attr.`#pop.fmf<fast>`
 
-        return __mlir_attr.`#pop<fmf none>`
+        return __mlir_attr.`#pop.fmf<none>`
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1253,6 +1253,28 @@ struct SIMD[dtype: DType, length: SIMDLength](
                 SIMD[exp.dtype, self.length](rebind[Scalar[exp.dtype]](exp)),
             )
 
+    @always_inline("nodebug")
+    def __pow__(self, exp: FloatLiteral) -> Self:
+        """Computes the vector raised to the power of a float literal.
+
+        The literal is converted to `Self`, so the exponent always has the
+        same dtype as the base.
+
+        Constraints:
+            The SIMD dtype must be floating point.
+
+        Args:
+            exp: The exponent value.
+
+        Returns:
+            A SIMD vector where each element is raised to the power of the
+            specified exponent value.
+        """
+        comptime assert (
+            Self.dtype.is_floating_point()
+        ), "a float literal exponent requires a floating point SIMD type"
+        return _pow(self, Self(exp))
+
     # TODO(#22771): remove this overload.
     @always_inline("nodebug")
     def __pow__(self, exp: Self) -> Self:
@@ -1517,7 +1539,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             `i` is the value of `self[i] == rhs[i]`.
         """
 
-        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred eq>`](
+        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<eq>`](
             self._mlir_value, rhs._mlir_value
         )
         return Self._Mask(mlir_value=res)
@@ -1534,7 +1556,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             `i` is the value of `self[i] != rhs[i]`.
         """
 
-        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ne>`](
+        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ne>`](
             self._mlir_value, rhs._mlir_value
         )
         return Self._Mask(mlir_value=res)
@@ -1551,7 +1573,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             `i` is the value of `self[i] > rhs[i]`.
         """
 
-        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred gt>`](
+        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<gt>`](
             self._mlir_value, rhs._mlir_value
         )
         return Self._Mask(mlir_value=res)
@@ -1569,7 +1591,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             `i` is the value of `self[i] >= rhs[i]`.
         """
 
-        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ge>`](
+        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ge>`](
             self._mlir_value, rhs._mlir_value
         )
         return Self._Mask(mlir_value=res)
@@ -1586,7 +1608,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             `i` is the value of `self[i] < rhs[i]`.
         """
 
-        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred lt>`](
+        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<lt>`](
             self._mlir_value, rhs._mlir_value
         )
         return Self._Mask(mlir_value=res)
@@ -1604,7 +1626,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             `i` is the value of `self[i] <= rhs[i]`.
         """
 
-        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred le>`](
+        var res = __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<le>`](
             self._mlir_value, rhs._mlir_value
         )
         return Self._Mask(mlir_value=res)
@@ -1983,7 +2005,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         """
 
         var ne_zero = __mlir_op.`pop.cmp`[
-            pred=__mlir_attr.`#kgen<cmp_pred ne>`
+            pred=__mlir_attr.`#kgen.cmp_pred<ne>`
         ](self._mlir_value, Self(0)._mlir_value)
         return Bool(mlir_value=__mlir_op.`pop.simd.reduce_or`(ne_zero))
 
@@ -2028,7 +2050,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
         return __mlir_op.`pop.cast_to_builtin`[_type=__mlir_type.index](
             __mlir_op.`pop.cast`[
                 _type=SIMD[.int, 1]._mlir_type,
-                fastmathFlags=__mlir_attr.`#pop<fmf fast>`,
+                fastmathFlags=__mlir_attr.`#pop.fmf<fast>`,
             ](rebind[SIMD[Self.dtype, SIMDLength(1)]](self)._mlir_value)
         )
 
@@ -2340,13 +2362,13 @@ struct SIMD[dtype: DType, length: SIMDLength](
             # `pop.cast` doesn't support some conversions from `ui1`, `ui2`, or `ui4`
             var uint = __mlir_op.`pop.cast`[
                 _type=SIMD[.uint32, Self.length]._mlir_type,
-                fastmathFlags=__mlir_attr.`#pop<fmf fast>`,
+                fastmathFlags=__mlir_attr.`#pop.fmf<fast>`,
             ](self._mlir_value)
             return SIMD[.uint32, Self.length](mlir_value=uint).cast[target]()
 
         var res = __mlir_op.`pop.cast`[
             _type=SIMD[target, Self.length]._mlir_type,
-            fastmathFlags=__mlir_attr.`#pop<fmf fast>`,
+            fastmathFlags=__mlir_attr.`#pop.fmf<fast>`,
         ](self._mlir_value)
         return SIMD(mlir_value=res)
 
@@ -3635,6 +3657,12 @@ def _pow[
 
     comptime if exp.dtype.is_floating_point() and base.dtype == exp.dtype:
         comptime if is_apple_gpu():
+            # AIR has no bf16 overload of `air.pow`; Metal rejects it, so
+            # evaluate in f32 and narrow the result back.
+            comptime if base.dtype == .bfloat16:
+                return _pow(base.cast[.float32](), exp.cast[.float32]()).cast[
+                    base.dtype
+                ]()
             return llvm_intrinsic[
                 "llvm.air.pow",
                 type_of(base),

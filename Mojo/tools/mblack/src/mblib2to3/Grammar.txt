@@ -29,7 +29,7 @@ eval_input: testlist NEWLINE* ENDMARKER
 
 decorator: '@' namedexpr_test NEWLINE
 decorators: decorator+
-decorated: decorators (classdef | funcdef | async_funcdef | if_stmt | for_stmt | var_stmt NEWLINE | alias_stmt NEWLINE | comptime_stmt | import_stmt)
+decorated: decorators (classdef | funcdef | async_funcdef | if_stmt | for_stmt | var_stmt NEWLINE | comptime_stmt | import_stmt)
 async_funcdef: ASYNC funcdef
 where_clause: WHERE top_test
 # Mojo terms: metaparams [..] = parameter list; parameters (..) = argument list;
@@ -107,8 +107,7 @@ vfplist: vfpdef (',' vfpdef)* [',']
 stmt: simple_stmt | compound_stmt
 simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
 small_stmt: (expr_stmt | print_stmt | del_stmt | pass_stmt | flow_stmt |
-             import_stmt | global_stmt | exec_stmt | assert_stmt |
-             old_comptime_assert_stmt | alias_stmt)
+             import_stmt | global_stmt | exec_stmt | assert_stmt)
 expr_stmt: testlist_star_expr_stmt (annassign | augassign (yield_expr|testlist) |
                      ('=' (yield_expr|testlist_star_expr))*)
 top_expr_stmt: testlist_star_expr (annassign | augassign (yield_expr|testlist) |
@@ -141,7 +140,6 @@ dotted_name: NAME ('.' NAME)*
 global_stmt: ('global' | 'nonlocal') NAME (',' NAME)*
 exec_stmt: 'exec' expr ['in' test [',' test]]
 assert_stmt: 'assert' test [',' test]
-old_comptime_assert_stmt: '__comptime_assert' test [',' test]
 var_stmt: (VAR|REF) top_expr_stmt
 alias_target: NAME | '(' alias_target_list ')'
 alias_target_list: alias_target (',' alias_target)*
@@ -152,7 +150,6 @@ alias_stmt_body: alias_target_list [metaparams] (
     ':' test (where_clause)* ['=' (yield_expr|testlist_star_expr)] |
     (where_clause)* '=' (yield_expr|testlist_star_expr)
 )
-alias_stmt: ALIAS alias_stmt_body
 comptime_assert_stmt_body: 'assert' test [',' test]
 comptime_stmt: COMPTIME (comptime_assert_stmt_body NEWLINE | alias_stmt_body NEWLINE | if_stmt | for_stmt)
 
@@ -197,7 +194,7 @@ namedexpr_test: asexpr_test [':=' asexpr_test]
 asexpr_test: test ['as' test]
 
 test: functype | generatortype | top_test
-top_test: [ALIAS|COMPTIME] if_else_test
+top_test: [COMPTIME] if_else_test
 if_else_test: or_test ['if' or_test 'else' test] | lambdef
 or_test: and_test ('or' and_test)*
 and_test: not_test ('and' not_test)*
@@ -319,6 +316,13 @@ yield_arg: 'from' test | testlist_star_expr
 
 
 # 3.10 match statement definition
+#
+# Soft keywords use double quotes ("match", "case", "__match").
+#
+# Two layouts are accepted after the subject colon:
+#   1. Python style: NEWLINE INDENT case_block+ DEDENT
+#   2. Mojo style:   NEWLINE case_block+   (cases share the match indent)
+# Mojo mode formatting always emits layout (2).
 
 # PS: normally the grammar is much much more restricted, but
 # at this moment for not trying to bother much with encoding the
@@ -332,7 +336,7 @@ yield_arg: 'from' test | testlist_star_expr
 # expressions, but who cares. If we can parse them, that is enough
 # to reformat them.
 
-match_stmt: "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
+match_stmt: ("match" | "__match") subject_expr ':' NEWLINE (INDENT case_block+ DEDENT | case_block+)
 
 # This is more permissive than the actual version. For example it
 # accepts `match *something:`, even though single-item starred expressions

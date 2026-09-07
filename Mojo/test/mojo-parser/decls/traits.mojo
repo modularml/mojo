@@ -593,8 +593,6 @@ trait GrandFather(GreatGrandFather):
     def bar(self):
         ...
 
-    # CHECK: lit.fn @"foo
-
 
 # CHECK-LABEL: lit.trait.decl @Father
 # CHECK-SAME: GrandFather_GreatGrandFather)
@@ -603,9 +601,6 @@ trait Father(GrandFather):
     # CHECK: lit.fn @"baz
     def baz(self):
         ...
-
-    # CHECK: lit.fn @"bar
-    # CHECK: lit.fn @"foo
 
 
 # CHECK-LABEL: lit.trait.decl @UnevenDiamond
@@ -915,7 +910,6 @@ trait RGTrait(Deinitable, RegisterPassable):
     # CHECK-NEXT: lit.fn @"doSomething{{.*}}"[imm *"{{.*}}"](%self: !lit.ref<:!AnyType_Deinitable_Movable_RegisterPassable_RGTrait *"{{.*}}", imm *"{{.*}}"> imm_mem) -> !kgen.none
     def doSomething(self):
         ...
-    # CHECK: lit.fn @"__deinit__({{.*}})"[mut *"{{.*}}"](%self: !lit.ref<:!AnyType_Deinitable_Movable_RegisterPassable_RGTrait *"{{.*}}", mut *"{{.*}}"> deinit_mem, |) -> !kgen.none
 
 # CHECK-LABEL: lit.trait.decl @RGTrivialTrait{{.*}} register_passable_trivial
 trait RGTrivialTrait(TrivialRegisterPassable):

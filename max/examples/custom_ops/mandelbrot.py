@@ -120,7 +120,8 @@ if __name__ == "__main__":
         devices=[device],
     )
     # Compile the graph.
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     # Perform the calculation on the target device.
     result = model.execute()[0]

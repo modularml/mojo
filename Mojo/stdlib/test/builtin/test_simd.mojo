@@ -1752,6 +1752,13 @@ def test_pow() raises:
         F32x4(0.0, 1.0, 1.414213562, 1.732050808),
     )
 
+    assert_almost_equal(Float16(4.0) ** 0.5, Float16(2.0))
+    assert_almost_equal(BFloat16(4.0) ** 0.5, BFloat16(2.0))
+    assert_almost_equal(Float32(4.0) ** 0.5, Float32(2.0))
+    assert_almost_equal(
+        f32x4_val**0.5, F32x4(0.0, 1.0, 1.414213562, 1.732050808)
+    )
+
     assert_almost_equal(
         F32x4(1, 2, 3, 4).__pow__(F32x4(2, 3, 2, 1)), F32x4(1.0, 8.0, 9.0, 4.0)
     )

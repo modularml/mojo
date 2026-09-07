@@ -55,6 +55,7 @@ modular_py_test(
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],
     }),  # FIXME: MOCO-2411
+    ignore_extra_deps = [requirement("jinja2")],
     tags = [
         "gpu",
         "manual",
@@ -70,6 +71,7 @@ modular_py_test(
         "//max/python/max/pipelines/lib",
         "//max/python/max/pipelines/modeling",
         "//max/tests/integration/test_common:mocks",
+        requirement("jinja2"),
         requirement("numpy"),
         requirement("pytest-asyncio"),
         requirement("requests"),
@@ -154,6 +156,12 @@ modular_py_test(
     env = {
         "MODULAR_PATH": ".",
     },
+    # Import-bound: pulling the whole pipelines stack dominates the wall time
+    # and outruns the 300s "small" budget on the shared BuildBuddy macOS
+    # workers, timing out during pytest collection. Nothing here is actually
+    # macOS-incompatible, so skip the CI job rather than the platform -- it
+    # still runs locally on a Mac.
+    tags = ["skip-ci-macos"],
     deps = [
         "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",

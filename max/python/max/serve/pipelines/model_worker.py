@@ -90,6 +90,11 @@ class SupportsGraphCaptureWarmup(Protocol):
     def warmup_graph_capture(self) -> None: ...
 
 
+@runtime_checkable
+class SupportsGraphSynthesisBuckets(Protocol):
+    def prepare_graph_synthesis_buckets(self) -> None: ...
+
+
 def _prime_pinned_memory_cache(device: Device, bytes: int = GiB) -> None:
     """Prime the pinned memory manager cache for the given device.
 
@@ -361,6 +366,19 @@ class ModelWorker:
                         warmup_duration_s,
                         pipeline_config.models.main_architecture_name,
                         pipeline.max_batch_size,
+                    )
+                elif (
+                    pipeline_config.runtime.experimental_device_graph_synthesis
+                ):
+                    if not isinstance(pipeline, SupportsGraphSynthesisBuckets):
+                        raise ValueError(
+                            "experimental_device_graph_synthesis is enabled but the "
+                            "pipeline does not support synthesis bucketing."
+                        )
+                    pipeline.prepare_graph_synthesis_buckets()
+                    logger.info(
+                        "Device graph synthesis bucketing prepared (model=%s).",
+                        pipeline_config.models.main_architecture_name,
                     )
 
             total_in_run_s = time.monotonic() - run_start_s

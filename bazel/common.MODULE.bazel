@@ -75,6 +75,9 @@ archive_override(
         "//bazel/public-patches:rules_mypy_pyi_files.patch",
         # https://github.com/bazel-contrib/rules_mypy/pull/141
         "//bazel/public-patches:rules_mypy_transitives.patch",
+        # The aspect applies to every top-level target, so target-configured
+        # type stubs make any cross-compile fail during loading. TODO: upstream.
+        "//bazel/public-patches:rules_mypy_exec_types.patch",
     ],
     strip_prefix = "rules_mypy-0.41.0",
     urls = [

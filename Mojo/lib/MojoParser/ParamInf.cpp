@@ -251,11 +251,11 @@ ParamInf::inferCValue(ASTExprAnd<AnyValue> operand, size_t argIdx,
       return getMojoDiag(loc);
     };
 
-    auto [argVal, _] =
+    auto argValResult =
         orValue->filterOverloadSetForValueType(expectedType, emitError);
-    if (!argVal)
+    if (!argValResult.isYes())
       return failure();
-    return SmartVariant<CValue, ASTType>(CValue(argVal));
+    return SmartVariant<CValue, ASTType>(CValue(argValResult.getYes().callee));
   }
 
   // FIXME: This emits an error unconditionally (not to getDiags) on failure.
@@ -372,18 +372,19 @@ ParamInf::inferFromRVType(ASTExprAnd<AnyValue> operand, size_t argIdx,
   // conversions using the normal type machinery.  This will handle things like
   // function pointer conversions that the code below doesn't.
   if (!paramFinder.hasReferences(expectedType)) {
-    ConversionFailure conversionFailure;
-    if (IREmitter::canImplicitlyConvertToType(
-            {argVal, operand.expr}, expectedType, getDeclScope(),
-            /*additionalAssumptions=*/{}, /*deferralCtx=*/nullptr,
-            &conversionFailure)) {
+    auto conversion = IREmitter::classifyImplicitConversionWithDetails(
+        {argVal, operand.expr}, expectedType, getDeclScope(),
+        /*additionalAssumptions=*/{}, /*deferralCtx=*/nullptr);
+    if (conversion.isYes())
       return success();
-    }
 
     // Restore the original failure so the diagnostic stays simple.
     ParamMatcher::FailableScope::restore(savedFailureInfo, matcher);
     auto &diag = emitWrongTypeDiag(expectedType);
-    std::move(conversionFailure).addExplanation(diag);
+    if (conversion.isNo())
+      std::move(conversion).getNo().addExplanation(diag);
+    else
+      attachConstraintNotes(diag, conversion.getUnknown(), "unproven");
     matcher.failureReason->addExplanation(diag);
     return failure();
   }
@@ -2290,11 +2291,11 @@ VerifiedParamBindings CallParamInf::inferForCall() {
         // Make sure the value is compatible with the expected trait, this
         // produces better error messages.  It would be great to sink this
         // into matchType at some point!
-        ConversionFailure conversionFailure;
-        if (!IREmitter::canImplicitlyConvertToType(
-                {eltTypeValue, operand.expr}, elementType,
-                emitter.getDeclScope(), /*additionalAssumptions=*/{},
-                /*deferralCtx=*/nullptr, &conversionFailure)) {
+        auto conversion = IREmitter::classifyImplicitConversionWithDetails(
+            {eltTypeValue, operand.expr}, elementType, emitter.getDeclScope(),
+            /*additionalAssumptions=*/{},
+            /*deferralCtx=*/nullptr);
+        if (!conversion.isYes()) {
           // Packs cannot be constrained by concrete types so elementType is
           // always a trait and reporting non-conformance instead of a type
           // mismatch is safe. This path is only reachable for packs (isPack
@@ -2306,7 +2307,10 @@ VerifiedParamBindings CallParamInf::inferForCall() {
                << elementType
                << "; either prove the conformance with 'conforms_to'"
                   ", or add conformance";
-          std::move(conversionFailure).addExplanation(diag);
+          if (conversion.isNo())
+            std::move(conversion).getNo().addExplanation(diag);
+          else
+            attachConstraintNotes(diag, conversion.getUnknown(), "unproven");
           return {};
         }
 

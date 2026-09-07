@@ -32,6 +32,7 @@ def test_notes_flag_a_tau2_task_subset_and_simulator() -> None:
     out = exacto_summary.notes(
         {
             "num_tasks": 2,
+            "full_task_count": 50,
             "user_llm": "openai/served-name",
             "reference_user_llm": "gemini/gemini-2.5-flash",
         },
@@ -45,6 +46,7 @@ def test_notes_accept_the_reference_simulator_on_a_full_task_set() -> None:
     out = exacto_summary.notes(
         {
             "num_tasks": 50,
+            "full_task_count": 50,
             "user_llm": "gemini/gemini-2.5-flash",
             "reference_user_llm": "gemini/gemini-2.5-flash",
         },
@@ -59,7 +61,8 @@ def test_notes_cannot_judge_the_simulator_without_a_recorded_reference() -> (
     # No reference recorded means we do not know what the reference was, so
     # do not invent a verdict about it.
     out = exacto_summary.notes(
-        {"num_tasks": 50, "user_llm": "openai/whatever"}, "taubench_airline"
+        {"num_tasks": 50, "full_task_count": 50, "user_llm": "openai/whatever"},
+        "taubench_airline",
     )
     assert "substitute user simulator" not in out
 
@@ -141,6 +144,7 @@ def test_render_flags_a_substitute_user_simulator() -> None:
                 "stderr": 0.06,
                 "total": 50,
                 "num_tasks": 50,
+                "full_task_count": 50,
                 "num_trials": 1,
                 "user_llm": "openai/some-local-model",
                 "reference_user_llm": "gemini/gemini-2.5-flash",
@@ -167,6 +171,7 @@ def test_render_treats_a_task_subset_as_partial() -> None:
                 "accuracy": 0.80,
                 "total": 2,
                 "num_tasks": 2,
+                "full_task_count": 50,
                 "num_trials": 1,
                 "user_llm": "gemini/gemini-2.5-flash",
                 "max_steps": 200,
@@ -200,3 +205,10 @@ def test_main_writes_to_the_github_step_summary(
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
     exacto_summary.main(["--gpqa", str(score)])
     assert "0.9500" in summary.read_text()
+
+
+def test_notes_cannot_judge_a_subset_without_the_split_size() -> None:
+    # Nothing hardcodes the dataset size, so with no recorded split count there
+    # is no basis to call a run partial.
+    out = exacto_summary.notes({"num_tasks": 2}, "taubench_airline")
+    assert "partial" not in out

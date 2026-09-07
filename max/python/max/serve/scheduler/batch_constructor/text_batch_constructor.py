@@ -593,6 +593,48 @@ class TextBatchConstructor:
         )
         return replica_idx
 
+    @property
+    def structured_output_enabled(self) -> bool:
+        """Whether constrained decoding can fire at all for this process:
+        ``--enable-structured-output`` (user-supplied JSON schemas) or
+        ``--enable-tool-call-constrained-decode`` with a grammar-capable
+        tool parser (server-generated tool-call grammars).
+
+        Mirrors ``PipelineConfig.needs_bitmask_constraints`` -- the same
+        signal that gates whether the bitmask-aware sampler graph and
+        pinned D2H buffer were even compiled/allocated for this process.
+        """
+        pipeline_config = getattr(self.pipeline, "pipeline_config", None)
+        return (
+            pipeline_config is not None
+            and pipeline_config.needs_bitmask_constraints
+        )
+
+    def submit_grammar_build(self, ctx: TextContext) -> None:
+        """Starts a request's off-thread grammar-matcher build, if needed.
+
+        Exposed so a caller admitting a request before it ever reaches
+        ``enqueue_new_request`` (DI's decode scheduler, at initial
+        admission) can overlap the build with prefill's round trip instead
+        of stacking it sequentially onto TTFT. ``AsyncGrammarGate.submit``
+        is idempotent, so ``enqueue_new_request``'s own submit call later is
+        a no-op re-check, not a duplicate compile.
+        """
+        if self._grammar_gate is not None:
+            self._grammar_gate.submit(ctx)
+
+    def release_grammar_build(self, request_id: RequestID) -> None:
+        """Drops a request's outstanding grammar build, if any.
+
+        Exposed for callers that remove a request before it ever reaches
+        ``enqueue_new_request``/``release_request`` (DI's decode scheduler,
+        on cancellation, TTL eviction, or prefill rejection) but may have
+        already started its build via ``submit_grammar_build``. Safe to call
+        unconditionally: a no-op when nothing was submitted.
+        """
+        if self._grammar_gate is not None:
+            self._grammar_gate.release(request_id)
+
     def enqueue_new_request(
         self, ctx: TextContext, replica_idx: int | None = None
     ) -> None:
@@ -1300,6 +1342,19 @@ class TextBatchConstructor:
 
                 if len(batch) == 0 and priority_override is None:
                     self._add_tg_requests(batch, replica_idx)
+                else:
+                    # This iteration is CE-only: the TG fallback above didn't
+                    # fire, so any pending TG requests get zero progress this
+                    # iteration (see _add_tg_requests, only reached from the
+                    # branch above). Pair with this batch's own execution
+                    # duration to estimate the TPOT cost of the stolen
+                    # iteration.
+                    pending_tg_count = len(self.replicas[replica_idx].tg_reqs)
+                    if len(batch) > 0 and pending_tg_count > 0:
+                        METRICS.di_ce_preempted_tg_iteration_count()
+                        METRICS.di_ce_preempted_tg_pending_count(
+                            pending_tg_count
+                        )
 
             case RequestType.TG:
                 self._add_tg_requests(batch, replica_idx)

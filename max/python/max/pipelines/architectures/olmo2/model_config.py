@@ -65,7 +65,7 @@ class Olmo2Config(Llama3Config):
             raise ValueError(
                 "Data parallelism is not supported for Olmo2 models"
             )
-        return ArchConfigWithStoredKVParams.construct_kv_params(
+        kv_params = ArchConfigWithStoredKVParams.construct_kv_params(
             huggingface_config,
             pipeline_config,
             devices,
@@ -73,6 +73,8 @@ class Olmo2Config(Llama3Config):
             cache_dtype,
             allow_kv_head_replication=allow_kv_head_replication,
         )
+        assert isinstance(kv_params, KVCacheParams)
+        return kv_params
 
     @staticmethod
     def calculate_attention_multiplier(huggingface_config: AutoConfig) -> float:

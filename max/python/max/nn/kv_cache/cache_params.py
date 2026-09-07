@@ -2408,31 +2408,3 @@ def compute_max_seq_len_fitting_in_cache(
         params
     )
     return max(1, max_seq_len)
-
-
-def host_bytes_per_block(params: KVCacheParamInterface) -> int:
-    """Returns the bytes one block occupies in the host (CPU/disk) tier.
-
-    This is the row size of the connector's shared pinned host buffer, and must
-    match the ``bytes_per_page`` the connector derives from its device buffers.
-
-    Args:
-        params: KV cache parameters, single or a multi-cache tree.
-
-    Returns:
-        The bytes one block occupies in the shared host pool.
-    """
-    # A tree's children can disagree on replication -- an MLA target paired with
-    # an MHA draft, say -- and ``MultiKVCacheParams`` reports only its first
-    # child's ``replicates_kv_across_tp`` / ``tensor_parallel_degree``. Sum each
-    # child's own host size instead of dividing the whole tree by one child's
-    # degree, which would undercount every non-replicated sibling.
-    if isinstance(params, MultiKVCacheParams):
-        return sum(host_bytes_per_block(c) for c in params.children.values())
-
-    bytes_per_block = params.bytes_per_block
-    if params.replicates_kv_across_tp:
-        # On cpu/disk, we don't need multiple replicas of the same KV state.
-        assert bytes_per_block % params.tensor_parallel_degree == 0
-        bytes_per_block = bytes_per_block // params.tensor_parallel_degree
-    return bytes_per_block

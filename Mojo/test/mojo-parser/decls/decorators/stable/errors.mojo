@@ -32,11 +32,10 @@ def test_local_var():
     var x = 1
 
 
-# @stable on alias is now supported (as of escape hatches feature).
+# @stable on comptime is now supported (as of escape hatches feature).
 # Verify it doesn't error - this alias will be verified in a separate test.
 @stable
-# expected-warning @+1 {{'alias' is deprecated; use 'comptime'}}
-alias MY_STABLE_ALIAS = 42
+comptime MY_STABLE_ALIAS = 42
 
 
 # Verify that @stable members in stable structs are allowed (no error).

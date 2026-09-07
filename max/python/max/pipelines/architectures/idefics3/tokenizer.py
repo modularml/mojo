@@ -28,7 +28,7 @@ from max.pipelines.context import (
 )
 from max.pipelines.context.exceptions import PromptTooLongError
 from max.pipelines.lib import TextAndVisionTokenizer
-from max.pipelines.lib.tokenizer import open_image
+from max.pipelines.lib.tokenizer import encode_dkv_cache_hint, open_image
 from max.pipelines.modeling.types import (
     ImageContentPart,
     TextContentPart,
@@ -307,6 +307,7 @@ class Idefics3Tokenizer(TextAndVisionTokenizer):
             log_probabilities_echo=request.echo,
             sampling_params=request.sampling_params,
             target_endpoint=request.target_endpoint,
+            dkv_cache_hint=encode_dkv_cache_hint(request.dkv_cache_hint),
             images=[
                 ImageMetadata(
                     start_idx=start_idx,

@@ -28,7 +28,7 @@ def test_argn() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     argmax(
@@ -64,7 +64,7 @@ def test_argn_2() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[batch_size, 1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     argmax(
@@ -110,7 +110,7 @@ def test_argn_2_test_2() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[batch_size, 1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     argmax(
@@ -152,7 +152,7 @@ def test_argn_2_neg_axis() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[batch_size, 1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     argmax(
@@ -190,7 +190,7 @@ def test_argn_test_zeros() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[batch_size, 1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     argmax(
@@ -226,7 +226,7 @@ def test_argn_test_identity() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[batch_size, 1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     vector[1, 4] = 1
@@ -372,7 +372,7 @@ def test_argn_simd_index_order() raises:
     var vector = TileTensor(vector_stack, vector_shape)
 
     comptime output_shape = row_major[1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     vector[5] = 1
@@ -416,7 +416,7 @@ def test_argn_parallelize() raises:
             input[i, j] = 0
 
     comptime output_shape = row_major[batch_size, 1]()
-    var output_stack = Array[Int, output_shape.product()](uninitialized=True)
+    var output_stack = Array[Int, output_shape.product()](fill={})
     var output = TileTensor(output_stack, output_shape)
 
     input[0, 10] = 100

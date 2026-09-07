@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from enum import Enum
 
 import numpy as np
 import pytest
@@ -32,78 +31,40 @@ from max.nn.kernels import (
     matmul_kv_cache_ragged,
 )
 from max.nn.kv_cache import (
-    KVCacheBuffer,
     KVCacheParams,
     MHAKVCacheParams,
     PagedCacheValues,
 )
-from max.pipelines.context import TextContext
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
 from test_common.modular_graph_test import modular_graph_test
+from test_common.simple_kv_cache import (
+    block_ids_for_batch,
+    paged_kv_cache_inputs,
+)
 from torch.utils.dlpack import from_dlpack
 
 
-class KeyOrValue(Enum):
-    KEY = 0
-    VALUE = 1
-
-
 def _dump_k_cache_to_torch_tensor(
-    cache: PagedKVCacheManager, ctx: TextContext, device_id: int = 0
+    params: KVCacheParams,
+    kv_blocks: Buffer,
+    block_ids: Sequence[int],
+    seq_len: int,
 ) -> torch.Tensor:
     """
     Returns a torch tensor of the shape [seq_len, num_layers, n_heads, head_dim]
 
     This should only be used for testing purposes.
     """
-    return _dump_k_or_v_cache_to_torch_tensor(
-        cache, ctx, device_id, KeyOrValue.KEY
-    )
-
-
-def _dump_v_cache_to_torch_tensor(
-    cache: PagedKVCacheManager, ctx: TextContext, device_id: int = 0
-) -> torch.Tensor:
-    """
-    Returns a torch tensor of the shape [seq_len, num_layers, n_heads, head_dim]
-
-    This should only be used for testing purposes.
-    """
-    return _dump_k_or_v_cache_to_torch_tensor(
-        cache, ctx, device_id, KeyOrValue.VALUE
-    )
-
-
-def _dump_k_or_v_cache_to_torch_tensor(
-    cache: PagedKVCacheManager,
-    ctx: TextContext,
-    device_id: int = 0,
-    key_or_value: KeyOrValue = KeyOrValue.KEY,
-) -> torch.Tensor:
-    """
-    Returns a torch tensor of the shape [seq_len, num_layers, n_heads, head_dim]
-
-    This should only be used for testing purposes.
-    """
-    req_blocks = cache.get_req_blocks(ctx)
-
-    params = cache.params
-    assert isinstance(params, KVCacheParams)
     torch_dtype = max_dtype_to_torch(params.dtype)
     page_size = params.page_size
 
     # [total_num_pages, kv_dim, num_layers, page_size, n_heads, head_dim]
-    kv_buffer = cache.get_device_buffer(replica_idx=0)
-    assert isinstance(kv_buffer, KVCacheBuffer)
-    device_buffer = kv_buffer.values[device_id]
-    device_buffer_torch = from_dlpack(device_buffer).to(torch_dtype).cpu()
+    device_buffer_torch = from_dlpack(kv_blocks).to(torch_dtype).cpu()
 
-    # [total_num_pages, num_layers, page_size, n_heads, head_dim]
-    device_buffer_torch = device_buffer_torch[:, key_or_value.value, :, :, :, :]
+    # Keys live at index 0 of the kv dim. [total_num_pages, num_layers,
+    # page_size, n_heads, head_dim]
+    device_buffer_torch = device_buffer_torch[:, 0, :, :, :, :]
 
     # [seq_len, num_layers, n_heads, head_dim]
-    seq_len = ctx.tokens.processed_length
     res = torch.empty(
         (
             seq_len,
@@ -117,7 +78,7 @@ def _dump_k_or_v_cache_to_torch_tensor(
     for start_idx in range(0, seq_len, page_size):
         end_idx = min(start_idx + page_size, seq_len)
 
-        block_id = req_blocks[start_idx // page_size]
+        block_id = block_ids[start_idx // page_size]
 
         # [num_layers, page_size, n_heads, head_dim]
         block_torch = device_buffer_torch[block_id, :]
@@ -164,13 +125,6 @@ def test_fused_qkv_ragged_matmul(session: InferenceSession) -> None:
         device=DeviceRef.CPU(),
     )
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     def construct() -> Graph:
         with Graph(
             "call_ragged_qkv_matmul",
@@ -215,14 +169,6 @@ def test_fused_qkv_ragged_matmul(session: InferenceSession) -> None:
 
     g = construct()
 
-    # Create contexts and claim seq_ids in cache
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
     input_row_offsets = Buffer(
         DType.uint32,
         [batch_size + 1],
@@ -232,7 +178,9 @@ def test_fused_qkv_ragged_matmul(session: InferenceSession) -> None:
         input_row_offsets[i] = running_sum
         running_sum += prompt_lens[i]
     input_row_offsets[i] = running_sum
-    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
     assert kv_runtime_inputs.attention_dispatch_metadata is not None
 
     @modular_graph_test(
@@ -351,13 +299,6 @@ def test_matmul_kv_ragged(session: InferenceSession, dtype: DType) -> None:
         device=DeviceRef.CPU(),
     )
 
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     # Stage the fetch op + custom matmul KV cache ragged op graph.
     graph = Graph(
         "matmul_kv_cache_ragged",
@@ -373,14 +314,6 @@ def test_matmul_kv_ragged(session: InferenceSession, dtype: DType) -> None:
     # Compile and init the model.
     model = session.load(graph)
 
-    # Create contexts and claim seq_ids in cache.
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
     # Compute input row offsets for ragged tensors.
     input_row_offsets = Buffer(DType.uint32, [batch_size + 1])
     running_sum = 0
@@ -388,8 +321,8 @@ def test_matmul_kv_ragged(session: InferenceSession, dtype: DType) -> None:
         input_row_offsets[i] = running_sum
         running_sum += prompt_lens[i]
     input_row_offsets[i] = running_sum
-    kv_inputs = kv_manager.runtime_inputs_for_leaf([batch])
-    kv_blocks = kv_inputs.inputs[0].kv_blocks
+    kv_inputs = paged_kv_cache_inputs(kv_params, prompt_lens, total_num_pages=8)
+    kv_blocks = kv_inputs.kv_blocks
     # First check that the KV cache was zeroed out on initialization.
     assert not kv_blocks.to_numpy().any()
 
@@ -485,13 +418,6 @@ def test_matmul_k_ragged(session: InferenceSession, dtype: DType) -> None:
         ["input_row_offsets_len"],
         device=DeviceRef.CPU(),
     )
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
-    )
-
     graph = Graph(
         "matmul_k_cache_ragged",
         forward=MatmulKRaggedModel(kv_params, layer_idx=0),
@@ -506,14 +432,6 @@ def test_matmul_k_ragged(session: InferenceSession, dtype: DType) -> None:
     # Compile and init the model.
     model = session.load(graph)
 
-    # Create contexts and claim seq_ids in cache.
-    batch = []
-    for i in range(batch_size):
-        context = create_text_context(np.empty(prompt_lens[i]))
-        kv_manager.claim(context)
-        kv_manager.alloc(context)
-        batch.append(context)
-
     # Compute input row offsets for ragged tensors.
     input_row_offsets = Buffer(DType.uint32, [batch_size + 1])
     running_sum = 0
@@ -521,7 +439,7 @@ def test_matmul_k_ragged(session: InferenceSession, dtype: DType) -> None:
         input_row_offsets[i] = running_sum
         running_sum += prompt_lens[i]
     input_row_offsets[batch_size] = running_sum
-    kv_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
+    kv_inputs = paged_kv_cache_inputs(kv_params, prompt_lens, total_num_pages=8)
 
     hidden_states = torch.randn(
         size=[total_seq_len, num_q_heads * kv_params.head_dim],
@@ -532,9 +450,14 @@ def test_matmul_k_ragged(session: InferenceSession, dtype: DType) -> None:
 
     ref_results = hidden_states @ wk.T
 
-    for batch_idx, ctx in enumerate(batch):
-        ctx.update(999)
-        k_cache = _dump_k_cache_to_torch_tensor(kv_manager, ctx)
+    block_ids = block_ids_for_batch(prompt_lens, kv_params.page_size)
+    for batch_idx in range(batch_size):
+        k_cache = _dump_k_cache_to_torch_tensor(
+            kv_params,
+            kv_inputs.kv_blocks,
+            block_ids[batch_idx],
+            prompt_lens[batch_idx],
+        )
 
         # Calculate starting position for this batch
         seq_start = (

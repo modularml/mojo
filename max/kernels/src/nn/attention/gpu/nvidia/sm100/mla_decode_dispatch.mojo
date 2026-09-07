@@ -2946,6 +2946,7 @@ def launch_mla_sm100_decode_enqueue_kernel[
         ValidLengthType=ValidLengthType,
         _is_cache_length_accurate=_is_cache_length_accurate,
         ragged=ragged,
+        Engine=scalar_args_buf.Engine,
     ].kernel if _is_old_fp8 else MLA_SM100_Decode_KV_BF16[
         q_type=q_type,
         KVLUTType=KVLUTType,
@@ -2956,6 +2957,7 @@ def launch_mla_sm100_decode_enqueue_kernel[
         ValidLengthType=ValidLengthType,
         _is_cache_length_accurate=_is_cache_length_accurate,
         ragged=ragged,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     # Enable PDL (Programmatic Dependent Launch) for split-K mode to chain
     # the MLA decode kernel with the combine kernel, reducing host synchronization.
@@ -3064,6 +3066,7 @@ def launch_mla_sm100_decode_native_fp8[
         ragged=ragged,
         fold_q=fold_q,
         q_len_fold=q_len_fold,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     comptime pdl_level = PDLLevel.OVERLAP_AT_END if config.decoding_warp_split_k else PDLLevel.OFF
     ctx.enqueue_function[kernel](
@@ -3178,6 +3181,7 @@ def launch_mla_sm100_decode_native_fp8_layout_g[
         ragged=ragged,
         fold_q=fold_q,
         q_len_fold=q_len_fold,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     comptime pdl_level = PDLLevel.OVERLAP_AT_END if config_g.decoding_warp_split_k else PDLLevel.OFF
     ctx.enqueue_function[kernel](
@@ -3287,6 +3291,7 @@ def launch_mla_sm100_decode_fp8_per_token_scale_rope_aware[
         _is_cache_length_accurate=_is_cache_length_accurate,
         ragged=ragged,
         has_per_token_scales=has_per_token_scales,
+        Engine=scalar_args_buf.Engine,
     ].kernel
     comptime pdl_level = PDLLevel.OVERLAP_AT_END if config.decoding_warp_split_k else PDLLevel.OFF
     ctx.enqueue_function[kernel](

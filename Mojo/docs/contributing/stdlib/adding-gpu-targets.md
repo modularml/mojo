@@ -2,8 +2,9 @@
 
 This guide explains how to add support for a new GPU architecture to the Mojo
 standard library. Targets live in
-[`std/_gpu/host/info.mojo`](../std/_gpu/host/info.mojo); this document is for
-contributors extending that file and is not part of the public API.
+[`std/_gpu/host/info.mojo`](../../../stdlib/std/_gpu/host/info.mojo); this
+document is for contributors extending that file and is not part of the public
+API.
 
 When adding support for a new GPU architecture, you must create a target
 configuration function that returns a `_TargetType`. The sections below explain

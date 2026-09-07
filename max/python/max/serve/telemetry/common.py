@@ -218,6 +218,9 @@ HISTOGRAM_BUCKETS_BY_METRIC: dict[str, tuple[float, ...]] = {
     "maxserve.di.reply_rtt": HISTOGRAM_LATENCY_BUCKETS_MS,
     "maxserve.di.prefill_queue_wait_time": HISTOGRAM_LATENCY_BUCKETS_MS,
     "maxserve.di.decode_postprocess_time": HISTOGRAM_LATENCY_BUCKETS_MS,
+    "maxserve.di.early_sync_time": HISTOGRAM_LATENCY_BUCKETS_MS,
+    "maxserve.di.handoff_to_first_token_time": HISTOGRAM_LATENCY_BUCKETS_MS,
+    "maxserve.structured_output.grammar_build_time": HISTOGRAM_LATENCY_BUCKETS_MS,
     "maxserve.video.encoding_time_milliseconds": HISTOGRAM_LATENCY_BUCKETS_MS,
     "maxserve.dkv.nixl_read_latency": HISTOGRAM_LATENCY_BUCKETS_MS,
     "maxserve.dkv.nixl_write_latency": HISTOGRAM_LATENCY_BUCKETS_MS,
@@ -241,6 +244,7 @@ HISTOGRAM_BUCKETS_BY_METRIC: dict[str, tuple[float, ...]] = {
     "maxserve.batch_pending_reqs": HISTOGRAM_COUNT_BUCKETS,
     "maxserve.requests_awaiting_admission": HISTOGRAM_COUNT_BUCKETS,
     "maxserve.responses_buffered": HISTOGRAM_COUNT_BUCKETS,
+    "maxserve.di.ce_preempted_tg_pending_count": HISTOGRAM_COUNT_BUCKETS,
     # Batch size
     "maxserve.batch_size": HISTOGRAM_BATCH_SIZE_BUCKETS,
     # MiniMax-M3's video processor samples up to 512 frames per clip

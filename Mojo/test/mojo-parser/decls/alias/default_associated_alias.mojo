@@ -73,9 +73,9 @@ struct Bar(D, Movable where False):
     pass
 
 
-# COM: When a refining trait inherits a defaulted alias whose default
-# COM: references `Self.X`, the clone in the child trait must rebind
-# COM: `_Self` to the child trait's own parameter.
+# COM: A defaulted alias whose default references `Self.X` must still resolve
+# COM: that reference correctly when it reaches a conformer through a refining
+# COM: trait rather than directly.
 
 # CHECK-LABEL: lit.trait.decl @Parent
 trait Parent:
@@ -89,11 +89,16 @@ trait Parent:
 
 # CHECK-LABEL: lit.trait.decl @Child
 trait Child(Parent):
-    # `A` has no Self references in its value, so the clone keeps `<{1}>`.
+    pass
+
+
+
+struct ConformsToChild(Child, Movable where False):
     # CHECK:      lit.alias.decl *"A`{{[0-9]+}}": !alias_Int1 = <rebind(:!Int {:scalar<index> 1})>
-    # CHECK-SAME:   {defaultedAssociatedAlias, inheritedFrom = #kgen.trait_symbol<@{{.*}}Parent>}
-    # `B`'s value DOES reference `_Self`; after cloning into Child, those
-    # `_Self` references must be retyped from `!Parent` to `!Child`.
-    # CHECK:      lit.alias.decl *"B`{{[0-9]+}}": !alias_Int1 = <sugar_member_alias(!kgen.param<:!Child_Parent_AnyType *"_Self`">, "A", #kgen.get_witness<:!Child_Parent_AnyType *"_Self`", @{{.*}}::@Parent, "A">)>
-    # CHECK-SAME:   {defaultedAssociatedAlias, inheritedFrom = #kgen.trait_symbol<@{{.*}}Parent>}
+    # CHECK-SAME:   {defaultedAssociatedAlias}
+    # CHECK:      lit.alias.decl *"B`{{[0-9]+}}": !alias_Int1 = <sugar_member_alias(!ConformsToChild, "A", rebind(:!Int {:scalar<index> 1}))>
+    # CHECK-SAME:   {defaultedAssociatedAlias}
+    # CHECK:      kgen.conformance {{.*}}@Parent {
+    # CHECK-NEXT:   kgen.witness "A" : !alias_Int1 = rebind(:!Int {:scalar<index> 1})
+    # CHECK-NEXT:   kgen.witness "B" : !alias_Int1 = sugar_member_alias(!ConformsToChild, "A", rebind(:!Int {:scalar<index> 1}))
     pass

@@ -325,84 +325,84 @@ comptime POP_Boolx4_EQ_Fold = __mlir_attr.`#kgen.simd<false, true, true, false> 
 def pop_simd_cmp_eq(
     x: __mlir_type.`!kgen.simd<4, si8>`, y: __mlir_type.`!kgen.simd<4, si8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred eq>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<eq>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_eq(
     x: __mlir_type.`!kgen.simd<4, ui8>`, y: __mlir_type.`!kgen.simd<4, ui8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred eq>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<eq>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_ne(
     x: __mlir_type.`!kgen.simd<4, si8>`, y: __mlir_type.`!kgen.simd<4, si8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ne>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ne>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_ne(
     x: __mlir_type.`!kgen.simd<4, ui8>`, y: __mlir_type.`!kgen.simd<4, ui8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ne>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ne>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_ult(
     x: __mlir_type.`!kgen.simd<4, ui8>`, y: __mlir_type.`!kgen.simd<4, ui8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred lt>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<lt>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_slt(
     x: __mlir_type.`!kgen.simd<4, si8>`, y: __mlir_type.`!kgen.simd<4, si8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred lt>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<lt>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_ule(
     x: __mlir_type.`!kgen.simd<4, ui8>`, y: __mlir_type.`!kgen.simd<4, ui8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred le>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<le>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_sle(
     x: __mlir_type.`!kgen.simd<4, si8>`, y: __mlir_type.`!kgen.simd<4, si8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred le>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<le>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_ugt(
     x: __mlir_type.`!kgen.simd<4, ui8>`, y: __mlir_type.`!kgen.simd<4, ui8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred gt>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<gt>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_sgt(
     x: __mlir_type.`!kgen.simd<4, si8>`, y: __mlir_type.`!kgen.simd<4, si8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred gt>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<gt>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_uge(
     x: __mlir_type.`!kgen.simd<4, ui8>`, y: __mlir_type.`!kgen.simd<4, ui8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ge>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ge>`](x, y)
 
 
 @always_inline("builtin")
 def pop_simd_cmp_sge(
     x: __mlir_type.`!kgen.simd<4, si8>`, y: __mlir_type.`!kgen.simd<4, si8>`
 ) -> __mlir_type.`!kgen.simd<4, bool>`:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ge>`](x, y)
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ge>`](x, y)
 
 
 # CHECK-LABEL: lit.fn @"fold_pop_simd_cmp
@@ -499,7 +499,7 @@ def fold_pop_simd_cmp() -> POPBoolx4T[POP_Boolx4_EQ_Fold]:
 def pop_unresolved_simd_cmp_sge[
     dt: DType, n: Int, m: Int
 ](x: SIMD[dt, n + m], y: SIMD[dt, n + m]) -> SIMD[.bool, n + m]._mlir_type:
-    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen<cmp_pred ge>`](
+    return __mlir_op.`pop.cmp`[pred=__mlir_attr.`#kgen.cmp_pred<ge>`](
         x._mlir_value, y._mlir_value
     )
 

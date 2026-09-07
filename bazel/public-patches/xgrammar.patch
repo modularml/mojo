@@ -602,7 +602,7 @@ index 5cf140d..5d7ef98 100644
  }
 
 diff --git a/cpp/grammar_functor.cc b/cpp/grammar_functor.cc
-index 4424aca..18e3893 100644
+index 4424aca..590aad2 100644
 --- a/cpp/grammar_functor.cc
 +++ b/cpp/grammar_functor.cc
 @@ -7,6 +7,7 @@
@@ -673,7 +673,7 @@ index 4424aca..18e3893 100644
      }
    }
 
-@@ -1384,7 +1398,25 @@ FSMWithStartEnd GrammarFSMBuilderImpl::BuildNegativeCharacterClass(const Grammar
+@@ -1384,7 +1398,14 @@ FSMWithStartEnd GrammarFSMBuilderImpl::BuildNegativeCharacterClass(const Grammar
        i = right_bound;
      }
    }
@@ -681,26 +681,15 @@ index 4424aca..18e3893 100644
 +  if (excluded_multibyte.empty()) {
 +    AddCharacterRange(result_fsm, start_state, end_state, kMin2BytesUnicode, kMax4BytesUnicode);
 +  } else {
-+    // Accept every multi-byte codepoint in [0x80, 0x10FFFF] that is not
-+    // excluded, by adding the complement of the excluded ranges.
-+    std::sort(excluded_multibyte.begin(), excluded_multibyte.end());
-+    uint32_t next = 0x80;
-+    for (const auto& [lo, hi] : excluded_multibyte) {
-+      if (lo > next) {
-+        AddCodepointRange(result_fsm, start_state, end_state, next, lo - 1);
-+      }
-+      if (hi + 1 > next) {
-+        next = hi + 1;
-+      }
-+    }
-+    if (next <= 0x10FFFF) {
-+      AddCodepointRange(result_fsm, start_state, end_state, next, 0x10FFFF);
++    // Accept every multi-byte codepoint in [0x80, 0x10FFFF] not excluded.
++    for (const auto& [lo, hi] : ComplementCharRanges(excluded_multibyte, 0x80, 0x10FFFF)) {
++      AddCodepointRange(result_fsm, start_state, end_state, lo, hi);
 +    }
 +  }
    return result_fsm;
  }
 
-@@ -1406,12 +1438,10 @@ FSMWithStartEnd GrammarFSMBuilderImpl::CharacterClass(const GrammarExpr& expr) {
+@@ -1406,12 +1427,10 @@ FSMWithStartEnd GrammarFSMBuilderImpl::CharacterClass(const GrammarExpr& expr) {
    }
    result_fsm.AddEndState(end_state);
    for (int i = 1; i < static_cast<int>(expr.size()); i += 2) {
@@ -840,7 +829,7 @@ index d68479f..360396f 100644
    XGRAMMAR_CHECK(!IsStopTokenAccepted())
        << "GrammarMatcher has terminated after accepting the stop token, but is trying to "
 diff --git a/cpp/json_schema_converter.cc b/cpp/json_schema_converter.cc
-index da8b516..b4f2370 100644
+index da8b516..e4758a8 100644
 --- a/cpp/json_schema_converter.cc
 +++ b/cpp/json_schema_converter.cc
 @@ -5,15 +5,20 @@
@@ -868,28 +857,23 @@ index da8b516..b4f2370 100644
      s += r;
      first = false;
    }
-+  s += "], forbidden_keys=[";
-+  for (size_t i = 0; i < forbidden_keys.size(); ++i) {
++  s += "], forbidden_properties=[";
++  for (size_t i = 0; i < forbidden_properties.size(); ++i) {
 +    if (i != 0) s += ", ";
-+    s += forbidden_keys[i];
++    s += forbidden_properties[i];
 +  }
    s +=
        std::string("], allow_additional_properties=") +
        (allow_additional_properties ? "true" : "false") +
-@@ -137,22 +147,486 @@ namespace {
+@@ -137,22 +147,481 @@ namespace {
  enum class SchemaErrorType : int {
    kInvalidSchema = 0,
    kUnsatisfiableSchema = 1,
-+  // Valid and satisfiable, but not expressible exactly here. The oneOf dispatch
-+  // reads this to decide whether it may approximate; the others never can.
 +  kUnsupportedSchema = 2,
  };
 
  using SchemaError = TypedError<SchemaErrorType>;
 
-+constexpr const char* kUnsupportedOneOfMessage =
-+    "unsupported schema keyword: oneOf with overlapping or non-provably-disjoint branches";
-+
 +bool IsSupportedJSONType(const std::string& type) {
 +  static const std::unordered_set<std::string> kTypes = {
 +      "null",
@@ -1365,7 +1349,7 @@ index da8b516..b4f2370 100644
 
    Result<SchemaSpecPtr, SchemaError> Parse(
        const picojson::value& schema,
-@@ -167,10 +641,31 @@ class SchemaParser {
+@@ -167,10 +636,31 @@ class SchemaParser {
        const std::string& uri, const std::string& rule_name_hint
    );
 
@@ -1397,7 +1381,7 @@ index da8b516..b4f2370 100644
    Result<BooleanSpec, SchemaError> ParseBoolean(const picojson::object& schema);
    Result<NullSpec, SchemaError> ParseNull(const picojson::object& schema);
    Result<ArraySpec, SchemaError> ParseArray(const picojson::object& schema);
-@@ -178,25 +673,60 @@ class SchemaParser {
+@@ -178,25 +668,60 @@ class SchemaParser {
    Result<ConstSpec, SchemaError> ParseConst(const picojson::object& schema);
    Result<EnumSpec, SchemaError> ParseEnum(const picojson::object& schema);
    Result<RefSpec, SchemaError> ParseRef(const picojson::object& schema);
@@ -1461,7 +1445,7 @@ index da8b516..b4f2370 100644
    static const std::unordered_set<std::string> kSkippedKeys = {
        "title",
        "default",
-@@ -208,40 +738,86 @@ std::string SchemaParser::ComputeCacheKey(const picojson::value& schema) {
+@@ -208,53 +733,697 @@ std::string SchemaParser::ComputeCacheKey(const picojson::value& schema) {
        "$comment",
        "$schema",
    };
@@ -1546,12 +1530,10 @@ index da8b516..b4f2370 100644
        ++idx;
 -      result += ComputeCacheKey(item);
 +      AppendCacheKey(item, child_context(nullptr), out);
-     }
--    return result + "]";
++    }
 +    out += "]";
 +    return;
-   }
--  return schema.serialize(false);
++  }
 +  schema.serialize(std::back_inserter(out), false);
 +}
 +
@@ -1561,13 +1543,21 @@ index da8b516..b4f2370 100644
 +  std::string key;
 +  AppendCacheKey(schema, context, key);
 +  return key;
- }
-
- void SchemaParser::WarnUnsupportedKeywords(
-@@ -257,12 +833,619 @@ void SchemaParser::WarnUnsupportedKeywords(
-   }
- }
-
++}
++
++void SchemaParser::WarnUnsupportedKeywords(
++    const picojson::object& schema, const std::vector<std::string>& keywords, bool verbose
++) {
++  if (!verbose) {
++    return;
++  }
++  for (const auto& keyword : keywords) {
++    if (schema.find(keyword) != schema.end()) {
++      XGRAMMAR_LOG(WARNING) << "Keyword " << keyword << " is not supported";
++    }
++  }
++}
++
 +std::optional<SchemaError> SchemaParser::CheckUnsupportedKeywords(
 +    const picojson::object& schema, const std::vector<std::string>& keywords
 +) {
@@ -1738,15 +1728,15 @@ index da8b516..b4f2370 100644
 +
 +// A local reference is "#" or a JSON Pointer fragment. RFC 6901 evaluates a
 +// fragment once it is percent-decoded, so "#%2F$defs%2Fx" names the same place
-+// as "#/$defs/x" and the decoded text is what decides. Upstream read the
-+// fragment raw, so permissive mode keeps reading it raw and only the stricter
-+// mode gains the escape handling.
++// as "#/$defs/x" and the decoded text is what decides. The fragment is decoded
++// before evaluation in both modes; decode_escapes gates only whether a
++// malformed escape is reported or left to a best-effort not-found.
 +static bool IsLocalPointerUri(const std::string& uri, bool decode_escapes) {
 +  if (uri.empty() || uri[0] != '#') return false;
 +  std::string path = uri.substr(1);
 +  // A malformed escape is still a local reference. Saying otherwise would
 +  // report it as a foreign URI instead of as the bad escape it is.
-+  if (decode_escapes && !DecodePercentEncoded(&path)) return true;
++  if (!DecodePercentEncoded(&path) && decode_escapes) return true;
 +  return path.empty() || path[0] == '/';
 +}
 +
@@ -1825,7 +1815,7 @@ index da8b516..b4f2370 100644
 +  if (!IsLocalPointerUri(uri, decode_escapes)) return {LocalPointerStatus::kNotFound, nullptr};
 +  const picojson::value* current = &root;
 +  std::string path = uri.substr(1);
-+  if (decode_escapes && !DecodePercentEncoded(&path)) {
++  if (!DecodePercentEncoded(&path) && decode_escapes) {
 +    return {LocalPointerStatus::kMalformedPercentEscape, nullptr};
 +  }
 +  for (size_t start = 0; start < path.size();) {
@@ -2140,18 +2130,28 @@ index da8b516..b4f2370 100644
 +          SchemaErrorType::kUnsupportedSchema,
 +          construct + " forbids extra items on one side while another sets prefixItems"
 +      );
-+    }
-+  }
+     }
+-    return result + "]";
+   }
+-  return schema.serialize(false);
 +  return std::nullopt;
-+}
-+
+ }
+
+-void SchemaParser::WarnUnsupportedKeywords(
+-    const picojson::object& schema, const std::vector<std::string>& keywords, bool verbose
 +// Parse dispatches on these ahead of everything else and ignores the rest, so a
 +// flatten pairing one with another side's constraint would drop it.
 +static std::optional<SchemaError> CheckExclusiveKeywordsUnmixed(
 +    const picojson::object& merged,
 +    const std::unordered_map<std::string, size_t>& key_source,
 +    const std::string& construct
-+) {
+ ) {
+-  if (!verbose) {
+-    return;
+-  }
+-  for (const auto& keyword : keywords) {
+-    if (schema.find(keyword) != schema.end()) {
+-      XGRAMMAR_LOG(WARNING) << "Keyword " << keyword << " is not supported";
 +  for (const char* exclusive : {"$ref", "const", "enum"}) {
 +    if (!merged.count(exclusive)) continue;
 +    const size_t owner = key_source.at(exclusive);
@@ -2161,13 +2161,13 @@ index da8b516..b4f2370 100644
 +          SchemaErrorType::kUnsupportedSchema,
 +          construct + " combines \"" + exclusive + "\" with \"" + key + "\" from another side"
 +      );
-+    }
-+  }
+     }
+   }
 +  return std::nullopt;
-+}
-+
+ }
+
  Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
-     const picojson::value& schema,
+@@ -262,7 +1437,16 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
      const std::string& rule_name_hint,
      std::optional<std::string> default_type
  ) {
@@ -2184,7 +2184,7 @@ index da8b516..b4f2370 100644
    if (schema_cache_.count(cache_key)) {
      return ResultOk(schema_cache_[cache_key]);
    }
-@@ -286,9 +1469,102 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
+@@ -286,9 +1470,102 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
    }
 
    const auto& schema_obj = schema.get<picojson::object>();
@@ -2290,7 +2290,7 @@ index da8b516..b4f2370 100644
 
    SchemaSpecPtr result;
 
-@@ -305,10 +1581,24 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
+@@ -305,10 +1582,24 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
      auto enum_result = ParseEnum(schema_obj);
      if (enum_result.IsErr()) return ResultErr(std::move(enum_result).UnwrapErr());
      result = SchemaSpec::Make(std::move(enum_result).Unwrap(), cache_key, rule_name_hint);
@@ -2317,7 +2317,7 @@ index da8b516..b4f2370 100644
    } else if (schema_obj.count("allOf")) {
      auto allof_result = ParseAllOf(schema_obj);
      if (allof_result.IsErr()) return ResultErr(std::move(allof_result).UnwrapErr());
-@@ -358,18 +1648,93 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
+@@ -358,18 +1649,93 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
          );
        }
      }
@@ -2422,7 +2422,7 @@ index da8b516..b4f2370 100644
    }
 
    schema_cache_[cache_key] = result;
-@@ -377,7 +1742,9 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
+@@ -377,7 +1743,9 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::Parse(
  }
 
  Result<IntegerSpec, SchemaError> SchemaParser::ParseInteger(const picojson::object& schema) {
@@ -2433,7 +2433,7 @@ index da8b516..b4f2370 100644
    IntegerSpec spec;
 
    auto checkAndConvertIntegerBound = [](const picojson::value& value
-@@ -462,14 +1829,24 @@ Result<IntegerSpec, SchemaError> SchemaParser::ParseInteger(const picojson::obje
+@@ -462,14 +1830,24 @@ Result<IntegerSpec, SchemaError> SchemaParser::ParseInteger(const picojson::obje
  }
 
  Result<NumberSpec, SchemaError> SchemaParser::ParseNumber(const picojson::object& schema) {
@@ -2461,7 +2461,7 @@ index da8b516..b4f2370 100644
    };
 
    if (schema.count("minimum")) {
-@@ -521,17 +1898,53 @@ Result<NumberSpec, SchemaError> SchemaParser::ParseNumber(const picojson::object
+@@ -521,17 +1899,53 @@ Result<NumberSpec, SchemaError> SchemaParser::ParseNumber(const picojson::object
    return ResultOk(std::move(spec));
  }
 
@@ -2518,7 +2518,7 @@ index da8b516..b4f2370 100644
    }
    if (schema.count("maxLength")) {
      if (!schema.at("maxLength").is<int64_t>()) {
-@@ -539,7 +1952,14 @@ Result<StringSpec, SchemaError> SchemaParser::ParseString(const picojson::object
+@@ -539,7 +1953,14 @@ Result<StringSpec, SchemaError> SchemaParser::ParseString(const picojson::object
            SchemaErrorType::kInvalidSchema, "maxLength must be an integer"
        );
      }
@@ -2534,7 +2534,7 @@ index da8b516..b4f2370 100644
    }
    if (spec.max_length != -1 && spec.min_length > spec.max_length) {
      return ResultErr<SchemaError>(
-@@ -548,9 +1968,80 @@ Result<StringSpec, SchemaError> SchemaParser::ParseString(const picojson::object
+@@ -548,9 +1969,80 @@ Result<StringSpec, SchemaError> SchemaParser::ParseString(const picojson::object
              std::to_string(spec.max_length)
      );
    }
@@ -2615,7 +2615,7 @@ index da8b516..b4f2370 100644
  Result<BooleanSpec, SchemaError> SchemaParser::ParseBoolean(const picojson::object&) {
    return ResultOk(BooleanSpec{});
  }
-@@ -560,7 +2051,18 @@ Result<NullSpec, SchemaError> SchemaParser::ParseNull(const picojson::object&) {
+@@ -560,7 +2052,18 @@ Result<NullSpec, SchemaError> SchemaParser::ParseNull(const picojson::object&) {
  }
 
  Result<ArraySpec, SchemaError> SchemaParser::ParseArray(const picojson::object& schema) {
@@ -2635,7 +2635,7 @@ index da8b516..b4f2370 100644
    ArraySpec spec;
 
    if (schema.count("prefixItems")) {
-@@ -615,7 +2117,12 @@ Result<ArraySpec, SchemaError> SchemaParser::ParseArray(const picojson::object&
+@@ -615,7 +2118,12 @@ Result<ArraySpec, SchemaError> SchemaParser::ParseArray(const picojson::object&
        if (items_result.IsErr()) return ResultErr(std::move(items_result).UnwrapErr());
        spec.additional_items = std::move(items_result).Unwrap();
      }
@@ -2649,7 +2649,7 @@ index da8b516..b4f2370 100644
      spec.allow_additional_items = true;
      spec.additional_items = SchemaSpec::Make(AnySpec{}, "", "any");
    } else {
-@@ -681,8 +2188,49 @@ Result<ArraySpec, SchemaError> SchemaParser::ParseArray(const picojson::object&
+@@ -681,8 +2189,49 @@ Result<ArraySpec, SchemaError> SchemaParser::ParseArray(const picojson::object&
    return ResultOk(std::move(spec));
  }
 
@@ -2699,7 +2699,7 @@ index da8b516..b4f2370 100644
 
    if (schema.count("properties")) {
      if (!schema.at("properties").is<picojson::object>()) {
-@@ -692,7 +2240,29 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -692,7 +2241,29 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
      }
      auto properties_obj = schema.at("properties").get<picojson::object>();
      for (const auto& key : properties_obj.ordered_keys()) {
@@ -2723,14 +2723,14 @@ index da8b516..b4f2370 100644
 +              "required property \"" + key + "\" is forbidden by a false schema"
 +          );
 +        }
-+        spec.forbidden_keys.push_back(key);
++        spec.forbidden_properties.push_back(key);
 +        continue;
 +      }
 +      auto prop_result = Parse(prop_schema, key);
        if (prop_result.IsErr()) return ResultErr(std::move(prop_result).UnwrapErr());
        spec.properties.push_back({key, std::move(prop_result).Unwrap()});
      }
-@@ -703,7 +2273,49 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -703,7 +2274,49 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
        return ResultErr<SchemaError>(SchemaErrorType::kInvalidSchema, "required must be an array");
      }
      for (const auto& req : schema.at("required").get<picojson::array>()) {
@@ -2781,7 +2781,7 @@ index da8b516..b4f2370 100644
      }
    }
 
-@@ -714,6 +2326,51 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -714,6 +2327,51 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
        );
      }
      auto pattern_props = schema.at("patternProperties").get<picojson::object>();
@@ -2824,7 +2824,7 @@ index da8b516..b4f2370 100644
 +    // just the same, and false-schema keys must not slip into the pattern
 +    // branch either.
 +    if (config_.reject_unsupported &&
-+        (!spec.properties.empty() || !spec.forbidden_keys.empty())) {
++        (!spec.properties.empty() || !spec.forbidden_properties.empty())) {
 +      return ResultErr<SchemaError>(
 +          SchemaErrorType::kUnsatisfiableSchema,
 +          "unsupported: declared or required properties combined with patternProperties"
@@ -2833,7 +2833,7 @@ index da8b516..b4f2370 100644
      for (const auto& key : pattern_props.ordered_keys()) {
        auto prop_result = Parse(pattern_props.at(key), "pattern_prop");
        if (prop_result.IsErr()) return ResultErr(std::move(prop_result).UnwrapErr());
-@@ -721,18 +2378,139 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -721,18 +2379,139 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
      }
    }
 
@@ -2969,7 +2969,7 @@ index da8b516..b4f2370 100644
 +    // rather than fail open, mirroring the properties + patternProperties
 +    // rejection above.
 +    if (config_.reject_unsupported &&
-+        (!spec.properties.empty() || !spec.forbidden_keys.empty() ||
++        (!spec.properties.empty() || !spec.forbidden_properties.empty() ||
 +         !spec.pattern_properties.empty())) {
        return ResultErr<SchemaError>(
            SchemaErrorType::kUnsatisfiableSchema,
@@ -2978,7 +2978,7 @@ index da8b516..b4f2370 100644
        );
      }
      auto prop_names_result = Parse(schema.at("propertyNames"), "property_name", "string");
-@@ -740,7 +2518,8 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -740,7 +2519,8 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
      spec.property_names = std::move(prop_names_result).Unwrap();
    }
 
@@ -2988,7 +2988,7 @@ index da8b516..b4f2370 100644
    if (schema.count("additionalProperties")) {
      auto add_props = schema.at("additionalProperties");
      if (add_props.is<bool>()) {
-@@ -797,6 +2576,50 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -797,6 +2577,50 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
      }
    }
 
@@ -3027,7 +3027,7 @@ index da8b516..b4f2370 100644
 +    }
 +    spec.max_properties = 0;
 +    spec.properties.clear();
-+    spec.forbidden_keys.clear();
++    spec.forbidden_properties.clear();
 +    spec.pattern_properties.clear();
 +    spec.property_names = nullptr;
 +    spec.allow_additional_properties = false;
@@ -3039,7 +3039,7 @@ index da8b516..b4f2370 100644
    if (spec.max_properties != -1 && spec.min_properties > spec.max_properties) {
      return ResultErr<SchemaError>(
          SchemaErrorType::kUnsatisfiableSchema,
-@@ -826,7 +2649,15 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
+@@ -826,7 +2650,15 @@ Result<ObjectSpec, SchemaError> SchemaParser::ParseObject(const picojson::object
 
  Result<ConstSpec, SchemaError> SchemaParser::ParseConst(const picojson::object& schema) {
    ConstSpec spec;
@@ -3056,7 +3056,7 @@ index da8b516..b4f2370 100644
    return ResultOk(std::move(spec));
  }
 
-@@ -840,7 +2671,14 @@ Result<EnumSpec, SchemaError> SchemaParser::ParseEnum(const picojson::object& sc
+@@ -840,7 +2672,14 @@ Result<EnumSpec, SchemaError> SchemaParser::ParseEnum(const picojson::object& sc
      return ResultErr<SchemaError>(SchemaErrorType::kInvalidSchema, "enum array must not be empty");
    }
    for (const auto& value : enum_array) {
@@ -3071,7 +3071,7 @@ index da8b516..b4f2370 100644
    }
    return ResultOk(std::move(spec));
  }
-@@ -854,9 +2692,22 @@ Result<RefSpec, SchemaError> SchemaParser::ParseRef(const picojson::object& sche
+@@ -854,9 +2693,22 @@ Result<RefSpec, SchemaError> SchemaParser::ParseRef(const picojson::object& sche
    return ResultOk(std::move(spec));
  }
 
@@ -3094,7 +3094,7 @@ index da8b516..b4f2370 100644
    if (ref_cache_.count(uri)) return ResultOk(ref_cache_[uri]);
 
    if (uri == "#") {
-@@ -869,58 +2720,186 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::ResolveRef(
+@@ -869,71 +2721,331 @@ Result<SchemaSpecPtr, SchemaError> SchemaParser::ResolveRef(
      return ResultOk(resolved);
    }
 
@@ -3122,6 +3122,8 @@ index da8b516..b4f2370 100644
 -      return ResultErr<SchemaError>(
 -          SchemaErrorType::kInvalidSchema, "Cannot find field " + p + " in " + uri
 -      );
+-    }
+-    current = current.get().get(p);
 +  std::string missing;
 +  const LocalPointerResult pointer =
 +      FindLocalPointerTarget(root_schema_, uri, &missing, config_.reject_unsupported);
@@ -3136,15 +3138,17 @@ index da8b516..b4f2370 100644
 +    return ResultErr<SchemaError>(
 +        SchemaErrorType::kInvalidSchema, "Cannot find field " + missing + " in " + uri
 +    );
-+  }
-+
+   }
+
+-  auto result = Parse(current, new_rule_name_prefix);
 +  auto result = Parse(*target, new_rule_name_prefix);
-+  if (result.IsErr()) return ResultErr(std::move(result).UnwrapErr());
-+  auto resolved = std::move(result).Unwrap();
-+  ref_cache_[uri] = resolved;
-+  return ResultOk(resolved);
-+}
-+
+   if (result.IsErr()) return ResultErr(std::move(result).UnwrapErr());
+   auto resolved = std::move(result).Unwrap();
+   ref_cache_[uri] = resolved;
+   return ResultOk(resolved);
+ }
+
+-Result<AnyOfSpec, SchemaError> SchemaParser::ParseAnyOf(const picojson::object& schema) {
 +void SchemaParser::CollectPropertyNamesConstraints(
 +    const picojson::value& schema,
 +    std::vector<picojson::object>& out
@@ -3178,29 +3182,17 @@ index da8b516..b4f2370 100644
 +      for (const auto& sub : obj.at(comb).get<picojson::array>()) {
 +        CollectPropertyNamesConstraints(sub, out, visited_refs);
 +      }
-     }
--    current = current.get().get(p);
-   }
--
--  auto result = Parse(current, new_rule_name_prefix);
--  if (result.IsErr()) return ResultErr(std::move(result).UnwrapErr());
--  auto resolved = std::move(result).Unwrap();
--  ref_cache_[uri] = resolved;
--  return ResultOk(resolved);
++    }
++  }
 +  out.push_back(obj);
- }
-
--Result<AnyOfSpec, SchemaError> SchemaParser::ParseAnyOf(const picojson::object& schema) {
++}
++
 +Result<AnyOfSpec, SchemaError> SchemaParser::ParseAnyOf(
 +    const picojson::object& schema, const std::string& keyword
 +) {
    AnyOfSpec spec;
 -  auto anyof_key = schema.count("anyOf") ? "anyOf" : "oneOf";
 -  if (!schema.at(anyof_key).is<picojson::array>()) {
--    return ResultErr<SchemaError>(
--        SchemaErrorType::kInvalidSchema, std::string(anyof_key) + " must be an array"
--    );
--  }
 +  if (!schema.at(keyword).is<picojson::array>()) {
 +    return ResultErr<SchemaError>(SchemaErrorType::kInvalidSchema, keyword + " must be an array");
 +  }
@@ -3216,9 +3208,7 @@ index da8b516..b4f2370 100644
 +    if (IsNoConstraintKeyword(k)) base.erase(k);
 +  }
 +  const std::vector<std::string> base_keys = base.ordered_keys();
-   int idx = 0;
--  for (const auto& option : schema.at(anyof_key).get<picojson::array>()) {
--    auto option_result = Parse(option, "case_" + std::to_string(idx));
++  int idx = 0;
 +  for (const auto& option : schema.at(keyword).get<picojson::array>()) {
 +    if (IsFalseSchema(option)) {
 +      // A false branch accepts nothing; drop it from the union instead of
@@ -3268,19 +3258,19 @@ index da8b516..b4f2370 100644
 +      );
 +    }
 +    auto option_result = Parse(merged, "case_" + std::to_string(idx));
-     if (option_result.IsErr()) return ResultErr(std::move(option_result).UnwrapErr());
-     spec.options.push_back(std::move(option_result).Unwrap());
-     ++idx;
-   }
++    if (option_result.IsErr()) return ResultErr(std::move(option_result).UnwrapErr());
++    spec.options.push_back(std::move(option_result).Unwrap());
++    ++idx;
++  }
 +  if (spec.options.empty()) {
 +    return ResultErr<SchemaError>(
 +        SchemaErrorType::kUnsatisfiableSchema,
 +        keyword + " has no satisfiable branch"
 +    );
 +  }
-   return ResultOk(std::move(spec));
- }
-
++  return ResultOk(std::move(spec));
++}
++
 +Result<AnyOfSpec, SchemaError> SchemaParser::ParseOneOf(const picojson::object& schema) {
 +  if (!schema.at("oneOf").is<picojson::array>()) {
 +    return ResultErr<SchemaError>(SchemaErrorType::kInvalidSchema, "oneOf must be an array");
@@ -3295,21 +3285,29 @@ index da8b516..b4f2370 100644
 +  // Prove before ParseAnyOf folds the base keywords in: folding only narrows, and
 +  // narrowing cannot create an overlap the declared branches did not have.
 +  if (!TryProvePairwiseDisjointOneOf(options, &work_remaining_)) {
-+    return ResultErr<SchemaError>(SchemaErrorType::kUnsupportedSchema, kUnsupportedOneOfMessage);
-+  }
+     return ResultErr<SchemaError>(
+-        SchemaErrorType::kInvalidSchema, std::string(anyof_key) + " must be an array"
++        SchemaErrorType::kUnsupportedSchema,
++        "unsupported schema keyword: oneOf with overlapping or non-provably-disjoint branches"
+     );
+   }
 +
 +  // Disjoint branches make at-least-one the same language as exactly-one, so
 +  // reuse anyOf's lowering and inherit its base-keyword fold.
 +  return ParseAnyOf(schema, "oneOf");
 +}
 +
- Result<AllOfSpec, SchemaError> SchemaParser::ParseAllOf(const picojson::object& schema) {
-   AllOfSpec spec;
-   if (!schema.at("allOf").is<picojson::array>()) {
-@@ -928,6 +2907,13 @@ Result<AllOfSpec, SchemaError> SchemaParser::ParseAllOf(const picojson::object&
-   }
++Result<AllOfSpec, SchemaError> SchemaParser::ParseAllOf(const picojson::object& schema) {
++  AllOfSpec spec;
++  if (!schema.at("allOf").is<picojson::array>()) {
++    return ResultErr<SchemaError>(SchemaErrorType::kInvalidSchema, "allOf must be an array");
++  }
    int idx = 0;
-   for (const auto& sub_schema : schema.at("allOf").get<picojson::array>()) {
+-  for (const auto& option : schema.at(anyof_key).get<picojson::array>()) {
+-    auto option_result = Parse(option, "case_" + std::to_string(idx));
+-    if (option_result.IsErr()) return ResultErr(std::move(option_result).UnwrapErr());
+-    spec.options.push_back(std::move(option_result).Unwrap());
++  for (const auto& sub_schema : schema.at("allOf").get<picojson::array>()) {
 +    // Drop no-op members (lone if/then/else, empty {}/true): they impose no
 +    // constraint, and keeping them would push the member count past 1 and make
 +    // GenerateAllOf fall back to unconstrained.
@@ -3317,13 +3315,15 @@ index da8b516..b4f2370 100644
 +      ++idx;
 +      continue;
 +    }
-     auto sub_result = Parse(sub_schema, "all_" + std::to_string(idx));
-     if (sub_result.IsErr()) return ResultErr(std::move(sub_result).UnwrapErr());
-     spec.schemas.push_back(std::move(sub_result).Unwrap());
-@@ -936,6 +2922,128 @@ Result<AllOfSpec, SchemaError> SchemaParser::ParseAllOf(const picojson::object&
-   return ResultOk(std::move(spec));
- }
-
++    auto sub_result = Parse(sub_schema, "all_" + std::to_string(idx));
++    if (sub_result.IsErr()) return ResultErr(std::move(sub_result).UnwrapErr());
++    spec.schemas.push_back(std::move(sub_result).Unwrap());
+     ++idx;
+   }
+-  return ResultOk(std::move(spec));
++  return ResultOk(std::move(spec));
++}
++
 +std::optional<SchemaError> AllOfFlattener::Collect(const picojson::object& schema) {
 +  picojson::object own = schema;
 +  own.erase("allOf");
@@ -3397,8 +3397,12 @@ index da8b516..b4f2370 100644
 +    if (auto err = Collect(member_obj)) return err;
 +  }
 +  return std::nullopt;
-+}
-+
+ }
+
+-Result<AllOfSpec, SchemaError> SchemaParser::ParseAllOf(const picojson::object& schema) {
+-  AllOfSpec spec;
+-  if (!schema.at("allOf").is<picojson::array>()) {
+-    return ResultErr<SchemaError>(SchemaErrorType::kInvalidSchema, "allOf must be an array");
 +Result<picojson::value, SchemaError> SchemaParser::MergeAllOf(const picojson::object& schema) {
 +  // The checks below need to know which contributor a merged key came from.
 +  AllOfFlattener flattener{GetRootSchema(), config_.reject_unsupported};
@@ -3433,7 +3437,13 @@ index da8b516..b4f2370 100644
 +      if (!SameJson(merged.at(key), *combined)) key_source[key] = kSeveralSources;
 +      merged[key] = std::move(*combined);
 +    }
-+  }
+   }
+-  int idx = 0;
+-  for (const auto& sub_schema : schema.at("allOf").get<picojson::array>()) {
+-    auto sub_result = Parse(sub_schema, "all_" + std::to_string(idx));
+-    if (sub_result.IsErr()) return ResultErr(std::move(sub_result).UnwrapErr());
+-    spec.schemas.push_back(std::move(sub_result).Unwrap());
+-    ++idx;
 +
 +  // No string-tier check here: the merged text carries every tier, and
 +  // ReconcileStringTiers judges the combination once ParseString reaches it, so
@@ -3441,15 +3451,14 @@ index da8b516..b4f2370 100644
 +
 +  if (auto err = CheckExclusiveKeywordsUnmixed(merged, key_source, "allOf")) {
 +    return ResultErr(std::move(*err));
-+  }
+   }
+-  return ResultOk(std::move(spec));
 +
 +  return ResultOk(picojson::value(std::move(merged)));
-+}
-+
+ }
+
  Result<TypeArraySpec, SchemaError> SchemaParser::ParseTypeArray(
-     const picojson::object& schema, const std::string& rule_name_hint
- ) {
-@@ -1102,6 +3210,7 @@ const std::string JSONSchemaConverter::kBasicArray = "basic_array";
+@@ -1102,6 +3214,7 @@ const std::string JSONSchemaConverter::kBasicArray = "basic_array";
  const std::string JSONSchemaConverter::kBasicObject = "basic_object";
  const std::string JSONSchemaConverter::kBasicEscape = "basic_escape";
  const std::string JSONSchemaConverter::kBasicStringSub = "basic_string_sub";
@@ -3457,7 +3466,7 @@ index da8b516..b4f2370 100644
 
  // ==================== JSONSchemaConverter Implementation ====================
 
-@@ -1111,7 +3220,12 @@ JSONSchemaConverter::JSONSchemaConverter(
+@@ -1111,7 +3224,11 @@ JSONSchemaConverter::JSONSchemaConverter(
      bool any_whitespace,
      std::optional<int> max_whitespace_cnt,
      RefResolver ref_resolver,
@@ -3466,19 +3475,17 @@ index da8b516..b4f2370 100644
 +    int string_value_delimiter_token_id,
 +    std::vector<int32_t> string_value_forbidden_token_ids,
 +    std::string additional_bare_key_terminal,
-+    std::string bare_key_pattern_forbidden,
-+    bool keys_are_bare
++    std::string bare_key_pattern_forbidden
  )
      : indent_manager_(
            indent,
-@@ -1123,9 +3237,25 @@ JSONSchemaConverter::JSONSchemaConverter(
+@@ -1123,9 +3240,24 @@ JSONSchemaConverter::JSONSchemaConverter(
        any_whitespace_(any_whitespace),
        max_whitespace_cnt_(max_whitespace_cnt),
        any_order_(any_order),
 +      string_value_delimiter_token_id_(string_value_delimiter_token_id),
 +      string_value_forbidden_token_ids_(std::move(string_value_forbidden_token_ids)),
 +      additional_bare_key_terminal_(std::move(additional_bare_key_terminal)),
-+      keys_are_bare_(keys_are_bare),
 +      bare_key_pattern_forbidden_(std::move(bare_key_pattern_forbidden)),
        ref_resolver_(std::move(ref_resolver)) {
 +  if (string_value_delimiter_token_id_ < 0) {
@@ -3497,33 +3504,128 @@ index da8b516..b4f2370 100644
    if (any_whitespace) {
      std::string whitespace_part;
      if (!max_whitespace_cnt_.has_value()) {
-@@ -1198,7 +3328,7 @@ void JSONSchemaConverter::AddBasicRules() {
+@@ -1137,6 +3269,12 @@ JSONSchemaConverter::JSONSchemaConverter(
+   } else {
+     colon_pattern_ = "\"" + colon_sep + "\"";
+   }
++  value_framing_ = string_value_delimiter_token_id_ >= 0
++      ? GenerationContext::Framing::kTokenDelimited
++      : GenerationContext::Framing::kQuotedJSON;
++  key_framing_ = additional_bare_key_terminal_.empty()
++      ? GenerationContext::Framing::kQuotedJSON
++      : GenerationContext::Framing::kBare;
+ }
+
+ std::string JSONSchemaConverter::Convert(const SchemaSpecPtr& spec) {
+@@ -1145,7 +3283,7 @@ std::string JSONSchemaConverter::Convert(const SchemaSpecPtr& spec) {
+   // Register the root rule for circular reference handling
+   // This allows $ref: "#" to resolve to "root"
+   std::string root_rule_name = ebnf_script_creator_.AllocateRuleName("root");
+-  uri_to_rule_name_["#"] = root_rule_name;
++  value_cache_.ref_rules["#"] = root_rule_name;
+
+   // Check if the spec can be directly mapped to an existing rule
+   auto cached_rule = GetCache(spec->cache_key);
+@@ -1157,7 +3295,8 @@ std::string JSONSchemaConverter::Convert(const SchemaSpecPtr& spec) {
+     if (!spec->cache_key.empty()) {
+       AddCache(spec->cache_key, root_rule_name);
+     }
+-    std::string root_body = GenerateFromSpec(spec, root_rule_name);
++    const GenerationContext value_ctx = MakeValueContext();
++    std::string root_body = GenerateFromSpec(spec, root_rule_name, value_ctx);
+     ebnf_script_creator_.AddRuleWithAllocatedName(root_rule_name, root_body);
+   }
+
+@@ -1175,44 +3314,49 @@ void JSONSchemaConverter::AddBasicRules() {
+     indent_manager_ = IndentManager(std::nullopt, ", ", false, std::nullopt);
+   }
+
++  const GenerationContext value_ctx = MakeValueContext();
++
+   // basic_any - use "{}" as the cache key for empty schema
+   auto any_spec = SchemaSpec::Make(AnySpec{}, "{}", kBasicAny);
+-  std::string any_body = GenerateAny(std::get<AnySpec>(any_spec->spec), kBasicAny);
++  std::string any_body = GenerateAny(std::get<AnySpec>(any_spec->spec), kBasicAny, value_ctx);
+   ebnf_script_creator_.AddRule(kBasicAny, any_body);
+   AddCache("{}", kBasicAny);
+
+   // basic_integer - cache_key matches SchemaParser::ComputeCacheKey for {"type": "integer"}
+   constexpr const char* kIntegerCacheKey = "{\"type\":\"integer\"}";
+   auto int_spec = SchemaSpec::Make(IntegerSpec{}, kIntegerCacheKey, kBasicInteger);
+-  std::string int_body = GenerateInteger(std::get<IntegerSpec>(int_spec->spec), kBasicInteger);
++  std::string int_body =
++      GenerateInteger(std::get<IntegerSpec>(int_spec->spec), kBasicInteger, value_ctx);
+   ebnf_script_creator_.AddRule(kBasicInteger, int_body);
+   AddCache(kIntegerCacheKey, kBasicInteger);
+
+   // basic_number - cache_key matches SchemaParser::ComputeCacheKey for {"type": "number"}
+   constexpr const char* kNumberCacheKey = "{\"type\":\"number\"}";
+   auto num_spec = SchemaSpec::Make(NumberSpec{}, kNumberCacheKey, kBasicNumber);
+-  std::string num_body = GenerateNumber(std::get<NumberSpec>(num_spec->spec), kBasicNumber);
++  std::string num_body =
++      GenerateNumber(std::get<NumberSpec>(num_spec->spec), kBasicNumber, value_ctx);
+   ebnf_script_creator_.AddRule(kBasicNumber, num_body);
+   AddCache(kNumberCacheKey, kBasicNumber);
+
    // basic_string - cache_key matches SchemaParser::ComputeCacheKey for {"type": "string"}
    constexpr const char* kStringCacheKey = "{\"type\":\"string\"}";
    auto str_spec = SchemaSpec::Make(StringSpec{}, kStringCacheKey, kBasicString);
 -  std::string str_body = "[\"] " + kBasicStringSub;
-+  std::string str_body = GenerateStringDefault();
++  std::string str_body = GenerateStringDefault(value_ctx);
    ebnf_script_creator_.AddRule(kBasicString, str_body);
    AddCache(kStringCacheKey, kBasicString);
 
-@@ -1236,6 +3366,10 @@ void JSONSchemaConverter::AddBasicRules() {
+   // basic_boolean - cache_key matches SchemaParser::ComputeCacheKey for {"type": "boolean"}
+   constexpr const char* kBooleanCacheKey = "{\"type\":\"boolean\"}";
+   auto bool_spec = SchemaSpec::Make(BooleanSpec{}, kBooleanCacheKey, kBasicBoolean);
+-  std::string bool_body = GenerateBoolean(std::get<BooleanSpec>(bool_spec->spec), kBasicBoolean);
++  std::string bool_body =
++      GenerateBoolean(std::get<BooleanSpec>(bool_spec->spec), kBasicBoolean, value_ctx);
+   ebnf_script_creator_.AddRule(kBasicBoolean, bool_body);
+   AddCache(kBooleanCacheKey, kBasicBoolean);
+
+   // basic_null - cache_key matches SchemaParser::ComputeCacheKey for {"type": "null"}
+   constexpr const char* kNullCacheKey = "{\"type\":\"null\"}";
+   auto null_spec = SchemaSpec::Make(NullSpec{}, kNullCacheKey, kBasicNull);
+-  std::string null_body = GenerateNull(std::get<NullSpec>(null_spec->spec), kBasicNull);
++  std::string null_body = GenerateNull(std::get<NullSpec>(null_spec->spec), kBasicNull, value_ctx);
+   ebnf_script_creator_.AddRule(kBasicNull, null_body);
+   AddCache(kNullCacheKey, kBasicNull);
+
+@@ -1222,7 +3366,8 @@ void JSONSchemaConverter::AddBasicRules() {
+   array_spec_val.allow_additional_items = true;
+   array_spec_val.additional_items = any_spec;
+   auto array_spec = SchemaSpec::Make(std::move(array_spec_val), kArrayCacheKey, kBasicArray);
+-  std::string array_body = GenerateArray(std::get<ArraySpec>(array_spec->spec), kBasicArray);
++  std::string array_body =
++      GenerateArray(std::get<ArraySpec>(array_spec->spec), kBasicArray, value_ctx);
+   ebnf_script_creator_.AddRule(kBasicArray, array_body);
+   AddCache(kArrayCacheKey, kBasicArray);
+
+@@ -1232,10 +3377,15 @@ void JSONSchemaConverter::AddBasicRules() {
+   obj_spec_val.allow_additional_properties = true;
+   obj_spec_val.additional_properties_schema = any_spec;
+   auto obj_spec = SchemaSpec::Make(std::move(obj_spec_val), kObjectCacheKey, kBasicObject);
+-  std::string obj_body = GenerateObject(std::get<ObjectSpec>(obj_spec->spec), kBasicObject);
++  std::string obj_body =
++      GenerateObject(std::get<ObjectSpec>(obj_spec->spec), kBasicObject, value_ctx);
    ebnf_script_creator_.AddRule(kBasicObject, obj_body);
    AddCache(kObjectCacheKey, kBasicObject);
 
-+  if (keys_are_bare_) {
++  if (!additional_bare_key_terminal_.empty()) {
 +    ebnf_script_creator_.AddRule(kBareKey, additional_bare_key_terminal_);
 +  }
 +
    indent_manager_ = saved_indent_manager;
  }
 
-@@ -1263,15 +3397,175 @@ std::string JSONSchemaConverter::NextSeparator(bool is_end) {
+@@ -1263,15 +3413,170 @@ std::string JSONSchemaConverter::NextSeparator(bool is_end) {
    return indent_manager_.NextSeparator(is_end);
  }
 
 -std::string JSONSchemaConverter::GetKeyPattern() const { return kBasicString; }
 +std::string JSONSchemaConverter::GetKeyPattern() const {
-+  if (keys_are_bare_) {
++  if (!additional_bare_key_terminal_.empty()) {
 +    return kBareKey;
 +  }
 +  return kBasicString;
@@ -3536,8 +3638,8 @@ index da8b516..b4f2370 100644
    bool is_terminal = false;
 -  std::map<char, TrieNode> children;
 +  std::map<TCodepoint, TrieNode> children;
-+};
-+
+ };
+
 +// Whether `c` must not be spliced into EBNF source raw. Raw \r/\n are lexer
 +// errors and NUL ends lexing; the remaining control bytes are escaped for
 +// hygiene.
@@ -3590,40 +3692,33 @@ index da8b516..b4f2370 100644
 +  return result;
 +}
 +
-+// First-char and continuation-char sets of a bare-key terminal.
-+struct BareKeyAlphabet {
-+  std::set<char> first;
-+  std::set<char> cont;
- };
-
-+// Splits a bare-key terminal of the canonical shape "[first][cont]*" into its
-+// expanded first-char and continuation-char sets. Any other shape returns
-+// nullopt (no exact exclusion possible; see the callers for how each handles
-+// that).
-+std::optional<BareKeyAlphabet> DecomposeBareKeyTerminal(const std::string& terminal) {
++// Splits a positional terminal of the canonical shape "[first][rest]*" into its
++// expanded first-char and rest-char sets. Any other shape returns nullopt (no
++// exact exclusion possible; see the callers for how each handles that).
++std::optional<FirstRestPattern> DecomposeFirstRestPattern(const std::string& pattern) {
 +  size_t i = 0;
 +  auto read_class = [&]() -> std::optional<std::string> {
-+    while (i < terminal.size() && terminal[i] == ' ') ++i;
-+    if (i >= terminal.size() || terminal[i] != '[') return std::nullopt;
++    while (i < pattern.size() && pattern[i] == ' ') ++i;
++    if (i >= pattern.size() || pattern[i] != '[') return std::nullopt;
 +    size_t start = ++i;
-+    while (i < terminal.size() && terminal[i] != ']') {
-+      if (terminal[i] == '\\') ++i;
++    while (i < pattern.size() && pattern[i] != ']') {
++      if (pattern[i] == '\\') ++i;
 +      ++i;
 +    }
-+    if (i >= terminal.size()) return std::nullopt;
-+    return terminal.substr(start, i++ - start);
++    if (i >= pattern.size()) return std::nullopt;
++    return pattern.substr(start, i++ - start);
 +  };
 +  auto first_body = read_class();
 +  if (!first_body) return std::nullopt;
-+  auto cont_body = read_class();
-+  if (!cont_body || i >= terminal.size() || terminal[i] != '*') return std::nullopt;
++  auto rest_body = read_class();
++  if (!rest_body || i >= pattern.size() || pattern[i] != '*') return std::nullopt;
 +  ++i;
-+  while (i < terminal.size() && terminal[i] == ' ') ++i;
-+  if (i != terminal.size()) return std::nullopt;
++  while (i < pattern.size() && pattern[i] == ' ') ++i;
++  if (i != pattern.size()) return std::nullopt;
 +
 +  auto first_chars = ExpandCharClassBodyToASCIISet(*first_body);
-+  auto cont_chars = ExpandCharClassBodyToASCIISet(*cont_body);
-+  if (!first_chars || !cont_chars) return std::nullopt;
++  auto rest_chars = ExpandCharClassBodyToASCIISet(*rest_body);
++  if (!first_chars || !rest_chars) return std::nullopt;
 +  // The exclusion trie's end-of-key soundness assumes the alphabet is
 +  // disjoint from the characters that terminate a key (whitespace, the
 +  // colon): otherwise an excluded name could be respelled as a distinct key
@@ -3631,18 +3726,20 @@ index da8b516..b4f2370 100644
 +  // collapses back. All of ASCII whitespace counts, not just the grammar's
 +  // own separators; non-ASCII whitespace (NBSP etc.) cannot appear at all --
 +  // the expansion above rejects non-ASCII members outright.
-+  for (const auto* chars : {&*first_chars, &*cont_chars}) {
++  for (const auto* chars : {&*first_chars, &*rest_chars}) {
 +    for (char c : *chars) {
 +      if (std::isspace(static_cast<unsigned char>(c)) || c == ':') return std::nullopt;
 +    }
 +  }
-+  return BareKeyAlphabet{std::move(*first_chars), std::move(*cont_chars)};
++  return FirstRestPattern{
++      std::move(*first_chars), std::move(*rest_chars), std::move(*first_body),
++      std::move(*rest_body)};
 +}
 +
-+bool IsBareKeyInAlphabet(const std::string& key, const BareKeyAlphabet& alphabet) {
-+  if (key.empty() || !alphabet.first.count(key[0])) return false;
++bool IsKeyInFirstRestPattern(const std::string& key, const FirstRestPattern& pattern) {
++  if (key.empty() || !pattern.first.count(key[0])) return false;
 +  for (size_t i = 1; i < key.size(); ++i) {
-+    if (!alphabet.cont.count(key[i])) return false;
++    if (!pattern.rest.count(key[i])) return false;
 +  }
 +  return true;
 +}
@@ -3655,7 +3752,7 @@ index da8b516..b4f2370 100644
 +// are non-empty). A node's alternatives are never all absent: a leaf's
 +// divergence class is the full continuation set.
 +std::string BuildBareTrieBody(
-+    const TrieNode& node, const BareKeyAlphabet& alphabet, bool at_root
++    const TrieNode& node, const FirstRestPattern& pattern, bool at_root
 +) {
 +  std::string result;
 +  bool first = true;
@@ -3671,14 +3768,14 @@ index da8b516..b4f2370 100644
 +  }
 +
 +  // 2. Diverging char - any alphabet char that is not a trie edge, then any
-+  // continuation tail
-+  std::set<char> diverging = at_root ? alphabet.first : alphabet.cont;
++  // rest tail
++  std::set<char> diverging = at_root ? pattern.first : pattern.rest;
 +  for (const auto& [codepoint, _] : node.children) {
 +    // The alphabet is ASCII-only, so a wider codepoint has nothing to erase.
 +    if (codepoint >= 0 && codepoint < 0x80) diverging.erase(static_cast<char>(codepoint));
 +  }
 +  if (!diverging.empty()) {
-+    add(FormatCharClass(diverging) + " " + FormatCharClass(alphabet.cont) + "*");
++    add(FormatCharClass(diverging) + " " + FormatCharClass(pattern.rest) + "*");
 +  }
 +
 +  // 3. Trie edges - recurse.
@@ -3686,7 +3783,7 @@ index da8b516..b4f2370 100644
 +    std::string char_lit = "\"";
 +    AppendEscapedCodepoint(&char_lit, codepoint, "\"\\");
 +    char_lit += "\"";
-+    add(char_lit + " " + BuildBareTrieBody(child, alphabet, false));
++    add(char_lit + " " + BuildBareTrieBody(child, pattern, false));
 +  }
 +
 +  return "(" + result + ")";
@@ -3695,9 +3792,20 @@ index da8b516..b4f2370 100644
  std::string BuildTrieBody(const TrieNode& node) {
    std::string result;
    bool first = true;
-@@ -1288,11 +3582,8 @@ std::string BuildTrieBody(const TrieNode& node) {
+@@ -1281,63 +3586,246 @@ std::string BuildTrieBody(const TrieNode& node) {
+     result += s;
+   };
+-
++  bool edge_quote = node.children.count('"') != 0;
++  bool edge_backslash = node.children.count('\\') != 0;
++
+   // 1. Close quote - only if no excluded key ends here
+   if (!node.is_terminal) {
+     add("\"\\\"\"");
+   }
 
-   // 2. Negated char class - excludes edge chars + JSON specials
+-  // 2. Negated char class - excludes edge chars + JSON specials
++  // 2. Negated char class - excludes unescaped edge chars + JSON specials
    std::string neg = "[^";
 -  for (const auto& [c, _] : node.children) {
 -    if (c == ']' || c == '\\' || c == '^' || c == '-') {
@@ -3705,26 +3813,46 @@ index da8b516..b4f2370 100644
 -    }
 -    neg += c;
 +  for (const auto& [codepoint, _] : node.children) {
++    if (codepoint == '"' || codepoint == '\\') continue;
 +    AppendEscapedCodepoint(&neg, codepoint, "]\\^-");
    }
    neg += "\\0-\\x1f\\\"\\\\\\r\\n]";
    add(neg + " " + JSONSchemaConverter::kBasicStringSub);
-@@ -1301,43 +3592,186 @@ std::string BuildTrieBody(const TrieNode& node) {
-   add("\"\\\\\" " + JSONSchemaConverter::kBasicEscape + " " + JSONSchemaConverter::kBasicStringSub);
 
-   // 4. Trie edges - recurse
+-  // 3. Escape sequence
+-  add("\"\\\\\" " + JSONSchemaConverter::kBasicEscape + " " + JSONSchemaConverter::kBasicStringSub);
++  // 3. Escape sequence - except for `"`/`\` edges (handled below)
++  if (!edge_quote && !edge_backslash) {
++    add("\"\\\\\" " + JSONSchemaConverter::kBasicEscape + " " +
++        JSONSchemaConverter::kBasicStringSub);
++  } else {
++    std::string esc_class = "[";
++    if (!edge_quote) esc_class += "\\\"";
++    if (!edge_backslash) esc_class += "\\\\";
++    esc_class += "/bfnrt]";
++    std::string escape_body = esc_class +
++                              " | \"u\" [A-Fa-f0-9] [A-Fa-f0-9] [A-Fa-f0-9] [A-Fa-f0-9]";
++    add("\"\\\\\" (" + escape_body + ") " + JSONSchemaConverter::kBasicStringSub);
++  }
+
+-  // 4. Trie edges - recurse
 -  for (const auto& [c, child] : node.children) {
 -    std::string child_body = BuildTrieBody(child);
++  // 4. Trie edges - recurse.
 +  for (const auto& [codepoint, child] : node.children) {
      std::string char_lit = "\"";
 -    if (c == '"') {
 -      char_lit += "\\\"";
 -    } else if (c == '\\') {
 -      char_lit += "\\\\";
--    } else {
++    if (codepoint == '"') {
++      char_lit += "\\\\\\\"";
++    } else if (codepoint == '\\') {
++      char_lit += "\\\\\\\\";
+     } else {
 -      char_lit += c;
--    }
-+    AppendEscapedCodepoint(&char_lit, codepoint, "\"\\");
++      AppendEscapedCodepoint(&char_lit, codepoint, "\"\\");
+     }
      char_lit += "\"";
 -    add(char_lit + " " + child_body);
 +    add(char_lit + " " + BuildTrieBody(child));
@@ -3735,14 +3863,14 @@ index da8b516..b4f2370 100644
 
 +// Build a trie of the names to carve out of an object's additional-key
 +// pattern: the declared property names followed by the forbidden (false-schema)
-+// keys. `accept`, when set, drops names that can never collide with an
++// properties. `accept`, when set, drops names that can never collide with an
 +// additional key (e.g. names unspellable in a bare-key alphabet).
 +// TODO(linzhang): For quoted keys, the trie only excludes the literal
 +// unescaped spelling of each name (an escape spelling like \u0066oo bypasses
 +// it). Bare keys have no escape mechanism, so their exclusion is exact.
 +TrieNode BuildNameTrie(
 +    const std::vector<ObjectSpec::Property>& properties,
-+    const std::vector<std::string>& forbidden_keys,
++    const std::vector<std::string>& forbidden_properties,
 +    const std::function<bool(const std::string&)>& accept = nullptr
 +) {
 +  TrieNode root;
@@ -3765,7 +3893,7 @@ index da8b516..b4f2370 100644
 +  for (const auto& prop : properties) {
 +    insert_name(prop.name);
 +  }
-+  for (const auto& key : forbidden_keys) {
++  for (const auto& key : forbidden_properties) {
 +    insert_name(key);
 +  }
 +  return root;
@@ -3862,11 +3990,34 @@ index da8b516..b4f2370 100644
 +  return ResultOk(root);
 +}
 +
++// Derive a rule-name hint from a $ref URI path so
++// the same $ref always maps to the same rule name. Fragment-relative URIs
++// (`#/a/b`) yield the sanitized joined path; everything else falls back to
++// "ref".
++std::string RefRuleNameHint(const std::string& uri) {
++  if (uri.size() < 2 || uri[0] != '#' || uri[1] != '/') {
++    return "ref";
++  }
++  std::string prefix;
++  std::stringstream ss(uri.substr(2));
++  std::string part;
++  while (std::getline(ss, part, '/')) {
++    if (part.empty()) continue;
++    if (!prefix.empty()) prefix += "_";
++    for (char c : part) {
++      if (std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.') {
++        prefix += c;
++      }
++    }
++  }
++  return prefix.empty() ? "ref" : prefix;
++}
++
  }  // namespace
 
-+const std::vector<std::string>& JSONSchemaConverter::CurrentForbiddenKeys() const {
++const std::vector<std::string>& JSONSchemaConverter::CurrentForbiddenProperties() const {
 +  static const std::vector<std::string> kNone;
-+  return current_forbidden_keys_ != nullptr ? *current_forbidden_keys_ : kNone;
++  return current_forbidden_properties_ != nullptr ? *current_forbidden_properties_ : kNone;
 +}
 +
 +std::optional<std::string> JSONSchemaConverter::BuildBareKeyPatternExcluding(
@@ -3874,17 +4025,17 @@ index da8b516..b4f2370 100644
 +    const std::vector<ObjectSpec::Property>& properties,
 +    const std::string& rule_name
 +) {
-+  auto alphabet = DecomposeBareKeyTerminal(terminal);
-+  if (!alphabet) return std::nullopt;
++  auto pattern = DecomposeFirstRestPattern(terminal);
++  if (!pattern) return std::nullopt;
 +
 +  // A name not spellable within the bare-key alphabet can never collide with an
 +  // additional key, so it need not be excluded.
-+  TrieNode root = BuildNameTrie(properties, CurrentForbiddenKeys(), [&](const std::string& name) {
-+    return IsBareKeyInAlphabet(name, *alphabet);
++  TrieNode root = BuildNameTrie(properties, CurrentForbiddenProperties(), [&](const std::string& name) {
++    return IsKeyInFirstRestPattern(name, *pattern);
 +  });
 +  if (root.children.empty()) return std::nullopt;
 +
-+  std::string body = BuildBareTrieBody(root, *alphabet, /*at_root=*/true);
++  std::string body = BuildBareTrieBody(root, *pattern, /*at_root=*/true);
 +  return ebnf_script_creator_.AddRule(rule_name + "_addl_key", body);
 +}
 +
@@ -3892,8 +4043,8 @@ index da8b516..b4f2370 100644
      const std::vector<ObjectSpec::Property>& properties, const std::string& rule_name
  ) {
 -  if (properties.empty()) {
-+  const std::vector<std::string>& forbidden_keys = CurrentForbiddenKeys();
-+  if (properties.empty() && forbidden_keys.empty()) {
++  const std::vector<std::string>& forbidden_properties = CurrentForbiddenProperties();
++  if (properties.empty() && forbidden_properties.empty()) {
      return GetKeyPattern();
    }
 
@@ -3906,40 +4057,45 @@ index da8b516..b4f2370 100644
 -      cur = &cur->children[c];
 -    }
 -    cur->is_terminal = true;
-+  if (keys_are_bare_) {
++  if (!additional_bare_key_terminal_.empty()) {
 +    auto pattern = BuildBareKeyPatternExcluding(additional_bare_key_terminal_, properties, rule_name);
 +    return pattern.has_value() ? *pattern : kBareKey;
    }
 
-+  TrieNode root = BuildNameTrie(properties, forbidden_keys);
++  TrieNode root = BuildNameTrie(properties, forbidden_properties);
 +
    // Generate EBNF body
    std::string inner = BuildTrieBody(root);
    std::string ws = GetWhitespacePattern();
-@@ -1346,8 +3780,36 @@ std::string JSONSchemaConverter::GetKeyPatternExcluding(
+@@ -1346,24 +3843,57 @@ std::string JSONSchemaConverter::GetKeyPatternExcluding(
    return ebnf_script_creator_.AddRule(rule_name + "_addl_key", body);
  }
 
-+std::string JSONSchemaConverter::FormatPatternPropertyKey(const std::string& pattern) {
-+  if (!bare_key_pattern_forbidden_.empty()) {
++std::string JSONSchemaConverter::FormatPatternPropertyKey(
++    const std::string& pattern, const GenerationContext& key_ctx
++) {
++  if (key_ctx.framing == GenerationContext::Framing::kBare) {
 +    return "(" + RegexToEBNF(pattern, false, bare_key_pattern_forbidden_) + ")";
 +  }
-+  return "\"\\\"\"" + RegexToEBNF(pattern, false, StringPatternForbiddenChars()) + "\"\\\"\"";
++  return "\"\\\"\"" + RegexToEBNF(pattern, false, StringPatternForbiddenChars(key_ctx)) + "\"\\\"\"";
 +}
 +
 +std::string JSONSchemaConverter::CreatePropertyNameKeyRule(
-+    const SchemaSpecPtr& property_names, const std::string& rule_name
++    const SchemaSpecPtr& property_names, const std::string& rule_name,
++    const GenerationContext& key_ctx
 +) {
-+  if (bare_key_pattern_forbidden_.empty()) {
-+    return CreateRule(property_names, rule_name);
++  if (key_ctx.framing != GenerationContext::Framing::kBare) {
++    return CreateRule(property_names, rule_name, key_ctx);
 +  }
-+  // Reuse the general string/const/enum generators in bare-key mode instead of
-+  // reimplementing the ladder: the hooks emit an unquoted key body confined by
-+  // bare_key_pattern_forbidden_.
-+  in_bare_key_mode_ = true;
-+  std::string body = GenerateFromSpec(property_names, rule_name);
-+  in_bare_key_mode_ = false;
-+  return ebnf_script_creator_.AddRule(rule_name, "(" + body + ")");
++  if (!property_names) {
++    return "([" + key_ctx.pattern->first_body + "] [" + key_ctx.pattern->rest_body + "]*)";
++  }
++  try {
++    return GenerateFromSpec(property_names, rule_name, key_ctx);
++  } catch (const LogFatalError& e) {
++    XGRAMMAR_LOG(FATAL) << "propertyNames: " << e.what();
++  }
++  XGRAMMAR_UNREACHABLE();
 +}
 +
  std::string JSONSchemaConverter::GetBasicAnyRuleName() const { return kBasicAny; }
@@ -3953,7 +4109,119 @@ index da8b516..b4f2370 100644
  void JSONSchemaConverter::AddCache(const std::string& key, const std::string& value) {
    if (key.empty()) {
      return;
-@@ -1491,41 +3953,162 @@ std::string JSONSchemaConverter::GenerateNumber(
+   }
+-  rule_cache_manager_.AddCache(key, true, value);
++  value_cache_.schema_rules.AddCache(key, true, value);
+ }
+
+ std::optional<std::string> JSONSchemaConverter::GetCache(const std::string& key) const {
+   if (key.empty()) {
+     return std::nullopt;
+   }
+-  return rule_cache_manager_.GetCache(key, true);
++  return value_cache_.schema_rules.GetCache(key, true);
+ }
+
+ std::string JSONSchemaConverter::CreateRule(
+-    const SchemaSpecPtr& spec, const std::string& rule_name_hint
++    const SchemaSpecPtr& spec, const std::string& rule_name_hint, const GenerationContext& ctx
+ ) {
+   // Only check cache for basic rules (pre-populated in AddBasicRules)
+   // Don't cache other rules to match original behavior
+@@ -1373,46 +3913,57 @@ std::string JSONSchemaConverter::CreateRule(
+   }
+
+   std::string rule_name = ebnf_script_creator_.AllocateRuleName(rule_name_hint);
+-  std::string rule_body = GenerateFromSpec(spec, rule_name);
++  std::string rule_body = GenerateFromSpec(spec, rule_name, ctx);
+   ebnf_script_creator_.AddRuleWithAllocatedName(rule_name, rule_body);
+
+   return rule_name;
+ }
+
+ std::string JSONSchemaConverter::GenerateFromSpec(
+-    const SchemaSpecPtr& spec, const std::string& rule_name_hint
++    const SchemaSpecPtr& spec, const std::string& rule_name_hint, const GenerationContext& ctx
+ ) {
++  if (ctx.string_only) {
++    const auto& variant = spec->spec;
++    const bool string_shaped = std::holds_alternative<StringSpec>(variant) ||
++                               std::holds_alternative<ConstSpec>(variant) ||
++                               std::holds_alternative<EnumSpec>(variant) ||
++                               std::holds_alternative<RefSpec>(variant) ||
++                               std::holds_alternative<AnyOfSpec>(variant);
++    if (!string_shaped) {
++      XGRAMMAR_LOG(FATAL) << "non-string schema shape in a string-only context";
++    }
++  }
+   return std::visit(
+-      [this, &rule_name_hint](const auto& s) -> std::string {
++      [this, &rule_name_hint, &ctx](const auto& s) -> std::string {
+         using T = std::decay_t<decltype(s)>;
+         if constexpr (std::is_same_v<T, IntegerSpec>) {
+-          return GenerateInteger(s, rule_name_hint);
++          return GenerateInteger(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, NumberSpec>) {
+-          return GenerateNumber(s, rule_name_hint);
++          return GenerateNumber(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, StringSpec>) {
+-          return GenerateString(s, rule_name_hint);
++          return GenerateString(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, BooleanSpec>) {
+-          return GenerateBoolean(s, rule_name_hint);
++          return GenerateBoolean(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, NullSpec>) {
+-          return GenerateNull(s, rule_name_hint);
++          return GenerateNull(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, ArraySpec>) {
+-          return GenerateArray(s, rule_name_hint);
++          return GenerateArray(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, ObjectSpec>) {
+-          return GenerateObject(s, rule_name_hint);
++          return GenerateObject(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, AnySpec>) {
+-          return GenerateAny(s, rule_name_hint);
++          return GenerateAny(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, ConstSpec>) {
+-          return GenerateConst(s, rule_name_hint);
++          return GenerateConst(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, EnumSpec>) {
+-          return GenerateEnum(s, rule_name_hint);
++          return GenerateEnum(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, RefSpec>) {
+-          return GenerateRef(s, rule_name_hint);
++          return GenerateRef(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, AnyOfSpec>) {
+-          return GenerateAnyOf(s, rule_name_hint);
++          return GenerateAnyOf(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, AllOfSpec>) {
+-          return GenerateAllOf(s, rule_name_hint);
++          return GenerateAllOf(s, rule_name_hint, ctx);
+         } else if constexpr (std::is_same_v<T, TypeArraySpec>) {
+-          return GenerateTypeArray(s, rule_name_hint);
++          return GenerateTypeArray(s, rule_name_hint, ctx);
+         } else {
+           XGRAMMAR_LOG(FATAL) << "Unknown spec type";
+           return "";
+@@ -1425,7 +3976,7 @@ std::string JSONSchemaConverter::GenerateFromSpec(
+ // ==================== Generate Methods ====================
+
+ std::string JSONSchemaConverter::GenerateInteger(
+-    const IntegerSpec& spec, const std::string& rule_name
++    const IntegerSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   std::optional<int64_t> start, end;
+   if (spec.minimum.has_value()) {
+@@ -1457,7 +4008,7 @@ std::string JSONSchemaConverter::GenerateInteger(
+ }
+
+ std::string JSONSchemaConverter::GenerateNumber(
+-    const NumberSpec& spec, const std::string& rule_name
++    const NumberSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   std::optional<double> start, end;
+   bool exclusive_start = false;
+@@ -1491,55 +4042,220 @@ std::string JSONSchemaConverter::GenerateNumber(
    return "\"-\"? (\"0\" | [1-9] [0-9]*) (\".\" [0-9]+)? ([eE] [+-]? [0-9]+)?";
  }
 
@@ -3978,89 +4246,127 @@ index da8b516..b4f2370 100644
 +  return delimiter + " ExcludeToken(" + ExcludeStringContentArgs() + ")* " + delimiter;
 +}
 +
-+std::pair<std::string, std::string> JSONSchemaConverter::StringDelimiters() const {
-+  if (in_bare_key_mode_) {
-+    return {"", ""};
-+  }
-+  if (string_value_delimiter_token_id_ >= 0) {
-+    const std::string delimiter = DelimiterTokenTerminal();
-+    return {delimiter, delimiter};
-+  }
-+  return {"\"\\\"\"", "\"\\\"\""};
++GenerationContext JSONSchemaConverter::MakeValueContext() {
++  GenerationContext ctx;
++  ctx.framing = value_framing_;
++  ctx.cache = &value_cache_;
++  return ctx;
 +}
 +
-+std::string JSONSchemaConverter::StringPatternForbiddenChars() const {
-+  if (in_bare_key_mode_) {
-+    return bare_key_pattern_forbidden_;
++GenerationContext JSONSchemaConverter::MakeKeyContext(
++    GenerationContext::Framing framing, const std::string& terminal
++) {
++  GenerationContext ctx;
++  ctx.cache = &key_cache_;
++  ctx.string_only = true;
++  ctx.framing = framing;
++  if (!terminal.empty()) {
++    ctx.pattern = DecomposeFirstRestPattern(terminal);
++    if (!ctx.pattern) {
++      XGRAMMAR_LOG(FATAL) << "bare-key terminal is not [first][rest]* shaped: " << terminal;
++    }
++    ctx.allow_empty = false;
 +  }
-+  if (string_value_delimiter_token_id_ >= 0) {
++  return ctx;
++}
++
++std::pair<std::string, std::string> JSONSchemaConverter::StringDelimiters(const GenerationContext& ctx)
++    const {
++  switch (ctx.framing) {
++    case GenerationContext::Framing::kBare:
++      // An alphabet-constrained string carries no surrounding delimiters.
++      return {"", ""};
++    case GenerationContext::Framing::kTokenDelimited: {
++      const std::string delimiter = DelimiterTokenTerminal();
++      return {delimiter, delimiter};
++    }
++    case GenerationContext::Framing::kQuotedJSON:
++      return {"\"\\\"\"", "\"\\\"\""};
++  }
++  XGRAMMAR_UNREACHABLE();
++}
++
++std::string JSONSchemaConverter::StringPatternForbiddenChars(const GenerationContext& ctx) const {
++  if (ctx.framing == GenerationContext::Framing::kTokenDelimited) {
 +    return R"(\\\x00-\x1F)";
 +  }
 +  return R"(\"\\\x00-\x1F)";
 +}
 +
-+std::string JSONSchemaConverter::GenerateStringLengthBody(int min_length, int max_length) const {
-+  if (!in_bare_key_mode_ && string_value_delimiter_token_id_ >= 0) {
-+    const std::string char_class = "[^" + StringPatternForbiddenChars() + "]";
-+    const std::string repetition = max_length == -1
-+                                       ? "{" + std::to_string(min_length) + ",}"
-+                                       : "{" + std::to_string(min_length) + "," +
-+                                             std::to_string(max_length) + "}";
-+    return char_class + repetition;
++std::string JSONSchemaConverter::WrapStringBody(
++    const std::string& body, const GenerationContext& ctx
++) const {
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    return "(" + body + ")";
 +  }
-+  std::string char_class =
-+      in_bare_key_mode_ ? "[^" + bare_key_pattern_forbidden_ + "]" : "[^\"\\\\\\r\\n]";
-+  // A zero-length bare key is unrepresentable (no delimiters), so a bare-key
-+  // minimum below one character is raised to one. Sub-one maxima never reach
-+  // generation (rejected or forced to an empty object at parse time).
-+  int effective_min = in_bare_key_mode_ ? std::max(min_length, 1) : min_length;
-+  std::string repetition = max_length == -1
-+                               ? "{" + std::to_string(effective_min) + ",}"
-+                               : "{" + std::to_string(effective_min) + "," +
-+                                     std::to_string(max_length) + "}";
++  auto [open_delim, close_delim] = StringDelimiters(ctx);
++  return open_delim + " " + body + " " + close_delim;
++}
++
++std::string JSONSchemaConverter::GenerateStringLengthBody(
++    int min_length, int max_length, const GenerationContext& ctx
++) const {
++  if (ctx.pattern) {
++    int min = std::max(0, min_length - 1);
++    int max = max_length == -1 ? -1 : max_length - 1;
++    if (!ctx.allow_empty && max_length != -1 && max < min) {
++      XGRAMMAR_LOG(FATAL) << "maxLength admits only the empty string, which an "
++                             "alphabet-constrained string cannot represent";
++    }
++    const std::string prefix =
++        "[" + ctx.pattern->first_body + "] [" + ctx.pattern->rest_body + "]{";
++    if (max == -1) {
++      return prefix + std::to_string(min) + ",}";
++    }
++    return prefix + std::to_string(min) + "," + std::to_string(max) + "}";
++  }
++  const std::string char_class = ctx.framing == GenerationContext::Framing::kTokenDelimited
++                                     ? "[^" + StringPatternForbiddenChars(ctx) + "]"
++                                     : "[^\"\\\\\\r\\n]";
++  const std::string repetition = max_length == -1
++                                     ? "{" + std::to_string(min_length) + ",}"
++                                     : "{" + std::to_string(min_length) + "," +
++                                           std::to_string(max_length) + "}";
 +  return char_class + repetition;
 +}
 +
-+std::string JSONSchemaConverter::GenerateStringDefault() const {
-+  if (in_bare_key_mode_) {
-+    // A bare key has no delimiters, so a zero-length key is unrepresentable:
-+    // require at least one character.
-+    return "[^" + bare_key_pattern_forbidden_ + "]+";
-+  }
-+  if (string_value_delimiter_token_id_ >= 0) {
++std::string JSONSchemaConverter::GenerateStringDefault(const GenerationContext& ctx) const {
++  if (ctx.framing == GenerationContext::Framing::kTokenDelimited) {
 +    return DelimitedStringRuleBody();
 +  }
 +  return "[\"] " + kBasicStringSub;
 +}
 +
-+std::string JSONSchemaConverter::WrapValueStringLiteral(const std::string& inner) const {
-+  if (in_bare_key_mode_) {
-+    return "\"" + inner + "\"";
++std::string JSONSchemaConverter::WrapLiteral(
++    const std::string& inner, const GenerationContext& ctx
++) const {
++  const std::string escaped = JSONStrToPrintableStr(inner);
++  switch (ctx.framing) {
++    case GenerationContext::Framing::kBare:
++      return "\"" + escaped + "\"";
++    case GenerationContext::Framing::kTokenDelimited: {
++      const std::string delimiter = DelimiterTokenTerminal();
++      return delimiter + " \"" + escaped + "\" " + delimiter;
++    }
++    case GenerationContext::Framing::kQuotedJSON:
++      return "\"\\\"" + escaped + "\\\"\"";
 +  }
-+  if (string_value_delimiter_token_id_ >= 0) {
-+    const std::string delimiter = DelimiterTokenTerminal();
-+    return delimiter + " \"" + inner + "\" " + delimiter;
-+  }
-+  return "\"\\\"" + inner + "\\\"\"";
++  XGRAMMAR_UNREACHABLE();
 +}
 +
-+std::string JSONSchemaConverter::WrapValueKeyLiteral(const std::string& inner) const {
-+  if (keys_are_bare_) {
-+    return "\"" + inner + "\"";
-+  }
-+  return "\"\\\"" + inner + "\\\"\"";
-+}
-+
-+std::string JSONSchemaConverter::RenderJSONValueLiteral(const picojson::value& v) const {
++std::string JSONSchemaConverter::RenderLiteral(
++    const picojson::value& v, const GenerationContext& value_ctx, const GenerationContext& key_ctx
++) const {
 +  if (v.is<std::string>()) {
 +    std::string json = v.serialize();
-+    return WrapValueStringLiteral(json.substr(1, json.size() - 2));
++    return WrapLiteral(json.substr(1, json.size() - 2), value_ctx);
 +  }
 +  if (v.is<picojson::array>()) {
 +    const auto& arr = v.get<picojson::array>();
 +    std::string body = "\"[\"";
 +    for (size_t i = 0; i < arr.size(); ++i) {
-+      body += (i == 0 ? std::string(" ") : " \"" + item_sep_ + "\" ") + RenderJSONValueLiteral(arr[i]);
++      body += (i == 0 ? std::string(" ") : " \"" + item_sep_ + "\" ") +
++              RenderLiteral(arr[i], value_ctx, key_ctx);
 +    }
 +    body += " \"]\"";
 +    return "(" + body + ")";
@@ -4072,8 +4378,8 @@ index da8b516..b4f2370 100644
 +    for (const auto& key : obj.ordered_keys()) {
 +      std::string kjson = picojson::value(key).serialize();
 +      body += (first ? std::string(" ") : " \"" + item_sep_ + "\" ") +
-+              WrapValueKeyLiteral(kjson.substr(1, kjson.size() - 2)) + " \"" + colon_sep_ + "\" " +
-+              RenderJSONValueLiteral(obj.at(key));
++              WrapLiteral(kjson.substr(1, kjson.size() - 2), key_ctx) + " \"" + colon_sep_ + "\" " +
++              RenderLiteral(obj.at(key), value_ctx, key_ctx);
 +      first = false;
 +    }
 +    body += " \"}\"";
@@ -4083,21 +4389,27 @@ index da8b516..b4f2370 100644
 +}
 +
  std::string JSONSchemaConverter::GenerateString(
-     const StringSpec& spec, const std::string& rule_name
+-    const StringSpec& spec, const std::string& rule_name
++    const StringSpec& spec, const std::string& rule_name, const GenerationContext& ctx
  ) {
-+  auto [open_delim, close_delim] = StringDelimiters();
++  const bool has_pattern = ctx.pattern.has_value();
++  const std::string allowed = has_pattern ? ctx.pattern->rest_body : "";
++  const std::string forbidden = has_pattern ? "" : StringPatternForbiddenChars(ctx);
 +
    // Check for format
    if (spec.format.has_value()) {
-     const std::string& format = *spec.format;
-     auto regex_pattern = JSONFormatToRegexPattern(format);
-
+-    const std::string& format = *spec.format;
+-    auto regex_pattern = JSONFormatToRegexPattern(format);
+-
++    auto regex_pattern = JSONFormatToRegexPattern(*spec.format);
      if (regex_pattern.has_value()) {
 -      std::string converted_regex = RegexToEBNF(regex_pattern.value(), false);
 -      return "\"\\\"\" " + converted_regex + " \"\\\"\"";
-+      std::string converted_regex =
-+          RegexToEBNF(regex_pattern.value(), false, StringPatternForbiddenChars());
-+      return open_delim + " " + converted_regex + " " + close_delim;
++      return WrapStringBody(RegexToEBNF(*regex_pattern, false, forbidden, allowed), ctx);
++    }
++    if (has_pattern) {
++      XGRAMMAR_LOG(FATAL) << "unsupported format for an alphabet-constrained string: "
++                          << *spec.format;
      }
    }
 
@@ -4105,8 +4417,7 @@ index da8b516..b4f2370 100644
    if (spec.pattern.has_value()) {
 -    std::string converted_regex = RegexToEBNF(*spec.pattern, false);
 -    return "\"\\\"\" " + converted_regex + " \"\\\"\"";
-+    std::string converted_regex = RegexToEBNF(*spec.pattern, false, StringPatternForbiddenChars());
-+    return open_delim + " " + converted_regex + " " + close_delim;
++    return WrapStringBody(RegexToEBNF(*spec.pattern, false, forbidden, allowed), ctx);
    }
 
    // Check for length constraints
@@ -4120,21 +4431,60 @@ index da8b516..b4f2370 100644
 -          "{" + std::to_string(spec.min_length) + "," + std::to_string(spec.max_length) + "}";
 -    }
 -    return "\"\\\"\" " + char_pattern + repetition + " \"\\\"\"";
-+    return open_delim + " " + GenerateStringLengthBody(spec.min_length, spec.max_length) + " " +
-+           close_delim;
++    return WrapStringBody(GenerateStringLengthBody(spec.min_length, spec.max_length, ctx), ctx);
    }
 
-   // Default string
+-  // Default string
 -  return "[\"] " + kBasicStringSub;
-+  return GenerateStringDefault();
++  // Default string: an unbounded run over the alphabet, else the framing's
++  // default string.
++  if (has_pattern) {
++    return "([" + ctx.pattern->first_body + "] [" + ctx.pattern->rest_body + "]*)";
++  }
++  return GenerateStringDefault(ctx);
  }
 
  std::string JSONSchemaConverter::GenerateBoolean(
-@@ -1641,6 +4224,11 @@ std::string JSONSchemaConverter::GenerateArray(
+-    const BooleanSpec& spec, const std::string& rule_name
++    const BooleanSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   return "\"true\" | \"false\"";
+ }
+
+-std::string JSONSchemaConverter::GenerateNull(const NullSpec& spec, const std::string& rule_name) {
++std::string JSONSchemaConverter::GenerateNull(
++    const NullSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++) {
+   return "\"null\"";
+ }
+
+ std::string JSONSchemaConverter::GenerateArray(
+-    const ArraySpec& spec, const std::string& rule_name
++    const ArraySpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   indent_manager_.StartIndent();
+
+@@ -1554,13 +4269,13 @@ std::string JSONSchemaConverter::GenerateArray(
+   // Handle prefix items
+   for (size_t i = 0; i < spec.prefix_items.size(); ++i) {
+     item_rule_names.push_back(
+-        CreateRule(spec.prefix_items[i], rule_name + "_item_" + std::to_string(i))
++        CreateRule(spec.prefix_items[i], rule_name + "_item_" + std::to_string(i), ctx)
+     );
+   }
+
+   // Handle additional items
+   if (spec.allow_additional_items && spec.additional_items) {
+-    additional_rule_name = CreateRule(spec.additional_items, rule_name + "_additional");
++    additional_rule_name = CreateRule(spec.additional_items, rule_name + "_additional", ctx);
+   }
+
+   indent_manager_.EndIndent();
+@@ -1641,6 +4356,11 @@ std::string JSONSchemaConverter::GenerateArray(
  }
 
  std::string JSONSchemaConverter::FormatPropertyKey(const std::string& key) {
-+  if (keys_are_bare_) {
++  if (!additional_bare_key_terminal_.empty()) {
 +    std::string json = picojson::value(key).serialize();
 +    std::string inner = json.substr(1, json.size() - 2);
 +    return "\"" + inner + "\"";
@@ -4142,64 +4492,192 @@ index da8b516..b4f2370 100644
    return "\"" + JSONStrToPrintableStr(picojson::value(key).serialize()) + "\"";
  }
 
-@@ -2096,6 +4684,8 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
- std::string JSONSchemaConverter::GenerateObject(
-     const ObjectSpec& spec, const std::string& rule_name, bool need_braces
+@@ -1687,6 +4407,7 @@ std::string JSONSchemaConverter::GetAnyOrderRuleForProperties(
+     const std::string& additional_suffix,
+     int min_properties,
+     int max_properties,
++    const GenerationContext& value_ctx,
+     const std::string& additional_prop_pattern_override
  ) {
-+  const std::vector<std::string>* saved_forbidden_keys = current_forbidden_keys_;
-+  current_forbidden_keys_ = &spec.forbidden_keys;
+   std::string first_sep = NextSeparator();
+@@ -1698,14 +4419,14 @@ std::string JSONSchemaConverter::GetAnyOrderRuleForProperties(
+   std::vector<std::string> item_patterns;
+   for (size_t idx = 0; idx < properties.size(); ++idx) {
+     const auto& prop = properties[idx];
+-    std::string value_rule = CreateRule(prop.schema, rule_name + "_prop_" + std::to_string(idx));
++    std::string value_rule = CreateRule(prop.schema, rule_name + "_prop_" + std::to_string(idx), value_ctx);
+     item_patterns.push_back(FormatProperty(prop.name, value_rule, rule_name, idx));
+   }
+   if (additional != nullptr) {
+     if (!additional_prop_pattern_override.empty()) {
+       item_patterns.push_back(additional_prop_pattern_override);
+     } else {
+-      std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix);
++      std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix, value_ctx);
+       item_patterns.push_back(FormatOtherProperty(
+           GetKeyPatternExcluding(properties, rule_name),
+           add_value_rule,
+@@ -1742,6 +4463,7 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+     const std::string& additional_suffix,
+     int min_properties,
+     int max_properties,
++    const GenerationContext& value_ctx,
+     const std::string& additional_prop_pattern_override
+ ) {
+   if (max_properties == 0) {
+@@ -1757,6 +4479,7 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+         additional_suffix,
+         min_properties,
+         max_properties,
++        value_ctx,
+         additional_prop_pattern_override
+     );
+   }
+@@ -1770,7 +4493,7 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+   std::vector<std::string> prop_patterns;
+   for (size_t idx = 0; idx < properties.size(); ++idx) {
+     const auto& prop = properties[idx];
+-    std::string value_rule = CreateRule(prop.schema, rule_name + "_prop_" + std::to_string(idx));
++    std::string value_rule = CreateRule(prop.schema, rule_name + "_prop_" + std::to_string(idx), value_ctx);
+     prop_patterns.push_back(FormatProperty(prop.name, value_rule, rule_name, idx));
+   }
+
+@@ -1786,7 +4509,7 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+       if (!additional_prop_pattern_override.empty()) {
+         additional_prop_pattern = additional_prop_pattern_override;
+       } else {
+-        std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix);
++        std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix, value_ctx);
+         additional_prop_pattern = FormatOtherProperty(
+             GetKeyPatternExcluding(properties, rule_name),
+             add_value_rule,
+@@ -1850,7 +4573,7 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+       if (!additional_prop_pattern_override.empty()) {
+         additional_prop_pattern = additional_prop_pattern_override;
+       } else {
+-        std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix);
++        std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix, value_ctx);
+         additional_prop_pattern = FormatOtherProperty(
+             GetKeyPatternExcluding(properties, rule_name),
+             add_value_rule,
+@@ -1969,7 +4692,7 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+       if (!additional_prop_pattern_override.empty()) {
+         additional_prop_pattern = additional_prop_pattern_override;
+       } else {
+-        std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix);
++        std::string add_value_rule = CreateRule(additional, rule_name + "_" + additional_suffix, value_ctx);
+         additional_prop_pattern = FormatOtherProperty(
+             GetKeyPatternExcluding(properties, rule_name),
+             add_value_rule,
+@@ -2094,8 +4817,10 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
+ }
+
+ std::string JSONSchemaConverter::GenerateObject(
+-    const ObjectSpec& spec, const std::string& rule_name, bool need_braces
++    const ObjectSpec& spec, const std::string& rule_name, const GenerationContext& ctx, bool need_braces
+ ) {
++  const std::vector<std::string>* saved_forbidden_properties = current_forbidden_properties_;
++  current_forbidden_properties_ = &spec.forbidden_properties;
    std::string result = "";
    if (need_braces) {
      result += "\"{\"";
-@@ -2133,8 +4723,8 @@ std::string JSONSchemaConverter::GenerateObject(
+@@ -2127,21 +4852,24 @@ std::string JSONSchemaConverter::GenerateObject(
+     std::string effective_suffix = additional_suffix;
+     std::string pp_override = "";
+
++    // The key slot for this object's pattern/propertyNames keys.
++    GenerationContext key_ctx = MakeKeyContext(key_framing_, additional_bare_key_terminal_);
++
+     if (!spec.pattern_properties.empty()) {
+       // Build patternProperties as additional property alternatives
+       std::string pp_body = "";
        for (size_t i = 0; i < spec.pattern_properties.size(); ++i) {
          const auto& pp = spec.pattern_properties[i];
-         std::string value = CreateRule(pp.schema, rule_name + "_pp_" + std::to_string(i));
+-        std::string value = CreateRule(pp.schema, rule_name + "_pp_" + std::to_string(i));
 -        std::string pp_single = "\"\\\"\"" + RegexToEBNF(pp.pattern, false) + "\"\\\"\" " +
 -                                colon_pattern_ + " " + value;
++        std::string value = CreateRule(pp.schema, rule_name + "_pp_" + std::to_string(i), ctx);
 +        std::string pp_single =
-+            FormatPatternPropertyKey(pp.pattern) + " " + colon_pattern_ + " " + value;
++            FormatPatternPropertyKey(pp.pattern, key_ctx) + " " + colon_pattern_ + " " + value;
          if (i != 0) pp_body += " | ";
          pp_body += pp_single;
        }
-@@ -2156,7 +4746,7 @@ std::string JSONSchemaConverter::GenerateObject(
+       // Merge with existing additionalProperties if present
+       if (effective_additional) {
+         std::string add_value_rule =
+-            CreateRule(effective_additional, rule_name + "_" + effective_suffix);
++            CreateRule(effective_additional, rule_name + "_" + effective_suffix, ctx);
+         std::string add_prop =
+             FormatOtherProperty(GetKeyPattern(), add_value_rule, rule_name, effective_suffix);
+         pp_body += " | " + add_prop;
+@@ -2156,8 +4884,9 @@ std::string JSONSchemaConverter::GenerateObject(
        // propertyNames constrains keys of additional properties.
        // Only apply when additional properties are allowed — when additionalProperties
        // is false, no extra keys beyond named properties should be permitted.
 -      auto key_pattern = CreateRule(spec.property_names, rule_name + "_name");
-+      auto key_pattern = CreatePropertyNameKeyRule(spec.property_names, rule_name + "_name");
-       std::string val_rule = CreateRule(effective_additional, rule_name + "_" + effective_suffix);
+-      std::string val_rule = CreateRule(effective_additional, rule_name + "_" + effective_suffix);
++      auto key_pattern =
++          CreatePropertyNameKeyRule(spec.property_names, rule_name + "_name", key_ctx);
++      std::string val_rule = CreateRule(effective_additional, rule_name + "_" + effective_suffix, ctx);
        pp_override = key_pattern + " " + colon_pattern_ + " " + val_rule;
        effective_suffix = "pn";
-@@ -2183,8 +4773,8 @@ std::string JSONSchemaConverter::GenerateObject(
+     }
+@@ -2170,6 +4899,7 @@ std::string JSONSchemaConverter::GenerateObject(
+                         effective_suffix,
+                         spec.min_properties,
+                         spec.max_properties,
++                        ctx,
+                         pp_override
+                     );
+     could_be_empty = spec.required.empty() && spec.min_properties == 0;
+@@ -2179,12 +4909,14 @@ std::string JSONSchemaConverter::GenerateObject(
+
+     std::string property_rule_body = "(";
+     if (spec.max_properties != 0) {
++      // The key slot for this object's pattern/propertyNames keys.
++      GenerationContext key_ctx = MakeKeyContext(key_framing_, additional_bare_key_terminal_);
+       if (!spec.pattern_properties.empty()) {
          for (size_t i = 0; i < spec.pattern_properties.size(); ++i) {
            const auto& pp = spec.pattern_properties[i];
-           std::string value = CreateRule(pp.schema, rule_name + "_prop_" + std::to_string(i));
+-          std::string value = CreateRule(pp.schema, rule_name + "_prop_" + std::to_string(i));
 -          std::string property_pattern = "\"\\\"\"" + RegexToEBNF(pp.pattern, false) + "\"\\\"\" " +
 -                                         colon_pattern_ + " " + value;
++          std::string value = CreateRule(pp.schema, rule_name + "_prop_" + std::to_string(i), ctx);
 +          std::string property_pattern =
-+              FormatPatternPropertyKey(pp.pattern) + " " + colon_pattern_ + " " + value;
++              FormatPatternPropertyKey(pp.pattern, key_ctx) + " " + colon_pattern_ + " " + value;
            if (i != 0) {
              property_rule_body += " | ";
            }
-@@ -2192,9 +4782,9 @@ std::string JSONSchemaConverter::GenerateObject(
+@@ -2192,9 +4924,10 @@ std::string JSONSchemaConverter::GenerateObject(
          }
          property_rule_body += ")";
        } else {
 -        auto key_pattern = CreateRule(spec.property_names, rule_name + "_name");
-+        auto key_pattern = CreatePropertyNameKeyRule(spec.property_names, rule_name + "_name");
++        auto key_pattern =
++            CreatePropertyNameKeyRule(spec.property_names, rule_name + "_name", key_ctx);
          property_rule_body +=
 -            beg_seq + " " + key_pattern + " " + colon_pattern_ + " " + GetBasicAnyRuleName() + ")";
-+            beg_seq + " " + key_pattern + " " + colon_pattern_ + " " + (additional_property ? CreateRule(additional_property, rule_name + "_" + additional_suffix) : GetBasicAnyRuleName()) + ")";
++            beg_seq + " " + key_pattern + " " + colon_pattern_ + " " + (additional_property ? CreateRule(additional_property, rule_name + "_" + additional_suffix, ctx) : GetBasicAnyRuleName()) + ")";
        }
 
        auto prop_rule_name = ebnf_script_creator_.AllocateRuleName(rule_name + "_prop");
-@@ -2225,8 +4815,12 @@ std::string JSONSchemaConverter::GenerateObject(
+@@ -2217,16 +4950,21 @@ std::string JSONSchemaConverter::GenerateObject(
+                         rule_name,
+                         additional_suffix,
+                         spec.min_properties,
+-                        spec.max_properties
++                        spec.max_properties,
++                        ctx
+                     );
+     could_be_empty = spec.required.empty() && spec.min_properties == 0;
+   } else if (additional_property) {
+     // Case 3: no properties defined, additional properties allowed
      if (spec.max_properties != 0) {
        std::string add_value_rule =
-           CreateRule(additional_property, rule_name + "_" + additional_suffix);
+-          CreateRule(additional_property, rule_name + "_" + additional_suffix);
 -      std::string other_property_pattern =
 -          FormatOtherProperty(GetKeyPattern(), add_value_rule, rule_name, additional_suffix);
++          CreateRule(additional_property, rule_name + "_" + additional_suffix, ctx);
 +      std::string other_property_pattern = FormatOtherProperty(
 +          GetKeyPatternExcluding(/*properties=*/{}, rule_name),
 +          add_value_rule,
@@ -4209,50 +4687,204 @@ index da8b516..b4f2370 100644
        result += " " + NextSeparator() + " " + other_property_pattern + " ";
        result += GetPropertyWithNumberConstraints(
                      NextSeparator() + " " + other_property_pattern,
-@@ -2260,6 +4854,7 @@ std::string JSONSchemaConverter::GenerateObject(
+@@ -2260,117 +4993,143 @@ std::string JSONSchemaConverter::GenerateObject(
      }
    }
 
-+  current_forbidden_keys_ = saved_forbidden_keys;
++  current_forbidden_properties_ = saved_forbidden_properties;
    if (result.empty()) {
      return "\"\"";
    }
-@@ -2267,19 +4862,32 @@ std::string JSONSchemaConverter::GenerateObject(
+   return result;
  }
 
- std::string JSONSchemaConverter::GenerateAny(const AnySpec& spec, const std::string& rule_name) {
+-std::string JSONSchemaConverter::GenerateAny(const AnySpec& spec, const std::string& rule_name) {
 -  return kBasicNumber + " | " + kBasicString + " | " + kBasicBoolean + " | " + kBasicNull + " | " +
 -         kBasicArray + " | " + kBasicObject;
++std::string JSONSchemaConverter::GenerateAny(
++    const AnySpec& spec, const std::string& rule_name, const GenerationContext& ctx
++) {
 +  return ScalarAnyUnion() + " | " + GetAnyStringRuleName() + " | " + kBasicArray + " | " +
 +         kBasicObject;
  }
 
  std::string JSONSchemaConverter::GenerateConst(
-     const ConstSpec& spec, const std::string& rule_name
+-    const ConstSpec& spec, const std::string& rule_name
++    const ConstSpec& spec, const std::string& rule_name, const GenerationContext& ctx
  ) {
-+  if (string_value_delimiter_token_id_ >= 0 || keys_are_bare_) {
-+    return RenderJSONValueLiteral(spec.parsed_json_value);
+-  return "\"" + JSONStrToPrintableStr(spec.json_value) + "\"";
++  if ((ctx.string_only || ctx.framing == GenerationContext::Framing::kBare) &&
++      !spec.parsed_json_value.is<std::string>()) {
++    XGRAMMAR_LOG(FATAL) << "non-string const in a string-only context";
 +  }
-   return "\"" + JSONStrToPrintableStr(spec.json_value) + "\"";
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    const std::string value = spec.parsed_json_value.get<std::string>();
++    if (!IsKeyInFirstRestPattern(value, *ctx.pattern)) {
++      XGRAMMAR_LOG(FATAL)
++          << "const not expressible as an alphabet-constrained string: " << value;
++    }
++    return "\"" + value + "\"";
++  }
++  return RenderLiteral(
++      spec.parsed_json_value, ctx, MakeKeyContext(key_framing_, additional_bare_key_terminal_)
++  );
  }
 
- std::string JSONSchemaConverter::GenerateEnum(const EnumSpec& spec, const std::string& rule_name) {
+-std::string JSONSchemaConverter::GenerateEnum(const EnumSpec& spec, const std::string& rule_name) {
++std::string JSONSchemaConverter::GenerateEnum(
++    const EnumSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++) {
    XGRAMMAR_DCHECK(!spec.json_values.empty())
        << "GenerateEnum called with empty enum spec for rule: " << rule_name;
-+  if (string_value_delimiter_token_id_ >= 0 || keys_are_bare_) {
-+    std::string result;
-+    for (size_t i = 0; i < spec.json_values.size(); ++i) {
-+      if (i != 0) {
-+        result += " | ";
+-  std::string result = "";
++  if (ctx.string_only || ctx.framing == GenerationContext::Framing::kBare) {
++    for (const auto& parsed : spec.parsed_json_values) {
++      if (!parsed.is<std::string>()) {
++        XGRAMMAR_LOG(FATAL) << "non-string enum value in a string-only context";
 +      }
-+      result += "(" + RenderJSONValueLiteral(spec.parsed_json_values[i]) + ")";
 +    }
-+    return result;
 +  }
-   std::string result = "";
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    std::string body;
++    for (const auto& parsed : spec.parsed_json_values) {
++      const std::string value = parsed.get<std::string>();
++      if (!IsKeyInFirstRestPattern(value, *ctx.pattern)) {
++        XGRAMMAR_LOG(FATAL)
++            << "enum value not expressible as an alphabet-constrained string: " << value;
++      }
++      if (!body.empty()) {
++        body += " | ";
++      }
++      body += "\"" + value + "\"";
++    }
++    return "(" + body + ")";
++  }
++  const GenerationContext key_ctx = MakeKeyContext(key_framing_, additional_bare_key_terminal_);
++  std::string result;
    for (size_t i = 0; i < spec.json_values.size(); ++i) {
      if (i != 0) {
-@@ -2391,12 +4999,18 @@ std::optional<std::string> JSONSchemaConverter::JSONFormatToRegexPattern(const s
+       result += " | ";
+     }
+-    result += "(\"" + JSONStrToPrintableStr(spec.json_values[i]) + "\")";
++    result += "(" + RenderLiteral(spec.parsed_json_values[i], ctx, key_ctx) + ")";
+   }
+   return result;
+ }
+
+-std::string JSONSchemaConverter::GenerateRef(const RefSpec& spec, const std::string& rule_name) {
+-  // First check if we have a direct URI mapping (for circular references)
+-  if (uri_to_rule_name_.count(spec.uri)) {
+-    return uri_to_rule_name_[spec.uri];
++std::string JSONSchemaConverter::GenerateRef(
++    const RefSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++) {
++  if (ctx.cache->ref_rules.count(spec.uri)) {
++    return ctx.cache->ref_rules[spec.uri];
+   }
+-
+   if (!ref_resolver_) {
+     XGRAMMAR_LOG(FATAL) << "Ref resolver not set; cannot resolve $ref: " << spec.uri;
+   }
+
+-  // Derive rule name from URI path (like original URIToRule) so that the same
+-  // $ref always gets the same rule name, and allocate before resolving to prevent
+-  // dead recursion when the ref target contains a ref back.
+-  std::string rule_name_hint = "ref";
+-  if (spec.uri.size() >= 2 && spec.uri[0] == '#' && spec.uri[1] == '/') {
+-    std::string new_rule_name_prefix;
+-    std::stringstream ss(spec.uri.substr(2));
+-    std::string part;
+-    while (std::getline(ss, part, '/')) {
+-      if (!part.empty()) {
+-        if (!new_rule_name_prefix.empty()) {
+-          new_rule_name_prefix += "_";
+-        }
+-        for (char c : part) {
+-          if (std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.') {
+-            new_rule_name_prefix += c;
+-          }
+-        }
+-      }
+-    }
+-    if (!new_rule_name_prefix.empty()) {
+-      rule_name_hint = std::move(new_rule_name_prefix);
+-    }
+-  }
+-
+-  std::string allocated_rule_name = ebnf_script_creator_.AllocateRuleName(rule_name_hint);
+-  uri_to_rule_name_[spec.uri] = allocated_rule_name;
++  std::string name = ebnf_script_creator_.AllocateRuleName(RefRuleNameHint(spec.uri));
++  ctx.cache->ref_rules[spec.uri] = name;
+
+-  SchemaSpecPtr resolved = ref_resolver_(spec.uri, allocated_rule_name);
+-  std::string rule_body = GenerateFromSpec(resolved, allocated_rule_name);
+-  ebnf_script_creator_.AddRuleWithAllocatedName(allocated_rule_name, rule_body);
++  SchemaSpecPtr resolved = ref_resolver_(spec.uri, name);
++  ebnf_script_creator_.AddRuleWithAllocatedName(name, GenerateFromSpec(resolved, name, ctx));
+
+-  if (!resolved->cache_key.empty()) {
+-    AddCache(resolved->cache_key, allocated_rule_name);
++  if (!resolved->cache_key.empty() && ctx.framing != GenerationContext::Framing::kBare) {
++    AddCache(resolved->cache_key, name);
+   }
+
+-  return allocated_rule_name;
++  return name;
+ }
+
+ std::string JSONSchemaConverter::GenerateAnyOf(
+-    const AnyOfSpec& spec, const std::string& rule_name
++    const AnyOfSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    std::string body;
++    for (const auto& option : spec.options) {
++      if (!body.empty()) {
++        body += " | ";
++      }
++      body += GenerateFromSpec(option, rule_name, ctx);
++    }
++    return "(" + body + ")";
++  }
+   std::string result = "";
+   for (size_t i = 0; i < spec.options.size(); ++i) {
+     if (i != 0) {
+       result += " | ";
+     }
+-    result += CreateRule(spec.options[i], rule_name + "_case_" + std::to_string(i));
++    result += CreateRule(spec.options[i], rule_name + "_case_" + std::to_string(i), ctx);
+   }
+   return result;
+ }
+
+ std::string JSONSchemaConverter::GenerateAllOf(
+-    const AllOfSpec& spec, const std::string& rule_name
++    const AllOfSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   if (spec.schemas.size() == 1) {
+-    return GenerateFromSpec(spec.schemas[0], rule_name + "_case_0");
++    return GenerateFromSpec(spec.schemas[0], rule_name + "_case_0", ctx);
+   }
+   XGRAMMAR_LOG(WARNING) << "Support for allOf with multiple options is still ongoing";
+-  return GenerateFromSpec(SchemaSpec::Make(AnySpec{}, "", "any"), rule_name);
++  return GenerateFromSpec(SchemaSpec::Make(AnySpec{}, "", "any"), rule_name, ctx);
+ }
+
+ std::string JSONSchemaConverter::GenerateTypeArray(
+-    const TypeArraySpec& spec, const std::string& rule_name
++    const TypeArraySpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   std::string result = "";
+   for (size_t i = 0; i < spec.type_schemas.size(); ++i) {
+     if (i != 0) {
+       result += " | ";
+     }
+-    result += CreateRule(spec.type_schemas[i], rule_name + "_type_" + std::to_string(i));
++    result += CreateRule(spec.type_schemas[i], rule_name + "_type_" + std::to_string(i), ctx);
+   }
+   return result;
+ }
+@@ -2391,12 +5150,18 @@ std::optional<std::string> JSONSchemaConverter::JSONFormatToRegexPattern(const s
          ")";
      m["email"] = "^(" + dot_string + "|" + quoted_string + ")@" + domain + "$";
 
@@ -4275,7 +4907,7 @@ index da8b516..b4f2370 100644
      m["duration"] =
          "^P((\\d+D|\\d+M(\\d+D)?|\\d+Y(\\d+M(\\d+D)?)?)(T(\\d+S|\\d+M(\\d+S)?|\\d+H(\\d+M(\\d+"
          "S)?"
-@@ -3328,7 +5942,16 @@ std::string JSONSchemaToEBNF(
+@@ -3328,7 +6093,16 @@ std::string JSONSchemaToEBNF(
      bool strict_mode,
      std::optional<int> max_whitespace_cnt,
      JSONFormat json_format,
@@ -4293,7 +4925,7 @@ index da8b516..b4f2370 100644
  ) {
    picojson::value schema_value;
    std::string err = picojson::parse(schema_value, schema);
-@@ -3342,7 +5965,16 @@ std::string JSONSchemaToEBNF(
+@@ -3342,7 +6116,16 @@ std::string JSONSchemaToEBNF(
        strict_mode,
        max_whitespace_cnt,
        json_format,
@@ -4311,7 +4943,7 @@ index da8b516..b4f2370 100644
    );
  }
 
-@@ -3354,11 +5986,58 @@ std::string JSONSchemaToEBNF(
+@@ -3354,11 +6137,58 @@ std::string JSONSchemaToEBNF(
      bool strict_mode,
      std::optional<int> max_whitespace_cnt,
      JSONFormat json_format,
@@ -4345,13 +4977,13 @@ index da8b516..b4f2370 100644
 +  }
 +
 +  // The declared/forbidden-key exclusion needs the bare-key terminal
-+  // decomposed into [first][cont]* character classes; a terminal outside that
++  // decomposed into [first][rest]* character classes; a terminal outside that
 +  // shape would silently skip the exclusion and reopen the
 +  // additional-properties hole. Fail closed up front under reject_unsupported
 +  // -- the terminal is static per-format config, not schema-dependent.
 +  if (reject_unsupported && !additional_bare_key_terminal.empty() &&
-+      !DecomposeBareKeyTerminal(additional_bare_key_terminal).has_value()) {
-+    XGRAMMAR_LOG(FATAL) << "additional_bare_key_terminal is not decomposable into [first][cont]* character "
++      !DecomposeFirstRestPattern(additional_bare_key_terminal).has_value()) {
++    XGRAMMAR_LOG(FATAL) << "additional_bare_key_terminal is not decomposable into [first][rest]* character "
 +                           "classes, so declared-key exclusion cannot be enforced: "
 +                        << additional_bare_key_terminal;
 +  }
@@ -4374,7 +5006,7 @@ index da8b516..b4f2370 100644
    if (spec_result.IsErr()) {
      XGRAMMAR_LOG(FATAL) << std::move(spec_result).UnwrapErr().what();
    }
-@@ -3372,18 +6051,37 @@ std::string JSONSchemaToEBNF(
+@@ -3372,18 +6202,36 @@ std::string JSONSchemaToEBNF(
      return std::move(r).Unwrap();
    };
 
@@ -4400,8 +5032,7 @@ index da8b516..b4f2370 100644
 +          string_value_delimiter_token_id,
 +          std::move(string_value_forbidden_token_ids),
 +          additional_bare_key_terminal,
-+          bare_key_pattern_forbidden,
-+          keys_are_bare
++          bare_key_pattern_forbidden
        );
        return converter.Convert(spec);
      }
@@ -4414,7 +5045,7 @@ index da8b516..b4f2370 100644
        XMLToolCallingConverter converter(
            indent,
            separators,
-@@ -3391,7 +6089,14 @@ std::string JSONSchemaToEBNF(
+@@ -3391,7 +6239,13 @@ std::string JSONSchemaToEBNF(
            max_whitespace_cnt,
            ref_resolver,
            json_format,
@@ -4424,13 +5055,12 @@ index da8b516..b4f2370 100644
 +          std::move(string_value_forbidden_token_ids),
 +          additional_bare_key_terminal,
 +          bare_key_pattern_forbidden,
-+          keys_are_bare,
 +          std::move(xml_marker_token_ids),
 +          xml_tag_prefix
        );
        return converter.Convert(spec);
      }
-@@ -3414,7 +6119,9 @@ std::string GenerateFloatRangeRegex(
+@@ -3414,7 +6268,9 @@ std::string GenerateFloatRangeRegex(
    );
  }
 
@@ -4441,7 +5071,7 @@ index da8b516..b4f2370 100644
    picojson::value json_value;
    std::string err = picojson::parse(json_value, schema);
    if (!err.empty()) {
-@@ -3428,11 +6135,16 @@ std::string QwenXMLToolCallingToEBNF(const std::string& schema, bool any_order)
+@@ -3428,11 +6284,16 @@ std::string QwenXMLToolCallingToEBNF(const std::string& schema, bool any_order)
        true,
        std::nullopt,
        JSONFormat::kQwenXML,
@@ -4460,7 +5090,7 @@ index da8b516..b4f2370 100644
    picojson::value json_value;
    std::string err = picojson::parse(json_value, schema);
    if (!err.empty()) {
-@@ -3446,11 +6158,16 @@ std::string MiniMaxXMLToolCallingToEBNF(const std::string& schema, bool any_orde
+@@ -3446,11 +6307,16 @@ std::string MiniMaxXMLToolCallingToEBNF(const std::string& schema, bool any_orde
        true,
        std::nullopt,
        JSONFormat::kMiniMaxXML,
@@ -4479,7 +5109,7 @@ index da8b516..b4f2370 100644
    picojson::value json_value;
    std::string err = picojson::parse(json_value, schema);
    if (!err.empty()) {
-@@ -3464,11 +6181,16 @@ std::string DeepSeekXMLToolCallingToEBNF(const std::string& schema, bool any_ord
+@@ -3464,11 +6330,16 @@ std::string DeepSeekXMLToolCallingToEBNF(const std::string& schema, bool any_ord
        true,
        std::nullopt,
        JSONFormat::kDeepSeekXML,
@@ -4498,7 +5128,7 @@ index da8b516..b4f2370 100644
    picojson::value json_value;
    std::string err = picojson::parse(json_value, schema);
    if (!err.empty()) {
-@@ -3482,7 +6204,10 @@ std::string GlmXMLToolCallingToEBNF(const std::string& schema, bool any_order) {
+@@ -3482,7 +6353,10 @@ std::string GlmXMLToolCallingToEBNF(const std::string& schema, bool any_order) {
        true,
        std::nullopt,
        JSONFormat::kGlmXML,
@@ -4511,29 +5141,34 @@ index da8b516..b4f2370 100644
  }
 
 diff --git a/cpp/json_schema_converter.h b/cpp/json_schema_converter.h
-index f0175ba..86bf0ed 100644
+index f0175ba..0d4697c 100644
 --- a/cpp/json_schema_converter.h
 +++ b/cpp/json_schema_converter.h
-@@ -9,6 +9,7 @@
+@@ -9,9 +9,12 @@
 
  #include <picojson.h>
 
 +#include <cstdint>
  #include <functional>
++#include <list>
  #include <memory>
  #include <optional>
-@@ -94,6 +95,10 @@ struct ObjectSpec {
++#include <set>
+ #include <string>
+ #include <unordered_map>
+ #include <unordered_set>
+@@ -94,6 +97,10 @@ struct ObjectSpec {
    std::vector<Property> properties;
    std::vector<PatternProperty> pattern_properties;
    std::unordered_set<std::string> required;
-+  // Keys forbidden outright by a `false` property schema. They get no
++  // Properties forbidden outright by a `false` property schema. They get no
 +  // declared-property rule, and the additional-properties key pattern
 +  // excludes them so they cannot be emitted.
-+  std::vector<std::string> forbidden_keys;
++  std::vector<std::string> forbidden_properties;
 
    bool allow_additional_properties = false;
    SchemaSpecPtr additional_properties_schema;
-@@ -110,12 +115,14 @@ struct ObjectSpec {
+@@ -110,12 +117,14 @@ struct ObjectSpec {
  // Composite Type Specs
  struct ConstSpec {
    std::string json_value;  // JSON serialized value
@@ -4548,15 +5183,49 @@ index f0175ba..86bf0ed 100644
 
    std::string ToString() const;
  };
-@@ -188,6 +195,7 @@ enum class JSONFormat : int {
+@@ -188,6 +197,27 @@ enum class JSONFormat : int {
    kMiniMaxXML = 2,
    kDeepSeekXML = 3,
    kGlmXML = 4,
 +  kMiniMaxM3XML = 5,
++};
++
++// First-char and rest-char sets of a positional first/rest terminal, plus the
++// raw class-body text (e.g. "a-zA-Z_").
++struct FirstRestPattern {
++  std::set<char> first;
++  std::set<char> rest;
++  std::string first_body;
++  std::string rest_body;
++};
++
++struct RuleCache;
++
++struct GenerationContext {
++  enum class Framing { kQuotedJSON, kTokenDelimited, kBare };
++  Framing framing = Framing::kQuotedJSON;
++  std::optional<FirstRestPattern> pattern;
++  bool allow_empty = true;
++  bool string_only = false;
++  RuleCache* cache = nullptr;
  };
 
  /*!
-@@ -262,7 +270,12 @@ class JSONSchemaConverter {
+@@ -213,6 +243,13 @@ class GenerateCacheManager {
+   std::unordered_map<std::pair<std::string, bool>, std::string> cache_;
+ };
+
++// Per-context memoization.
++struct RuleCache {
++  GenerateCacheManager schema_rules;
++  // $ref URI -> rule name, for circular-reference handling.
++  std::unordered_map<std::string, std::string> ref_rules;
++};
++
+ /*!
+  * \brief Manage the indent and separator for the generation of EBNF grammar.
+  */
+@@ -262,7 +299,11 @@ class JSONSchemaConverter {
        bool any_whitespace,
        std::optional<int> max_whitespace_cnt,
        RefResolver ref_resolver = nullptr,
@@ -4565,49 +5234,119 @@ index f0175ba..86bf0ed 100644
 +      int string_value_delimiter_token_id = -1,
 +      std::vector<int32_t> string_value_forbidden_token_ids = {},
 +      std::string additional_bare_key_terminal = "",
-+      std::string bare_key_pattern_forbidden = "",
-+      bool keys_are_bare = false
++      std::string bare_key_pattern_forbidden = ""
    );
 
    virtual ~JSONSchemaConverter() = default;
-@@ -316,17 +329,71 @@ class JSONSchemaConverter {
+@@ -278,22 +319,52 @@ class JSONSchemaConverter {
+   // ==================== Virtual methods for generation ====================
+   // Subclasses can override these to customize output format
+
+-  virtual std::string GenerateInteger(const IntegerSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateNumber(const NumberSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateString(const StringSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateBoolean(const BooleanSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateNull(const NullSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateArray(const ArraySpec& spec, const std::string& rule_name);
++  virtual std::string GenerateInteger(
++      const IntegerSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateNumber(
++      const NumberSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateString(
++      const StringSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateBoolean(
++      const BooleanSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateNull(
++      const NullSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateArray(
++      const ArraySpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
+   virtual std::string GenerateObject(
+-      const ObjectSpec& spec, const std::string& rule_name, bool need_brace = true
++      const ObjectSpec& spec, const std::string& rule_name, const GenerationContext& ctx,
++      bool need_brace = true
++  );
++  virtual std::string GenerateAny(
++      const AnySpec& spec, const std::string& rule_name, const GenerationContext& ctx
+   );
+-  virtual std::string GenerateAny(const AnySpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateConst(const ConstSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateEnum(const EnumSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateRef(const RefSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateAnyOf(const AnyOfSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateAllOf(const AllOfSpec& spec, const std::string& rule_name);
+-  virtual std::string GenerateTypeArray(const TypeArraySpec& spec, const std::string& rule_name);
++  virtual std::string GenerateConst(
++      const ConstSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateEnum(
++      const EnumSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateRef(
++      const RefSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateAnyOf(
++      const AnyOfSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateAllOf(
++      const AllOfSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++  virtual std::string GenerateTypeArray(
++      const TypeArraySpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  );
++
++  GenerationContext MakeValueContext();
++  GenerationContext MakeKeyContext(GenerationContext::Framing framing, const std::string& terminal);
+
+   // ==================== Hooks for customization ====================
+
+@@ -316,17 +387,75 @@ class JSONSchemaConverter {
        const std::string& rule_name_suffix
    );
 
 +  /*! \brief Opening/closing EBNF delimiter fragments wrapping a string body in
 +   * GenerateString (format/pattern/length ladder). The JSON `"` byte quote, or
 +   * the configured token-delimited pair when a string value delimiter is set. */
-+  std::pair<std::string, std::string> StringDelimiters() const;
++  std::pair<std::string, std::string> StringDelimiters(const GenerationContext& ctx) const;
 +
 +  /*! \brief `forbidden_chars` passed to RegexToEBNF for GenerateString
 +   * format/pattern bodies. Excludes the JSON quote, backslash, and control
 +   * bytes, dropping the quote for token-delimited formats. */
-+  std::string StringPatternForbiddenChars() const;
++  std::string StringPatternForbiddenChars(const GenerationContext& ctx) const;
 +
 +  /*! \brief EBNF body (between the string delimiters) enforcing minLength/
-+   * maxLength in GenerateString. A JSON string char class with a `{min,max}`
-+   * repetition, or a token-safe char class for token-delimited formats. */
-+  std::string GenerateStringLengthBody(int min_length, int max_length) const;
++   * maxLength in GenerateString. */
++  std::string GenerateStringLengthBody(int min_length, int max_length, const GenerationContext& ctx)
++      const;
++
++  /*! \brief Frame a computed string body per ctx.framing: parenthesized for a
++   * bare (alphabet-constrained) string, else padded by the string delimiters. */
++  std::string WrapStringBody(const std::string& body, const GenerationContext& ctx) const;
 +
 +  /*! \brief Full EBNF for an unconstrained string (no format/pattern/length) in
 +   * GenerateString. The JSON `basic_string_sub` rule, or a self-delimited
 +   * string rule for token-delimited formats. */
-+  std::string GenerateStringDefault() const;
++  std::string GenerateStringDefault(const GenerationContext& ctx) const;
 +
    /*! \brief Get the basic string rule name. Override for different formats. */
    virtual std::string GetKeyPattern() const;
 
 -  /*! \brief Get a key pattern that excludes specific property names. */
 +  /*! \brief Get a key pattern that excludes the declared property names, plus
-+   * the forbidden (false-schema) keys of the object currently being generated
-+   * (see current_forbidden_keys_). */
++   * the forbidden (false-schema) properties of the object currently being
++   * generated. */
    virtual std::string GetKeyPatternExcluding(
        const std::vector<ObjectSpec::Property>& properties, const std::string& rule_name
    );
 
 +  /*! \brief Build an additional-key pattern over a bare-key terminal of shape
-+   * [first][cont]* that excludes the declared property names and the current
-+   * object's forbidden keys. Returns nullopt when the terminal cannot be
++   * [first][rest]* that excludes the declared property names and the current
++   * object's forbidden properties. Returns nullopt when the terminal cannot be
 +   * decomposed or no excluded name is spellable in its alphabet; the caller
 +   * falls back to its plain key pattern. */
 +  std::optional<std::string> BuildBareKeyPatternExcluding(
@@ -4616,18 +5355,18 @@ index f0175ba..86bf0ed 100644
 +      const std::string& rule_name
 +  );
 +
-+  /*! \brief Forbidden (false-schema) keys of the object currently being
-+   * generated, or an empty vector when current_forbidden_keys_ is null. */
-+  const std::vector<std::string>& CurrentForbiddenKeys() const;
++  /*! \brief Forbidden (false-schema) properties of the object currently being
++   * generated, or an empty vector when current_forbidden_properties_ is null. */
++  const std::vector<std::string>& CurrentForbiddenProperties() const;
 +
 +  /*! \brief Build the EBNF key fragment for a patternProperties pattern. Emits
 +   * a JSON quoted key, or a bare key for bare-key formats. */
-+  std::string FormatPatternPropertyKey(const std::string& pattern);
++  std::string FormatPatternPropertyKey(const std::string& pattern, const GenerationContext& key_ctx);
 +
-+  /*! \brief Build the EBNF key rule for a propertyNames subschema. Routes
-+   * through CreateRule (JSON string), or emits a bare key for bare-key formats. */
++  /*! \brief Build the EBNF key rule for a propertyNames subschema. */
 +  std::string CreatePropertyNameKeyRule(
-+      const SchemaSpecPtr& property_names, const std::string& rule_name
++      const SchemaSpecPtr& property_names, const std::string& rule_name,
++      const GenerationContext& key_ctx
 +  );
 +
    /*! \brief Get the basic any rule name. Override for different formats. */
@@ -4643,7 +5382,24 @@ index f0175ba..86bf0ed 100644
    /*! \brief Add basic rules for the format. Override for different formats. */
    virtual void AddBasicRules();
 
-@@ -350,6 +417,11 @@ class JSONSchemaConverter {
+@@ -339,10 +468,14 @@ class JSONSchemaConverter {
+   // ==================== Helper methods (for subclasses to use) ====================
+
+   /*! \brief Dispatch to the appropriate Generate method based on spec type. */
+-  std::string GenerateFromSpec(const SchemaSpecPtr& spec, const std::string& rule_name_hint);
++  std::string GenerateFromSpec(
++      const SchemaSpecPtr& spec, const std::string& rule_name_hint, const GenerationContext& ctx
++  );
+
+   /*! \brief Create a rule and return the rule name (handles caching). */
+-  std::string CreateRule(const SchemaSpecPtr& spec, const std::string& rule_name_hint);
++  std::string CreateRule(
++      const SchemaSpecPtr& spec, const std::string& rule_name_hint, const GenerationContext& ctx
++  );
+
+   /*! \brief Get next separator from indent manager. */
+   virtual std::string NextSeparator(bool is_end = false);
+@@ -350,6 +483,11 @@ class JSONSchemaConverter {
    /*! \brief Get whitespace pattern. */
    std::string GetWhitespacePattern() const;
 
@@ -4655,7 +5411,38 @@ index f0175ba..86bf0ed 100644
    /*! \brief Helper to create rule with repetition constraints. */
    std::string GetPropertyWithNumberConstraints(
        const std::string& pattern,
-@@ -394,12 +466,29 @@ class JSONSchemaConverter {
+@@ -359,6 +497,7 @@ class JSONSchemaConverter {
+   );
+
+   /*! \brief Generate partial rule for object properties.
++   *  \param value_ctx The value context whose property values are emitted.
+    *  \param additional_prop_pattern_override When non-empty, used as the additional property
+    *         pattern instead of the default GetKeyPattern() : value. This supports patternProperties
+    *         and propertyNames constraints on additional keys.
+@@ -371,12 +510,14 @@ class JSONSchemaConverter {
+       const std::string& additional_suffix,
+       int min_properties,
+       int max_properties,
++      const GenerationContext& value_ctx,
+       const std::string& additional_prop_pattern_override = ""
+   );
+
+   /*! \brief Generate the object rule in "any order" mode: an "item" alternation over all property
+    *  keys, repeated between max(min_properties, required.size()) and max_properties times. Only the
+    *  entry count is bounded, not which keys appear.
++   *  \param value_ctx The value context whose property values are emitted.
+    */
+   std::string GetAnyOrderRuleForProperties(
+       const std::vector<ObjectSpec::Property>& properties,
+@@ -386,6 +527,7 @@ class JSONSchemaConverter {
+       const std::string& additional_suffix,
+       int min_properties,
+       int max_properties,
++      const GenerationContext& value_ctx,
+       const std::string& additional_prop_pattern_override = ""
+   );
+
+@@ -394,12 +536,20 @@ class JSONSchemaConverter {
    EBNFScriptCreator ebnf_script_creator_;
    IndentManager indent_manager_;
    std::string colon_pattern_;
@@ -4670,22 +5457,13 @@ index f0175ba..86bf0ed 100644
 +  int string_value_delimiter_token_id_ = -1;
 +  std::vector<int32_t> string_value_forbidden_token_ids_;
 +  std::string additional_bare_key_terminal_;
-+  bool keys_are_bare_;
 +  std::string bare_key_pattern_forbidden_;
-+  // When set, the string hooks (StringDelimiters, StringPatternForbiddenChars,
-+  // GenerateStringLengthBody, GenerateStringDefault, WrapValueStringLiteral)
-+  // emit a bare (unquoted) key body confined by bare_key_pattern_forbidden_
-+  // instead of a value string, so CreatePropertyNameKeyRule can reuse the
-+  // general string/const/enum generators for propertyNames keys.
-+  bool in_bare_key_mode_ = false;
-+  // Forbidden (false-schema) keys of the object being generated; read via
-+  // CurrentForbiddenKeys(). Object generation nests, so this is saved/restored
-+  // around GenerateObject. Null means none.
-+  const std::vector<std::string>* current_forbidden_keys_ = nullptr;
++  // Forbidden (false-schema) properties of the object being generated. Null means none.
++  const std::vector<std::string>* current_forbidden_properties_ = nullptr;
 
   public:
    // Basic rule names
-@@ -413,6 +502,13 @@ class JSONSchemaConverter {
+@@ -413,17 +563,43 @@ class JSONSchemaConverter {
    static const std::string kBasicObject;
    static const std::string kBasicEscape;
    static const std::string kBasicStringSub;
@@ -4698,24 +5476,41 @@ index f0175ba..86bf0ed 100644
 +  static std::optional<std::string> JSONFormatToRegexPattern(const std::string& format);
 
   protected:
-   GenerateCacheManager rule_cache_manager_;
-@@ -420,6 +516,15 @@ class JSONSchemaConverter {
+-  GenerateCacheManager rule_cache_manager_;
++  // The two cache instances a context can point at.
++  RuleCache value_cache_;
++  RuleCache key_cache_;
+
   private:
    void AddHelperRules();
 
+-  std::unordered_map<std::string, std::string>
+-      uri_to_rule_name_;      // For circular reference handling
 +  std::string DelimiterTokenTerminal() const;
 +  std::string ExcludeStringContentArgs() const;
 +  // EBNF body for a token-delimited string value: the delimiter token, a run of
 +  // any tokens except the delimiter and the excluded tokens, then the delimiter.
 +  std::string DelimitedStringRuleBody() const;
-+  std::string RenderJSONValueLiteral(const picojson::value& v) const;
-+  std::string WrapValueStringLiteral(const std::string& inner) const;
-+  std::string WrapValueKeyLiteral(const std::string& inner) const;
++  // Render a parsed JSON literal. Strings/scalars/array
++  // items are framed by the value context; an object key by the key context.
++  std::string RenderLiteral(
++      const picojson::value& v, const GenerationContext& value_ctx,
++      const GenerationContext& key_ctx
++  ) const;
++  // Wrap a literal body per ctx.framing: bare chars, a quoted JSON string, or a
++  // token-delimited pair.
++  std::string WrapLiteral(const std::string& inner, const GenerationContext& ctx) const;
 +
-   std::unordered_map<std::string, std::string>
-       uri_to_rule_name_;      // For circular reference handling
    RefResolver ref_resolver_;  // Resolves $ref URI to SchemaSpecPtr at generate time
-@@ -447,12 +552,10 @@ class JSONSchemaConverter {
+
++  // Explicit framing per emission axis.
++  GenerationContext::Framing value_framing_;
++  GenerationContext::Framing key_framing_;
++
+   // For string spec deduplication
+   struct StringSpecKey {
+     std::string pattern;
+@@ -447,12 +623,10 @@ class JSONSchemaConverter {
        bool exclusive_end = false
    );
 
@@ -4729,7 +5524,7 @@ index f0175ba..86bf0ed 100644
    // Expose for testing
    friend std::string GenerateRangeRegex(std::optional<int64_t> start, std::optional<int64_t> end);
    friend std::string GenerateFloatRangeRegex(
-@@ -499,7 +602,27 @@ std::string JSONSchemaToEBNF(
+@@ -499,7 +673,27 @@ std::string JSONSchemaToEBNF(
      bool strict_mode = true,
      std::optional<int> max_whitespace_cnt = std::nullopt,
      JSONFormat json_format = JSONFormat::kJSON,
@@ -4758,7 +5553,7 @@ index f0175ba..86bf0ed 100644
  );
 
  /*!
-@@ -535,7 +658,24 @@ std::string JSONSchemaToEBNF(
+@@ -535,7 +729,24 @@ std::string JSONSchemaToEBNF(
      bool strict_mode = true,
      std::optional<int> max_whitespace_cnt = std::nullopt,
      JSONFormat json_format = JSONFormat::kJSON,
@@ -4784,7 +5579,7 @@ index f0175ba..86bf0ed 100644
  );
 
  /*!
-@@ -559,7 +699,12 @@ std::string GenerateFloatRangeRegex(
+@@ -559,7 +770,12 @@ std::string GenerateFloatRangeRegex(
   * \return The ebnf-grammar to match the requirements of the schema, and
   * in Qwen xml style.
   */
@@ -4798,7 +5593,7 @@ index f0175ba..86bf0ed 100644
 
  /*!
   * \brief Convert a function call to a Grammar.
-@@ -567,7 +712,12 @@ std::string QwenXMLToolCallingToEBNF(const std::string& schema, bool any_order =
+@@ -567,7 +783,12 @@ std::string QwenXMLToolCallingToEBNF(const std::string& schema, bool any_order =
   * \return The ebnf-grammar to match the requirements of the schema, and
   * in MiniMax xml style.
   */
@@ -4812,7 +5607,7 @@ index f0175ba..86bf0ed 100644
 
  /*!
   * \brief Convert a function call to a Grammar.
-@@ -575,7 +725,12 @@ std::string MiniMaxXMLToolCallingToEBNF(const std::string& schema, bool any_orde
+@@ -575,7 +796,12 @@ std::string MiniMaxXMLToolCallingToEBNF(const std::string& schema, bool any_orde
   * \return The ebnf-grammar to match the requirements of the schema, and
   * in DeepSeek xml style.
   */
@@ -4826,7 +5621,7 @@ index f0175ba..86bf0ed 100644
 
  /*!
   * \brief Convert a function call to a Grammar.
-@@ -583,7 +738,12 @@ std::string DeepSeekXMLToolCallingToEBNF(const std::string& schema, bool any_ord
+@@ -583,7 +809,12 @@ std::string DeepSeekXMLToolCallingToEBNF(const std::string& schema, bool any_ord
   * \return The ebnf-grammar to match the requirements of the schema, and
   * in GLM xml style (<arg_key>key</arg_key><arg_value>value</arg_value>).
   */
@@ -4841,7 +5636,7 @@ index f0175ba..86bf0ed 100644
  }  // namespace xgrammar
 
 diff --git a/cpp/json_schema_converter_ext.cc b/cpp/json_schema_converter_ext.cc
-index 4f1cc65..8dde507 100644
+index 4f1cc65..08e8d7b 100644
 --- a/cpp/json_schema_converter_ext.cc
 +++ b/cpp/json_schema_converter_ext.cc
 @@ -5,10 +5,14 @@
@@ -4882,7 +5677,7 @@ index 4f1cc65..8dde507 100644
  };
 
  XMLToolCallingConverter::XMLToolCallingConverter(
-@@ -37,13 +50,142 @@ XMLToolCallingConverter::XMLToolCallingConverter(
+@@ -37,19 +50,158 @@ XMLToolCallingConverter::XMLToolCallingConverter(
      std::optional<int> max_whitespace_cnt,
      RefResolver ref_resolver,
      JSONFormat json_format,
@@ -4892,7 +5687,6 @@ index 4f1cc65..8dde507 100644
 +    std::vector<int32_t> string_value_forbidden_token_ids,
 +    std::string additional_bare_key_terminal,
 +    std::string bare_key_pattern_forbidden,
-+    bool keys_are_bare,
 +    std::vector<int32_t> xml_marker_token_ids,
 +    std::string xml_tag_prefix
  )
@@ -4907,8 +5701,7 @@ index 4f1cc65..8dde507 100644
 +          string_value_delimiter_token_id,
 +          std::move(string_value_forbidden_token_ids),
 +          std::move(additional_bare_key_terminal),
-+          std::move(bare_key_pattern_forbidden),
-+          keys_are_bare
++          std::move(bare_key_pattern_forbidden)
        ),
        nested_object_level_(0),
 -      xml_wrapper_(kKeyWrapperMap.at(json_format)) {}
@@ -5018,17 +5811,36 @@ index 4f1cc65..8dde507 100644
 +}
 +
 +std::string XMLToolCallingConverter::GenerateXMLVariableKeyObject(
-+    const std::string& value_rule, int min_properties, int max_properties
-+) const {
++    const SchemaSpecPtr& property_names,
++    const std::string& value_rule,
++    int min_properties,
++    int max_properties
++) {
 +  std::string ws = GetWhitespacePattern();
-+  std::string entry = "(" + OpenTagPattern() + " " + ws + " " + value_rule + " " + ws + " " +
++  GenerationContext key_ctx = MakeKeyContext(GenerationContext::Framing::kBare, kXMLVariableNameTerminal);
++  std::string open_tag =
++      "\"<\" " +
++      CreatePropertyNameKeyRule(property_names, /*rule_name=*/"", key_ctx) +
++      " \">\"";
++  if (!xml_tag_prefix_.empty()) {
++    open_tag = xml_tag_prefix_literal_ + " " + open_tag;
++  }
++  std::string entry = "(" + open_tag + " " + ws + " " + value_rule + " " + ws + " " +
 +                      CloseTagPattern() + ")";
 +  return entry + RepeatExpr(min_properties, max_properties);
 +}
 
  std::string XMLToolCallingConverter::Convert(const SchemaSpecPtr& spec) {
    nested_object_level_ = 0;
-@@ -63,16 +205,39 @@ void XMLToolCallingConverter::AddBasicRules() {
+   AddBasicRules();
+   std::string root_rule_name = ebnf_script_creator_.AllocateRuleName("root");
+-  std::string root_body = GenerateFromSpec(spec, root_rule_name);
++  const GenerationContext value_ctx = MakeValueContext();
++  std::string root_body = GenerateFromSpec(spec, root_rule_name, value_ctx);
+   ebnf_script_creator_.AddRuleWithAllocatedName(root_rule_name, root_body);
+
+   return ebnf_script_creator_.GetScript();
+@@ -63,41 +215,70 @@ void XMLToolCallingConverter::AddBasicRules() {
    JSONSchemaConverter::AddBasicRules();
    nested_object_level_ = 1;
    // The outer part, xml format, is at level 1.
@@ -5078,7 +5890,15 @@ index 4f1cc65..8dde507 100644
    constexpr const char* kStringCacheKey = "{\"type\":\"string\"}";
    AddCache(kStringCacheKey, kXMLString);
 
-@@ -85,19 +250,22 @@ void XMLToolCallingConverter::AddBasicRules() {
++  const GenerationContext value_ctx = MakeValueContext();
++
+   // Add XML any rule
+   auto any_spec = SchemaSpec::Make(AnySpec{}, "{}", kXMLAny);
+-  std::string any_body = GenerateAny(std::get<AnySpec>(any_spec->spec), kXMLAny);
++  std::string any_body = GenerateAny(std::get<AnySpec>(any_spec->spec), kXMLAny, value_ctx);
+   ebnf_script_creator_.AddRule(kXMLAny, any_body);
+   AddCache("{}", kXMLAny);
+
    // Reset the nested object level to 0, which is the root level.
    nested_object_level_ = 0;
 
@@ -5095,8 +5915,10 @@ index 4f1cc65..8dde507 100644
    obj_spec_val.allow_additional_properties = true;
    obj_spec_val.additional_properties_schema = any_spec;
 -  auto obj_spec = SchemaSpec::Make(std::move(obj_spec_val), kObjectCacheKey, kXMLObject);
+-  std::string obj_body = GenerateObject(std::get<ObjectSpec>(obj_spec->spec), kXMLObject);
 +  auto obj_spec = SchemaSpec::Make(std::move(obj_spec_val), "", kXMLObject);
-   std::string obj_body = GenerateObject(std::get<ObjectSpec>(obj_spec->spec), kXMLObject);
++  std::string obj_body =
++      GenerateObject(std::get<ObjectSpec>(obj_spec->spec), kXMLObject, value_ctx);
    ebnf_script_creator_.AddRule(kXMLObject, obj_body);
 -  AddCache(kObjectCacheKey, kXMLObject);
 
@@ -5107,7 +5929,7 @@ index 4f1cc65..8dde507 100644
  }
 
  std::string XMLToolCallingConverter::GetKeyPattern() const {
-@@ -118,7 +286,11 @@ std::string XMLToolCallingConverter::GetKeyPatternExcluding(
+@@ -118,7 +299,11 @@ std::string XMLToolCallingConverter::GetKeyPatternExcluding(
      const std::vector<ObjectSpec::Property>& properties, const std::string& rule_name
  ) {
    if (nested_object_level_ <= 1) {
@@ -5120,7 +5942,20 @@ index 4f1cc65..8dde507 100644
    }
    return JSONSchemaConverter::GetKeyPatternExcluding(properties, rule_name);
  }
-@@ -155,25 +327,49 @@ std::string XMLToolCallingConverter::GenerateString(
+@@ -131,8 +316,11 @@ std::string XMLToolCallingConverter::NextSeparator(bool is_end) {
+ }
+
+ std::string XMLToolCallingConverter::GenerateString(
+-    const StringSpec& spec, const std::string& rule_name
++    const StringSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    return JSONSchemaConverter::GenerateString(spec, rule_name, ctx);
++  }
+   if (nested_object_level_ <= 1) {
+     // For XML format, use TagDispatch for strings
+     if (!spec.pattern.has_value() && !spec.format.has_value() && spec.min_length == 0 &&
+@@ -155,46 +343,103 @@ std::string XMLToolCallingConverter::GenerateString(
        return converted_regex;
      }
 
@@ -5157,13 +5992,15 @@ index 4f1cc65..8dde507 100644
 +    XGRAMMAR_LOG(FATAL) << "unsupported string format for a bare XML tool-call value: "
 +                        << *spec.format;
    }
-   return JSONSchemaConverter::GenerateString(spec, rule_name);
+-  return JSONSchemaConverter::GenerateString(spec, rule_name);
++  return JSONSchemaConverter::GenerateString(spec, rule_name, ctx);
  }
 
 +std::string XMLToolCallingConverter::GetAnyStringRuleName() const { return kXMLString; }
 +
  std::string XMLToolCallingConverter::GenerateAny(
-     const AnySpec& spec, const std::string& rule_name
+-    const AnySpec& spec, const std::string& rule_name
++    const AnySpec& spec, const std::string& rule_name, const GenerationContext& ctx
  ) {
 +  if (xml_wrapper_.xml_all_depths) {
 +    std::string array_arm;
@@ -5179,9 +6016,16 @@ index 4f1cc65..8dde507 100644
    if (nested_object_level_ == 0) {
      return kXMLObject;
    }
-@@ -186,6 +382,36 @@ std::string XMLToolCallingConverter::GenerateAny(
+   if (nested_object_level_ == 1) {
+     return kXMLString + " | " + kBasicArray + " | " + kBasicObject;
+   }
+-  return JSONSchemaConverter::GenerateAny(spec, rule_name);
++  return JSONSchemaConverter::GenerateAny(spec, rule_name, ctx);
+ }
+
  std::string XMLToolCallingConverter::GenerateArray(
-     const ArraySpec& spec, const std::string& rule_name
+-    const ArraySpec& spec, const std::string& rule_name
++    const ArraySpec& spec, const std::string& rule_name, const GenerationContext& ctx
  ) {
 +  if (!xml_wrapper_.array_item_tag.empty()) {
 +    const std::string& item_tag = xml_wrapper_.array_item_tag;
@@ -5190,7 +6034,7 @@ index 4f1cc65..8dde507 100644
 +    std::string result;
 +    for (int64_t i = 0; i < item_count; ++i) {
 +      std::string type_rule =
-+          CreateRule(spec.prefix_items[i], rule_name + "_item_" + std::to_string(i));
++          CreateRule(spec.prefix_items[i], rule_name + "_item_" + std::to_string(i), ctx);
 +      if (!result.empty()) {
 +        result += " ";
 +      }
@@ -5199,7 +6043,7 @@ index 4f1cc65..8dde507 100644
 +
 +    if (spec.allow_additional_items) {
 +      std::string add_rule =
-+          spec.additional_items ? CreateRule(spec.additional_items, rule_name + "_additional")
++          spec.additional_items ? CreateRule(spec.additional_items, rule_name + "_additional", ctx)
 +                                : kXMLAny;
 +      std::string element =
 +          "(" + OpenTag(item_tag) + " " + add_rule + " " + CloseTag(item_tag) + ")";
@@ -5214,9 +6058,49 @@ index 4f1cc65..8dde507 100644
 +    return result;
 +  }
    nested_object_level_++;
-   auto result = JSONSchemaConverter::GenerateArray(spec, rule_name);
+-  auto result = JSONSchemaConverter::GenerateArray(spec, rule_name);
++  auto result = JSONSchemaConverter::GenerateArray(spec, rule_name, ctx);
    nested_object_level_--;
-@@ -230,7 +456,8 @@ std::string XMLToolCallingConverter::GenerateEnum(
+   return result;
+ }
+
+ std::string XMLToolCallingConverter::GenerateConst(
+-    const ConstSpec& spec, const std::string& rule_name
++    const ConstSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    return JSONSchemaConverter::GenerateConst(spec, rule_name, ctx);
++  }
+   if (nested_object_level_ <= 1) {
+     const std::string& val = spec.json_value;
+     if (val.size() >= 2 && val.front() == '"' && val.back() == '"') {
+@@ -202,14 +447,17 @@ std::string XMLToolCallingConverter::GenerateConst(
+     }
+     return "\"" + val + "\"";
+   }
+-  return JSONSchemaConverter::GenerateConst(spec, rule_name);
++  return JSONSchemaConverter::GenerateConst(spec, rule_name, ctx);
+ }
+
+ std::string XMLToolCallingConverter::GenerateEnum(
+-    const EnumSpec& spec, const std::string& rule_name
++    const EnumSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+ ) {
+   XGRAMMAR_DCHECK(!spec.json_values.empty())
+       << "GenerateEnum called with empty enum spec for rule: " << rule_name;
++  if (ctx.framing == GenerationContext::Framing::kBare) {
++    return JSONSchemaConverter::GenerateEnum(spec, rule_name, ctx);
++  }
+   if (nested_object_level_ <= 1) {
+     std::string result;
+     for (size_t i = 0; i < spec.json_values.size(); ++i) {
+@@ -225,12 +473,13 @@ std::string XMLToolCallingConverter::GenerateEnum(
+     }
+     return result;
+   }
+-  return JSONSchemaConverter::GenerateEnum(spec, rule_name);
++  return JSONSchemaConverter::GenerateEnum(spec, rule_name, ctx);
+ }
 
  std::string XMLToolCallingConverter::FormatPropertyKey(const std::string& key) {
    if (nested_object_level_ <= 1) {
@@ -5226,7 +6110,7 @@ index 4f1cc65..8dde507 100644
    }
    return JSONSchemaConverter::FormatPropertyKey(key);
  }
-@@ -239,15 +466,16 @@ std::string XMLToolCallingConverter::FormatProperty(
+@@ -239,15 +488,16 @@ std::string XMLToolCallingConverter::FormatProperty(
      const std::string& key, const std::string& value_rule, const std::string& rule_name, int64_t idx
  ) {
    if (nested_object_level_ <= 1) {
@@ -5251,7 +6135,7 @@ index 4f1cc65..8dde507 100644
    }
    return JSONSchemaConverter::FormatProperty(key, value_rule, rule_name, idx);
  }
-@@ -259,16 +487,16 @@ std::string XMLToolCallingConverter::FormatOtherProperty(
+@@ -259,16 +509,16 @@ std::string XMLToolCallingConverter::FormatOtherProperty(
      const std::string& rule_name_suffix
  ) {
    if (nested_object_level_ <= 1) {
@@ -5277,9 +6161,13 @@ index 4f1cc65..8dde507 100644
    }
    return JSONSchemaConverter::FormatOtherProperty(
        key_pattern, value_rule, rule_name, rule_name_suffix
-@@ -278,10 +506,59 @@ std::string XMLToolCallingConverter::FormatOtherProperty(
+@@ -276,12 +526,65 @@ std::string XMLToolCallingConverter::FormatOtherProperty(
+ }
+
  std::string XMLToolCallingConverter::GenerateObject(
-     const ObjectSpec& spec, const std::string& rule_name, bool dummy_need_braces
+-    const ObjectSpec& spec, const std::string& rule_name, bool dummy_need_braces
++    const ObjectSpec& spec, const std::string& rule_name, const GenerationContext& ctx,
++    bool dummy_need_braces
  ) {
 -  nested_object_level_++;
 +  // Tag-key styles emit a brace-less, tag-prefixed wrap (tag-prefix "<key>").
@@ -5301,9 +6189,11 @@ index 4f1cc65..8dde507 100644
 +      // else any value.
 +      std::string value_rule =
 +          spec.additional_properties_schema
-+              ? CreateRule(spec.additional_properties_schema, rule_name + "_val")
++              ? CreateRule(spec.additional_properties_schema, rule_name + "_val", ctx)
 +              : kXMLAny;
-+      return GenerateXMLVariableKeyObject(value_rule, spec.min_properties, spec.max_properties);
++      return GenerateXMLVariableKeyObject(
++          spec.property_names, value_rule, spec.min_properties, spec.max_properties
++      );
 +    }
 +    // Declared properties only: a close tag cannot backreference a variable
 +    // key, so additional/pattern/propertyNames are dropped before the base
@@ -5319,7 +6209,8 @@ index 4f1cc65..8dde507 100644
 +    if (!xml_wrapper_.xml_all_depths) {
 +      nested_object_level_++;
 +    }
-+    auto result = JSONSchemaConverter::GenerateObject(declared_only, rule_name, /*need_braces=*/false);
++    auto result =
++        JSONSchemaConverter::GenerateObject(declared_only, rule_name, ctx, /*need_braces=*/false);
 +    if (!xml_wrapper_.xml_all_depths) {
 +      nested_object_level_--;
 +    }
@@ -5331,16 +6222,34 @@ index 4f1cc65..8dde507 100644
 +    nested_object_level_++;
 +  }
    bool need_brace = nested_object_level_ > 1;
-   auto result = JSONSchemaConverter::GenerateObject(spec, rule_name, need_brace);
+-  auto result = JSONSchemaConverter::GenerateObject(spec, rule_name, need_brace);
 -  nested_object_level_--;
++  auto result = JSONSchemaConverter::GenerateObject(spec, rule_name, ctx, need_brace);
 +  if (!xml_wrapper_.xml_all_depths) {
 +    nested_object_level_--;
 +  }
    return result;
  }
 
+@@ -289,14 +592,14 @@ void XMLToolCallingConverter::AddCache(const std::string& key, const std::string
+   if (key.empty()) {
+     return;
+   }
+-  rule_cache_manager_.AddCache(key, nested_object_level_ > 1, value);
++  value_cache_.schema_rules.AddCache(key, nested_object_level_ > 1, value);
+ }
+
+ std::optional<std::string> XMLToolCallingConverter::GetCache(const std::string& key) const {
+   if (key.empty()) {
+     return std::nullopt;
+   }
+-  return rule_cache_manager_.GetCache(key, nested_object_level_ > 1);
++  return value_cache_.schema_rules.GetCache(key, nested_object_level_ > 1);
+ }
+
+ }  // namespace xgrammar
 diff --git a/cpp/json_schema_converter_ext.h b/cpp/json_schema_converter_ext.h
-index 8d778e0..9a3461b 100644
+index 8d778e0..96a3cef 100644
 --- a/cpp/json_schema_converter_ext.h
 +++ b/cpp/json_schema_converter_ext.h
 @@ -7,8 +7,10 @@
@@ -5354,7 +6263,7 @@ index 8d778e0..9a3461b 100644
 
  #include "json_schema_converter.h"
 
-@@ -30,7 +32,14 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
+@@ -30,7 +32,13 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
        std::optional<int> max_whitespace_cnt,
        RefResolver ref_resolver = nullptr,
        JSONFormat json_format = JSONFormat::kQwenXML,
@@ -5364,13 +6273,44 @@ index 8d778e0..9a3461b 100644
 +      std::vector<int32_t> string_value_forbidden_token_ids = {},
 +      std::string additional_bare_key_terminal = "",
 +      std::string bare_key_pattern_forbidden = "",
-+      bool keys_are_bare = false,
 +      std::vector<int32_t> xml_marker_token_ids = {},
 +      std::string xml_tag_prefix = ""
    );
 
    /*! \brief Convert SchemaSpec to EBNF with XML format for root object. Note that this function is
-@@ -65,6 +74,7 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
+@@ -39,14 +47,25 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
+
+  protected:
+   // Override methods for XML format
+-  std::string GenerateString(const StringSpec& spec, const std::string& rule_name) override;
++  std::string GenerateString(
++      const StringSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  ) override;
+   std::string GenerateObject(
+-      const ObjectSpec& spec, const std::string& rule_name, bool dummy_need_braces = false
++      const ObjectSpec& spec, const std::string& rule_name, const GenerationContext& ctx,
++      bool dummy_need_braces = false
++  ) override;
++  std::string GenerateAny(
++      const AnySpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  ) override;
++  std::string GenerateArray(
++      const ArraySpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  ) override;
++  std::string GenerateConst(
++      const ConstSpec& spec, const std::string& rule_name, const GenerationContext& ctx
++  ) override;
++  std::string GenerateEnum(
++      const EnumSpec& spec, const std::string& rule_name, const GenerationContext& ctx
+   ) override;
+-  std::string GenerateAny(const AnySpec& spec, const std::string& rule_name) override;
+-  std::string GenerateArray(const ArraySpec& spec, const std::string& rule_name) override;
+-  std::string GenerateConst(const ConstSpec& spec, const std::string& rule_name) override;
+-  std::string GenerateEnum(const EnumSpec& spec, const std::string& rule_name) override;
+
+   // Override format hooks
+   std::string FormatPropertyKey(const std::string& key) override;
+@@ -65,6 +84,7 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
 
    std::string GetKeyPattern() const override;
    std::string GetBasicAnyRuleName() const override;
@@ -5378,7 +6318,7 @@ index 8d778e0..9a3461b 100644
    std::string GetKeyPatternExcluding(
        const std::vector<ObjectSpec::Property>& properties, const std::string& rule_name
    ) override;
-@@ -76,13 +86,21 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
+@@ -76,13 +96,21 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
    void AddCache(const std::string& key, const std::string& value) override;
    std::optional<std::string> GetCache(const std::string& key) const override;
 
@@ -5401,7 +6341,7 @@ index 8d778e0..9a3461b 100644
    };
 
    static const std::unordered_map<JSONFormat, XMLWrapper> kKeyWrapperMap;
-@@ -90,10 +108,50 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
+@@ -90,10 +118,53 @@ class XMLToolCallingConverter : public JSONSchemaConverter {
    static const std::string kXMLAny;
    static const std::string kXMLObject;
    static const std::string kXMLVariableName;
@@ -5435,8 +6375,11 @@ index 8d778e0..9a3461b 100644
 +  std::string CloseTagPattern() const;
 +
 +  std::string GenerateXMLVariableKeyObject(
-+      const std::string& value_rule, int min_properties, int max_properties
-+  ) const;
++      const SchemaSpecPtr& property_names,
++      const std::string& value_rule,
++      int min_properties,
++      int max_properties
++  );
 +
 +  // EBNF repetition suffix for an already-built element:
 +  //   (0, -1) -> "*", (n, -1) -> "{n,}", (n, m) -> "{n,m}".
@@ -5455,7 +6398,7 @@ index 8d778e0..9a3461b 100644
 
  }  // namespace xgrammar
 diff --git a/cpp/regex_converter.cc b/cpp/regex_converter.cc
-index 76a0f4c..fc2003e 100644
+index 76a0f4c..bbfbb68 100644
 --- a/cpp/regex_converter.cc
 +++ b/cpp/regex_converter.cc
 @@ -4,11 +4,15 @@
@@ -5479,10 +6422,10 @@ index 76a0f4c..fc2003e 100644
  class RegexConverter {
   public:
 -  explicit RegexConverter(const std::string& regex) : regex_(regex) {
-+  explicit RegexConverter(const std::string& regex, const std::string& forbidden_chars = "")
++  explicit RegexConverter(const std::string& regex, const std::string& forbidden_alphabet = "")
 +      : regex_(regex),
-+        forbidden_chars_(forbidden_chars),
-+        quote_is_delim_(forbidden_chars.find('"') != std::string::npos) {
++        forbidden_alphabet_(forbidden_alphabet),
++        quote_is_delim_(forbidden_alphabet.find('"') != std::string::npos) {
      if (!regex.empty()) {
        regex_codepoints_ = ParseUTF8(regex_.c_str(), false);
        if (regex_codepoints_[0] == kInvalidUTF8) {
@@ -5515,7 +6458,7 @@ index 76a0f4c..fc2003e 100644
 +  // Format a single codepoint as an EBNF terminal. json_escape is set for a
 +  // standalone literal (class members are escaped as a unit by
 +  // MakeCharClassJsonSafe). When it is set and this regex is a JSON-string body
-+  // (forbidden_chars_ non-empty), `"` and control chars (0x00-0x1F) are emitted as
++  // (forbidden_alphabet_ non-empty), `"` and control chars (0x00-0x1F) are emitted as
 +  // \" / \uXXXX so the grammar matches valid JSON, not a raw invalid byte.
 +  std::string FormatCharLiteral(TCodepoint codepoint, bool json_escape);
 +  // Rewrite a positive character class so it is safe inside a delimited JSON
@@ -5523,7 +6466,7 @@ index 76a0f4c..fc2003e 100644
 +  // bytes, so each JSON-unsafe member (control, `\`, and `"` when it delimits)
 +  // is lifted out into an alternation of escape-sequence terminals, leaving the
 +  // safe members as a residual class. No-op outside a string context, for
-+  // negated classes (already confined via forbidden_chars_), or when nothing is
++  // negated classes (already confined via forbidden_alphabet_), or when nothing is
 +  // unsafe.
 +  std::string MakeCharClassJsonSafe(const std::string& char_class);
    /**
@@ -5532,17 +6475,17 @@ index 76a0f4c..fc2003e 100644
     */
    void HandleGroupModifier();
 
-+  // Parse forbidden_chars_ (an EBNF char-class body) into codepoint ranges so a
++  // Parse forbidden_alphabet_ (an EBNF char-class body) into codepoint ranges so a
 +  // positive literal / class member can be tested for membership.
 +  void ParseForbiddenRanges();
 +
    std::string regex_;
 +  // EBNF char-class body of characters that `.` / negated classes must exclude
 +  // (so a regex used as a delimited-string body cannot match its delimiter).
-+  std::string forbidden_chars_;
-+  // Precomputed: is `"` in forbidden_chars_ (a delimiter that must be escaped)?
++  std::string forbidden_alphabet_;
++  // Precomputed: is `"` in forbidden_alphabet_ (a delimiter that must be escaped)?
 +  bool quote_is_delim_;
-+  // Parsed [lo, hi] ranges of forbidden_chars_ (empty if none).
++  // Parsed [lo, hi] ranges of forbidden_alphabet_ (empty if none).
 +  std::vector<std::pair<TCodepoint, TCodepoint>> forbidden_ranges_;
 +  // Set when a positive literal / positive class member is in forbidden_ranges_.
 +  bool matched_forbidden_positive_ = false;
@@ -5555,8 +6498,8 @@ index 76a0f4c..fc2003e 100644
    }
 +  // A negated class (`[^...]`) must also exclude the forbidden characters, else
 +  // it can match the delimiter/escape/control bytes of an enclosing string.
-+  if (!forbidden_chars_.empty() && char_class.size() >= 2 && char_class[1] == '^') {
-+    char_class += forbidden_chars_;
++  if (!forbidden_alphabet_.empty() && char_class.size() >= 2 && char_class[1] == '^') {
++    char_class += forbidden_alphabet_;
 +  }
    char_class += ']';
    ++current_;
@@ -5565,7 +6508,7 @@ index 76a0f4c..fc2003e 100644
  }
 
  // {x}: Match exactly x occurrences of the preceding regular expression.
-@@ -141,7 +188,179 @@ std::string RegexConverter::HandleRepetitionRange() {
+@@ -141,7 +188,210 @@ std::string RegexConverter::HandleRepetitionRange() {
    return result;
  }
 
@@ -5604,10 +6547,41 @@ index 76a0f4c..fc2003e 100644
 +  return true;
 +}
 +
++// Complement of a char-class body over [0, 0x10FFFF], returned as a char-class
++// body. A positive alphabet is applied by excluding its complement, so
++// `[^complement]` matches exactly the alphabet -- letting the forbidden-set
++// machinery (`.`, negated classes, the positive-literal guard) confine a regex
++// to that alphabet with no changes.
++static std::string ComplementCharClassBody(const std::string& positive) {
++  std::vector<std::pair<uint32_t, uint32_t>> ranges;
++  ScanCharClassBody(
++      positive.c_str(), positive.c_str() + positive.size(), /*stop_on_error=*/false,
++      [&](TCodepoint lo, TCodepoint hi) {
++        ranges.emplace_back(static_cast<uint32_t>(lo), static_cast<uint32_t>(hi));
++      }
++  );
++  auto endpoint = [](uint32_t c) {
++    char buf[11];
++    std::snprintf(
++        buf, sizeof(buf), c <= 0xFFFF ? R"(\u%04x)" : R"(\U%08x)", static_cast<unsigned>(c)
++    );
++    return std::string(buf);
++  };
++  std::string body;
++  for (const auto& [lo, hi] : ComplementCharRanges(ranges, 0, 0x10FFFF)) {
++    body += endpoint(lo);
++    if (hi != lo) {
++      body += "-";
++      body += endpoint(hi);
++    }
++  }
++  return body;
++}
++
 +void RegexConverter::ParseForbiddenRanges() {
-+  if (forbidden_chars_.empty()) return;
-+  const char* p = forbidden_chars_.c_str();
-+  ScanCharClassBody(p, p + forbidden_chars_.size(), /*stop_on_error=*/false, [&](TCodepoint lo, TCodepoint hi) {
++  if (forbidden_alphabet_.empty()) return;
++  const char* p = forbidden_alphabet_.c_str();
++  ScanCharClassBody(p, p + forbidden_alphabet_.size(), /*stop_on_error=*/false, [&](TCodepoint lo, TCodepoint hi) {
 +    forbidden_ranges_.emplace_back(lo, hi);
 +  });
 +}
@@ -5625,7 +6599,7 @@ index 76a0f4c..fc2003e 100644
 +  if (IsForbidden(codepoint)) {
 +    matched_forbidden_positive_ = true;
 +  }
-+  if (json_escape && !forbidden_chars_.empty()) {
++  if (json_escape && !forbidden_alphabet_.empty()) {
 +    // Inside a delimited JSON-string body, a character that JSON requires to be
 +    // escaped must be emitted as its escape sequence, so the grammar matches the
 +    // encoded bytes (e.g. `\t`) rather than a raw byte (a literal tab) that is
@@ -5645,7 +6619,7 @@ index 76a0f4c..fc2003e 100644
 +      case '\\':
 +        return R"(\\\\)";
 +    }
-+    // `"` is a delimiter only in the standard-JSON context (forbidden_chars_
++    // `"` is a delimiter only in the standard-JSON context (forbidden_alphabet_
 +    // lists it); in a token-delimited context the `"` byte is content.
 +    if (codepoint == '"' && quote_is_delim_) {
 +      return R"(\\\")";
@@ -5663,7 +6637,7 @@ index 76a0f4c..fc2003e 100644
 +  // Only positive classes in a delimited JSON-string context need rewriting.
 +  // Negated classes already exclude the forbidden set (appended at build time),
 +  // and an empty forbidden set means this regex is not a string body.
-+  if (forbidden_chars_.empty() || char_class.size() < 2 || char_class.front() != '[' ||
++  if (forbidden_alphabet_.empty() || char_class.size() < 2 || char_class.front() != '[' ||
 +      char_class.back() != ']' || char_class[1] == '^') {
 +    return char_class;
 +  }
@@ -5746,7 +6720,7 @@ index 76a0f4c..fc2003e 100644
    // clang-format off
    static const std::unordered_map<char, TCodepoint> CUSTOM_ESCAPE_MAP = {
        {'^', '^'}, {'$', '$'}, {'.', '.'}, {'*', '*'}, {'+', '+'}, {'?', '?'}, {'\\', '\\'},
-@@ -156,7 +375,7 @@ std::string RegexConverter::HandleCharEscape() {
+@@ -156,7 +406,7 @@ std::string RegexConverter::HandleCharEscape() {
    auto [codepoint, len] = ParseNextEscaped(current_, CUSTOM_ESCAPE_MAP);
    if (codepoint != CharHandlingError::kInvalidEscape) {
      current_ += len;
@@ -5755,7 +6729,7 @@ index 76a0f4c..fc2003e 100644
    } else if (current_[1] == 'u' && current_[2] == '{') {
      current_ += 3;
      int len = 0;
-@@ -169,21 +388,21 @@ std::string RegexConverter::HandleCharEscape() {
+@@ -169,21 +419,21 @@ std::string RegexConverter::HandleCharEscape() {
        RaiseError("Invalid Unicode escape sequence.");
      }
      current_ += len + 1;
@@ -5780,19 +6754,19 @@ index 76a0f4c..fc2003e 100644
    }
  }
 
-@@ -235,19 +454,19 @@ std::string RegexConverter::HandleEscape() {
+@@ -235,19 +485,19 @@ std::string RegexConverter::HandleEscape() {
      return "[0-9]";
    } else if (current_[1] == 'D') {
      current_ += 2;
 -    return "[^0-9]";
-+    return "[^0-9" + forbidden_chars_ + "]";
++    return "[^0-9" + forbidden_alphabet_ + "]";
    } else if (current_[1] == 'w') {
      current_ += 2;
      return "[a-zA-Z0-9_]";
    } else if (current_[1] == 'W') {
      current_ += 2;
 -    return "[^a-zA-Z0-9_]";
-+    return "[^a-zA-Z0-9_" + forbidden_chars_ + "]";
++    return "[^a-zA-Z0-9_" + forbidden_alphabet_ + "]";
    } else if (current_[1] == 's') {
      current_ += 2;
 -    return R"([\f\n\r\t\v\u0020\u00a0])";
@@ -5800,11 +6774,11 @@ index 76a0f4c..fc2003e 100644
    } else if (current_[1] == 'S') {
      current_ += 2;
 -    return R"([^[\f\n\r\t\v\u0020\u00a0])";
-+    return R"([^[\f\n\r\t\v\u0020\u00a0)" + forbidden_chars_ + "]";
++    return R"([^[\f\n\r\t\v\u0020\u00a0)" + forbidden_alphabet_ + "]";
    } else if ((current_[1] >= '1' && current_[1] <= '9') || current_[1] == 'k') {
      RaiseError("Backreference is not supported yet.");
    } else if (current_[1] == 'p' || current_[1] == 'P') {
-@@ -255,7 +474,7 @@ std::string RegexConverter::HandleEscape() {
+@@ -255,7 +505,7 @@ std::string RegexConverter::HandleEscape() {
    } else if (current_[1] == 'b' || current_[1] == 'B') {
      RaiseError("Word boundary is not supported yet.");
    } else {
@@ -5813,13 +6787,13 @@ index 76a0f4c..fc2003e 100644
    }
  }
 
-@@ -371,12 +590,14 @@ std::string RegexConverter::Convert() {
+@@ -371,12 +621,14 @@ std::string RegexConverter::Convert() {
        AddEBNFSegment(HandleEscape());
      } else if (*current_ == '.') {
        is_empty = false;
 -      AddEBNFSegment(R"([\u0000-\U0010FFFF])");
 +      AddEBNFSegment(
-+          forbidden_chars_.empty() ? R"([\u0000-\U0010FFFF])" : ("[^" + forbidden_chars_ + "]")
++          forbidden_alphabet_.empty() ? R"([\u0000-\U0010FFFF])" : ("[^" + forbidden_alphabet_ + "]")
 +      );
        ++current_;
      } else {
@@ -5830,32 +6804,36 @@ index 76a0f4c..fc2003e 100644
        ++current_;
      }
    }
-@@ -393,8 +614,10 @@ std::string RegexConverter::Convert() {
+@@ -393,8 +645,14 @@ std::string RegexConverter::Convert() {
    return result_ebnf_;
  }
 
 -std::string RegexToEBNF(const std::string& regex, bool with_rule_name) {
 -  RegexConverter converter(regex);
 +std::string RegexToEBNF(
-+    const std::string& regex, bool with_rule_name, const std::string& forbidden_chars
++    const std::string& regex, bool with_rule_name, const std::string& forbidden_alphabet,
++    const std::string& allowed_alphabet
 +) {
-+  RegexConverter converter(regex, forbidden_chars);
++  RegexConverter converter(
++      regex,
++      allowed_alphabet.empty() ? forbidden_alphabet : ComplementCharClassBody(allowed_alphabet)
++  );
    if (with_rule_name) {
      return "root ::= " + converter.Convert() + "\n";
    } else {
-@@ -402,4 +625,208 @@ std::string RegexToEBNF(const std::string& regex, bool with_rule_name) {
+@@ -402,4 +660,208 @@ std::string RegexToEBNF(const std::string& regex, bool with_rule_name) {
    }
  }
 
-+bool RegexMatchesForbidden(const std::string& regex, const std::string& forbidden_chars) {
-+  RegexConverter converter(regex, forbidden_chars);
++bool RegexMatchesForbidden(const std::string& regex, const std::string& forbidden_alphabet) {
++  RegexConverter converter(regex, forbidden_alphabet);
 +  converter.Convert();
 +  return converter.MatchedForbiddenPositive();
 +}
 +
-+bool LiteralMatchesForbidden(const std::string& literal, const std::string& forbidden_chars) {
-+  if (forbidden_chars.empty() || literal.empty()) return false;
-+  RegexConverter converter(/*regex=*/"", forbidden_chars);
++bool LiteralMatchesForbidden(const std::string& literal, const std::string& forbidden_alphabet) {
++  if (forbidden_alphabet.empty() || literal.empty()) return false;
++  RegexConverter converter(/*regex=*/"", forbidden_alphabet);
 +  for (TCodepoint c : ParseUTF8(literal.c_str(), false)) {
 +    if (c != kInvalidUTF8 && converter.IsForbidden(c)) return true;
 +  }
@@ -6053,10 +7031,10 @@ index 76a0f4c..fc2003e 100644
 +
  }  // namespace xgrammar
 diff --git a/cpp/regex_converter.h b/cpp/regex_converter.h
-index fcb3442..c72d2fa 100644
+index fcb3442..a6aaa3c 100644
 --- a/cpp/regex_converter.h
 +++ b/cpp/regex_converter.h
-@@ -7,14 +7,82 @@
+@@ -7,14 +7,88 @@
  #ifndef XGRAMMAR_REGEX_CONVERTER_H_
  #define XGRAMMAR_REGEX_CONVERTER_H_
 
@@ -6070,22 +7048,28 @@ index fcb3442..c72d2fa 100644
 
  /*!
   * \brief Convert a regex string to EBNF grammar string.
-+ * \param forbidden_chars An EBNF character-class body (e.g. `\"\\\x00-\x1F`) of
-+ *   characters the emitted grammar must never match. When non-empty, `.` and
++ * \param forbidden_alphabet An EBNF character-class body (e.g. `\"\\\x00-\x1F`)
++ *   of characters the emitted grammar must never match. When non-empty, `.` and
 + *   negated classes (`[^...]`, `\D`, `\W`, `\S`) are confined to exclude these,
 + *   so a regex used as the body of a delimited string cannot match the closing
 + *   delimiter / escape / control bytes and over-run its boundary.
++ * \param allowed_alphabet An EBNF character-class body of the ONLY characters
++ *   the grammar may match (e.g. `a-zA-Z0-9_`). Mutually exclusive with
++ *   forbidden_alphabet: when non-empty it is applied as its complement,
++ *   confining `.` and negated classes to the alphabet. Used to confine a pattern
++ *   key to a bare-key / XML tag-name alphabet.
   */
 -std::string RegexToEBNF(const std::string& regex, bool with_rule_name = true);
 +std::string RegexToEBNF(
-+    const std::string& regex, bool with_rule_name = true, const std::string& forbidden_chars = ""
++    const std::string& regex, bool with_rule_name = true,
++    const std::string& forbidden_alphabet = "", const std::string& allowed_alphabet = ""
 +);
 +
 +/*!
-+ * \brief Whether a regex can match one of `forbidden_chars` via a POSITIVE
++ * \brief Whether a regex can match one of `forbidden_alphabet` via a POSITIVE
 + *   literal or positive char-class member.
 + *
-+ * `RegexToEBNF`'s `forbidden_chars` confines only `.`, negated classes, and
++ * `RegexToEBNF`'s `forbidden_alphabet` confines only `.`, negated classes, and
 + * `\D`/`\W`/`\S`; a positive literal (`:`) or positive class member (`[a:b]`)
 + * still passes through. When such a regex is used as an unquoted key body (a
 + * bare-key format), it could emit a structural byte and over-run the key.
@@ -6093,17 +7077,17 @@ index fcb3442..c72d2fa 100644
 + * member fell in the forbidden set, so the parser can reject fail-closed.
 + * Regex quantifier syntax (`{n,m}`) is not a literal and never trips this.
 + */
-+bool RegexMatchesForbidden(const std::string& regex, const std::string& forbidden_chars);
++bool RegexMatchesForbidden(const std::string& regex, const std::string& forbidden_alphabet);
 +
 +/*!
-+ * \brief Whether a LITERAL string contains a byte in `forbidden_chars`.
++ * \brief Whether a LITERAL string contains a byte in `forbidden_alphabet`.
 + *
 + * The literal-key counterpart of `RegexMatchesForbidden`: a declared/const/enum
 + * key is emitted as an escaped string literal, so the caller passes the
-+ * literal-key alphabet (which omits the escapable `"`/`\`). `forbidden_chars` is
-+ * an EBNF char-class body; an empty one matches nothing.
++ * literal-key alphabet (which omits the escapable `"`/`\`). `forbidden_alphabet`
++ * is an EBNF char-class body; an empty one matches nothing.
 + */
-+bool LiteralMatchesForbidden(const std::string& literal, const std::string& forbidden_chars);
++bool LiteralMatchesForbidden(const std::string& literal, const std::string& forbidden_alphabet);
 +
 +/*!
 + * \brief Whether a regex's language contains the EMPTY string.
@@ -6632,6 +7616,65 @@ index 88e990e..d3019be 100644
    picojson::value ToJSON() const;
  };
 
+diff --git a/cpp/support/encoding.h b/cpp/support/encoding.h
+index decb412..acf1f66 100644
+--- a/cpp/support/encoding.h
++++ b/cpp/support/encoding.h
+@@ -7,12 +7,14 @@
+ #define XGRAMMAR_SUPPORT_ENCODING_H_
+ // TODO(yixin): enhance performance
+
++#include <algorithm>
+ #include <array>
+ #include <cstdint>
+ #include <cstdio>
+ #include <optional>
+ #include <string>
+ #include <unordered_map>
++#include <utility>
+ #include <vector>
+
+ #include "logging.h"
+@@ -35,6 +37,18 @@ enum CharHandlingError : TCodepoint {
+   kInvalidLatin1 = -12,
+ };
+
++/******************** Character Ranges ********************/
++
++/*!
++ * \brief The ranges in [min, max] not covered by `ranges` (its complement),
++ *   returned as sorted, merged [lo, hi] pairs. `ranges` need not be sorted or
++ *   disjoint. Used to accept "everything except X" as positive codepoint ranges,
++ *   since an FSM edge or char-class body cannot be negated in place.
++ */
++std::vector<std::pair<uint32_t, uint32_t>> ComplementCharRanges(
++    std::vector<std::pair<uint32_t, uint32_t>> ranges, uint32_t min, uint32_t max
++);
++
+ /******************** UTF-8 Handling ********************/
+
+ /*!
+@@ -140,6 +154,20 @@ std::pair<TCodepoint, int32_t> ParseNextUTF8OrEscaped(
+
+ /******************** Implementation ********************/
+
++inline std::vector<std::pair<uint32_t, uint32_t>> ComplementCharRanges(
++    std::vector<std::pair<uint32_t, uint32_t>> ranges, uint32_t min, uint32_t max
++) {
++  std::sort(ranges.begin(), ranges.end());
++  std::vector<std::pair<uint32_t, uint32_t>> result;
++  uint32_t next = min;
++  for (const auto& [lo, hi] : ranges) {
++    if (lo > next) result.emplace_back(next, lo - 1);
++    if (hi + 1 > next) next = hi + 1;
++  }
++  if (next <= max) result.emplace_back(next, max);
++  return result;
++}
++
+ inline std::string CharToUTF8(TCodepoint codepoint) {
+   XGRAMMAR_DCHECK(codepoint <= 0x10FFFF) << "Invalid codepoint: " << codepoint;
+   std::string utf8;
 diff --git a/cpp/tokenizer_info.cc b/cpp/tokenizer_info.cc
 index 24f5d27..f1406b3 100644
 --- a/cpp/tokenizer_info.cc

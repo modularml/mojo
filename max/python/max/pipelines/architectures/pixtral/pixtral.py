@@ -17,7 +17,7 @@ from max.graph import TensorValue, ops
 from max.nn.attention import AttentionWithRope
 from max.nn.conv import Conv2d
 from max.nn.embedding import Embedding
-from max.nn.kv_cache import PagedCacheValues
+from max.nn.kv_cache import KVCacheParams, PagedCacheValues
 from max.nn.layer import Module
 from max.nn.linear import MLP, Linear
 from max.nn.norm import RMSNorm
@@ -216,6 +216,9 @@ def _build_language_model(config: PixtralConfig) -> Transformer:
         interleaved=False,
     )
 
+    kv_params = config.kv_params
+    assert isinstance(kv_params, KVCacheParams)
+
     layers = [
         TransformerBlock(
             attention=AttentionWithRope(
@@ -223,7 +226,7 @@ def _build_language_model(config: PixtralConfig) -> Transformer:
                 num_attention_heads=config.num_attention_heads,
                 num_key_value_heads=config.num_key_value_heads,
                 hidden_size=config.hidden_size,
-                kv_params=config.kv_params,
+                kv_params=kv_params,
                 dtype=config.dtype,
                 devices=config.devices,
                 scale=config.attention_multiplier,
@@ -278,7 +281,7 @@ def _build_language_model(config: PixtralConfig) -> Transformer:
         ),
         output=output,
         embedding=embedding_layer,
-        kv_params=config.kv_params,
+        kv_params=kv_params,
         rope=rope,
         return_logits=config.return_logits,
     )

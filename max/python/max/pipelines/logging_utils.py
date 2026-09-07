@@ -173,6 +173,9 @@ def log_basic_config(
         ("device_graph_capture", pipeline_config.runtime.device_graph_capture)
     )
 
+    if pipeline_config.runtime.experimental_device_graph_synthesis:
+        config_entries.append(("experimental_device_graph_synthesis", True))
+
     if pipeline_config.speculative is not None:
         spec = pipeline_config.speculative
         config_entries.append(("speculative_method", spec.speculative_method))

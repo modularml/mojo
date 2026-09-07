@@ -117,11 +117,11 @@ def _test_naive_matmul[size: Int]():
     var c_stack = Array[Float32, size * size](fill=0)
     var c = c_stack.unsafe_ptr()
 
-    var b_stack = Array[Float32, size * size](uninitialized=True)
+    var b_stack = Array[Float32, size * size](fill={})
     var b = b_stack.unsafe_ptr()
     fill_b[size](b)
 
-    var a_stack = Array[Float32, size * size](uninitialized=True)
+    var a_stack = Array[Float32, size * size](fill={})
     var a = a_stack.unsafe_ptr()
     fill_a[size](a)
 

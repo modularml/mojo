@@ -34,7 +34,12 @@ from max.gpu.primitives.grid_controls import (
 )
 from max.gpu.host import DeviceBuffer, DeviceContext
 from max.gpu.memory import external_memory
-from std.sys.info import has_apple_gpu_accelerator, is_amd_gpu, is_apple_gpu
+from std.sys.info import (
+    has_amd_gpu_accelerator,
+    has_apple_gpu_accelerator,
+    is_amd_gpu,
+    is_apple_gpu,
+)
 from layout import (
     ComptimeInt,
     Coord,
@@ -58,6 +63,12 @@ from std.utils.static_tuple import StaticTuple
 from ..normalization import (
     _APPLE_STATIC_SHMEM_MAX_COUNT,
     _APPLE_STATIC_SHMEM_MAX_BYTES,
+)
+from .coop_row import (
+    COOP_SLOT_FLOATS,
+    CoopRow,
+    coop_group_size,
+    coop_row_words,
 )
 
 # Apple-only `topk_softmax_sample` cache budget. The kernel statically allocates
@@ -1291,6 +1302,34 @@ def apply_min_p_mask_kernel[
 # search path's fixed bound.
 comptime _CUTOFF_SEARCH_MAX_ITERS = 64
 
+# Eight lanes keep the six cutoff statistics in one aligned store.
+comptime _COOP_STATS_WIDTH = 8
+
+
+@always_inline
+@__parameter
+def _coop_max(x: SIMD, y: type_of(x)) -> type_of(x):
+    return max(x, y)
+
+
+@always_inline
+@__parameter
+def _coop_sum(x: SIMD, y: type_of(x)) -> type_of(x):
+    return x + y
+
+
+@always_inline
+@__parameter
+def _coop_cutoff_stats(x: SIMD, y: type_of(x)) -> type_of(x):
+    """Combines cutoff statistics.
+
+    Lanes 0 through 3 are sums, lane 4 is a minimum, and lane 5 is a maximum.
+    """
+    var r = x + y
+    r[4] = min(x[4], y[4])
+    r[5] = max(x[5], y[5])
+    return r
+
 
 @always_inline
 def _block_reduce_cutoff_stats[
@@ -1390,11 +1429,196 @@ def _block_reduce_topp_stats[
 
 
 @always_inline
+def _sampling_rejection_loop_coop[
+    vec_size: Int,
+    block_size: Int,
+    dtype: DType,
+    deterministic: Bool,
+    coop_size: Int,
+    load_vec: def(Int) capturing[_] -> SIMD[.float32, vec_size],
+    load_one: def(Int) capturing[_] -> Float32,
+](
+    d: Int,
+    k: Int,
+    p_eff: Float32,
+    z: Float32,
+    mut generator: Random,
+    mut coop: CoopRow[coop_size],
+    coop_ws: UnsafePointer[Int32, MutAnyOrigin],
+    coop_table: UnsafePointer[mut=True, Float32, _, address_space=.SHARED],
+    vec_begin: Int,
+    vec_end: Int,
+) -> Tuple[Int, Float32, Float32, Float32]:
+    """Draws one token from a row split across blocks.
+
+    Each block scans a contiguous slice. Group-wide values keep every block
+    on the same branch and barrier sequence.
+    """
+    var tx = Int(thread_idx.x)
+    var sampled_id_sram = unsafe_stack_allocation[
+        1, Int, address_space=.SHARED
+    ]()
+
+    var sampled_id = 0
+    var low = Float32(0)
+    var high = Float32(1)
+    var q = z
+    var accepted_e = Float32(-1)
+
+    while low < high:
+        var u = generator.step_uniform()[0] * q
+
+        # Float32 represents every vocabulary index exactly.
+        var thread_sum = Float32(0)
+        var thread_last = Float32(-1)
+        for g in range(vec_begin + tx, vec_end, block_size):
+            var v = load_vec(g * vec_size)
+            comptime for j in range(vec_size):
+                if v[j] > low:
+                    thread_sum += v[j]
+                    thread_last = Float32(g * vec_size + j)
+        var slice_mass = block.sum[block_size=block_size, broadcast=True](
+            thread_sum
+        )
+        var slice_last = block.max[block_size=block_size, broadcast=True](
+            thread_last
+        )
+        var slice_last_val = Float32(0)
+        if slice_last >= 0:
+            slice_last_val = load_one(Int(slice_last))
+
+        coop.gather[4](
+            coop_ws,
+            coop_table,
+            SIMD[.float32, 4](slice_mass, slice_last, slice_last_val, 0),
+        )
+
+        # Rank order matches token order, so these are row-wide CDF prefixes.
+        var prefix = Float32(0)
+        var owner = -1
+        var owner_base = Float32(0)
+        var global_last = Float32(-1)
+        var global_last_val = Float32(0)
+        comptime for r in range(coop_size):
+            var r_sum = coop_table[r * 4]
+            var r_last = coop_table[r * 4 + 1]
+            if owner < 0 and u < prefix + r_sum:
+                owner = r
+                owner_base = prefix
+            prefix += r_sum
+            if r_last > global_last:
+                global_last = r_last
+                global_last_val = coop_table[r * 4 + 2]
+
+        if tx == 0:
+            sampled_id_sram[0] = d
+        barrier()
+        var found = SIMD[.float32, 2](-1, 0)
+        if coop.rank == owner:
+            var aggregate = owner_base
+            var slice_vecs = vec_end - vec_begin
+            for i in range(ceildiv(slice_vecs, block_size)):
+                var probs_vec = SIMD[.float32, vec_size](0)
+                var g = i * block_size + tx
+                if g < slice_vecs:
+                    probs_vec = load_vec((vec_begin + g) * vec_size)
+                var result = device_sampling_from_prob[
+                    vec_size, block_size, dtype, deterministic
+                ](i, d, low, u, probs_vec, aggregate, sampled_id_sram)
+                aggregate = result[0]
+                if aggregate > u:
+                    break
+            barrier()
+            var sid = sampled_id_sram[0]
+            if sid < d:
+                var gid = sid + vec_begin * vec_size
+                found[0] = Float32(gid)
+                found[1] = load_one(gid)
+
+        var comb = coop.combine[2, _coop_max](coop_ws, coop_table, found)
+
+        var pivot_0: Float32
+        if comb[0] >= 0:
+            sampled_id = Int(comb[0])
+            pivot_0 = comb[1]
+        elif global_last >= 0:
+            # Rounding can put `u` beyond the summed mass.
+            sampled_id = Int(global_last)
+            pivot_0 = global_last_val
+        else:
+            # Non-finite logits can leave the row without a valid token.
+            sampled_id = 0
+            break
+
+        var pivot_1 = (pivot_0 + high) / 2.0
+
+        var thread_count_0: Int32 = 0
+        var thread_count_1: Int32 = 0
+        var thread_mass_0 = Float32(0)
+        var thread_mass_1 = Float32(0)
+        for g in range(vec_begin + tx, vec_end, block_size):
+            var v = load_vec(g * vec_size)
+            comptime for j in range(vec_size):
+                if v[j] > pivot_0:
+                    thread_count_0 += 1
+                    thread_mass_0 += v[j]
+                if v[j] > pivot_1:
+                    thread_count_1 += 1
+                    thread_mass_1 += v[j]
+        var stats = _block_reduce_cutoff_stats[block_size](
+            thread_count_0,
+            thread_count_1,
+            thread_mass_0,
+            thread_mass_1,
+            Float32.MAX_FINITE,
+            Float32.MIN_FINITE,
+        )
+        var combined = coop.combine[4, _coop_sum](
+            coop_ws,
+            coop_table,
+            SIMD[.float32, 4](
+                Float32(stats[0]),
+                Float32(stats[1]),
+                stats[2],
+                stats[3],
+            ),
+        )
+        var count_0 = Int32(combined[0])
+        var count_1 = Int32(combined[1])
+        var mass_0 = combined[2]
+        var mass_1 = combined[3]
+
+        # A zero top-p budget must still accept the argmax.
+        if count_0 < Int32(k) and mass_0 <= p_eff:
+            accepted_e = pivot_0
+            break
+        if count_1 < Int32(k) and mass_1 <= p_eff:
+            low = pivot_0
+            high = pivot_1
+            q = mass_0
+        else:
+            low = pivot_1
+            q = mass_1
+
+    return Tuple[Int, Float32, Float32, Float32](sampled_id, low, accepted_e, q)
+
+
+def _topp_budget(p: Float32, z: Float32) -> Float32:
+    """Makes the top-p budget unbounded when ``p >= 1``.
+
+    Independent reductions can disagree by a few ulps, so using ``z`` as the
+    limit can reject a valid pivot.
+    """
+    return Float32.MAX if p >= 1.0 else p * z
+
+
+@always_inline
 def _topk_topp_cutoff_search[
     vec_size: Int,
     block_size: Int,
     load_dist: def(Int) capturing[_] -> SIMD[.float32, vec_size],
     track_count: Bool = True,
+    coop_size: Int = 1,
 ](
     d: Int,
     k: Int32,
@@ -1402,6 +1626,11 @@ def _topk_topp_cutoff_search[
     low_init: Float32,
     high_init: Float32,
     mass_above_low_init: Float32,
+    mut coop: CoopRow[coop_size],
+    coop_ws: Optional[UnsafePointer[Int32, MutAnyOrigin]],
+    coop_table: UnsafePointer[mut=True, Float32, _, address_space=.SHARED],
+    vec_begin: Int,
+    vec_end: Int,
 ) -> Tuple[Float32, Float32]:
     """Finds the exact constraint-set cutoff and kept mass for joint top-k/top-p.
 
@@ -1424,6 +1653,10 @@ def _topk_topp_cutoff_search[
     and ``mass_above_low_init == mass(> low_init)``. Rows where nothing fails
     (constraints disabled, or fewer than ``k`` positive-mass tokens) must be
     short-circuited by the caller instead of searched.
+
+    With ``coop_size`` above one, blocks scan contiguous slices and combine
+    statistics in rank order. Group-wide values keep every block on the same
+    branch and barrier sequence.
 
     Returns:
         ``(cutoff, kept_mass)`` where ``kept_mass == mass(> cutoff)``. On the
@@ -1459,25 +1692,22 @@ def _topk_topp_cutoff_search[
         var min_gt_low = high
         var max_le_high = low
 
-        for i in range(ceildiv(d, block_size * vec_size)):
-            var v = SIMD[.float32, vec_size](0)
-            if (i * block_size + tx) * vec_size < d:
-                v = load_dist((i * block_size + tx) * vec_size)
+        # `vec_size` divides `d`, so every vector stays within the row.
+        for g in range(vec_begin + Int(tx), vec_end, block_size):
+            var v = load_dist(g * vec_size)
 
             comptime for j in range(vec_size):
-                var idx = (i * block_size + tx) * vec_size + j
-                var valid = idx < d
-                if v[j] > pivot_0 and valid:
+                if v[j] > pivot_0:
                     comptime if track_count:
                         thread_count_0 += 1
                     thread_mass_0 += v[j]
-                if v[j] > pivot_1 and valid:
+                if v[j] > pivot_1:
                     comptime if track_count:
                         thread_count_1 += 1
                     thread_mass_1 += v[j]
-                if v[j] > low and valid:
+                if v[j] > low:
                     min_gt_low = min(min_gt_low, v[j])
-                if v[j] <= high and valid:
+                if v[j] <= high:
                     max_le_high = max(max_le_high, v[j])
 
         # Single fused block reduction after processing all chunks.
@@ -1511,6 +1741,28 @@ def _topk_topp_cutoff_search[
             mass_1 = stats[1]
             min_gt_low = stats[2]
             max_le_high = stats[3]
+
+        comptime if coop_size > 1:
+            var combined = coop.combine[_COOP_STATS_WIDTH, _coop_cutoff_stats](
+                coop_ws.unsafe_value(),
+                coop_table,
+                SIMD[.float32, _COOP_STATS_WIDTH](
+                    Float32(count_0),
+                    Float32(count_1),
+                    mass_0,
+                    mass_1,
+                    min_gt_low,
+                    max_le_high,
+                    0,
+                    0,
+                ),
+            )
+            count_0 = Int32(combined[0])
+            count_1 = Int32(combined[1])
+            mass_0 = combined[2]
+            mass_1 = combined[3]
+            min_gt_low = combined[4]
+            max_le_high = combined[5]
 
         # pivot_1 > pivot_0: if the constraint still fails above the higher
         # pivot it also fails above the lower one, so test high-to-low.
@@ -1547,7 +1799,7 @@ def _topk_topp_cutoff_search[
     MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](Int32(block_size))
 )
 @__name(
-    t"topk_topp_sampling_from_prob_{dtype}_{out_idx_type}_{deterministic}_{from_logits}_{emit_dist}_{dist_dtype}",
+    t"topk_topp_sampling_from_prob_{dtype}_{out_idx_type}_{deterministic}_{from_logits}_{emit_dist}_{dist_dtype}_{coop_size}",
 )
 def TopKTopPSamplingFromProbKernel[
     ProbsLayoutType: TensorLayout,
@@ -1562,6 +1814,7 @@ def TopKTopPSamplingFromProbKernel[
     from_logits: Bool = False,
     emit_dist: Bool = False,
     dist_dtype: DType = .float32,
+    coop_size: Int = 1,
     ProbsEngine: TensorEngine = DefaultEngine[element_width=1],
     OutputEngine: TensorEngine = DefaultEngine[element_width=1],
 ](
@@ -1580,6 +1833,7 @@ def TopKTopPSamplingFromProbKernel[
     rng_offset: UInt64,
     temperature: Optional[UnsafePointer[Float32, ImmutAnyOrigin]],
     min_p: Optional[UnsafePointer[Float32, ImmutAnyOrigin]],
+    coop_ws: Optional[UnsafePointer[Int32, MutAnyOrigin]],
 ):
     """Kernel for joint top-k + top-p sampling from probability distribution.
 
@@ -1625,6 +1879,8 @@ def TopKTopPSamplingFromProbKernel[
         emit_dist: If True, also write the masked distribution to
             `out_dist` (defaults to False).
         dist_dtype: Element type of `out_dist`.
+        coop_size: Blocks sharing each row; 1 keeps the whole row in one
+            block and compiles the cross-block traffic away.
         ProbsEngine: Engine of the input `probs` tile.
         OutputEngine: Engine of the output `output` tile.
 
@@ -1646,6 +1902,8 @@ def TopKTopPSamplingFromProbKernel[
             when `from_logits` is True; defaults to 1.0 per row.
         min_p: Optional per-row min-p thresholds [batch_size]. Only used
             when `from_logits` is True.
+        coop_ws: Zeroed cross-block workspace; required when `coop_size`
+            exceeds one, ignored otherwise.
     """
     comptime assert (
         not emit_dist or from_logits
@@ -1663,8 +1921,26 @@ def TopKTopPSamplingFromProbKernel[
     var _d = Int(d)
     comptime assert output.flat_rank == 1
 
-    var bx = block_idx.x
+    comptime assert (
+        coop_size == 1 or from_logits
+    ), "the cooperative split needs the fused softmax"
+    var n_vec = _d // vec_size
+    var rank = Int(block_idx.x) % coop_size
+    var bx = Int(block_idx.x) // coop_size
     var tx = thread_idx.x
+
+    # Contiguous slices make block-rank order match token order.
+    var slice_vec = ceildiv(n_vec, coop_size)
+    var vec_begin = min(rank * slice_vec, n_vec)
+    var vec_end = min(vec_begin + slice_vec, n_vec)
+
+    var coop = CoopRow[coop_size](bx, rank)
+    var coop_table = unsafe_stack_allocation[
+        coop_size * COOP_SLOT_FLOATS,
+        Float32,
+        alignment=16,
+        address_space=.SHARED,
+    ]()
 
     var row_idx = bx
     if indices:
@@ -1719,9 +1995,10 @@ def TopKTopPSamplingFromProbKernel[
             if min_p:
                 min_p_thresh = min_p.unsafe_value()[row_idx]
 
-            # Pass 1: block max of the logits.
+            # Every block needs the same row maximum because later control
+            # flow contains group barriers.
             var thread_max = Float32.MIN
-            for i in range(tx, _d // vec_size, block_size):
+            for i in range(vec_begin + Int(tx), vec_end, block_size):
                 var v = probs_row.load[width=vec_size](
                     (Idx[0], i * vec_size)
                 ).cast[.float32]()
@@ -1729,22 +2006,26 @@ def TopKTopPSamplingFromProbKernel[
             row_max = block.max[block_size=block_size, broadcast=True](
                 thread_max
             )
+            comptime if coop_size > 1:
+                row_max = coop.combine[1, _coop_max](
+                    coop_ws.unsafe_value(),
+                    coop_table,
+                    SIMD[.float32, 1](row_max),
+                )[0]
 
             # Pass 2: block sum of exp((logit - row_max) / temp). The full
             # (unmasked) mass is used, matching the separate-softmax path
             # where probabilities are normalized before min-p masking.
             var thread_sum = Float32(0.0)
             var thread_masked_sum = Float32(0.0)
-            for i in range(tx, _d // vec_size, block_size):
+            for i in range(vec_begin + Int(tx), vec_end, block_size):
                 var v = probs_row.load[width=vec_size](
                     (Idx[0], i * vec_size)
                 ).cast[.float32]()
                 var e = exp((v - row_max) * inv_temp)
                 comptime if cache_dist:
-                    # No barrier needed after the store: the strided readers
-                    # below re-read the slice this thread wrote. The lone
-                    # cross-thread read (`load_dist[1](sampled_id)`) is ordered
-                    # by the block reductions in between.
+                    # Each thread rereads its own slice. Block reductions
+                    # order the only cross-thread scalar read.
                     var dist_row = TileTensor(
                         out_dist.unsafe_value() + bx * _d,
                         row_major(Idx[1], _d),
@@ -1770,6 +2051,21 @@ def TopKTopPSamplingFromProbKernel[
                     )
                 else:
                     masked_z = z
+            comptime if coop_size > 1:
+                comptime if emit_dist:
+                    var totals = coop.combine[2, _coop_sum](
+                        coop_ws.unsafe_value(),
+                        coop_table,
+                        SIMD[.float32, 2](z, masked_z),
+                    )
+                    z = totals[0]
+                    masked_z = totals[1]
+                else:
+                    z = coop.combine[1, _coop_sum](
+                        coop_ws.unsafe_value(),
+                        coop_table,
+                        SIMD[.float32, 1](z),
+                    )[0]
 
         @__parameter
         @always_inline
@@ -1805,7 +2101,7 @@ def TopKTopPSamplingFromProbKernel[
                 ]()
 
         # Top-p budget in the working domain (z == 1.0 in from-prob mode).
-        var p_eff = p * z
+        var p_eff = _topp_budget(p, z)
 
         # The final sampled index, produced by whichever search path runs.
         var sampled_id = 0
@@ -1900,164 +2196,188 @@ def TopKTopPSamplingFromProbKernel[
 
             sampled_id = out_id_sram[0]
         else:
-            var sampled_id_sram = unsafe_stack_allocation[
-                1, Int, address_space=.SHARED
-            ]()
-            var last_valid_id_sram = unsafe_stack_allocation[
-                1, Int, address_space=.SHARED
-            ]()
-
-            var probs_vec: SIMD[.float32, vec_size]
-            var aggregate: Float32
+            # `emit_dist` reuses this bracket for its cutoff search.
             var q: Float32 = z
             var low: Float32 = 0.0
-            var high: Float32 = 1.0
-            # Weight of the accepted token, or -1 if the loop exited without
-            # accepting. `emit_dist` warm-starts its cutoff search from
-            # (low, accepted_e], the bracket this loop already narrowed.
             var accepted_e = Float32(-1)
 
-            # Seeded once; see the top-k kernel above for why the slot cannot
-            # be left to whatever the previous workgroup wrote.
-            if tx == 0:
-                last_valid_id_sram[0] = -1
-            barrier()
+            comptime if coop_size > 1:
 
-            while low < high:
+                @__parameter
+                @always_inline
+                def load_slice(offset: Int) -> SIMD[.float32, vec_size]:
+                    return load_dist[vec_size](offset)
+
+                @__parameter
+                @always_inline
+                def load_scalar(offset: Int) -> Float32:
+                    return load_dist[1](offset)[0]
+
+                var drawn = _sampling_rejection_loop_coop[
+                    vec_size,
+                    block_size,
+                    dtype,
+                    deterministic,
+                    coop_size,
+                    load_slice,
+                    load_scalar,
+                ](
+                    _d,
+                    k,
+                    p_eff,
+                    z,
+                    generator,
+                    coop,
+                    coop_ws.unsafe_value(),
+                    coop_table,
+                    vec_begin,
+                    vec_end,
+                )
+                sampled_id = drawn[0]
+                low = drawn[1]
+                accepted_e = drawn[2]
+                q = drawn[3]
+            else:
+                var sampled_id_sram = unsafe_stack_allocation[
+                    1, Int, address_space=.SHARED
+                ]()
+                var last_valid_id_sram = unsafe_stack_allocation[
+                    1, Int, address_space=.SHARED
+                ]()
+
+                var probs_vec: SIMD[.float32, vec_size]
+                var aggregate: Float32
+                var high: Float32 = 1.0
+
+                # A row without a candidate must not read stale shared memory.
                 if tx == 0:
-                    sampled_id_sram[0] = _d
+                    last_valid_id_sram[0] = -1
                 barrier()
 
-                var u = generator.step_uniform()[0] * q
-                aggregate = 0.0
-                var thread_max_valid = -1
+                while low < high:
+                    if tx == 0:
+                        sampled_id_sram[0] = _d
+                    barrier()
 
-                for i in range(ceildiv(_d, block_size * vec_size)):
-                    probs_vec = 0
-                    if (i * block_size + tx) * vec_size < _d:
-                        probs_vec = load_dist[vec_size](
-                            (i * block_size + tx) * vec_size
+                    var u = generator.step_uniform()[0] * q
+                    aggregate = 0.0
+                    var thread_max_valid = -1
+
+                    for i in range(ceildiv(_d, block_size * vec_size)):
+                        probs_vec = 0
+                        if (i * block_size + tx) * vec_size < _d:
+                            probs_vec = load_dist[vec_size](
+                                (i * block_size + tx) * vec_size
+                            )
+                        var result = device_sampling_from_prob[
+                            vec_size, block_size, dtype, deterministic
+                        ](
+                            i,
+                            _d,
+                            low,
+                            u,
+                            probs_vec,
+                            aggregate,
+                            sampled_id_sram,
                         )
-                    var result = device_sampling_from_prob[
-                        vec_size, block_size, dtype, deterministic
-                    ](
-                        i,
-                        _d,
-                        low,
-                        u,
-                        probs_vec,
-                        aggregate,
-                        sampled_id_sram,
-                    )
-                    aggregate = result[0]
-                    thread_max_valid = max(thread_max_valid, result[1])
-                    if aggregate > u:
+                        aggregate = result[0]
+                        thread_max_valid = max(thread_max_valid, result[1])
+                        if aggregate > u:
+                            break
+
+                    var block_max_valid = block.max[
+                        block_size=block_size,
+                        broadcast=False,
+                    ](Int32(thread_max_valid))
+
+                    if tx == 0 and block_max_valid != -1:
+                        last_valid_id_sram[0] = Int(block_max_valid)
+
+                    barrier()
+
+                    sampled_id = sampled_id_sram[0]
+                    if sampled_id == _d:
+                        sampled_id = last_valid_id_sram[0]
+
+                    if sampled_id < 0:
+                        # Non-finite logits can leave the row without a valid token.
+                        sampled_id = 0
                         break
 
-                # Reduce last_valid_id across block (single reduction after loop).
-                var block_max_valid = block.max[
-                    block_size=block_size,
-                    broadcast=False,
-                ](Int32(thread_max_valid))
+                    var pivot_0 = Float32(load_dist[1](sampled_id))
+                    var pivot_1 = (pivot_0 + high) / 2.0
 
-                if tx == 0 and block_max_valid != -1:
-                    last_valid_id_sram[0] = Int(block_max_valid)
+                    var thread_vc_0_total = ValueCount[.float32](0.0, 0)
+                    var thread_vc_1_total = ValueCount[.float32](0.0, 0)
 
-                barrier()
+                    for i in range(ceildiv(_d, block_size * vec_size)):
+                        probs_vec = 0
+                        if (i * block_size + tx) * vec_size < _d:
+                            probs_vec = load_dist[vec_size](
+                                (i * block_size + tx) * vec_size
+                            )
+                        var probs_gt_pivot_0_values = SIMD[.float32, vec_size]()
+                        var probs_gt_pivot_0_counts = SIMD[.int32, vec_size]()
+                        var probs_gt_pivot_1_values = SIMD[.float32, vec_size]()
+                        var probs_gt_pivot_1_counts = SIMD[.int32, vec_size]()
 
-                sampled_id = sampled_id_sram[0]
-                if sampled_id == _d:
-                    sampled_id = last_valid_id_sram[0]
+                        comptime for j in range(vec_size):
+                            var idx = (i * block_size + tx) * vec_size + j
+                            var is_valid = idx < _d
 
-                if sampled_id < 0:
-                    # Degenerate row: nothing ever exceeded `low`. From logits,
-                    # one non-finite value does it -- `row_max` goes +inf, so
-                    # every weight is exp(inf-inf)=NaN or exp(-inf)=0 and no
-                    # comparison can be true. Emit an in-range index and stop.
-                    sampled_id = 0
-                    break
+                            var gt_pivot_0 = probs_vec[j] > pivot_0
+                            probs_gt_pivot_0_values[j] = probs_vec[
+                                j
+                            ] if gt_pivot_0 else 0.0
+                            probs_gt_pivot_0_counts[j] = Int32(1) if (
+                                gt_pivot_0 and is_valid
+                            ) else Int32(0)
 
-                var pivot_0 = Float32(load_dist[1](sampled_id))
-                var pivot_1 = (pivot_0 + high) / 2.0
+                            var gt_pivot_1 = probs_vec[j] > pivot_1
+                            probs_gt_pivot_1_values[j] = probs_vec[
+                                j
+                            ] if gt_pivot_1 else 0.0
+                            probs_gt_pivot_1_counts[j] = Int32(1) if (
+                                gt_pivot_1 and is_valid
+                            ) else Int32(0)
 
-                # Accumulate thread-local value counts across all chunks.
-                var thread_vc_0_total = ValueCount[.float32](0.0, 0)
-                var thread_vc_1_total = ValueCount[.float32](0.0, 0)
-
-                for i in range(ceildiv(_d, block_size * vec_size)):
-                    probs_vec = 0
-                    if (i * block_size + tx) * vec_size < _d:
-                        probs_vec = load_dist[vec_size](
-                            (i * block_size + tx) * vec_size
+                        thread_vc_0_total += ValueCount[.float32](
+                            probs_gt_pivot_0_values.reduce_add(),
+                            probs_gt_pivot_0_counts.reduce_add(),
                         )
-                    var probs_gt_pivot_0_values = SIMD[.float32, vec_size]()
-                    var probs_gt_pivot_0_counts = SIMD[.int32, vec_size]()
-                    var probs_gt_pivot_1_values = SIMD[.float32, vec_size]()
-                    var probs_gt_pivot_1_counts = SIMD[.int32, vec_size]()
+                        thread_vc_1_total += ValueCount[.float32](
+                            probs_gt_pivot_1_values.reduce_add(),
+                            probs_gt_pivot_1_counts.reduce_add(),
+                        )
 
-                    comptime for j in range(vec_size):
-                        var idx = (i * block_size + tx) * vec_size + j
-                        var is_valid = idx < _d
+                    # Small top-k values usually accept the first pivot, so
+                    # defer the second reduction.
+                    var aggregate_gt_pivot_0 = _block_reduce_value_count[
+                        .float32, broadcast=True
+                    ](thread_vc_0_total)
 
-                        var gt_pivot_0 = probs_vec[j] > pivot_0
-                        probs_gt_pivot_0_values[j] = probs_vec[
-                            j
-                        ] if gt_pivot_0 else 0.0
-                        probs_gt_pivot_0_counts[j] = Int32(1) if (
-                            gt_pivot_0 and is_valid
-                        ) else Int32(0)
+                    if (
+                        aggregate_gt_pivot_0.count < Int32(k)
+                        and aggregate_gt_pivot_0.value <= p_eff
+                    ):
+                        # A zero top-p budget must still accept the argmax.
+                        accepted_e = pivot_0
+                        break
 
-                        var gt_pivot_1 = probs_vec[j] > pivot_1
-                        probs_gt_pivot_1_values[j] = probs_vec[
-                            j
-                        ] if gt_pivot_1 else 0.0
-                        probs_gt_pivot_1_counts[j] = Int32(1) if (
-                            gt_pivot_1 and is_valid
-                        ) else Int32(0)
+                    var aggregate_gt_pivot_1 = _block_reduce_value_count[
+                        .float32, broadcast=True
+                    ](thread_vc_1_total)
 
-                    # Accumulate thread-local (no block reduction per chunk).
-                    thread_vc_0_total += ValueCount[.float32](
-                        probs_gt_pivot_0_values.reduce_add(),
-                        probs_gt_pivot_0_counts.reduce_add(),
-                    )
-                    thread_vc_1_total += ValueCount[.float32](
-                        probs_gt_pivot_1_values.reduce_add(),
-                        probs_gt_pivot_1_counts.reduce_add(),
-                    )
-
-                # Reduce pivot_0 first; defer pivot_1 until needed.
-                # For small K, acceptance (count_0 < k) is common, saving
-                # the pivot_1 reduction (2 barriers) on the fast path.
-                var aggregate_gt_pivot_0 = _block_reduce_value_count[
-                    .float32, broadcast=True
-                ](thread_vc_0_total)
-
-                if (
-                    aggregate_gt_pivot_0.count < Int32(k)
-                    and aggregate_gt_pivot_0.value <= p_eff
-                ):
-                    # Case 1: pivot_0 accepted - count below k AND prob mass below p.
-                    # Use <= so that p=0 correctly accepts the argmax (sum_above=0).
-                    accepted_e = pivot_0
-                    break
-
-                # Only reduce pivot_1 when pivot_0 is rejected.
-                var aggregate_gt_pivot_1 = _block_reduce_value_count[
-                    .float32, broadcast=True
-                ](thread_vc_1_total)
-
-                if (
-                    aggregate_gt_pivot_1.count < Int32(k)
-                    and aggregate_gt_pivot_1.value <= p_eff
-                ):
-                    # Case 2: pivot_0 rejected, pivot_1 accepted.
-                    low = pivot_0
-                    high = pivot_1
-                    q = aggregate_gt_pivot_0.value
-                else:
-                    # Case 3: both pivots rejected.
-                    low = pivot_1
-                    q = aggregate_gt_pivot_1.value
+                    if (
+                        aggregate_gt_pivot_1.count < Int32(k)
+                        and aggregate_gt_pivot_1.value <= p_eff
+                    ):
+                        low = pivot_0
+                        high = pivot_1
+                        q = aggregate_gt_pivot_0.value
+                    else:
+                        low = pivot_1
+                        q = aggregate_gt_pivot_1.value
 
             barrier()
 
@@ -2096,6 +2416,7 @@ def TopKTopPSamplingFromProbKernel[
                                 block_size,
                                 load_dist_vec,
                                 track_count=False,
+                                coop_size=coop_size,
                             ](
                                 _d,
                                 Int32(k),
@@ -2103,10 +2424,18 @@ def TopKTopPSamplingFromProbKernel[
                                 low,
                                 accepted_e,
                                 mass_above_low,
+                                coop,
+                                coop_ws,
+                                coop_table,
+                                vec_begin,
+                                vec_end,
                             )
                         else:
                             refined = _topk_topp_cutoff_search[
-                                vec_size, block_size, load_dist_vec
+                                vec_size,
+                                block_size,
+                                load_dist_vec,
+                                coop_size=coop_size,
                             ](
                                 _d,
                                 Int32(k),
@@ -2114,6 +2443,11 @@ def TopKTopPSamplingFromProbKernel[
                                 low,
                                 accepted_e,
                                 mass_above_low,
+                                coop,
+                                coop_ws,
+                                coop_table,
+                                vec_begin,
+                                vec_end,
                             )
                         cutoff = refined[0]
                         kept_mass = refined[1]
@@ -2122,7 +2456,7 @@ def TopKTopPSamplingFromProbKernel[
                     out_dist.unsafe_value() + bx * _d,
                     row_major(Idx[1], _d),
                 )
-                for i in range(tx, _d // vec_size, block_size):
+                for i in range(vec_begin + Int(tx), vec_end, block_size):
                     var e = load_dist[vec_size](i * vec_size)
                     var masked = (e.gt(cutoff)).select(
                         e / kept_mass, SIMD[.float32, vec_size](0)
@@ -2131,7 +2465,7 @@ def TopKTopPSamplingFromProbKernel[
                         (Idx[0], i * vec_size), masked.cast[dist_dtype]()
                     )
 
-        if tx == 0:
+        if tx == 0 and rank == 0:
             output[bx] = Scalar[out_idx_type](sampled_id)
 
 
@@ -2368,8 +2702,23 @@ def topk_topp_sampling_from_prob[
                 raise Error("out_dist shape must match probs shape")
             dist_ptr = out_dist.unsafe_value().ptr
 
+        comptime coop_capable = from_logits and has_amd_gpu_accelerator()
+        var coop = 1
+        comptime if coop_capable:
+            coop = coop_group_size(ctx, batch_size, block_size, d // vec_size)
+        var coop_buf = ctx.enqueue_create_buffer[.int32](
+            coop_row_words(batch_size, coop) if coop > 1 else 1
+        )
+        var coop_ptr: Optional[UnsafePointer[Int32, MutAnyOrigin]] = None
+        if coop > 1:
+            # Barrier counters must start at zero.
+            ctx.enqueue_memset(coop_buf, 0)
+            coop_ptr = coop_buf.unsafe_ptr().as_unsafe_any_origin()
+
         @__parameter
-        def launch_kernel[vec_size: Int, deterministic: Bool]() raises:
+        def launch_kernel[
+            vec_size: Int, deterministic: Bool, coop_size: Int
+        ]() raises:
             comptime kernel = TopKTopPSamplingFromProbKernel[
                 probs.LayoutType,
                 ImmOrigin(probs.origin),
@@ -2383,6 +2732,7 @@ def topk_topp_sampling_from_prob[
                 from_logits,
                 emit_dist,
                 dist_dtype,
+                coop_size,
                 ProbsEngine=probs.Engine,
                 OutputEngine=output.Engine,
             ]
@@ -2400,7 +2750,8 @@ def topk_topp_sampling_from_prob[
                 rng_offset,
                 temperature_ptr,
                 min_p_ptr,
-                grid_dim=batch_size,
+                coop_ptr,
+                grid_dim=batch_size * coop_size,
                 block_dim=block_size,
                 attributes=pdl_launch_attributes(PDLLevel.ON),
             )
@@ -2409,12 +2760,19 @@ def topk_topp_sampling_from_prob[
         def dispatch_vec_size[deterministic: Bool]() raises:
             comptime for param_vec_size in [16, 8, 4, 2, 1]:
                 if vec_size == param_vec_size:
-                    return launch_kernel[param_vec_size, deterministic]()
+                    comptime if coop_capable:
+                        comptime for param_coop in [2, 4, 8, 16]:
+                            if coop == param_coop:
+                                return launch_kernel[
+                                    param_vec_size, deterministic, param_coop
+                                ]()
+                    return launch_kernel[param_vec_size, deterministic, 1]()
 
         if deterministic:
             dispatch_vec_size[True]()
         else:
             dispatch_vec_size[False]()
+        _ = coop_buf^
 
 
 @__llvm_metadata(
@@ -2812,13 +3170,14 @@ def topk_softmax_sample[
 @__llvm_metadata(
     MAX_THREADS_PER_BLOCK_METADATA=StaticTuple[Int32, 1](Int32(block_size))
 )
-@__name(t"topk_topp_masked_probs_{dtype}")
+@__name(t"topk_topp_masked_probs_{dtype}_{coop_size}")
 def TopKTopPMaskedProbsKernel[
     block_size: Int,
     vec_size: Int,
     dtype: DType,
     LogitsLayoutType: TensorLayout,
     logits_origin: ImmOrigin,
+    coop_size: Int = 1,
 ](
     logits: TileTensor[dtype, LogitsLayoutType, logits_origin],
     probs_ptr: UnsafePointer[Float32, MutAnyOrigin],
@@ -2828,23 +3187,57 @@ def TopKTopPMaskedProbsKernel[
     top_p_val: Float32,
     temperature: Optional[UnsafePointer[Float32, ImmutAnyOrigin]],
     d: Int32,
+    coop_ws: Optional[UnsafePointer[Int32, MutAnyOrigin]],
 ):
-    """Writes each row's top-k/top-p masked softmax, without sampling.
+    """Writes each row's top-k/top-p masked softmax.
 
-    Works in the unnormalized domain `e_i = exp((logit_i - row_max) / temp)`:
-    a token survives the joint constraint iff `e > cutoff` (recovered by the
-    same dual-pivot search the sampler uses) and its masked probability is
-    `e / kept_mass`. The output row is that masked renormalized distribution
-    -- the same tensor `TopKTopPSamplingFromProbKernel` emits under
-    `emit_dist`, so a verifier's target-side probabilities and a draft's
-    proposal distribution are described identically.
+    With `coop_size` above one, `coop_size` blocks share a row: each owns a
+    contiguous slice and combines whole-row statistics through `coop_ws`. The
+    launch must keep every block in a group resident.
+
+    Parameters:
+        block_size: Number of threads per block.
+        vec_size: Number of elements each thread loads per access.
+        dtype: Element type of `logits`.
+        LogitsLayoutType: Memory layout of the `logits` tile.
+        logits_origin: Origin tag for the immutable `logits` tile.
+        coop_size: Blocks sharing each row; 1 keeps the whole row in one
+            block and compiles the cross-block traffic away.
+
+    Args:
+        logits: Input logits [batch_size, d].
+        probs_ptr: Output masked renormalized distribution [batch_size, d].
+        top_k_arr: Optional per-row top-k [batch_size].
+        top_k_val: Default top-k if `top_k_arr` is null.
+        top_p_arr: Optional per-row top-p [batch_size].
+        top_p_val: Default top-p if `top_p_arr` is null.
+        temperature: Optional per-row temperature [batch_size].
+        d: Vocabulary size.
+        coop_ws: Zeroed cross-block workspace; required when `coop_size`
+            exceeds one, ignored otherwise.
     """
     comptime assert (
         not is_apple_gpu()
     ), "TopKTopPMaskedProbsKernel is not supported on Apple GPUs"
     var _d = Int(d)
-    var bx = block_idx.x
+    var n_vec = _d // vec_size
+    var rank = Int(block_idx.x) % coop_size
+    var bx = Int(block_idx.x) // coop_size
     var tx = thread_idx.x
+
+    # Contiguous slices make block-rank order match token order.
+    var slice_vec = ceildiv(n_vec, coop_size)
+    var vec_begin = min(rank * slice_vec, n_vec)
+    var vec_end = min(vec_begin + slice_vec, n_vec)
+
+    # The single-block specialization never dereferences `coop_ws`.
+    var coop = CoopRow[coop_size](bx, rank)
+    var coop_table = unsafe_stack_allocation[
+        coop_size * COOP_SLOT_FLOATS,
+        Float32,
+        alignment=16,
+        address_space=.SHARED,
+    ]()
 
     wait_on_dependent_grids()
     launch_dependent_grids()
@@ -2868,13 +3261,19 @@ def TopKTopPMaskedProbsKernel[
 
     var logits_row = TileTensor(logits.ptr + bx * _d, row_major(Idx[1], _d))
 
+    # Every block needs the same row maximum because the search contains
+    # group barriers.
     var thread_max = Float32.MIN
-    for i in range(tx, _d // vec_size, block_size):
+    for i in range(vec_begin + Int(tx), vec_end, block_size):
         var v = logits_row.load[width=vec_size]((Idx[0], i * vec_size)).cast[
             .float32
         ]()
         thread_max = max(thread_max, v.reduce_max())
     var m = block.max[block_size=block_size, broadcast=True](thread_max)
+    comptime if coop_size > 1:
+        m = coop.combine[1, _coop_max](
+            coop_ws.unsafe_value(), coop_table, SIMD[.float32, 1](m)
+        )[0]
 
     @__parameter
     @always_inline
@@ -2890,7 +3289,7 @@ def TopKTopPMaskedProbsKernel[
     # need no top-k search: cutoff zero already keeps the full positive set.
     var thread_sum = Float32(0)
     var thread_pos: Int32 = 0
-    for i in range(tx, _d // vec_size, block_size):
+    for i in range(vec_begin + Int(tx), vec_end, block_size):
         var e = compute_e(i * vec_size)
         # Repeated exponentiation costs more than the wider cache traffic on
         # AMD; each thread reuses its own output slice until the final write.
@@ -2912,7 +3311,16 @@ def TopKTopPMaskedProbsKernel[
         positive_count = total.count
     else:
         z = block.sum[block_size=block_size, broadcast=True](thread_sum)
-    var p_eff = p * z
+    comptime if coop_size > 1:
+        # `k` is identical across the group, so this conditional is collective.
+        var totals = coop.combine[2, _coop_sum](
+            coop_ws.unsafe_value(),
+            coop_table,
+            SIMD[.float32, 2](z, Float32(positive_count)),
+        )
+        z = totals[0]
+        positive_count = Int32(totals[1])
+    var p_eff = _topp_budget(p, z)
 
     @__parameter
     @always_inline
@@ -2928,16 +3336,44 @@ def TopKTopPMaskedProbsKernel[
         var refined: Tuple[Float32, Float32]
         if k == _d:
             refined = _topk_topp_cutoff_search[
-                vec_size, block_size, load_e, track_count=False
-            ](_d, Int32(k), p_eff, 0.0, 1.0, z)
+                vec_size,
+                block_size,
+                load_e,
+                track_count=False,
+                coop_size=coop_size,
+            ](
+                _d,
+                Int32(k),
+                p_eff,
+                0.0,
+                1.0,
+                z,
+                coop,
+                coop_ws,
+                coop_table,
+                vec_begin,
+                vec_end,
+            )
         else:
-            refined = _topk_topp_cutoff_search[vec_size, block_size, load_e](
-                _d, Int32(k), p_eff, 0.0, 1.0, z
+            refined = _topk_topp_cutoff_search[
+                vec_size, block_size, load_e, coop_size=coop_size
+            ](
+                _d,
+                Int32(k),
+                p_eff,
+                0.0,
+                1.0,
+                z,
+                coop,
+                coop_ws,
+                coop_table,
+                vec_begin,
+                vec_end,
             )
         cut = refined[0]
         mass_s = refined[1]
 
-    for i in range(tx, _d // vec_size, block_size):
+    for i in range(vec_begin + Int(tx), vec_end, block_size):
         var e = load_e(i * vec_size)
         var masked = (e.gt(cut)).select(e / mass_s, SIMD[.float32, vec_size](0))
         probs_row.store[width=vec_size]((Idx[0], i * vec_size), masked)
@@ -2978,7 +3414,7 @@ def topk_topp_masked_probs[
         TileTensor[.float32, TemperatureLayoutType, ImmutAnyOrigin]
     ] = None,
 ) raises:
-    """Computes per-row top-k/top-p masked softmax, one block per row.
+    """Computes per-row top-k/top-p masked softmax.
 
     See `TopKTopPMaskedProbsKernel` for what the output means.
 
@@ -3049,14 +3485,28 @@ def topk_topp_masked_probs[
         if temperature:
             temperature_ptr = temperature.unsafe_value().ptr
 
+        comptime coop_capable = has_amd_gpu_accelerator()
+        var coop = 1
+        comptime if coop_capable:
+            coop = coop_group_size(ctx, batch_size, block_size, d // vec_size)
+        var coop_buf = ctx.enqueue_create_buffer[.int32](
+            coop_row_words(batch_size, coop) if coop > 1 else 1
+        )
+        var coop_ptr: Optional[UnsafePointer[Int32, MutAnyOrigin]] = None
+        if coop > 1:
+            # Barrier counters must start at zero.
+            ctx.enqueue_memset(coop_buf, 0)
+            coop_ptr = coop_buf.unsafe_ptr().as_unsafe_any_origin()
+
         @__parameter
-        def launch_kernel[vec_size: Int]() raises:
+        def launch_kernel[vec_size: Int, coop_size: Int]() raises:
             comptime kernel = TopKTopPMaskedProbsKernel[
                 block_size,
                 vec_size,
                 dtype,
                 logits.LayoutType,
                 ImmOrigin(logits.origin),
+                coop_size,
             ]
             ctx.enqueue_function[kernel](
                 logits.as_immut(),
@@ -3067,11 +3517,20 @@ def topk_topp_masked_probs[
                 top_p_val,
                 temperature_ptr,
                 Int32(d),
-                grid_dim=batch_size,
+                coop_ptr,
+                grid_dim=batch_size * coop_size,
                 block_dim=block_size,
                 attributes=pdl_launch_attributes(PDLLevel.ON),
             )
 
         comptime for param_vec_size in [16, 8, 4, 2, 1]:
             if vec_size == param_vec_size:
-                return launch_kernel[param_vec_size]()
+                comptime if coop_capable:
+                    comptime for param_coop in [2, 4, 8, 16]:
+                        if coop == param_coop:
+                            launch_kernel[param_vec_size, param_coop]()
+                            _ = coop_buf^
+                            return
+                launch_kernel[param_vec_size, 1]()
+                _ = coop_buf^
+                return

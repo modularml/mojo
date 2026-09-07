@@ -48,6 +48,7 @@ _LIT_TESTS = [
     "test_issue_3908.mojo",
     "test_print_long_string.mojo",
     "test_print_stderr.mojo",
+    "test_simd_pow_compile_fail.mojo",
     "test_stdin.mojo",
 ]
 

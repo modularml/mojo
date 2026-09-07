@@ -21,6 +21,9 @@
 /Mojo/docs/site/ @modular/mojo-docs
 /Mojo/docs/compiler/ @modular/compiler
 /Mojo/docs/stdlib/ @modular/stdlib
+/Mojo/docs/contributing/ @alisterburt @JoeLoser @dgurchenkov
+/Mojo/docs/contributing/stdlib/ @modular/stdlib
+/Mojo/docs/contributing/compiler/ @modular/compiler
 /Mojo/examples/ @modular/mojo-docs
 /Mojo/include/ @modular/compiler
 /Mojo/integration-test/ @modular/stdlib

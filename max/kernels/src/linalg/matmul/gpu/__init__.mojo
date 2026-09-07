@@ -1739,7 +1739,14 @@ def multistage_gemm[
                     True,
                     std_config,
                     elementwise_lambda_fn,
-                ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+                ].run[
+                    c.LayoutType,
+                    a.LayoutType,
+                    b.LayoutType,
+                    c.Engine,
+                    a.Engine,
+                    b.Engine,
+                ]
                 ctx.enqueue_function[k](
                     c,
                     a,
@@ -1777,7 +1784,14 @@ def multistage_gemm[
                 True,
                 bf16_config,
                 elementwise_lambda_fn,
-            ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+            ].run[
+                c.LayoutType,
+                a.LayoutType,
+                b.LayoutType,
+                c.Engine,
+                a.Engine,
+                b.Engine,
+            ]
             ctx.enqueue_function[k](
                 c,
                 a,
@@ -2045,7 +2059,14 @@ def multistage_gemm[
                     True,
                     std_config,
                     elementwise_lambda_fn,
-                ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+                ].run[
+                    c.LayoutType,
+                    a.LayoutType,
+                    b.LayoutType,
+                    c.Engine,
+                    a.Engine,
+                    b.Engine,
+                ]
                 ctx.enqueue_function[k](
                     c,
                     a,
@@ -2083,7 +2104,14 @@ def multistage_gemm[
                 True,
                 bf16_config,
                 elementwise_lambda_fn,
-            ].run[c.LayoutType, a.LayoutType, b.LayoutType]
+            ].run[
+                c.LayoutType,
+                a.LayoutType,
+                b.LayoutType,
+                c.Engine,
+                a.Engine,
+                b.Engine,
+            ]
             ctx.enqueue_function[k](
                 c,
                 a,

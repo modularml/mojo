@@ -90,12 +90,7 @@ def compute_block_hashes(
     # We do not compute the hash for the last token because it is ineligible
     # for prefix caching. This is because 100% prefix cache hit is illegal
     # and will result in a 0 input tokens for the request. Hence the minus 1.
-    # When the request carries pending future-token placeholders, all of
-    # them are excluded instead: a placeholder value must never be hashed
-    # into a block key, or the committed block's content would desync from
-    # its key. (With one placeholder pending, this coincides with the
-    # classic minus 1.)
-    num_hashable_tokens = len(ctx.tokens) - max(1, ctx.pending_future_count)
+    num_hashable_tokens = len(ctx.tokens) - 1
     num_unhashed_tokens = num_hashable_tokens - num_hashed_tokens
     if num_unhashed_tokens < block_size:
         return []
@@ -168,11 +163,9 @@ def _compute_seq_len(
     #   2 * num_draft_tokens          : drafts to verify *next* batch
     #                                   + drafts written *during* that batch
     #   1                             : one regular decode step
-    #   -max(1, pending_future_count) : the trailing tokens with no KV entry:
-    #                                   the pending future-token placeholders
-    #                                   (each is a not-yet-run forward's input),
-    #                                   or, with none pending, the last
-    #                                   generated token
+    #   -1                            : the last generated token has no KV
+    #                                   entry yet (overlap's in-flight
+    #                                   placeholder, or the just-sampled token)
     #
     # Block-draft correction (DFlash): the draft model's ``forward_block``
     # writes ``num_draft_tokens_per_step + 1`` positions in a single batched
@@ -202,7 +195,7 @@ def _compute_seq_len(
         + 2 * num_draft_tokens
         + 1
         + block_draft_extra
-        - max(1, ctx.pending_future_count)
+        - 1
     )
     return seq_len
 
@@ -729,6 +722,8 @@ class BlockManager:
         self,
         desired_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        *,
+        hint: bytes | None,
     ) -> tuple[list[KVCacheBlock], KVConnectorTransfer]:
         """Onloads device blocks with the desired hashes from the connector.
 
@@ -744,6 +739,9 @@ class BlockManager:
         separate copy engine: the destination blocks are pinned and their
         prefix-cache commit is deferred until the copy lands (``poll_transfers``)
         so a concurrent request in the same batch cannot read them early.
+
+        ``hint`` is the request's raw ``dkv_cache_hint``, passed through to the
+        connector; see :meth:`KVConnector.load`.
 
         Returns:
             ``(loaded_blocks, event)``; ``event`` is an already-complete
@@ -769,6 +767,7 @@ class BlockManager:
             {leaf_id: block_ids for leaf_id in connector.leaves},
             desired_hashes,
             replica_idx=replica_idx,
+            hint=hint,
         )
 
         # The connector may load fewer blocks than requested; its event reports
@@ -903,7 +902,7 @@ class BlockManager:
 
         # query the host prefix cache for full blocks via connector
         host_blocks, load_event = self._get_full_blocks_from_host_prefix_cache(
-            uncommitted_hashes, replica_idx
+            uncommitted_hashes, replica_idx, hint=ctx.dkv_cache_hint
         )
 
         # refresh the lru status of all hit hashes associated with the request.
@@ -936,16 +935,8 @@ class BlockManager:
         )
 
         # Count the number of tokens for which we know the values of and align
-        # to the block size. Trailing future-token placeholders count as
-        # processed positions once a later forward is enqueued behind them,
-        # but their host token values are unrealized (-999), so they are not
-        # committable: committing one would poison a prefix block (and there
-        # is no hash for it — compute_hashes_for_request excludes them).
-        num_realized_tokens = len(ctx.tokens) - ctx.pending_future_count
-        num_computed_blocks = (
-            min(ctx.tokens.processed_length, num_realized_tokens)
-            // self.block_size
-        )
+        # to the block size.
+        num_computed_blocks = ctx.tokens.processed_length // self.block_size
 
         # Commit blocks into the prefix cache.
         for block_idx in range(num_committed_blocks, num_computed_blocks):

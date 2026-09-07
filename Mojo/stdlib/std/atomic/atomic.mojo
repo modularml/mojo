@@ -159,19 +159,19 @@ struct Ordering(
             The MLIR attribute representation of the Ordering object.
         """
         if self == Self.NOT_ATOMIC:
-            return __mlir_attr.`#pop<atomic_ordering not_atomic>`
+            return __mlir_attr.`#pop.atomic_ordering<not_atomic>`
         if self == Self.UNORDERED:
-            return __mlir_attr.`#pop<atomic_ordering unordered>`
+            return __mlir_attr.`#pop.atomic_ordering<unordered>`
         if self == Self.RELAXED:
-            return __mlir_attr.`#pop<atomic_ordering monotonic>`
+            return __mlir_attr.`#pop.atomic_ordering<monotonic>`
         if self == Self.ACQUIRE:
-            return __mlir_attr.`#pop<atomic_ordering acquire>`
+            return __mlir_attr.`#pop.atomic_ordering<acquire>`
         if self == Self.RELEASE:
-            return __mlir_attr.`#pop<atomic_ordering release>`
+            return __mlir_attr.`#pop.atomic_ordering<release>`
         if self == Self.ACQUIRE_RELEASE:
-            return __mlir_attr.`#pop<atomic_ordering acq_rel>`
+            return __mlir_attr.`#pop.atomic_ordering<acq_rel>`
         if self == Self.SEQUENTIAL:
-            return __mlir_attr.`#pop<atomic_ordering seq_cst>`
+            return __mlir_attr.`#pop.atomic_ordering<seq_cst>`
 
         abort()
 
@@ -324,7 +324,7 @@ struct Atomic[T: Deinitable & Movable, *, scope: StaticString = ""]:
             return res
 
         var res = __mlir_op.`pop.atomic.rmw`[
-            bin_op=__mlir_attr.`#pop<bin_op add>`,
+            bin_op=__mlir_attr.`#pop.bin_op<add>`,
             ordering=ordering.__mlir_attr(),
             syncscope=_get_kgen_string[Self.scope](),
             _type=Scalar[dtype]._mlir_type,
@@ -364,7 +364,7 @@ struct Atomic[T: Deinitable & Movable, *, scope: StaticString = ""]:
             return res
 
         var res = __mlir_op.`pop.atomic.rmw`[
-            bin_op=__mlir_attr.`#pop<bin_op xchg>`,
+            bin_op=__mlir_attr.`#pop.bin_op<xchg>`,
             ordering=ordering.__mlir_attr(),
             syncscope=_get_kgen_string[Self.scope](),
             _type=Scalar[dtype]._mlir_type,
@@ -496,7 +496,7 @@ struct Atomic[T: Deinitable & Movable, *, scope: StaticString = ""]:
 
         var value_addr = Pointer(to=self._value._mlir_value)
         var res = __mlir_op.`pop.atomic.rmw`[
-            bin_op=__mlir_attr.`#pop<bin_op sub>`,
+            bin_op=__mlir_attr.`#pop.bin_op<sub>`,
             ordering=ordering.__mlir_attr(),
             syncscope=_get_kgen_string[Self.scope](),
             _type=Scalar[dtype]._mlir_type,
@@ -824,7 +824,7 @@ def _max_impl_base[
 ](ptr: MutPointer[Scalar[dtype], ...], rhs: Scalar[dtype]):
     var value_addr = ptr.unsafe_bitcast[Scalar[dtype]._mlir_type]()
     _ = __mlir_op.`pop.atomic.rmw`[
-        bin_op=__mlir_attr.`#pop<bin_op max>`,
+        bin_op=__mlir_attr.`#pop.bin_op<max>`,
         ordering=ordering.__mlir_attr(),
         syncscope=_get_kgen_string[scope](),
         _type=Scalar[dtype]._mlir_type,
@@ -837,7 +837,7 @@ def _min_impl_base[
 ](ptr: MutPointer[Scalar[dtype], ...], rhs: Scalar[dtype]):
     var value_addr = ptr.unsafe_bitcast[Scalar[dtype]._mlir_type]()
     _ = __mlir_op.`pop.atomic.rmw`[
-        bin_op=__mlir_attr.`#pop<bin_op min>`,
+        bin_op=__mlir_attr.`#pop.bin_op<min>`,
         ordering=ordering.__mlir_attr(),
         syncscope=_get_kgen_string[scope](),
         _type=Scalar[dtype]._mlir_type,

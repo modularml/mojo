@@ -1,5 +1,5 @@
 load("@module_versions//:config.bzl", "DEFAULT_PYTHON_VERSION")
-load("//bazel:api.bzl", "mojo_test")
+load("//bazel:api.bzl", "modular_py_binary", "mojo_test")
 
 # gazelle:default_visibility //visibility:private
 
@@ -75,6 +75,20 @@ _TARGET_COMPATIBLE_WITH = select({
     )
     for src in _SRCS
 ]
+
+modular_py_binary(
+    name = "builtin/bench_debug_assert_compiletime.py.bench",
+    srcs = ["builtin/bench_debug_assert_compiletime.py"],
+    # py_binary derives its entry point from the target name, which here ends
+    # in `.bench` to match the Mojo benchmarks above.
+    main = "builtin/bench_debug_assert_compiletime.py",
+    mojo_deps = ["@mojo//:std"],
+    tags = [
+        "manual",
+        "stdlib-benchmark",
+    ],
+    target_compatible_with = _TARGET_COMPATIBLE_WITH,
+)
 
 # Named entry point for running every benchmark in full measurement mode. The
 # test_suite itself is `manual` so it is not swept in by `//...`, but

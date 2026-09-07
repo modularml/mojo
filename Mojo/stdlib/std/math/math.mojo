@@ -243,6 +243,13 @@ def sqrt[
             return _llvm_unary_fn["llvm.sqrt"](x)
         return _sqrt_nvvm(x)
     elif is_apple_gpu():
+        # AIR has no bf16 overload of `air.sqrt`; Metal rejects it outright,
+        # so round-trip through f32. The other `air.*` math intrinsics in this
+        # file need the same treatment for the same reason.
+        comptime if dtype == .bfloat16:
+            return _llvm_unary_fn["llvm.air.sqrt"](x.cast[.float32]()).cast[
+                dtype
+            ]()
         return _llvm_unary_fn["llvm.air.sqrt"](x)
 
     return _llvm_unary_fn["llvm.sqrt"](x)
@@ -300,6 +307,10 @@ def rsqrt[
 
         return rsqrt(x.cast[.float32]()).cast[dtype]()
     elif is_apple_gpu():
+        comptime if dtype == .bfloat16:
+            return _llvm_unary_fn["llvm.air.rsqrt"](x.cast[.float32]()).cast[
+                dtype
+            ]()
         return _llvm_unary_fn["llvm.air.rsqrt"](x)
 
     return 1.0 / sqrt(x)
@@ -1696,6 +1707,10 @@ def cos[
             instruction="cos.approx.ftz.f32", constraints="=f,f"
         ](x)
     elif is_apple_gpu():
+        comptime if dtype == .bfloat16:
+            return _llvm_unary_fn["llvm.air.cos"](x.cast[.float32]()).cast[
+                dtype
+            ]()
         return _llvm_unary_fn["llvm.air.cos"](x)
     else:
         comptime assert (
@@ -1739,6 +1754,10 @@ def sin[
             instruction="sin.approx.ftz.f32", constraints="=f,f"
         ](x)
     elif is_apple_gpu():
+        comptime if dtype == .bfloat16:
+            return _llvm_unary_fn["llvm.air.sin"](x.cast[.float32]()).cast[
+                dtype
+            ]()
         return _llvm_unary_fn["llvm.air.sin"](x)
     else:
         comptime assert (
@@ -2111,6 +2130,10 @@ def log10[
     elif is_amd_gpu():
         return _llvm_unary_fn["llvm.log10"](x)
     elif is_apple_gpu():
+        comptime if dtype == .bfloat16:
+            return _llvm_unary_fn["llvm.air.log10"](x.cast[.float32]()).cast[
+                dtype
+            ]()
         return _llvm_unary_fn["llvm.air.log10"](x)
 
     return _call_libm["log10"](x)
@@ -2122,12 +2145,14 @@ def log10[
 
 
 @always_inline
-def _log1p_f64[width: SIMDLength, //](x: SIMD[.float64, width]) -> type_of(x):
+def _log1p_impl[
+    dtype: DType, width: SIMDLength, //
+](x: SIMD[dtype, width]) -> type_of(x) where dtype.is_floating_point():
     # This uses the approximation from cephes to compute log1p via the approximation
     # log(1+x) = x - x**2/2 + x**3 P(x)/Q(x)
     # in the domain 1/sqrt(2) <= x < sqrt(2)
 
-    comptime P = [
+    comptime P: List[Scalar[dtype]] = [
         2.0039553499201281259648e1,
         5.7112963590585538103336e1,
         6.0949667980987787057556e1,
@@ -2136,7 +2161,7 @@ def _log1p_f64[width: SIMDLength, //](x: SIMD[.float64, width]) -> type_of(x):
         4.9854102823193375972212e-1,
         4.5270000862445199635215e-5,
     ]
-    comptime Q = [
+    comptime Q: List[Scalar[dtype]] = [
         6.0118660497603843919306e1,
         2.1642788614495947685003e2,
         3.0909872225312059774938e2,
@@ -2186,7 +2211,14 @@ def log1p[
         The `log1p` of the input.
     """
 
-    return _log1p_f64(x.cast[.float64]()).cast[dtype]()
+    # Metal rejects every double-typed value, so evaluating the approximation
+    # in f64 makes `log1p` uncompilable on Apple GPUs for any input dtype --
+    # and it fails as an LLVM IR verifier abort, taking the process with it
+    # rather than surfacing a diagnostic. Evaluate in f32 there instead.
+    comptime if is_apple_gpu():
+        return _log1p_impl(x.cast[.float32]()).cast[dtype]()
+
+    return _log1p_impl(x.cast[.float64]()).cast[dtype]()
 
 
 # ===----------------------------------------------------------------------=== #

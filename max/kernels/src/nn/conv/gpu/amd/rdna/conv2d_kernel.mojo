@@ -31,7 +31,7 @@ from max.gpu import (
 )
 from max.gpu.sync import barrier
 from max.gpu.compute.mma import mma as _mma_intrinsic
-from layout import TensorLayout, TileTensor
+from layout import TensorEngine, TensorLayout, TileTensor
 from std.math import ceildiv
 from std.memory import unsafe_stack_allocation
 from std.utils import Index, IndexList
@@ -145,9 +145,10 @@ def _load_b_tile_to_smem[
     BLOCK_K: Int,
     SMEM_STRIDE: Int,
     NUM_THREADS: Int,
+    tile_engine: TensorEngine,
 ](
     smem: UnsafePointer[mut=True, Scalar[dtype], _, address_space=.SHARED],
-    tile: TileTensor[mut=True, dtype, tile_layout, _],
+    tile: TileTensor[mut=True, dtype, tile_layout, _, Engine=tile_engine],
     block_n_offset: Int,
     k_offset: Int,
     max_n: Int,
@@ -194,6 +195,8 @@ def conv2d_kernel_rdna[
     filter_type: DType,
     out_layout: TensorLayout,
     filter_nk_layout: TensorLayout,
+    out_engine: TensorEngine,
+    filter_nk_engine: TensorEngine,
     elementwise_lambda_fn: Optional[elementwise_epilogue_type] = None,
     s_type: DType = get_accum_type[out_type](),
     BLOCK_K: Int = 32,
@@ -204,9 +207,11 @@ def conv2d_kernel_rdna[
     WARP_TILE_M: Int = 1,
     WARP_TILE_N: Int = 4,
 ](
-    output: TileTensor[out_type, out_layout, MutAnyOrigin],
+    output: TileTensor[out_type, out_layout, MutAnyOrigin, Engine=out_engine],
     input_ptr: UnsafePointer[Scalar[in_type], ImmutAnyOrigin],
-    filter_nk: TileTensor[filter_type, filter_nk_layout, MutAnyOrigin],
+    filter_nk: TileTensor[
+        filter_type, filter_nk_layout, MutAnyOrigin, Engine=filter_nk_engine
+    ],
     # GEMM dimensions
     M: Int32,
     N: Int32,
@@ -243,6 +248,9 @@ def conv2d_kernel_rdna[
         filter_type: `DType` of the filter tensor.
         out_layout: `TensorLayout` of the output `TileTensor`.
         filter_nk_layout: `TensorLayout` of the pre-transposed [N, K] filter
+            `TileTensor`.
+        out_engine: `TensorEngine` of the output `TileTensor`.
+        filter_nk_engine: `TensorEngine` of the pre-transposed [N, K] filter
             `TileTensor`.
         elementwise_lambda_fn: Optional fused epilogue lambda applied per
             output element (defaults to `None`).
@@ -375,6 +383,7 @@ def conv2d_kernel_rdna[
         BLOCK_K,
         SMEM_STRIDE,
         NUM_THREADS,
+        tile_engine=filter_nk_engine,
     ](b_smem_0, filter_nk, block_n_offset, 0, _N, tid)
     barrier()
 
@@ -450,6 +459,7 @@ def conv2d_kernel_rdna[
                 BLOCK_K,
                 SMEM_STRIDE,
                 NUM_THREADS,
+                tile_engine=filter_nk_engine,
             ](b_next, filter_nk, block_n_offset, next_k_offset, _N, tid)
 
         barrier()

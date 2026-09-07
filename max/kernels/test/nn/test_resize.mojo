@@ -30,7 +30,7 @@ def main() raises:
         var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = Array[Float32, 24](uninitialized=True)
+        var output_stack = Array[Float32, 24](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 4, 6]())
 
         resize_nearest_neighbor[
@@ -59,7 +59,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 4]())
 
-        var output_stack = Array[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
 
         resize_nearest_neighbor[
@@ -98,7 +98,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = Array[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
 
         resize_nearest_neighbor[
@@ -118,7 +118,7 @@ def main() raises:
         var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = Array[Float32, 56](uninitialized=True)
+        var output_stack = Array[Float32, 56](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 7, 8]())
 
         resize_nearest_neighbor[
@@ -157,7 +157,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = Array[Float32, 64](uninitialized=True)
+        var output_stack = Array[Float32, 64](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 8, 8]())
 
         resize_nearest_neighbor[
@@ -196,7 +196,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = Array[Float32, 64](uninitialized=True)
+        var output_stack = Array[Float32, 64](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 8, 8]())
 
         resize_nearest_neighbor[
@@ -233,7 +233,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = Array[Float32, 64](uninitialized=True)
+        var output_stack = Array[Float32, 64](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 8, 8]())
 
         resize_nearest_neighbor[
@@ -253,7 +253,7 @@ def main() raises:
         var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = Array[Float32, 16](uninitialized=True)
+        var output_stack = Array[Float32, 16](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 4, 4]())
 
         # TORCH REFERENCE:
@@ -298,7 +298,7 @@ def main() raises:
         var input_stack: Array[Float32, 4] = [Float32(1), 2, 3, 4]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = Array[Float32, 16](uninitialized=True)
+        var output_stack = Array[Float32, 16](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 4, 4]())
 
         # TORCH REFERENCE:
@@ -352,7 +352,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 4]())
 
-        var output_stack = Array[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
         # TORCH REFERENCE:
         # x = np.arange(1, 9).reshape((1, 1, 2, 4))
@@ -390,7 +390,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 4]())
 
-        var output_stack = Array[Float32, 2](uninitialized=True)
+        var output_stack = Array[Float32, 2](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 1, 2]())
         # TORCH REFERENCE:
         # x = np.arange(1, 9).reshape((1, 1, 2, 4))
@@ -435,7 +435,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 4, 2, 2]())
 
-        var output_stack = Array[Float32, 96](uninitialized=True)
+        var output_stack = Array[Float32, 96](fill={})
         var output = TileTensor(output_stack, row_major[1, 6, 4, 4]())
 
         # TORCH REFERENCE:
@@ -498,7 +498,7 @@ def main() raises:
         ]
         var input = TileTensor(input_stack, row_major[1, 1, 4, 4]())
 
-        var output_stack = Array[Float32, 4](uninitialized=True)
+        var output_stack = Array[Float32, 4](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 2, 2]())
 
         # TORCH REFERENCE:
@@ -532,7 +532,7 @@ def main() raises:
         var input_stack: Array[Float32, 4] = [Float32(1), 1, 1, 1]
         var input = TileTensor(input_stack, row_major[1, 1, 2, 2]())
 
-        var output_stack = Array[Float32, 4](uninitialized=True)
+        var output_stack = Array[Float32, 4](fill={})
         var output = TileTensor(output_stack, row_major[1, 1, 2, 2]())
 
         var reference_stack: Array[Float32, 4] = [

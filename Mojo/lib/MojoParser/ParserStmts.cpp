@@ -108,6 +108,7 @@ static bool isStatementThatMightHaveDecorators(Token::Kind tokenKind) {
   case Token::kw_while:
   case Token::kw_try:
   case Token::kw_with:
+  case Token::kw___match:
   case Token::kw_async:
   case Token::kw_def:
   case Token::kw_fn:
@@ -117,7 +118,6 @@ static bool isStatementThatMightHaveDecorators(Token::Kind tokenKind) {
   case Token::kw_import:
   case Token::kw_pass:
   case Token::kw_var:
-  case Token::kw_alias:
   case Token::kw_comptime:
   case Token::kw___mlir_region:
   case Token::kw_return:
@@ -290,6 +290,7 @@ struct StmtParser : public ParserBase {
   ParseResult parseParamIf(Location ifLoc, LexerCursor startCursor,
                            size_t curIndent);
   ParseResult parseWhileStmt(size_t curIndent);
+  ParseResult parseMatchStmt(size_t curIndent);
 
   // This emits the pattern for a 'for' loop, calling the specified 'bodyFn'
   // closure on success when in the scope of the loop, and the specified
@@ -324,13 +325,6 @@ struct StmtParser : public ParserBase {
   ParseResult parseForTargetAndSequence(size_t curIndent, SMLoc &forLoc,
                                         ExprNode *&targetExpr,
                                         ExprNode *&seqExpr);
-  // Helper to check if decorators contain @parameter.
-  // If emitErrors is true, emits errors for non-@parameter decorators.
-  // Returns true if @parameter was found, restores cursor if restoreCursor is
-  // true.
-  bool hasParameterDecorator(LexerCursor startCursor, size_t curIndent,
-                             bool emitErrors, bool restoreCursor,
-                             StringRef stmtName);
   // Parses 'comptime assert' after keywords are consumed.
   ParseResult parseComptimeAssertStmtBody(LexerCursor startCursor,
                                           size_t curIndent, SMLoc kwLoc);
@@ -722,11 +716,13 @@ ParseResult StmtParser::parseStmt(bool onlySimpleStmt, bool &parsedCompound,
     // Compound statements.
     //===------------------------------------------------------------------===//
   case Token::kw_if:
+    rejectDecorator();  // Decorators not allowed.
     rejectSimpleStmt(); // Not a simple_stmt.
     if (rejectInNonFunctionScope())
       return success();
     return parseIfStmt(startCursor, stmtIndent);
   case Token::kw_for:
+    rejectDecorator();  // Decorators not allowed.
     rejectSimpleStmt(); // Not a simple_stmt.
     if (rejectInNonFunctionScope())
       return success();
@@ -737,6 +733,12 @@ ParseResult StmtParser::parseStmt(bool onlySimpleStmt, bool &parsedCompound,
     if (rejectInNonFunctionScope())
       return success();
     return parseWhileStmt(stmtIndent);
+  case Token::kw___match:
+    rejectDecorator();  // Decorators not allowed.
+    rejectSimpleStmt(); // Not a simple_stmt.
+    if (rejectInNonFunctionScope())
+      return success();
+    return parseMatchStmt(stmtIndent);
   case Token::kw_try:
     rejectDecorator(); // Decorators not allowed.
     rejectSimpleStmt();
@@ -791,15 +793,6 @@ ParseResult StmtParser::parseStmt(bool onlySimpleStmt, bool &parsedCompound,
     if (isa_and_nonnull<FnOp>(getParentDecl().getIfOperation()))
       break;
     return parseVarStmt(startCursor, stmtIndent);
-  case Token::kw_alias: {
-    // Decorators on aliases are not allowed inside function bodies.
-    if (isa_and_nonnull<FnOp>(getParentDecl().getIfOperation()))
-      rejectDecorator(/*inFunctionBody=*/true);
-    SMLoc kwLoc = consumeToken(Token::kw_alias).getLoc();
-    shared.emitWarning(kwLoc, "'alias' is deprecated; use 'comptime'")
-        << FixIt::replaceToken(kwLoc, "comptime");
-    return parseAliasDeclStmtBody(startCursor, stmtIndent, kwLoc);
-  }
   case Token::kw_comptime:
     return parseComptimeCompoundStmt(startCursor, stmtIndent, hadDecorators);
   case Token::kw___mlir_region:
@@ -815,14 +808,6 @@ ParseResult StmtParser::parseStmt(bool onlySimpleStmt, bool &parsedCompound,
   case Token::kw_assert:
     rejectDecorator(); // Decorators not allowed.
     return parseAssertStmt(stmtIndent);
-  case Token::kw___comptime_assert: {
-    rejectDecorator(); // Decorators not allowed.
-    SMLoc kwLoc = consumeToken(Token::kw___comptime_assert).getLoc();
-    shared.emitWarning(
-        kwLoc, "'__comptime_assert' is deprecated; use 'comptime assert'")
-        << FixIt::replaceToken(kwLoc, "comptime assert");
-    return parseComptimeAssertStmtBody(startCursor, stmtIndent, kwLoc);
-  }
   case Token::kw_continue:
     rejectDecorator(); // Decorators not allowed.
     return parseBreakOrContinueStmt(Token::kw_continue, "continue",
@@ -914,27 +899,12 @@ ParseResult StmtParser::parseComptimeCompoundStmt(LexerCursor startCursor,
     if (!hadDecorators)
       return;
 
-    // Check if the decorator is @parameter to provide a more specific error.
-    bool hasParamDecorator =
-        hasParameterDecorator(startCursor, curIndent,
-                              /*emitErrors=*/false, /*restoreCursor=*/true,
-                              /*stmtName=*/{});
-
     auto diag = emitTokenError();
-    if (hasParamDecorator) {
-      // Special error for @parameter since it's redundant with comptime.
-      diag << "@parameter decorator is redundant on 'comptime";
-      if (isCompoundStmt)
-        diag << " " << getToken().getSpelling();
-      diag << "'";
-    } else {
-      // Generic error for other decorators.
-      diag << "'comptime";
-      if (isCompoundStmt)
-        diag << " " << getToken().getSpelling();
-      diag << "' statement " << (inFunctionBody ? "in function body " : "")
-           << "does not support decorators; remove the decorator";
-    }
+    diag << "'comptime";
+    if (isCompoundStmt)
+      diag << " " << getToken().getSpelling();
+    diag << "' statement " << (inFunctionBody ? "in function body " : "")
+         << "does not support decorators; remove the decorator";
   };
 
   // Check if we're in a non-function scope (type body or module scope) where
@@ -988,6 +958,16 @@ ParseResult StmtParser::parseComptimeCompoundStmt(LexerCursor startCursor,
   return parseAliasDeclStmtBody(startCursor, curIndent, kwLoc);
 }
 
+/// if_stmt ::=  "if" assignment_expression ":" suite
+///             ("elif" assignment_expression ":" suite)*
+///             ["else" ":" suite]
+ParseResult StmtParser::parseIfStmt(LexerCursor startCursor, size_t curIndent) {
+  Location ifLoc = translateLocation(getToken().getLoc());
+  if (parseToken(Token::kw_if, "expected 'if' token after decorators"))
+    return failure();
+  return parseElif(ifLoc, startCursor, curIndent);
+}
+
 /// Parses 'comptime if <condition>:' after 'comptime' has been consumed.
 /// Delegates to parseParamIf for the actual IR generation.
 ParseResult StmtParser::parseComptimeIfStmt(LexerCursor startCursor,
@@ -995,44 +975,6 @@ ParseResult StmtParser::parseComptimeIfStmt(LexerCursor startCursor,
   Location ifLoc = translateLocation(getToken().getLoc());
   consumeToken(Token::kw_if);
   return parseParamIf(ifLoc, startCursor, curIndent);
-}
-
-/// Helper to check if decorators contain @parameter.
-/// If emitErrors is true, emits errors for non-@parameter decorators.
-/// Returns true if @parameter was found, restores cursor if restoreCursor is
-/// true.
-bool StmtParser::hasParameterDecorator(LexerCursor startCursor,
-                                       size_t curIndent, bool emitErrors,
-                                       bool restoreCursor, StringRef stmtName) {
-  if (startCursor == getLexer().getCursor())
-    return false;
-
-  LexerCursor savedCursor = getLexer().getCursor();
-  startCursor.restore(getLexer());
-
-  bool foundParameter = false;
-  for (auto [decorator, cursor] : parseDecorators(curIndent)) {
-    if (auto *dre = dyn_cast<DeclRefNode>(decorator)) {
-      if (dre->spelling == "parameter") {
-        foundParameter = true;
-        if (!emitErrors)
-          break; // Early exit if we're just checking
-        continue;
-      }
-    }
-
-    if (emitErrors) {
-      emitError(decorator->getLoc())
-          << "'" << stmtName
-          << "' statement does not support decorators; remove the decorator"
-          << decorator->getRange();
-    }
-  }
-
-  if (restoreCursor)
-    savedCursor.restore(getLexer());
-
-  return foundParameter;
 }
 
 /// Helper to parse 'for <target> in <seq>:' syntax, used by both regular
@@ -1560,9 +1502,10 @@ ParseResult StmtParser::parseWhileStmt(size_t curIndent) {
   //   hlcf.yield
   // else:
   //   lit.loop.break.else  // Jump to the 'else' block.
-  RValue condRVal = getEmitter().emitExprScalarBool(condExp, EC_BoolCondition);
+  auto emitter = getEmitter();
+  RValue condRVal = emitter.emitExprScalarBool(condExp, EC_BoolCondition);
   Value condVal =
-      getEmitter().emitSRValue({AnyValue(condRVal), condExp}, EC_BoolCondition);
+      emitter.emitSRValue({AnyValue(condRVal), condExp}, EC_BoolCondition);
 
   // After the condition is evaluated, validate the end of the statement.
   if (parseToken(Token::colon, "expected ':' after expression"))
@@ -1570,12 +1513,19 @@ ParseResult StmtParser::parseWhileStmt(size_t curIndent) {
   if (!condVal)
     return success(); // IRGen error already emitted; parse succeeded!
 
-  auto ifOp = HLCF::IfOp::create(builder, whileLoc, ValueRange{}, condVal);
-  builder.createBlock(&ifOp.getThenRegion());
-  HLCF::YieldOp::create(builder, whileLoc);
-  builder.createBlock(&ifOp.getElseRegion());
-  LoopBreakElseOp::create(builder, whileLoc);
-  builder.setInsertionPointAfter(ifOp);
+  Operation *condIf = emitter.emitIfThen(
+      whileLoc, condVal, TypeRange{},
+      [&]() -> LogicalResult {
+        HLCF::YieldOp::create(*emitter.builder, whileLoc);
+        return success();
+      },
+      [&]() -> LogicalResult {
+        LoopBreakElseOp::create(*emitter.builder, whileLoc);
+        return success();
+      });
+  if (!condIf)
+    return success();
+  builder.setInsertionPointAfter(condIf);
 
   if (failed(parseLocalScopeSuite(curIndent)))
     return failure();
@@ -1594,23 +1544,229 @@ ParseResult StmtParser::parseWhileStmt(size_t curIndent) {
   return success();
 }
 
+/// match_stmt ::=  "match" subject_expr ":" NEWLINE
+///                 case_block+
+/// case_block  ::= "case" pattern ["if" expression] ":" suite
+///
+ParseResult StmtParser::parseMatchStmt(size_t curIndent) {
+  SMLoc matchLoc = consumeToken(Token::kw___match).getLoc();
+  Location matchLocation = translateLocation(matchLoc);
+
+  // Parse the match subject.
+  ExprNode *subjectExpr = nullptr;
+  if (parseExpression(subjectExpr, curIndent, Precedence::kAssignExpr) ||
+      parseToken(Token::colon, "expected ':' after match subject"))
+    return failure();
+
+  // Evaluate the subject once; match IR will consume this later.
+  CValue subject = getEmitter().emitExprCValue(subjectExpr, EC_MatchSubject);
+  if (!subject) {
+    // If we failed to emit the subject expression, skip over the body of the
+    // match statement entirely. We do this by skipping any same-indent `case`
+    // blocks that belong to this match, then stop at the next
+    // same-or-less-indented token (this also covers Python-style cases
+    // indented under the match).
+    while (isTokenInCurrentStatement(curIndent, /*allowSameIndent=*/true) &&
+           getToken().is(Token::kw_case)) {
+      size_t caseIndent = getToken().getIndentation().value_or(curIndent);
+      consumeToken(Token::kw_case);
+      skipUntilIndentation(caseIndent);
+    }
+    skipUntilIndentation(curIndent);
+    return success();
+  }
+
+  // Parse one or more case blocks. Cases may share the match indent (Mojo
+  // style) or be indented beneath it (Python style).  We parse each of the
+  // patterns before emitting the IR so we can optimize the pattern tests and
+  // allocate the ElIf statement once.
+  struct CaseEntry {
+    ExprNode *patternExpr;
+    ExprNode *guardExpr;
+    LexerCursor caseCursor;
+  };
+  SmallVector<CaseEntry, 4> caseEntries;
+
+  while (isTokenInCurrentStatement(curIndent, /*allowSameIndent=*/true) &&
+         getToken().is(Token::kw_case)) {
+    size_t caseIndent = getToken().getIndentation().value_or(curIndent);
+    consumeToken(Token::kw_case);
+
+    // Parse the case pattern as an expression. Stop before `if` so a trailing
+    // match guard is not absorbed as a ternary `x if y else z`. `as` is looser
+    // than `if`, so a top-level `case <pattern> as name` is attached here.
+    ExprNode *patternExpr = nullptr;
+    if (parseExpression(patternExpr, caseIndent,
+                        Precedence(int(Precedence::kIfElse) + 1))) {
+      skipUntilIndentation(caseIndent);
+      continue;
+    }
+
+    // Optional `as` binding: `case <pattern> as name`. Nested `as` inside
+    // parentheses is handled by the expression parser.
+    SMLoc asLoc;
+    if (consumeIf(Token::kw_as, &asLoc)) {
+      Token nameTok = getToken();
+      if (parseIdentifier("expected a name after 'as'")) {
+        skipUntilIndentation(caseIndent);
+        continue;
+      }
+      auto *name = shared.allocPersistent<DeclRefNode>(
+          nameTok.getSpelling(), nameTok.is(Token::escaped_identifier));
+      patternExpr = shared.allocPersistent<BinOpNode>(ExprNode::kAsPat,
+                                                      patternExpr, asLoc, name);
+    }
+
+    // Optional match guard: `case <pattern> if <cond>:`.
+    ExprNode *guardExpr = nullptr;
+    if (consumeIf(Token::kw_if)) {
+      if (parseExpression(guardExpr, caseIndent, Precedence::kAssignExpr)) {
+        skipUntilIndentation(caseIndent);
+        continue;
+      }
+    }
+    if (parseToken(Token::colon, "expected ':' after case pattern")) {
+      skipUntilIndentation(caseIndent);
+      continue;
+    }
+
+    // Okay, we successfully parsed a case block. Remember it for later.
+    caseEntries.push_back({patternExpr, guardExpr, getLexer().getCursor()});
+    skipUntilIndentation(caseIndent);
+  }
+
+  if (caseEntries.empty()) {
+    emitError(matchLoc) << "'__match' statement must have at least one 'case' "
+                           "block";
+    return success();
+  }
+
+  auto afterCaseCursor = getLexer().getCursor();
+
+  // Given we have the pile of pattern collected together in a list, we can add
+  // emission optimizations to improve the order various sub-patterns are
+  // emitted.  For now, we simply emit each linearly.
+
+  // Because we don't know whether a case is allowed to consume an RValue, we
+  // convert the subject to a BValue, so none of the pattern emission can
+  // consume the RValue.  For example, any "var" bindings will have to do a
+  // copy.
+  // TODO: maintain RValueness for as long as we can.
+  BValue subjectBVal =
+      getEmitter().emitBValue({subject, subjectExpr}, EC_MatchSubject);
+  if (!subjectBVal)
+    return failure();
+
+  auto emitCasePredicate = [&](const CaseEntry &caseEntry) -> SRValue {
+    auto emitter = getEmitter();
+    CValue condCVal = caseEntry.patternExpr->emitMatch(emitter, subjectBVal,
+                                                       PatternDeclKind::kNone);
+
+    // If a guard predicate is present, AND it with the pattern predicate.
+    // Always evaluate the guard even when the pattern is known-false so
+    // diagnostics still fire for an unreachable guard.
+    if (condCVal && caseEntry.guardExpr)
+      condCVal = emitter.emitAndMatchPredicates(
+          {condCVal, caseEntry.patternExpr},
+          [&]() -> ASTExprAnd<CValue> {
+            return {emitter.emitExprScalarBool(caseEntry.guardExpr,
+                                               EC_BoolCondition),
+                    caseEntry.guardExpr};
+          },
+          /*evaluateRhsEvenIfLhsFalse=*/true);
+    return emitter.emitSRValue({condCVal, caseEntry.patternExpr},
+                               EC_BoolCondition);
+  };
+
+  auto emitCaseBody = [&](Block &bodyBlock, const CaseEntry &caseEntry,
+                          Location caseLoc) -> ParseResult {
+    builder.setInsertionPointToStart(&bodyBlock);
+    // Change the parser cursor to the start of the case body so we can parse
+    // the right text. Use parseSuite (not parseLocalScopeSuite) so the body
+    // shares the case scope above — pattern bindings remain visible.
+    caseEntry.caseCursor.restore(getLexer());
+    if (failed(parseSuite(curIndent)))
+      return failure();
+    HLCF::YieldOp::create(builder, caseLoc);
+    return success();
+  };
+
+  // First case: pattern bindings are created while emitting the predicate.
+  // Keep them in a case-local scope that also wraps the body. The predicate
+  // itself becomes the elif operand; later cases stay in-region for
+  // short-circuit.
+  HLCF::ElifOp elifOp;
+  {
+    DebugInfo::DIBuilder::ScopeGuard scopeGuard;
+    llvm::SaveAndRestore<ASTDecl *> keepDecl(curDeclScope);
+    pushChildScope(scopeGuard, keepDecl);
+
+    auto firstCaseLoc =
+        translateLocation(caseEntries.front().patternExpr->getLoc());
+    SRValue firstCond = emitCasePredicate(caseEntries.front());
+
+    // A bad first pattern still needs an operand for the elif, so recover
+    // with a statically-false arm. That keeps the later cases (and the rest
+    // of the enclosing suite) parsed, so their diagnostics still fire.
+    Value condValue =
+        firstCond ? Value(firstCond)
+                  : ParamConstantOp::create(
+                        builder, firstCaseLoc,
+                        SIMDAttr::getScalarBool(builder.getContext(), false));
+
+    unsigned numExtraRegions =
+        caseEntries.size() > 1 ? (caseEntries.size() - 1) * 2 : 0;
+    elifOp = HLCF::ElifOp::create(builder, matchLocation, TypeRange(),
+                                  condValue, numExtraRegions);
+    elifOp.getThenRegion().emplaceBlock();
+    elifOp.getElseRegion().emplaceBlock();
+    for (Region &region : elifOp.getElifRegions())
+      region.emplaceBlock();
+
+    if (!firstCond) {
+      builder.setInsertionPointToStart(&elifOp.getThenRegion().front());
+      HLCF::YieldOp::create(builder, firstCaseLoc);
+    } else if (failed(emitCaseBody(elifOp.getThenRegion().front(),
+                                   caseEntries.front(), firstCaseLoc))) {
+      return failure();
+    }
+  }
+
+  for (auto [idx, caseEntry] :
+       llvm::enumerate(ArrayRef<CaseEntry>(caseEntries).drop_front())) {
+    unsigned extraIdx = idx; // 0-based into additional (cond, then) pairs
+    auto &condBlock = elifOp.getElifRegions()[extraIdx * 2].front();
+    builder.setInsertionPointToStart(&condBlock);
+
+    DebugInfo::DIBuilder::ScopeGuard scopeGuard;
+    llvm::SaveAndRestore<ASTDecl *> keepDecl(curDeclScope);
+    pushChildScope(scopeGuard, keepDecl);
+
+    auto caseLoc = translateLocation(caseEntry.patternExpr->getLoc());
+    SRValue condRVal = emitCasePredicate(caseEntry);
+    if (!condRVal)
+      continue;
+    HLCF::ElifYieldOp::create(builder, caseLoc, condRVal,
+                              /*no extra values*/ ValueRange());
+
+    if (failed(emitCaseBody(elifOp.getElifRegions()[extraIdx * 2 + 1].front(),
+                            caseEntry, caseLoc)))
+      return failure();
+  }
+
+  // The "else" of the elif is a noop.  TODO: We should mark this as unreachable
+  // if there is an irrefutable pattern so we don't get dead code errors.
+  builder.setInsertionPointToStart(&elifOp.getElseRegion().front());
+  HLCF::YieldOp::create(builder, matchLocation);
+  builder.setInsertionPointAfter(elifOp);
+  afterCaseCursor.restore(getLexer());
+  return success();
+}
+
 /// for_stmt ::=  "for" target_list "in" starred_list ":" suite
 ///              ["else" ":" suite]
 ParseResult StmtParser::parseForStmt(LexerCursor startCursor,
                                      size_t curIndent) {
-  // This is enabled with the @parameter decorator or 'comptime' keyword.
-  // Check for decorators and emit errors for unsupported ones.
-  bool isParamFor = hasParameterDecorator(startCursor, curIndent,
-                                          /*emitErrors=*/true,
-                                          /*restoreCursor=*/false, "for");
-
-  if (isParamFor) {
-    SMLoc atLoc = startCursor.getToken().getLoc();
-    SMLoc forTokLoc = getToken().getLoc();
-    emitWarning(atLoc, "'@parameter for' is deprecated; use 'comptime for'")
-        << FixIt(SourceRange::getByteLevel(atLoc, forTokLoc), "comptime ");
-  }
-
   SMLoc forLoc;
   ExprNode *targetExpr = nullptr;
   ExprNode *seqExpr = nullptr;
@@ -1620,9 +1776,6 @@ ParseResult StmtParser::parseForStmt(LexerCursor startCursor,
   // We will be moving the builder into sub-regions that are created, make sure
   // we end up after it when this is done.
   llvm::SaveAndRestore builderSaver(builder);
-
-  if (isParamFor) // Comptime for stmt.
-    return parseParamFor(curIndent, forLoc, targetExpr, seqExpr);
 
   // Otherwise, this is a dynamic for stmt.
   auto forStmt = emitForStmt(
@@ -1793,12 +1946,21 @@ LoopResult StmtParser::emitForStmt(SMLoc forLoc, ExprNode *targetExpr,
 
     // Emit an if statement, if the condition is true then yield other break to
     // the else block.
-    auto ifOp = HLCF::IfOp::create(builder, forLocation, shouldContinue);
-    builder.createBlock(&ifOp.getThenRegion());
-    HLCF::YieldOp::create(builder, forLocation);
-    builder.createBlock(&ifOp.getElseRegion());
-    LoopBreakElseOp::create(builder, forLocation);
-    builder.setInsertionPointAfter(ifOp);
+    Operation *condIf = emitter.emitIfThen(
+        forLocation, shouldContinue, TypeRange{},
+        [&]() -> LogicalResult {
+          HLCF::YieldOp::create(*emitter.builder, forLocation);
+          return success();
+        },
+        [&]() -> LogicalResult {
+          LoopBreakElseOp::create(*emitter.builder, forLocation);
+          return success();
+        });
+    if (!condIf) {
+      indvarDest.resetForError(emitter);
+      return LoopResult(LoopResult::ErrorKind::inLoopStmt);
+    }
+    builder.setInsertionPointAfter(condIf);
     emitter.builder = builder;
 
     // Emit the call to __next__ now that we know there is an element.
@@ -2287,7 +2449,7 @@ ParseResult StmtParser::parseSingleWithStmt(size_t curIndent, SMLoc smLoc,
   //     try {
   //       SUITE
   //     } except(errorVal : Error) {
-  //       hlcf.if (contextMgr.__exit__(errorVal)) {
+  //       hlcf.elif (contextMgr.__exit__(errorVal)) {
   //         hlcf.yield
   //       } else {
   //         raise errorVal
@@ -2656,7 +2818,7 @@ ParseResult StmtParser::parseSingleWithStmt(size_t curIndent, SMLoc smLoc,
     // Set up the except region for the nested try.  Pseudo code:
     //  except(%__inner_error__ : Error) {
     //    %stop_rethrow = contextMgr.__exit__(%__inner_error__);
-    //    hlcf.if %stop_rethrow {
+    //    hlcf.elif %stop_rethrow {
     //      hlcf.yield
     //    } else {
     //      raise %inner_error
@@ -2678,32 +2840,42 @@ ParseResult StmtParser::parseSingleWithStmt(size_t curIndent, SMLoc smLoc,
                                  EC_WithExitResult,
                                  {{MLValue(contextMgrDecl), contextExp},
                                   {MBValue(nestedErrDecl), contextExp}});
-    CValue exitResult = getEmitter().emitNamedMethodCall(
-        "__exit__", std::move(exitOperandList));
-    RValue exitI1RVal = getEmitter().emitScalarBool({exitResult, contextExp},
-                                                    EC_WithExitResult);
+    auto emitter = getEmitter();
+    CValue exitResult =
+        emitter.emitNamedMethodCall("__exit__", std::move(exitOperandList));
+    RValue exitI1RVal =
+        emitter.emitScalarBool({exitResult, contextExp}, EC_WithExitResult);
     SRValue exitI1Val =
-        getEmitter().emitSRValue({exitI1RVal, contextExp}, EC_WithExitResult);
+        emitter.emitSRValue({exitI1RVal, contextExp}, EC_WithExitResult);
     if (!exitI1Val)
       // Fail, but non-fatal so return success to keep parsing.
       return success();
     // If __exit__ returns false, then re-raise the error.
-    auto ifOp = HLCF::IfOp::create(builder, loc, exitI1Val);
+    Operation *stopRethrowIf = emitter.emitIfThen(
+        loc, exitI1Val, TypeRange{},
+        [&]() -> LogicalResult {
+          // On true, nothing is to be done.
+          HLCF::YieldOp::create(*emitter.builder, loc);
+          return success();
+        },
+        [&]() -> LogicalResult {
+          // On false, we re-raise the error. Sync the statement builder so
+          // getEmitter() emits into this else region.
+          builder = *emitter.builder;
+          ExprDest dest(MLValue(errDecl), EC_RaiseValue);
+          // If the error type is unresolved, resolve it to whatever we
+          // propagate.
+          if (isa<UnresolvedType>(errDecl.getType().getElementType()))
+            dest = ExprDest(errDecl, EC_RaiseValue);
+          getEmitter().emitResult(MRValue(nestedErrDecl), contextExp, dest);
+          LIT::RaiseOp::create(builder, loc);
+          HLCF::YieldOp::create(builder, loc);
+          return success();
+        });
+    if (!stopRethrowIf)
+      return success();
+    builder.setInsertionPointAfter(stopRethrowIf);
     TryYieldOp::create(builder, loc);
-
-    builder.createBlock(&ifOp.getThenRegion());
-    // On true, nothing is to be done.
-    HLCF::YieldOp::create(builder, loc);
-
-    // On false, we re-raise the error.
-    builder.createBlock(&ifOp.getElseRegion());
-    ExprDest dest(MLValue(errDecl), EC_RaiseValue);
-    // If the error type is unresolved, resolve it to whatever we propagate.
-    if (isa<UnresolvedType>(errDecl.getType().getElementType()))
-      dest = ExprDest(errDecl, EC_RaiseValue);
-    getEmitter().emitResult(MRValue(nestedErrDecl), contextExp, dest);
-    LIT::RaiseOp::create(builder, loc);
-    HLCF::YieldOp::create(builder, loc);
   }
 
   // Now that we have seen the body of the try, we can have inferred the thrown
@@ -2712,20 +2884,31 @@ ParseResult StmtParser::parseSingleWithStmt(size_t curIndent, SMLoc smLoc,
 
   // Emit the conditional call to __exit__.
   builder.createBlock(&tryOp.getFinallyRegion());
-  (void)handleRaisingFinallyRegion(tryOp, smLoc, [&] {
-    HLCF::IfOp excIf;
-    if (nestedTryOp) {
-      Value excFlag = RefLoadOp::create(builder, loc, excVar);
-      excIf = HLCF::IfOp::create(builder, loc, excFlag);
-      builder.createBlock(&excIf.getThenRegion());
+  (void)handleRaisingFinallyRegion(tryOp, smLoc, [&]() -> ParseResult {
+    if (!nestedTryOp) {
+      emitNormalExitLogic();
+      return success();
     }
-    emitNormalExitLogic();
-    if (nestedTryOp) {
-      HLCF::YieldOp::create(builder, loc);
-      // Stub the 'else' region.
-      builder.createBlock(&excIf.getElseRegion());
-      HLCF::YieldOp::create(builder, loc);
-    }
+
+    // Only call the no-error __exit__ when the suite completed without an
+    // exception (exc flag still true).
+    Value excFlag = RefLoadOp::create(builder, loc, excVar);
+    auto emitter = getEmitter();
+    Operation *excIf = emitter.emitIfThen(
+        loc, excFlag, TypeRange{},
+        [&]() -> LogicalResult {
+          builder = *emitter.builder;
+          emitNormalExitLogic();
+          HLCF::YieldOp::create(builder, loc);
+          return success();
+        },
+        [&]() -> LogicalResult {
+          HLCF::YieldOp::create(*emitter.builder, loc);
+          return success();
+        });
+    if (!excIf)
+      return failure();
+    builder.setInsertionPointAfter(excIf);
     return success();
   });
 
@@ -2840,111 +3023,102 @@ ParseResult StmtParser::parseElif(Location ifLoc, LexerCursor startCursor,
     /// The value of the constant condition.
     bool conditionValue;
 
-    /// The location of the constant condition block.
+    /// The location of the constant condition expression.
     Location location;
 
-    /// The index of the condition region within the ElifOp.
-    unsigned index;
+    /// Index into elifRegions of the condition region, or ~0u for the first
+    /// (operand) condition.
+    unsigned elifCondIndex;
   };
 
   // We will be moving the builder into sub-regions that are created, make sure
   // we end up after it when this is done.
   llvm::SaveAndRestore builderSaver(builder);
 
-  // Create a new elifOp state and initialize it with 2 blocks.
-  HLCF::ElifOp elifOp = HLCF::ElifOp::create(builder, ifLoc, TypeRange(), 2);
-  elifOp.getElifRegions()[0].emplaceBlock();
-  elifOp.getElifRegions()[1].emplaceBlock();
+  // Unreachable-arm metadata collected while emitting conditions; processed
+  // after the full elif is built so we can mark regions dead.
+  SmallVector<DeadCodeInfo> ifOpsWithDeadCode;
 
-  auto parseCondition =
-      [&](Location loc) -> std::pair<ParseResult, std::optional<DeadCodeInfo>> {
-    unsigned indexOfCondition = elifOp.getElifRegions().size() - 2;
-    Block &conditionBlock = elifOp.getElifRegions()[indexOfCondition].front();
-    builder.setInsertionPointToStart(&conditionBlock);
+  // Emit a condition at the current insertion point. The first `if` condition
+  // is emitted before the elif; later `elif` conditions stay in their regions.
+  auto emitConditionExpr = [&](unsigned elifCondIndex) -> FailureOr<Value> {
     auto emitter = getEmitter();
 
     ExprNode *condExp = nullptr;
     if (parseExpression(condExp, curIndent, Precedence::kAssignExpr))
-      return {failure(), {}};
+      return failure();
 
-    // Create the 'elif' and parse the body into its "then" region.
     RValue condI1RVal = emitter.emitExprScalarBool(condExp, EC_BoolCondition);
     if (!condI1RVal)
-      return {failure(), {}};
-    std::optional<bool> knownConditionForWarning;
+      return failure();
     if (PValue condI1PVal = condI1RVal.getIfPValue();
         auto asBoolAttr = sugarDynCastIfPresent<SIMDAttr>(condI1PVal.get())) {
-      knownConditionForWarning = asBoolAttr.getAsBool();
+      ifOpsWithDeadCode.push_back({asBoolAttr.getAsBool(),
+                                   condExp->getLocation(emitter),
+                                   elifCondIndex});
     }
     SRValue condRVal =
         emitter.emitSRValue({condI1RVal, condExp}, EC_BoolCondition);
     if (!condRVal)
-      return {failure(), {}};
-
-    // Terminate the condition region of the current ElifOp.
-    HLCF::ElifYieldOp::create(builder, loc, condRVal,
-                              /*no extra values*/ ValueRange());
-
-    std::optional<DeadCodeInfo> deadCodeInfo;
-    if (knownConditionForWarning.has_value()) {
-      deadCodeInfo = {knownConditionForWarning.value(),
-                      condExp->getLocation(emitter), indexOfCondition};
-    }
-    return {success(), deadCodeInfo};
+      return failure();
+    return Value(condRVal);
   };
 
+  // First condition is evaluated in the parent and becomes the elif operand.
+  FailureOr<Value> firstCond = emitConditionExpr(/*elifCondIndex=*/~0u);
+  if (failed(firstCond) ||
+      parseToken(Token::colon, "expected ':' after 'if' expression"))
+    return failure();
+
+  HLCF::ElifOp elifOp =
+      HLCF::ElifOp::create(builder, ifLoc, TypeRange(), *firstCond);
+  elifOp.getThenRegion().emplaceBlock();
+  elifOp.getElseRegion().emplaceBlock();
+
   auto appendElifRegionPair = [&]() {
-    // We need to add two regions.
     builder.setInsertionPoint(elifOp);
     IRRewriter rewriter{builder};
-    HLCF::ElifOp replacement =
-        HLCF::ElifOp::create(builder, elifOp.getLoc(), elifOp->getResultTypes(),
-                             elifOp.getElifRegions().size() + 2);
+    HLCF::ElifOp replacement = HLCF::ElifOp::create(
+        builder, elifOp.getLoc(), elifOp->getResultTypes(), elifOp.getCond(),
+        elifOp.getElifRegions().size() + 2);
 
-    // Take previously parsed regions from old op.
+    replacement.getThenRegion().takeBody(elifOp.getThenRegion());
+    replacement.getElseRegion().takeBody(elifOp.getElseRegion());
     for (auto [index, source] : llvm::enumerate(elifOp.getElifRegions()))
       replacement.getElifRegions()[index].takeBody(source);
 
-    // Add another (Condition, Then) pair.
     Region &lastConditionRegion =
         replacement.getElifRegions()[replacement.getElifRegions().size() - 2];
     Region &lastThenRegion = replacement.getElifRegions().back();
     lastConditionRegion.emplaceBlock();
     lastThenRegion.emplaceBlock();
 
-    // Replace the original elif with the expanded elif.
     rewriter.replaceOp(elifOp, replacement);
     elifOp = replacement;
   };
 
-  // Vector of unreachable code metadata.  After emitting code, these need to
-  // raise warnings and be marked as dead.
-  SmallVector<DeadCodeInfo> ifOpsWithDeadCode;
-  auto [ifParseResult, maybeDeadCodeInfo] = parseCondition(ifLoc);
-  if (maybeDeadCodeInfo.has_value())
-    ifOpsWithDeadCode.push_back(maybeDeadCodeInfo.value());
-  if (ifParseResult ||
-      parseToken(Token::colon, "expected ':' after 'if' expression"))
-    return failure();
   // Parse Then region.
-  builder.setInsertionPointToStart(&elifOp.getElifRegions().back().front());
+  builder.setInsertionPointToStart(&elifOp.getThenRegion().front());
   if (failed(parseLocalScopeSuite(curIndent)))
     return failure();
   HLCF::YieldOp::create(builder, ifLoc);
 
-  // Parse Elif chain if it exists.
+  // Parse Elif chain if it exists. Subsequent conditions stay in their regions
+  // so they are only evaluated when earlier arms fail.
   while (getToken().is(Token::kw_elif) &&
          isTokenInCurrentStatement(curIndent, /*allowSameIndent=*/true)) {
     Location elifLoc = translateLocation(consumeToken(Token::kw_elif).getLoc());
     appendElifRegionPair();
 
-    // Parse Condition region.
-    auto [ifParseResult, maybeDeadCodeInfo] = parseCondition(elifLoc);
-    if (ifParseResult ||
+    unsigned condRegionIndex = elifOp.getElifRegions().size() - 2;
+    builder.setInsertionPointToStart(
+        &elifOp.getElifRegions()[condRegionIndex].front());
+    FailureOr<Value> elifCond = emitConditionExpr(condRegionIndex);
+    if (failed(elifCond) ||
         parseToken(Token::colon, "expected ':' after 'elif' expression"))
       return failure();
-    if (maybeDeadCodeInfo.has_value())
-      ifOpsWithDeadCode.push_back(maybeDeadCodeInfo.value());
+    HLCF::ElifYieldOp::create(builder, elifLoc, *elifCond,
+                              /*no extra values*/ ValueRange());
 
     // Parse Then region.
     builder.setInsertionPointToStart(&elifOp.getElifRegions().back().front());
@@ -2953,7 +3127,7 @@ ParseResult StmtParser::parseElif(Location ifLoc, LexerCursor startCursor,
     HLCF::YieldOp::create(builder, elifLoc);
   }
 
-  builder.setInsertionPointToStart(&elifOp.getElseRegion().emplaceBlock());
+  builder.setInsertionPointToStart(&elifOp.getElseRegion().front());
   if (isTokenInCurrentStatement(curIndent, /*allowSameIndent=*/true) &&
       consumeIf(Token::kw_else)) {
     if (parseToken(Token::colon, "expected ':' after else"))
@@ -2964,55 +3138,38 @@ ParseResult StmtParser::parseElif(Location ifLoc, LexerCursor startCursor,
   HLCF::YieldOp::create(builder, ifLoc);
 
   // Process dead code.  Go backward to avoid needing to erase an already erased
-  // IfOp.
+  // region.
   if (!ifOpsWithDeadCode.empty()) {
-    for (auto [condition, condExprLoc, index] :
+    for (auto [condition, condExprLoc, elifCondIndex] :
          llvm::reverse(ifOpsWithDeadCode)) {
       shared.emitWarning(condExprLoc)
           << "'if' condition always evaluates to '"
           << (condition ? "True" : "False")
           << (condition ? "'; 'else' branch is unreachable"
                         : "'; 'if' branch is unreachable");
-      if (condition) {
-        // Condition is true which means all subsequent regions, including else
-        // region, are unreachable.
+      if (elifCondIndex == ~0u) {
+        // First (operand) condition.
+        if (condition) {
+          markRegionUnreachable(&elifOp.getElseRegion(), ifLoc);
+          for (auto &region : elifOp.getElifRegions())
+            markRegionUnreachable(&region, ifLoc);
+        } else {
+          markRegionUnreachable(&elifOp.getThenRegion(), ifLoc);
+        }
+      } else if (condition) {
+        // Additional arm is true: else and later pairs are unreachable.
         markRegionUnreachable(&elifOp.getElseRegion(), ifLoc);
-        for (auto &region : elifOp.getElifRegions().slice(index + 2))
+        for (auto &region : elifOp.getElifRegions().slice(elifCondIndex + 2))
           markRegionUnreachable(&region, ifLoc);
       } else {
-        // Condition is false. Only the first Then region is unreachable.
-        markRegionUnreachable(&elifOp.getElifRegions()[index + 1], ifLoc);
+        // Additional arm is false: its then is unreachable.
+        markRegionUnreachable(&elifOp.getElifRegions()[elifCondIndex + 1],
+                              ifLoc);
       }
     }
   }
 
   return success();
-}
-
-/// if_stmt ::=  "if" assignment_expression ":" suite
-///             ("elif" assignment_expression ":" suite)*
-///             ["else" ":" suite]
-ParseResult StmtParser::parseIfStmt(LexerCursor startCursor, size_t curIndent) {
-  // This is enabled with the @parameter decorator.
-  // Note that the `comptime if` pattern is parsed elsewhere.
-  // Check for decorators and emit errors for unsupported ones.
-  bool isParamIf = hasParameterDecorator(startCursor, curIndent,
-                                         /*emitErrors=*/true,
-                                         /*restoreCursor=*/false, "if");
-
-  if (isParamIf) {
-    SMLoc atLoc = startCursor.getToken().getLoc();
-    SMLoc ifTokLoc = getToken().getLoc();
-    emitWarning(atLoc, "'@parameter if' is deprecated; use 'comptime if'")
-        << FixIt(SourceRange::getByteLevel(atLoc, ifTokLoc), "comptime ");
-  }
-
-  Location ifLoc = translateLocation(getToken().getLoc());
-  if (parseToken(Token::kw_if, "expected 'if' token after decorators"))
-    return failure();
-  if (!isParamIf)
-    return parseElif(ifLoc, startCursor, curIndent);
-  return parseParamIf(ifLoc, startCursor, curIndent);
 }
 
 /// Validates that an import statement appears at a permitted scope: either
@@ -4158,13 +4315,6 @@ static LogicalResult emitIfClause(StmtParser &stmtEmitter,
   auto location = stmtEmitter.translateLocation(clause.kwLoc);
   auto emitter = stmtEmitter.getEmitter();
 
-  // Create a new elifOp state and initialize it with 2 blocks.
-  HLCF::ElifOp elifOp =
-      HLCF::ElifOp::create(*emitter.builder, location, TypeRange(), 2);
-  auto &condBlock = elifOp.getElifRegions()[0].emplaceBlock();
-  emitter.builder->setInsertionPointToStart(&condBlock);
-
-  // Emit the condition expression.
   RValue condI1RVal = emitter.emitExprScalarBool(clause.expr, EC_BoolCondition);
   if (!condI1RVal)
     return failure();
@@ -4172,26 +4322,22 @@ static LogicalResult emitIfClause(StmtParser &stmtEmitter,
       emitter.emitSRValue({condI1RVal, clause.expr}, EC_BoolCondition);
   if (!condRVal)
     return failure();
-  HLCF::ElifYieldOp::create(*emitter.builder, location, condRVal,
-                            /*no extra values*/ ValueRange());
 
-  // Emit the body of the 'then' clause.
-  auto &thenBlock = elifOp.getElifRegions()[1].emplaceBlock();
-  emitter.builder->setInsertionPointToStart(&thenBlock);
-
-  {
-    llvm::SaveAndRestore builderSaver(stmtEmitter.getBuilder());
-    stmtEmitter.getBuilder().setInsertionPointToStart(&thenBlock);
-    if (failed(callback()))
-      return failure();
-  }
-  HLCF::YieldOp::create(*emitter.builder, location);
-
-  // Leave the else block empty.
-  auto &elseBlock = elifOp.getElseRegion().emplaceBlock();
-  emitter.builder->setInsertionPointToStart(&elseBlock);
-  HLCF::YieldOp::create(*emitter.builder, location);
-  return success();
+  return success((bool)emitter.emitIfThen(
+      location, condRVal, TypeRange(),
+      [&]() -> LogicalResult {
+        llvm::SaveAndRestore builderSaver(stmtEmitter.getBuilder());
+        stmtEmitter.getBuilder().setInsertionPointToStart(
+            emitter.builder->getInsertionBlock());
+        if (failed(callback()))
+          return failure();
+        HLCF::YieldOp::create(*emitter.builder, location);
+        return success();
+      },
+      [&]() -> LogicalResult {
+        HLCF::YieldOp::create(*emitter.builder, location);
+        return success();
+      }));
 }
 
 /// Emit the clauses for a comprehension expression, then call the callback.

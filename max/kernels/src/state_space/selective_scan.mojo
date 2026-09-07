@@ -3252,6 +3252,7 @@ def mamba_split_conv1d_scan_combined_gpu[
     rmsnorm_weight_layout: TensorLayout,
     outproj_weight_layout: TensorLayout,
     outproj_bias_layout: TensorLayout,
+    Engine: TensorEngine,
 ](
     total_batch_dim: Int32,
     batch: Int32,
@@ -3266,26 +3267,38 @@ def mamba_split_conv1d_scan_combined_gpu[
     norm_before_gate: Int8,
     has_rmsnorm: Int8,
     has_outproj: Int8,
-    zxbcdt: TileTensor[kernel_dtype, zxbcdt_layout, MutAnyOrigin],
-    conv_weight: TileTensor[kernel_dtype, conv_weight_layout, MutAnyOrigin],
-    conv_bias: TileTensor[kernel_dtype, conv_bias_layout, MutAnyOrigin],
-    dt_bias: TileTensor[kernel_dtype, delta_bias_layout, MutAnyOrigin],
-    A: TileTensor[kernel_dtype, A_layout, MutAnyOrigin],
-    D: TileTensor[kernel_dtype, D_layout, MutAnyOrigin],
-    x: TileTensor[kernel_dtype, x_layout, MutAnyOrigin],
-    out_z: TileTensor[kernel_dtype, out_z_layout, MutAnyOrigin],
-    dt: TileTensor[kernel_dtype, dt_layout, MutAnyOrigin],
-    B: TileTensor[kernel_dtype, B_layout, MutAnyOrigin],
-    C: TileTensor[kernel_dtype, C_layout, MutAnyOrigin],
-    z: TileTensor[kernel_dtype, z_layout, MutAnyOrigin],
+    zxbcdt: TileTensor[
+        kernel_dtype, zxbcdt_layout, MutAnyOrigin, Engine=Engine
+    ],
+    conv_weight: TileTensor[
+        kernel_dtype, conv_weight_layout, MutAnyOrigin, Engine=Engine
+    ],
+    conv_bias: TileTensor[
+        kernel_dtype, conv_bias_layout, MutAnyOrigin, Engine=Engine
+    ],
+    dt_bias: TileTensor[
+        kernel_dtype, delta_bias_layout, MutAnyOrigin, Engine=Engine
+    ],
+    A: TileTensor[kernel_dtype, A_layout, MutAnyOrigin, Engine=Engine],
+    D: TileTensor[kernel_dtype, D_layout, MutAnyOrigin, Engine=Engine],
+    x: TileTensor[kernel_dtype, x_layout, MutAnyOrigin, Engine=Engine],
+    out_z: TileTensor[kernel_dtype, out_z_layout, MutAnyOrigin, Engine=Engine],
+    dt: TileTensor[kernel_dtype, dt_layout, MutAnyOrigin, Engine=Engine],
+    B: TileTensor[kernel_dtype, B_layout, MutAnyOrigin, Engine=Engine],
+    C: TileTensor[kernel_dtype, C_layout, MutAnyOrigin, Engine=Engine],
+    z: TileTensor[kernel_dtype, z_layout, MutAnyOrigin, Engine=Engine],
     rmsnorm_weight: TileTensor[
-        kernel_dtype, rmsnorm_weight_layout, MutAnyOrigin
+        kernel_dtype, rmsnorm_weight_layout, MutAnyOrigin, Engine=Engine
     ],
     outproj_weight: TileTensor[
-        kernel_dtype, outproj_weight_layout, MutAnyOrigin
+        kernel_dtype, outproj_weight_layout, MutAnyOrigin, Engine=Engine
     ],
-    outproj_bias: TileTensor[kernel_dtype, outproj_bias_layout, MutAnyOrigin],
-    output: TileTensor[kernel_dtype, output_layout, MutAnyOrigin],
+    outproj_bias: TileTensor[
+        kernel_dtype, outproj_bias_layout, MutAnyOrigin, Engine=Engine
+    ],
+    output: TileTensor[
+        kernel_dtype, output_layout, MutAnyOrigin, Engine=Engine
+    ],
     epsilon: Scalar[kernel_dtype],
 ):
     """GPU kernel for mamba_split_conv1d_scan_combined operation."""

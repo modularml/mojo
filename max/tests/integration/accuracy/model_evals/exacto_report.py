@@ -409,6 +409,7 @@ def write_outputs(
     print(format_score_line(dataset, summary))
     if position_warning:
         print(position_warning)
+    _enforce_no_samples(summary)
     _append_github_env(metric_prefix, summary)
     _enforce_error_budget(summary)
     _enforce_stop_ratio(summary)
@@ -438,6 +439,26 @@ def _append_github_env(metric_prefix: str, summary: dict[str, Any]) -> None:
         stderr = summary.get("stderr")
         if isinstance(stderr, (int, float)):
             f.write(f"{metric_prefix}_STDERR={stderr:.4f}\n")
+
+
+def _enforce_no_samples(summary: dict[str, Any]) -> None:
+    """Exits nonzero when the harness scored nothing at all.
+
+    The error budget cannot catch this: with zero samples the harness reports
+    no counts, both guards return early, and the run exits 0 having printed
+    ``none`` as the score. That is how a 404 against every request passed CI.
+    """
+    accuracy = summary.get("accuracy")
+    if isinstance(accuracy, (int, float)):
+        return
+    status = summary.get("harness_status")
+    print(
+        "::error::the harness scored no samples "
+        f"(status={status!r}, completed={summary.get('completed')!r}, "
+        f"total={summary.get('total')!r}). Nothing was measured, so there is "
+        "no score. Check the endpoint, the model name and the credential."
+    )
+    raise SystemExit(1)
 
 
 def _enforce_error_budget(summary: dict[str, Any]) -> None:
@@ -572,6 +593,14 @@ def main(argv: list[str] | None = None) -> None:
         help="Prefix for the $GITHUB_ENV metric keys (e.g. EXACTO_GPQA).",
     )
     parser.add_argument(
+        "--full-task-count",
+        type=int,
+        help=(
+            "How many tasks the chosen split holds, so a subset run is "
+            "identifiable without anything hardcoding the dataset size."
+        ),
+    )
+    parser.add_argument(
         "--reference-user-llm",
         help=(
             "The simulator OpenRouter pins, recorded so downstream readers can "
@@ -609,6 +638,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     if args.reference_user_llm:
         summary["reference_user_llm"] = args.reference_user_llm
+    if args.full_task_count:
+        summary["full_task_count"] = args.full_task_count
     write_outputs(args.out_dir, args.dataset, rows, summary, args.metric_prefix)
 
 

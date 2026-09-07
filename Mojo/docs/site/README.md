@@ -64,8 +64,8 @@ Guide](../../CONTRIBUTING.md)
 
 ## Other docs
 
-- [`/Mojo/docs/stdlib`](/Mojo/docs/stdlib): Docs for developers working in the
-  Mojo standard library.
+- [`/Mojo/docs/contributing`](/Mojo/docs/contributing): Docs for contributors
+  to the Mojo compiler and standard library.
 - [`/max/docs`](/max/docs): Docs for developers working in the MAX framework
   codebase.
 - [`/max/docs/design-docs`](/max/docs/design-docs): Engineering docs that

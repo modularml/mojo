@@ -200,8 +200,8 @@ hints, and does use them in a few places, here is one trivial example:
 
 ```python
 $ cat a.mojo
-fn returns_int() -> Int: return 4
-fn test():
+def returns_int() -> Int: return 4
+def test():
     returns_int()
 
 $ mojo a.mojo
@@ -317,7 +317,7 @@ We want warnings to be deterministic, but sometimes it can be better for code
 readability to use idioms that we’d normally want to warn about. For example:
 
 ```python
-fn loops():
+def loops():
     for i in range(100):
         var sum = 0
         # warning: assignment to 'j' was never used; assign to '_' instead?

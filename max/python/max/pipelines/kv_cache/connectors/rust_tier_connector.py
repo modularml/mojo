@@ -497,7 +497,10 @@ class RustTierConnector(KVConnector):
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
+        # ``hint`` is ignored: every tier this connector owns is host-local, so
+        # a hint naming the instances that hold a prefix has nothing to route.
         if block_ids.keys() != self._leaves.keys():
             raise ValueError(
                 f"RustTierConnector.load block_ids keys {sorted(block_ids)} do not "

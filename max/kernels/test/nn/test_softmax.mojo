@@ -33,7 +33,7 @@ def test_logsoftmax() raises:
 
     def logsoftmax_test_nd[rank: Int, shape: IndexList[rank]]() raises:
         comptime if rank == 1:
-            var in_stack = Array[Scalar[type], shape[0]](uninitialized=True)
+            var in_stack = Array[Scalar[type], shape[0]](fill={})
             var in_tt = TileTensor(in_stack, row_major[shape[0]]())
             var out_stack = Array[Scalar[type], shape[0]](fill=0)
             arange(in_tt)
@@ -44,7 +44,7 @@ def test_logsoftmax() raises:
         else:
             comptime if rank == 2:
                 comptime sz = shape[0] * shape[1]
-                var in_stack = Array[Scalar[type], sz](uninitialized=True)
+                var in_stack = Array[Scalar[type], sz](fill={})
                 var in_tt = TileTensor(
                     in_stack, row_major[shape[0], shape[1]]()
                 )

@@ -465,5 +465,5 @@ For example `test_sort.mojo`.
 
 #### Integration with build system
 
-- See the [bazel usage docs](../../../bazel/docs/usage.md) for more details
+- See the [bazel usage docs](../../../../bazel/docs/usage.md) for more details
   on how to run tests.

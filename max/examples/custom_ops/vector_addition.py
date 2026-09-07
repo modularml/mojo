@@ -67,7 +67,8 @@ if __name__ == "__main__":
     )
 
     # Compile the graph.
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     # Fill input matrices with random values.
     lhs_values = np.random.uniform(size=(vector_width)).astype(np.float32)

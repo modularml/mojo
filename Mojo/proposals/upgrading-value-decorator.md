@@ -43,19 +43,19 @@ struct Simple(Copyable, Movable, ExplicitlyCopyable):
   var x: Int
   var y: String
 
-  fn __init__(x: Int, owned y: String):
+  def __init__(x: Int, owned y: String):
      self.x = x
      self.y = y^
 
-  fn __copyinit__(out self, existing: Self):
+  def __copyinit__(out self, existing: Self):
      self.x = existing.x
      self.y = existing.y
 
-  fn copy(out self, existing: Self):
+  def copy(out self, existing: Self):
      self.x = existing.x
      self.y = existing.y
 
-  fn __moveinit__(out self, owned existing: Self):
+  def __moveinit__(out self, owned existing: Self):
      self.x = existing.x
      self.y = existing.y^
 ```

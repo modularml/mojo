@@ -28,6 +28,17 @@ namespace M::KGEN::LIT {
 /// The callee an overload filter selected, or why none was selected.
 using CalleeResult = TriResult<PValue>;
 
+/// The callee a value-type overload filter selected, together with the decl it
+/// came from. Most callers want one or the other, so they are named rather
+/// than positional.
+struct SelectedCallee {
+  PValue callee;
+  ASTDecl *decl;
+};
+
+/// What a value-type overload filter selected, or why it selected nothing.
+using CalleeAndDeclResult = TriResult<SelectedCallee>;
+
 /// Returns true if `candidate` is a compiler-synthesized function whose own
 /// where clause can never be satisfied (e.g. the move/copy-init synthesized
 /// for a `Movable`/`Copyable` conformance). Such a function is never actually
@@ -221,13 +232,12 @@ public:
   /// this scope is inconclusive: it cannot be selected, but neither can it be
   /// ruled out, so no other candidate may be selected over it either. When
   /// `emitError` is set this is diagnosed like any other inconclusive overload
-  /// set; `hasInconclusiveCandidates`, when non-null, additionally reports it
-  /// to callers that probe silently and must account for every candidate that
-  /// survives (e.g. witness selection).
-  std::pair<PValue, ASTDecl *> filterOverloadSetForValueType(
+  /// set; otherwise the `unknown` answer reports the same situation to callers
+  /// that probe silently and must account for every candidate that survives
+  /// (e.g. witness selection).
+  CalleeAndDeclResult filterOverloadSetForValueType(
       ASTType functionType,
-      function_ref<MojoInflightDiag &(llvm::SMLoc)> emitError,
-      bool *hasInconclusiveCandidates = nullptr) const;
+      function_ref<MojoInflightDiag &(llvm::SMLoc)> emitError) const;
 
   /// If the specified type can be constructed with the specified operands
   /// return the initializer that would be invoked. If not, return a `no`

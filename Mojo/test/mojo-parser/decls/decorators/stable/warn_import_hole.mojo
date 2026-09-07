@@ -26,7 +26,7 @@ def test_hole():
     # Accessing a comptime alias member is suppressed — it's a member of
     # UnstableStruct, which is in the override set.
     # CHECK-NOT: warning{{.*}}AliasedType
-    alias B = UnstableStruct.AliasedType
+    comptime B = UnstableStruct.AliasedType
     # Calling a static method on the aliased type (AnotherUnstableStruct) is
     # NOT suppressed — AnotherUnstableStruct is not in the stable override set.
     # CHECK: warning: use of unstable API 'static_method'

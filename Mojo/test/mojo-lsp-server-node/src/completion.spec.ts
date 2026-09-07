@@ -388,7 +388,7 @@ def function(arg: Int):
 struct Foo:
     var field_a: Int
     var field_b: Int
-    fn bar(self):
+    def bar(self):
         self.
 `;
 

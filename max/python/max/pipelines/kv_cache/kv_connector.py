@@ -259,6 +259,7 @@ class KVConnector(Protocol):
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         """Load data from external cache into device blocks.
 
@@ -273,6 +274,11 @@ class KVConnector(Protocol):
             replica_idx: DP replica whose device buffers receive the loaded
                 blocks. The external tier itself is replica-agnostic (keyed by
                 hash); this only selects the H2D destination.
+            hint: The request's ``dkv_cache_hint`` as raw JSON bytes, or
+                ``None`` when it carried none. Opaque to the manager: only the
+                dKV connector reads it, to route blocks to the peer that holds
+                them. It never affects correctness, since an unusable hint
+                costs a cache miss and nothing else.
 
         Returns:
             A :class:`KVConnectorTransfer` for the H2D copy. ``g0_blocks_per_leaf``

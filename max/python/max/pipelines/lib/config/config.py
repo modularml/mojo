@@ -319,6 +319,15 @@ def _resolve_overlap_and_device_graph_capture(
     else in construction.
     """
     device_graph_capture = runtime.device_graph_capture
+
+    if runtime.experimental_device_graph_synthesis:
+        if device_graph_capture:
+            raise ValueError(
+                "experimental_device_graph_synthesis and device_graph_capture are "
+                "mutually exclusive; pick one device-graph pathway"
+            )
+        device_graph_capture = False
+
     if not runtime.force:
         if (
             device_graph_capture is None

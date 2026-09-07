@@ -471,6 +471,15 @@ def moe_requires_scales_offsets(quant_config: QuantConfig | None) -> bool:
 _SUPPORTED_FORMATS = (QuantFormat.BLOCKSCALED_FP8, QuantFormat.NVFP4)
 
 
+def routed_weight_dtype(quant_config: QuantConfig | None) -> DType:
+    """The storage dtype :func:`quantized_weight` picks for ``quant_config``."""
+    if is_nvfp4_quantized(quant_config):
+        return DType.uint8
+    if is_fp8_block_quantized(quant_config):
+        return DType.float8_e4m3fn
+    return DType.bfloat16
+
+
 def quantized_weight(
     out_dim: int,
     in_dim: int,

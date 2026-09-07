@@ -333,3 +333,43 @@ def test_contamination_reaches_score_json_not_just_stdout(
     )
     written = json.loads((tmp_path / "score.json").read_text())
     assert written["target_letter_counts"] == {"B": 198}
+
+
+# Shaped after the CI run where every request 404'd: openbench interrupts, so
+# it reports no counts at all and no score.
+INTERRUPTED_LOG: dict[str, Any] = {
+    "status": "error",
+    "eval": {"task": "gpqa_diamond", "dataset": {}, "config": {}},
+    "plan": {"config": {}},
+    "results": {"scores": []},
+    "reductions": [],
+    "samples": [],
+}
+
+
+def test_zero_sample_run_fails_instead_of_reporting_none(
+    tmp_path: Path,
+) -> None:
+    # Regression: the error budget cannot fire without counts, so this run
+    # printed "none" and exited 0 while nothing had been measured.
+    rows, summary = exacto_report.parse_openbench_log(INTERRUPTED_LOG)
+    assert summary["accuracy"] is None
+    with pytest.raises(SystemExit):
+        exacto_report.write_outputs(
+            str(tmp_path), "gpqa_diamond", rows, summary, "EXACTO_GPQA"
+        )
+
+
+def test_zero_sample_failure_still_leaves_artifacts(tmp_path: Path) -> None:
+    # The score file has to survive the failure, or there is nothing to debug.
+    rows, summary = exacto_report.parse_openbench_log(INTERRUPTED_LOG)
+    with pytest.raises(SystemExit):
+        exacto_report.write_outputs(
+            str(tmp_path), "gpqa_diamond", rows, summary, "EXACTO_GPQA"
+        )
+    assert (tmp_path / "score.json").exists()
+
+
+def test_a_scored_run_is_not_treated_as_empty() -> None:
+    _, summary = exacto_report.parse_openbench_log(OPENBENCH_LOG)
+    exacto_report._enforce_no_samples(summary)

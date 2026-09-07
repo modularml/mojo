@@ -125,15 +125,17 @@ static bool canConvertFunctionTypes(FnTypeGeneratorType actualGen,
 
 /// Prove `from`'s generator body constraints under `declScope`, treating
 /// `to`'s body constraints and `additionalAssumptions` as extra facts. It
-/// only checks the constraints, not the body types of the generators.
-static TriState
+/// only checks the constraints, not the body types of the generators. When
+/// `unprovenConstraints` is non-null an `unknown` verdict fills it with the
+/// constraints that lacked evidence.
+static TriBool
 canProveBodyConstraints(GeneratorType from, GeneratorType to,
                         ASTDecl &declScope,
                         ArrayRef<ConstraintAttr> additionalAssumptions,
-                        ConversionFailure *failure) {
+                        SmallVectorImpl<ConstraintAttr> *unprovenConstraints) {
   ArrayRef<ConstraintAttr> fromConstraints = from.getBodyConstraints();
   if (fromConstraints.empty())
-    return TriState::yes();
+    return TriBool::yes();
 
   // `additionalAssumptions` lets callers supply facts that hold in their
   // context but are not in `declScope`'s known assumptions; `to`'s constraints
@@ -145,18 +147,13 @@ canProveBodyConstraints(GeneratorType from, GeneratorType to,
   auto fromParamList = cast<PogListAttr>(from.getParamListAttrs());
   OptionalDiag diag(declScope.getShared(), declScope.getLoc(),
                     /*discardError=*/true);
-  ConstraintFailure details;
-  TriState verdict = canDischargeConstraintsInScope(
-      declScope, fromParamList, fromConstraints, fromConstraints,
-      diag.getDiag(), failure ? &details.unprovenConstraints : nullptr,
-      /*evaluator=*/nullptr, assumptions);
-  if (failure && !details.unprovenConstraints.empty())
-    failure->recordIfEmpty(
-        ConversionFailure::UnsatisfiedConstraints{std::move(details)});
-  return verdict;
+  return canDischargeConstraintsInScope(declScope, fromParamList,
+                                        fromConstraints, fromConstraints,
+                                        diag.getDiag(), unprovenConstraints,
+                                        /*evaluator=*/nullptr, assumptions);
 }
 
-static TriState
+static TriBool
 canConvertGeneratorTypes(ASTExprAnd<CValue> valueExpr, GeneratorType actual,
                          GeneratorType expected, ASTDecl &declScope,
                          ArrayRef<ConstraintAttr> additionalAssumptions = {}) {
@@ -164,19 +161,19 @@ canConvertGeneratorTypes(ASTExprAnd<CValue> valueExpr, GeneratorType actual,
   // are different. When bodies are the same, `canZeroCostConvert` will have
   // already allowed it.
   if (!actual.getBodyConstraints().empty())
-    return TriState::no();
+    return TriBool::no();
 
   // Handle function conversions.
   if (auto actualFnType = sugarDynCast<FnTypeGeneratorType>(actual))
     if (auto expectedFnType = sugarDynCast<FnTypeGeneratorType>(expected)) {
-      return TriState::fromBool(canConvertFunctionTypes(
+      return TriBool::fromBool(canConvertFunctionTypes(
           actualFnType, expectedFnType, valueExpr.expr, declScope));
     }
 
   if (auto actualType = sugarDynCast<FnLiteralTypeGeneratorType>(actual)) {
     if (auto expectedType = sugarDynCast<FnTypeGeneratorType>(expected)) {
       // See if the literal itself has a compatible type.
-      return TriState::fromBool(
+      return TriBool::fromBool(
           canConvertFunctionTypes(actualType.getSymbolConstantAttr().getType(),
                                   expectedType, valueExpr.expr, declScope));
     }
@@ -188,7 +185,7 @@ canConvertGeneratorTypes(ASTExprAnd<CValue> valueExpr, GeneratorType actual,
   // TODO: Consider default parameter values and enable parameter inference to
   // reconcile differences.
   if (actual.getInputParamTypes() != expected.getInputParamTypes())
-    return TriState::no();
+    return TriBool::no();
 
   // We are pulling out the body of the generator to test type convertibility.
   // To do it correctly, we need to replace index ref to name refs. Otherwise,
@@ -204,7 +201,7 @@ canConvertGeneratorTypes(ASTExprAnd<CValue> valueExpr, GeneratorType actual,
   auto genAttr =
       sugarDynCastIfPresent<GeneratorAttr>(valueExpr.ir.getIfPValue().get());
   if (!genAttr)
-    return TriState::no();
+    return TriBool::no();
 
   return IREmitter::classifyImplicitConversion(
       {remapper.replace(genAttr.getBody()), valueExpr.expr},
@@ -911,15 +908,15 @@ struct ConversionResult {
   };
 
   Sensitivity sensitivity;
-  TriState isConvertible;
+  TriBool isConvertible; // TODO: Change into ConstraintResult.
 
   static ConversionResult notApplicable() {
-    return {Sensitivity::NotApplicable, TriState::no()};
+    return {Sensitivity::NotApplicable, TriBool::no()};
   }
-  static ConversionResult scopeIndependent(TriState isConvertible) {
+  static ConversionResult scopeIndependent(TriBool isConvertible) {
     return {Sensitivity::ScopeIndependent, isConvertible};
   }
-  static ConversionResult scopeDependent(TriState isConvertible) {
+  static ConversionResult scopeDependent(TriBool isConvertible) {
     return {Sensitivity::ScopeDependent, isConvertible};
   }
 
@@ -947,7 +944,7 @@ classifyEmptyGeneratorToBody(ASTExprAnd<CValue> valueExpr, ASTType requiredType,
 
   ArrayRef<ConstraintAttr> bodyConstraints = generator.getBodyConstraints();
   if (bodyConstraints.empty())
-    return ConversionResult::scopeIndependent(TriState::yes());
+    return ConversionResult::scopeIndependent(TriBool::yes());
 
   // Whether the body constraints are dischargeable depends on this scope's
   // assumptions (and any caller-supplied assumptions), so the result is
@@ -955,7 +952,7 @@ classifyEmptyGeneratorToBody(ASTExprAnd<CValue> valueExpr, ASTType requiredType,
   auto paramList = cast<PogListAttr>(generator.getParamListAttrs());
   OptionalDiag diag(declScope.getShared(), valueExpr.expr->getLoc(),
                     /*discardError=*/true);
-  TriState satisfied = canDischargeConstraintsInScope(
+  TriBool satisfied = canDischargeConstraintsInScope(
       declScope, paramList, bodyConstraints,
       /*origConstraints=*/{}, diag.getDiag(),
       /*unprovableConstraints=*/nullptr,
@@ -985,7 +982,7 @@ classifyGeneratorToGenerator(ASTExprAnd<CValue> valueExpr,
   if (!rvGeneratorType.getBodyConstraints().empty())
     return ConversionResult::notApplicable();
 
-  TriState result =
+  TriBool result =
       canConvertGeneratorTypes(valueExpr, rvGeneratorType, requiredGenerator,
                                declScope, additionalAssumptions);
   // A result that could have depended on `additionalAssumptions` is not safe to
@@ -1141,30 +1138,33 @@ static bool canZeroCostConvertFnTypes(FnTypeGeneratorType from,
 /// Returns if a value of the specified type can be coerced to the other type
 /// with a zero-cost conversion like a rebind.  This means that values of the
 /// two types have exactly the same representation post-elaboration.
-TriState
-IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
-                              SharedState &shared, ASTDecl &declScope,
-                              ArrayRef<ConstraintAttr> additionalAssumptions,
-                              ConversionFailure *failure) {
+/// Shared body of `IREmitter::canZeroCostConvert` and the one caller in this
+/// file that wants the constraints behind an `unknown` verdict, which
+/// `unprovenConstraints` receives when non-null.
+static TriBool
+canZeroCostConvertImpl(ASTType sugaredFromType, ASTType sugaredToType,
+                       SharedState &shared, ASTDecl &declScope,
+                       ArrayRef<ConstraintAttr> additionalAssumptions,
+                       SmallVectorImpl<ConstraintAttr> *unprovenConstraints) {
   if (sugaredFromType.isEqualCanon(sugaredToType))
-    return TriState::yes(); // No rebind needed!
+    return TriBool::yes(); // No rebind needed!
   ASTType toType = getCanonicalType(sugaredToType);
   ASTType fromType = getCanonicalType(sugaredFromType);
 
   FailureOr<bool> upCastable =
       isValidUpCastToTypeType(shared, fromType, toType);
   if (succeeded(upCastable))
-    return TriState::fromBool(upCastable.value());
+    return TriBool::fromBool(upCastable.value());
 
   // fn type is non-struct type (but should it?)
   if (sugarIsa<FnLiteralTypeGeneratorMetaType>(fromType) &&
       sugarIsa<NonStructTypeType>(toType))
-    return TriState::yes();
+    return TriBool::yes();
 
   // Check for param type conversions.
   if (auto fromParamType = sugarDynCast<ParamType>(fromType))
     if (auto toParamType = sugarDynCast<ParamType>(toType))
-      return TriState::fromBool(
+      return TriBool::fromBool(
           canZeroCostConvertParamTypes(fromParamType, toParamType, shared));
 
   // Check for closure structs and dig out their underlying signature types to
@@ -1186,8 +1186,9 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
             fromType.getParamBindings(), &shared.getEvaluationContext());
         toSig = toSig.getSpecializedGenerator(toType.getParamBindings(),
                                               &shared.getEvaluationContext());
-        return canZeroCostConvert(fromSig, toSig, shared, declScope,
-                                  additionalAssumptions, failure);
+        return canZeroCostConvertImpl(fromSig, toSig, shared, declScope,
+                                      additionalAssumptions,
+                                      unprovenConstraints);
       }
 
       // Otherwise, if both types reference the same struct declaration (e.g.
@@ -1196,14 +1197,14 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
       // require both sides to be `StructType` here, though in principle this
       // just needs both sides to be some metatype of struct types at the same
       // type-universe level.
-      if (fromDecl == toDecl && sugarIsa<StructType>(fromType) &&
-          sugarIsa<StructType>(toType)) {
+      if (fromDecl == toDecl && sugarIsa<LIT::StructType>(fromType) &&
+          sugarIsa<LIT::StructType>(toType)) {
         CastRemover remover;
         if (remover.replace(fromType.mlirType) ==
             remover.replace(toType.mlirType))
-          return TriState::yes();
+          return TriBool::yes();
       }
-      return TriState::no();
+      return TriBool::no();
     }
   }
 
@@ -1219,7 +1220,7 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
       auto result =
           ParamOperatorAttr::get(POC::And, toMut, fromOrigin.getIsMutable());
       if (result == toMut)
-        return TriState::yes();
+        return TriBool::yes();
     }
 
   // Check reference downcasting.  The only thing allowed to disagree is the
@@ -1230,22 +1231,23 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
       if (fromRef.getAddressSpace() != toRef.getAddressSpace() ||
           !ASTType(fromRef.getElementType())
                .isEqualCanon(toRef.getElementType()))
-        return TriState::no();
+        return TriBool::no();
 
       // Verify compatible OriginType(mutability).  This is checking the type
       // of the origin, which contains its mutability specifier.
       auto toOriginType = toRef.getOriginType();
       if (fromRef.getOriginType() != toOriginType &&
-          !canZeroCostConvert(fromRef.getOriginType(), toOriginType, shared,
-                              declScope, additionalAssumptions)
+          !canZeroCostConvertImpl(fromRef.getOriginType(), toOriginType, shared,
+                                  declScope, additionalAssumptions,
+                                  /*unprovenConstraints=*/nullptr)
                .isTrue())
-        return TriState::no();
+        return TriBool::no();
 
       // We allow converting an "any" origin to anything concrete.
       // NOTE: This is not memory safe; we should make this an explicit
       // operation someday.
       if (sugarIsa<AnyOriginAttr>(fromRef.getOrigin()))
-        return TriState::yes();
+        return TriBool::yes();
 
       // FIXME: People are using things StaticString to refer to comptime
       // strings, even though StaticString is a runtime concept :-/.
@@ -1255,7 +1257,7 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
           if (isa<StaticOriginAttr>(originField.getBase()) &&
               originField.getField().str() == "__constants__" &&
               originField.getType().isMutableKnown(false)) {
-            return TriState::yes();
+            return TriBool::yes();
           }
         }
       }
@@ -1265,25 +1267,25 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
       auto originUnion = OriginUnionAttr::get(
           {toOrigin, OriginMutCastAttr::get(fromRef.getOrigin(), toOriginType)},
           toOriginType);
-      return TriState::fromBool(toOrigin == originUnion);
+      return TriBool::fromBool(toOrigin == originUnion);
     }
   }
 
   if (auto actual = sugarDynCast<FnLiteralTypeGeneratorType>(sugaredFromType))
     if (sugarIsa<FnTypeGeneratorType>(sugaredToType))
-      return canZeroCostConvert(actual.getSymbolConstantAttr().getType(),
-                                sugaredToType, shared, declScope,
-                                additionalAssumptions, failure);
+      return canZeroCostConvertImpl(actual.getSymbolConstantAttr().getType(),
+                                    sugaredToType, shared, declScope,
+                                    additionalAssumptions, unprovenConstraints);
 
   // Otherwise handle generator conversions. Both sides must be generators.
   auto fromGen = sugarDynCast<GeneratorType>(sugaredFromType);
   auto toGen = sugarDynCast<GeneratorType>(sugaredToType);
   if (!fromGen || !toGen)
-    return TriState::no();
+    return TriBool::no();
 
   // Input parameter types must match exactly.
   if (fromGen.getInputParamTypes() != toGen.getInputParamTypes())
-    return TriState::no();
+    return TriBool::no();
 
   // The representations must agree. Function types have their own looser match
   // (argument/parameter names, passing kinds, and capture origins may differ);
@@ -1292,16 +1294,25 @@ IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
   if (auto fromFn = sugarDynCast<FnTypeGeneratorType>(fromGen)) {
     auto toFn = sugarDynCast<FnTypeGeneratorType>(toGen);
     if (!toFn || !canZeroCostConvertFnTypes(fromFn, toFn))
-      return TriState::no();
+      return TriBool::no();
   } else if (!ASTType(fromGen.getWithoutBodyConstraints())
                   .isEqualCanon(toGen.getWithoutBodyConstraints())) {
-    return TriState::no();
+    return TriBool::no();
   }
 
   // The representations agree, so all that is left is the body constraints.
   // Gaining a constraint is free; shedding one requires this scope to prove it.
   return canProveBodyConstraints(fromGen, toGen, declScope,
-                                 additionalAssumptions, failure);
+                                 additionalAssumptions, unprovenConstraints);
+}
+
+TriBool
+IREmitter::canZeroCostConvert(ASTType sugaredFromType, ASTType sugaredToType,
+                              SharedState &shared, ASTDecl &declScope,
+                              ArrayRef<ConstraintAttr> additionalAssumptions) {
+  return canZeroCostConvertImpl(sugaredFromType, sugaredToType, shared,
+                                declScope, additionalAssumptions,
+                                /*unprovenConstraints=*/nullptr);
 }
 
 /// If there is a common type shared between the two reference types, return
@@ -1742,28 +1753,34 @@ static ASTDecl *getClosureTraitDecl(SharedState &shared,
 // Returns the upcastability verdict (`yes`/`no`/`unknown`) for converting a
 // type value to a trait. Returns failure for non-applicable cases (i.e.,
 // `fromType` is not a typetype and/or `toType` is not a trait type).
-FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
-    SharedState &shared, SMLoc loc, ASTType fromType, ASTType toType,
-    ASTDecl *declScope, bool *scopeDependent, ConstraintFailure *details) {
+//
+// Shared body of the two public entry points. `unsatConstraints`, when
+// non-null, is filled with the constraints behind a non-`yes` verdict; when
+// passed null, the conformance query short-circuits.
+static FailureOr<TriBool>
+canMetaTypeUpCastToImpl(SharedState &shared, SMLoc loc, ASTType fromType,
+                        ASTType toType, ASTDecl *declScope,
+                        bool *scopeDependent,
+                        SmallVectorImpl<ConstraintAttr> *unsatConstraints) {
   auto conformanceVerdict = [&](ASTType type, TraitType trait) {
     // Owned, not an ArrayRef: `getAssumptionsFromScope` returns by value.
     SmallVector<ConstraintAttr> assumptions =
         ASTDecl::getAssumptionsFromScope(declScope);
     if (scopeDependent && !assumptions.empty())
       *scopeDependent = true;
-    if (!details)
+    if (!unsatConstraints)
       return type.doesConformTo(trait, shared, assumptions);
 
     ConstraintResult result =
         type.doesConformToWithDetails(trait, shared, assumptions);
     if (result.isYes())
-      return TriState::yes();
+      return TriBool::yes();
     if (result.isNo()) {
-      details->failedConstraints = std::move(result).getNo();
-      return TriState::no();
+      *unsatConstraints = std::move(result).getNo();
+      return TriBool::no();
     }
-    details->unprovenConstraints = std::move(result).getUnknown();
-    return TriState::unknown();
+    *unsatConstraints = std::move(result).getUnknown();
+    return TriBool::unknown();
   };
 
   // By default the verdict depends only on the (fromType, toType) pair. The
@@ -1773,14 +1790,14 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
     *scopeDependent = false;
 
   if (isEqualCanon(fromType, toType))
-    return TriState::yes();
+    return TriBool::yes();
 
   // Trait metatypes/struct MetaMetaType are allowed to upcast to trivial
   // types.
   FailureOr<bool> upCastable =
       isValidUpCastToTypeType(shared, fromType, toType);
   if (succeeded(upCastable))
-    return TriState::fromBool(*upCastable);
+    return TriBool::fromBool(*upCastable);
 
   auto canFnLiteralUpCastToTrait = [&](TypedAttr fnPValue,
                                        AnyTraitType anyTrait) {
@@ -1823,7 +1840,7 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
             if (sugarIsa<StructMetaType>(fromType) &&
                 failed(shared.closureEmitter->isCompatibleWith(fromType,
                                                                &symbolDecl)))
-              return TriState::no();
+              return TriBool::no();
 
             if (sugarIsa<TraitType>(fromType) &&
                 failed(shared.closureEmitter->isTraitCompatibleWith(
@@ -1848,13 +1865,13 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
     } else if (auto fnGen =
                    sugarDynCastIfPresent<FnLiteralTypeGeneratorMetaType>(
                        fromType)) {
-      return TriState::fromBool(canFnLiteralUpCastToTrait(
+      return TriBool::fromBool(canFnLiteralUpCastToTrait(
           fnGen.getType().getSymbolConstantAttr(), anyTrait));
     } else {
       // This isn't relevant, e.g. in function pointer to closure case.
       return failure();
     }
-    return TriState::fromBool(result);
+    return TriBool::fromBool(result);
   }
 
   if (auto anyTrait = sugarDynCast<AnyTraitType>(toType)) {
@@ -1864,7 +1881,7 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
     // one metatype level up.
     if (auto fnGen = sugarDynCastIfPresent<FnLiteralTypeGeneratorMetaMetaType>(
             fromType)) {
-      return TriState::fromBool(canFnLiteralUpCastToTrait(
+      return TriBool::fromBool(canFnLiteralUpCastToTrait(
           fnGen.getType().getType().getSymbolConstantAttr(), anyTrait));
     }
 
@@ -1891,7 +1908,7 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
                                                                 &symbolDecl)) ||
               succeeded(shared.closureEmitter->isTraitCompatibleWith(
                   concreteType, traitDeclOp, declScope)))
-            return TriState::yes();
+            return TriBool::yes();
         }
       }
 
@@ -1903,6 +1920,27 @@ FailureOr<TriState> IREmitter::canMetaTypeUpCastTo(
 
   // Not applicable.
   return failure();
+}
+
+FailureOr<TriBool> IREmitter::canMetaTypeUpCastTo(SharedState &shared,
+                                                  SMLoc loc, ASTType fromType,
+                                                  ASTType toType,
+                                                  ASTDecl *declScope,
+                                                  bool *scopeDependent) {
+  return canMetaTypeUpCastToImpl(shared, loc, fromType, toType, declScope,
+                                 scopeDependent, /*details=*/nullptr);
+}
+
+FailureOr<ConstraintResult> IREmitter::canMetaTypeUpCastToWithDetails(
+    SharedState &shared, SMLoc loc, ASTType fromType, ASTType toType,
+    ASTDecl *declScope, bool *scopeDependent) {
+  SmallVector<ConstraintAttr, 2> unsatConstraints;
+  FailureOr<TriBool> verdict =
+      canMetaTypeUpCastToImpl(shared, loc, fromType, toType, declScope,
+                              scopeDependent, &unsatConstraints);
+  if (failed(verdict))
+    return failure();
+  return makeConstraintResult(*verdict, std::move(unsatConstraints));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1944,36 +1982,53 @@ static bool isClosureWrapperStruct(SharedState &shared, PValue value,
 }
 
 void ConversionFailure::addExplanation(MojoInflightDiag &diag) && {
-  if (auto *unsatisfied = std::get_if<UnsatisfiedConstraints>(&reason))
-    unsatisfied->constraints.attachNotes(diag);
+  if (auto *refuted = std::get_if<RefutedConstraints>(&reason))
+    attachConstraintNotes(diag, refuted->constraints, "failed");
 }
 
-/// Return true if 'value' may be implicitly converted to 'requiredType'
-/// by invoking (one level of) conversion operations.  This does not generate
-/// any IR.
+namespace {
+/// A struct for collecting the reasons for a non-`yes` answer from
+/// `classifyImplicitConversionImpl`.
+struct ConversionNonYesReason {
+  ConversionFailure rejection;
+  SmallVector<ConstraintAttr, 2> unproven;
+
+  void recordUnprovenIfEmpty(SmallVector<ConstraintAttr, 2> constraints) {
+    if (unproven.empty())
+      unproven = std::move(constraints);
+  }
+};
+} // namespace
+
+/// Shared body of the two public `classifyImplicitConversion` entry points:
+/// `reason` non-null means the caller asked why the answer was not `yes`.
 ///
-/// CAUTION: This method must line up with `emitImplicitConversionToType`!!!
-TriState IREmitter::classifyImplicitConversion(
+/// CAUTION: This must line up with `IREmitter::emitImplicitConversionToType`!!!
+static TriBool classifyImplicitConversionImpl(
     ASTExprAnd<CValue> value, ASTType requiredType, ASTDecl &declScope,
     ArrayRef<ConstraintAttr> additionalAssumptions,
-    DeferredTypingContext *deferralCtx, ConversionFailure *failure) {
+    DeferredTypingContext *deferralCtx, ConversionNonYesReason *reason) {
   auto &shared = declScope.getShared();
   assert(value.ir && "Should only query valid values");
   ASTType rvType = value.ir.getRValueType();
   // Clear so an early return leaves no stale reason behind.
-  if (failure)
-    failure->clear();
+  if (reason)
+    *reason = {};
 
   // If it already matches, then we're done.
   if (rvType.isEqualCanon(requiredType))
-    return TriState::yes();
+    return TriBool::yes();
 
   // If the types have the same representation after elaboration then they are
   // implicitly convertible.
-  TriState zeroCost = canZeroCostConvert(
-      rvType, requiredType, shared, declScope, additionalAssumptions, failure);
+  SmallVector<ConstraintAttr, 2> zeroCostUnproven;
+  TriBool zeroCost = canZeroCostConvertImpl(
+      rvType, requiredType, shared, declScope, additionalAssumptions,
+      reason ? &zeroCostUnproven : nullptr);
   if (zeroCost.isTrue())
-    return TriState::yes();
+    return TriBool::yes();
+  if (reason && zeroCost.isUnknown())
+    reason->recordUnprovenIfEmpty(std::move(zeroCostUnproven));
   // An undecided zero-cost verdict does not stop the other strategies from
   // finding a definitive answer, but if none of them does, undecided is the
   // honest result rather than a flat no.
@@ -1982,14 +2037,14 @@ TriState IREmitter::classifyImplicitConversion(
   // Origin values can convert into an OriginSet by becoming a member of the
   // set.  OriginSet is a singleton type, the value carries the origins.
   if (sugarIsa<OriginType>(rvType) && sugarIsa<OriginSetType>(requiredType))
-    return TriState::yes();
+    return TriBool::yes();
 
-  // Check to see if we already cached this convertibility check. If user
-  // requested failure details, we use the cached only if the verdict was true.
+  // Check to see if we already cached this convertibility check. If the caller
+  // asked why, we use the cached value only if the verdict was true.
   std::optional<bool> cache =
       shared.getCachedImplicitConvertibility(rvType, requiredType);
-  if (cache.has_value() && (!failure || cache.value()))
-    return TriState::fromBool(cache.value());
+  if (cache.has_value() && (!reason || cache.value()))
+    return TriBool::fromBool(cache.value());
 
   // Cache and return a convertibility verdict. When `scopeDependent` is true
   // the verdict was derived from this scope's assumptions rather than being a
@@ -1998,64 +2053,69 @@ TriState IREmitter::classifyImplicitConversion(
   // from scopes with a different assumption set. `reason` is recorded on a
   // false verdict; `None` (the default) is a no-op.
   auto cacheAndReturnVal =
-      [&shared, failure](ASTType from, ASTType to, bool isConvertible,
-                         bool scopeDependent = false,
-                         ConversionFailure::Reason reason = {}) -> TriState {
+      [&shared, reason](ASTType from, ASTType to, bool isConvertible,
+                        bool scopeDependent = false,
+                        ConversionFailure::Reason rejection = {}) -> TriBool {
     if (!scopeDependent)
       shared.cacheImplicitConvertibility(from, to, isConvertible);
-    if (!isConvertible && failure)
-      failure->recordIfEmpty(std::move(reason));
-    return TriState::fromBool(isConvertible);
+    if (!isConvertible && reason)
+      reason->rejection.recordIfEmpty(std::move(rejection));
+    return TriBool::fromBool(isConvertible);
   };
 
-  // Cache, return, or fall through based on a converter's caching sensitivity.
-  // Scope-dependent results must never be cached, since the cache is keyed only
-  // on the type pair and would otherwise poison queries from other scopes.
-  auto resolveGeneratorConv =
-      [&](ConversionResult conv) -> std::optional<TriState> {
+  // Handle turning a ConversionResult into a TriBool for returning from this
+  // function, or for falling through to the next conversion strategy. Also
+  // handles caching & recording the rejection reason if needed.
+  auto resolveConversionResult =
+      [&](ConversionResult conv) -> std::optional<TriBool> {
     if (!conv.applies())
       return std::nullopt;
     // An undecided verdict is scope-dependent by nature and never cached.
     if (conv.isConvertible.isUnknown())
-      return TriState::unknown();
+      return TriBool::unknown();
     if (conv.isCacheable())
       return cacheAndReturnVal(rvType, requiredType,
                                conv.isConvertible.isTrue());
     return conv.isConvertible;
   };
 
-  // Resolve a tri-state conformance verdict into a boolean result that is
-  // potentially cached. Returns the boolean result. `reason` is recorded on a
-  // definitive false.
-  auto resolveTriStateVerdict =
-      [&](TriState verdict, bool scopeDependent,
-          ConversionFailure::Reason reason = {}) -> TriState {
-    if (verdict.isTrue())
+  // Handle turning a ConstraintResult into a TriBool for returning from this
+  // function. Also handles caching & recording the rejection reason if needed.
+  auto resolveConstraintResult = [&](ConstraintResult result,
+                                     bool scopeDependent) -> TriBool {
+    if (result.isYes())
       return cacheAndReturnVal(rvType, requiredType, true, scopeDependent);
-    if (verdict.isUnknown())
-      return TriState::unknown();
+    if (result.isUnknown()) {
+      // An undecided result is never cached. Record and return directly.
+      if (reason)
+        reason->recordUnprovenIfEmpty(std::move(result.getUnknown()));
+      return TriBool::unknown();
+    }
+    // A failure result may need a rejection reason.
+    ConversionFailure::Reason rejection;
+    if (reason)
+      rejection =
+          ConversionFailure::RefutedConstraints{std::move(result.getNo())};
     return cacheAndReturnVal(rvType, requiredType, false, scopeDependent,
-                             std::move(reason));
+                             std::move(rejection));
   };
 
   // Empty generators are zero-cost convertible to their body type when the
   // generator's body constraints are satisfied by this scope's assumptions.
   // A conversion that "applies" but fails the convertibility check returns
   // false immediately intentionally.
-  if (std::optional<TriState> resolved =
-          resolveGeneratorConv(classifyEmptyGeneratorToBody(
+  if (std::optional<TriBool> resolved =
+          resolveConversionResult(classifyEmptyGeneratorToBody(
               value, requiredType, declScope, additionalAssumptions)))
     return *resolved;
 
   bool upCastScopeDependent = false;
-  ConstraintFailure upCastConstraints;
-  FailureOr<TriState> canUpCast = canMetaTypeUpCastTo(
-      shared, value.expr->getLoc(), rvType, requiredType, &declScope,
-      &upCastScopeDependent, failure ? &upCastConstraints : nullptr);
+  FailureOr<ConstraintResult> canUpCast =
+      IREmitter::canMetaTypeUpCastToWithDetails(
+          shared, value.expr->getLoc(), rvType, requiredType, &declScope,
+          &upCastScopeDependent);
   if (succeeded(canUpCast))
-    return resolveTriStateVerdict(*canUpCast, upCastScopeDependent,
-                                  ConversionFailure::UnsatisfiedConstraints{
-                                      std::move(upCastConstraints)});
+    return resolveConstraintResult(*canUpCast, upCastScopeDependent);
 
   if (sugarIsa<ParamListType>(rvType) &&
       sugarIsa<ParamListType>(requiredType)) {
@@ -2071,14 +2131,12 @@ TriState IREmitter::classifyImplicitConversion(
     ASTType fromEltTp = sugarCast<ParamListType>(rvType).getElementType();
     // Reuse assumptions from above for variadic element upcast.
     bool eltUpCastScopeDependent = false;
-    ConstraintFailure eltUpCastConstraints;
-    FailureOr<TriState> canUpCast = canMetaTypeUpCastTo(
-        shared, value.expr->getLoc(), fromEltTp, toEltTp, &declScope,
-        &eltUpCastScopeDependent, failure ? &eltUpCastConstraints : nullptr);
-    if (succeeded(canUpCast))
-      return resolveTriStateVerdict(*canUpCast, eltUpCastScopeDependent,
-                                    ConversionFailure::UnsatisfiedConstraints{
-                                        std::move(eltUpCastConstraints)});
+    FailureOr<ConstraintResult> canEltUpCast =
+        IREmitter::canMetaTypeUpCastToWithDetails(
+            shared, value.expr->getLoc(), fromEltTp, toEltTp, &declScope,
+            &eltUpCastScopeDependent);
+    if (succeeded(canEltUpCast))
+      return resolveConstraintResult(*canEltUpCast, eltUpCastScopeDependent);
   }
 
   // Support implicit conversions of generator types, including dropping
@@ -2086,7 +2144,7 @@ TriState IREmitter::classifyImplicitConversion(
   // relative order as the generator-conversion path in
   // `emitImplicitConversionToType` so the two stay in lockstep.
   if (auto requiredGenerator = sugarDynCast<GeneratorType>(requiredType)) {
-    if (std::optional<TriState> resolved = resolveGeneratorConv(
+    if (std::optional<TriBool> resolved = resolveConversionResult(
             classifyGeneratorToGenerator(value, requiredGenerator, rvType,
                                          declScope, additionalAssumptions)))
       return *resolved;
@@ -2097,7 +2155,7 @@ TriState IREmitter::classifyImplicitConversion(
   if (sugarIsa<FnTypeGeneratorType, FnLiteralTypeGeneratorType>(rvType)) {
     if (auto structMeta =
             sugarDynCast<StructMetaType>(requiredType.extractMetaType())) {
-      StructType structTy = structMeta.getType();
+      LIT::StructType structTy = structMeta.getType();
       PValue target = value.ir.getIfPValue();
       if (auto fnLiteral = sugarDynCast<FnLiteralTypeGeneratorType>(rvType))
         target = PValue(fnLiteral.getSymbolConstantAttr());
@@ -2124,11 +2182,36 @@ TriState IREmitter::classifyImplicitConversion(
   // undecided.
   if (!isConvertible &&
       (sawUnknown || (succeeded(result) && result->isUnknown())))
-    return TriState::unknown();
+    return TriBool::unknown();
   // Must cache the overall value type, not just its stripped down rvType.
   shared.cacheImplicitConvertibility(value.ir.getType(), requiredType,
                                      isConvertible);
-  return TriState::fromBool(isConvertible);
+  return TriBool::fromBool(isConvertible);
+}
+
+TriBool IREmitter::classifyImplicitConversion(
+    ASTExprAnd<CValue> value, ASTType requiredType, ASTDecl &declScope,
+    ArrayRef<ConstraintAttr> additionalAssumptions,
+    DeferredTypingContext *deferralCtx) {
+  return classifyImplicitConversionImpl(value, requiredType, declScope,
+                                        additionalAssumptions, deferralCtx,
+                                        /*reason=*/nullptr);
+}
+
+IREmitter::ImplicitConversionResult
+IREmitter::classifyImplicitConversionWithDetails(
+    ASTExprAnd<CValue> value, ASTType requiredType, ASTDecl &declScope,
+    ArrayRef<ConstraintAttr> additionalAssumptions,
+    DeferredTypingContext *deferralCtx) {
+  ConversionNonYesReason reason;
+  TriBool verdict = classifyImplicitConversionImpl(
+      value, requiredType, declScope, additionalAssumptions, deferralCtx,
+      &reason);
+  if (verdict.isTrue())
+    return ImplicitConversionResult::yes();
+  if (verdict.isFalse())
+    return ImplicitConversionResult::no(std::move(reason.rejection));
+  return ImplicitConversionResult::unknown(std::move(reason.unproven));
 }
 
 FailureOr<PValue>
@@ -2408,7 +2491,7 @@ CValue IREmitter::emitImplicitConversionToType(
       return emitCResult(ParamListAttr::get(converted, dstVATp), expr, dest);
     } else {
       // Must match the check in canImplicitlyConvertToType.
-      FailureOr<TriState> canUpCast =
+      FailureOr<TriBool> canUpCast =
           canMetaTypeUpCastTo(shared, valueExpr.expr->getLoc(), fromEltTp,
                               toEltTp, &getDeclScope());
       if (failed(canUpCast) || !canUpCast->isTrue())

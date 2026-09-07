@@ -104,6 +104,11 @@ struct MTPEhNorm:
             ImmOrigin(hw_tt.origin),
             hidden_size,
             max_warps,
+            out_tt.Engine,
+            type_of(embed_tt.as_immut()).Engine,
+            type_of(prev_tt.as_immut()).Engine,
+            type_of(ew_tt.as_immut()).Engine,
+            type_of(hw_tt.as_immut()).Engine,
         ]
         ctx.enqueue_function[kernel](
             out_tt,

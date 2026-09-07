@@ -267,19 +267,22 @@ class MiniMaxMusic3Config:
 
     @property
     def sampling_rate(self) -> int:
+        """The output audio sample rate, in Hz."""
         return self.vocoder.sampling_rate
 
     @property
     def frame_rate(self) -> float:
+        """The autoregressive frame rate, in frames per second."""
         return self.condition_encoder.frame_rate
 
     @property
     def latent_hop_length(self) -> int:
+        """The latent hop length, in samples."""
         return self.condition_encoder.output_hop_length
 
     @staticmethod
     def from_pretrained(root: Path | str) -> MiniMaxMusic3Config:
-        """Load every component config from a checkpoint directory."""
+        """Loads every component configuration from a checkpoint directory."""
         root = Path(root)
         return MiniMaxMusic3Config(
             vocoder=VocoderConfig.from_pretrained(root),
@@ -293,11 +296,12 @@ class MiniMaxMusic3Config:
     def from_dicts(
         configs: Mapping[str, Mapping[str, Any]],
     ) -> MiniMaxMusic3Config:
-        """Build from each component's parsed ``config.json``.
+        """Builds a configuration from each component's parsed ``config.json``.
 
         Args:
-            configs: Keyed by the checkpoint's own role names, which are the
-                subfolders its component index names.
+            configs: The parsed ``config.json`` contents, keyed by the
+                checkpoint's role names. Those names are the subfolders listed
+                in the component index.
 
         Raises:
             KeyError: If a component is missing.

@@ -174,11 +174,9 @@ def _run_fp8_gemv_direct[
     ctx.enqueue_copy(act_dev, act_host)
     ctx.enqueue_copy(weight_dev, weight_host)
 
-    var act_tt = TileTensor(act_dev.unsafe_ptr(), row_major(1, K)).as_immut()
-    var weight_tt = TileTensor(
-        weight_dev.unsafe_ptr(), row_major(N, K)
-    ).as_immut()
-    var out_tt = TileTensor(out_dev.unsafe_ptr(), row_major(1, N))
+    var act_tt = TileTensor(act_dev, row_major(1, K)).as_immut()
+    var weight_tt = TileTensor(weight_dev, row_major(N, K)).as_immut()
+    var out_tt = TileTensor(out_dev, row_major(1, N))
 
     enqueue_apple_fp8_gemv[c_type=c_type](out_tt, act_tt, weight_tt, N, K, ctx)
 
@@ -261,7 +259,7 @@ def _run_tiled_fp8[
         # too slow at production N*K). Reduction-order diff only.
         var wdense_dev = ctx.enqueue_create_buffer[.bfloat16](N * K)
         var oracle_dev = ctx.enqueue_create_buffer[c_type](M * N)
-        var wdense_tt = TileTensor(wdense_dev.unsafe_ptr(), row_major(N, K))
+        var wdense_tt = TileTensor(wdense_dev, row_major(N, K))
         enqueue_fp8_materialize[.bfloat16](wdense_tt, weight_tt, ctx)
         var oracle_tt = TileTensor(oracle_dev.unsafe_ptr(), row_major(M, N))
         enqueue_apple_matmul[

@@ -1244,9 +1244,8 @@ components:
           required:
             - type
           description: |
-            Controls model reasoning, translated to the chat template's thinking
-            flags. The effect is model-dependent: only models whose chat
-            template reads these flags honor it.
+            Controls model reasoning. Useful if the model expects `thinking`
+            rather than `reasoning` parameters.
           properties:
             type:
               type: string
@@ -1255,10 +1254,11 @@ components:
         reasoning:
           type: object
           description: |
-            Reasoning controls. MAX honors `enabled` (mapped to the chat
-            template's thinking flags); when `enabled` is unset, providing
-            `effort` with any value enables thinking. `max_tokens` and
-            `exclude` are accepted but ignored.
+            Sets the reasoning configuration. See the
+            [Reasoning](/serve/reasoning/) guide for more information.
+
+            Note that some fields are non-functional and only exist
+            to maintain compatibility with different providers.
           properties:
             enabled:
               type: boolean

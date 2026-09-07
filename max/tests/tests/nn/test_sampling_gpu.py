@@ -23,6 +23,10 @@ from max.driver import CPU, Accelerator, Buffer, Device
 from max.dtype import DType
 from max.engine import InferenceSession, Model
 from max.graph import DeviceRef, Graph, TensorType, ops
+from max.nn.kernels import (
+    topk_fused_sampling_with_dist,
+    topk_topp_masked_probs,
+)
 from max.nn.sampling import (
     MinPSampler,
     compute_synthetic_acceptance_base_rate,
@@ -294,6 +298,80 @@ def test_stochastic_acceptance_sampler_draft_dist_required_iff_sampled() -> (
             draft_proposal="argmax",
             draft_probs_full=cast(Any, object()),
         )
+
+
+def test_bfloat16_sampling_matches_exact_float32_upcast() -> None:
+    device = Accelerator()
+    session = InferenceSession(devices=[device])
+    device_ref = DeviceRef.from_device(device)
+    rows = 8
+    vocab_size = 257
+
+    input_types = [
+        TensorType(DType.float32, [rows, vocab_size], device=device_ref),
+        TensorType(DType.int64, [rows], device=device_ref),
+        TensorType(DType.float32, [rows], device=device_ref),
+        TensorType(DType.float32, [rows], device=device_ref),
+        TensorType(DType.uint64, [rows], device=device_ref),
+    ]
+    with Graph("bfloat16_sampling_handoff", input_types=input_types) as graph:
+        source, top_k, temperature, top_p, seed = (
+            value.tensor for value in graph.inputs
+        )
+        native_logits = source.cast(DType.bfloat16)
+        legacy_logits = native_logits.cast(DType.float32)
+        native_masked = topk_topp_masked_probs(
+            native_logits,
+            top_k=top_k,
+            temperature=temperature,
+            top_p=top_p,
+        )
+        legacy_masked = topk_topp_masked_probs(
+            legacy_logits,
+            top_k=top_k,
+            temperature=temperature,
+            top_p=top_p,
+        )
+        native_tokens, native_dist = topk_fused_sampling_with_dist(
+            native_logits,
+            top_k=top_k,
+            temperature=temperature,
+            top_p=top_p,
+            seed=seed,
+        )
+        legacy_tokens, legacy_dist = topk_fused_sampling_with_dist(
+            legacy_logits,
+            top_k=top_k,
+            temperature=temperature,
+            top_p=top_p,
+            seed=seed,
+        )
+        graph.output(
+            native_masked,
+            legacy_masked,
+            native_tokens,
+            legacy_tokens,
+            native_dist,
+            legacy_dist,
+        )
+
+    model = session.load(graph)
+    rng = np.random.default_rng(20260901)
+    input_buffers = [
+        Buffer.from_numpy(
+            rng.normal(0.0, 2.0, size=(rows, vocab_size)).astype(np.float32)
+        ).to(device),
+        Buffer.from_numpy(np.full(rows, -1, dtype=np.int64)).to(device),
+        Buffer.from_numpy(np.ones(rows, dtype=np.float32)).to(device),
+        Buffer.from_numpy(np.full(rows, 0.95, dtype=np.float32)).to(device),
+        Buffer.from_numpy(np.arange(rows, dtype=np.uint64) + 99).to(device),
+    ]
+
+    outputs = model.capture(92, *input_buffers)
+    model.replay(92, *input_buffers)
+    arrays = [cast(Buffer, output).to_numpy() for output in outputs]
+    for native, legacy in zip(arrays[::2], arrays[1::2], strict=True):
+        np.testing.assert_array_equal(native, legacy)
 
 
 @pytest.mark.parametrize(

@@ -46,7 +46,7 @@ int main() {
 **Mojo (currently compiles):**
 
 ```mojo
-fn foo(ptr: UnsafePointer[mut=True, Int]): pass
+def foo(ptr: UnsafePointer[mut=True, Int]): pass
 
 def main():
     var y = 42
@@ -188,10 +188,10 @@ Function arguments that accept pointers must now state their mutability using
 `mut=True` or `mut=False`.
 
 ```mojo
-fn read_pointer(ptr: UnsafePointer[mut=False, Int]):
+def read_pointer(ptr: UnsafePointer[mut=False, Int]):
     var n = ptr[]
 
-fn write_pointer(ptr: UnsafePointer[mut=True, Int]):
+def write_pointer(ptr: UnsafePointer[mut=True, Int]):
     ptr[] = 42
 ```
 
@@ -205,7 +205,7 @@ where the pointer came from and who manages its lifetime. [Read more about
 lifetimes here](https://mojolang.org/docs/manual/values/lifetimes/).
 
 ```mojo
-fn pointer_to(
+def pointer_to(
     mut string: String,
 ) -> UnsafePointer[String, origin_of(string)]:
     return UnsafePointer(to=string)
@@ -222,11 +222,11 @@ struct MyList:
     var _data: UnsafePointer[Int, MutOrigin.external]
     var _len: Int
 
-    fn __init__(out self, *, length: Int):
+    def __init__(out self, *, length: Int):
         self._data = alloc[Int](length)
         self._len = length
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         # Always free external memory you allocate.
         self._data.free()
 ```
@@ -246,7 +246,7 @@ struct MyList:
     var _data: UnsafePointer[Int, MutOrigin.external]
     var _len: Int
 
-    fn unsafe_ptr[
+    def unsafe_ptr[
         mut: Bool,
         origin: Origin[mut], //
     ](ref [origin] self) -> UnsafePointer[Int, origin]:
@@ -260,7 +260,7 @@ struct MyList:
 Most FFI calls can pass pointers directly using `external_call`.
 
 ```mojo
-fn wrap_c_func(
+def wrap_c_func(
     read_ptr: UnsafePointer[mut=False, Int32],
     write_ptr: UnsafePointer[mut=True, UInt],
 ):
@@ -273,7 +273,7 @@ If an FFI function returns a pointer, its origin should often be `external`
 since the memory comes from outside Mojo.
 
 ```mojo
-fn wrap_c_func(
+def wrap_c_func(
     length: UInt,
     out result: UnsafePointer[Int32, ImmutOrigin.external],
 ):
@@ -287,7 +287,7 @@ fn wrap_c_func(
 Similar to that of `LayoutTensor`, the origin must be specified.
 
 ```mojo
-fn kernel(
+def kernel(
     ptr: UnsafePointer[Float32, MutAnyOrigin]
 ):
     ...

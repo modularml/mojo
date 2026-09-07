@@ -54,7 +54,9 @@ from scenarios._image_fixtures import (
 from scenarios._image_stress_common import (
     HEAVY_TIMEOUT_SEC,
     PAYLOAD_OVERHEAD_TOKENS,
+    BatchTally,
     LivenessProbe,
+    failure_verdict,
     probe_result,
     served_context_window,
 )
@@ -181,44 +183,41 @@ class ImageKVSaturation(BaseScenario):
         )
         test = f"kv_saturation_x{concurrency}"
 
-        timeouts = sum(1 for r in responses if r.error == "TIMEOUT")
-        server_errors = sum(1 for r in responses if r.status >= 500)
-        dropped = sum(
-            1 for r in responses if r.status == 0 and r.error != "TIMEOUT"
+        tally = BatchTally().add(responses)
+        # An OOM kills the pod outright, so it shows up as a mass failure or as
+        # a stall; a lone reset from the network path is neither, and must not
+        # halt the ramp on this rung's behalf.
+        result = failure_verdict(
+            self.name, test, tally, config, context=context, probe=probe
         )
-        client_errors = sum(1 for r in responses if 400 <= r.status < 500)
-        ok = sum(1 for r in responses if r.status == 200)
-        tally = (
-            f"{ok}/{len(responses)} ok, {client_errors} 4xx, "
-            f"{server_errors} 5xx, {timeouts} timeouts, {dropped} dropped"
-        )
-
-        if timeouts or server_errors or dropped:
-            verdict, detail = (
-                Verdict.FAIL,
-                f"{tally} -- OOM or hang ({context})",
-            )
-        elif client_errors:
-            # Every request here is inside the served window by construction,
-            # so a 4xx means the deployment rejected work the criterion
-            # requires it to accept -- not a crash, but not a pass either.
-            verdict, detail = (
-                Verdict.INTERESTING,
-                f"{tally} -- legal max-payload requests rejected ({context})",
-            )
-        elif fill < CENG880_FILL_FRACTION and concurrency == RAMP[-1]:
-            # Survived every rung but never got near the bar: the window is
-            # too small to saturate G0, so a PASS here would overstate what
-            # was proven.
-            verdict, detail = (
-                Verdict.INTERESTING,
-                f"{tally} -- survived, but peak fill {fill:.0%} never reached "
-                f"{CENG880_FILL_FRACTION:.0%} of the target ({context})",
-            )
-        else:
-            verdict, detail = Verdict.PASS, f"{tally} ({context})"
+        if result is None:
+            if tally.client_errors or tally.other:
+                # Every request here is inside the served window by
+                # construction, so a 4xx means the deployment rejected work the
+                # criterion requires it to accept -- not a crash, but not a
+                # pass either. Nor is a status no bucket claims.
+                verdict, detail = (
+                    Verdict.INTERESTING,
+                    f"{tally.summary()} -- rung not fully served ({context})",
+                )
+            elif fill < CENG880_FILL_FRACTION and concurrency == RAMP[-1]:
+                # Survived every rung but never got near the bar: the window is
+                # too small to saturate G0, so a PASS here would overstate what
+                # was proven.
+                verdict, detail = (
+                    Verdict.INTERESTING,
+                    f"{tally.summary()} -- survived, but peak fill "
+                    f"{fill:.0%} never reached "
+                    f"{CENG880_FILL_FRACTION:.0%} of the target ({context})",
+                )
+            else:
+                verdict, detail = (
+                    Verdict.PASS,
+                    f"{tally.summary()} ({context})",
+                )
+            result = self.make_result(self.name, test, verdict, detail=detail)
 
         return [
-            self.make_result(self.name, test, verdict, detail=detail),
+            result,
             probe_result(self.name, f"{test}_liveness", probe, config),
         ]

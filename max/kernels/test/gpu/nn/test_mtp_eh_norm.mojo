@@ -148,6 +148,11 @@ def test_mtp_eh_norm[
         ImmOrigin(hw_t.origin),
         hidden_size,
         max_warps,
+        out_t.Engine,
+        type_of(embed_t.as_immut()).Engine,
+        type_of(prev_t.as_immut()).Engine,
+        type_of(ew_t.as_immut()).Engine,
+        type_of(hw_t.as_immut()).Engine,
     ]
     ctx.enqueue_function[kernel](
         out_t,

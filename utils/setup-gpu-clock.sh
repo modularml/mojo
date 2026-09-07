@@ -57,8 +57,36 @@ set_nvidia_gpu_config() {
 
 
 # Configures AMD GPUs. These settings are important for performance testing.
+#
+# Performance determinism caps GFXCLK to trade peak clock for a repeatable one.
+# The 1900 MHz cap was tuned for MI300 (gfx942, ~2100 MHz peak), so apply it
+# only there rather than everywhere but the parts known to suffer: on gfx950
+# (MI350/MI355, 2400 MHz peak) it costs 13% of serving throughput and AMD
+# documents the mode as unsupported there, and newer parts should not silently
+# inherit an MI300 value either. Match on the GFX version because it is a
+# stable machine identifier; the marketing name varies by SKU.
 set_amd_gpu_config() {
   echo "set_amd_gpu_config: Setting AMD GPU config".
+
+  local version
+  version=$(rocm-smi --showproductname 2>&1 |
+    awk '/GFX Version/ {print $NF; exit}')
+
+  # Unpinning a machine we failed to identify would silently change what its
+  # benchmarks measure, so do nothing until someone looks. rocm-smi reports
+  # N/A rather than failing when it cannot read the version.
+  if [ -z "$version" ] || [ "$version" = "N/A" ]; then
+    echo "Warning: cannot read GFX version; leaving GPU clocks alone." >&2
+    return
+  fi
+
+  if [ "$version" != "gfx942" ]; then
+    # The cap is applied at runtime and does not survive a reboot, so a machine
+    # pinned by an earlier version of this script stays pinned until cleared.
+    rocm-smi --resetperfdeterminism
+    echo "set_amd_gpu_config: $version is not gfx942; perf determinism cleared."
+    return
+  fi
 
   if ! rocm-smi --setperfdeterminism 1900 2>&1; then
     echo "Warning: rocm-smi command failed from setup-gpu-clock.sh" >&2

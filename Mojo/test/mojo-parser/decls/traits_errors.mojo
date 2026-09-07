@@ -340,16 +340,3 @@ def never_greeter_call_is_no_candidates_found():
     # `greet` is not a member at all.
     # expected-error @+1 {{'SilentGreeter' value has no attribute 'greet'}}
     var msg = s.greet()
-
-
-# Test that overriding a parent trait's comptime decl with a non-comptime decl is an error.
-# Regression test for MOCO-4227 (latent null-pointer dereference in error path).
-trait TraitWithComptime:
-    # expected-note @+1 {{cannot overload comptime alias with a non-comptime definition}}
-    comptime MyType = Int
-
-
-trait ChildOverridesComptimeWithFn(TraitWithComptime):
-    # expected-error @+1 {{invalid redefinition of 'MyType'}}
-    def MyType(self):
-        pass

@@ -183,11 +183,9 @@ class KVConnectorConfig(ConfigFileModel):
     )
     """Endpoint for the co-located dKV service.
 
-    Remote dKV endpoints are discovered at runtime through the
-    Orchestrator (via ``external_block_metadata`` on the request
-    context), not configured statically. For multi-store reads, the
-    discovered metadata must include MAX-native transfer-engine metadata so
-    the connector can reuse ``KVTransferEngine.connect()``.
+    Remote dKV endpoints are discovered at runtime from the Orchestrator's
+    per-request ``dkv_cache_hint``, not configured statically. The connector
+    parses the hint in Rust and dials each named instance itself.
     """
 
 

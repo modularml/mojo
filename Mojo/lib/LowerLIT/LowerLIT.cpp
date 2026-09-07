@@ -261,7 +261,7 @@ flattenNameAndReinsertOp(T op, SymbolTable &symbolTable,
   else
     op->remove();
 
-  op.setName(mangled.mangled);
+  op.setSymbolName(mangled.mangled);
   symbolTable.insert(op, mainSymbolTablePosIter);
   return mangled.mangled;
 }
@@ -284,7 +284,7 @@ LITLowerer::lowerFunction(FnOp func, ArrayRef<ParamDeclAttr> parentInputParams,
   // If this function has a subprogram attached, update its information to
   // account for the new name.
   if (newName != func.getSymNameAttr()) {
-    func.setName(newName);
+    func.setSymbolName(newName);
     DebugInfo::updateSubprogram(func, newName);
   }
 

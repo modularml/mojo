@@ -30,7 +30,7 @@ by the mask-disabled identity (the row is its plain softmax).
 from std.math import exp
 from max.gpu.host import DeviceContext
 from layout import TileTensor, row_major
-from std.testing import assert_almost_equal
+from std.testing import assert_almost_equal, assert_equal
 
 from nn.sampling import topk_topp_masked_probs
 
@@ -256,8 +256,64 @@ def test_empty_batch(ctx: DeviceContext, d: Int) raises:
     _ = probs^
 
 
+def test_narrow_cluster_brackets(
+    ctx: DeviceContext, rows: Int, d: Int, k: Int
+) raises:
+    var logits_host = ctx.enqueue_create_host_buffer[.float32](rows * d)
+    for row in range(rows):
+        for col in range(d):
+            logits_host[row * d + col] = Float32(-Float64(col + row) * 8.94e-8)
+    var logits_dev = ctx.enqueue_create_buffer[.float32](rows * d)
+    ctx.enqueue_copy(logits_dev, logits_host)
+    var probs_dev = ctx.enqueue_create_buffer[.float32](rows * d)
+
+    var top_p_host = ctx.enqueue_create_host_buffer[.float32](rows)
+    var top_k_host = ctx.enqueue_create_host_buffer[.int64](rows)
+    for row in range(rows):
+        top_p_host[row] = 1.0
+        top_k_host[row] = Int64(k)
+    var top_p_dev = ctx.enqueue_create_buffer[.float32](rows)
+    var top_k_dev = ctx.enqueue_create_buffer[.int64](rows)
+    ctx.enqueue_copy(top_p_dev, top_p_host)
+    ctx.enqueue_copy(top_k_dev, top_k_host)
+
+    topk_topp_masked_probs(
+        ctx,
+        TileTensor(logits_dev, row_major(rows, d)),
+        TileTensor(probs_dev, row_major(rows, d)).as_unsafe_any_origin(),
+        top_k_val=d,
+        top_p_val=1.0,
+        top_k_arr=TileTensor(top_k_dev, row_major(rows))
+        .as_unsafe_any_origin()
+        .as_immut(),
+        top_p_arr=TileTensor(top_p_dev, row_major(rows))
+        .as_unsafe_any_origin()
+        .as_immut(),
+    )
+
+    var probs_host = ctx.enqueue_create_host_buffer[.float32](rows * d)
+    ctx.enqueue_copy(probs_host, probs_dev)
+    ctx.synchronize()
+
+    for row in range(rows):
+        for col in range(d):
+            assert_equal(
+                probs_host[row * d + col] != 0.0,
+                col < k,
+                msg=String(t"narrow bracket d={d} k={k} row={row} col={col}"),
+            )
+
+    _ = logits_dev^
+    _ = probs_dev^
+    _ = top_p_dev^
+    _ = top_k_dev^
+
+
 def main() raises:
     with DeviceContext() as ctx:
+        for k in [32, 45, 51, 61, 63]:
+            test_narrow_cluster_brackets(ctx, rows=2, d=4096, k=k)
+
         test_empty_batch(ctx, d=1024)
         # Vocabularies far narrower than one cluster's thread count. At these
         # widths a row does not even fill one block, so under a cluster most
@@ -423,6 +479,27 @@ def main() raises:
             filler=scrambled_logit,
             k=40,
             top_p=1.0,
+            temperature=1.0,
+            exact_reference=False,
+        )
+        # Exercise two- and four-block row groups.
+        run_probs(
+            ctx,
+            rows=100,
+            d=16384,
+            filler=scrambled_logit,
+            k=40,
+            top_p=0.95,
+            temperature=1.0,
+            exact_reference=False,
+        )
+        run_probs(
+            ctx,
+            rows=50,
+            d=32768,
+            filler=scrambled_logit,
+            k=40,
+            top_p=0.95,
             temperature=1.0,
             exact_reference=False,
         )

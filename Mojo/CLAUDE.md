@@ -186,7 +186,7 @@ least one simple code example.
 - `Raises:` - Error conditions
 
 For complete Mojo docstring style guidelines, see
-[`docstring-style-guide.md`](stdlib/docs/docstring-style-guide.md).
+[`docstring-style-guide.md`](docs/contributing/stdlib/docstring-style-guide.md).
 
 ## Contribution Guidelines
 

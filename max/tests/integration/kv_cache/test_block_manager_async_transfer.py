@@ -111,6 +111,7 @@ class _AsyncConnector:
         block_ids: Mapping[str, Sequence[int]],
         block_hashes: Sequence[bytes],
         replica_idx: int = 0,
+        hint: bytes | None = None,
     ) -> KVConnectorTransfer:
         bids = list(block_ids["full"])
         num_loaded = min(len(block_hashes), self.num_blocks_to_load)
@@ -171,10 +172,14 @@ def _make_block_manager() -> tuple[BlockManager, _AsyncConnector]:
 def _make_ctx(bm: BlockManager, request_id: RequestID) -> TextContext:
     """Minimal claimed ctx stub.
 
-    The host-onload path reads only ``ctx.request_id``, but the claim is what
-    pins which replica's pool the request resolves against.
+    The host-onload path reads only ``ctx.request_id`` and
+    ``ctx.dkv_cache_hint``, but the claim is what pins which replica's pool the
+    request resolves against.
     """
-    ctx = cast(TextContext, SimpleNamespace(request_id=request_id))
+    ctx = cast(
+        TextContext,
+        SimpleNamespace(request_id=request_id, dkv_cache_hint=None),
+    )
     bm.claim(ctx)
     return ctx
 

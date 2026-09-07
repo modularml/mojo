@@ -350,6 +350,9 @@ class Gemma3_MultiModalModel(
             "gemma4_language",
             input_types=self._language_model_input_types(config),
             module=module,
+            is_device_graph=(
+                self.pipeline_config.runtime.experimental_device_graph_synthesis
+            ),
         ) as graph:
             language_model = Gemma4TextModel(config)
             language_model.load_state_dict(

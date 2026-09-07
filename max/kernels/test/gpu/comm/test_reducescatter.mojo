@@ -501,13 +501,16 @@ def grouped_reducescatter_test(list_of_ctx: List[DeviceContext]) raises:
 
     comptime for group_idx in range(ngpus // group_size):
         comptime group_start = group_idx * group_size
-        var group_in_bufs = Array[InputTileType, group_size](uninitialized=True)
+        var group_in_bufs = Array[_, group_size](
+            fill_with=lambda (local_idx: Int) -> InputTileType: in_bufs[
+                group_start + local_idx
+            ]
+        )
         var group_rank_sigs = Array[MutPointer[Signal, MutAnyOrigin], MAX_GPUS](
             uninitialized=True
         )
 
         comptime for local_idx in range(group_size):
-            group_in_bufs[local_idx] = in_bufs[group_start + local_idx]
             group_rank_sigs[local_idx] = rank_sigs[group_start + local_idx]
 
         comptime for local_idx in range(group_size):

@@ -26,9 +26,8 @@ from max.engine import InferenceSession
 from max.graph import DeviceRef, Graph, TensorType, ops
 from max.nn.kernels import MHAMaskVariant, flash_attention_ragged
 from max.nn.kv_cache import MHAKVCacheParams, PagedCacheValues
-from max.pipelines.kv_cache import PagedKVCacheManager
-from test_common.context_utils import create_text_context
 from test_common.modular_graph_test import modular_graph_test
+from test_common.simple_kv_cache import paged_kv_cache_inputs
 
 ACCURACY_RTOL = 1e-2
 ACCURACY_ATOL = 1e-2
@@ -72,13 +71,6 @@ def test_kv_cache_ragged_attention(
     )
     input_row_offsets_type = TensorType(
         DType.uint32, ["input_row_offsets_len"], DeviceRef.CPU()
-    )
-
-    kv_manager = PagedKVCacheManager(
-        kv_params,
-        total_num_pages=8,
-        session=session,
-        max_batch_size=128,
     )
 
     kv_symbolic_inputs = kv_params.get_symbolic_inputs()
@@ -127,15 +119,6 @@ def test_kv_cache_ragged_attention(
 
     g = construct()
 
-    batch = [
-        create_text_context(np.empty(prompt_lens[i])) for i in range(batch_size)
-    ]
-
-    for context in batch:
-        kv_manager.claim(context)
-        assert isinstance(kv_manager, PagedKVCacheManager)
-        kv_manager.alloc(context)
-
     input_row_offsets = Buffer(
         DType.uint32,
         [batch_size + 1],
@@ -145,7 +128,9 @@ def test_kv_cache_ragged_attention(
         input_row_offsets[i] = running_sum
         running_sum += prompt_lens[i]
     input_row_offsets[batch_size] = running_sum
-    kv_runtime_inputs = kv_manager.runtime_inputs_for_leaf([batch]).inputs[0]
+    kv_runtime_inputs = paged_kv_cache_inputs(
+        kv_params, prompt_lens, total_num_pages=8
+    )
     assert kv_runtime_inputs.attention_dispatch_metadata is not None
 
     @modular_graph_test(

@@ -204,6 +204,55 @@ def test_scaled_kernel_node(ctx: DeviceContext) raises:
             assert_equal(out_host[i], Float32(length) * scale)
 
 
+def test_closure_node(ctx: DeviceContext) raises:
+    print("Test using a closure as a device graph node.")
+    comptime length = 1024
+    comptime block_dim = 256
+    var scale = Float32(2.0)
+
+    var in0_dev = ctx.enqueue_create_buffer[.float32](length)
+    var in1_dev = ctx.enqueue_create_buffer[.float32](length)
+    var out_dev = ctx.enqueue_create_buffer[.float32](length)
+
+    with in0_dev.map_to_host() as in0_host, in1_dev.map_to_host() as in1_host:
+        for i in range(length):
+            in0_host[i] = Float32(i)
+            in1_host[i] = Float32(length - i)
+
+    var out_ptr = out_dev.unsafe_ptr()
+    var in0_ptr = in0_dev.unsafe_ptr()
+    var in1_ptr = in1_dev.unsafe_ptr()
+
+    # Closure captures device pointers and scale from the enclosing scope.
+    # Dispatches to the `DevicePassable` capturing-closure `add_function`
+    # overload, which encodes the closure so the captured `DevicePointer`s
+    # become device addresses at the launch boundary.
+    def scaled_vec_add() {var scale, var out_ptr, var in0_ptr, var in1_ptr}:
+        var tid = global_idx.x
+        if tid >= length:
+            return
+        out_ptr[unsafe_offset=tid] = (
+            in0_ptr[unsafe_offset=tid] + in1_ptr[unsafe_offset=tid]
+        ) * scale
+
+    def build(mut builder: DeviceGraphBuilder) raises {imm}:
+        _ = builder.add_function(
+            scaled_vec_add,
+            grid_dim=ceildiv(length, block_dim),
+            block_dim=block_dim,
+        )
+
+    var graph = DeviceGraph.create(ctx, build)
+    graph.replay()
+
+    _ = in0_dev^
+    _ = in1_dev^
+
+    with out_dev.map_to_host() as out_host:
+        for i in range(length):
+            assert_equal(out_host[i], Float32(length) * scale)
+
+
 def test_add_copy_to_device(ctx: DeviceContext) raises:
     print("Test capturing a host-to-device memcpy node.")
     comptime length = 1024

@@ -184,17 +184,13 @@ struct qgemm_Q4_0(QuantizedGemm):
             _block_Q4_0
         ]() + (k // Self.k_group_size())
 
-        var a_quant_data = Array[Int8, _block_Q4_0.group_size](
-            uninitialized=True
-        )
+        var a_quant_data = Array[Int8, _block_Q4_0.group_size](fill={})
 
         var a_scale = quantize_a_Q8[_block_Q4_0.group_size](
             a.ptr + a._offset(Index(m, k)), a_quant_data.unsafe_ptr()
         )
 
-        var b_quant_data = Array[UInt8, _block_Q4_0.group_size](
-            uninitialized=True
-        )
+        var b_quant_data = Array[UInt8, _block_Q4_0.group_size](fill={})
 
         # Decode the bits of the weight data. The origin here is
         # parametrically mutable (it inherits `block_ptr`'s origin), so it can
@@ -284,9 +280,7 @@ struct qgemm_Q4_K(QuantizedGemm):
             _block_Q4_K
         ]() + (k // Self.k_group_size())
 
-        var a_quant_data = Array[Int8, _block_QK_K.quantized_k](
-            uninitialized=True
-        )
+        var a_quant_data = Array[Int8, _block_QK_K.quantized_k](fill={})
 
         var a_scale = quantize_a_Q8[_block_QK_K.quantized_k](
             a.ptr + a._offset(Index(m, k)), a_quant_data.unsafe_ptr()
@@ -324,9 +318,7 @@ struct qgemm_Q4_K(QuantizedGemm):
         )
         var b_mins = Array[UInt8, _block_Q4_K.group_count](fill_with=b_min_at)
 
-        var b_quant_data = Array[UInt8, _block_QK_K.quantized_k](
-            uninitialized=True
-        )
+        var b_quant_data = Array[UInt8, _block_QK_K.quantized_k](fill={})
         var b_quant_data_ptr: MutPointer[
             UInt8, origin_of(b_quant_data)
         ] = b_quant_data.unsafe_ptr()
@@ -419,17 +411,13 @@ struct qgemm_Q6_K(QuantizedGemm):
             _block_Q6_K
         ]() + (k // Self.k_group_size())
 
-        var a_quant_data = Array[Int8, _block_QK_K.quantized_k](
-            uninitialized=True
-        )
+        var a_quant_data = Array[Int8, _block_QK_K.quantized_k](fill={})
 
         var a_scale = quantize_a_Q8[_block_QK_K.quantized_k](
             a.ptr + a._offset(Index(m, k)), a_quant_data.unsafe_ptr()
         )
 
-        var b_quant_data = Array[UInt8, _block_QK_K.quantized_k](
-            uninitialized=True
-        )
+        var b_quant_data = Array[UInt8, _block_QK_K.quantized_k](fill={})
         var b_quant_data_ptr: MutPointer[
             UInt8, origin_of(b_quant_data)
         ] = b_quant_data.unsafe_ptr()

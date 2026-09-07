@@ -46,6 +46,7 @@ from max.pipelines.lib import (
     max_tokens_to_generate,
 )
 from max.pipelines.lib.config import PipelineConfig
+from max.pipelines.lib.tokenizer import encode_dkv_cache_hint
 from max.pipelines.modeling.types import (
     ImageContentPart,
     MessageContent,
@@ -841,6 +842,7 @@ class Qwen3VLTokenizer(TextAndVisionTokenizer):
             log_probabilities_echo=request.echo,
             sampling_params=request.sampling_params,
             target_endpoint=request.target_endpoint,
+            dkv_cache_hint=encode_dkv_cache_hint(request.dkv_cache_hint),
             images=images,
             vision_token_ids=[self.image_token_id],
             # Qwen3VL-specific fields

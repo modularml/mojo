@@ -50,6 +50,9 @@ from max.serve.scheduler.base import (
     PrefillResponse,
     SchedulerProgress,
 )
+from max.serve.scheduler.batch_constructor.text_batch_constructor import (
+    TextBatchConstructor,
+)
 from max.serve.scheduler.decode_scheduler import (
     DecodeRequestPhase,
     DecodeScheduler,
@@ -873,6 +876,47 @@ def test_cancel_after_prefill_response_defers_release_until_transfer_completes()
     )
 
 
+def test_cancel_after_prefill_response_releases_deferred_grammar_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The deferred-cancellation path in ``check_for_completed_transfers``
+    must release an outstanding grammar build too, not just KV blocks and
+    ``_handoff_landed_at`` -- a request cancelled while its transfer is
+    still in flight can have a grammar build running from admission time.
+    """
+    decode, prefill, server_addr, q = create_di_scheduler()
+    ctx = create_text_context(
+        target_endpoint=server_addr, prompt_len=100, output_len=5
+    )
+    req_id = ctx.request_id
+
+    released_ids: list[RequestID] = []
+    monkeypatch.setattr(
+        decode.batch_constructor,
+        "release_grammar_build",
+        lambda rid: released_ids.append(rid),
+    )
+
+    q.request_queue.put(ctx)
+    decode.run_iteration()
+    prefill.run_iteration()
+    run_until(lambda: in_transfer(decode, req_id), decode, prefill)
+
+    q.cancel_queue.put([req_id])
+    with patch.object(
+        decode.transfer_engine, "is_complete", return_value=False
+    ):
+        decode.run_iteration()
+
+    assert released_ids == [], (
+        "release_grammar_build must not fire before the transfer completes"
+    )
+
+    run_until(lambda: req_id not in decode.requests, decode, prefill)
+
+    assert released_ids == [req_id]
+
+
 def test_cancel_before_prefill_response_with_onload_in_flight_defers_release() -> (
     None
 ):
@@ -953,6 +997,201 @@ def test_cancel_before_prefill_response_with_onload_in_flight_defers_release() -
     assert response_count(q, req_id) == 1, (
         "Expected exactly one response for the whole lifecycle"
     )
+
+
+def test_structured_output_handoff_discards_prefill_token_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the DI prefill-to-decode handoff on by default, a constrained
+    request's prefill token is discarded and the handoff is treated as a
+    one-token chunked-CE continuation instead of a completed generation
+    step.
+    """
+    monkeypatch.setattr(
+        TextBatchConstructor,
+        "structured_output_enabled",
+        property(lambda self: True),
+    )
+
+    decode, _prefill, server_addr, q = create_di_scheduler()
+    ctx = create_text_context(
+        target_endpoint=server_addr, prompt_len=100, output_len=5
+    )
+    ctx.json_schema = '{"type": "object"}'
+    req_id = ctx.request_id
+
+    q.request_queue.put(ctx)
+    decode.run_iteration()  # allocs and sends to prefill
+    assert req_id in decode.requests
+
+    decode.handle_prefill_response(
+        PrefillResponse(
+            id=req_id,
+            generated_token_id=5,
+            transfer_metadata=MagicMock(),
+        )
+    )
+
+    pending = decode.requests[req_id]
+    assert pending.phase is DecodeRequestPhase.TRANSFERRING
+    assert pending.context.tokens.generated_length == 0, (
+        "The handoff must not apply prefill's discarded token"
+    )
+    assert pending.context.tokens.active_length == 1, (
+        "Exactly one token (the last prompt token) must remain active for "
+        "decode's own re-forward"
+    )
+    assert response_count(q, req_id) == 0, (
+        "No output is produced until decode's own forward samples token 1"
+    )
+
+
+def test_handoff_to_first_token_metric_recorded_end_to_end(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The handoff-to-first-token metric is a new TTFT contribution: time
+    from the handoff landing (prefill's token discarded) to decode's own
+    re-forward actually sending token 1. Drives a real end-to-end flow
+    (real prefill scheduler, real KV transfer) rather than injecting a
+    ``PrefillResponse`` directly, since the metric is only emitted once
+    decode's own CE step for the handoff actually completes.
+    """
+    monkeypatch.setattr(
+        TextBatchConstructor,
+        "structured_output_enabled",
+        property(lambda self: True),
+    )
+
+    decode, prefill, server_addr, q = create_di_scheduler()
+    ctx = create_text_context(
+        target_endpoint=server_addr, prompt_len=100, output_len=5
+    )
+    ctx.json_schema = '{"type": "object"}'
+    req_id = ctx.request_id
+    q.request_queue.put(ctx)
+
+    decode.run_iteration()
+    prefill.run_iteration()
+
+    with patch("max.serve.scheduler.decode_scheduler.METRICS") as mock_metrics:
+        run_until(lambda: req_id in done_request_ids(q), decode, prefill)
+
+    mock_metrics.di_handoff_to_first_token_time.assert_called_once()
+    assert req_id not in decode._handoff_landed_at, (
+        "the tracked landing time must be popped once read back, not leaked"
+    )
+
+
+def test_structured_output_handoff_completes_multi_token_generation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The handoff's chunked-CE continuation must hand off cleanly into
+    ordinary TG scheduling for the rest of the sequence -- not just sample
+    token 1 and stall. Drives a real end-to-end flow through completion.
+    """
+    monkeypatch.setattr(
+        TextBatchConstructor,
+        "structured_output_enabled",
+        property(lambda self: True),
+    )
+
+    output_len = 8
+    decode, prefill, server_addr, q = create_di_scheduler()
+    ctx = create_text_context(
+        target_endpoint=server_addr, prompt_len=100, output_len=output_len
+    )
+    ctx.json_schema = '{"type": "object"}'
+    req_id = ctx.request_id
+    q.request_queue.put(ctx)
+
+    decode.run_iteration()
+    prefill.run_iteration()
+    run_until(lambda: req_id in done_request_ids(q), decode, prefill)
+
+    assert response_count(q, req_id) == output_len, (
+        f"expected exactly {output_len} responses (one per generated "
+        "token) -- the handoff must hand off into ordinary TG scheduling "
+        "for the rest of the sequence, not stall after token 1"
+    )
+
+
+def test_structured_output_handoff_discards_draft_tokens_with_spec_decode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Speculative decoding's draft tokens must not survive the handoff for
+    a constrained request: prefill ran fully unconstrained, so its draft
+    tokens (verified against an unconstrained target distribution) can't
+    be trusted to satisfy the grammar either. Decode's spec-decode state
+    cold-starts like any other fresh context, same as the sampled token.
+    """
+    monkeypatch.setattr(
+        TextBatchConstructor,
+        "structured_output_enabled",
+        property(lambda self: True),
+    )
+
+    num_spec_tokens = 3
+    decode, prefill, server_addr, q = create_di_scheduler(
+        spec_decode_prefill=True,
+        num_speculative_tokens=num_spec_tokens,
+    )
+    ctx = create_text_context(
+        target_endpoint=server_addr, prompt_len=100, output_len=5
+    )
+    ctx.json_schema = '{"type": "object"}'
+    req_id = ctx.request_id
+    q.request_queue.put(ctx)
+
+    decode.run_iteration()
+    prefill.run_iteration()
+
+    prefill_metadata = decode.dispatcher.recv_reply_nowait()
+    assert isinstance(prefill_metadata, KVTransferEngineMetadata)
+    prefill_response = decode.dispatcher.recv_reply_nowait()
+    assert isinstance(prefill_response, PrefillResponse)
+    assert prefill_response.draft_tokens is not None
+    assert len(prefill_response.draft_tokens) == num_spec_tokens
+
+    decode.handle_prefill_response(prefill_response)
+
+    pending = decode.requests[req_id]
+    assert pending.context.spec_decoding_state.draft_tokens_to_verify == [], (
+        "prefill's draft tokens must be discarded for a constrained "
+        "handoff, not applied to decode's spec-decode state"
+    )
+    assert pending.context.tokens.generated_length == 0
+    assert pending.context.tokens.active_length == 1
+
+
+def test_grammar_build_failure_is_forwarded_to_response_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A request whose admission-time grammar build fails must reach the
+    client as a failed response instead of hanging -- run_iteration must
+    drain ``batch_constructor.take_grammar_failed()``, same as the
+    aggregated scheduler already does. If the request's handoff had
+    already landed, its tracked landing time must be popped alongside
+    the failure, not leaked.
+    """
+    decode, _prefill, q, ctx = (
+        create_default_di_scheduler_and_submit_one_request()
+    )
+    req_id = ctx.request_id
+    error = "Grammar provided in request cannot be compiled: bad schema"
+    monkeypatch.setattr(
+        decode.batch_constructor,
+        "take_grammar_failed",
+        lambda: [(req_id, error)],
+    )
+    # A handoff can fail its grammar build on the same request; the tracked
+    # landing time must be popped alongside the failure, not leaked.
+    decode._handoff_landed_at[req_id] = time.monotonic()
+
+    decode.run_iteration()
+
+    output = q.response_queue.get_nowait()
+    assert output[req_id].error == error
+    assert req_id not in decode._handoff_landed_at
 
 
 def test_stale_prefill_response_after_cancel_does_not_crash() -> None:

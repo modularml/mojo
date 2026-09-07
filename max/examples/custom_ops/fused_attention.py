@@ -71,7 +71,8 @@ def main() -> None:
     session = InferenceSession(devices=[device])
 
     # Compile the graph.
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     np.random.seed(123)
     Q = Buffer.from_numpy(np.random.randn(N, D).astype("f")).to(device)

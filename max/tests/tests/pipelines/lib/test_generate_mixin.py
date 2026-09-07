@@ -91,13 +91,18 @@ class FakePipeline(GenerateMixin[TextContext, TextContext]):
     _pipeline_model: Any = None
 
     def __init__(
-        self, kv_manager: FakeKVManager, budget: dict[RequestID, int]
+        self,
+        kv_manager: FakeKVManager,
+        budget: dict[RequestID, int],
+        fail_on_step: int | None = None,
     ) -> None:
         self._kv_manager = kv_manager
         self._budget = budget
+        self._fail_on_step = fail_on_step
         self._emitted: dict[RequestID, int] = {}
         self._done: set[RequestID] = set()
         self.steps_run = 0
+        self.released: list[RequestID] = []
 
     @property
     def kv_manager(self) -> Any:
@@ -118,10 +123,12 @@ class FakePipeline(GenerateMixin[TextContext, TextContext]):
         return FakeTokenizer()
 
     def release(self, request_id: RequestID) -> None:
-        pass
+        self.released.append(request_id)
 
     def execute(self, inputs: Any) -> dict[RequestID, TextGenerationOutput]:
         self.steps_run += 1
+        if self.steps_run == self._fail_on_step:
+            raise RuntimeError("execute interrupted")
         outputs: dict[RequestID, TextGenerationOutput] = {}
         for batch in inputs.batches:
             for context in batch:
@@ -153,19 +160,28 @@ class FakePipeline(GenerateMixin[TextContext, TextContext]):
         return outputs
 
 
-def _run(
-    steps: Sequence[int],
+def _make(
+    steps: Sequence[int], fail_on_step: int | None = None
 ) -> tuple[FakePipeline, FakeKVManager, list[TextContext]]:
     prompts = [_context() for _ in steps]
     budget = {c.request_id: n for c, n in zip(prompts, steps, strict=True)}
     kv_manager = FakeKVManager()
-    pipeline = FakePipeline(kv_manager, budget)
+    return FakePipeline(kv_manager, budget, fail_on_step), kv_manager, prompts
 
+
+def _drive(pipeline: FakePipeline, prompts: Sequence[TextContext]) -> None:
     async def drive() -> None:
         async for _ in pipeline.generate_async(list(prompts)):
             pass
 
     asyncio.run(drive())
+
+
+def _run(
+    steps: Sequence[int],
+) -> tuple[FakePipeline, FakeKVManager, list[TextContext]]:
+    pipeline, kv_manager, prompts = _make(steps)
+    _drive(pipeline, prompts)
     return pipeline, kv_manager, prompts
 
 
@@ -203,3 +219,37 @@ def test_generate_async_finish_order(lengths: tuple[int, ...]) -> None:
     assert kv_manager.claimed == set()
     assert set(kv_manager.released) == {p.request_id for p in prompts}
     assert len(kv_manager.released) == len(prompts), "released twice"
+
+
+@pytest.mark.parametrize("lengths", [(1, 3), (2, 2), (3, 1, 2)])
+def test_pipeline_release_called_once_per_request(
+    lengths: tuple[int, ...],
+) -> None:
+    """Finishing a request must release the PIPELINE, not just the KV cache.
+
+    ``kv_manager.release`` frees only the paged KV blocks. Recurrent state
+    slots and vision-encoder-cache refs hang off ``pipeline.release``, so
+    without it a state-pool slot leaks per request -- and the next request
+    inherits, or is denied, that slot. The post-EOS extra output must not
+    turn into a second release for the same id.
+    """
+    pipeline, _, prompts = _run(lengths)
+
+    assert set(pipeline.released) == {p.request_id for p in prompts}
+    assert len(pipeline.released) == len(prompts), "released twice"
+
+
+def test_pipeline_release_on_interrupted_generation() -> None:
+    """An interrupted run must release every request it still holds.
+
+    The ``finally`` path is the one that runs on cancellation, so it has to
+    release both layers too; otherwise an aborted run strands its slots.
+    """
+    pipeline, kv_manager, prompts = _make([4, 4], fail_on_step=2)
+
+    with pytest.raises(RuntimeError, match="execute interrupted"):
+        _drive(pipeline, prompts)
+
+    assert kv_manager.claimed == set(), "a request was left claimed"
+    assert set(pipeline.released) == {p.request_id for p in prompts}
+    assert len(pipeline.released) == len(prompts), "released twice"

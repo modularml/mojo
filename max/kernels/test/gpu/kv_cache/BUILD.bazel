@@ -66,6 +66,12 @@ _EXTRA_CONSTRAINTS = {
         "//:b200_gpu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+    "test_paged_mha_spec_verify_garbage_row_canary.mojo": select({
+        # fp8-only cross-row leak regression guard for the SM100 FA4
+        # dense-GQA kernel (mha_sm100_dispatch is NVIDIA-only vendor code).
+        "//:b200_gpu": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     # test_mha_gemma4_shapes.mojo is split into per-(page_size, mask_kind) targets below; the AMD-only crash repro is one of them.
 }
 

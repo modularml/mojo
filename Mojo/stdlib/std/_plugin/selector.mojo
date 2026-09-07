@@ -88,6 +88,6 @@ struct PluginSelector[
 
 def _index_lt[lhs: __mlir_type.index, rhs: __mlir_type.index]() -> Bool:
     """Returns whether raw parameter index `lhs` is less than `rhs`."""
-    return __mlir_op.`index.cmp`[pred=__mlir_attr.`#index<cmp_predicate ult>`](
+    return __mlir_op.`index.cmp`[pred=__mlir_attr.`#index.cmp_predicate<ult>`](
         lhs, rhs
     )

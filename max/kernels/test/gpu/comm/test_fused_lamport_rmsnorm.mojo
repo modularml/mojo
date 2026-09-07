@@ -226,25 +226,25 @@ def rmsnorm_test[
     comptime InTensorType = TileTensor[
         dtype, type_of(row_major(0)), ImmutAnyOrigin
     ]
-    var in_tensors = Array[InTensorType, ngpus](uninitialized=True)
-    for g in range(ngpus):
-        in_tensors[g] = InTensorType(
+    var in_tensors = Array[_, ngpus](
+        fill_with=lambda (g: Int) -> InTensorType: InTensorType(
             rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                 act_in[g].unsafe_ptr()
             ),
             act_layout,
         )
+    )
     comptime OutTensorType = TileTensor[
         dtype, type_of(row_major(0)), MutAnyOrigin
     ]
-    var ar_out_tensors = Array[OutTensorType, ngpus](uninitialized=True)
-    for g in range(ngpus):
-        ar_out_tensors[g] = OutTensorType(
+    var ar_out_tensors = Array[_, ngpus](
+        fill_with=lambda (g: Int) -> OutTensorType: OutTensorType(
             rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
                 ar_out[g].unsafe_ptr()
             ),
             act_layout,
         )
+    )
 
     # ---- Unfused reference: on-device AR -> on-device rms_norm_gpu. ----
     # `allreduce` routes to the standalone Lamport AR for this shape (small,
@@ -441,21 +441,22 @@ def unsynced_skew_test[
 
     for it in range(NUM_UNSYNCED_ITERS):
         var base = it * slice_size
-        var in_tensors = Array[InType, ngpus](uninitialized=True)
-        var ar_out_tensors = Array[OutType, ngpus](uninitialized=True)
-        for g in range(ngpus):
-            in_tensors[g] = InType(
+        var in_tensors = Array[_, ngpus](
+            fill_with=lambda (g: Int) -> InType: InType(
                 rebind[ImmPointer[Scalar[dtype], ImmutAnyOrigin]](
                     act_big[g].unsafe_ptr() + base
                 ),
                 act_layout,
             )
-            ar_out_tensors[g] = OutType(
+        )
+        var ar_out_tensors = Array[_, ngpus](
+            fill_with=lambda (g: Int) -> OutType: OutType(
                 rebind[MutPointer[Scalar[dtype], MutAnyOrigin]](
                     ar_big[g].unsafe_ptr() + base
                 ),
                 act_layout,
             )
+        )
 
         group_start()
         comptime for g in range(ngpus):

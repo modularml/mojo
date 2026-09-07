@@ -48,7 +48,7 @@ Thanks for your interest in contributing to Mojo!
 We welcome contributions to this repo for Mojo on the
 [`main`](https://github.com/modular/modular/tree/main)
 branch. Please first read our [Contributor
-Guide](https://github.com/modular/modular/blob/main/mojo/CONTRIBUTING.md).
+Guide](https://github.com/modular/modular/blob/main/Mojo/CONTRIBUTING.md).
 
 If you want to report issues or request features, [please create a GitHub
 issue here](https://github.com/modular/modular/issues)—also see our [guide to

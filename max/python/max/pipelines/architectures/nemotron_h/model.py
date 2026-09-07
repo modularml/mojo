@@ -33,7 +33,7 @@ import numpy as np
 from max.driver import Buffer, Device, is_virtual_device_mode
 from max.dtype import DType
 from max.engine import InferenceSession, Model
-from max.graph import BufferValue, DeviceRef, Graph, TensorValue, ops
+from max.graph import BufferValue, DeviceRef, Graph, TensorValue
 from max.graph.weights import Weights, WeightsAdapter
 from max.nn.comm import (
     Signals,  # noqa: F401  (kept for parity; unused single-GPU)
@@ -183,16 +183,6 @@ class NemotronHModel(LlamaModelBase, SupportsSSMStateWarmup):
             ).to(self.devices[0])
         return model
 
-    @property
-    def _fold_sampler_into_graph(self) -> bool:
-        """Whether to append a folded greedy-token (argmax) graph output."""
-        return self.pipeline_config.runtime.fold_sampler_into_graph
-
-    @property
-    def emits_folded_sampled_tokens(self) -> bool:
-        """The graph appends a folded argmax token when the fold flag is on."""
-        return self._fold_sampler_into_graph
-
     @override
     def _create_model_config(
         self, state_dict: dict[str, Any]
@@ -309,17 +299,7 @@ class NemotronHModel(LlamaModelBase, SupportsSSMStateWarmup):
                 ssm_pools,
                 has_initial_state_g,
             )
-            if self._fold_sampler_into_graph:
-                # Fold greedy token selection into the captured graph: append
-                # argmax over the last-token logits (``outputs[0]``, shape
-                # ``[B, V]``) as a trailing ``[B, 1]`` int64 output. argmax is a
-                # pure device op (no host readback), so it is capture-safe. The
-                # overlap pipeline consumes this only for all-greedy decode
-                # batches; otherwise it is ignored and the separate sampler runs.
-                sampled_tokens = ops.argmax(outputs[0], axis=-1)
-                graph.output(*outputs, sampled_tokens)
-            else:
-                graph.output(*outputs)
+            graph.output(*outputs)
             return graph, weights_registry
 
     def execute(self, model_inputs: ModelInputs) -> ModelOutputs:
@@ -327,15 +307,6 @@ class NemotronHModel(LlamaModelBase, SupportsSSMStateWarmup):
         assert model_inputs.kv_cache_inputs is not None
 
         model_outputs = list(self.model.execute(*model_inputs.buffers))
-
-        # When the greedy-token fold is enabled, the last graph output is the
-        # folded argmax token buffer; peel it off so the remaining buffers map
-        # onto the logits fields exactly as in the unfolded path.
-        sampled_tokens: Buffer | None = None
-        if self._fold_sampler_into_graph:
-            popped = model_outputs.pop()
-            assert isinstance(popped, Buffer)
-            sampled_tokens = popped
 
         # Both the conv pools and SSM pools are mutated in place by their
         # respective inplace ops; the only graph output is the logits (plus
@@ -349,12 +320,10 @@ class NemotronHModel(LlamaModelBase, SupportsSSMStateWarmup):
                 logits=model_outputs[1],
                 next_token_logits=logits,
                 logit_offsets=model_outputs[2],
-                sampled_tokens=sampled_tokens,
             )
         return ModelOutputs(
             logits=logits,
             next_token_logits=logits,
-            sampled_tokens=sampled_tokens,
         )
 
     def prepare_initial_token_inputs(

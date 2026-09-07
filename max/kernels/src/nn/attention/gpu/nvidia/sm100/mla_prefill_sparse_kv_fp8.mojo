@@ -1192,9 +1192,11 @@ struct MLAPrefillSparseFP8[
                 )
                 real_mi = max(real_mi, cur_pi_max)
 
-                var should_scale_o = warp.vote[.uint32](
-                    cur_pi_max - mi > Float32(6.0)
-                ) != UInt32(0)
+                # Per-lane decision for the STATE update (new_max/mi/li):
+                # `idx_in_wg` packs one independent head-row's softmax
+                # state per lane, so an OR here would leak a sibling
+                # head's rescale trajectory into this one's.
+                var should_scale_o = cur_pi_max - mi > Float32(6.0)
 
                 var new_max: Float32
                 var scale_for_old: Float32
@@ -1206,6 +1208,19 @@ struct MLAPrefillSparseFP8[
                     scale_for_old = exp2(mi - new_max)
                 mi = new_max
                 li = mul_ftz(li, scale_for_old)
+
+                # The O-rescale WALK below touches TMEM via tcgen05_ld/st,
+                # which are warp-collective ops (datapaths=32) requiring
+                # every lane to participate uniformly -- a per-lane branch
+                # here would diverge the warp on those ops and hang. Vote
+                # ANY (not the state above): any lane needing a rescale
+                # pulls every lane through the walk, but each lane applies
+                # its OWN `scale_for_old` (exactly 1.0 for a lane that
+                # didn't need it), so a coerced lane's contribution is an
+                # exact no-op multiply, not a value substitution.
+                var any_rescale = warp.vote[.uint32](should_scale_o) != UInt32(
+                    0
+                )
 
                 var s_bf16 = Array[Scalar[Self.qkv_dtype], P_PER_THREAD](
                     uninitialized=True
@@ -1226,7 +1241,7 @@ struct MLAPrefillSparseFP8[
                 var o_chunk_prefetch = Array[Float32, O_RESCALE_CHUNK](
                     uninitialized=True
                 )
-                if k > 0 and should_scale_o:
+                if k > 0 and any_rescale:
                     tcgen05_fence_after()
                     o_chunk_prefetch = tcgen05_ld[
                         datapaths=32,
@@ -1261,7 +1276,7 @@ struct MLAPrefillSparseFP8[
 
                 # Rescale O (in TMEM) if mi changed materially; chunk 0
                 # was prefetched above, chunks 1..N-1 load sequentially.
-                if k > 0 and should_scale_o:
+                if k > 0 and any_rescale:
                     tcgen05_load_wait()
                     var o_scaled_0 = Array[_, O_RESCALE_CHUNK](
                         fill_with_unrolled=lambda [j: Int]() -> Float32: (

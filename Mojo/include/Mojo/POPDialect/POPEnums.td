@@ -146,7 +146,11 @@ def POP_IntLiteralBinKind : I32EnumAttr<"IntLiteralBinKind",
 
 def POP_IntLiteralBinKindAttr : EnumAttr<POPDialect,
                                          POP_IntLiteralBinKind,
-                                         "int_literal.bin_kind">;
+                                         "int_literal.bin_kind"> {
+  // Dotted mnemonic; keep bare `$value` so it embeds
+  // cleanly in the IntLiteralBin/FloatLiteralBin wrappers.
+  let assemblyFormat = "$value";
+}
 
 //===----------------------------------------------------------------------===//
 // POP_IntLiteralCmpPred
@@ -168,7 +172,11 @@ def POP_IntLiteralCmpPred : I32EnumAttr<"IntLiteralCmpPred",
 }
 
 def POP_IntLiteralCmpPredAttr : EnumAttr<POPDialect, POP_IntLiteralCmpPred,
-                                         "int_literal.cmp_pred">;
+                                         "int_literal.cmp_pred"> {
+  // Dotted mnemonic; keep bare `$value` so it embeds
+  // cleanly in the IntLiteralBin/FloatLiteralBin wrappers.
+  let assemblyFormat = "$value";
+}
 
 //===----------------------------------------------------------------------===//
 // POP_FloatLiteralSpecialValues
@@ -189,7 +197,11 @@ def POP_FloatLiteralSpecialValues : I32EnumAttr<"FloatLiteralSpecialValues",
 
 def POP_FloatLiteralSpecialValuesAttr :
   EnumAttr<POPDialect, POP_FloatLiteralSpecialValues,
-           "float_literal.special_values">;
+           "float_literal.special_values"> {
+  // Dotted mnemonic; keep bare `$value` so it embeds
+  // cleanly in the IntLiteralBin/FloatLiteralBin wrappers.
+  let assemblyFormat = "$value";
+}
 
 /// This encodes which specific operation is to be performed
 /// for `pop.float_literal.bin` ops.
@@ -207,7 +219,11 @@ def POP_FloatLiteralBinKind : I32EnumAttr<"FloatLiteralBinKind",
 
 def POP_FloatLiteralBinKindAttr : EnumAttr<POPDialect,
                                            POP_FloatLiteralBinKind,
-                                           "float_literal.bin_kind">;
+                                           "float_literal.bin_kind"> {
+  // Dotted mnemonic; keep bare `$value` so it embeds
+  // cleanly in the IntLiteralBin/FloatLiteralBin wrappers.
+  let assemblyFormat = "$value";
+}
 
 /// This encodes which specific comparison operation is to be performed
 /// for `pop.float_literal.cmp` ops.
@@ -226,6 +242,10 @@ def POP_FloatLiteralCmpPred : I32EnumAttr<"FloatLiteralCmpPred",
 
 def POP_FloatLiteralCmpPredAttr : EnumAttr<POPDialect,
                                           POP_FloatLiteralCmpPred,
-                                          "float_literal.cmp_pred">;
+                                          "float_literal.cmp_pred"> {
+  // Dotted mnemonic; keep bare `$value` so it embeds
+  // cleanly in the IntLiteralBin/FloatLiteralBin wrappers.
+  let assemblyFormat = "$value";
+}
 
 #endif // KGEN_POPDIALECT_POPENUMS_TD

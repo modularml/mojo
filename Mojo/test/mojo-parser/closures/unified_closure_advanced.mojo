@@ -124,8 +124,8 @@ def s2_top[A: Copyable, B: Copyable](aa: A, bb: B):
 # COM: Verify Lazy Conformance (adaptor on storage, not parametric wrapper).
 # S3-LABEL: lit.struct.decl @"{{.*}}s3_top{{.*}}::closureConcrete::__storage"
 # S3: lit.fn @"__call__$def
-# S3-NEXT: kgen.rebind %a : !lit.ref<:!AnyType_Copyable_Movable _D, imm *"1_unnamed`"> to !lit.ref<!String, imm *"1_unnamed`">
-# S3-NEXT: kgen.rebind %b : !lit.ref<:!AnyType_Copyable_Movable _E, imm *"2_unnamed`"> to !lit.ref<!String, imm *"2_unnamed`">
+# S3-NEXT: kgen.rebind %a : !lit.ref<:!AnyType_Copyable_Movable *"Closure_Syn#0", imm *"1_unnamed`"> to !lit.ref<!String, imm *"1_unnamed`">
+# S3-NEXT: kgen.rebind %b : !lit.ref<:!AnyType_Copyable_Movable *"Closure_Syn#1", imm *"2_unnamed`"> to !lit.ref<!String, imm *"2_unnamed`">
 
 
 

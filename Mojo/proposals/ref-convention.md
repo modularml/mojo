@@ -65,7 +65,7 @@ specifying an expected lifetime and that is auto-dereferenced in the body like
 basic example:
 
 ```mojo
-fn take_int_ref(a: Int, ref [_] b: Int) -> Int:
+def take_int_ref(a: Int, ref [_] b: Int) -> Int:
     return a+b  # b, not b[]
 ```
 
@@ -75,7 +75,7 @@ Given this feature, we can remove the ability to define `self` as a `Reference`
 and just use this new argument convention. Instead of:
 
 ```mojo
-fn __refitem__(self: Reference[Self, _, _], index: Int) -> Reference[
+def __refitem__(self: Reference[Self, _, _], index: Int) -> Reference[
         Self.ElementType, self.is_mutable, self.lifetime
     ]:
 ```
@@ -83,13 +83,13 @@ fn __refitem__(self: Reference[Self, _, _], index: Int) -> Reference[
 You would now use an argument convention:
 
 ```mojo
-fn __refitem__(ref [_] self, index: Int) -> Reference[
+def __refitem__(ref [_] self, index: Int) -> Reference[
         # This is a bit yuck, but is simplified further below.
         Self.ElementType, origin_of(self).is_mutable, origin_of(self)
     ]:
 
 # Alternatively, name the Lifetime:
-fn __refitem__[life: Lifetime](ref [life] self, index: Int) -> Reference[
+def __refitem__[life: Lifetime](ref [life] self, index: Int) -> Reference[
         # This is a bit yuck, see below.
         Self.ElementType, life.is_mutable, life
     ]:
@@ -102,7 +102,7 @@ space. The address space is a relatively niche but important feature used for
 GPUs and other accelerators. We specify the address space as follows:
 
 ```mojo
-fn foo(...) -> ref [lifetime, addr_space] T: ...
+def foo(...) -> ref [lifetime, addr_space] T: ...
 ```
 
 This parameter would be optional, just as it is currently optional for
@@ -135,11 +135,11 @@ syntax for this. This feature can replace the use of `Reference` in the previous
 example:
 
 ```mojo
-fn __refitem__(ref [_] self, index: Int)
+def __refitem__(ref [_] self, index: Int)
     -> ref [self] Self.ElementType:
 
 # Hopefully someday we'll have a Lifetime type:
-fn __refitem__(ref [_] self, index: Int)
+def __refitem__(ref [_] self, index: Int)
     -> ref [Lifetime(self)] Self.ElementType:
 ```
 
@@ -156,8 +156,8 @@ Note that this gives the developer control over auto-deref, because both of
 these are valid:
 
 ```mojo
-fn yes_auto_deref(...) -> ref [lifetime] Int: ...
-fn no_auto_deref(...) -> Reference[Int, lifetime]: ...
+def yes_auto_deref(...) -> ref [lifetime] Int: ...
+def no_auto_deref(...) -> Reference[Int, lifetime]: ...
 ```
 
 We would expect `ref` to be the default choice. It's the most versatile: if a
@@ -175,7 +175,7 @@ simplifies the language and improves consistency with Python. Our example above
 becomes:
 
 ```mojo
-fn __getitem__(ref [_] self, index: Int)
+def __getitem__(ref [_] self, index: Int)
     -> ref [self] Self.ElementType:
 ```
 
@@ -229,7 +229,7 @@ possible to define a local “ref”, and it isn’t possible to define a “ref
 ref”:
 
 ```mojo
-fn weird_tests[life1: Lifetime, life2: Lifetime](
+def weird_tests[life1: Lifetime, life2: Lifetime](
            ref [life1] arg1: Int,  ## ok
 
            # error: 'ref' is an argument convention, not a type.
@@ -256,13 +256,13 @@ auto-dereferenced values in a tuple:
 
 ```mojo
 # Simple tuple result type is ok of course:
-fn g1(...) -> (Int, Int): ...
+def g1(...) -> (Int, Int): ...
 
 # Returning safe pointers is fine: each element needs explicit derefs
-fn g2(...) -> (Pointer[Int, life1], Pointer[Int, life2])
+def g2(...) -> (Pointer[Int, life1], Pointer[Int, life2])
 
 # error: 'ref' is an argument convention, not a type.
-fn g3(...) -> (ref [life1] Int, ref [life2] Int)
+def g3(...) -> (ref [life1] Int, ref [life2] Int)
 ```
 
 This is unfortunate, and really doesn’t fit with this model, but it isn’t a
@@ -277,7 +277,7 @@ something that could be supported with native multiple return values are
 “unpacking” for non-movable results, e.g.:
 
 ```mojo
-fn do_stuff() -> result: NonMovable:
+def do_stuff() -> result: NonMovable:
   var a : NonMovable
   a, result = f()
 ```
@@ -351,13 +351,13 @@ above:
 
 ```mojo
 # We could repurpose Python's `from` keyword:
-fn foo(x from <lifetime>: Int):
+def foo(x from <lifetime>: Int):
 
 # Or its `in` keyword:
-fn foo(x in <lifetime>: Int):
+def foo(x in <lifetime>: Int):
 
 # Or introduce a new `at` keyword:
-fn foo(x at <lifetime>: Int):
+def foo(x at <lifetime>: Int):
 ```
 
 All of these keywords are suggestive of a lifetime being a "location" associated
@@ -381,13 +381,13 @@ usually not named, so a naïve translation of the above syntax doesn't look very
 clean:
 
 ```mojo
-fn foo() -> from <origin>: Int:
+def foo() -> from <origin>: Int:
 ```
 
 Using the `ref` keyword here would avoid this problem:
 
 ```mojo
-fn foo() -> ref from <origin>: Int:
+def foo() -> ref from <origin>: Int:
 ```
 
 But given that we're trying to avoid the term "reference", we should consider
@@ -412,11 +412,11 @@ result convention.
 Given all of this, the following syntax might be reasonable:
 
 ```mojo
-fn foo() -> var from <origin>: Int:
+def foo() -> var from <origin>: Int:
 
 # The use of `var` here is independent of the `from` syntax.
 # We could combine it with the square bracket syntax instead:
-fn foo() -> var [<origin>] Int:
+def foo() -> var [<origin>] Int:
 ```
 
 The expression `foo()` behaves just like a variable does. If it is mutable, you
@@ -438,13 +438,13 @@ As mentioned, `var` is the only noun that seems suitable. However, we could
 consider a verb or an adjective:
 
 ```mojo
-fn foo() -> select from <origin>: Int:
+def foo() -> select from <origin>: Int:
 
-fn foo() -> select [<origin>] Int:
+def foo() -> select [<origin>] Int:
 
-fn foo() -> shared from <origin>: Int:
+def foo() -> shared from <origin>: Int:
 
-fn foo() -> shared [<origin>] Int:
+def foo() -> shared [<origin>] Int:
 ```
 
 Unfortunately, if `->` is read as "returns", then a verb doesn't make
@@ -457,14 +457,14 @@ an issue with the `:` character. We are using it to specify both the type of the
 returned variable, and to mark the end of the function signature:
 
 ```mojo
-fn foo() -> var from <origin>: Int:
+def foo() -> var from <origin>: Int:
 ```
 
 This is clunky, and may complicate parsing. We can fix this by adding
 parentheses:
 
 ```mojo
-fn foo() -> (var from <origin>: Int):
+def foo() -> (var from <origin>: Int):
 ```
 
 Alternatively, if (for some reason) the `Lifetime`/`Origin` type ends up being
@@ -472,16 +472,16 @@ parameterized by the type of the variables that it contains, we could drop the
 type annotation entirely:
 
 ```mojo
-fn foo() -> var from <origin>:
+def foo() -> var from <origin>:
 
-fn foo() -> var at <origin>:
+def foo() -> var at <origin>:
 ```
 
 Another option would be to revert to the square bracket syntax, since this
 allows us to omit the first colon:
 
 ```mojo
-fn foo() -> var [<origin>] Int:
+def foo() -> var [<origin>] Int:
 ```
 
 In summary: there are a lot of alternatives worth considering!
@@ -498,19 +498,19 @@ Let’s look at a few examples in 24.3 Mojo:
 ## Today in mojo:
 struct MyInt:
    # Note that inout is a lie here, the input is uninitialized.
-   fn __init__(inout self, value: Int): ...
+   def __init__(inout self, value: Int): ...
 
    # borrowed is the default (e.g. on 'rhs') so not usually written.
-   fn __add__(borrowed self, rhs: MyInt) -> MyInt: ...
+   def __add__(borrowed self, rhs: MyInt) -> MyInt: ...
 
    # This function actually just takes a mutable reference, the
    # caller may do some copy in/out depending on its situation though.
-   fn __iadd__(inout self, rhs: MyInt): ...
+   def __iadd__(inout self, rhs: MyInt): ...
 
    # An owned argument must be initialized when the function is called,
    # and it will be deinitialized by the time the function returns.
    # (Unless the caller provides a copy.)
-   fn __del__(owned self): ...
+   def __del__(owned self): ...
 ```
 
 A common question a programmer has in their mind when browsing unfamiliar code
@@ -575,13 +575,13 @@ If we repaint the earlier example with the new keywords, we get:
 ```mojo
 ## Proposed
 struct MyInt:
-   fn __init__(init self, value: Int): ...
+   def __init__(init self, value: Int): ...
 
-   fn __add__(borrow self, rhs: MyInt) -> MyInt: ...
+   def __add__(borrow self, rhs: MyInt) -> MyInt: ...
 
-   fn __iadd__(mut self, rhs: MyInt): ...
+   def __iadd__(mut self, rhs: MyInt): ...
 
-   fn __del__(consume self): ...
+   def __del__(consume self): ...
 ```
 
 On top of this, we would have `ref`, which would be used whenever you need to
