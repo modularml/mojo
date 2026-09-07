@@ -17,6 +17,7 @@ can't be caught with `try`/`except`. This runs the code under test in a
 re-exec'd child and checks that the child crashed with the expected message.
 """
 
+from std.ffi import CStringSlice
 from std.os import abort
 from std.os.env import getenv
 from std.os.process import Pipe, Process, ProcessStatus
@@ -25,7 +26,6 @@ from std.sys import argv
 from std.sys._io import stderr, stdout
 from std.sys._libc import _get_environ, close, dup2
 from std.sys.compile import SanitizeAddress
-from std.ffi import CStringSlice
 from std.time import perf_counter, sleep
 
 # Which call site (file:line:col) the re-exec'd child should run.
