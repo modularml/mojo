@@ -118,21 +118,21 @@ def test_index_comparisons() raises:
     var ten: __mlir_type.index = __mlir_attr.`10 : index`
 
     var lt = __mlir_op.`index.cmp`[
-        pred=__mlir_attr.`#index<cmp_predicate slt>`
+        pred=__mlir_attr.`#index.cmp_predicate<slt>`
     ](five, ten)
     assert_equal(Bool(lt), True)
 
-    var eq = __mlir_op.`index.cmp`[pred=__mlir_attr.`#index<cmp_predicate eq>`](
+    var eq = __mlir_op.`index.cmp`[pred=__mlir_attr.`#index.cmp_predicate<eq>`](
         five, five
     )
     assert_equal(Bool(eq), True)
 
     var gt = __mlir_op.`index.cmp`[
-        pred=__mlir_attr.`#index<cmp_predicate sgt>`
+        pred=__mlir_attr.`#index.cmp_predicate<sgt>`
     ](five, ten)
     assert_equal(Bool(gt), False)
 
-    var ne = __mlir_op.`index.cmp`[pred=__mlir_attr.`#index<cmp_predicate ne>`](
+    var ne = __mlir_op.`index.cmp`[pred=__mlir_attr.`#index.cmp_predicate<ne>`](
         five, ten
     )
     assert_equal(Bool(ne), True)
@@ -262,12 +262,12 @@ struct MiniInt(Writable):
 
     def __eq__(self, rhs: Self) -> Bool:
         return __mlir_op.`index.cmp`[
-            pred=__mlir_attr.`#index<cmp_predicate eq>`
+            pred=__mlir_attr.`#index.cmp_predicate<eq>`
         ](self._mlir_value, rhs._mlir_value)
 
     def __lt__(self, rhs: Self) -> Bool:
         return __mlir_op.`index.cmp`[
-            pred=__mlir_attr.`#index<cmp_predicate slt>`
+            pred=__mlir_attr.`#index.cmp_predicate<slt>`
         ](self._mlir_value, rhs._mlir_value)
 
     def to_int(self) -> Int:
@@ -322,7 +322,7 @@ def test_conditional_on_mlir_cmp() raises:
     var threshold: __mlir_type.index = __mlir_attr.`10 : index`
 
     var above = __mlir_op.`index.cmp`[
-        pred=__mlir_attr.`#index<cmp_predicate sgt>`
+        pred=__mlir_attr.`#index.cmp_predicate<sgt>`
     ](x, threshold)
 
     var label = "big" if Bool(above) else "small"
@@ -337,7 +337,7 @@ def sum_to(end: Int) -> Int:
 
     # end.__mlir_index__() converts Int to raw __mlir_type.index
     while Bool(
-        __mlir_op.`index.cmp`[pred=__mlir_attr.`#index<cmp_predicate slt>`](
+        __mlir_op.`index.cmp`[pred=__mlir_attr.`#index.cmp_predicate<slt>`](
             i, end.__mlir_index__()
         )
     ):
@@ -392,7 +392,7 @@ def test_clamp() raises:
         var too_low = __mlir_op.`pop.cast_from_builtin`[
             _type=__mlir_type.`!kgen.scalar<bool>`
         ](
-            __mlir_op.`index.cmp`[pred=__mlir_attr.`#index<cmp_predicate slt>`](
+            __mlir_op.`index.cmp`[pred=__mlir_attr.`#index.cmp_predicate<slt>`](
                 v, lo
             )
         )
@@ -400,7 +400,7 @@ def test_clamp() raises:
         var too_high = __mlir_op.`pop.cast_from_builtin`[
             _type=__mlir_type.`!kgen.scalar<bool>`
         ](
-            __mlir_op.`index.cmp`[pred=__mlir_attr.`#index<cmp_predicate sgt>`](
+            __mlir_op.`index.cmp`[pred=__mlir_attr.`#index.cmp_predicate<sgt>`](
                 result, hi
             )
         )

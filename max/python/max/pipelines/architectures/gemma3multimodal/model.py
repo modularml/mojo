@@ -307,15 +307,18 @@ class Gemma3_MultiModalModel(
             ]
             variadic_args = variadic_args[len(self.devices) :]
 
-            # Extract KV cache inputs
-            kv_cache = self._unflatten_kv_inputs(variadic_args)
+            # Extract KV cache inputs from the unified {sliding, global} tree.
+            kv_cache_local, kv_cache_global = (
+                self.kv_params.unflatten_basic_kv_tree(iter(variadic_args))
+            )
 
             outputs = language_model(
                 tokens=tokens.tensor,
                 signal_buffers=signal_buffers,
                 return_n_logits=return_n_logits.tensor,
                 input_row_offsets=input_row_offsets,
-                kv_collections=kv_cache,
+                sliding_kv_collections=kv_cache_local,
+                global_kv_collections=kv_cache_global,
                 image_embeddings=image_embeddings,
                 image_token_indices=image_token_indices,
             )

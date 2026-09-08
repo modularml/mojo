@@ -73,8 +73,6 @@ static bool usesClosurePipeline(FnOp fn) {
 
 static FnOp getFnOpNamed(TraitDeclOp traitDecl, StringRef name) {
   for (FnOp candidate : traitDecl.getFields().getOps<FnOp>()) {
-    if (candidate.getInheritedFrom())
-      continue;
     StringRef sourceName = *candidate.getSourceName();
     if (sourceName.contains(name))
       return candidate;
@@ -487,8 +485,6 @@ std::pair<TraitDeclOp, ASTDecl *> ClosureEmitter::createTraitOp(
                                                 parents, immediateParents);
   DenseSet<std::pair<StringAttr, StringAttr>> existingFns;
   populateTrait(traitDecl, existingFns);
-  // TODO(MOCO-4712): we don't really need to do this.
-  shared.declResolver->addParentDeclsToTrait(closureTrait, traitDecl);
   return std::pair<TraitDeclOp, ASTDecl *>(closureTrait, &traitDecl);
 }
 
@@ -914,8 +910,7 @@ void ClosureEmitter::collectClosureExternalRefs(
     // aliases; only witness references to those names should be rewritten.
     DenseSet<StringRef> aliasNames;
     for (AliasDeclOp aliasOp : closureTrait.getOps<AliasDeclOp>())
-      if (!aliasOp.getInheritedFrom())
-        aliasNames.insert(aliasOp.getName());
+      aliasNames.insert(aliasOp.getName());
 
     // The dependent capture types are internalized to a get_witness attr;
     // extern it back to a reference of the original parameter declaration.
@@ -927,10 +922,6 @@ void ClosureEmitter::collectClosureExternalRefs(
       return witness;
     });
     for (AliasDeclOp aliasOp : closureTrait.getOps<AliasDeclOp>()) {
-      // Skip aliases that are inherited from a parent trait: Those are not
-      // captured parameters by the closure.
-      if (aliasOp.getInheritedFrom())
-        continue;
       Type externalType = externCapture.replace(aliasOp.getType());
       refs.push_back({closureParam, aliasOp.getName(), externalType});
     }
@@ -1009,8 +1000,6 @@ ClosureEmitter::createFnStructWrapper(ASTDecl &moduleDecl, ASTDecl &traitDecl,
   {
     size_t aliasCount = 0;
     for (auto alias : trait.getFields().getOps<AliasDeclOp>()) {
-      if (alias.getInheritedFrom())
-        continue;
       aliasCount++;
       StringAttr aliasName = alias.getParamDecl().getName();
       StringAttr captureName =
@@ -2704,12 +2693,13 @@ ClosureEmitter::Closure ClosureEmitter::liftClosure(
     WitnessOp::create(builder, closureParent.getWitnessName(),
                       /*sym_visibility=*/nullptr, symbol);
 
-    // add the alias entries
-    if (closureParent.getClosureMethod() == ClosureMethod::CALL) {
+    // add the alias entries if this is not a parametric trait: Non-parametric
+    // trait always has a `_Self` parameter.
+    if (closureParent.getClosureMethod() == ClosureMethod::CALL &&
+        traitParent.getInputParams().size() == 1) {
       SmallVector<AliasDeclOp> traitAliases;
       for (AliasDeclOp alias : traitParent.getFields().getOps<AliasDeclOp>())
-        if (!alias.getInheritedFrom())
-          traitAliases.push_back(alias);
+        traitAliases.push_back(alias);
       assert(traitAliases.size() == aliases.size() &&
              "trait capture aliases must mirror closure captures");
       SmallVector<TypedAttr> captureBindings = getCaptureBindings(structOp);
@@ -2799,10 +2789,13 @@ static TypeConvention typeConventionOf(SharedState &shared, ParamType paramType,
 }
 
 Value ClosureEmitter::emitClosure(ASTDecl &moduleDecl, ASTDecl &nestedFnDecl,
-                                  ArrayRef<Capture> captures, TraitDeclOp trait,
-                                  Location location, bool isCopyable,
+                                  ArrayRef<Capture> captures,
+                                  ASTDecl &traitDecl, Location location,
+                                  bool isCopyable,
                                   FnTypeGeneratorType closureSig,
                                   ArrayRef<ParamDeclRefAttr> paramCaptures) {
+  TraitDeclOp trait = cast<TraitDeclOp>(traitDecl.getIfOperation());
+
   // (1) Lift the nested function into a storage struct and instantiate it.
   FnOp nestedFn = cast<FnOp>(nestedFnDecl.getIfOperation());
   FnOp parent = nestedFn->getParentOfType<FnOp>();
@@ -2928,10 +2921,26 @@ Value ClosureEmitter::emitClosure(ASTDecl &moduleDecl, ASTDecl &nestedFnDecl,
       highestCaptureConvention == TypeConvention::MemoryOnly)
     allCapturesEncodable = false;
 
-  SmallVector<ClosureParent> closureParents{
-      ClosureParent(shared, trait.bindReference({}), "__call__",
-                    ClosureMethod::CALL),
-      getMoveParent(), getDeinitableParent(), getAnyParent()};
+  SmallVector<ClosureParent> closureParents;
+  if (trait.getInputParams().size() > 1) {
+    TraitSymbolAttr boundSymbol =
+        emitter.bindParamsToClosureTraitFromSig(closureSig);
+    ParameterEvaluator evaluator =
+        *populateTraitBindingEvaluator(boundSymbol, shared);
+    auto callAlias = cast<AliasDeclOp>(
+        traitDecl.lookupInCurrentScope("__call__").front()->getIfOperation());
+    assert(callAlias.getDeclName() == "__call__");
+    closureParents.emplace_back(
+        boundSymbol,
+        cast<FnTypeGeneratorType>(evaluator.replace(callAlias.getType())),
+        callAlias.getDeclName(), ClosureMethod::CALL);
+  } else {
+    closureParents.emplace_back(shared, trait.bindReference({}), "__call__",
+                                ClosureMethod::CALL);
+  }
+  closureParents.append(
+      {getMoveParent(), getDeinitableParent(), getAnyParent()});
+
   if (isCopyable) {
     closureParents.push_back(getCopyParent());
     closureParents.push_back(getImplicitlyCopyableParent());
@@ -3607,8 +3616,7 @@ static bool canFunctionSignatureMatchTraitParamInf(FnOp actualFn,
 static SmallVector<AliasDeclOp> collectClosureAliases(TraitDeclOp trait) {
   SmallVector<AliasDeclOp> aliases;
   for (AliasDeclOp alias : trait.getFields().getOps<AliasDeclOp>())
-    if (!alias.getInheritedFrom())
-      aliases.push_back(alias);
+    aliases.push_back(alias);
   return aliases;
 }
 
@@ -3893,14 +3901,14 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
                  CallSyntax::kMethodCallSynthetic);
   /// Perform rebind on method that implements the trait function but with
   /// different argument names.
-  auto [newWitness, _] =
+  auto newWitnessResult =
       ov.filterOverloadSetForValueType(traitSignature, nullptr);
+  PValue newWitness =
+      newWitnessResult.isYes() ? newWitnessResult.getYes().callee : PValue();
   if (newWitness) {
     SmallVector<StringRef> traitAliasNames;
     for (AliasDeclOp traitAlias :
          traitDeclOp.getFields().getOps<AliasDeclOp>()) {
-      if (traitAlias.getInheritedFrom())
-        continue;
       traitAliasNames.push_back(traitAlias.getParamDecl().getName().getValue());
     }
     SmallVector<TypedAttr> captureBindings = getCaptureBindings(structDeclOp);
@@ -3933,11 +3941,9 @@ LogicalResult ClosureEmitter::checkStructCompatibility(ASTType structType,
   // `__del__is_trivial`) are cloned into the trait's fields by lazy body
   // resolution and are marked with `inheritedFrom`; skip them.
   SmallVector<StringAttr> traitAliasOps;
-  for (AliasDeclOp aliasOp : traitDeclOp.getFields().getOps<AliasDeclOp>()) {
-    if (aliasOp.getInheritedFrom())
-      continue;
+  for (AliasDeclOp aliasOp : traitDeclOp.getFields().getOps<AliasDeclOp>())
     traitAliasOps.push_back(aliasOp.getParamDecl().getName());
-  }
+
   size_t traitAliasCount = traitAliasOps.size();
   SmallVector<ParamDeclAttr> auxiliaryParams;
   for (ParamDeclAttr auxiliaryParam :
@@ -4272,9 +4278,6 @@ void ClosureEmitter::addConformanceToDevicePassable(
                                               devicePassableTrait->getLoc())))
     return;
   TraitDeclOp trait = cast<TraitDeclOp>(devicePassableTrait->getIfOperation());
-  auto devicePassableSymbol =
-      TraitSymbolAttr::get(devicePassableTrait->getSymbolRef());
-
   for (auto &nameGroup : devicePassableTrait->getDeclsInScope()) {
     for (ASTDecl *funcFieldOrAlias : nameGroup.second) {
       if (failed(shared.declResolver->resolveBody(*funcFieldOrAlias,
@@ -4288,9 +4291,6 @@ void ClosureEmitter::addConformanceToDevicePassable(
 
   for (Operation &member : trait.getFields().getOps()) {
     if (auto function = dyn_cast<FnOp>(member)) {
-      auto parent = function.getInheritedFrom();
-      if (parent && parent != devicePassableSymbol)
-        continue;
       FailureOr<SymbolConstantAttr> witness =
           [&]() -> FailureOr<SymbolConstantAttr> {
         if (function.getSourceName() == kIsDeviceTypeConvertible)
@@ -4314,9 +4314,6 @@ void ClosureEmitter::addConformanceToDevicePassable(
     }
 
     if (auto alias = dyn_cast<AliasDeclOp>(member)) {
-      auto parent = alias.getInheritedFrom();
-      if (parent && parent != devicePassableSymbol)
-        continue;
       assert(alias.getDeclName().getValue() == kDeviceType &&
              "unexpected alias in DevicePassable trait");
       devicePassableWitnesses.push_back({kDeviceType, deviceTypeWitness});

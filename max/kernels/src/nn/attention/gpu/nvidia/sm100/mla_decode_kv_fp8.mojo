@@ -935,7 +935,7 @@ struct MLA_SM100_Decode_KV_FP8[
 
             # Compute the scale SMEM stage pointer for blockwise scaling.
             # When scale_block_size == 0, scale_smem_per_stage is 0 so
-            # this pointer is never dereferenced (guarded by @parameter if).
+            # this pointer is never dereferenced (guarded by comptime if).
             # Scale visibility is guaranteed by the kv_load2cvt_pipe mbar:
             # warp 8's per-thread mbar.arrive() (release) after scale stores
             # ensures this mbar.wait() (acquire) sees all scale data.

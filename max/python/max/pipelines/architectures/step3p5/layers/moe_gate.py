@@ -64,26 +64,16 @@ class Step3p5MoEGate(MoEGate):
                 device=devices[0],
             )
 
-    @property
-    def sharding_strategy(self) -> ShardingStrategy | None:
-        """Get the sharding strategy for the module."""
-        return self._sharding_strategy
-
-    @sharding_strategy.setter
-    def sharding_strategy(self, strategy: ShardingStrategy) -> None:
-        """Set the sharding strategy, including router_bias."""
-        if strategy.is_replicate:
-            self._sharding_strategy = strategy
-            self.gate_score.sharding_strategy = ShardingStrategy.replicate(
-                strategy.num_devices
-            )
-            self.router_bias.sharding_strategy = ShardingStrategy.replicate(
-                strategy.num_devices
-            )
-        else:
+    def _set_sharding_strategy(self, strategy: ShardingStrategy) -> None:
+        """Replicates ``router_bias`` alongside the base gate weights."""
+        if not strategy.is_replicate:
             raise ValueError(
                 "Only replicate sharding strategy is supported for Step3p5MoEGate."
             )
+        super()._set_sharding_strategy(strategy)
+        self.router_bias.sharding_strategy = ShardingStrategy.replicate(
+            strategy.num_devices
+        )
 
     def __call__(
         self, hidden_states: TensorValue

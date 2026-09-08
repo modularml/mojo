@@ -34,7 +34,7 @@ from std.sys import (
     get_defined_string,
     is_gpu,
     llvm_intrinsic,
-    simd_bit_width,
+    simd_byte_width,
     simd_width_of,
     size_of,
 )
@@ -185,7 +185,7 @@ def _memcpy_impl(
         )
 
     comptime if is_gpu():
-        vectorize[simd_bit_width()](n, copy)
+        vectorize[simd_byte_width()](n, copy)
 
         return
 

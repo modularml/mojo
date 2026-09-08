@@ -42,7 +42,7 @@ There are several challenges that occur when these types are used in symbolic
 parameter expressions. What is an example? Consider the result type of:
 
 ```mojo
-fn widen[dt: DType, n: Int](a: SIMD[dt, n], b: SIMD[dt, n]) -> SIMD[dt, n+n]:
+def widen[dt: DType, n: Int](a: SIMD[dt, n], b: SIMD[dt, n]) -> SIMD[dt, n+n]:
 ```
 
 The result type ends up being represented as `SIMD[dt, Int.__add__(n, n)]`.
@@ -80,7 +80,7 @@ problems:
    no rebind would be needed:
 
    ```mojo
-   fn example[dt2: DType](a: SIMD[dt2, 4]):
+   def example[dt2: DType](a: SIMD[dt2, 4]):
    var x = widen(a, a)
    ```
 

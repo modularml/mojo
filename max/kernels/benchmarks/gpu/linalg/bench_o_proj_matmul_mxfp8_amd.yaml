@@ -20,7 +20,8 @@ file: $KERNEL_BENCHMARKS_ROOT/gpu/linalg/bench_o_proj_matmul_mxfp8_amd.mojo
 params:
 
 # Per device at TP=4: q_dim 8192/4 = 2048 into hidden 6144.
-- $M: [1, 8, 32, 128, 512, 1024, 2048, 4096, 8192]
+# M=4 is the batch-1 target-verification shape for three MTP draft tokens.
+- $M: [1, 4, 8, 32, 128, 512, 1024, 2048, 4096, 8192]
   N: 6144
   K: 2048
   metadata:

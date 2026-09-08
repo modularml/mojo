@@ -21,7 +21,7 @@ very simple type:
 struct FileDescriptor:
     var value: Int
 
-    fn __del__(owned self):
+    def __del__(owned self):
         sys.close(self.value) # Call close(2)
 ```
 
@@ -45,15 +45,15 @@ Mojo to look like this:
 
 ```mojo
 # Semantic references to values:
-fn f1(a: SomeType):     # Read only reference to a value.
-fn f2(mut a: SomeType): # Mutable reference to a value.
-fn f3(ref a: SomeType): # Reference with contextually inferred mutability
+def f1(a: SomeType):     # Read only reference to a value.
+def f2(mut a: SomeType): # Mutable reference to a value.
+def f3(ref a: SomeType): # Reference with contextually inferred mutability
 
 # Semanticly a mutable owned copy of a value, formerly known as "owned":
-fn f4(var a: SomeType):
+def f4(var a: SomeType):
 
-# Syntax sugar for "fn f5() -> SomeType:".
-fn f5(out a: SomeType):
+# Syntax sugar for "def f5() -> SomeType:".
+def f5(out a: SomeType):
 ```
 
 This design has been through a lot of discussion, has been rolled out now and
@@ -68,16 +68,16 @@ migrate the code base and hit upon some odd cases, consider core value methods:
 ```mojo
 struct MyThing:
   ...
-  fn __init__(out self): ...
-  fn __copyinit__(out self, existing: Self): ...
-  fn __moveinit__(out self, owned existing: Self): ...
-  fn __del__(owned self): ...
+  def __init__(out self): ...
+  def __copyinit__(out self, existing: Self): ...
+  def __moveinit__(out self, owned existing: Self): ...
+  def __del__(owned self): ...
 ```
 
 Per the above decisions, the `owned` arguments to `__moveinit__` and `__del__`
 should change to `var`.
 
-I decided not to do this, because `fn __del__(var self)` ”looked weird”, and it
+I decided not to do this, because `def __del__(var self)` ”looked weird”, and it
 reminded me is that Mojo still has two outlier cases which are special cased in
 the compiler and therefore magic: the “source”/self of `moveinit` and `del`:
 they do not work like normal `owned` arguments.
@@ -98,16 +98,16 @@ is an unfortunate bit of magic afoot. With top of tree Mojo, `__del__` and
 `normal_method1` behave differently due to this magic.
 
 ```mojo
-fn consume_str(var data: String): ... # Consumes the string
+def consume_str(var data: String): ... # Consumes the string
 
 struct MyStringWrapper:
     var str: String
     ...
-    fn __del__(var self): # same as "owned self"
+    def __del__(var self): # same as "owned self"
         consume_str(self.str^) # this is ok.
         return # ok!
 
-    fn normal_method1(var self):
+    def normal_method1(var self):
        use_normally(self.str)
        # Mojo calls self.__del__() for you implicitly here.
        return
@@ -121,7 +121,7 @@ implicit destructor:
 
 ```mojo
 extension MyStringWrapper:
-    fn normal_method2(var self):
+    def normal_method2(var self):
        transfer_whole(self^) # transfer_whole consumed all of 'self'.
        return # ok, self.__del__() is NOT called.
 ```
@@ -134,7 +134,7 @@ it, it produces a compile time error saying it can’t.
 
 ```mojo
 extension MyStringWrapper:
-    fn normal_method3(var self): # same as "owned self"
+    def normal_method3(var self): # same as "owned self"
         consume_str(self.str^)  # this is ok.
         return # Error, cannot run the dtor on self because "str" is missing.
 ```
@@ -150,7 +150,7 @@ state of `self` before any returns, which makes it actually behave like this:
 
 ```mojo
 extension MyStringWrapper:
-    fn normal_method4(var str: MyStringWrapper):
+    def normal_method4(var str: MyStringWrapper):
         consume_str(self.str^)  # this is ok.
         __disable_del str # disable the dtor
         return # ok!
@@ -173,12 +173,12 @@ struct StringPair:
     var a: String
     var b: String
 
-    fn __moveinit__(out self, owned existing: Self):
+    def __moveinit__(out self, owned existing: Self):
         self.a = existing.a^ # transfer out of existing
         self.b = existing.b^ # transfer out of existing
         return # Ok!
 
-    fn notmoveinit(owned existing: Self):
+    def notmoveinit(owned existing: Self):
         consume(existing.a^)
         consume(existing.b^)
         return # error: cannot destroy "existing": a and b fields are uninit!
@@ -198,10 +198,10 @@ struct MyArray:
   var ptr: UnsafePointer[...]
   var size: Int
 
-  fn __del__(owned self):
+  def __del__(owned self):
        free(self.ptr)
 
-  fn __moveinit__(out self, owned existing: Self):
+  def __moveinit__(out self, owned existing: Self):
       self.ptr = existing.ptr
       self.size = existing.size
       # This has no effect, del isn't called anyway
@@ -255,7 +255,7 @@ so, which embeds the `__disable_del` call:
 ```mojo
 struct MyStruct:
     ...
-    fn __del__(owned self):
+    def __del__(owned self):
          consume(self.field^)
 ```
 
@@ -266,7 +266,7 @@ argument convention explicit by introducing a new argument convention, e.g.
 ```mojo
 struct MyStruct:
     ...
-    fn __del__(deinit self):
+    def __del__(deinit self):
        consume(self.field^)
        # Ok, the destructor is not implicitly run
 ```
@@ -279,7 +279,7 @@ though, not just destructors:
 ```mojo
 struct MySpaceShip:
 
-    fn launch(deinit self):
+    def launch(deinit self):
         process(self.cargo)
         # del is not invoked here
 ```
@@ -291,7 +291,7 @@ definitely get a specialized error message):
 
 ```mojo
 struct MyThing:
-    fn __del__(var self):
+    def __del__(var self):
        use(self.state)
        return # error: recursive call to self.__del__() is an infinite loop, change "var" to "deinit"
 ```
@@ -305,7 +305,7 @@ struct StringPair:
     var a: String
     var b: String
 
-    fn __moveinit__(out self, deinit existing: Self):
+    def __moveinit__(out self, deinit existing: Self):
         self.a = existing.a^ # transfer out of existing
         self.b = existing.b^ # transfer out of existing
         return # Ok!
@@ -336,7 +336,7 @@ they don’t control, things like this will be invalid:
 
 ```cpp
 struct Tuple[...]:
-   fn __init__(
+   def __init__(
         out self,
         var storage: VariadicPack[_, _, Copyable & Movable, *element_types],
     ):
@@ -366,10 +366,10 @@ While it will be vastly the most common thing for the `self` argument of
 # var instead of deinit - when delegating destruction to a named destructor.
 struct DelNeedNotBeDeinit:
 
-   fn __del__(var self):
+   def __del__(var self):
        self^.custom_del(42, "foo")
 
-   fn custom_del(deinit self, x: Int, message: String):
+   def custom_del(deinit self, x: Int, message: String):
        pass # custom logic is here.
 ```
 
@@ -380,7 +380,7 @@ compiler has the right infrastructure to diagnose mistakes correctly, e.g.:
 # This is a flow-sensitive error: 'self' not being consumed in del leads
 # to a recursive call to del, which is an error.
 struct UserError2:
-  fn __del__(var self):
+  def __del__(var self):
     use(self.state)
     pass       # CheckLifetimes generates an error "declare self as deinit"
 ```
@@ -391,16 +391,16 @@ the deinit path to a named destructor:
 
 ```mojo
 struct NoParametricDeinit:
-   fn __del__(var self):
+   def __del__(var self):
       if some_cond():
         self^.custom_del(42, "foo")
       else:
          self^._actual_del()
 
-   fn custom_del(deinit self, x: Int, message: String):
+   def custom_del(deinit self, x: Int, message: String):
        pass # whatever logic.
 
-    fn _actual_del(deinit self):
+    def _actual_del(deinit self):
       pass # Stub that just drops all the elements.
 ```
 
@@ -425,17 +425,17 @@ types:
 
 ```mojo
 struct Example:
-    fn deinit_method(deinit self): ...
-    fn var_method(var self): ...
+    def deinit_method(deinit self): ...
+    def var_method(var self): ...
 
-fn example():
-    var fp1 : fn(var Example) -> None
+def example():
+    var fp1 : def(var Example) -> None
     # Both are ok.
     fp1 = Example.deinit_method
     fp1 = Example.var_method
 
     # error: 'deinit' not allowed in function type, use 'var' instead.
-    var fp2 : fn(deinit Example) -> None
+    var fp2 : def(deinit Example) -> None
 ```
 
 ### Other minor behaviors
@@ -446,13 +446,13 @@ These just show some minor behavior, but shouldn't be surprising:
 # This is a parser error: 'self' is required to be 'var' or 'deinit' in an
 # implicit destructor.
 struct UserError1:
-  fn __del__(self):   # Parser rejects.
+  def __del__(self):   # Parser rejects.
 
 # Deinit is ASAP destruction for all the members.
 struct Thing:
   var state1: String
   var state2: String
-  fn custom_del(deinit self, var other_arg: String):
+  def custom_del(deinit self, var other_arg: String):
      # state2.__del__()  # Inserted by the compiler.
 
      use(other_arg)
@@ -480,7 +480,7 @@ is that it would make the behavior very explicit:
 ```mojo
 struct String:
     ...
-    fn __del__(owned self):
+    def __del__(owned self):
         """Destroy the string data."""
         self._drop_ref()
         __disable_del self

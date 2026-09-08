@@ -109,6 +109,13 @@ _EXTRA_CONSTRAINTS = {
         "//conditions:default": [],
     }),  # Kernel uses NVIDIA SM90 TMA primitives; Metal AIR codegen crashes.
     "gpu/nn/bench_mla_index_fp8_paged.mojo": ["//:b200_gpu"],  # SM100 tensor-core scorer: tcgen05 / TMA / SS-UMMA
+    # TODO(MOCO-4551): re-enable once Metal supports non-relaxed atomic
+    # orderings natively; CoopRow's device-scope release fence needs a Metal 4
+    # deployment target today.
+    "gpu/bench_coop_row_barrier.mojo": select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     "gpu/nn/bench_topk_bitonic.mojo": select({
         "//:apple_gpu": ["@platforms//:incompatible"],
         "//conditions:default": [],

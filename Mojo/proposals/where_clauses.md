@@ -361,8 +361,7 @@ struct S[
     def some_method(self)
        where pred2(b):
 
-       @parameter
-       if pred3(c):
+       comptime if pred3(c):
 
            def nested()
              where pred4(d):
@@ -450,8 +449,7 @@ evaluate today, but it extends to fully symbolic expressions too.
 The current paradigm we’re forcing users to adopt is a parameter-if:
 
 ```python
-@parameter
-if 2.is_prime():
+comptime if 2.is_prime():
   needs_prime[2]()
 else
   constrained[False, "This shouldn't happen"]()
@@ -566,7 +564,7 @@ struct A[T: AnyType]:
          var elt_copy = self.elt
 ```
 
-1. Depending on how we implement #2, maybe we can make `@parameter if T
+1. Depending on how we implement #2, maybe we can make `comptime if T
   instanceof SomeTrait` refine the value of T within the body of the `if`.
   Theoretically if we did this, we could eliminate the need for `rebind` in a
   lot of kernel code. I’m not sure if this is possible though.
@@ -602,8 +600,7 @@ def test(value: X[2]):
     # Error, cannot symbolically evaluate '2.is_prime()' to a constant.
     value.example()
 
-    @parameter
-    if 2.is_prime(): # tell dumb mojo that 2 is prime.
+    comptime if 2.is_prime(): # tell dumb mojo that 2 is prime.
        # This is ok.
        value.example()
 ```

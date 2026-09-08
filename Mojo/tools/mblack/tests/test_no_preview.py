@@ -98,8 +98,8 @@ def test_keyword_spacing():
 
 def test_parametric_alias():
     """Parametric aliases format correctly without preview."""
-    source = "alias addOne[x: Int] : Int = x + 1"
-    expected = "alias addOne[x: Int]: Int = x + 1\n"
+    source = "comptime addOne[x: Int] : Int = x + 1"
+    expected = "comptime addOne[x: Int]: Int = x + 1\n"
     assert_mojo_format(source, expected, mode=MOJO_MODE_NO_PREVIEW)
 
 

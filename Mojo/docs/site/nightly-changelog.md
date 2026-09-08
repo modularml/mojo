@@ -124,6 +124,8 @@ This version is still a work in progress.
   - `def __init__(out self):`
   - `def __init__(out self, *, capacity_bytes: Int):`
   - `def reserve_bytes(mut self, new_capacity_bytes: Int, /):`
+- List
+  - `def append(mut self, var value: Self.T, /):`
 
 ## Library performance improvements
 
@@ -163,6 +165,11 @@ This version is still a work in progress.
   visibly the baseline `x86-64` CPU, where it used to return `False`. Use
   `has_sse4()`, `has_avx2()`, and friends to gate code on a specific
   instruction set.
+
+- `Hasher.update` now takes a `ImmSpan[Byte, _]` instead of
+  `Some[Hashable]`. Code such as `hasher.update(some_subobject)`
+  in `__hash__` implementations should be changed to
+  `some_subobject.__hash__(hasher)`.
 
 - `CompilationTarget` can now describe RISC-V targets: `is_riscv()`,
   `is_rv32()`, and `is_rv64()` report the architecture, and
@@ -352,7 +359,19 @@ This version is still a work in progress.
 
 ## Removed
 
+- Legacy constructs replaced in 1.0 were removed in this release, including
+  the `fn`, `alias` and `__comptime_assert` keywords, `@parameter if` and
+  `@parameter for` syntax.
+
 This release completes the removal of APIs deprecated during the v1.0 cycle.
+
+- Removed `is_npu()` from `max.gpu.host.info`. A custom op's `target` says
+  whether the op was placed on the host or on a device, not which kind of
+  device it landed on -- that comes from the build, via `_accelerator_arch()`,
+  `get_gpu_target()` or `ctx.default_device_info`. `is_npu()` invited the
+  target string to be asked a question it cannot answer, and nothing called
+  it. `is_accelerator()` is unchanged in meaning for every target a graph
+  produces: use it to ask whether an op is off the host.
 
 - Implicit variable declaration now produces an error instead of a warning. The
   walrus operator also only overwrite existing values, not implicitly declare

@@ -20,12 +20,15 @@ from max.dtype import DType
 from max.experimental.sharding import DeviceMesh
 from max.graph import DeviceRef
 from max.graph.weights import WeightData
-from max.nn.kv_cache import KVCacheParamInterface
+from max.nn.kv_cache import KVCacheParamInterface, MultiKVCacheParams
 from max.nn.quant_config import QuantConfig
 from max.nn.rotary_embedding import LinearScalingParams
 from max.nn.transformer import ReturnLogits
+from max.pipelines.architectures.gpt_oss.hybrid_kv_params_util import (
+    hybrid_swa_full_kv_params,
+)
 from max.pipelines.kv_cache import cache_dtype_for_encoding
-from max.pipelines.lib import MAXModelConfig, PipelineConfig
+from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
 from max.pipelines.lib.config.model_config import (
     _interleaved_rope_weights,
     _select_quantization_encoding,
@@ -159,6 +162,39 @@ class Gemma3Config(
             The number of hidden layers specified in the configuration's text config.
         """
         return huggingface_config.num_hidden_layers
+
+    @classmethod
+    def construct_kv_params(
+        cls,
+        huggingface_config: AutoConfig,
+        pipeline_config: PipelineConfig,
+        devices: list[DeviceRef],
+        kv_cache_config: KVCacheConfig,
+        cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
+    ) -> MultiKVCacheParams:
+        """Constructor for hybrid sliding + full KV tree."""
+        pattern = huggingface_config._sliding_window_pattern
+        layer_types = [
+            (
+                "full_attention"
+                if (i + 1) % pattern == 0
+                else "sliding_attention"
+            )
+            for i in range(huggingface_config.num_hidden_layers)
+        ]
+        return hybrid_swa_full_kv_params(
+            layer_types=layer_types,
+            sliding_window=huggingface_config.sliding_window,
+            pipeline_config=pipeline_config,
+            devices=devices,
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
+            n_kv_heads=huggingface_config.num_key_value_heads,
+            head_dim=huggingface_config.head_dim,
+            allow_kv_head_replication=allow_kv_head_replication,
+        )
 
     @override
     @classmethod

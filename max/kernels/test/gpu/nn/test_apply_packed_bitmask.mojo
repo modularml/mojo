@@ -25,7 +25,7 @@ def test_apply_packed_bitmask(ctx: DeviceContext) raises:
     comptime fill_value: Float32 = -10000.0
 
     # logits[b, v] = b * 100 + v, so every kept value is unique and checkable.
-    var logits_stack = Array[Float32, batch * vocab](uninitialized=True)
+    var logits_stack = Array[Float32, batch * vocab](fill={})
     var logits = TileTensor(logits_stack, row_major[batch, vocab]())
     for b in range(batch):
         for v in range(vocab):
@@ -67,7 +67,7 @@ def test_apply_packed_bitmask(ctx: DeviceContext) raises:
         out_gpu, logits_gpu, packed_gpu, fill_value, ctx
     )
 
-    var out_stack = Array[Float32, batch * vocab](uninitialized=True)
+    var out_stack = Array[Float32, batch * vocab](fill={})
     ctx.enqueue_copy(Span(out_stack), out_gpu_buf)
     ctx.synchronize()
     var out = TileTensor(out_stack, row_major[batch, vocab]())
@@ -106,7 +106,7 @@ def test_neg_inf_survives_the_mask(ctx: DeviceContext) raises:
     # Mirrors a padded vocabulary: ids at or above this are untrained.
     comptime unpadded = 37
 
-    var logits_stack = Array[Float32, batch * vocab](uninitialized=True)
+    var logits_stack = Array[Float32, batch * vocab](fill={})
     var logits = TileTensor(logits_stack, row_major[batch, vocab]())
     for b in range(batch):
         for v in range(vocab):
@@ -145,7 +145,7 @@ def test_neg_inf_survives_the_mask(ctx: DeviceContext) raises:
         out_gpu, logits_gpu, packed_gpu, fill_value, ctx
     )
 
-    var out_stack = Array[Float32, batch * vocab](uninitialized=True)
+    var out_stack = Array[Float32, batch * vocab](fill={})
     ctx.enqueue_copy(Span(out_stack), out_gpu_buf)
     ctx.synchronize()
     var out = TileTensor(out_stack, row_major[batch, vocab]())

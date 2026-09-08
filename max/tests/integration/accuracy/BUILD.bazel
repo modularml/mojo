@@ -7,6 +7,13 @@ package(default_visibility = [
     "//oss/modular/max/tests:__subpackages__",
 ])
 
+# Read by //utils:test_run_llm_fuzz_flags, which checks the flags
+# run-llm-fuzz.sh forwards against the options declared here.
+exports_files(
+    ["pipelines_llm_fuzz.py"],
+    visibility = ["//utils:__pkg__"],
+)
+
 modular_py_test(
     name = "test_debug_utils",
     size = "small",

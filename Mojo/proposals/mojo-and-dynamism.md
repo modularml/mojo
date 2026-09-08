@@ -264,7 +264,8 @@ interop is on the table:
 def python_func(a, b=[]):
     return a + [2] + b
 
-fn mojo_func():
+
+def mojo_func():
     try:
         print(python_func([3]))
     except e:

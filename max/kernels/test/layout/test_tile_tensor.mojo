@@ -989,7 +989,7 @@ def test_transpose_2d() raises:
 
 def test_transpose_is_view() raises:
     """Test that transpose creates a view sharing memory with the original."""
-    var data = Array[Int32, 6](uninitialized=True)
+    var data = Array[Int32, 6](fill={})
     var tensor = TileTensor(data, row_major[2, 3]()).fill(0)
 
     var trans = tensor.transpose()
@@ -1047,7 +1047,7 @@ def test_transpose_1d() raises:
 
 def test_transpose_preserves_element_count() raises:
     """Test that transpose preserves the total number of elements."""
-    var data = Array[Int32, 20](uninitialized=True)
+    var data = Array[Int32, 20](fill={})
     var tensor = TileTensor(data, row_major[4, 5]()).fill(1)
     var trans = tensor.transpose()
 
@@ -1086,7 +1086,7 @@ def test_select_4d_to_2d() raises:
 
 def test_select_preserves_comptime_dims() raises:
     """Test that select preserves compile-time shape and stride info."""
-    var data = Array[Int32, 48](uninitialized=True)
+    var data = Array[Int32, 48](fill={})
     var tensor = TileTensor(data, row_major[2, 3, 4, 2]())
 
     _ = tensor.slice(Idx[0], All, Idx[1], All)

@@ -50,7 +50,7 @@ def decorator_on_statements() raises:
 # expected-error @+1 {{decorators must be on their own line; add a newline after the decorator}}
 @always_inline def same_line_decorator(): pass
 
-# @parameter if causes confusing indentation error message
+# comptime if causes confusing indentation error message
 # https://github.com/modularml/modular/issues/19163
 def some_fn():
     # expected-error @below {{decorators must be on their own line; add a newline after the decorator}}

@@ -222,13 +222,13 @@ struct AHasher[key: U256](Defaultable, Hasher):
                     ).cast[.uint64]()
                     self._large_update(U128(u64_1, u64_2))
 
-    def update(mut self, value: Some[Hashable]):
+    def update(mut self, value: ImmSpan[Byte, _]):
         """Update the buffer value with new hashable value.
 
         Args:
             value: Value used for update.
         """
-        value.__hash__(self)
+        self._update_with_bytes(value)
 
     @always_inline
     def finish(var self) -> UInt64:
@@ -281,6 +281,6 @@ def hash_seeded[T: Hashable](value: T, seed: U256) -> UInt64:
         A 64-bit integer hash value.
     """
     var hasher = AHasher[U256(0)](seed)
-    hasher.update(value)
+    value.__hash__(hasher)
     var result = hasher^.finish()
     return result

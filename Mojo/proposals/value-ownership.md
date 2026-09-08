@@ -113,16 +113,16 @@ Functions can be declared to take any of their arguments by-reference, with an &
 sigil in the function definition:
 
 ```mojo
-    fn globalFn(a: Int, b&: Int):
+    def globalFn(a: Int, b&: Int):
       b = a  # ok
       a = 4  # error
 
     struct Vec:
      ...
-     fn push_back(self&, item: Int): ...  # mutable self
-     fn size(self): ...                   # immutable self
+     def push_back(self&, item: Int): ...  # mutable self
+     def size(self): ...                   # immutable self
 
-    fn workWithVecs(a: Vec, b&: Vec):
+    def workWithVecs(a: Vec, b&: Vec):
      use(a.size()) # ok
      use(b.size()) # ok
 
@@ -158,7 +158,7 @@ in implicit conversions:
     struct Int:
       var value : __mlir_type.index
 
-    fn __init__(value: __mlir_type.index) -> Int:
+    def __init__(value: __mlir_type.index) -> Int:
       return Int { value: value }
 ```
 
@@ -204,7 +204,7 @@ function:
 
 ```mojo
   # This takes ownership of a unique vector, including its resources.
-  fn someFunction(owned v: Vec):
+  def someFunction(owned v: Vec):
       print(v)
       v.push_back(42)  # Ok: v is mutable because we own it
 ```
@@ -213,7 +213,7 @@ In the code above, we show “owned v” takes and owns a value from the caller.
 Just like normal arguments, we would need a copy to get them as mutable:
 
 ```mojo
-  fn anotherFunction(a: Int, owned v: Vec):
+  def anotherFunction(a: Int, owned v: Vec):
       a += 1           # Error: a is immutable
       var a2 = a       # Copy the argument to make it mutable
       a2 += 1          # Ok, a2 is mutable.
@@ -241,7 +241,7 @@ need something concrete to explain the examples.
 ```mojo
   # This takes a borrow and return it.
   # Returned references need lifetimes for safety of course.
-  fn printSizeAndReturn(borrowed v: Vec) -> borrowed Vec
+  def printSizeAndReturn(borrowed v: Vec) -> borrowed Vec
       print(v.size())
       return v
 ```
@@ -267,7 +267,7 @@ default convention for return values is to be owned:
 
 ```mojo
     # Result defaults to being an owned reference.
-    fn getVec() -> Vec:   # Equivalent to "...) -> Vec^"
+    def getVec() -> Vec:   # Equivalent to "...) -> Vec^"
         ...
 ```
 
@@ -292,7 +292,7 @@ places. Consider this example:
 
 ```mojo
     struct Dictionary:
-      fn size(self) -> Int: ...
+      def size(self) -> Int: ...
 ```
 
 You don’t want to **copy the dictionary**, when calling size! This worked for
@@ -329,14 +329,14 @@ obvious):
       var data: Pointer<Int>   # I just made this type up.
       var capacity: Int
       var size: Int
-      fn __init__(inout self, capacity: Int):
+      def __init__(inout self, capacity: Int):
          self.data = Pointer<Int>.malloc(capacity)
          self.capacity = capacity
          self.size = 0
 
       # default args will be nice some day
-      fn __new__(inout self): return Vec(1)
-      fn __del__(owned self):  # owning reference to self.
+      def __new__(inout self): return Vec(1)
+      def __del__(owned self):  # owning reference to self.
         # Any int values don't need to be destroyed.
         self.data.free()
 ```
@@ -365,7 +365,7 @@ Two major choices exist:
 The difference can be seen in cases like this:
 
 ```mojo
-  fn bindingLifetimeExample():
+  def bindingLifetimeExample():
       var vec = Vec()
       vec.push_back(12)
       use(vec)
@@ -407,9 +407,9 @@ operation).
 I propose supporting this with the `^` postfix operator, e.g.:
 
 ```mojo
-    fn takeVec(owned v: Vec): ...
+    def takeVec(owned v: Vec): ...
 
-    fn showEarlyBindingEnd():
+    def showEarlyBindingEnd():
       var vec = Vec()
       vec.push_back(12)
       takeVec(vec^)   # Ownership of vec is transferred to takeVec.
@@ -436,7 +436,7 @@ formalized as a trait) where types who want it define a `take()` method:
 ```mojo
   struct Vec:
       ...
-      fn __moveinit__(out self, inout existing):
+      def __moveinit__(out self, inout existing):
           # Steal the contents of 'existing'
           self.data = existing.data
           self.capacity = existing.capacity
@@ -498,7 +498,7 @@ For example in:
         var a: T1
         var b: T2
 
-        fn __del__(owned self):  # This should be synthesized.
+        def __del__(owned self):  # This should be synthesized.
             _ = self.a^
             _ = self.b^
 ```
@@ -517,7 +517,7 @@ values, which is super pure, but it would be impractically painful to work with
 simple types that have trivial copy constructors. For example:
 
 ```mojo
-  fn useIntegers(a: Int):
+  def useIntegers(a: Int):
       var b = a+4        # ok, b gets owned value returned by plus operator.
       let c = b          # error, cannot take ownership from an lvalue.
       let c2 = b.copy()  # Ok, but laughable for Int.
@@ -544,7 +544,7 @@ trait):
 ```mojo
     struct Int:
       var value: __mlir_type.index
-      fn __copyinit__(inout self, borrowed existing: Int):
+      def __copyinit__(inout self, borrowed existing: Int):
         self.value = existing.value
 ```
 
@@ -611,17 +611,17 @@ for Rust-style lifetimes.
 This is the TL;DR: summary of what I think we end up with:
 
 ```mojo
-    fn borrow_it(a: X)           # takes X as borrow (sugar).
-    fn borrow_it(borrowed a: X)  # takes X as borrow.
-    fn take_it(owned a: X)            # takes owned X
-    fn ref_it(inout a: X)             # takes mutable reference to X
-    fn register_it(a: Int)       # by copy when Int is register-passable.
+    def borrow_it(a: X)           # takes X as borrow (sugar).
+    def borrow_it(borrowed a: X)  # takes X as borrow.
+    def take_it(owned a: X)            # takes owned X
+    def ref_it(inout a: X)             # takes mutable reference to X
+    def register_it(a: Int)       # by copy when Int is register-passable.
 
-    fn ret_owned(self) -> X:           # Return an owned X (sugar).
-    fn ret_owned(self) -> owned X:     # Return an owned X.
-    fn ret_borrow(self) -> borrowed X: # Return an X as a borrow
-    fn ret_ref(self) -> inout X:       # Return an X as a mutable ref
-    fn ret_register(self) -> Int:      # Return by copy when Int is register-passable
+    def ret_owned(self) -> X:           # Return an owned X (sugar).
+    def ret_owned(self) -> owned X:     # Return an owned X.
+    def ret_borrow(self) -> borrowed X: # Return an X as a borrow
+    def ret_ref(self) -> inout X:       # Return an X as a mutable ref
+    def ret_register(self) -> Int:      # Return by copy when Int is register-passable
 ```
 
 ### Extension for Lifetime types
@@ -636,11 +636,11 @@ and MLIR design. For example, you could imagine things like this:
 
 ```mojo
     # Take a non-copyable SomeTy as a borrow and return owned copy
-    fn life_ex1['a: origin](value: 'a SomeTy) -> SomeTy:
+    def life_ex1['a: origin](value: 'a SomeTy) -> SomeTy:
       return value.copy()
 
     # Take a non-copyable SomeTy and return the reference
-    fn life_ex2['a: origin](value: 'a SomeTy) -> borrowed 'a SomeTy:
+    def life_ex2['a: origin](value: 'a SomeTy) -> borrowed 'a SomeTy:
       return value
 ```
 
@@ -667,11 +667,11 @@ library proposal, but we could implement some copy traits like this:
 ```mojo
   trait Copyable:
       # Just a signature, no body.
-      fn copy(self) -> Self: ...
+      def copy(self) -> Self: ...
 
   trait ImplicitlyCopyable(Copyable):     # Could use a better name :)
       # A __copyinit__ is required, and this is the default implementation.
-      fn __copyinit__(inout self, borrowed existing: Self):
+      def __copyinit__(inout self, borrowed existing: Self):
           self = existing.copy()
 ```
 
@@ -688,11 +688,11 @@ This allows types to use it like this:
 ```mojo
     struct Int(ImplicitlyCopyable):
         var value: __mlir_type.index
-        fn copy(self: Self) -> Self:
+        def copy(self: Self) -> Self:
             return Int{value: self.value}
 
       # Don't have to write this, we get a default impl from ImplicitlyCopyable
-      # fn __copyinit__(inout self, borrowed existing: Self):
+      # def __copyinit__(inout self, borrowed existing: Self):
       #     self = existing.copy()
 ```
 

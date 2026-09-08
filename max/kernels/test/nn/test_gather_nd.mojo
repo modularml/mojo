@@ -45,7 +45,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 2](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 2](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -81,7 +81,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 4](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 4](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -109,7 +109,7 @@ def main():
         var data_stack: Array[Scalar[data_type], _] = [0, 1, 2, 3, 4, 5, 6, 7]
         var data = TileTensor(data_stack, row_major[2, 2, 2]())
 
-        var indices_stack = Array[Int64, 4](uninitialized=True)
+        var indices_stack = Array[Int64, 4](fill={})
         var indices = TileTensor(indices_stack, row_major[2, 2]())
 
         indices[0, 0] = 0
@@ -126,7 +126,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 4](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 4](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -156,7 +156,7 @@ def main():
         )
         var data = TileTensor(data_stack, row_major[2, 2, 2]())
 
-        var indices_stack = Array[Int64, 4](uninitialized=True)
+        var indices_stack = Array[Int64, 4](fill={})
         var indices = TileTensor(indices_stack, row_major[2, 1, 2]())
 
         indices[0, 0, 0] = 0
@@ -173,7 +173,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 4](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 4](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -215,7 +215,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 4](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 4](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -247,7 +247,7 @@ def main():
         )
         var data = TileTensor(data_stack, row_major[2, 3, 4]())
 
-        var indices_stack = Array[Int64, 2 * 3](uninitialized=True)
+        var indices_stack = Array[Int64, 2 * 3](fill={})
         var indices = TileTensor(indices_stack, row_major[2, 3, 1, 1]())
 
         indices[0, 0, 0, 0] = 1
@@ -266,7 +266,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 6](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 6](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -312,7 +312,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 8](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 8](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )
@@ -366,7 +366,7 @@ def main():
         )
         print("Output shape: ", output_shape)
 
-        var output_data_data = Array[Scalar[data_type], 6](uninitialized=True)
+        var output_data_data = Array[Scalar[data_type], 6](fill={})
         var output_data_buffer = TileTensor(
             output_data_data, row_major(Coord(output_shape))
         )

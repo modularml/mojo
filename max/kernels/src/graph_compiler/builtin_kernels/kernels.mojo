@@ -5253,12 +5253,13 @@ struct WaitHostValue:
     - `payload[1]`: the 64-bit value to wait for (the int64 element is
       reinterpreted as a u64).
 
-    Captures cleanly into a CUDA graph as a wait-value / batch-mem-op
+    Records into a captured device graph as a wait-value / batch-mem-op
     node, so this op can sit inside a captured forward graph just before
     the sampling kernel to gate the sampler on the bitmask compute
-    finishing while the rest of the forward body runs concurrently.
-    Currently only CUDA streams support stream memory ops; non-CUDA
-    backends raise at runtime.
+    finishing while the rest of the forward body runs concurrently. On
+    HIP that node is recorded explicitly by the driver layer, because
+    ROCm's stream capture does not record `hipStreamWaitValue64` itself.
+    Supported on CUDA and HIP streams; other backends raise at runtime.
     """
 
     @staticmethod

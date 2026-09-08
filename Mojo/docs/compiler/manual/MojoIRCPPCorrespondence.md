@@ -7,7 +7,7 @@ markdown-notebook-data-directory: mdnb-data/manual-correspondence/
 For any given piece of language semantics, there are three different domains in
 which you will view things:
 
-- Mojo source code (`fn main(): ...`)
+- Mojo source code (`def main(): ...`)
 - MLIR code (`lit.fn @”main()”() -> !kgen.none { ... }`)
 - The compiler C++ code that produces that MLIR.
 

@@ -6,6 +6,9 @@ github_url: https://github.com/modular/modular/tree/main/max/examples/gpu-intro
 image: /images/artwork/mojo-motorcycle.jpg
 ---
 
+import ConditionalVersionDocs from '@site/src/components/ConditionalVersionDocs'
+import CodeBlock from '@theme/CodeBlock';
+
 This tutorial introduces you to GPU programming with Mojo. You'll learn how to
 write a simple program that performs vector addition on a GPU, exploring
 fundamental concepts of GPU programming along the way.
@@ -50,24 +53,31 @@ other options, see [Packages](/packages/)).
 
     ```bash
     pixi init gpu-intro \
-      -c https://conda.modular.com/max/ -c conda-forge \
+      -c https://conda.modular.com/max-nightly/ -c conda-forge \
       && cd gpu-intro
     ```
 
-    This creates a project directory named `gpu-intro`, adds the Modular conda
-    package channel, and enters the directory.
+   This creates a project directory named `gpu-intro`, adds the MAX conda
+   package channel, and enters the directory.
 
 3. Install the `max` package, which includes the Mojo compiler and the MAX
    accelerator library where the GPU APIs live:
 
-    ```bash
-    pixi add max
-    ```
+   <ConditionalVersionDocs version="nightly">
+   <CodeBlock language="sh">
+   {`pixi add max`}
+   </CodeBlock>
+   </ConditionalVersionDocs>
+   <ConditionalVersionDocs version="stable">
+   <CodeBlock language="sh">
+   {`pixi add "max==26.5"`}
+   </CodeBlock>
+   </ConditionalVersionDocs>
 
-    This tutorial needs nothing more than `max`. If you also want the rest of
-    the Mojo developer tools, or the serving and benchmarking commands, install
-    `max-all` instead (`max[all]` with pip or uv). For a breakdown of each
-    package, see [Packages](/packages/).
+   This tutorial needs nothing more than `max`. If you also want the rest of
+   the Mojo developer tools, or the serving and benchmarking commands, install
+   `max-all` instead (`max[all]` with pip or uv). For a breakdown of each
+   package, see [Packages](/packages/).
 
 4. Verify the project is configured correctly by checking the version of Mojo
    that's installed within our project's virtual environment:
@@ -76,16 +86,13 @@ other options, see [Packages](/packages/)).
     pixi run mojo --version
     ```
 
-    You should see a version string indicating the version of Mojo installed.
-    By default, this should be the latest nightly version.
-
 5. Activate the project's virtual environment:
 
     ```bash
     pixi shell
     ```
 
-    Later on, when you want to exit the virtual environment, just type `exit`.
+   Later on, when you want to exit the virtual environment, just type `exit`.
 
 ## 2. Get a reference to the GPU device
 

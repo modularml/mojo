@@ -625,8 +625,9 @@ struct Shuffler[E: Int]:
         MN: Int,
         K_SCALES: Int,
         SrcLayout: TensorLayout,
+        SrcEngine: TensorEngine,
     ](
-        src: TileTensor[.uint8, SrcLayout, MutAnyOrigin],
+        src: TileTensor[.uint8, SrcLayout, MutAnyOrigin, Engine=SrcEngine],
         mut dst: HostBuffer[.uint8],
     ):
         # shuffles the scale layout on CPU, and pads the layout
@@ -635,6 +636,11 @@ struct Shuffler[E: Int]:
         comptime assert (
             K_SCALES % Self.S_K_BLOCK == 0
         ), "preshuffle_scale_4d: K_SCALES must be a multiple of 8"
+        comptime assert SrcEngine.element_size == 1, (
+            "preshuffle_scale_4d: requires a scalar engine"
+            " (DefaultEngine / PointerStorage); vectorized engines are not"
+            " supported."
+        )
 
         comptime MN_padded = Self.scale_padded_mn(MN)
         comptime group_bytes = MN_padded * K_SCALES
@@ -646,7 +652,12 @@ struct Shuffler[E: Int]:
                     var byte_off = e_off + Self.scale_4d_byte_off[
                         K_SCALES=K_SCALES
                     ](mn, k_scale)
-                    dst[byte_off] = src[Coord(e, mn, k_scale)]
+                    # ElementType is `SIMD[.uint8, SrcEngine.element_size]`,
+                    # but only scalar engines are accepted (asserted above),
+                    # so a width-1 load yields a `UInt8` scalar.
+                    dst[byte_off] = UInt8(
+                        src.load[width=1](Coord(e, mn, k_scale))
+                    )
 
             for mn in range(MN, MN_padded):
                 for k_scale in range(K_SCALES):

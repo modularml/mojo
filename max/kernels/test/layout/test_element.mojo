@@ -278,7 +278,7 @@ def test_element_dynamic_layout() raises:
 # CHECK-LABEL: test_element_masked_load
 def test_element_masked_load():
     print("== test_element_masked_load")
-    var tensor_4x4_stack = Array[Float32, 4 * 4](uninitialized=True)
+    var tensor_4x4_stack = Array[Float32, 4 * 4](fill={})
     var tensor_4x4 = LayoutTensor[.float32, Layout.row_major(4, 4)](
         tensor_4x4_stack
     )
@@ -334,7 +334,7 @@ def test_element_masked_load():
 # CHECK-LABEL: test_element_masked_store
 def test_element_masked_store():
     print("== test_element_masked_store")
-    var tensor_4x4_stack = Array[Float32, 4 * 4](uninitialized=True)
+    var tensor_4x4_stack = Array[Float32, 4 * 4](fill={})
     var tensor_4x4 = LayoutTensor[.float32, Layout.row_major(4, 4)](
         tensor_4x4_stack
     ).fill(-1)

@@ -20,6 +20,7 @@ modular_py_library(
         "//max/python/max/nn",
         # Hooks added for convenience for when we want to print the model layers
         "//max/python/max/nn/hooks",
+        "//max/python/max/pipelines/architectures/gpt_oss",
         "//max/python/max/pipelines/architectures/llama3",
         "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/kv_cache",

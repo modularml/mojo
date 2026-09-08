@@ -667,7 +667,16 @@ def grouped_matmul_amd_kernel_launcher[
             Optional[elementwise_epilogue_type](
                 elementwise_epilogue_fn_wrapper
             ) if elementwise_lambda_fn else None,
-        ].run(c_tile, a_tile, b_tile)
+        ].run[
+            type_of(c_tile).LayoutType,
+            type_of(a_tile).LayoutType,
+            type_of(b_tile).LayoutType,
+            type_of(c_tile).Engine,
+            type_of(a_tile).Engine,
+            type_of(b_tile).Engine,
+        ](
+            c_tile, a_tile, b_tile
+        )
 
     # Perform the epilogue function separately if expert_id is -1
     else:

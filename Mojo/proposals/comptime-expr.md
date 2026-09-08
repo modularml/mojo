@@ -13,7 +13,7 @@ positions and parameters are evaluated at comptime, but local statements default
 to being runtime:
 
 ```mojo
-fn example1(arg: Int):     # types like Int are comptime expressions
+def example1(arg: Int):     # types like Int are comptime expressions
    someFunction[foo()+5]() # parameter expressions are comptime
    comptime c = foo()+5    # comptime assignments are comptime
 
@@ -27,7 +27,7 @@ dynamic value at comptime, one example is (assuming `Layout` becomes
 non-implicitly-materializable in the near future, because it can malloc):
 
 ```mojo
-fn example2[layout: Layout]():
+def example2[layout: Layout]():
    # Error, materializes "layout" to runtime, not its size.
    use(layout.size())
 
@@ -46,7 +46,7 @@ allowing an subexpression to be forced to evaluate at comptime. This would
 allow writing the code above as:
 
 ```mojo
-fn example3[layout: Layout]():
+def example3[layout: Layout]():
    # Ok, evaluate .size() at comptime and materialize the resulting Int.
    use(comptime(layout.size()), layout.size())
 ```
@@ -83,7 +83,7 @@ comptime comptime_eval[T: AnyType, //, val: T] = val
 which would allow writing:
 
 ```mojo
-fn example4[layout: Layout]():
+def example4[layout: Layout]():
    # Ok, evaluate .size() at comptime and materialize the Int.
    use(comptime_eval[layout.size()])
 ```

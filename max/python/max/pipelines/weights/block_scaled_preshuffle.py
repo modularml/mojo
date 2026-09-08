@@ -76,6 +76,17 @@ _SHARED_EXPERT_SCALE_RE = re.compile(
     r"\.(?P<proj>gate_proj|up_proj|down_proj)\.weight_scale$"
 )
 
+# What an expert projection weight/scale looks like regardless of how the layer
+# prefix is spelled. Used only to tell "this checkpoint has no experts" from
+# "the strict patterns above no longer match this checkpoint's naming"; never
+# to select what gets permuted.
+_LOOSE_EXPERT_WEIGHT_RE = re.compile(r"(?:^|\.)mlp\.experts\..*_proj\.weight$")
+
+_LOOSE_EXPERT_SCALE_RE = re.compile(
+    r"(?:^|\.)mlp\.experts\..*_proj\.weight_scale$"
+)
+
+
 # MFMA geometry, mirroring the constants of the same name in
 # `max/kernels/src/linalg/matmul/gpu/amd/mxfp4_preshuffle_layouts.mojo`.
 _MFMA_MN_LANES = 16
@@ -228,7 +239,7 @@ def preshuffle_block_scaled_b_experts(
     *,
     include_shared_weights: bool = False,
     lane_bytes: int = 16,
-) -> None:
+) -> int:
     """MX B preshuffle of all per-expert weights in-place on CPU.
 
     Walks ``state_dict``, groups expert weights by ``(prefix, proj)``,
@@ -250,6 +261,11 @@ def preshuffle_block_scaled_b_experts(
         lane_bytes: Bytes one lane feeds the MFMA. 16 for MXFP4 and MXFP8
             (``b_5d_grouped_layout``); :data:`MXFP6_LANE_BYTES` for MXFP6,
             which selects the plane-split layout instead.
+
+    Returns:
+        How many expert weights the FQN patterns matched. Counted under
+        virtual devices too, where the byte permutation is skipped, so a
+        caller can tell "matched nothing" from "did the work" in both modes.
     """
     if lane_bytes not in (_MFMA_LANE_BYTES, MXFP6_LANE_BYTES):
         raise ValueError(
@@ -271,7 +287,16 @@ def preshuffle_block_scaled_b_experts(
                 continue
 
     if not groups:
-        return
+        if unmatched := [
+            n for n in state_dict if _LOOSE_EXPERT_WEIGHT_RE.search(n)
+        ]:
+            raise ValueError(
+                "MX expert preshuffle matched no weights, but this checkpoint "
+                f"has expert tensors (e.g. {unmatched[0]!r}), so the preb "
+                "kernel would read them row-major. Teach this module's FQN "
+                "patterns about this naming."
+            )
+        return 0
 
     t0 = time.perf_counter()
     n_total = 0
@@ -324,13 +349,14 @@ def preshuffle_block_scaled_b_experts(
         len(groups),
         time.perf_counter() - t0,
     )
+    return n_total
 
 
 def preshuffle_block_scaled_b_scales(
     state_dict: dict[str, WeightData],
     *,
     include_shared_weights: bool = False,
-) -> None:
+) -> int:
     """MXFP4 B-scale preshuffle of all per-expert scales in-place on CPU.
 
     Walks ``state_dict``, groups expert scales by ``(prefix, proj)``,
@@ -343,6 +369,10 @@ def preshuffle_block_scaled_b_scales(
 
     Companion to :func:`preshuffle_block_scaled_b_experts`; should be called
     immediately after it so weight and scale layouts stay in sync.
+
+    Returns:
+        How many expert scales the FQN patterns matched, on the same terms
+        as :func:`preshuffle_block_scaled_b_experts`.
     """
     groups: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
     for name in state_dict:
@@ -356,7 +386,16 @@ def preshuffle_block_scaled_b_scales(
                 continue
 
     if not groups:
-        return
+        if unmatched := [
+            n for n in state_dict if _LOOSE_EXPERT_SCALE_RE.search(n)
+        ]:
+            raise ValueError(
+                "MX expert B-scale preshuffle matched no scales, but this "
+                f"checkpoint has expert scales (e.g. {unmatched[0]!r}), so the "
+                "preb kernel would read them row-major. Teach this module's "
+                "FQN patterns about this naming."
+            )
+        return 0
 
     t0 = time.perf_counter()
     n_total = 0
@@ -406,6 +445,7 @@ def preshuffle_block_scaled_b_scales(
         len(groups),
         time.perf_counter() - t0,
     )
+    return n_total
 
 
 def shuffle_block_scaled_b_dense_arrays(

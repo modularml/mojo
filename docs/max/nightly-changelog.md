@@ -37,6 +37,9 @@ the [container](/container) page now links to the new page.
   releases each stage in turn within a request; the first request after a cold
   start pays a multi-minute compile that later ones replay from the
   compilation cache.
+- Startup no longer prints one `unknown dtype found in safetensors file`
+  warning for each tensor with a dtype that is not a weight encoding. Each
+  scan of the weight files now prints one warning for each unknown dtype.
 - Fixed unbounded host-memory usage in Gemma 4 video pre-processing: the
   server now decodes only the sampled frames of a video instead of
   materializing every frame before sampling, bounding peak memory at the
@@ -461,6 +464,14 @@ the [container](/container) page now links to the new page.
   now resolve on this path, folded into the handshake's `kv_config_hash`. A
   single-tenant node spanning more than one GPU must set the dKV server's
   `--fair-share-partitions` to its GPU count.
+- The dKV external KV-cache connector now waits out a busy node instead of
+  failing model load on it. dKV refuses a handshake when it has no room for
+  another share, which is a transient condition that clears once a departing
+  share's memory is released, so the refusal is now retriable and the
+  connector's admission budget (`MODULAR_DKV_ADMISSION_TIMEOUT_S`, default
+  raised from 120s to 600s) retries it. A budget too small to cover several
+  attempts is raised to that floor with a warning rather than rejected, so a
+  deployment that pinned the old default keeps starting.
 - A request's `dkv_cache_hint` now reaches the dKV external KV-cache connector,
   which reads it to load a cached prefix from the instance that holds it rather
   than only from the co-located one. The serving layer forwards the field
@@ -562,6 +573,34 @@ the [container](/container) page now links to the new page.
   grammar is still rejected with the same HTTP 400, streaming requests
   included, and a disaggregated prefill node now reports the failure to
   the decode node instead of leaving the request to time out.
+
+- Speculative decoding can now verify only some of the draft tokens it
+  generates, varying that count with the decode batch size via the new
+  `num_speculative_tokens_per_batch_size` speculative-config field. Each entry
+  names an inclusive batch-size range and a count through the keys
+  `batch_start`, `batch_end`, and `num_tokens`, so a two-range schedule is
+  `[{"batch_start": 1, "batch_end": 16, "num_tokens": 3}, {"batch_start": 17,
+  "batch_end": 64, "num_tokens": 1}]`. The first range must start at batch size
+  1 so every batch size resolves to a count; gaps and the tail carry the
+  previous count forward. Drafting is cheap, but every draft the target verifies
+  is another query position in its forward pass, so at high concurrency those
+  positions compete with real tokens for the same compute and a rejected draft
+  is compute spent for nothing. Whether narrowing pays off therefore depends on
+  how well the drafts are being accepted, which is a property of the workload
+  rather than of the batch size. Measure your own workload before adopting a
+  schedule. The field is off by default, and unset behavior is unchanged. It
+  applies to every speculative method. A block drafter (`dflash`) still drafts
+  its whole checkpoint-fixed block every step, so a schedule narrows only how
+  much of that block the target verifies; the saving comes from the target's
+  verify pass, never from drafting less.
+
+  It is most useful for a block drafter, whose draft depth is fixed by its
+  checkpoint, making the verified count the only runtime lever on step cost.
+  Where the draft depth is itself configurable, as it is for `eagle` and
+  `mtp`, lowering `num_speculative_tokens` is the better tool: it removes the
+  draft passes as well as the verify positions, while a schedule pays for
+  drafts it then discards. A count of `0` is accepted and disables
+  verification for that batch-size range.
 
 - GLM models now map `reasoning_effort` onto the two thinking levels their
   chat template can express, instead of forwarding it verbatim. The template
@@ -1112,9 +1151,7 @@ the [container](/container) page now links to the new page.
 
 - `DeviceGraphBuilder.add_function[kernel](*args, ...)` takes a thin
   function pointer (`func: def(...) thin -> None`), the same identity as
-  `DeviceContext.compile_function[kernel]()`. The capturing compile-and-add
-  overloads are removed; capturing kernels use
-  `DeviceContext.enqueue_function()` or `recording_context()`.
+  `DeviceContext.compile_function[kernel]()`.
 
 - `PipelineRegistry.retrieve_factory` now returns a `RetrievedPipeline`
   dataclass with `tokenizer`, `factory`, and `memory_plan` fields instead of
@@ -1144,11 +1181,34 @@ the [container](/container) page now links to the new page.
 
 ## Fixes
 
+- Fixed a pre-tokenized prompt longer than `--max-length` killing the model
+  worker instead of being rejected. Only a string prompt was length-checked,
+  so a token-array prompt — an OpenAI `/v1/completions` token array, or the
+  pre-tokenized prompt an orchestrator supplies for KV cache-aware routing —
+  was admitted at any length and produced a request whose length exceeded the
+  model's context window. Under speculative decoding the response path then
+  raised rather than capping, taking the worker down and wiping its prefix
+  cache; such a request now returns HTTP 400 like an over-length string
+  prompt.
+
+- Fixed constrained decoding producing invalid output when combined with
+  speculative decoding on AMD GPUs. The in-graph wait that gates the grammar
+  bitmask copy was not recorded into captured device graphs, so replays read a
+  stale mask.
+
 - Fixed tool calls being returned as raw markup in the assistant's `content`
   when a request did not declare a `tools` array. A tool established only by
   the conversation history, such as retrying a call that previously failed,
   now comes back as a structured `tool_calls` entry. Parsing runs whenever the
   model has a tool parser configured; `tool_choice="none"` still opts out.
+
+- Fixed `max-debug.source-tracebacks` (for example
+  `MODULAR_DEBUG=source-tracebacks` or
+  `Graph.debug.source_tracebacks = True`) being silently ignored when it
+  was enabled after `max.graph` was first imported. The flag was cached at
+  import time, so runtime error messages lacked the `Source Traceback`
+  section pointing back at the Python code that built the failing op, even
+  though the config reported the feature as enabled.
 
 - Fixed the `disk_bytes_written` KV cache metric counting blocks the tiered
   connector's disk tier declined to write because they were already saved or
@@ -1159,6 +1219,14 @@ the [container](/container) page now links to the new page.
 - Fixed `generate_async` raising `KeyError: Request ID not found in replica
   batch` when requests in one batch finish on different steps, which happens
   whenever they are given different `max_new_tokens`.
+
+- Fixed the offline `generate()` and `generate_async()` APIs releasing only a
+  finished request's KV cache blocks, and never the pipeline itself. The
+  pipeline-level release is what frees a recurrent state pool slot and drops a
+  request's vision encoder cache references, so architectures that carry
+  recurrent state — such as Nemotron-H, Mamba, and LFM2 — leaked one state slot
+  per request, and a second run in the same process could inherit the first
+  run's slot and return different greedy tokens.
 
 - Fixed `DeviceExternalFunction` crashing on Metal instead of launching, so
   separately compiled kernels now load and launch there as they already did on

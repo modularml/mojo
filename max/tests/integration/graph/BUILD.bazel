@@ -47,6 +47,7 @@ _SEPARATE_TARGET_TESTS = [
     "test_runtime_source_notes.py",
     "test_scatter.py",
     "test_tile_based_fusion.py",
+    "test_typical_llm_snifftest.py",
 ]
 
 modular_py_test(
@@ -207,6 +208,36 @@ modular_py_test(
         "//max/python/max/graph",
         requirement("hypothesis"),
         requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_typical_llm_snifftest",
+    srcs = [
+        "conftest.py",
+        "test_typical_llm_snifftest.py",
+    ],
+    exec_properties = {
+        "test.resources:gpu-memory": "2",
+    },
+    gpu_constraints = ["//:has_gpu"] + select({
+        "//:apple_gpu": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    # max.experimental.nn.Module.compile() reaches max.engine.InferenceSession
+    # transitively through its own lazy internals; optional at runtime, like
+    # the experimental package's own ignore_extra_deps for the same target.
+    ignore_unresolved_imports = ["max.engine.InferenceSession"],
+    tags = [
+        "gpu",
+    ],
+    deps = [
+        "//max/python/max/driver",
+        "//max/python/max/dtype",
+        "//max/python/max/experimental",
+        "//max/python/max/experimental/nn",
+        "//max/python/max/graph",
+        requirement("hypothesis"),
     ],
 )
 

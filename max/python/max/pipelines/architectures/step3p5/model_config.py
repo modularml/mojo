@@ -20,7 +20,10 @@ from typing import ClassVar
 
 from max.dtype import DType
 from max.graph import DeviceRef
-from max.nn.kv_cache import KVCacheParams
+from max.nn.kv_cache import MultiKVCacheParams
+from max.pipelines.architectures.gpt_oss.hybrid_kv_params_util import (
+    hybrid_swa_full_kv_params,
+)
 from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import KVCacheConfig, MAXModelConfig, PipelineConfig
 from max.pipelines.modeling.config_enums import SupportedEncoding
@@ -103,7 +106,7 @@ class Step3p5Config(Llama3Config):
     """Per-layer SwiGLU activation clipping thresholds for shared experts."""
 
     @staticmethod
-    def construct_kv_params(
+    def construct_kv_params(  # type: ignore[override]
         huggingface_config: AutoConfig,
         pipeline_config: PipelineConfig,
         devices: list[DeviceRef],
@@ -111,45 +114,24 @@ class Step3p5Config(Llama3Config):
         cache_dtype: DType,
         *,
         allow_kv_head_replication: bool = False,
-    ) -> KVCacheParams:
-        """Construct KV cache parameters for Step-3.5.
-
-        Uses the maximum number of KV heads across all layer types, since
-        the KV cache is allocated per-layer and sliding layers may have
-        more KV heads than full attention layers.
-
-        Args:
-            huggingface_config: The HuggingFace configuration object.
-            pipeline_config: The MAX Engine pipeline configuration.
-            devices: Devices to use for the KV cache.
-            kv_cache_config: Configuration for KV cache.
-            cache_dtype: Data type for the cache.
-
-        Returns:
-            KVCacheParams object.
-        """
-        head_dim = getattr(huggingface_config, "head_dim", 128)
-
-        # Use the max KV heads across layer types for cache allocation
-        num_kv_heads_full = getattr(
-            huggingface_config, "num_attention_groups", 8
-        )
-        other = getattr(huggingface_config, "attention_other_setting", None)
-        num_kv_heads_sliding = (
-            other.get("num_attention_groups", num_kv_heads_full)
-            if other
-            else num_kv_heads_full
-        )
-        max_kv_heads = max(num_kv_heads_full, num_kv_heads_sliding)
-
-        return kv_cache_config.to_params(
-            allow_kv_head_replication=allow_kv_head_replication,
-            dtype=cache_dtype,
-            n_kv_heads=max_kv_heads,
-            head_dim=head_dim,
-            num_layers=huggingface_config.num_hidden_layers,
+    ) -> MultiKVCacheParams:
+        """Constructor for hybrid sliding + full KV tree."""
+        layer_types = huggingface_config.layer_types
+        assert len(layer_types) == huggingface_config.num_hidden_layers
+        return hybrid_swa_full_kv_params(
+            layer_types=layer_types,
+            sliding_window=huggingface_config.sliding_window,
+            pipeline_config=pipeline_config,
             devices=devices,
-            data_parallel_degree=pipeline_config.model.data_parallel_degree,
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
+            n_kv_heads=huggingface_config.num_attention_groups,
+            head_dim=huggingface_config.head_dim,
+            allow_kv_head_replication=allow_kv_head_replication,
+            sliding_n_kv_heads=huggingface_config.attention_other_setting[
+                "num_attention_groups"
+            ],
+            full_n_kv_heads=huggingface_config.num_attention_groups,
         )
 
     @staticmethod
@@ -389,7 +371,7 @@ class Step3p5Config(Llama3Config):
             model_quantization_encoding=base_config.model_quantization_encoding,
             quantization_config=base_config.quantization_config,
             max_seq_len=base_config.max_seq_len,
-            kv_params=kv_params,
+            kv_params=kv_params,  # type: ignore[arg-type]
             attention_multiplier=attention_multiplier,
             embedding_multiplier=base_config.embedding_multiplier,
             residual_multiplier=base_config.residual_multiplier,

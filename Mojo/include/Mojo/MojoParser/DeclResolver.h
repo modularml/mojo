@@ -354,9 +354,6 @@ public:
                                    ArrayRef<ParamDeclAttr> parameters = {},
                                    ArrayRef<PassingKind> passingKinds = {});
 
-  // Populate the trait with methods it inherits from parents.
-  void addParentDeclsToTrait(TraitDeclOp traitOp, ASTDecl &traitDecl);
-
   /// Remove the Decl registered under the oldName and re-register it under a
   /// new name.
   LogicalResult replaceNameAssociatedWithParameter(StringAttr oldName,

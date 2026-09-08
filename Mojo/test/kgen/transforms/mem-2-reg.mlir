@@ -500,30 +500,51 @@ kgen.func @elif(%arg0 : index, %arg1: index, %arg2: index) -> index {
   %idx0 = index.constant 0
   %idx1 = index.constant 1
 
-  // CHECK-NEXT: %0:4 = hlcf.elif -> index, index, index, index {
-  // CHECK-NEXT:   [[V3:%*.]] = index.add %arg0, %idx1
-  // CHECK-NEXT:   [[V4:%*.]] = index.cmp eq([[V3]], %idx0)
-  // CHECK-NEXT:   [[V4B:%*.]] = pop.cast_from_builtin [[V4]] : i1 to !kgen.scalar<bool>
-  // CHECK-NEXT:   hlcf.elif.yield [[V4B]], [[V3]], %arg1, %arg2 : index, index, index
+  // The first condition is an SSA operand, so its side-effecting computation
+  // is promoted in the enclosing block and the `then` reads the dominating
+  // value. Only the additional arm still forwards a promoted value through
+  // `hlcf.elif.yield` into its `then` and the `else`.
+  // CHECK-NEXT: [[C0:%.*]] = index.add %arg0, %idx1
+  // CHECK-NEXT: [[C1:%.*]] = index.cmp eq([[C0]], %idx0)
+  // CHECK-NEXT: [[C1B:%.*]] = pop.cast_from_builtin [[C1]] : i1 to !kgen.scalar<bool>
+  // CHECK-NEXT: [[V0:%.*]]:4 = hlcf.elif [[C1B]] -> index, index, index, index {
+  // CHECK-NEXT:   [[W3:%.*]] = index.add %arg1, %idx1
+  // CHECK-NEXT:   hlcf.yield [[W3]], [[C0]], [[W3]], %arg2 : index, index, index, index
+  // CHECK-NEXT: } else {
+  // CHECK-NEXT:   [[X3:%.*]] = index.add [[C0]], %idx1
+  // CHECK-NEXT:   [[X4:%.*]] = index.cmp eq([[X3]], %idx1)
+  // CHECK-NEXT:   [[X4B:%.*]] = pop.cast_from_builtin [[X4]] : i1 to !kgen.scalar<bool>
+  // CHECK-NEXT:   hlcf.elif.yield [[X4B]], [[X3]], %arg1, %arg2 : index, index, index
   // CHECK-NEXT: } then (%arg3: index, %arg4: index, %arg5: index){
-  // CHECK-NEXT:   [[W3:%*.]] = index.add %arg4, %idx1
-  // CHECK-NEXT:   hlcf.yield [[W3]], %arg3, [[W3]], %arg5 : index, index, index, index
+  // CHECK-NEXT:   [[Y3:%.*]] = index.add %arg4, %idx1
+  // CHECK-NEXT:   hlcf.yield [[Y3]], %arg3, [[Y3]], %arg5 : index, index, index, index
   // CHECK-NEXT: } else (%arg3: index, %arg4: index, %arg5: index){
-  // CHECK-NEXT:   [[U3:%*.]] = index.add %arg5, %idx1
+  // CHECK-NEXT:   [[U3:%.*]] = index.add %arg5, %idx1
   // CHECK-NEXT:   hlcf.yield [[U3]], %arg3, %arg4, [[U3]] : index, index, index, index
   // CHECK-NEXT: }
-  %0 = hlcf.elif -> index {
-    %1 = pop.load %varCondition : !kgen.pointer<index>
-    %var2 = index.add %1, %idx1
-    pop.store %var2, %varCondition : !kgen.pointer<index>
-    %c = index.cmp eq(%var2, %idx0)
-    %cb = pop.cast_from_builtin %c : i1 to !kgen.scalar<bool>
-    hlcf.elif.yield %cb
-  } then {
+  %1 = pop.load %varCondition : !kgen.pointer<index>
+  %var2 = index.add %1, %idx1
+  pop.store %var2, %varCondition : !kgen.pointer<index>
+  %c = index.cmp eq(%var2, %idx0)
+  %cb = pop.cast_from_builtin %c : i1 to !kgen.scalar<bool>
+
+  %0 = hlcf.elif %cb -> index {
     %4 = pop.load %varThen : !kgen.pointer<index>
     %var5 = index.add %4, %idx1
     pop.store %var5, %varThen : !kgen.pointer<index>
     hlcf.yield %var5 : index
+  } else {
+    %8 = pop.load %varCondition : !kgen.pointer<index>
+    %var9 = index.add %8, %idx1
+    pop.store %var9, %varCondition : !kgen.pointer<index>
+    %c2 = index.cmp eq(%var9, %idx1)
+    %cb2 = pop.cast_from_builtin %c2 : i1 to !kgen.scalar<bool>
+    hlcf.elif.yield %cb2
+  } then {
+    %10 = pop.load %varThen : !kgen.pointer<index>
+    %var11 = index.add %10, %idx1
+    pop.store %var11, %varThen : !kgen.pointer<index>
+    hlcf.yield %var11 : index
   } else {
     %5 = pop.load %varElse : !kgen.pointer<index>
     %var6 = index.add %5, %idx1
@@ -535,9 +556,9 @@ kgen.func @elif(%arg0 : index, %arg1: index, %arg2: index) -> index {
   %6 = pop.load %varThen : !kgen.pointer<index>
   %7 = pop.load %varElse : !kgen.pointer<index>
 
-  // CHECK-NEXT: %1 = index.add %0#1, %0#2
-  // CHECK-NEXT: %2 = index.add %1, %0#3
-  // CHECK-NEXT: kgen.return %2 : index
+  // CHECK-NEXT: [[R1:%.*]] = index.add [[V0]]#1, [[V0]]#2
+  // CHECK-NEXT: [[R2:%.*]] = index.add [[R1]], [[V0]]#3
+  // CHECK-NEXT: kgen.return [[R2]] : index
   %res1 = index.add %3, %6
   %res2 = index.add %res1, %7
   kgen.return %res2 : index

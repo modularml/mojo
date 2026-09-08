@@ -201,12 +201,44 @@ def _shard_unit_strides(kv_memory: Sequence[KVCacheMemory]) -> list[int]:
 
 # Default wall-clock budget for admitting (connect + handshake) one per-replica
 # dKV client. dKV is co-located and usually up within seconds, but a still-
-# starting server (connection refused) or a cold slab warm-up (deferred region
-# carve) can take longer; admission retries transient failures until this budget
-# is spent, then fails model load. Override via MODULAR_DKV_ADMISSION_TIMEOUT_S.
-_DEFAULT_ADMISSION_TIMEOUT_S = 120.0
+# starting server (connection refused), a cold slab warm-up (deferred region
+# carve), or a node with no room until a departed tenant's pages drain can all
+# take much longer; admission retries transient failures until this budget is
+# spent, then fails model load. Override via MODULAR_DKV_ADMISSION_TIMEOUT_S.
+#
+# Sized above a worst-case cold carve, which budgets to roughly 600s for a
+# 1.6 TiB slab. A single attempt does not have to cover that carve, because the
+# server builds a share single-flight and a retry blocks on the in-flight build
+# rather than starting a second one, so what matters is that the budget spans
+# enough attempts to outlast it.
+_DEFAULT_ADMISSION_TIMEOUT_S = 600.0
 _ADMISSION_INITIAL_BACKOFF_S = 1.0
 _ADMISSION_MAX_BACKOFF_S = 10.0
+
+# The Rust client's default per-attempt handshake bound, mirrored from
+# DEFAULT_HANDSHAKE_REQUEST_TIMEOUT in dkv-connector/src/transport.rs, purely to
+# size the admission floor below.
+#
+# Deliberately the constant and not MODULAR_DKV_HANDSHAKE_TIMEOUT_S. That
+# variable belongs to the transport, which reads it permissively (anything
+# unparsable, non-positive, or above its 3600s cap silently falls back), and a
+# second parser here would disagree with it in both directions: rejecting values
+# the transport accepts, and sizing the floor off values the transport ignores.
+_DEFAULT_HANDSHAKE_TIMEOUT_S = 60.0
+
+# An admission budget has to cover several whole attempts. At or just above the
+# per-attempt timeout it is spent inside the first attempt and retries nothing,
+# so a refusal that would clear in seconds fails model load instead. That is the
+# shape of CLIN-1842.
+#
+# The floor is computed against the DEFAULT per-attempt timeout, not the
+# configured one. An operator raising the handshake timeout is covering one long
+# cold carve, not asking for a proportionally longer budget: a retry blocks on
+# the in-flight single-flight build rather than starting a second one, so the
+# per-attempt bound does not multiply the work. Scaling the floor by it would
+# reject configurations that raise both together, which is exactly what the
+# in-tree kimi26 deployment and transport.rs both instruct.
+_MIN_ADMISSION_ATTEMPTS = 4
 
 
 # Env-var overrides for the Rust client's background heartbeat poller, mapped to
@@ -507,6 +539,62 @@ def _is_permanent_admission_error(exc: Exception) -> bool:
     return "[retriable=false]" in str(exc)
 
 
+def _resolve_admission_timeout_s(env: Mapping[str, str] | None = None) -> float:
+    """Resolves the admission retry budget, raising it to cover several attempts.
+
+    A budget too small to retry is corrected with a warning rather than
+    rejected. The point of the floor is to guarantee that a transient refusal is
+    retried; failing model load at construction would trade one broken outcome
+    for another, and would do it to deployments that merely pinned the old
+    default.
+
+    Args:
+        env: Environment to read; defaults to :data:`os.environ`. Injectable for
+            tests.
+
+    Returns:
+        The admission budget in seconds, never below the floor.
+
+    Raises:
+        ValueError: If ``MODULAR_DKV_ADMISSION_TIMEOUT_S`` is set but not a
+            positive, finite number. This shim is its only reader, so there is
+            no permissive parser to mirror and a typo is worth surfacing.
+    """
+    env = os.environ if env is None else env
+
+    raw = env.get("MODULAR_DKV_ADMISSION_TIMEOUT_S")
+    if raw is None:
+        admission_s = _DEFAULT_ADMISSION_TIMEOUT_S
+    else:
+        try:
+            admission_s = float(raw)
+        except ValueError:
+            raise ValueError(
+                f"MODULAR_DKV_ADMISSION_TIMEOUT_S={raw!r} is not a number"
+            ) from None
+        if not (0 < admission_s < float("inf")):
+            raise ValueError(
+                f"MODULAR_DKV_ADMISSION_TIMEOUT_S={raw!r} must be a positive, "
+                f"finite number"
+            )
+
+    minimum = _MIN_ADMISSION_ATTEMPTS * _DEFAULT_HANDSHAKE_TIMEOUT_S
+    if admission_s < minimum:
+        _logger.warning(
+            "dKV admission budget %gs is below %.0fs, the time %d handshake "
+            "attempts can take, so a transient refusal would fail model load "
+            "instead of being retried; using %.0fs. Set "
+            "MODULAR_DKV_ADMISSION_TIMEOUT_S at or above %.0fs to silence this.",
+            admission_s,
+            minimum,
+            _MIN_ADMISSION_ATTEMPTS,
+            minimum,
+            minimum,
+        )
+        return minimum
+    return admission_s
+
+
 def _admit_with_retry(
     factory: Callable[[], object],
     *,
@@ -710,12 +798,7 @@ class DKVConnector(KVConnector):
         # than a restatement of it.
         devices_per_replica = split_into_groups(list(devices), num_replicas)
 
-        admission_timeout_s = float(
-            os.getenv(
-                "MODULAR_DKV_ADMISSION_TIMEOUT_S",
-                str(_DEFAULT_ADMISSION_TIMEOUT_S),
-            )
-        )
+        admission_timeout_s = _resolve_admission_timeout_s()
 
         heartbeat_overrides = _heartbeat_overrides()
         if heartbeat_overrides:

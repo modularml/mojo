@@ -78,27 +78,21 @@ def test_every_cli_flag_routes_to_a_known_destination() -> None:
     )
 
 
-def test_from_args_threads_fold_sampler_and_pending_futures() -> None:
+def test_from_args_threads_runtime_flags() -> None:
     args = PipelineArgs(
-        runtime=PipelineRuntimeConfig(
-            fold_sampler_into_graph=True, max_pending_futures=2
-        )
+        runtime=PipelineRuntimeConfig(execute_empty_batches=True)
     )
     config = PipelineConfig.from_args(args)
-    assert config.runtime.fold_sampler_into_graph is True
-    assert config.runtime.max_pending_futures == 2
+    assert config.runtime.execute_empty_batches is True
 
 
 def test_runtime_flags_survive_flat_kwargs_path() -> None:
     # Non-default values for the fields this test guards, spelled the way
     # the CLI passes them (flat).
     config = PipelineConfig.from_args(
-        PipelineArgs.from_flat_kwargs(
-            fold_sampler_into_graph=True, max_pending_futures=2
-        )
+        PipelineArgs.from_flat_kwargs(execute_empty_batches=True)
     )
-    assert config.runtime.fold_sampler_into_graph is True
-    assert config.runtime.max_pending_futures == 2
+    assert config.runtime.execute_empty_batches is True
 
 
 def test_sampling_flags_survive_flat_kwargs_path() -> None:

@@ -34,10 +34,10 @@ inline, dictionaries specialized for string keys, and we also want to
 interoperate well with Python.
 
 ```mojo
-fn take_inline_array(arr: InlineArray[Int, 18]): ...
-fn take_python(obj: PythonObject): ...
+def take_inline_array(arr: InlineArray[Int, 18]): ...
+def take_python(obj: PythonObject): ...
 
-fn example():
+def example():
     # This should form an InlineArray directly. It shouldn't create a List and
     # copy it.
     take_inline_array([1, 2, 3])
@@ -69,7 +69,7 @@ and list literals, and the initializers do different things). For example,
 
 ```mojo
 struct List[T: Copyable & Movable, hint_trivial_type: Bool = False](...):
-     fn __init__(out self, owned *values: T, __list_literal__: NoneType = None):
+     def __init__(out self, owned *values: T, __list_literal__: NoneType = None):
         """Constructs a list from the given values.
         ...
 ```
@@ -84,10 +84,10 @@ required:
 ```mojo
 # A type that allows initializers with 2 or 3 integers only.
 struct TwoAndThreeList:
-   fn __init__(out self, a: Int, b: Int, __list_literal__: NoneType): pass
-   fn __init__(out self, a: Int, b: Int, c: Int, __list_literal__: NoneType): pass
+   def __init__(out self, a: Int, b: Int, __list_literal__: NoneType): pass
+   def __init__(out self, a: Int, b: Int, c: Int, __list_literal__: NoneType): pass
 
-fn test():
+def test():
   # These are ok.
   var a: TwoAndThreeList = [1, 2]
   var b: TwoAndThreeList = [1, 2, 3]
@@ -100,9 +100,9 @@ Similarly, you can also define things that take heterogenous types:
 
 ```mojo
 struct StringIntListLiteral:
-   fn __init__(out self, a: String, b: Int, __list_literal__: NoneType): pass
+   def __init__(out self, a: String, b: Int, __list_literal__: NoneType): pass
 
-fn test():
+def test():
   # Weird but accepted.
   var a: StringIntListLiteral = ["foo", 2]
 ```
@@ -123,7 +123,7 @@ implementing a constructor. Here is `Dict` for example:
 
 ```mojo
 struct Dict[K: KeyElement, V: Copyable & Movable](...):
-    fn __init__(
+    def __init__(
         out self,
         owned keys: List[K],
         owned values: List[V],
@@ -150,7 +150,7 @@ which is applied to a contextual type. This can be useful if you have a
 complicated type that you don't want to spell.
 
 ```mojo
-fn foo(x: SomeComplicatedType): ...
+def foo(x: SomeComplicatedType): ...
 
 # Example with normal initializer.
 foo(SomeComplicatedType(1, kwarg=42))

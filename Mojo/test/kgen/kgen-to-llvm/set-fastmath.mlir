@@ -18,20 +18,20 @@
 // CONTRACT: pop.add %0, %arg2 : !kgen.scalar<f32>
 // CONTRACT: pop.sub %1, %arg2 : !kgen.scalar<f32>
 // CONTRACT-LABEL: kgen.func @explicit
-// CONTRACT: pop.mul %arg0, %arg1 {fastmathFlags = #pop<fmf fast>}
+// CONTRACT: pop.mul %arg0, %arg1 {fastmathFlags = #pop.fmf<fast>}
 // The pass reaches every op taking the flags, not just mul/add/sub.
 // CONTRACT-LABEL: kgen.func @other_ops
-// CONTRACT: pop.fma {{.*}} {fastmathFlags = #pop<fmf contract>}
-// CONTRACT: pop.cast {{.*}} {fastmathFlags = #pop<fmf contract>}
+// CONTRACT: pop.fma {{.*}} {fastmathFlags = #pop.fmf<contract>}
+// CONTRACT: pop.cast {{.*}} {fastmathFlags = #pop.fmf<contract>}
 
 // `contract=false` clears only the `contract` bit: mul/add/sub become `none`;
 // the explicit `fast` keeps every bit except `contract`.
 // PRECISE-LABEL: kgen.func @arith
-// PRECISE: pop.mul %arg0, %arg1 {fastmathFlags = #pop<fmf none>} : !kgen.scalar<f32>
-// PRECISE: pop.add %0, %arg2 {fastmathFlags = #pop<fmf none>} : !kgen.scalar<f32>
-// PRECISE: pop.sub %1, %arg2 {fastmathFlags = #pop<fmf none>} : !kgen.scalar<f32>
+// PRECISE: pop.mul %arg0, %arg1 {fastmathFlags = #pop.fmf<none>} : !kgen.scalar<f32>
+// PRECISE: pop.add %0, %arg2 {fastmathFlags = #pop.fmf<none>} : !kgen.scalar<f32>
+// PRECISE: pop.sub %1, %arg2 {fastmathFlags = #pop.fmf<none>} : !kgen.scalar<f32>
 // PRECISE-LABEL: kgen.func @explicit
-// PRECISE: pop.mul %arg0, %arg1 {fastmathFlags = #pop<fmf nnan|ninf|nsz|arcp|afn|reassoc>}
+// PRECISE: pop.mul %arg0, %arg1 {fastmathFlags = #pop.fmf<nnan|ninf|nsz|arcp|afn|reassoc>}
 // PRECISE-LABEL: kgen.func @other_ops
 // PRECISE: pop.fma {{.*}} : !kgen.scalar<f32>
 // PRECISE: pop.cast %0 : !kgen.scalar<f32> to !kgen.scalar<f16>
@@ -45,13 +45,13 @@ kgen.func @arith(%a: !kgen.scalar<f32>, %b: !kgen.scalar<f32>,
 }
 
 kgen.func @explicit(%a: !kgen.scalar<f32>, %b: !kgen.scalar<f32>) -> !kgen.scalar<f32> {
-  %0 = pop.mul %a, %b {fastmathFlags = #pop<fmf fast>} : !kgen.scalar<f32>
+  %0 = pop.mul %a, %b {fastmathFlags = #pop.fmf<fast>} : !kgen.scalar<f32>
   kgen.return %0 : !kgen.scalar<f32>
 }
 
 kgen.func @other_ops(%a: !kgen.scalar<f32>, %b: !kgen.scalar<f32>,
                      %c: !kgen.scalar<f32>) -> !kgen.scalar<f16> {
-  %0 = pop.fma %a, %b, %c {fastmathFlags = #pop<fmf contract>} : !kgen.scalar<f32>
-  %1 = pop.cast %0 {fastmathFlags = #pop<fmf contract>} : !kgen.scalar<f32> to !kgen.scalar<f16>
+  %0 = pop.fma %a, %b, %c {fastmathFlags = #pop.fmf<contract>} : !kgen.scalar<f32>
+  %1 = pop.cast %0 {fastmathFlags = #pop.fmf<contract>} : !kgen.scalar<f32> to !kgen.scalar<f16>
   kgen.return %1 : !kgen.scalar<f16>
 }

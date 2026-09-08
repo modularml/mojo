@@ -260,7 +260,9 @@ class Step3p5Model(AlwaysSignalBuffersMixin, LlamaModelBase):
 
             kv_input_count = len(self.kv_params.flattened_kv_inputs())
             kv_cache_inputs = [next(inputs_iter) for _ in range(kv_input_count)]
-            kv_collections = self._unflatten_kv_inputs(kv_cache_inputs)
+            sliding_kv, global_kv = self.kv_params.unflatten_basic_kv_tree(
+                iter(kv_cache_inputs)
+            )
 
             # Tail of the input list is the EP comm buffers, present for
             # both TP_EP and DP_EP. Empty in TP_TP.
@@ -270,7 +272,8 @@ class Step3p5Model(AlwaysSignalBuffersMixin, LlamaModelBase):
 
             outputs = nn_model(
                 tokens.tensor,
-                kv_collections,
+                sliding_kv,
+                global_kv,
                 return_n_logits.tensor,
                 input_row_offsets.tensor,
                 signal_buffers,

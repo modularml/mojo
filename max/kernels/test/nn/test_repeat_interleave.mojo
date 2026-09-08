@@ -60,7 +60,7 @@ def test_repeat_interleave_1d(ctx: DeviceContext) raises:
     var repeats_stack: Array[Scalar[type_repeats], _] = [1, 2, 3, 4]
     var repeats = TileTensor(repeats_stack, row_major[4,]())
 
-    var output_stack = Array[Scalar[type], 10](uninitialized=True)
+    var output_stack = Array[Scalar[type], 10](fill={})
     var output = TileTensor(output_stack, row_major[10]())
 
     repeat_interleave(input, repeats, 0, output, ctx)
@@ -90,7 +90,7 @@ def test_repeat_interleave_1d_broadcast_repeats(ctx: DeviceContext) raises:
     var repeats_stack: Array[Scalar[type_repeats], _] = [2]
     var repeats = TileTensor(repeats_stack, row_major[1]())
 
-    var output_stack = Array[Scalar[type], 8](uninitialized=True)
+    var output_stack = Array[Scalar[type], 8](fill={})
     var output = TileTensor(output_stack, row_major[8]())
 
     repeat_interleave(input, repeats, 0, output, ctx)
@@ -117,14 +117,14 @@ def test_repeat_interleave_2d_axis_0(ctx: DeviceContext) raises:
     # type_repeats is always .int64
     comptime type_repeats = DType.int64
 
-    var repeats_stack = Array[Scalar[type_repeats], 4](uninitialized=True)
+    var repeats_stack = Array[Scalar[type_repeats], 4](fill={})
     var repeats = TileTensor(repeats_stack, row_major[2]())
 
     repeats[0] = 2
     repeats[1] = 3
 
     # Result is 2x5
-    var output_stack = Array[Scalar[type], 10](uninitialized=True)
+    var output_stack = Array[Scalar[type], 10](fill={})
     var output = TileTensor(output_stack, row_major[5, 2]())
 
     repeat_interleave(input, repeats, 0, output, ctx)
@@ -161,7 +161,7 @@ def test_repeat_interleave_2d_axis_1(ctx: DeviceContext) raises:
     var repeats = TileTensor(repeats_stack, row_major[2]())
 
     # Result is 2x5
-    var output_stack = Array[Scalar[type], 10](uninitialized=True)
+    var output_stack = Array[Scalar[type], 10](fill={})
     var output = TileTensor(output_stack, row_major[2, 5]())
 
     repeat_interleave(input, repeats, 1, output, ctx)
@@ -197,7 +197,7 @@ def test_repeat_interleave_3d(ctx: DeviceContext) raises:
     var repeats = TileTensor(repeats_stack, row_major[2]())
 
     # Result is 2x5
-    var output_stack = Array[Scalar[type], 20](uninitialized=True)
+    var output_stack = Array[Scalar[type], 20](fill={})
     var output = TileTensor(output_stack, row_major[2, 5, 2]())
 
     repeat_interleave(input, repeats, 1, output, ctx)

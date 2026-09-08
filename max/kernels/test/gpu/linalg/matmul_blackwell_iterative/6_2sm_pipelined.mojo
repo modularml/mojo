@@ -396,10 +396,10 @@ def store_C[
     var c_lower_pow_2_main: Array[Scalar[accum_type], main_frag_size]
 
     var c_upper_pow_2_rem = Array[Scalar[accum_type], remainder_frag_size](
-        uninitialized=True
+        fill={}
     )
     var c_lower_pow_2_rem = Array[Scalar[accum_type], remainder_frag_size](
-        uninitialized=True
+        fill={}
     )
 
     # Primary Load

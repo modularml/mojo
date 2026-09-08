@@ -943,9 +943,9 @@ CalleeResult OverloadSet::filterOverloadSet(
   return CalleeResult::no();
 }
 
-std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
-    ASTType functionType, function_ref<MojoInflightDiag &(SMLoc)> emitError,
-    bool *hasInconclusiveCandidates) const {
+CalleeAndDeclResult OverloadSet::filterOverloadSetForValueType(
+    ASTType functionType,
+    function_ref<MojoInflightDiag &(SMLoc)> emitError) const {
 
   // If the target type is something weird then don't filter.  Let the error be
   // reported another way.
@@ -958,7 +958,7 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
       for (ASTDecl *candidate : fnDecls)
         diag.attachNote(*candidate) << "candidate declared here";
     }
-    return {};
+    return CalleeAndDeclResult::no();
   }
 
   // We do parameter inference to support cases like:
@@ -1000,22 +1000,17 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     unprovableConstraints.clear();
     // Pass our assumptions along: dropping the candidate's generator body
     // constraints to reach `functionType` may depend on them.
-    ConversionFailure failure;
-    TriState verdict = IREmitter::classifyImplicitConversion(
+    auto conversion = IREmitter::classifyImplicitConversionWithDetails(
         {UnboundAttr::get(boundCandidateType), getExpr()}, functionType,
-        getDeclScope(), additionalAssumptions, /*deferralCtx=*/nullptr,
-        &failure);
-    if (verdict.isTrue())
+        getDeclScope(), additionalAssumptions, /*deferralCtx=*/nullptr);
+    if (conversion.isYes())
       return Candidacy::kValid;
-    if (verdict.isFalse())
+    if (conversion.isNo())
       return Candidacy::kInvalid;
 
-    // Undecided: Only an unsatisfied constraint names anything this diagnostic
-    // can use.
-    if (auto *unsatisfied =
-            failure.getReasonIf<ConversionFailure::UnsatisfiedConstraints>())
-      llvm::append_range(unprovableConstraints,
-                         unsatisfied->constraints.unprovenConstraints);
+    // Undecided: Record the constraints it could not discharge.
+    llvm::append_range(unprovableConstraints,
+                       std::move(conversion).getUnknown());
     return Candidacy::kInconclusive;
   };
 
@@ -1062,10 +1057,8 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
   // out, so nothing else may be selected over it: committing to another
   // candidate would silently discard a potential match.
   if (!inconclusiveEvaluations.empty()) {
-    if (hasInconclusiveCandidates)
-      *hasInconclusiveCandidates = true;
     if (!emitError || isErroneous())
-      return {};
+      return CalleeAndDeclResult::unknown();
 
     // A valid candidate is still worth reporting: it is the one the user
     // probably meant, and the note says why it cannot be selected yet.
@@ -1079,7 +1072,7 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     explainInconclusiveCandidates(getShared(), getExpr(), baseName,
                                   /*isCall=*/false, inconclusiveEvaluations,
                                   diag);
-    return {};
+    return CalleeAndDeclResult::unknown();
   }
 
   // Notify the listener of the updated decl references for the call now that
@@ -1099,12 +1092,12 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     PValue result = emitter.emitPValue({callee, getExpr()},
                                        EC_OverloadResolution, functionType);
     assert(result && "Conversion should always succeed");
-    return {result, selectedMethod};
+    return CalleeAndDeclResult::yes({result, selectedMethod});
   }
 
   // If we aren't to emit a diagnostic, just return the failure.
   if (!emitError)
-    return {};
+    return CalleeAndDeclResult::no();
 
   MojoInflightDiag &diag = emitError(getExprLoc());
 
@@ -1147,7 +1140,7 @@ std::pair<PValue, ASTDecl *> OverloadSet::filterOverloadSetForValueType(
     if (!hadCandidate)
       diag << ASTType(candidateType);
   }
-  return {};
+  return CalleeAndDeclResult::no();
 }
 
 /// Perform substitutions of the specified bindings into the symbol, returning
@@ -1345,8 +1338,10 @@ PValue OverloadSet::getDirectSymbol(
     auto emitError = [&](SMLoc loc) -> MojoInflightDiag & {
       return diag.emplace(getShared().emitError(loc));
     };
-    auto [result, _] = filterOverloadSetForValueType(expectedType, emitError);
-    return result;
+    auto result = filterOverloadSetForValueType(expectedType, emitError);
+    if (!result.isYes())
+      return {};
+    return result.getYes().callee;
   }
 
   // If the overload set has parameter bindings, try to resolve the candidates

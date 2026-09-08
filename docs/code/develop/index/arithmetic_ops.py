@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# DOC: max/develop/index.mdx
+# DOC: max/develop/eager-execution.mdx
 
 from max.experimental.tensor import Tensor
 

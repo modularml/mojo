@@ -648,8 +648,8 @@ didn’t specify that the *parameters* should start with `<`, so it assumed the
 The Mojo compiler has a lot of passes. Some of the big ones are:
 
 - Parsing, which does lexing, parsing, and type-checking.
-- Elaborating, which instantiates generics, for example `fn add[x: Int](...)`
-  into `fn add[3](...)`, `fn add[42](...)`, `fn add[1337](...)` etc.
+- Elaborating, which instantiates generics, for example `def add[x: Int](...)`
+  into `def add[3](...)`, `def add[42](...)`, `def add[1337](...)` etc.
 - Post-elaboration optimizations on concretized IR before lowering to LLVM.
 - Lowering all Mojo MLIR dialects to LLVM.
 
@@ -661,7 +661,7 @@ doc.
 
 You can see all the passes that run for a particular program by running
 `kgen --mlir-print-ir-before-all -elaborate main.mojo 2>&1 | grep 'IR Dump Before'`.
-For example when run on a simple `fn main(): pass` it mentions these passes
+For example when run on a simple `def main(): pass` it mentions these passes
 coming after the parser:
 
 - DebugInfoStrip

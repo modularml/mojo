@@ -128,11 +128,11 @@ using new `ref` and `mutref` keywords parameterized on a lifetime, and a new
 
 ```mojo
 # Proposed Mojo syntax.
-fn longest[a: Lifetime](x: ref[a] String,
+def longest[a: Lifetime](x: ref[a] String,
                         y: ref[a] String) -> ref[a] String:
     return x if len(x) >= len(y) else y
 
-fn longest2[a: Lifetime](x: mutref[a] String,
+def longest2[a: Lifetime](x: mutref[a] String,
                          y: mutref[a] String) -> mutref[a] String: ...
 ```
 
@@ -141,11 +141,11 @@ and will get us going until we have more experience. For example, we can make
 any of these work:
 
 ```mojo
-fn f(x: ref[a] String, y: mutref[a] String): ... # Homage to Rust!
-fn f(x: ref(a) String, y: mutref(a) String): ... # Homage to Rust!
-fn f(x: ref a String,  y: mutref a String): ... # Homage to Rust!
-fn f(x: ref 'a String, y: mutref 'a String): ... # Homage to Rust!
-fn f(x: 'a String,     y: mut 'a String): ... # Homage to Rust!
+def f(x: ref[a] String, y: mutref[a] String): ... # Homage to Rust!
+def f(x: ref(a) String, y: mutref(a) String): ... # Homage to Rust!
+def f(x: ref a String,  y: mutref a String): ... # Homage to Rust!
+def f(x: ref 'a String, y: mutref 'a String): ... # Homage to Rust!
+def f(x: 'a String,     y: mut 'a String): ... # Homage to Rust!
 ```
 
 The argument for square brackets vs parens is if we like the explanation that
@@ -166,7 +166,7 @@ Being first class types, we will naturally allow local references: these should
 also allow late initialization and explicitly declared lifetimes as well:
 
 ```mojo
-fn example[life: Lifetime](cond: Bool,
+def example[life: Lifetime](cond: Bool,
                            x: ref[life] String,
                            y: ref[life] String):
     # Late initialized local borrow with explicit lifetime
@@ -190,16 +190,16 @@ lifetimes:
 
 ```mojo
 // Mojo today
-fn example(inout a: Int, borrowed b: Float32): …
+def example(inout a: Int, borrowed b: Float32): …
 
 struct S:
-  fn method(inout self): …
+  def method(inout self): …
 
 // Written long-hand with explicit lifetimes.
-fn example[a_life: Lifetime, b_life: Lifetime]
+def example[a_life: Lifetime, b_life: Lifetime]
           (a: mutref[a_life] Int, b: ref[b_life] Float32): …
 struct S:
-  fn method[self_life: Lifetime](self: mutref[self_life]): …
+  def method[self_life: Lifetime](self: mutref[self_life]): …
 ```
 
 This is very nice - every memory-only type passed into or returned from a
@@ -243,11 +243,11 @@ lifetimes on their first use. For example, we don’t need to require a
 declaration of `life` in this example:
 
 ```mojo
-fn longest(x: ref[life] String,
+def longest(x: ref[life] String,
            y: ref[life] String) -> ref[life] String:
 
 # Alternatively follow Rust's lead.
-fn longest(x: 'life String, y: 'life String) -> 'life String:
+def longest(x: 'life String, y: 'life String) -> 'life String:
 ```
 
 Let's **NOT** add this in the near future. Explicit lifetimes will be much less
@@ -263,11 +263,11 @@ declaring it explicitly like this:
 
 ```mojo
     struct MyExample:
-        fn method[self_life: Lifetime](self: mutref[self_life] Self)
+        def method[self_life: Lifetime](self: mutref[self_life] Self)
                 -> Pointer[Int, self_life]:
             ...
 
-    fn callMethod(x: mutref[life1] MyExample):
+    def callMethod(x: mutref[life1] MyExample):
         use(x.method())
 
         var y = MyExample()
@@ -304,7 +304,7 @@ being more efficient). We can do this by allowing:
 ```mojo
     struct Pointer[type: AnyType, life: Lifetime]:
         # This __getref__ returns a reference, so no setitem needed.
-        fn __getref__(self, offset: Int) -> mutref[life] type:
+        def __getref__(self, offset: Int) -> mutref[life] type:
             return __get_address_as_lvalue[life](...)
 ```
 
@@ -328,22 +328,22 @@ that it needs to work with as well as element type:
         alias pointer_type = __mlir_type[...]
         var address: pointer_type
 
-           fn __init__(inout self): ...
-        fn __init__(inout self, address: pointer_type): ...
+           def __init__(inout self): ...
+        def __init__(inout self, address: pointer_type): ...
 
         # Should this be an __init__ to allow implicit conversions?
         @static_method
-        fn address_of(arg: mutref[life] type) -> Self:
+        def address_of(arg: mutref[life] type) -> Self:
             ...
 
-        fn __getitem__(self, offset: Int) -> inout[life] type:
+        def __getitem__(self, offset: Int) -> inout[life] type:
                ...
 
         @staticmethod
-        fn alloc(count: Int) -> Self: ...
-        fn free(self): ...
+        def alloc(count: Int) -> Self: ...
+        def free(self): ...
 
-    fn exercise_pointer():
+    def exercise_pointer():
         # Allocated untracked data with static/immortal lifetime.
         let ptr = MutablePointer[Int, __static_lifetime].alloc(42)
 
@@ -383,11 +383,11 @@ We may also want to wire up the prefix star operator into a dunder method.
         var ptr: MutablePointer[type, life]
         var size: Int
 
-        fn __init__(inout self):
-        fn __init__(inout self, ptr: MutablePointer[type, life], size: Int):
+        def __init__(inout self):
+        def __init__(inout self, ptr: MutablePointer[type, life], size: Int):
 
         # All the normal slicing operations etc, with bounds checks.
-        fn __getitem__(self, offset: Int) -> inout[life] type:
+        def __getitem__(self, offset: Int) -> inout[life] type:
             assert(offset < size)
             return ptr[offset]
 ```
@@ -411,7 +411,7 @@ implemented with `std::vector` style eager copying:
         var size: Int
         var capacity: Int
 
-        fn __getitem__[life: Lifetime](self: inout[life], start: Int,
+        def __getitem__[life: Lifetime](self: inout[life], start: Int,
                             stop: Int) -> MutableArraySlice[type, life]:
             return MutableArraySlice(ptr, size)
 ```

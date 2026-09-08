@@ -438,22 +438,34 @@ def test_partial_tile[
     the last row. Bounding those on the offset alone lets them overwrite live
     data. `transpose_b=False` keeps the dispatch on the multistage kernel
     rather than on `AMDMatmul`.
+
+    C carries a guard band past its last element, so a warp tile that straddles
+    the last row is caught here rather than by whatever allocation happens to
+    follow C.
     """
+    comptime WM = 32
     comptime config = MatmulConfig[dtype, dtype, dtype, False](
         block_tile_shape=Index(64, 64, 32),
-        warp_tile_shape=Index(32, 32, 32),
+        warp_tile_shape=Index(WM, 32, 32),
     )
 
     print("=== test_partial_tile", dtype, M, "x", N, "x", K)
 
+    # A straddling warp tile writes all WM of its rows, so it reaches at most
+    # WM * N elements past C's start. The operands below are integers, so the
+    # kernel cannot produce a fractional value: only an untouched guard element
+    # still holds the fill.
+    comptime c_size = M * N + WM * N
+    comptime guard_fill = Scalar[dtype](0.5)
+
     var a_host_ptr = ctx.enqueue_create_host_buffer[dtype](M * K)
     var b_host_ptr = ctx.enqueue_create_host_buffer[dtype](K * N)
-    var c_host_ptr = ctx.enqueue_create_host_buffer[dtype](M * N)
+    var c_host_ptr = ctx.enqueue_create_host_buffer[dtype](c_size)
     var c_host_ref_ptr = ctx.enqueue_create_host_buffer[dtype](M * N)
 
     var a_device = ctx.enqueue_create_buffer[dtype](M * K)
     var b_device = ctx.enqueue_create_buffer[dtype](K * N)
-    var c_device = ctx.enqueue_create_buffer[dtype](M * N)
+    var c_device = ctx.enqueue_create_buffer[dtype](c_size)
     var c_device_ref = ctx.enqueue_create_buffer[dtype](M * N)
 
     var a_tensor = TileTensor(a_device, row_major(Coord(Idx[M], Idx[K])))
@@ -471,11 +483,14 @@ def test_partial_tile[
         b_host_ptr[i] = random_si64(-100, 100).cast[dtype]()
     for i in range(M * N):
         c_host_ptr[i] = 0
+        c_host_ref_ptr[i] = 0
+    for i in range(M * N, c_size):
+        c_host_ptr[i] = guard_fill
 
     ctx.enqueue_copy(a_device, a_host_ptr)
     ctx.enqueue_copy(b_device, b_host_ptr)
     ctx.enqueue_copy(c_device, c_host_ptr)
-    ctx.enqueue_copy(c_device_ref, c_host_ptr)
+    ctx.enqueue_copy(c_device_ref, c_host_ref_ptr)
 
     multistage_gemm[transpose_b=False, config=config](
         c_tensor, a_tensor.as_immut(), b_tensor.as_immut(), ctx
@@ -513,6 +528,13 @@ def test_partial_tile[
             errors += 1
 
     assert_equal(errors, 0)
+
+    var guard_writes = 0
+    for i in range(M * N, c_size):
+        if c_host_ptr[i] != guard_fill:
+            guard_writes += 1
+
+    assert_equal(guard_writes, 0)
 
     _ = a_device^
     _ = b_device^

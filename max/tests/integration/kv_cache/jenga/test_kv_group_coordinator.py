@@ -20,13 +20,15 @@ import pytest
 from max.nn.kv_cache import KVCacheGroupId
 from max.pipelines.kv_cache.paged_kv_cache.block_utils import LittleKVCacheBlock
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_manager import (
-    FullKVGroupCoordinator,
-    KVGroupCoordinatorInterface,
-    SlidingWindowKVGroupCoordinator,
     create_kv_group_coordinator,
 )
 from max.pipelines.kv_cache.paged_kv_cache.jenga_block_pool import (
     JengaBlockPool,
+)
+from max.pipelines.kv_cache.paged_kv_cache.kv_group_coordinator import (
+    FullKVGroupCoordinator,
+    KVGroupCoordinatorInterface,
+    SlidingWindowKVGroupCoordinator,
 )
 
 BLOCK_SIZE = 4

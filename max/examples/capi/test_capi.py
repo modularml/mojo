@@ -43,7 +43,8 @@ def build_graph() -> None:
 
     # Compile the graph for the accelerator
     session = engine.InferenceSession(devices=[device])
-    model = session.load(graph)
+    compiled = session.compile(graph)
+    model = session.init(compiled)
 
     # Save the graph to a MEF file
     model._export_mef("graph.mef")

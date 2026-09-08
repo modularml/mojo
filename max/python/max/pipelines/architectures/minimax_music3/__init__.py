@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""MiniMax Music 3: text and lyrics to sung music."""
+"""Generates music from a text description and lyrics."""
 
 from .arch import MiniMaxMusic3ArchConfig, minimax_music3_arch
 from .model_config import MiniMaxMusic3Config

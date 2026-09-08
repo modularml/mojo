@@ -34,7 +34,7 @@ my_project/
 
 ```mojo
 struct MyAllocator:
-    fn allocate(self, size: Int) -> UnsafePointer[UInt8]:
+    def allocate(self, size: Int) -> UnsafePointer[UInt8]:
         # Custom allocation logic
         ...
 ```
@@ -44,7 +44,7 @@ struct MyAllocator:
 ```mojo
 from memory import MyAllocator  # Fails! Resolves to std.memory
 
-fn main():
+def main():
     var alloc = MyAllocator()
 ```
 

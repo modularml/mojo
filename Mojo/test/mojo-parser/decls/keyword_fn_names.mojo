@@ -17,10 +17,6 @@
 def _():
     pass
 
-# expected-error @+1 {{'alias' cannot be used as a function name in this context}}
-def alias():
-    pass
-
 # expected-error @+1 {{'and' cannot be used as a function name in this context}}
 def and():
     pass
@@ -57,10 +53,6 @@ def class():
 def comptime():
     pass
 
-# expected-error @+1 {{'__comptime_assert' cannot be used as a function name in this context}}
-def __comptime_assert():
-    pass
-
 # expected-error @+1 {{'continue' cannot be used as a function name in this context}}
 def continue():
     pass
@@ -83,10 +75,6 @@ def else():
 
 # expected-error @+1 {{'except' cannot be used as a function name in this context}}
 def except():
-    pass
-
-# expected-error @+1 {{'fn' cannot be used as a function name in this context}}
-def fn():
     pass
 
 # expected-error @+1 {{'False' cannot be used as a function name in this context}}
@@ -251,6 +239,10 @@ def __struct_field_ref():
 
 # expected-error @+1 {{'__is_run_in_comptime_interpreter' cannot be used as a function name in this context}}
 def __is_run_in_comptime_interpreter():
+    pass
+
+# expected-error @+1 {{'__match' cannot be used as a function name in this context}}
+def __match():
     pass
 
 

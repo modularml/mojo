@@ -524,10 +524,10 @@ struct Optional[T: AnyType](
         """
         if self:
             # Tag the hash so that hash(T) != hash(Optional[T](..)).
-            hasher.update(UInt8(1))
+            UInt8(1).__hash__(hasher)
             self._unsafe_unchecked_value().__hash__(hasher)
         else:
-            hasher.update(UInt8(0))
+            UInt8(0).__hash__(hasher)
 
     def _to_device_type(
         self, mut encoder: Some[DeviceTypeEncoder], target: MutOpaquePointer[_]

@@ -18,7 +18,7 @@ struct RP:
   var p: ArcPointer[String]
 
   # Can choose to provide __copyinit__ and __del__ if it wants.
-  fn __copyinit__(out self, existing: Self): ...
+  def __copyinit__(out self, existing: Self): ...
 
   # Can't define __moveinit__.
 
@@ -139,40 +139,38 @@ indicating whether the operation is trivial:
 ```mojo
 trait AnyType:
   # Existing
-  fn __del__(owned self, /): ...
+  def __del__(owned self, /): ...
   # New
   alias __del__is_trivial_unsafe: Bool = False
 
 trait Movable:
    # Existing
-   fn __moveinit__(out self, owned existing: Self, /): ...
+   def __moveinit__(out self, owned existing: Self, /): ...
    # New
    alias __moveinit__is_trivial_unsafe: Bool = False
 
 trait Copyable:
    # Existing
-   fn __copyinit__(out self, existing: Self, /): ...
+   def __copyinit__(out self, existing: Self, /): ...
    # New
    alias __copyinit__is_trivial_unsafe: Bool = False
 ```
 
 These aliases allow containers to use custom logic with straight-forward
-`@parameter if`'s to conditionalize their behavior:
+`comptime if`'s to conditionalize their behavior:
 
 ```mojo
 struct List[T: Copyable & Movable]: # Look, no hint_trivial_type!
     ...
-    fn __del__(owned self):
-        @parameter
-        if not T.__del__is_trivial_unsafe:
+    def __del__(owned self):
+        comptime if not T.__del__is_trivial_unsafe:
             for i in range(len(self)):
                 (self.data + i).destroy_pointee()
         self.data.free()
 
-    fn __copyinit__(out self, existing: Self):
+    def __copyinit__(out self, existing: Self):
         self = Self(capacity=existing.capacity)
-        @parameter
-        if T.__copyinit__is_trivial_unsafe:
+        comptime if T.__copyinit__is_trivial_unsafe:
             # ... memcpy ...
         else:
             # ... append copies...
@@ -192,7 +190,7 @@ When Mojo implicitly synthesizes a member, it can synthesize the alias as well.
 struct MyStruct(Copyable):
   var x: Int
   # Compiler already synthesizes:
-  # fn __copyinit__(out self, other: Self):
+  # def __copyinit__(out self, other: Self):
   #    self.x = other.x
 
   # Compiler newly synthesizes:
@@ -207,7 +205,7 @@ struct MyStruct2[EltTy: Copyable](Copyable):
   var x: Int
   var y: EltTy
   # Compiler already synthesizes:
-  # fn __copyinit__(out self, other: Self):
+  # def __copyinit__(out self, other: Self):
   #    self.x = other.x
   #    self.y = other.y
 
@@ -226,7 +224,7 @@ method would be handled correctly by default:
 ```mojo
 struct MyStruct:
   # __del__is_trivial_unsafe defaults to false.
-  fn __del__(owned self):
+  def __del__(owned self):
     print("hi")
 ```
 
@@ -237,9 +235,8 @@ smart custom behavior:
 
 ```mojo
 struct InlineArray[ElementType: Copyable & Movable]:
-    fn __copyinit__(out self, other: Self):
-        @parameter
-        if ElementType.__copyinit__is_trivial_unsafe:
+    def __copyinit__(out self, other: Self):
+        comptime if ElementType.__copyinit__is_trivial_unsafe:
             # ... memcpy ...
         else:
             # ... append copies...

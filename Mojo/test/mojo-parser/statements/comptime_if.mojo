@@ -65,9 +65,7 @@ def comptime_if_else[a: __mlir_type.`!kgen.scalar<bool>`]():
 # CHECK-LABEL: lit.fn @"param_if{{.*}}"<a: scalar<bool>, b: !Bool>()
 def param_if[a: __mlir_type.`!kgen.scalar<bool>`, b: Bool]():
     # CHECK: kgen.param.if <a> {
-    # expected-warning @+1 {{'@parameter if' is deprecated; use 'comptime if'}}
-    @parameter
-    if a:
+    comptime if a:
         # CHECK: lit.var.decl "inside_1" var
         var inside_1: Int
     # CHECK: } else {
@@ -84,9 +82,7 @@ def param_if[a: __mlir_type.`!kgen.scalar<bool>`, b: Bool]():
 # CHECK-LABEL: lit.fn @"param_if_andor_i1{{.*}}"<a: scalar<bool>, b: scalar<bool>>()
 def param_if_andor_i1[a: __mlir_type.`!kgen.scalar<bool>`, b: __mlir_type.`!kgen.scalar<bool>`]():
     # CHECK: kgen.param.if <cond(a, b, a)>
-    # expected-warning @+1 {{'@parameter if' is deprecated; use 'comptime if'}}
-    @parameter
-    if a and b:
+    comptime if a and b:
         # CHECK:   lit.var.decl "v" var
         var v: Int
     # CHECK:   kgen.param.yield
@@ -100,9 +96,7 @@ def param_if_andor_i1[a: __mlir_type.`!kgen.scalar<bool>`, b: __mlir_type.`!kgen
 # CHECK-LABEL: lit.fn @"param_if_and{{.*}}"<a: !Bool, b: !Bool>()
 def param_if_and[a: Bool, b: Bool]():
     # CHECK: kgen.param.if <#lit.struct.extract<:!Bool cond(#lit.struct.extract<:!Bool a, "_mlir_value">, b, a), "_mlir_value">> {
-    # expected-warning @+1 {{'@parameter if' is deprecated; use 'comptime if'}}
-    @parameter
-    if a and b:
+    comptime if a and b:
         # CHECK:   lit.var.decl "v" var
         var v: Int
     # CHECK:   kgen.param.yield

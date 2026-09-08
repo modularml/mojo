@@ -63,7 +63,7 @@ def example(a: String, b: List[Int], c: List[Int]):
 This ends up working like this:
 
 ```python
-**fn** example(a: String, b: List[Int], c: List[Int]):
+**def** example(a: String, b: List[Int], c: List[Int]):
    var b2 = b
 
    print(a)

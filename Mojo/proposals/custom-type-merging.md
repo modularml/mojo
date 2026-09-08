@@ -24,7 +24,7 @@ As of this writing, Mojo’s type unification follows the following algorithm in
 pseudo code:
 
 ```mojo
-fn get_common_type(typea, typeb) raises -> Type:
+def get_common_type(typea, typeb) raises -> Type:
    # If the types are already identical, then we are done.
    if typea == typeb:
        return typea
@@ -48,7 +48,7 @@ and an `Int` into an `Optional[Int]` and many other cases. However, this isn’t
 enough for numeric conversions, e.g. consider:
 
 ```mojo
-fn int_example(a: Int8, b: Int16, cond: Bool):
+def int_example(a: Int8, b: Int16, cond: Bool):
   # Currently: error: value of type 'SIMD[int8, 1]' is not compatible with value of type 'SIMD[int16, 1]'
   c = a if cond else b
   # Desired type: Int16
@@ -64,7 +64,7 @@ above only works when one or the other types is the right answer.
 Consider examples like this (Note: these all work now):
 
 ```mojo
-fn ptr_example(mut x: Int, mut y: Int, cond: Bool):
+def ptr_example(mut x: Int, mut y: Int, cond: Bool):
   alias s1 = "hello"    # Type = StringLiteral["hello"]
   alias s2 = "goodbye"  # Type = StringLiteral["goodbye"]
 
@@ -79,7 +79,7 @@ promote to type `StaticString` (which type-erases the value of the literal).
 Or pointers with origins that need to be unioned:
 
 ```mojo
-fn ptr_example(mut x: Int, mut y: Int, cond: Bool):
+def ptr_example(mut x: Int, mut y: Int, cond: Bool):
   xptr = Pointer.address_of(x) # Type: Pointer[Int, origin_of(x)]
   yptr = Pointer.address_of(y) # Type: Pointer[Int, origin_of(y)]
 
@@ -109,7 +109,7 @@ We do this by defining a new dunder (we should support both the forward and the
 
 ```mojo
 struct StringLiteral[value: ...]:  # slightly simplified from StringLiteral.mojo
-   fn __merge_with__[
+   def __merge_with__[
          other_type: type_of(StringLiteral[_])
       ](self) -> StaticString:
         return self
@@ -144,7 +144,7 @@ generics:
 struct Pointer[type, origin]:  # slightly simplified from pointer.mojo
    # TODO: '_' doesn't work right in parameter lists currently, so the unbound
    # params of Pointer need to be explicitly declared.
-   fn __merge_with__[other_type: type_of(Pointer[type, _])]
+   def __merge_with__[other_type: type_of(Pointer[type, _])]
       (self) -> Pointer[type, origin_of(self.origin, other_type.origin)]:
         return {self._value}
 ```
@@ -156,13 +156,13 @@ This would also solve the numeric issue it would look like:
 
 ```mojo
 struct SIMD[type: DType, size: Int](
-    fn __merge_with__[other_type: type_of(SIMD[_, size])]
+    def __merge_with__[other_type: type_of(SIMD[_, size])]
       (self) -> SIMD[type.merged_with(other_type.type), size]:
         return {self} # Use explicit conversion ctor
 
 struct DType:
    ...
-   fn merged_with(self, other: DType) -> DType:
+   def merged_with(self, other: DType) -> DType:
       # ... decide how to merge two dtypes, or use pop operation to do it...
 
 ```
@@ -177,7 +177,7 @@ and an `Int` into an `Optional[Int]` and many other cases. However, this isn’t
 enough for numeric conversions, e.g. consider:
 
 ```mojo
-fn int_example(a: Int8, b: Int16, cond: Bool):
+def int_example(a: Int8, b: Int16, cond: Bool):
   # Currently: error: value of type 'SIMD[int8, 1]' is not compatible with value of type 'SIMD[int16, 1]'
   c = a if cond else b
   # Desired type: Int16
@@ -194,7 +194,7 @@ With this proposal, Mojo’s type unification follows the following algorithm in
 pseudo code:
 
 ```mojo
-fn get_common_type(typea, typeb) raises -> Type:
+def get_common_type(typea, typeb) raises -> Type:
    # If the types are already identical, then we are done.
    if typea == typeb:
        return typea

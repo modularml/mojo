@@ -599,30 +599,7 @@ class TokenBuffer:
 
     def overwrite_last_token(self, token: int) -> None:
         """Overwrite the last token in the buffer."""
-        self.overwrite_token_at_offset_from_end(1, token)
-
-    def overwrite_token_at_offset_from_end(
-        self, offset_from_end: int, token: int
-    ) -> None:
-        """Overwrite the token ``offset_from_end`` positions from the end.
-
-        ``offset_from_end == 1`` targets the last token (equivalent to
-        :meth:`overwrite_last_token`). Used to realize the oldest of several
-        trailing future-token placeholders in place.
-
-        Args:
-            offset_from_end: 1-based offset from the end of the buffer.
-            token: The token ID to write.
-
-        Raises:
-            ValueError: If ``offset_from_end`` is out of bounds.
-        """
-        if offset_from_end < 1 or offset_from_end > self._current_length:
-            raise ValueError(
-                f"offset_from_end ({offset_from_end}) must be between 1 and "
-                f"the current length ({self._current_length})"
-            )
-        self.array[self._current_length - offset_from_end] = token
+        self.array[self._current_length - 1] = token
 
     # ============================================================================
     # Completion Tracking
@@ -637,23 +614,14 @@ class TokenBuffer:
         """
         return len(self._completion_range) > 0
 
-    def consume_recently_generated_tokens(
-        self, num_trailing_to_exclude: int = 0
-    ) -> TokenSlice:
+    def consume_recently_generated_tokens(self) -> TokenSlice:
         """Return newly generated tokens since the last consumption.
-
-        Args:
-            num_trailing_to_exclude: Number of trailing tokens to hold back
-                from this consumption. Used to leave unrealized future-token
-                placeholders unconsumed; they are consumed by a later call
-                once realized.
 
         Returns:
             A slice containing tokens ready to stream to the caller.
 
         Raises:
-            ValueError: If no new tokens are available, or if the exclusion
-                exceeds the unconsumed window.
+            ValueError: If no new tokens are available.
         """
         if self._completion_range.start == self._completion_range.end:
             raise ValueError("No tokens have been generated yet.")
@@ -665,19 +633,12 @@ class TokenBuffer:
                 f"exceeds current length ({self._current_length})"
             )
 
-        consume_end = self._completion_range.end - num_trailing_to_exclude
-        if consume_end < self._completion_range.start:
-            raise ValueError(
-                f"Cannot exclude {num_trailing_to_exclude} trailing tokens: "
-                f"only {len(self._completion_range)} unconsumed tokens exist."
-            )
-
         generated_tokens = self.array[
-            self._completion_range.start : consume_end
+            self._completion_range.start : self._completion_range.end
         ]
 
         # Use bump_start to maintain validation instead of direct assignment
-        amount = consume_end - self._completion_range.start
+        amount = self._completion_range.end - self._completion_range.start
         self._completion_range.bump_start(amount)
         return generated_tokens
 
@@ -686,7 +647,7 @@ class TokenBuffer:
     # ============================================================================
 
     def reset_as_new_prompt(
-        self, num_trailing_tokens_to_delete: int = 0
+        self, delete_last_generated_token: bool = False
     ) -> None:
         """Treat the current sequence as a fresh prompt.
 
@@ -694,9 +655,9 @@ class TokenBuffer:
         starts from this state.
 
         Args:
-            num_trailing_tokens_to_delete: Number of trailing generated tokens
-                to delete before resetting the buffer. This is used to drop
-                any placeholder future tokens still pending on the sequence.
+            delete_last_generated_token: If True, deletes the last generated
+                token before resetting the buffer. This is useful when the
+                last token is a placeholder future token.
 
         Raises:
             ValueError: If the buffer state is invalid.
@@ -708,14 +669,13 @@ class TokenBuffer:
                 f"exceeds current length ({self._current_length})"
             )
 
-        if num_trailing_tokens_to_delete:
-            if num_trailing_tokens_to_delete > self.generated_length:
+        if delete_last_generated_token:
+            if not self.generated_length:
                 raise ValueError(
-                    "Cannot delete more trailing tokens "
-                    f"({num_trailing_tokens_to_delete}) than there are "
-                    f"generated tokens ({self.generated_length})."
+                    "Cannot delete the last generated token if there are no "
+                    "generated tokens."
                 )
-            self._current_length -= num_trailing_tokens_to_delete
+            self._current_length -= 1
 
         # Reset ranges and make all current tokens the new prompt
         self._processing_range = Range(0, self._current_length)

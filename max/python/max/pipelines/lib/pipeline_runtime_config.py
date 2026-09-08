@@ -272,39 +272,11 @@ class PipelineRuntimeConfig(ConfigFileModel):
         ),
     )
 
-    fold_sampler_into_graph: bool = Field(
-        default=True,
-        description=(
-            "Fold greedy token selection (argmax) into the captured forward "
-            "graph so a single device-graph replay materializes the sampled "
-            "token, avoiding a separate sampler submission and its blocking "
-            "readback. Only takes effect for all-greedy decode batches on "
-            "architectures that emit the folded token output (Nemotron-H); "
-            "any non-greedy request falls back to the separate sampler. "
-            "Default on."
-        ),
-    )
-
     force: bool = Field(
         default=False,
         description=(
             "Skip validation of user provided flags against the architecture's "
             "required arguments."
-        ),
-    )
-
-    max_pending_futures: int = Field(
-        default=1,
-        description=(
-            "Maximum number of unrealized future-token placeholders a request "
-            "may hold at once. The default of 1 is the classic overlap-"
-            "scheduler depth: one forward in flight per request. A value of 2 "
-            "enables experimental schedule-ahead decoding in the overlap "
-            "pipeline: two forwards stay in flight and each step's outputs "
-            "are consumed one step late, for pure-greedy token-generation "
-            "batches only (other batches drain to the classic depth). Not "
-            "supported with speculative decoding; prefill-only workers pin "
-            "to 1."
         ),
     )
 

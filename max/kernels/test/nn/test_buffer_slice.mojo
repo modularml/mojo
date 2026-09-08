@@ -49,7 +49,7 @@ def test_slice[
     use_copy: Bool,
 ) raises:
     # Isn't always used but is used for the output buffer if we copy.
-    var output_mem = Array[Scalar[dtype], numelems](uninitialized=True)
+    var output_mem = Array[Scalar[dtype], numelems](fill={})
 
     var memory1 = Array[Scalar[dtype], numelems](
         fill_with=lambda (i: Int) -> Scalar[dtype]: Scalar[dtype](i)

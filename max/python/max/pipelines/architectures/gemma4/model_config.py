@@ -25,6 +25,9 @@ from max.pipelines.architectures.gemma3.model_config import (
     _HIDDEN_ACTIVATION_MAP,
     Gemma3Config,
 )
+from max.pipelines.architectures.gpt_oss.hybrid_kv_params_util import (
+    hybrid_swa_full_kv_params,
+)
 from max.pipelines.kv_cache import cache_dtype_for_encoding
 from max.pipelines.lib import (
     KVCacheConfig,
@@ -191,6 +194,38 @@ class Gemma4TextConfig(Gemma3Config):
             huggingface_config, model_config
         )
 
+    @override
+    @classmethod
+    def construct_kv_params(
+        cls,
+        huggingface_config: AutoConfig,
+        pipeline_config: PipelineConfig,
+        devices: list[DeviceRef],
+        kv_cache_config: KVCacheConfig,
+        cache_dtype: DType,
+        *,
+        allow_kv_head_replication: bool = False,
+    ) -> MultiKVCacheParams:
+        """Constructor for hybrid sliding + full KV tree.
+
+        Gemma 4 HF text configs list attention type per layer and may use a
+        wider full-attention head (``global_head_dim``,
+        ``num_global_key_value_heads``) than the sliding-window leaf.
+        """
+        return hybrid_swa_full_kv_params(
+            layer_types=huggingface_config.layer_types,
+            sliding_window=huggingface_config.sliding_window,
+            pipeline_config=pipeline_config,
+            devices=devices,
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
+            n_kv_heads=huggingface_config.num_key_value_heads,
+            head_dim=huggingface_config.head_dim,
+            allow_kv_head_replication=allow_kv_head_replication,
+            full_n_kv_heads=_resolve_num_global_kv_heads(huggingface_config),
+            full_head_dim=huggingface_config.global_head_dim,
+        )
+
     @classmethod
     def initialize_from_config(
         cls,
@@ -281,7 +316,7 @@ class Gemma4TextConfig(Gemma3Config):
             dtype=dtype,
             devices=device_refs,
             interleaved_rope_weights=interleaved_rope_weights,
-            kv_params=Gemma3Config.construct_kv_params(
+            kv_params=cls.construct_kv_params(
                 huggingface_config=huggingface_config,
                 pipeline_config=pipeline_config,
                 devices=device_refs,
@@ -509,58 +544,12 @@ class Gemma4ForConditionalGenerationConfig(
         Returns:
             Configured KV cache parameters.
         """
-        sliding_window_layers = 0
-        global_layers = 0
-        for attention_type in huggingface_config.text_config.layer_types:
-            if attention_type == "sliding_attention":
-                sliding_window_layers += 1
-            elif attention_type == "full_attention":
-                global_layers += 1
-            else:
-                raise ValueError(f"Unknown attention type: {attention_type}")
-
-        num_spec_tokens = (
-            (pipeline_config.speculative.num_speculative_tokens or 0)
-            if pipeline_config.speculative
-            else 0
-        )
-        sliding_window_kv_params = kv_cache_config.to_params(
-            dtype=cache_dtype,
-            n_kv_heads=huggingface_config.text_config.num_key_value_heads,
-            head_dim=huggingface_config.text_config.head_dim,
-            num_layers=sliding_window_layers,
+        return Gemma4TextConfig.construct_kv_params(
+            huggingface_config=huggingface_config.text_config,
+            pipeline_config=pipeline_config,
             devices=devices,
-            data_parallel_degree=pipeline_config.model.data_parallel_degree,
-            speculative_method=(
-                pipeline_config.speculative.speculative_method
-                if pipeline_config.speculative
-                else None
-            ),
-            num_draft_tokens=num_spec_tokens,
-            window_size=huggingface_config.text_config.sliding_window,
-        )
-        global_kv_params = kv_cache_config.to_params(
-            dtype=cache_dtype,
-            n_kv_heads=_resolve_num_global_kv_heads(
-                huggingface_config.text_config
-            ),
-            head_dim=huggingface_config.text_config.global_head_dim,
-            num_layers=global_layers,
-            devices=devices,
-            data_parallel_degree=pipeline_config.model.data_parallel_degree,
-            speculative_method=(
-                pipeline_config.speculative.speculative_method
-                if pipeline_config.speculative
-                else None
-            ),
-            num_draft_tokens=num_spec_tokens,
-            window_size=None,
-        )
-        return MultiKVCacheParams.from_params(
-            {
-                "sliding_attention": sliding_window_kv_params,
-                "full_attention": global_kv_params,
-            }
+            kv_cache_config=kv_cache_config,
+            cache_dtype=cache_dtype,
         )
 
     @classmethod

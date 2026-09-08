@@ -245,3 +245,28 @@ def wants_both_mixed[W: CommonA & CommonB & Deinitable](x: W):
 def use_mixed[V: Deinitable](b: MixedBox[V, No]):
     # expected-error @below {{does not conform to trait}}
     wants_both_mixed(b)
+
+
+##===----------------------------------------------------------------------===##
+# Same, with the refutation arriving after the unproven one rather than before.
+# The verdict is still `no` and still reports only the refutation, so the
+# unproven constraint gathered first has to be dropped once it shows up.
+##===----------------------------------------------------------------------===##
+
+
+struct LateMixedBox[T: Deinitable, U: Deinitable](
+    CommonA where (conforms_to(T, MarkerA), "LateMixedBox needs MarkerA for CommonA"),
+    # expected-note @below {{failed constraint: LateMixedBox needs MarkerB for CommonB}}
+    CommonB where (conforms_to(U, MarkerB), "LateMixedBox needs MarkerB for CommonB"),
+):
+    pass
+
+
+# expected-note @below {{function declared here}}
+def wants_both_late[W: CommonA & CommonB & Deinitable](x: W):
+    pass
+
+
+def use_late_mixed[V: Deinitable](b: LateMixedBox[V, No]):
+    # expected-error @below {{does not conform to trait}}
+    wants_both_late(b)

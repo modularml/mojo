@@ -259,13 +259,17 @@ void LowerSemanticCF::lowerElif(HLCF::ElifOp elifOp, bool &doesRaise,
   for (auto &region : elifOp->getRegions()) {
     if (region.empty())
       continue;
+    // Additional condition regions (elifRegions even indices) always transfer
+    // into a sibling then/else; they don't contribute to fallthrough of the
+    // elif itself. Region layout: 0=then, 1=else, 2+=elifRegions.
+    unsigned regionNumber = region.getRegionNumber();
+    bool isAdditionalCond = regionNumber >= 2 && ((regionNumber - 2) % 2 == 0);
+
     bool blockRaises = false, blockBreaks = false, blockFallThroughs = false;
     lowerBlock(region.front(), blockRaises, blockBreaks, blockFallThroughs);
     doesRaise |= blockRaises;
     doesBreak |= blockBreaks;
-    // Condition regions are odd indexed regions and always fallthrough to elif
-    // contained regions.
-    if (region.getRegionNumber() % 2 == 1)
+    if (isAdditionalCond)
       continue;
     elifFallsThrough |= blockFallThroughs;
   }
@@ -744,6 +748,34 @@ void LowerSemanticCF::lowerBlock(Block &block, bool &doesRaise, bool &doesBreak,
 
     // Process a HLCF::ElifOp
     if (auto elifOp = dyn_cast<HLCF::ElifOp>(op)) {
+      // If the first condition is a known constant, mark unreachable regions
+      // so we don't consider them live.
+      SIMDAttr elifCond;
+      if (mlir::matchPattern(elifOp.getCond(), m_Constant(&elifCond))) {
+        bool constantCondValue = elifCond.getAsBool();
+        auto markDead = [&](Region &region) {
+          if (region.empty())
+            return;
+          Block &deadBlock = region.front();
+          Operation *firstDeadOp = &deadBlock.front();
+          if (!firstDeadOp->hasTrait<OpTrait::IsTerminator>())
+            emitWarning(firstDeadOp->getLoc(), "unreachable code after 'if ")
+                << (constantCondValue ? "True'" : "False'");
+          eraseOpToEndOfBlock(firstDeadOp);
+          auto b = OpBuilder::atBlockBegin(&deadBlock);
+          UnreachableOp::create(b, op.getLoc());
+        };
+        if (constantCondValue) {
+          // First then is taken; else and additional arms are dead.
+          markDead(elifOp.getElseRegion());
+          for (Region &region : elifOp.getElifRegions())
+            markDead(region);
+        } else {
+          // First then is dead; later arms / else remain live.
+          markDead(elifOp.getThenRegion());
+        }
+      }
+
       bool elifFallsThrough = false;
       lowerElif(elifOp, doesRaise, doesBreak, elifFallsThrough);
       if (elifFallsThrough) {
@@ -765,7 +797,7 @@ void LowerSemanticCF::lowerBlock(Block &block, bool &doesRaise, bool &doesBreak,
     assert((isa<HLCF::IfOp, ParamIfOp>(op)) &&
            "Unknown operation with regions");
 
-    // If this is a dynamic `if False:` or @parameter if on known condition,
+    // If this is a dynamic `if False:` or comptime if on known condition,
     // mark the unreachable block as unreachable so we don't consider it live.
     Region *deadRegion = nullptr;
     bool constantCondValue = false;
@@ -790,7 +822,7 @@ void LowerSemanticCF::lowerBlock(Block &block, bool &doesRaise, bool &doesBreak,
     if (deadRegion) {
       Block &deadBlock = deadRegion->front();
       Operation *firstDeadOp = &deadBlock.front();
-      // Warn about unreachable code in an 'if', but not in a '@parameter if'.
+      // Warn about unreachable code in an 'if', but not in a 'comptime if'.
       // It serves the function of ifdef's, and conditions are often
       // known-statically true/false.
       if (!isa<ParamIfOp>(op) &&

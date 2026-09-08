@@ -11,4 +11,4 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-alias VALUE = 42
+comptime VALUE = 42

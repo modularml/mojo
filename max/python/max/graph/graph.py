@@ -63,10 +63,6 @@ from .type import (
 from .value import BufferValue, TensorValue, TensorValueLike, Value, _ChainValue
 from .weight import Weight
 
-# Read from the max-debug.source-tracebacks config key (covers the
-# MODULAR_DEBUG=source-tracebacks env var, modular.cfg, and the
-# Graph.debug.source_tracebacks Python setter via Config overrides).
-_SOURCE_TRACEBACKS_ENABLED = _InferenceSession.debug.source_tracebacks
 CURRENT_GRAPH: ContextVar[Graph] = ContextVar("CURRENT_GRAPH")
 # Stack of active Graph.profile_scope() scopes, outermost first. Each entry is
 # a (name, color) tuple; color is None when unset. A tuple (not a list) so
@@ -389,7 +385,11 @@ def _location(
     if not mlir.Context.current:
         raise RuntimeError("Can't create location: No MLIR context active")
 
-    if not _SOURCE_TRACEBACKS_ENABLED:
+    # Read the live config value rather than caching at import time: the
+    # flag can be flipped after import via Graph.debug.source_tracebacks,
+    # InferenceSession.debug.sensible_mode, or MODULAR_DEBUG, and each
+    # graph op must honor the setting at the moment it is created.
+    if not _InferenceSession.debug.source_tracebacks:
         location: mlir.Location = mlir.Location.unknown()
     else:
         # Extract the stack into summaries

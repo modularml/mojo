@@ -728,7 +728,7 @@ static TypeConvention getRegisterPassability(ASTType type, llvm::SMLoc loc,
     if (!trait)
       return !decl;
 
-    FailureOr<TriState> upCast = IREmitter::canMetaTypeUpCastTo(
+    FailureOr<TriBool> upCast = IREmitter::canMetaTypeUpCastTo(
         shared, loc, ty.extractMetaType(), trait, decl);
     return succeeded(upCast) && upCast->isTrue();
   };
@@ -820,13 +820,13 @@ bool ASTType::isTrivial(llvm::SMLoc loc, SharedState &shared) const {
          TypeConvention::RegisterPassableTrivial;
 }
 
-TriState ASTType::isSpecialFunctionTrivial(llvm::SMLoc loc,
-                                           SpecialFunctionKind kind,
-                                           SharedState &shared) const {
+TriBool ASTType::isSpecialFunctionTrivial(llvm::SMLoc loc,
+                                          SpecialFunctionKind kind,
+                                          SharedState &shared) const {
   // MLIR types and types conforming to AnyTrivialRegType are assumed to be
   // trivial for all purposes
   if (isTrivialRegisterType(loc, shared))
-    return TriState::yes();
+    return TriBool::yes();
 
   StringRef traitName;
   StringRef isTrivialHook;
@@ -855,10 +855,10 @@ TriState ASTType::isSpecialFunctionTrivial(llvm::SMLoc loc,
   auto [conformanceResult, traitDecl] =
       conformsToBuiltinTrait(traitName, loc, shared, {});
   if (conformanceResult.isFalse())
-    return TriState::no();
+    return TriBool::no();
 
   if (!typeDecl->getParentDecl())
-    return TriState::unknown();
+    return TriBool::unknown();
 
   auto witnessName = StringAttr::get(shared.getContext(), isTrivialHook);
   auto traitSymbol = TraitSymbolAttr::get(traitDecl->getSymbolRef());
@@ -871,19 +871,19 @@ TriState ASTType::isSpecialFunctionTrivial(llvm::SMLoc loc,
 
   auto structAttr = dyn_cast_if_present<LITStructAttr>(fieldIsTrivial);
   if (!structAttr)
-    return TriState::unknown();
+    return TriBool::unknown();
 
   assert(structAttr.getType() == boolType);
   auto structVals = structAttr.getValues();
   if (structVals.size() != 1)
-    return TriState::unknown();
+    return TriBool::unknown();
 
   if (auto &[name, boolVal] = structVals.front(); name == "_mlir_value") {
     if (auto boolAttr = dyn_cast<SIMDAttr>(boolVal))
-      return boolAttr.getAsBool() ? TriState::yes() : TriState::no();
+      return boolAttr.getAsBool() ? TriBool::yes() : TriBool::no();
   }
 
-  return TriState::unknown();
+  return TriBool::unknown();
 }
 
 bool ASTType::isProvablyImplicitlyTriviallyCopyable(llvm::SMLoc loc,
@@ -891,19 +891,19 @@ bool ASTType::isProvablyImplicitlyTriviallyCopyable(llvm::SMLoc loc,
                                                     ASTDecl &scope) const {
   return isImplicitlyCopyable(loc, shared, scope) &&
          isSpecialFunctionTrivial(loc, SpecialFunctionKind::kCopyCtor,
-                                  shared) == TriState::yes();
+                                  shared) == TriBool::yes();
 }
 
 bool ASTType::isProvablyTriviallyMoveable(llvm::SMLoc loc,
                                           SharedState &shared) const {
   return isSpecialFunctionTrivial(loc, SpecialFunctionKind::kMoveCtor,
-                                  shared) == TriState::yes();
+                                  shared) == TriBool::yes();
 }
 
 bool ASTType::isProvablyTriviallyDeletable(llvm::SMLoc loc,
                                            SharedState &shared) const {
   return isSpecialFunctionTrivial(loc, SpecialFunctionKind::kDeinit, shared) ==
-         TriState::yes();
+         TriBool::yes();
 }
 
 /// Return true if this type is a register-passable type that can be passed
@@ -983,14 +983,14 @@ bool ASTType::isMovable(llvm::SMLoc loc, SharedState &shared,
                                       ASTDecl::getAssumptionsFromScope(&scope));
 }
 
-TriState
+TriBool
 ASTType::doesConformTo(TraitType trait, SharedState &shared,
                        ArrayRef<ConstraintAttr> callerAssumptions) const {
   // FIXME: this seems pretty wrong, `getDecl` is type depth insensitive,
   // meaning that it is true for `meta<meta<!struct>> conforms_to AnyType`...
   ASTDecl *typeDecl = getDecl(shared);
   if (!typeDecl)
-    return TriState::no();
+    return TriBool::no();
   return typeDecl->doesNominalTypeConformTo(trait, *this, callerAssumptions);
 }
 
@@ -1007,16 +1007,16 @@ ConstraintResult ASTType::doesConformToWithDetails(
 /// Given a standard trait like Copyable, look up the conformance.  On
 /// success, the ASTDecl of the trait itself is returned, it is otherwise
 /// null.
-std::pair<TriState, ASTDecl *> ASTType::conformsToBuiltinTrait(
+std::pair<TriBool, ASTDecl *> ASTType::conformsToBuiltinTrait(
     StringRef traitName, llvm::SMLoc loc, SharedState &shared,
     ArrayRef<ConstraintAttr> callerAssumptions) const {
   ASTDecl *traitDecl = shared.lookupBuiltinTrait(traitName, loc);
   if (!traitDecl)
-    return {TriState::no(), {}};
+    return {TriBool::no(), {}};
 
   auto trait = dyn_cast_or_null<TraitDeclOp>(traitDecl->getIfOperation());
   if (!trait)
-    return {TriState::no(), {}};
+    return {TriBool::no(), {}};
 
   // Micro optimization to avoid creating a canonical trait type for for
   // checking conformance, we only care the root symbol.

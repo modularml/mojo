@@ -30,7 +30,7 @@ def test_broadcast_empty_shape():
     # Create a 1D tensor of shape (0)
     # Note: output_layout.product() is 0, but we need to allocate a buffer for the
     # output tensor.
-    var output_stack = Array[Int, 1](uninitialized=True)
+    var output_stack = Array[Int, 1](fill={})
     var output = TileTensor(output_stack, output_layout)
 
     broadcast(output, input)

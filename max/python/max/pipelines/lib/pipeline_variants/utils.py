@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 from max.pipelines.context import (
+    FUTURE_TOKEN,
     GenerationStatus,
     GrammarMatcher,
     LogProbabilities,
@@ -377,7 +378,9 @@ class CommittedSpanSnapshot:
         for ctx in context_batch:
             keep = ctx.eos_tracker.eos_sequence_lookback
             gen = ctx.tokens.generated
-            end = len(gen) - ctx.pending_future_count
+            end = len(gen)
+            if end > 0 and int(gen[-1]) == FUTURE_TOKEN:
+                end -= 1
             snapshots.append(
                 cls(
                     prior_generated=np.array(
