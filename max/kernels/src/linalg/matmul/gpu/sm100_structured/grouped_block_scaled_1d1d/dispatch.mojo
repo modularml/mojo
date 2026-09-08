@@ -81,6 +81,11 @@ comptime SMALL_PREFILL_AVG_M = 64
 # The down-proj has only 8 K-iters, so the deeper pipeline overlaps
 # cold-weight loads under more concurrent CTAs as the grid widens; the
 # up-proj (N=4096, K=7168) is already optimal at 6.
+#
+# (N=2048, K=4096) Inkling-Small TP=2 gate+up decode: the K-loop runs
+# only 16 iterations (BK=128 over the packed byte count), too few to fill
+# the 10 stages the auto-maximizer picks, so the extra stages only add
+# prologue latency. A stage sweep puts the minimum at 6.
 comptime NVFP4_TUNED_STAGES = [
     # DeepSeek-V3 up-proj.
     (4096, 7168, DECODE_AVG_M, 6),
@@ -92,6 +97,8 @@ comptime NVFP4_TUNED_STAGES = [
     (7168, 2048, -1, 6),
     # Kimi K2.5 TP=8 down-proj.
     (7168, 256, -1, 6),
+    # Inkling-Small TP=2 gate+up.
+    (2048, 4096, DECODE_AVG_M, 6),
 ]
 
 

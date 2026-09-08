@@ -14,7 +14,8 @@
 
 Tests the dispatch function that selects optimal kernel configuration based
 on (N, K) shape. Verifies correctness against vendor_blas reference for:
-- Dispatch-tuned shapes: N=4096,K=7168 and N=7168,K=2048
+- Dispatch-tuned shapes: N=4096,K=7168 and N=7168,K=2048, plus the
+  decode-only entry N=2048,K=4096
 - Fallback path (auto-computed config for unknown shapes)
 - Various active expert counts, token patterns, and -1 expert IDs
 """
@@ -911,6 +912,33 @@ def main() raises:
         # 8j: Large prefill: 4 experts @ 128 tok
         print("  8j: N=7168, K=256, large prefill 4 experts @ 128 tok")
         _test_dispatch[4, 7168, 256](
+            4,
+            [128, 128, 128, 128],
+            [0, 1, 2, 3],
+            ctx,
+        )
+
+        # ============================================================
+        # 9. Decode-only tuned shape
+        #    N=2048, K=4096 carries a tuned stage count at decode
+        #    (mma_bn=8, cta_group=1) only. The prefill case below is the
+        #    first time the shape reaches the auto-maximizer, which is
+        #    what it exists to pin.
+        # ============================================================
+        print("\n=== Decode-only tuned: N=2048, K=4096 ===")
+
+        # 9a: Decode regime: 9 experts at 1 tok each
+        print("  9a: N=2048, K=4096, decode 9 experts @ 1 tok")
+        _test_dispatch[9, 2048, 4096](
+            9,
+            [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 1, 2, 3, 4, 5, 6, 7, 8],
+            ctx,
+        )
+
+        # 9b: Large prefill: falls through to auto stages
+        print("  9b: N=2048, K=4096, large prefill 4 experts @ 128 tok")
+        _test_dispatch[4, 2048, 4096](
             4,
             [128, 128, 128, 128],
             [0, 1, 2, 3],
