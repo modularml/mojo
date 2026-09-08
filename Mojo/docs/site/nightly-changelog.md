@@ -124,6 +124,10 @@ This version is still a work in progress.
   - `def __init__(out self):`
   - `def __init__(out self, *, capacity_bytes: Int):`
   - `def reserve_bytes(mut self, new_capacity_bytes: Int, /):`
+- SIMD
+  - `def __init__(out self):`
+  - `def __eq__(self, rhs: Self) -> Bool:`
+  - `def __len__(self) -> Int:`
 - List
   - `def append(mut self, var value: Self.T, /):`
 

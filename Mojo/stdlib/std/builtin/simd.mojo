@@ -440,6 +440,7 @@ struct FastMathFlag(Equatable, ImplicitlyCopyable, RegisterPassable):
 # ===----------------------------------------------------------------------=== #
 
 
+@stable(since="1.1")
 @lldb_formatter_wrapping_type
 struct SIMD[dtype: DType, length: SIMDLength](
     Absable,
@@ -653,6 +654,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
+    @stable(since="1.1")
     @always_inline("builtin")
     def __init__(out self):
         """Default initializer of the SIMD vector.
@@ -1433,6 +1435,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # ===------------------------------------------------------------------=== #
 
     @always_inline("builtin")
+    @stable(since="1.1")
     def __eq__(self, rhs: Self) -> Bool:
         """Compares two SIMD vectors for equality.
 
@@ -1446,6 +1449,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
             mlir_value=__mlir_op.`pop.simd.reduce_and`(self.eq(rhs)._mlir_value)
         )
 
+    @stable(since="1.1")
     @always_inline("builtin")
     def __ne__(self, rhs: Self) -> Bool:
         """Compares two SIMD vectors for inequality.
@@ -1986,6 +1990,7 @@ struct SIMD[dtype: DType, length: SIMDLength](
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
+    @stable(since="1.1")
     @always_inline("nodebug")
     def __len__(self) -> Int:
         """Gets the length of the SIMD vector.
