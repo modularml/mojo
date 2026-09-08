@@ -1,7 +1,6 @@
 ---
-title: Prefix caching with PagedAttention
-sidebar_label: Prefix caching
-description: Use prefix caching and PagedAttention when serving a model with the MAX CLI
+title: Prefix caching
+description: Enable prefix caching when serving a model with MAX
 ---
 
 Prefix caching is a technique that caches the key-value (KV) cache of existing
@@ -10,7 +9,7 @@ cache if they share the same prefix. This eliminates redundant computations and
 improves performance for workloads with repeated prefixes.
 
 Prefix caching is enabled by default when serving a model with the [`max
-serve`](/cli/serve) CLI command. It can be disabled using the
+serve`](/cli/serve) CLI command. You can disable it with the
 `--no-enable-prefix-caching` flag.
 
 ## When to use prefix caching
@@ -23,82 +22,73 @@ throughput.
 Prefix caching can provide significant performance improvements in the following
 scenarios:
 
-1. **Similar queries**: When a user repeatedly makes similar queries that use
-   the same system prompt instructions, the KV cache of the prefix can be
-   stored in advance to reduce redundant computation.
-2. **Multi-round conversations**: In chat applications, users often ask
-   follow-up queries related to previous inputs. Since the server releases KV
-   cache memory after each request, prefix caching preserves computation from
-   past conversation turns without requiring an explicit session.
+- **Similar queries**: When a user repeatedly makes similar queries that use
+  the same system prompt instructions, the KV cache of the prefix can be
+  stored in advance to reduce redundant computation.
+- **Multi-round conversations**: In chat applications, users often ask
+  follow-up queries related to previous inputs. Since the server releases KV
+  cache memory after each request, prefix caching preserves computation from
+  past conversation turns without requiring an explicit session.
 
-Prefix caching won't result in performance degradation. However, it also does
-not provide additional benefit in the following cases:
+Prefix caching won't result in performance degradation. However, it also
+doesn't provide additional benefit in the following cases:
 
-- **Unique queries**: If new queries do not share prefixes with previous
-  queries, there is no opportunity to reuse cached KV values, making prefix
+- **Unique queries**: If new queries don't share prefixes with previous
+  queries, there's no opportunity to reuse cached KV values, making prefix
   caching ineffective.
 - **Long response generation**: Prefix caching only speeds up the pre-fill phase
-  of a request. If most of the time is spent generating new tokens (decoding),
-  caching will have little impact.
+  of a request. If a request spends most of its time generating new tokens
+  (decoding), caching has little impact.
 
 ## How prefix caching works
 
 Prefix caching works by storing the key-value (KV) cache for a prefix and
 applying it to future prompts that include the same prefix, reducing redundant
-computation. It's built on
+computation. MAX manages the KV cache with
 [PagedAttention](https://handbook.modular.com/inference-optimization/pagedattention/),
-which MAX uses by default to manage the KV cache. The following flags control
-prefix caching behavior:
+which stores the cache in fixed-size pages that MAX can reuse across requests
+that share a prefix.
+
+The following flags control prefix caching behavior:
 
 - `--enable-prefix-caching`: enables prefix caching. This is on by default, so
   you only need it to re-enable caching after disabling it. Use
   `--no-enable-prefix-caching` to disable it.
 - `--kv-cache-page-size`: sets the number of tokens per page in the paged KV
-  cache. PagedAttention requires a page size that is a multiple of 128.
+  cache. The page size must be a multiple of 128.
 - `--enable-dp-cross-replica-prefix-copy`: when serving with data parallelism
   (`--data-parallel-degree` greater than 1), lets MAX serve a prefix-cache hit
   that lives on another replica's GPU by copying it device-to-device onto the
-  requesting replica. This is on by default. When disabled, cross-replica
-  reuse is served only from the shared host or disk tier, or recomputed.
+  requesting replica. This is on by default. When disabled, MAX serves
+  cross-replica reuse only from the shared host or disk tier, or recomputes it.
 
-Prefix caching is not compatible with [LoRA
-adapters](/serve/lora-adapters). Disable it with
-`--no-enable-prefix-caching` when serving LoRA adapters.
-
-Prefix caching with PagedAttention works on both CPU and GPU. To deploy a model
+Prefix caching works on both CPU and GPU. To deploy a model
 with prefix caching using the `max` CLI, you can use the flag `--devices cpu`
 for CPU or `--devices gpu` for GPU workloads. If you omit `--devices`, MAX uses
 the model or config default.
+
+MAX doesn't support prefix caching for multimodal models or [LoRA
+adapters](/serve/lora-adapters). Because of this, MAX automatically disables
+prefix caching for multimodal models. When serving with LoRA adapters, disable
+prefix caching explicitly with the `--no-enable-prefix-caching` flag.
 
 ## Quickstart
 
 Prefix caching is enabled by default when serving a model with MAX. To install
 the `max` CLI, see the [installation guide](/packages#install).
 
-The following command serves Gemma 3 with prefix caching enabled. The default
-KV cache page size for Gemma 3 is `256`.
+The following command serves Gemma 3 with prefix caching enabled by default:
 
 ```bash
 max serve --model google/gemma-3-27b-it
 ```
 
-:::note
+Explicitly enable prefix caching when serving your model with the
+`--enable-prefix-caching` flag:
 
-MAX does not support prefix caching for multimodal models.
-
-If you explicitly enable prefix caching for an incompatible model, you will see
-a log similar to the following (referencing
-[`KVCacheConfig`](/api/python/generated/max.pipelines.kv_cache.KVCacheConfig/)):
-
-```text
-WARNING: Architecture 'MllamaForConditionalGeneration' requires \
-KVCacheConfig.enable_prefix_caching=False, overriding current value True
+```bash
+max serve --model google/gemma-3-27b-it --enable-prefix-caching
 ```
-
-In this case, MAX automatically disables prefix caching and reverts to
-`--no-enable-prefix-caching`.
-
-:::
 
 ### Disable prefix caching
 
@@ -108,28 +98,10 @@ To disable prefix caching when serving a model, use the following command:
 max serve --model google/gemma-3-27b-it --no-enable-prefix-caching
 ```
 
-### Enable prefix caching
-
-You can explicitly enable prefix caching when serving your model with the
-[`max` CLI](/cli/serve). The following command represents the default MAX
-behavior:
-
-```bash
-max serve --model google/gemma-3-27b-it \
-    --enable-prefix-caching \
-    --kv-cache-page-size 256
-```
-
 ## Next steps
 
-Now that you know the basics of prefix caching and PagedAttention, you can get
-started with MAX on GPUs.
-
-MAX also includes a benchmarking script that allows you to evaluate throughput,
-latency, and GPU utilization metrics. You can use this script to track
-performance gains from prefix caching. For more detailed instructions on
-benchmarking, see the
-[`max benchmark` docs](/cli/benchmark).
+Now that you know the basics of prefix caching, keep customizing how you serve
+models on MAX:
 
 - [Speculative decoding](/serve/speculative-decoding): Use speculative
   decoding to accelerate LLM inference.
