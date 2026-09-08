@@ -44,6 +44,9 @@ def test_join() raises:
         "/absolute/path",
         join("ignored", "/ignored/absolute/path", "/absolute", "path"),
     )
+
+    # Separator insertion after absolute path reset.
+    assert_equal("/abs/next", join("first/", "/abs", "next"))
     # assert_equal(
     #     "/path/to/file",
     #     join(
