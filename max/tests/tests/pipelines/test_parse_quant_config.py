@@ -36,7 +36,9 @@ from max.nn.quant_config import (
 )
 from max.pipelines.weights.quant import (
     _modelopt_ignore_patterns,
+    _modelopt_layer_subtree_ignored,
     _modelopt_shared_experts_quantized_dtype,
+    _quantized_layers_from_modelopt_ignore,
     parse_quant_config,
 )
 from transformers import AutoConfig
@@ -893,6 +895,225 @@ def test_modelopt_ignore_normalizes_block_sparse_moe_shared_experts() -> None:
     assert global_ignore == ["layers.*.mlp.shared_experts*"]
     assert (
         _modelopt_shared_experts_quantized_dtype(global_ignore)
+        == DType.bfloat16
+    )
+
+
+@pytest.fixture
+def hf_config_qwen3_8_flash_next_nvfp4() -> AutoConfig:
+    """Modelopt NVFP4 config with Qwen3.8-Flash-Next's real ``ignore`` list."""
+    config_path = (
+        TEST_DATA_PATH / "radixark__qwen3_8_flash_next_nvfp4_quant.json"
+    )
+    return AutoConfig.from_pretrained(str(config_path), trust_remote_code=True)
+
+
+@pytest.fixture
+def state_dict_bf16_embed_tokens() -> dict[str, WeightData]:
+    """A state dict holding only the BF16 embedding, as the parser reads."""
+    return {
+        "embed_tokens.weight": WeightData(
+            name="embed_tokens.weight",
+            shape=Shape((1, 1)),
+            dtype=DType.bfloat16,
+            data=torch.zeros((1, 1), dtype=max_dtype_to_torch(DType.bfloat16)),
+        ),
+    }
+
+
+def test_parse_modelopt_nvfp4_qwen3_8_flash_next_ignore_list(
+    hf_config_qwen3_8_flash_next_nvfp4: AutoConfig,
+    state_dict_bf16_embed_tokens: dict[str, WeightData],
+) -> None:
+    """Reads RadixArk/Qwen3.8-Flash-Next-NVFP4's ``ignore`` list verbatim.
+
+    Only the routed experts of the 48 MoE layers carry NVFP4 weights. Every
+    attention tensor is BF16, named by two globs -- ``*.self_attn.*`` for the
+    12 full-attention layers and ``*.linear_attn.*`` for the 36 gated-DeltaNet
+    ones, which ``layer_types`` tells apart -- and the gated shared expert is
+    BF16 under the singular ``shared_expert`` spelling Qwen uses.
+
+    The checkpoint writes those 12 as ``qwen_sparse_attention``, which only its
+    own remote-code config class accepts; ``layer_types`` here holds the
+    ``full_attention`` the reference rewrites to it, and
+    ``test_modelopt_layer_types_read_through_a_vl_text_config`` covers the
+    checkpoint's own spelling.
+    """
+    quant_config = parse_quant_config(
+        hf_config_qwen3_8_flash_next_nvfp4,
+        state_dict_bf16_embed_tokens,
+        DType.uint8,
+    )
+
+    assert quant_config is not None
+    assert quant_config.format == QuantFormat.NVFP4
+    # `*.mlp.gate*` and `*.mlp.shared_expert*` name parts of the MLP, so the
+    # routed experts stay quantized -- the layer must not roll up to ignored.
+    assert quant_config.mlp_quantized_layers == set(range(48))
+    assert quant_config.attn_quantized_layers == set()
+    assert quant_config.shared_experts_weight_dtype == DType.bfloat16
+    assert quant_config.embedding_output_dtype == DType.bfloat16
+
+
+def test_modelopt_nvfp4_flash_next_ignore_list_is_prefix_independent(
+    hf_config_qwen3_8_flash_next_nvfp4: AutoConfig,
+    state_dict_bf16_embed_tokens: dict[str, WeightData],
+) -> None:
+    """The leading-``*`` globs hold whichever prefix the arch passes.
+
+    Which prefix a multimodal architecture strips is its own choice, and this
+    checkpoint's attention globs are anchored on the module name rather than on
+    the model root, so the answer cannot depend on it.
+    """
+    quant_config = parse_quant_config(
+        hf_config_qwen3_8_flash_next_nvfp4,
+        state_dict_bf16_embed_tokens,
+        DType.uint8,
+        state_dict_name_prefix="",
+        ignored_modules_prefix="language_model.",
+    )
+
+    assert quant_config is not None
+    assert quant_config.mlp_quantized_layers == set(range(48))
+    assert quant_config.attn_quantized_layers == set()
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected_ignored"),
+    [
+        # Descendant globs cover the whole subtree.
+        ("*.self_attn.*", True),
+        ("model.layers.7.self_attn.*", True),
+        ("layers.7.self_attn.*", True),
+        # Trailing-wildcard globs on the module itself, already handled.
+        ("*.self_attn*", True),
+        ("model.layers.7.self_attn*", True),
+        ("model.layers.7.*", True),
+        # A glob naming only part of the subtree must not cover it.
+        ("*.self_attn.q_proj", False),
+        ("*.self_attn.q*", False),
+        ("*.mlp.gate*", False),
+        ("mtp.*", False),
+        ("*hyper_connection*", False),
+    ],
+)
+def test_modelopt_layer_subtree_ignored_glob_shapes(
+    pattern: str, expected_ignored: bool
+) -> None:
+    """Pins which glob shapes leave a whole layer subtree unquantized.
+
+    ``*.self_attn.*`` and ``*.self_attn.q_proj`` both match modules under
+    ``self_attn`` and differ only in whether they match *every* one, which is
+    what makes the layer's attention BF16 rather than partially quantized.
+    """
+    assert (
+        _modelopt_layer_subtree_ignored(7, "self_attn", [pattern])
+        is expected_ignored
+    )
+
+
+def test_modelopt_linear_attn_counts_as_the_attention_subtree() -> None:
+    """A hybrid checkpoint may only name ``linear_attn`` in its ``ignore`` list.
+
+    Its linear-attention layers hold no ``self_attn`` tensors at all, so
+    testing that spelling alone would report the layer as attention-quantized
+    and build FP4 projections for BF16 weights. Without ``layer_types`` there
+    is nothing to say which layer is which, so either spelling has to count.
+    """
+    hf_config = SimpleNamespace(num_hidden_layers=4)
+    mlp, attn = _quantized_layers_from_modelopt_ignore(
+        hf_config, ["*.linear_attn.*"]
+    )
+
+    assert attn == set()
+    assert mlp == {0, 1, 2, 3}
+
+
+def test_modelopt_layer_types_keep_the_two_attentions_apart() -> None:
+    """``layer_types`` decides which spelling a given layer is judged by.
+
+    A checkpoint that leaves its Gated DeltaNet layers BF16 while quantizing
+    full attention names only ``*.linear_attn.*``. Testing both spellings for
+    every index would drop the ``self_attn`` layers too and read their packed
+    weights as BF16.
+    """
+    hf_config = SimpleNamespace(
+        num_hidden_layers=4,
+        layer_types=[
+            "linear_attention",
+            "linear_attention",
+            "linear_attention",
+            "full_attention",
+        ],
+    )
+    _, attn = _quantized_layers_from_modelopt_ignore(
+        hf_config, ["*.linear_attn.*"]
+    )
+    assert attn == {3}
+
+    # And the mirror image, which is the shape a checkpoint quantizing only
+    # the linear layers would take.
+    _, attn = _quantized_layers_from_modelopt_ignore(
+        hf_config, ["*.self_attn.*"]
+    )
+    assert attn == {0, 1, 2}
+
+
+def test_modelopt_layer_types_read_through_a_vl_text_config() -> None:
+    """The field sits on the text config of a multimodal checkpoint.
+
+    ``num_hidden_layers`` is already read from there, and a mismatch would
+    silently fall back to the both-spellings union rather than fail.
+    """
+    hf_config = SimpleNamespace(
+        text_config=SimpleNamespace(
+            num_hidden_layers=2,
+            layer_types=["linear_attention", "qwen_sparse_attention"],
+        )
+    )
+    _, attn = _quantized_layers_from_modelopt_ignore(
+        hf_config, ["*.linear_attn.*"]
+    )
+    # `qwen_sparse_attention` is a full-attention layer under another name;
+    # its tensors live under `self_attn`.
+    assert attn == {1}
+
+
+def test_modelopt_shared_expert_singular_spelling() -> None:
+    """Qwen writes ``shared_expert``; DeepSeek and GLM write ``shared_experts``.
+
+    Reading only the plural leaves the shared expert marked quantized while
+    its weights are BF16, which is a silent mis-typing rather than an error.
+    """
+    for pattern in (
+        "*.mlp.shared_expert.*",
+        "layers.*.mlp.shared_experts*",
+        "*shared_expert*",
+    ):
+        assert (
+            _modelopt_shared_experts_quantized_dtype([pattern])
+            == DType.bfloat16
+        ), pattern
+
+    assert _modelopt_shared_experts_quantized_dtype(["*.mlp.gate*"]) is None
+
+
+def test_modelopt_shared_expert_gate_is_not_the_shared_expert() -> None:
+    """``shared_expert_gate`` is a separate one-column gating projection.
+
+    A checkpoint can leave that gate BF16 while quantizing the shared expert
+    itself, so treating the name as a substring reads the expert's packed
+    weights as BF16.
+    """
+    assert (
+        _modelopt_shared_experts_quantized_dtype(["*.mlp.shared_expert_gate*"])
+        is None
+    )
+    # Qwen3.8-Flash-Next ignores both, and the expert's own glob still counts.
+    assert (
+        _modelopt_shared_experts_quantized_dtype(
+            ["*.mlp.shared_expert.*", "*.mlp.shared_expert_gate*"]
+        )
         == DType.bfloat16
     )
 

@@ -223,6 +223,13 @@ class Qwen3_5Attention(Module, Shardable):
     def shard(self, devices: Iterable[DeviceRef]) -> list[Qwen3_5Attention]:
         """Creates one per-device view of this layer, split by head.
 
+        Constructs :class:`Qwen3_5Attention` rather than ``type(self)``, so a
+        subclass that overrides :meth:`_attend` or carries state of its own has
+        to override this too -- the shards would otherwise be plain causal
+        attention, which serves silently rather than failing. Such a subclass
+        can still call this for the projection and norm shards and rebuild
+        itself around them.
+
         Args:
             devices: Devices to place the shards on.
 
@@ -302,6 +309,45 @@ class Qwen3_5Attention(Module, Shardable):
             ops.unsqueeze(identity, 0), [freqs_cis.shape[0], nope_dim]
         )
         return ops.concat((identity, freqs_cis), axis=-1)
+
+    def _attend(
+        self,
+        *,
+        query: TensorValue,
+        kv_collection: PagedCacheValues,
+        layer_idx: TensorValue,
+        input_row_offsets: TensorValue,
+        output_dtype: DType,
+    ) -> TensorValue:
+        """Attends over the whole causal context.
+
+        A seam rather than an inline call so that a subclass whose attention
+        reads a *subset* of the keys can replace this one step without
+        duplicating the projection, the partial-RoPE reordering and the FP8
+        store path above it. ``output_dtype`` is pinned to the activation dtype
+        by the caller so an FP8 query still yields a bf16 output for the gate
+        and ``o_proj``; it is a no-op on the bf16 path.
+
+        Args:
+            query: ``[total_seq_len, n_heads, head_dim]``, post-RoPE.
+            kv_collection: KV cache handle, already written for this step.
+            layer_idx: Layer index for the KV cache.
+            input_row_offsets: Ragged offsets for the batch.
+            output_dtype: Dtype of the attention output.
+
+        Returns:
+            ``[total_seq_len, n_heads, head_dim]``.
+        """
+        return flash_attention_ragged(
+            self.kv_params,
+            input=query,
+            kv_collection=kv_collection,
+            layer_idx=layer_idx,
+            input_row_offsets=input_row_offsets,
+            mask_variant=MHAMaskVariant.CAUSAL_MASK,
+            scale=self.scale,
+            output_dtype=output_dtype,
+        )
 
     def __call__(
         self,
@@ -481,17 +527,11 @@ class Qwen3_5Attention(Module, Shardable):
                 position_ids=freq_row_ids,
             )
 
-        # Flash attention. `output_dtype` is pinned to the activation dtype so
-        # an FP8 query still yields a bf16 attention output for the gate and
-        # o_proj; it is a no-op on the bf16 path.
-        attn_out = flash_attention_ragged(
-            self.kv_params,
-            input=query,
+        attn_out = self._attend(
+            query=query,
             kv_collection=kv_collection,
             layer_idx=layer_idx,
             input_row_offsets=input_row_offsets,
-            mask_variant=MHAMaskVariant.CAUSAL_MASK,
-            scale=self.scale,
             output_dtype=x.dtype,
         )
 

@@ -21,6 +21,7 @@ modular_py_test(
         "//max/python/max/nn",
         "//max/python/max/pipelines/architectures/qwen3_5",
         "//max/python/max/pipelines/lib",
+        requirement("torch"),
     ],
 )
 
@@ -124,6 +125,16 @@ modular_py_test(
         "//max/python/max/pipelines/context",
         "//max/python/max/pipelines/lib",
         requirement("numpy"),
+    ],
+)
+
+modular_py_test(
+    name = "test_output_gate",
+    srcs = ["test_output_gate.py"],
+    deps = [
+        "//max/python/max/dtype",
+        "//max/python/max/graph",
+        "//max/python/max/pipelines/architectures/qwen3_5",
     ],
 )
 

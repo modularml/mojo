@@ -1,0 +1,100 @@
+{
+  "model_type": "qwen3_vl_moe",
+  "text_config": {
+    "model_type": "qwen3_vl_moe_text",
+    "num_hidden_layers": 48,
+    "layer_types": [
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention"
+    ],
+    "full_attention_interval": 4
+  },
+  "quantization_config": {
+    "quant_method": "modelopt",
+    "quant_algo": "NVFP4",
+    "producer": {
+      "name": "modelopt",
+      "version": "0.46.0"
+    },
+    "config_groups": {
+      "group_0": {
+        "targets": [
+          "Linear"
+        ],
+        "weights": {
+          "dynamic": false,
+          "group_size": 16,
+          "num_bits": 4,
+          "type": "float"
+        },
+        "input_activations": {
+          "dynamic": false,
+          "group_size": 16,
+          "num_bits": 4,
+          "type": "float"
+        }
+      }
+    },
+    "ignore": [
+      "model.embed_tokens",
+      "mtp.*",
+      "model.mtp.*",
+      "*.self_attn.*",
+      "*.linear_attn.*",
+      "*.mlp.gate*",
+      "*.mlp.shared_expert.*",
+      "*.mlp.shared_expert_gate*",
+      "*hyper_connection*",
+      "*.ple.*",
+      "model.visual.*",
+      "model.language_model.embed_tokens",
+      "lm_head"
+    ]
+  }
+}

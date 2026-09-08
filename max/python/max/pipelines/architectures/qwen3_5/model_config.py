@@ -54,11 +54,24 @@ def _declared_dtype(text_config: AutoConfig) -> DType | None:
     alone -- norms, embeddings, the GDN conv, the state pools. Returns None
     when the field is absent or names a dtype outside the set above, leaving
     the caller on its existing fallback.
+
+    ``PretrainedConfig`` normalizes the JSON string into a ``torch.dtype``
+    object, so a string match alone reads ``None`` off a config that does
+    declare a dtype -- and the caller then falls back to the *storage* dtype,
+    which is ``uint8`` on a packed-FP4 encoding. Take the name off either
+    form rather than importing torch into the pipeline.
     """
     for attr in ("dtype", "torch_dtype"):
         declared = getattr(text_config, attr, None)
-        if isinstance(declared, str) and declared in _DECLARED_DTYPES:
-            return _DECLARED_DTYPES[declared]
+        if declared is None:
+            continue
+        name = (
+            declared
+            if isinstance(declared, str)
+            else str(declared).removeprefix("torch.")
+        )
+        if name in _DECLARED_DTYPES:
+            return _DECLARED_DTYPES[name]
     return None
 
 

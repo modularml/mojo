@@ -6418,6 +6418,11 @@ def grouped_matmul_block_scaled(
     requires ``K`` to be a multiple of 128, which the padded FP4 TMA copy that
     feeds the weights into shared memory imposes.
 
+    Every combination needs the activation row to be a multiple of 16 storage
+    elements for its TMA descriptor, so a packed-FP4 ``K`` must be a multiple
+    of 32. For a MoE down projection ``K`` is the expert intermediate size, and
+    that is the constraint a tensor-parallel split of it runs into.
+
     ``hidden_states`` and ``expert_start_indices`` together implement the ragged
     tensor representation for variable-length expert inputs.
 
