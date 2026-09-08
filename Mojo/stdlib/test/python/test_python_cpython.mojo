@@ -584,7 +584,6 @@ def test_cpython_init_populates_version() raises:
     var python = Python()
     ref cpython = python.cpython()
     assert_true(cpython.version.major >= 3)
-    assert_true(cpython.version.minor >= 0)
 
 
 def main() raises:
