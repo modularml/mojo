@@ -35,11 +35,8 @@ NVFP4 routing (B200-tuned via ablation):
     Small prefill (avg_m <= 64):   AB_swapped=True, mma_bn=64, cta_group=2
     Large prefill (avg_m > 64):    AB_swapped=True, mma_bn=128, cta_group=2
 
-  Tuned stages per (N, K) live at the three `_dispatch_regime` call sites:
-    (N=4096, K=7168) DeepSeek-V3 up-proj,
-    (N=7168, K=2048) DeepSeek-V3 down-proj,
-    (N=7168, K=256) Kimi K2.5 TP=8 down-proj (large prefill only).
-  Unknown shapes fall through to stages=auto.
+  Tuned stages live in `NVFP4_TUNED_STAGES`, one row per (N, K, regime).
+  A (shape, regime) pair with no row there falls through to stages=auto.
 """
 
 from std.collections import Optional
@@ -71,6 +68,49 @@ from .grouped_1d1d_matmul_kernel import (
 # prefill. Tuned on B200 NVFP4 traffic; don't change without a new ablation.
 comptime DECODE_AVG_M = 8
 comptime SMALL_PREFILL_AVG_M = 64
+
+# Tuned NVFP4 pipeline depths as (N, K, regime, stages), where `regime` is
+# the regime row's `upper_avg_m` bound (-1 = large prefill). A (shape,
+# regime) pair absent from this table uses stages=auto, which maximizes
+# depth against the SMEM budget. Every row is a B200 ablation result
+# (bench_grouped_matmul); don't add one without a measurement.
+#
+# (N=7168, K=2048) DeepSeek-V3 down-proj decode: stages 4->6 is a
+# no-regret win that grows with the active expert count -- ~0% at 8
+# active experts (grid too small to benefit), +11% at 12, +5% at 16.
+# The down-proj has only 8 K-iters, so the deeper pipeline overlaps
+# cold-weight loads under more concurrent CTAs as the grid widens; the
+# up-proj (N=4096, K=7168) is already optimal at 6.
+comptime NVFP4_TUNED_STAGES = [
+    # DeepSeek-V3 up-proj.
+    (4096, 7168, DECODE_AVG_M, 6),
+    (4096, 7168, SMALL_PREFILL_AVG_M, 6),
+    (4096, 7168, -1, 7),
+    # DeepSeek-V3 down-proj.
+    (7168, 2048, DECODE_AVG_M, 6),
+    (7168, 2048, SMALL_PREFILL_AVG_M, 6),
+    (7168, 2048, -1, 6),
+    # Kimi K2.5 TP=8 down-proj.
+    (7168, 256, -1, 6),
+]
+
+
+def _tuned_stages[N: Int, K: Int, regime: Int]() -> Optional[Int]:
+    """Look up the tuned pipeline depth for one (N, K, regime).
+
+    Parameters:
+        N: Output N dimension.
+        K: Reduction dimension (unpacked element count).
+        regime: The regime row's `upper_avg_m` bound (-1 = large prefill).
+
+    Returns:
+        The tuned stage count, or None for stages=auto when the table has
+        no row for this (shape, regime).
+    """
+    comptime for row in NVFP4_TUNED_STAGES:
+        comptime if row[0] == N and row[1] == K and row[2] == regime:
+            return Optional[Int](row[3])
+    return Optional[Int](None)
 
 
 def _launch_grouped_block_scaled[
@@ -188,80 +228,6 @@ def _launch_grouped_block_scaled[
         expert_ids,
         a_scales,
         b_scales,
-        expert_scales,
-        num_active_experts,
-        ctx,
-        swiglu_out,
-        trace_buf,
-    )
-
-
-def _dispatch_regime[
-    transpose_b: Bool,
-    N: Int,
-    K: Int,
-    mma_bn: Int,
-    cta_group: Int,
-    stages_4096_7168: Optional[Int],
-    stages_7168_2048: Optional[Int],
-    stages_7168_256: Optional[Int],
-    pdl_level: PDLLevel = PDLLevel.ON,
-    fuse_swiglu: Bool = False,
-    SwiGLUOutputT: SwiGLUOutput = NullSwiGLUOutput[],
-    swiglu_match_bf16: Bool = True,
-    swiglu_disable_compute: Bool = False,
-    swiglu_enable_trace: Bool = False,
-    TraceBufT: TraceBuf = NullTrace,
-    swiglu_use_inplace: Bool = False,
-](
-    c: TileTensor,
-    a: TileTensor,
-    b: TileTensor,
-    a_scales: TileTensor,
-    b_scales: TileTensor,
-    a_offsets: TileTensor,
-    a_scale_offsets: TileTensor,
-    expert_ids: TileTensor,
-    expert_scales: TileTensor,
-    num_active_experts: Int,
-    ctx: DeviceContext,
-    swiglu_out: SwiGLUOutputT = NullSwiGLUOutput[](),
-    trace_buf: TraceBufT = NullTrace(),
-) raises:
-    """Dispatch with shape-specific pipeline stages.
-
-    Uses tuned stages for known (N, K) shapes, auto-computes for others.
-    """
-    comptime stages = (
-        stages_4096_7168 if (N == 4096 and K == 7168) else stages_7168_2048 if (
-            N == 7168 and K == 2048
-        ) else stages_7168_256 if (N == 7168 and K == 256) else Optional[Int](
-            None
-        )
-    )
-    _launch_grouped_block_scaled[
-        transpose_b,
-        True,
-        mma_bn,
-        cta_group,
-        num_pipeline_stages=stages,
-        pdl_level=pdl_level,
-        fuse_swiglu=fuse_swiglu,
-        SwiGLUOutputT=SwiGLUOutputT,
-        swiglu_match_bf16=swiglu_match_bf16,
-        swiglu_disable_compute=swiglu_disable_compute,
-        swiglu_enable_trace=swiglu_enable_trace,
-        TraceBufT=TraceBufT,
-        swiglu_use_inplace=swiglu_use_inplace,
-    ](
-        c,
-        a,
-        b,
-        a_scales,
-        b_scales,
-        a_offsets,
-        a_scale_offsets,
-        expert_ids,
         expert_scales,
         num_active_experts,
         ctx,
@@ -400,7 +366,7 @@ def grouped_matmul_nvfp4_dispatch[
 
         # Nested forwarder: every regime threads the SAME 13 runtime args
         # and the SAME forwarding comptime params (pdl_level, fuse_swiglu,
-        # the swiglu knobs, the trace knobs) to `_dispatch_regime`; only
+        # the swiglu knobs, the trace knobs) to the launcher; only
         # (mma_bn, cta_group, stages) vary. Factoring the call here keeps
         # the regime selection below a one-liner per regime.
         @always_inline
@@ -408,19 +374,14 @@ def grouped_matmul_nvfp4_dispatch[
         def _regime[
             mma_bn: Int,
             cta_group: Int,
-            stages_4096_7168: Optional[Int],
-            stages_7168_2048: Optional[Int],
-            stages_7168_256: Optional[Int],
+            stages: Optional[Int],
         ]() raises:
-            _dispatch_regime[
+            _launch_grouped_block_scaled[
                 transpose_b,
-                N,
-                K,
+                True,
                 mma_bn=mma_bn,
                 cta_group=cta_group,
-                stages_4096_7168=stages_4096_7168,
-                stages_7168_2048=stages_7168_2048,
-                stages_7168_256=stages_7168_256,
+                num_pipeline_stages=stages,
                 pdl_level=pdl_level,
                 fuse_swiglu=fuse_swiglu,
                 SwiGLUOutputT=SwiGLUOutputT,
@@ -450,9 +411,9 @@ def grouped_matmul_nvfp4_dispatch[
         # and stages differs from the regime-default classifier. All three
         # regimes converge on cta_group=2, stages=6; only mma_bn changes with
         # decode vs prefill. This path goes straight to
-        # `_launch_grouped_block_scaled` with an explicit stages=6 (NOT via
-        # `_regime`/`_dispatch_regime`, whose (N, K) stage table has no (512,
-        # 7168) row and would fall through to stages=auto).
+        # `_launch_grouped_block_scaled` with an explicit stages=6, since
+        # the two-way split it needs doesn't fit the three-regime rows
+        # `_regime` iterates.
         @always_inline
         @__parameter
         def _launch512[mma_bn: Int, cta_group: Int]() raises:
@@ -498,36 +459,20 @@ def grouped_matmul_nvfp4_dispatch[
             # `if avg <= D / elif avg <= S / else` cascade exactly: the
             # decode row (upper=DECODE_AVG_M) wins first, else small-prefill
             # (upper=SMALL_PREFILL_AVG_M), else the unbounded large-prefill
-            # row. Per-(N, K) tuned stages travel in each row, identical to
-            # the prior explicit arms.
-            #
-            # (N=7168, K=2048) down-proj decode (mma_bn=8, cta_group=1):
-            # B200 ablation (bench_grouped_matmul) shows stages 4->6 is a
-            # no-regret win that grows with the active expert count: ~0%
-            # at 8 active experts (grid too small to benefit), +11% at 12,
-            # +5% at 16. The down-proj has only 8 K-iters (K=2048), so the
-            # deeper pipeline overlaps cold-weight loads under more
-            # concurrent CTAs as the grid widens; up-proj (s_4096_7168) is
-            # already optimal at 6.
+            # row. The row's `upper_avg_m` doubles as the regime key into
+            # `NVFP4_TUNED_STAGES`, so a new tuned shape is one table row
+            # there and nothing here.
             comptime regimes = [
-                # (upper_avg_m, mma_bn, cta_group, s_4096_7168, s_7168_2048,
-                #  s_7168_256). upper_avg_m < 0 = unbounded (large prefill).
-                (DECODE_AVG_M, 8, 1, 6, 6, -1),
-                (SMALL_PREFILL_AVG_M, 64, 2, 6, 6, -1),
-                (-1, 128, 2, 7, 6, 6),
+                # (upper_avg_m, mma_bn, cta_group). upper_avg_m < 0 =
+                # unbounded (large prefill).
+                (DECODE_AVG_M, 8, 1),
+                (SMALL_PREFILL_AVG_M, 64, 2),
+                (-1, 128, 2),
             ]
             comptime for r in regimes:
-                comptime _s0 = Optional[Int](r[3]) if r[3] >= 0 else Optional[
-                    Int
-                ](None)
-                comptime _s1 = Optional[Int](r[4]) if r[4] >= 0 else Optional[
-                    Int
-                ](None)
-                comptime _s2 = Optional[Int](r[5]) if r[5] >= 0 else Optional[
-                    Int
-                ](None)
+                comptime _stages = _tuned_stages[N, K, r[0]]()
                 if r[0] < 0 or estimated_total_m <= num_active_experts * r[0]:
-                    _regime[r[1], r[2], _s0, _s1, _s2]()
+                    _regime[r[1], r[2], _stages]()
                     return
 
 
