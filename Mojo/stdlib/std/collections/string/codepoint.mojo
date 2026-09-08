@@ -24,21 +24,7 @@ from std.bit import count_leading_zeros
 from std.bit.mask import splat
 import std.format._utils as fmt
 from std.os import abort
-
-
-@always_inline
-def _is_unicode_scalar_value(codepoint: UInt32) -> Bool:
-    """Returns True if `codepoint` is a valid Unicode scalar value.
-
-    Args:
-        codepoint: The codepoint integer value to check.
-
-    Returns:
-        True if `codepoint` is a valid Unicode scalar value; False otherwise.
-    """
-    return codepoint <= 0xD7FF or (
-        codepoint >= 0xE000 and codepoint <= 0x10FFFF
-    )
+from std.collections.string._unicode import _is_unicode_scalar_value
 
 
 struct Codepoint(Comparable, ImplicitlyCopyable, Intable, Movable, Writable):
