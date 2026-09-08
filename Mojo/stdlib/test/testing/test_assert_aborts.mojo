@@ -68,5 +68,18 @@ def test_raises_when_closure_does_not_abort_in_time() raises:
         _assert_aborts(hangs, timeout=0.5)
 
 
+def test_distinguishes_iterations_of_the_same_loop() raises:
+    for name in [
+        "assert_aborts self-test: loop case 0",
+        "assert_aborts self-test: loop case 1",
+        "assert_aborts self-test: loop case 2",
+    ]:
+
+        def aborts() {imm}:
+            abort(name)
+
+        _assert_aborts(aborts, contains=name)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
