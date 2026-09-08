@@ -157,7 +157,7 @@ auto mlirLoc = emitter.shared.translateLocation(getLoc());
 if (auto fileLineColLoc = dyn_cast<mlir::FileLineColLoc>(mlirLoc)) {
   if (fileLineColLoc.getFilename().str().find("zork.mojo") != std::string::npos &&
       fileLineColLoc.getLine() == 3) {
-    waitForDebuggerToAttach(); // Like a breakpoint, pauses the debugger
+    attachToNewRemoteDebugSession(); // Like a breakpoint, starts a debug session that attaches to the program
   }
 }
 ```
