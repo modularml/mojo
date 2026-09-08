@@ -138,7 +138,7 @@ There are several ways to run debugger on Mojo's tools:
   debugger on `<tool>` with `<options>`. For example:
 
 ```bash
-  bd --config=debug-modular --gdb KGEN/tools/mojo -- build \
+  bd --config=debug-modular --gdb Mojo/tools/mojo -- build \
               --target-accelerator="amdgpu:gfx942" test.mojo
 ```
 
